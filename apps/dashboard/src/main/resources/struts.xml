@@ -1,0 +1,311 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE struts PUBLIC
+        "-//Apache Software Foundation//DTD Struts Configuration 2.3//EN"
+        "http://struts.apache.org/dtds/struts-2.3.dtd">
+<struts>
+    <constant name="struts.devMode" value="true"></constant>
+    <constant name="struts.enable.SlashesInActionNames" value="true"/>
+    <constant name="struts.mapper.alwaysSelectFullNamespace" value="false"/>
+
+    <package name="user" namespace="" extends="struts-default, json-default">
+        <default-action-ref name="home" />
+
+        <action name="home" class="com.akto.action.HomeAction">
+            <result name="SUCCESS">/pages/login.jsp</result>
+        </action>
+
+        <action name="auth/login" class="com.akto.action.LoginAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+            <result name="VALIDATION_REQUIRED" type="httpheader">
+                <param name="status">423</param>
+            </result>
+        </action>
+
+        <action name="auth/accessToken" class="com.akto.action.AccessTokenAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/me" class="com.akto.action.ProfileAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/saveSubscription" method="saveSubscription" class="com.akto.action.ProfileAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="root">subscription</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="validate" class="com.akto.action.ValidateEmailAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">477</param>
+            </result>
+            <result name="VALIDATED" type="httpheader">
+                <param name="status">424</param>
+            </result>
+        </action>
+
+        <action name="api/createNewTeam" class="com.akto.action.TeamAction" method="saveNewTeam">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/createNewAccount" class="com.akto.action.AccountAction" method="createNewAccount">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/goToAccount" class="com.akto.action.AccountAction" method="goToAccount">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="root">newAccountId</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/googleConfig" class="com.akto.action.tpi.GoogleAuthAction" method="retrieveGoogleConfig">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="root">googleConfigResult</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/sendGoogleAuthCodeToServer" class="com.akto.action.tpi.GoogleAuthAction" method="sendGoogleAuthCodeToServer">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/getDriveNames" class="com.akto.action.tpi.GoogleAuthAction" method="fetchDriveNames">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+                <param name="root">driveNamesToThirdPartyId</param>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/getSpreadsheets" class="com.akto.action.tpi.GoogleAuthAction" method="fetchSpreadsheets">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/fetchWorksheetsFromSheet" class="com.akto.action.tpi.GoogleAuthAction" method="fetchWorksheetsFromSheet">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/fetchDataFromWorksheet" class="com.akto.action.tpi.GoogleAuthAction" method="fetchDataFromWorksheet">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+
+
+        <action name="api/getTeamData" class="com.akto.action.TeamAction" method="fetchTeamData">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="signup-slack" class="com.akto.action.SignupAction" method="registerViaSlack">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="signup-google" class="com.akto.action.SignupAction" method="registerViaGoogle">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+        <action name="signup-email" class="com.akto.action.SignupAction" method="registerViaEmail">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="root">code</param>
+            </result>
+        </action>
+
+        <action name="setup/add-signup-info" class="com.akto.action.SignupAction" method="addSignupInfo">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">shouldLogin</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/saveContentAndFetchAuditResults" class="com.akto.action.AuditAction" method="saveContentAndFetchAuditResults">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">auditResult</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/fetchAuditResults" class="com.akto.action.AuditAction" method="fetchAuditResults">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">auditResult</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/saveTestConfig" class="com.akto.action.AuditAction" method="saveTestConfig">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">testConfigId</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/fetchTestResults" class="com.akto.action.AuditAction" method="fetchTestResults">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">testConfigId</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/getAPICatalog" class="com.akto.action.APICatalogAction" method="getAPICatalog">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">apiCatalogData</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+
+        <action name="api/getAPICollection" class="com.akto.action.observe.InventoryAction" method="getAPICollection">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+
+        <action name="api/getAllUrlsAndMethods" class="com.akto.action.observe.InventoryAction" method="getAllUrlsAndMethods">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="middleware/config" class="com.akto.action.MiddlewareConfigAction" method="getMiddlewareConfig">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/addSensitiveField" class="com.akto.action.SensitiveFieldAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+
+    </package>
+
+</struts>

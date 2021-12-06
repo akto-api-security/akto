@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.akto</groupId>
+        <artifactId>root</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <groupId>com.akto.apps</groupId>
+    <artifactId>apps</artifactId>
+    <packaging>pom</packaging>
+
+    <profiles>
+        <profile>
+            <id>dashboard</id>
+            <activation>
+                <file>
+                    <exists>dashboard/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>dashboard</module>
+            </modules>
+        </profile>
+        <profile>
+            <id>api-runtime</id>
+            <activation>
+                <file>
+                    <exists>api-runtime/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>api-runtime</module>
+            </modules>
+        </profile>
+    </profiles>
+</project>
+

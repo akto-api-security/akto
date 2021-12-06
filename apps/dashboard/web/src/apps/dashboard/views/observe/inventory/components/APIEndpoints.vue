@@ -1,0 +1,146 @@
+<template>
+    <div class="pt-4 pr-4">
+        <div class="d-flex">
+            <count-box title="Sensitive Endpoints" :count="sensitiveEndpoints.length" colorTitle="Overdue"/>
+            <count-box title="Shadow Endpoints" :count="shadowEndpoints.length" colorTitle="Pending"/>
+            <count-box title="Unused Endpoints" :count="unusedEndpoints.length" colorTitle="This week"/>
+            <count-box title="All Endpoints" :count="allEndpoints.length" colorTitle="Total"/>
+        </div>    
+
+        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Shadow', 'Unused']">
+            <template slot="All">
+                <simple-table :headers=tableHeaders :items=allEndpoints @rowClicked=rowClicked name="All" />
+            </template>
+            <template slot="Sensitive">
+                <simple-table :headers=tableHeaders :items=sensitiveEndpoints @rowClicked=rowClicked name="Sensitive"/>
+            </template>
+            <template slot="Shadow">
+                <simple-table :headers=tableHeaders :items=shadowEndpoints @rowClicked=rowClicked name="Shadow" />
+            </template>
+            <template slot="Unused">
+                <simple-table :headers=unusedHeaders :items=unusedEndpoints name="Unused"/>
+            </template>
+        </layout-with-tabs>
+
+    </div>
+</template>
+
+<script>
+import CountBox from '@/apps/dashboard/shared/components/CountBox'
+import { mapState } from 'vuex'
+import func from "@/util/func"
+import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
+import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
+import api from '../api'
+
+export default {
+    name: "ApiEndpoints",
+    components: { 
+        CountBox, 
+        LayoutWithTabs,
+        SimpleTable
+    },
+    data() {
+        return {
+            tableHeaders: [
+                {
+                    text: '',
+                    value: 'color'
+                },
+                {
+                    text: 'Endpoint',
+                    value: 'endpoint'
+                },
+                {
+                    text: 'Method',
+                    value: 'method'
+                },
+                {
+                    text: 'Sensitive Params',
+                    value: 'sensitive'
+                },
+                {
+                    text: 'Added',
+                    value: 'added'
+                },
+                {
+                    text: 'Changes',
+                    value: 'changes'
+                }
+            ],
+            unusedHeaders: [
+                {
+                    text: '',
+                    value: 'color'
+                },                
+                {
+                    text: 'Endpoint',
+                    value: 'endpoint'
+                },
+                {
+                    text: 'Method',
+                    value: 'method'
+                }
+            ],
+            documentedURLs: {}
+        }
+    },
+    methods: {
+        rowClicked(row) {
+            this.$emit('selected', row.endpoint + " " + row.method)
+        },
+        groupByEndpoint(listParams) {
+            func.groupByEndpoint(listParams)
+        },
+        prettifyDate(ts) {
+            if (ts)
+                return func.prettifyEpoch(ts)
+            else
+                return '-'
+        },
+        isShadow(x) {
+            return !(this.documentedURLs[x.endpoint] && this.documentedURLs[x.endpoint].indexOf(x.method) != -1)
+        },
+        isUnused(url, method) {
+            return this.allEndpoints.filter(e => e.endpoint === url && e.method == method).length == 0
+        }
+    },
+    computed: {
+        ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'apiCollectionId']),
+        allEndpoints () {
+            return func.groupByEndpoint(this.apiCollection)
+        },
+        sensitiveEndpoints() {
+            return func.groupByEndpoint(this.apiCollection).filter(x => x.sensitive > 0)
+        },
+        shadowEndpoints () {
+            return func.groupByEndpoint(this.apiCollection).filter(x => this.isShadow(x))
+        },
+        unusedEndpoints () {
+            let ret = []
+            Object.entries(this.documentedURLs).forEach(entry => {
+                let endpoint = entry[0]
+                entry[1].forEach(method => {
+                    if(this.isUnused(endpoint, method)) {
+                        ret.push({
+                            endpoint, 
+                            method,
+                            color: func.actionItemColors()["This week"]
+                        })
+                    }
+                })
+            })
+            return ret
+        }
+    },
+    mounted() {
+        api.getAllUrlsAndMethods(this.apiCollectionId).then(resp => {
+            this.documentedURLs = resp.data
+        })
+    }
+
+}
+</script>
+
+<style lang="sass" scoped>
+</style>
