@@ -12,10 +12,22 @@
         </a-card>
         <layout-with-tabs title="" :tabs="['New endpoints', 'New parameters']">
             <template slot="New endpoints">
-                <simple-table :headers="endpointHeaders" :items="newEndpoints" name="New endpoints" />
+                <simple-table 
+                    :headers="endpointHeaders" 
+                    :items="newEndpoints" 
+                    name="New endpoints" 
+                    sortKeyDefault="detectedTs" 
+                    :sortDescDefault="true" 
+                />
             </template>
             <template slot="New parameters">
-                <simple-table :headers="parameterHeaders" :items="newParameters" name="New parameters" />
+                <simple-table 
+                    :headers="parameterHeaders" 
+                    :items="newParameters" 
+                    name="New parameters" 
+                    sortKeyDefault="detectedTs" 
+                    :sortDescDefault="true"
+                />
             </template>
         </layout-with-tabs>
     </div>    
@@ -107,7 +119,8 @@ export default {
                 method: x.method,
                 added: func.prettifyEpoch(x.timestamp),
                 location: (x.responseCode == -1 ? 'Request' : 'Response') + ' ' + (x.isHeader ? 'headers' : 'payload'),
-                type: x.subType
+                type: x.subType,
+                detectedTs: x.timestamp
             }
         }        
     },

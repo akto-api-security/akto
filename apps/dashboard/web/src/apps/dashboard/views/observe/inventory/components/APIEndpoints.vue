@@ -9,16 +9,38 @@
 
         <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Shadow', 'Unused']">
             <template slot="All">
-                <simple-table :headers=tableHeaders :items=allEndpoints @rowClicked=rowClicked name="All" />
+                <simple-table 
+                    :headers=tableHeaders 
+                    :items=allEndpoints 
+                    @rowClicked=rowClicked 
+                    name="All" 
+                    sortKeyDefault="sensitive" 
+                    :sortDescDefault="true"
+                />
             </template>
             <template slot="Sensitive">
-                <simple-table :headers=tableHeaders :items=sensitiveEndpoints @rowClicked=rowClicked name="Sensitive"/>
+                <simple-table 
+                    :headers=tableHeaders 
+                    :items=sensitiveEndpoints 
+                    @rowClicked=rowClicked name="Sensitive"
+                />
             </template>
             <template slot="Shadow">
-                <simple-table :headers=tableHeaders :items=shadowEndpoints @rowClicked=rowClicked name="Shadow" />
+                <simple-table 
+                    :headers=tableHeaders 
+                    :items=shadowEndpoints 
+                    @rowClicked=rowClicked 
+                    name="Shadow"  
+                    sortKeyDefault="sensitive" 
+                    :sortDescDefault="true"
+                />
             </template>
             <template slot="Unused">
-                <simple-table :headers=unusedHeaders :items=unusedEndpoints name="Unused"/>
+                <simple-table 
+                    :headers=unusedHeaders 
+                    :items=unusedEndpoints 
+                    name="Unused"
+                />
             </template>
         </layout-with-tabs>
 
