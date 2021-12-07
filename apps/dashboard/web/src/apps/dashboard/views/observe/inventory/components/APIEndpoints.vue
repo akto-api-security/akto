@@ -29,6 +29,7 @@
 import CountBox from '@/apps/dashboard/shared/components/CountBox'
 import { mapState } from 'vuex'
 import func from "@/util/func"
+import constants from '@/util/constants'
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import api from '../api'
@@ -60,7 +61,7 @@ export default {
                     value: 'sensitive'
                 },
                 {
-                    text: 'Added',
+                    text: constants.DISCOVERED,
                     value: 'added'
                 },
                 {

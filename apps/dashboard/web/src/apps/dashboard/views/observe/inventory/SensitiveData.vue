@@ -27,6 +27,7 @@ import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import SensitiveParamsCard from './components/SensitiveParamsCard'
 import { mapState } from 'vuex'
 import func from '@/util/func'
+import constants from '@/util/constants'
 import SimpleLayout from '@/apps/dashboard/layouts/SimpleLayout'
 
 export default {
@@ -63,7 +64,7 @@ export default {
                     value: 'method'
                 },
                 {
-                    text: 'Added',
+                    text: constants.DISCOVERED,
                     value: 'added'
                 },
                 {

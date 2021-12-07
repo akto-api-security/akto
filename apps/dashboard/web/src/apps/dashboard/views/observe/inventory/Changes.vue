@@ -29,6 +29,7 @@ import CountBox from '@/apps/dashboard/shared/components/CountBox'
 import LineChart from '@/apps/dashboard/shared/components/LineChart'
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import func from '@/util/func'
+import constants from '@/util/constants'
 import {mapState} from 'vuex'
 
 export default {
@@ -61,7 +62,7 @@ export default {
                     value: 'sensitive'
                 },
                 {
-                    text: 'Added',
+                    text: constants.DISCOVERED,
                     value: 'added'
                 }
             ],
@@ -91,7 +92,7 @@ export default {
                     value: 'location'
                 },
                 {
-                    text: 'Added',
+                    text: constants.DISCOVERED,
                     value: 'added'
                 }
             ]
