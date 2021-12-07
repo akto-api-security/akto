@@ -114,19 +114,19 @@ export default {
         ...mapState('inventory', ['apiCollection']),
         newEndpoints() {
             let now = func.timeNow()
-            return func.groupByEndpoint(this.apiCollection).filter(x => x.detectedTs > now - 15*24*60*60)
+            return func.groupByEndpoint(this.apiCollection).filter(x => x.detectedTs > now - func.recencyPeriod)
         },
         newParameters() {
             let now = func.timeNow()
-            return this.apiCollection.filter(x => x.timestamp > now - 15*24*60*60).map(this.prepareItemForTable)
+            return this.apiCollection.filter(x => x.timestamp > now - func.recencyPeriod).map(this.prepareItemForTable)
         },
         newSensitiveEndpoints() {
             let now = func.timeNow()
-            return func.groupByEndpoint(this.apiCollection).filter(x => x.detectedTs > now - 15*24*60*60 && x.sensitive > 0)
+            return func.groupByEndpoint(this.apiCollection).filter(x => x.detectedTs > now - func.recencyPeriod && x.sensitive > 0)
         },
         newSensitiveParameters() {
             let now = func.timeNow()
-            return this.apiCollection.filter(x => x.timestamp > now - 15*24*60*60 && func.isSubTypeSensitive(x.subType)).map(this.prepareItemForTable)
+            return this.apiCollection.filter(x => x.timestamp > now - func.recencyPeriod && func.isSubTypeSensitive(x.subType)).map(this.prepareItemForTable)
         },
     },
     mounted() {

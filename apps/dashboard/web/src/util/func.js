@@ -331,7 +331,7 @@ export default {
 
             let now = this.timeNow()
 
-            if ((now - x.timestamp) < 14 * 24 * 60 * 60) {
+            if ((now - x.timestamp) < this.recencyPeriod) {
                 val.changesCount++
             }
 
@@ -350,5 +350,6 @@ export default {
         })
 
         return Object.values(ret)        
-    }    
+    },
+    recencyPeriod: 60 * 24 * 60 * 60 
 }
