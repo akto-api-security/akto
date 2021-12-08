@@ -6,6 +6,7 @@
         class="board-table-cards keep-scrolling"
         :search="search"
         :sort-by="sortKey"
+        :sort-desc="sortDesc"
         :items-per-page="-1"
         hide-default-footer
         hide-default-header>
@@ -60,12 +61,15 @@ export default {
     props: {
         headers: obj.arrR,
         items: obj.arrR,
-        name: obj.strN
+        name: obj.strN,
+        sortKeyDefault: obj.strN,
+        sortDescDefault: obj.boolN
     },
     data () {
         return {
             search: null,
-            sortKey: null
+            sortKey: this.sortKeyDefault || null,
+            sortDesc: this.sortDescDefault || false
         }
     },
     methods: {
