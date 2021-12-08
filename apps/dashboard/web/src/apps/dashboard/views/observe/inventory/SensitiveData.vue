@@ -27,6 +27,7 @@ import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import SensitiveParamsCard from './components/SensitiveParamsCard'
 import { mapState } from 'vuex'
 import func from '@/util/func'
+import constants from '@/util/constants'
 import SimpleLayout from '@/apps/dashboard/layouts/SimpleLayout'
 
 export default {
@@ -63,7 +64,7 @@ export default {
                     value: 'method'
                 },
                 {
-                    text: 'Added',
+                    text: constants.DISCOVERED,
                     value: 'added'
                 },
                 {
@@ -125,7 +126,7 @@ export default {
         },
         newSensitiveParams() {
            let now = func.timeNow()
-           return this.apiCollection.filter(x => func.isSubTypeSensitive(x.subType) && x.timestamp > (now - 15 * 24 * 60 * 60))
+           return this.apiCollection.filter(x => func.isSubTypeSensitive(x.subType) && x.timestamp > (now - func.recencyPeriod))
         }              
     },
     mounted() {

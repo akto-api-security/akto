@@ -12,10 +12,22 @@
         </a-card>
         <layout-with-tabs title="" :tabs="['New endpoints', 'New parameters']">
             <template slot="New endpoints">
-                <simple-table :headers="endpointHeaders" :items="newEndpoints" name="New endpoints" />
+                <simple-table 
+                    :headers="endpointHeaders" 
+                    :items="newEndpoints" 
+                    name="New endpoints" 
+                    sortKeyDefault="detectedTs" 
+                    :sortDescDefault="true" 
+                />
             </template>
             <template slot="New parameters">
-                <simple-table :headers="parameterHeaders" :items="newParameters" name="New parameters" />
+                <simple-table 
+                    :headers="parameterHeaders" 
+                    :items="newParameters" 
+                    name="New parameters" 
+                    sortKeyDefault="detectedTs" 
+                    :sortDescDefault="true"
+                />
             </template>
         </layout-with-tabs>
     </div>    
@@ -29,6 +41,7 @@ import CountBox from '@/apps/dashboard/shared/components/CountBox'
 import LineChart from '@/apps/dashboard/shared/components/LineChart'
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import func from '@/util/func'
+import constants from '@/util/constants'
 import {mapState} from 'vuex'
 
 export default {
@@ -61,7 +74,7 @@ export default {
                     value: 'sensitive'
                 },
                 {
-                    text: 'Added',
+                    text: constants.DISCOVERED,
                     value: 'added'
                 }
             ],
@@ -91,7 +104,7 @@ export default {
                     value: 'location'
                 },
                 {
-                    text: 'Added',
+                    text: constants.DISCOVERED,
                     value: 'added'
                 }
             ]
@@ -106,7 +119,8 @@ export default {
                 method: x.method,
                 added: func.prettifyEpoch(x.timestamp),
                 location: (x.responseCode == -1 ? 'Request' : 'Response') + ' ' + (x.isHeader ? 'headers' : 'payload'),
-                type: x.subType
+                type: x.subType,
+                detectedTs: x.timestamp
             }
         }        
     },
@@ -114,19 +128,19 @@ export default {
         ...mapState('inventory', ['apiCollection']),
         newEndpoints() {
             let now = func.timeNow()
-            return func.groupByEndpoint(this.apiCollection).filter(x => x.detectedTs > now - 15*24*60*60)
+            return func.groupByEndpoint(this.apiCollection).filter(x => x.detectedTs > now - func.recencyPeriod)
         },
         newParameters() {
             let now = func.timeNow()
-            return this.apiCollection.filter(x => x.timestamp > now - 15*24*60*60).map(this.prepareItemForTable)
+            return this.apiCollection.filter(x => x.timestamp > now - func.recencyPeriod).map(this.prepareItemForTable)
         },
         newSensitiveEndpoints() {
             let now = func.timeNow()
-            return func.groupByEndpoint(this.apiCollection).filter(x => x.detectedTs > now - 15*24*60*60 && x.sensitive > 0)
+            return func.groupByEndpoint(this.apiCollection).filter(x => x.detectedTs > now - func.recencyPeriod && x.sensitive > 0)
         },
         newSensitiveParameters() {
             let now = func.timeNow()
-            return this.apiCollection.filter(x => x.timestamp > now - 15*24*60*60 && func.isSubTypeSensitive(x.subType)).map(this.prepareItemForTable)
+            return this.apiCollection.filter(x => x.timestamp > now - func.recencyPeriod && func.isSubTypeSensitive(x.subType)).map(this.prepareItemForTable)
         },
     },
     mounted() {

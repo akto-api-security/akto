@@ -37,6 +37,10 @@ export default {
         type: Array,
         required: false
     },
+    boolN: {
+        type: Boolean,
+        required: false
+    },
 
     overviewChartOpts: {
         legend: {

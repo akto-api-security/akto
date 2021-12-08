@@ -14,10 +14,22 @@
         </v-row>
         <layout-with-tabs :tabs="['Request', 'Response']">
             <template slot="Request">
-                <simple-table :headers="headers" :items="requestItems" name="Request"/>
+                <simple-table 
+                    :headers="headers" 
+                    :items="requestItems" 
+                    name="Request" 
+                    sortKeyDefault="sensitive" 
+                    :sortDescDefault="true"
+                />
             </template>
             <template slot="Response">
-                <simple-table :headers="headers" :items="responseItems"  name="Response"/>
+                <simple-table 
+                    :headers="headers" 
+                    :items="responseItems"  
+                    name="Response" 
+                    sortKeyDefault="sensitive" 
+                    :sortDescDefault="true"
+                />
             </template>
         </layout-with-tabs>
     </div>    
