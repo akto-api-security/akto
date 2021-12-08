@@ -82,10 +82,7 @@ public class APICatalogSync {
                 BasicDBObject payload = BasicDBObject.parse(reqPayload);
                 payload.putAll(queryParams.toMap());
                 deletedInfo.addAll(requestTemplate.process2(payload, baseURL, methodStr, -1, userId));
-            } else {
-                return;
             }
-
         }
 
         Map<Integer, RequestTemplate> responseTemplates = requestTemplate.getResponseTemplates();
