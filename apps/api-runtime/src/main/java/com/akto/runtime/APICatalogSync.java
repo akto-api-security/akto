@@ -57,7 +57,11 @@ public class APICatalogSync {
     public void processResponse(URLMethods urlMethods, Collection<HttpResponseParams> responses, List<SingleTypeInfo> deletedInfo) {
         Iterator<HttpResponseParams> iter = responses.iterator();
         while(iter.hasNext()) {
-            processResponse(urlMethods, iter.next(), deletedInfo);
+            try {
+                processResponse(urlMethods, iter.next(), deletedInfo);
+            } catch (Exception e) {
+                // eat all
+            }
         }
     }
 
