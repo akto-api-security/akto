@@ -158,7 +158,7 @@ export default {
     },
     mounted() {
         api.getAllUrlsAndMethods(this.apiCollectionId).then(resp => {
-            this.documentedURLs = resp.data
+            this.documentedURLs = resp.data || {}
         })
     }
 
