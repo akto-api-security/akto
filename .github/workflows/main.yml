@@ -33,6 +33,7 @@ jobs:
       - uses: actions/setup-node@v2
         with:
           node-version: '17'
-      - run: npm install
-      - run: npm run build
+      - name: Prepare Dashboard UI
+        working-directory: ./apps/dashboard/
+        run: npm install && npm run build
       - run: mvn package

@@ -14,9 +14,12 @@ import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Main {
     private Consumer<String, String> consumer;
+    private static final Logger logger = LoggerFactory.getLogger(HttpCallParser.class);
 
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
@@ -36,9 +39,7 @@ public class Main {
         APIConfig apiConfig;
         apiConfig = APIConfigsDao.instance.findOne(Filters.eq("name", configName));
         if (apiConfig == null) {
-            apiConfig = new APIConfig(configName,"access-token", 1, 2, 60);
-            // TODO: remove
-            APIConfigsDao.instance.insertOne(apiConfig);
+            apiConfig = new APIConfig(configName,"access-token", 5, 1000, 60);
         }
 
         final Main main = new Main();
@@ -72,13 +73,9 @@ public class Main {
                 for (ConsumerRecord<String,String> r: records) {
                     HttpCallParser.HttpResponseParams httpResponseParams;
                     try {
-                         System.out.println("*****");
-                         System.out.println(r.value());
                          httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
-                         System.out.println(httpResponseParams.getRequestParams().getURL());
-                         System.out.println("*****");
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        logger.info("Error while parsing kafka message " + e);
                         continue;
                     }
                     String accountId = httpResponseParams.getAccountId();
@@ -94,6 +91,7 @@ public class Main {
                         accountIdInt = Integer.parseInt(accountId);
                     } catch (Exception ignored) {
                         // TODO:
+                        logger.info("Account id not string");
                         continue;
                     }
 
@@ -131,7 +129,7 @@ public class Main {
                 }
 
                 for (TopicPartition tp: main.consumer.assignment()) {
-                    System.out.println("Committing offset at position: " + main.consumer.position(tp) + " for partition " + tp.partition());
+                    logger.info("Committing offset at position: " + main.consumer.position(tp) + " for partition " + tp.partition());
                 }
 
                 main.consumer.commitSync();
