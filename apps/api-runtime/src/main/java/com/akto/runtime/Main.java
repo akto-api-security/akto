@@ -18,6 +18,14 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 public class Main {
     private Consumer<String, String> consumer;
 
+    private static int debugPrintCounter = 500;
+    private static void printL(Object o) {
+        if (debugPrintCounter > 0) {
+            debugPrintCounter--;
+            System.out.println(o);
+        }
+    }   
+
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
@@ -72,11 +80,10 @@ public class Main {
                 for (ConsumerRecord<String,String> r: records) {
                     HttpCallParser.HttpResponseParams httpResponseParams;
                     try {
-                         System.out.println("*****");
-                         System.out.println(r.value());
-                         httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
-                         System.out.println(httpResponseParams.getRequestParams().getURL());
-                         System.out.println("*****");
+                         
+                        printL(r.value());
+                        httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
+                         
                     } catch (Exception e) {
                         e.printStackTrace();
                         continue;
@@ -131,7 +138,10 @@ public class Main {
                 }
 
                 for (TopicPartition tp: main.consumer.assignment()) {
-                    System.out.println("Committing offset at position: " + main.consumer.position(tp) + " for partition " + tp.partition());
+                    long position = main.consumer.position(tp);
+                    if (position < 100 || position % 100 == 0) {
+                        System.out.println("Committing offset at position: " + main.consumer.position(tp) + " for partition " + tp.partition());
+                    }
                 }
 
                 main.consumer.commitSync();
@@ -140,14 +150,10 @@ public class Main {
         } catch (WakeupException ignored) {
           // nothing to catch. This exception is called from the shutdown hook.
         } catch (Exception e) {
-            System.out.println("************");
-            System.out.println(e);
-            System.out.println("************");
+            printL(e);
         } finally {
             main.consumer.close();
         }
-
-
     }
 
 
