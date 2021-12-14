@@ -23,6 +23,7 @@ import com.akto.runtime.URLAggregator;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -95,6 +96,13 @@ public class TestDump2 {
         return ret;
     }
 
+    public void assertEquals(int actual, int expected) {
+        Assertions.assertEquals(expected, actual);
+    }
+
+    public void assertEquals(String actual, String expected) {
+        Assertions.assertEquals(expected, actual);
+    }
 
     @Test
     public void testHappyPath() {
