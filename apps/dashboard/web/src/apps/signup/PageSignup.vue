@@ -110,7 +110,7 @@ export default {
       request({
         url: '/signup-email',
         method: 'post',
-        data: {email: this.formModel.username, password: this.formModel.password}
+        data: {email: this.formModel.username, password: this.formModel.password, invitationCode:window.SIGNUP_INVITATION_CODE}
       }).then((resp) => {
         if (resp && resp.indexOf("<")== -1) {
           window._AKTO.$emit('SHOW_SNACKBAR', {
