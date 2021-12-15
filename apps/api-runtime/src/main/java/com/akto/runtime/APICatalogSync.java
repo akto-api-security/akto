@@ -338,7 +338,7 @@ public class APICatalogSync {
                             delta.getStrictURLToMethods().remove(url);
                         }
 
-                        deletedInfo.addAll(removed.getAllTypeInfo());
+                        deletedInfo.addAll(removed.copy().getAllTypeInfo());
                         matchIterator.remove();
                     }
                 }
