@@ -223,14 +223,6 @@ public class TestDump2 {
 
         sync.computeDelta(aggr, true);
 
-        Map<String, URLMethods> urlMethodsMap = sync.getDelta().getStrictURLToMethods();
-        assertEquals(urlMethodsMap.size(), 1);
-
-        URLMethods urlMethods = urlMethodsMap.get(resp.getRequestParams().url);
-        
-        RequestTemplate reqTemplate = urlMethods.getMethodToRequestTemplate().get(Method.valueOf(resp.getRequestParams().method));
-        assertNotNull(reqTemplate);
-
         Map<URLTemplate, URLMethods> urlTemplateMap = sync.getDelta().getTemplateURLToMethods();
 
         assertEquals(urlTemplateMap.size(), 1);
@@ -239,13 +231,13 @@ public class TestDump2 {
 
         assertEquals(entry.getKey().getTemplateString(), url+"INTEGER");
 
-        reqTemplate = entry.getValue().getMethodToRequestTemplate().get(Method.POST);
+        RequestTemplate reqTemplate = entry.getValue().getMethodToRequestTemplate().get(Method.POST);
 
-        assertEquals(reqTemplate.getUserIds().size(), 29);
+        assertEquals(reqTemplate.getUserIds().size(), 30);
         assertEquals(reqTemplate.getParameters().size(), 2);
         
         RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
-        assertEquals(respTemplate.getUserIds().size(), 29);
+        assertEquals(respTemplate.getUserIds().size(), 30);
         assertEquals(respTemplate.getParameters().size(), 3);
     }
 

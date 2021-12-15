@@ -323,22 +323,30 @@ public class APICatalogSync {
                 methodToTemplate.put(method, newTemplate);
                 delta.getTemplateURLToMethods().put(sample, new URLMethods(methodToTemplate));
 
+                Iterator<Map.Entry<String, URLMethods>> strictURLIterator = delta.getStrictURLToMethods().entrySet().iterator();
+
+                while(strictURLIterator.hasNext()) {
+                    Map.Entry<String, URLMethods> urlAndMethods = strictURLIterator.next();
+                    if (sample.match(urlAndMethods.getKey())) {
+                        Map<Method, RequestTemplate> strictMethods = urlAndMethods.getValue().getMethodToRequestTemplate();
+
+                        if (strictMethods != null && strictMethods.containsKey(method)) {
+                            newTemplate.mergeFrom(strictMethods.get(method));
+                            RequestTemplate removed = strictMethods.remove(method);
+                            if (strictMethods.size() == 0) {
+                                logger.info("Removing completely" + urlAndMethods.getKey());
+                                strictURLIterator.remove();
+                            }
+                            deletedInfo.addAll(removed.copy().getAllTypeInfo());
+                        }
+                    }
+                }
+
                 Iterator<Map.Entry<String, RequestTemplate>> matchIterator = origUrls.entrySet().iterator();
                 while(matchIterator.hasNext()) {
                     Map.Entry<String, RequestTemplate> matchingUrlAndTemplate = matchIterator.next();
                     String url = matchingUrlAndTemplate.getKey();
                     if (sample.match(url)) {
-                        logger.info("Removing" + url + " " + method);
-
-                        URLMethods urlMethods = delta.getStrictURLToMethods().get(url);
-                        newTemplate.mergeFrom(urlMethods.getMethodToRequestTemplate().get(method));
-                        RequestTemplate removed = urlMethods.getMethodToRequestTemplate().remove(method);
-                        if (urlMethods.getMethodToRequestTemplate().size() == 0) {
-                            logger.info("Removing completely" + url);
-                            delta.getStrictURLToMethods().remove(url);
-                        }
-
-                        deletedInfo.addAll(removed.copy().getAllTypeInfo());
                         matchIterator.remove();
                     }
                 }
