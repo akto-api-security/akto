@@ -23,6 +23,7 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.parsers.HttpCallParser;
 import com.akto.parsers.HttpCallParser.HttpResponseParams;
 import com.mongodb.BasicDBObject;
+import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.DeleteOneModel;
 import com.mongodb.client.model.DeleteOptions;
 import com.mongodb.client.model.Filters;
@@ -567,12 +568,16 @@ public class APICatalogSync {
     public void syncWithDB() {
         List<WriteModel<SingleTypeInfo>> writes = getDBUpdates();
 
+        logger.info("docs in mongo before writes: " + SingleTypeInfoDao.instance.getMCollection().countDocuments());
+
         logger.info("adding " + writes.size() + " updates");
 
         if (writes.size() > 0) {
-            SingleTypeInfoDao.instance.getMCollection().bulkWrite(writes);
+            BulkWriteResult res = SingleTypeInfoDao.instance.getMCollection().bulkWrite(writes);
+            logger.info("writes result: " + res.getDeletedCount() + " " + res.getInsertedCount() + " " + res.getMatchedCount() + " " + res.getModifiedCount());
         }
 
+        logger.info("docs in mongo after writes: " + SingleTypeInfoDao.instance.getMCollection().countDocuments());
         buildFromDB(1);
     }
 
