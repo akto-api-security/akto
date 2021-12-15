@@ -28,8 +28,12 @@ public class APICatalog {
             ret.addAll(urlMethods.getAllTypeInfo());
         }
 
-        for(URLMethods urlMethods: templateURLToMethods.values()) {
-            ret.addAll(urlMethods.getAllTypeInfo());
+        for(Map.Entry<URLTemplate, URLMethods> urlTemplateAndMethods: templateURLToMethods.entrySet()) {
+            List<SingleTypeInfo> singleTypeInfos = urlTemplateAndMethods.getValue().getAllTypeInfo();
+            for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
+                singleTypeInfo.setUrl(urlTemplateAndMethods.getKey().getTemplateString());
+            }
+            ret.addAll(singleTypeInfos);
         }
 
         return ret;

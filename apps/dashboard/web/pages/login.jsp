@@ -48,7 +48,7 @@ navigator.serviceWorker.register('/sw.js').then(function(reg) {
     window.ACCESS_TOKEN = '${accessToken}';
     // Enabling the debug mode flag is useful during implementation,
     // but it's recommended you remove it for production
-    mixpanel.init('c403d0b00353cc31d7e33d68dc778806', {debug: false}); 
+    mixpanel.init('c403d0b00353cc31d7e33d68dc778806', {debug: false, ignore_dnt:true}); 
    // mixpanel.track('Login');
     
 
