@@ -296,6 +296,9 @@ public class APICatalogSync {
                 removeMatchedUrls(method, urls);
             }
         }
+
+        logger.info("after removing matched urls: ");
+        delta.prettyPrint();
     }
 
     private void removeMatchedUrls(Method method, Map<String, RequestTemplate> origUrls) {
@@ -324,10 +327,13 @@ public class APICatalogSync {
                     Map.Entry<String, RequestTemplate> matchingUrlAndTemplate = matchIterator.next();
                     String url = matchingUrlAndTemplate.getKey();
                     if (sample.match(url)) {
+                        logger.info("Removing" + url + " " + method);
+
                         URLMethods urlMethods = delta.getStrictURLToMethods().get(url);
                         newTemplate.mergeFrom(urlMethods.getMethodToRequestTemplate().get(method));
                         RequestTemplate removed = urlMethods.getMethodToRequestTemplate().remove(method);
                         if (urlMethods.getMethodToRequestTemplate().size() == 0) {
+                            logger.info("Removing completely" + url);
                             delta.getStrictURLToMethods().remove(url);
                         }
 
