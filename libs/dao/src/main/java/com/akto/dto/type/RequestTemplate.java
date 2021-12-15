@@ -404,25 +404,34 @@ public class RequestTemplate {
             return false;
         }
 
-        RequestTemplate aResp = a.getResponseTemplates().get(200);
-        RequestTemplate bResp = b.getResponseTemplates().get(200);
+        for (int status: a.getResponseTemplates().keySet()) {
 
-        if (aResp == null || bResp == null) {
-            return false;
+            RequestTemplate aResp = a.getResponseTemplates().get(status);
+            RequestTemplate bResp = b.getResponseTemplates().get(status);
+
+            if (aResp == null || bResp == null) {
+                return false;
+            }
+
+            int aRespParamsCount = aResp.parameters.size() + aResp.headers.size();
+            int bRespParamsCount = bResp.parameters.size() + bResp.headers.size();
+
+            if (aRespParamsCount != bRespParamsCount) {
+                return false;
+            }
+
+            boolean areEqual = 
+                a.headers.keySet().equals(b.headers.keySet()) && 
+                a.parameters.keySet().equals(b.parameters.keySet()) &&
+                aResp.headers.keySet().equals(bResp.headers.keySet()) && 
+                aResp.parameters.keySet().equals(bResp.parameters.keySet());
+
+            if (!areEqual) {
+                return false;
+            }    
         }
 
-        int aRespParamsCount = aResp.parameters.size() + aResp.headers.size();
-        int bRespParamsCount = bResp.parameters.size() + bResp.headers.size();
-
-        if (aRespParamsCount != bRespParamsCount) {
-            return false;
-        }
-
-        return 
-            a.headers.keySet().equals(b.headers.keySet()) && 
-            a.parameters.keySet().equals(b.parameters.keySet()) &&
-            aResp.headers.keySet().equals(bResp.headers.keySet()) && 
-            aResp.parameters.keySet().equals(bResp.parameters.keySet());
+        return a.getResponseTemplates() != null && b.getResponseTemplates() != null;
     }
 
     public boolean compare(RequestTemplate that) {

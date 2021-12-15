@@ -173,7 +173,9 @@ public class APICatalogSync {
         int now = Context.now();
         if (now - tryGenerateURLsTimestamp > 60 * 5 || triggerTemplateGeneration) {
 
+            logger.info("trying to generate url template");
             tryGenerateURLsTimestamp = now;
+
             tryGenerateURLTemplates();
 
             iterator = aggregator.urls.entrySet().iterator();
@@ -300,28 +302,40 @@ public class APICatalogSync {
             Iterator<Map.Entry<String, RequestTemplate>> origUrlsIterator = origUrls.entrySet().iterator();
             Map.Entry<String, RequestTemplate> urlAndTemplate = origUrlsIterator.next();
             String[] sampleUrl = tokenize(urlAndTemplate.getKey());
+
             URLTemplate sample = new URLTemplate(sampleUrl, new SuperType[sampleUrl.length]);
             int count = tryPatternsHelper(sample, urlAndTemplate.getValue(), 0, origUrls, thresh);
-            
             if (count > thresh) {
+                logger.info("Merging in a single URL template" + sample.getTemplateString());
                 Map<Method, RequestTemplate> methodToTemplate = new HashMap<>();
                 RequestTemplate newTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>());
                 methodToTemplate.put(method, newTemplate);
                 delta.getTemplateURLToMethods().put(sample, new URLMethods(methodToTemplate));
+
+                Iterator<Map.Entry<String, URLMethods>> strictURLIterator = delta.getStrictURLToMethods().entrySet().iterator();
+
+                while(strictURLIterator.hasNext()) {
+                    Map.Entry<String, URLMethods> urlAndMethods = strictURLIterator.next();
+                    if (sample.match(urlAndMethods.getKey())) {
+                        Map<Method, RequestTemplate> strictMethods = urlAndMethods.getValue().getMethodToRequestTemplate();
+
+                        if (strictMethods != null && strictMethods.containsKey(method)) {
+                            newTemplate.mergeFrom(strictMethods.get(method));
+                            RequestTemplate removed = strictMethods.remove(method);
+                            if (strictMethods.size() == 0) {
+                                logger.info("Removing completely" + urlAndMethods.getKey());
+                                strictURLIterator.remove();
+                            }
+                            deletedInfo.addAll(removed.copy().getAllTypeInfo());
+                        }
+                    }
+                }
 
                 Iterator<Map.Entry<String, RequestTemplate>> matchIterator = origUrls.entrySet().iterator();
                 while(matchIterator.hasNext()) {
                     Map.Entry<String, RequestTemplate> matchingUrlAndTemplate = matchIterator.next();
                     String url = matchingUrlAndTemplate.getKey();
                     if (sample.match(url)) {
-                        URLMethods urlMethods = delta.getStrictURLToMethods().get(url);
-                        newTemplate.mergeFrom(urlMethods.getMethodToRequestTemplate().get(method));
-                        RequestTemplate removed = urlMethods.getMethodToRequestTemplate().remove(method);
-                        if (urlMethods.getMethodToRequestTemplate().size() == 0) {
-                            delta.getStrictURLToMethods().remove(url);
-                        }
-
-                        deletedInfo.addAll(removed.getAllTypeInfo());
                         matchIterator.remove();
                     }
                 }
@@ -413,8 +427,6 @@ public class APICatalogSync {
             if (oldTs == 0) {
                 update = Updates.combine(update, Updates.set("timestamp", now));
             }
-
-            logger.info("updating count={} for {}", inc, deltaInfo.composeKey());
 
             Bson updateKey = createFilters(deltaInfo);
 

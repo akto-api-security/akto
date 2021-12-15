@@ -2,6 +2,7 @@ package com.akto.parsers;
 
 import static org.junit.Assert.assertEquals;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -41,6 +42,9 @@ public class TestDBSync extends MongoBasedTest {
         String url = "/link/";
         HttpResponseParams resp = TestDump2.createSampleParams("user1", url+1);
         URLAggregator aggr = new URLAggregator();
+        ArrayList<String> newHeader = new ArrayList<>();
+        newHeader.add("hnew");
+        resp.headers.put("new header", newHeader);
         aggr.addURL(resp);
         APICatalogSync sync = new APICatalogSync("access-token", 5);
 
