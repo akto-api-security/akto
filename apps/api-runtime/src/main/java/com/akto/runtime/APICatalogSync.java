@@ -23,7 +23,6 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.parsers.HttpCallParser;
 import com.akto.parsers.HttpCallParser.HttpResponseParams;
 import com.mongodb.BasicDBObject;
-import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.DeleteOneModel;
 import com.mongodb.client.model.DeleteOptions;
 import com.mongodb.client.model.Filters;
@@ -172,12 +171,10 @@ public class APICatalogSync {
         }
 
         int now = Context.now();
-        if (now - tryGenerateURLsTimestamp > 60 || triggerTemplateGeneration) {
+        if (now - tryGenerateURLsTimestamp > 60 * 5 || triggerTemplateGeneration) {
 
             logger.info("trying to generate url template");
             tryGenerateURLsTimestamp = now;
-
-            this.delta.prettyPrint();
 
             tryGenerateURLTemplates();
 
@@ -297,9 +294,6 @@ public class APICatalogSync {
                 removeMatchedUrls(method, urls);
             }
         }
-
-        logger.info("after removing matched urls: ");
-        delta.prettyPrint();
     }
 
     private void removeMatchedUrls(Method method, Map<String, RequestTemplate> origUrls) {
@@ -309,13 +303,8 @@ public class APICatalogSync {
             Map.Entry<String, RequestTemplate> urlAndTemplate = origUrlsIterator.next();
             String[] sampleUrl = tokenize(urlAndTemplate.getKey());
 
-            logger.info("attempt to match - " + urlAndTemplate.getKey());
-
             URLTemplate sample = new URLTemplate(sampleUrl, new SuperType[sampleUrl.length]);
             int count = tryPatternsHelper(sample, urlAndTemplate.getValue(), 0, origUrls, thresh);
-            
-            logger.info("found " + count + " matches for " + urlAndTemplate.getKey());
-
             if (count > thresh) {
                 logger.info("Merging in a single URL template" + sample.getTemplateString());
                 Map<Method, RequestTemplate> methodToTemplate = new HashMap<>();
@@ -364,10 +353,8 @@ public class APICatalogSync {
     int tryPatternsHelper(URLTemplate urlTemplate, RequestTemplate requestTemplate, int index, Map<String, RequestTemplate> urls, int thresh) {
 
         if (index == urlTemplate.getTypes().length) {
-            logger.info("trying to match for: " + urlTemplate.getTemplateString());
             int count = 0;
             for(Map.Entry<String, RequestTemplate> entry: urls.entrySet()) {
-                logger.info("url: " + entry.getKey());
                 if (urlTemplate.match(tokenize(entry.getKey())) && requestTemplate.compare(entry.getValue())) {
                     count++;
 
@@ -440,8 +427,6 @@ public class APICatalogSync {
             if (oldTs == 0) {
                 update = Updates.combine(update, Updates.set("timestamp", now));
             }
-
-            logger.info("updating count={} for {}", inc, deltaInfo.composeKey());
 
             Bson updateKey = createFilters(deltaInfo);
 
@@ -576,16 +561,12 @@ public class APICatalogSync {
     public void syncWithDB() {
         List<WriteModel<SingleTypeInfo>> writes = getDBUpdates();
 
-        logger.info("docs in mongo before writes: " + SingleTypeInfoDao.instance.getMCollection().countDocuments());
-
         logger.info("adding " + writes.size() + " updates");
 
         if (writes.size() > 0) {
-            BulkWriteResult res = SingleTypeInfoDao.instance.getMCollection().bulkWrite(writes);
-            logger.info("writes result: " + res.getDeletedCount() + " " + res.getInsertedCount() + " " + res.getMatchedCount() + " " + res.getModifiedCount());
+            SingleTypeInfoDao.instance.getMCollection().bulkWrite(writes);
         }
 
-        logger.info("docs in mongo after writes: " + SingleTypeInfoDao.instance.getMCollection().countDocuments());
         buildFromDB(1);
     }
 

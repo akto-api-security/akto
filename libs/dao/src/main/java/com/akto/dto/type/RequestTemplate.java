@@ -400,9 +400,6 @@ public class RequestTemplate {
         int aReqParamsCount = a.headers.size() + a.parameters.size();
         int bReqParamsCount = b.headers.size() + b.parameters.size();
 
-
-        logger.info(aReqParamsCount + " " + bReqParamsCount );
-
         if (aReqParamsCount != bReqParamsCount) {
             return false;
         }
@@ -411,7 +408,6 @@ public class RequestTemplate {
 
             RequestTemplate aResp = a.getResponseTemplates().get(status);
             RequestTemplate bResp = b.getResponseTemplates().get(status);
-            logger.info(aResp + " " + bResp );
 
             if (aResp == null || bResp == null) {
                 return false;
@@ -419,15 +415,10 @@ public class RequestTemplate {
 
             int aRespParamsCount = aResp.parameters.size() + aResp.headers.size();
             int bRespParamsCount = bResp.parameters.size() + bResp.headers.size();
-            logger.info(aRespParamsCount + " " + bRespParamsCount);
 
             if (aRespParamsCount != bRespParamsCount) {
                 return false;
             }
-            logger.info(a.headers.keySet().size() + " " + b.headers.keySet().size());
-            logger.info(a.parameters.keySet().size() + " " + b.parameters.keySet().size());
-            logger.info(aResp.headers.keySet().size() + " " + bResp.headers.keySet().size());
-            logger.info(aResp.parameters.keySet().size() + " " + bResp.parameters.keySet().size());
 
             boolean areEqual = 
                 a.headers.keySet().equals(b.headers.keySet()) && 

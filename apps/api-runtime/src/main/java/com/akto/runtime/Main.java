@@ -47,7 +47,7 @@ public class Main {
         APIConfig apiConfig;
         apiConfig = APIConfigsDao.instance.findOne(Filters.eq("name", configName));
         if (apiConfig == null) {
-            apiConfig = new APIConfig(configName,"access-token", 5, 1000, 10);
+            apiConfig = new APIConfig(configName,"access-token", 5, 1000, 60);
         }
 
         final Main main = new Main();

@@ -71,13 +71,4 @@ public class APICatalog {
             ", templateURLToMethods='" + getTemplateURLToMethods() + "'" +
             "}";
     }
-
-    public void prettyPrint() {
-        for(SingleTypeInfo s: this.getAllTypeInfo()) {
-            System.out.println(s.toString());
-        }
-
-    }
-
-    
 }
