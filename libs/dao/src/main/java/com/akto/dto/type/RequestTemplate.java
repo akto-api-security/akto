@@ -400,29 +400,47 @@ public class RequestTemplate {
         int aReqParamsCount = a.headers.size() + a.parameters.size();
         int bReqParamsCount = b.headers.size() + b.parameters.size();
 
+
+        logger.info(aReqParamsCount + " " + bReqParamsCount );
+
         if (aReqParamsCount != bReqParamsCount) {
             return false;
         }
 
-        RequestTemplate aResp = a.getResponseTemplates().get(200);
-        RequestTemplate bResp = b.getResponseTemplates().get(200);
+        for (int status: a.getResponseTemplates().keySet()) {
 
-        if (aResp == null || bResp == null) {
-            return false;
+            RequestTemplate aResp = a.getResponseTemplates().get(status);
+            RequestTemplate bResp = b.getResponseTemplates().get(status);
+            logger.info(aResp + " " + bResp );
+
+            if (aResp == null || bResp == null) {
+                return false;
+            }
+
+            int aRespParamsCount = aResp.parameters.size() + aResp.headers.size();
+            int bRespParamsCount = bResp.parameters.size() + bResp.headers.size();
+            logger.info(aRespParamsCount + " " + bRespParamsCount);
+
+            if (aRespParamsCount != bRespParamsCount) {
+                return false;
+            }
+            logger.info(a.headers.keySet().size() + " " + b.headers.keySet().size());
+            logger.info(a.parameters.keySet().size() + " " + b.parameters.keySet().size());
+            logger.info(aResp.headers.keySet().size() + " " + bResp.headers.keySet().size());
+            logger.info(aResp.parameters.keySet().size() + " " + bResp.parameters.keySet().size());
+
+            boolean areEqual = 
+                a.headers.keySet().equals(b.headers.keySet()) && 
+                a.parameters.keySet().equals(b.parameters.keySet()) &&
+                aResp.headers.keySet().equals(bResp.headers.keySet()) && 
+                aResp.parameters.keySet().equals(bResp.parameters.keySet());
+
+            if (!areEqual) {
+                return false;
+            }    
         }
 
-        int aRespParamsCount = aResp.parameters.size() + aResp.headers.size();
-        int bRespParamsCount = bResp.parameters.size() + bResp.headers.size();
-
-        if (aRespParamsCount != bRespParamsCount) {
-            return false;
-        }
-
-        return 
-            a.headers.keySet().equals(b.headers.keySet()) && 
-            a.parameters.keySet().equals(b.parameters.keySet()) &&
-            aResp.headers.keySet().equals(bResp.headers.keySet()) && 
-            aResp.parameters.keySet().equals(bResp.parameters.keySet());
+        return a.getResponseTemplates() != null && b.getResponseTemplates() != null;
     }
 
     public boolean compare(RequestTemplate that) {

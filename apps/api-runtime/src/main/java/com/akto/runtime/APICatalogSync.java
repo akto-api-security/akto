@@ -304,9 +304,14 @@ public class APICatalogSync {
             Iterator<Map.Entry<String, RequestTemplate>> origUrlsIterator = origUrls.entrySet().iterator();
             Map.Entry<String, RequestTemplate> urlAndTemplate = origUrlsIterator.next();
             String[] sampleUrl = tokenize(urlAndTemplate.getKey());
+
+            logger.info("attempt to match - " + urlAndTemplate.getKey());
+
             URLTemplate sample = new URLTemplate(sampleUrl, new SuperType[sampleUrl.length]);
             int count = tryPatternsHelper(sample, urlAndTemplate.getValue(), 0, origUrls, thresh);
             
+            logger.info("found " + count + " matches for " + urlAndTemplate.getKey());
+
             if (count > thresh) {
                 logger.info("Merging in a single URL template" + sample.getTemplateString());
                 Map<Method, RequestTemplate> methodToTemplate = new HashMap<>();
@@ -344,8 +349,10 @@ public class APICatalogSync {
     int tryPatternsHelper(URLTemplate urlTemplate, RequestTemplate requestTemplate, int index, Map<String, RequestTemplate> urls, int thresh) {
 
         if (index == urlTemplate.getTypes().length) {
+            logger.info("trying to match for: " + urlTemplate.getTemplateString());
             int count = 0;
             for(Map.Entry<String, RequestTemplate> entry: urls.entrySet()) {
+                logger.info("url: " + entry.getKey());
                 if (urlTemplate.match(tokenize(entry.getKey())) && requestTemplate.compare(entry.getValue())) {
                     count++;
 
