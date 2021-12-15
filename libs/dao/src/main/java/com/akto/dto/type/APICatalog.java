@@ -72,5 +72,12 @@ public class APICatalog {
             "}";
     }
 
+    public void prettyPrint() {
+        for(SingleTypeInfo s: this.getAllTypeInfo()) {
+            System.out.println(s.toString());
+        }
+
+    }
+
     
 }

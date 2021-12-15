@@ -171,9 +171,13 @@ public class APICatalogSync {
         }
 
         int now = Context.now();
-        if (now - tryGenerateURLsTimestamp > 60 * 5 || triggerTemplateGeneration) {
+        if (now - tryGenerateURLsTimestamp > 60 || triggerTemplateGeneration) {
 
+            logger.info("trying to generate url template");
             tryGenerateURLsTimestamp = now;
+
+            this.delta.prettyPrint();
+
             tryGenerateURLTemplates();
 
             iterator = aggregator.urls.entrySet().iterator();
@@ -304,6 +308,7 @@ public class APICatalogSync {
             int count = tryPatternsHelper(sample, urlAndTemplate.getValue(), 0, origUrls, thresh);
             
             if (count > thresh) {
+                logger.info("Merging in a single URL template" + sample.getTemplateString());
                 Map<Method, RequestTemplate> methodToTemplate = new HashMap<>();
                 RequestTemplate newTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>());
                 methodToTemplate.put(method, newTemplate);
