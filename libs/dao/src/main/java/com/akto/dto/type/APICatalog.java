@@ -71,6 +71,4 @@ public class APICatalog {
             ", templateURLToMethods='" + getTemplateURLToMethods() + "'" +
             "}";
     }
-
-    
 }
