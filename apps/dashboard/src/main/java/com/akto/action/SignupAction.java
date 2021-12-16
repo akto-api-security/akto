@@ -249,7 +249,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             PendingInviteCode pendingInviteCode = PendingInviteCodesDao.instance.findOne(filter);
 
             if (pendingInviteCode == null) {
-                code = "Ask admin to invite you";
+                code = "Ask admin to invite you. If you are already a user, please click on login";
                 return ERROR.toUpperCase();
             }
 
@@ -257,7 +257,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             PendingInviteCodesDao.instance.getMCollection().deleteOne(filter);
 
             if (UsersDao.instance.findOne("login", email) != null) {
-                code = "Ask admin to invite you";
+                code = "This ";
                 return ERROR.toUpperCase();
             }
         }
