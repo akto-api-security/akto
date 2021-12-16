@@ -84,11 +84,13 @@ export default {
                 },
                 {
                     text: constants.DISCOVERED,
-                    value: 'added'
+                    value: 'added',
+                    sortKey: 'detectedTs'
                 },
                 {
                     text: 'Changes',
-                    value: 'changes'
+                    value: 'changes',
+                    sortKey: 'changesCount'
                 }
             ],
             unusedHeaders: [

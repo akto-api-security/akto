@@ -82,7 +82,8 @@ export default {
                 },
                 {
                     text: 'Added on',
-                    value: 'date'
+                    value: 'date',
+                    sortKey: 'detectedTs'
                 }                
             ]
         }  
@@ -103,6 +104,7 @@ export default {
                 type: x.subType,
                 container: x.isHeader ? 'Headers' : 'Payload ',
                 date: this.prettifyDate(x.timestamp),
+                detectedTs: x.timestamp,
                 location: (x.responseCode == -1 ? 'Request' : 'Response') + ' ' + (x.isHeader ? 'headers' : 'payload')
             }
         }

@@ -16,7 +16,7 @@
                     :headers="endpointHeaders" 
                     :items="newEndpoints" 
                     name="New endpoints" 
-                    sortKeyDefault="detectedTs" 
+                    sortKeyDefault="added" 
                     :sortDescDefault="true" 
                 />
             </template>
@@ -25,7 +25,7 @@
                     :headers="parameterHeaders" 
                     :items="newParameters" 
                     name="New parameters" 
-                    sortKeyDefault="detectedTs" 
+                    sortKeyDefault="added" 
                     :sortDescDefault="true"
                 />
             </template>
@@ -75,7 +75,8 @@ export default {
                 },
                 {
                     text: constants.DISCOVERED,
-                    value: 'added'
+                    value: 'added',
+                    sortKey: 'detectedTs'
                 }
             ],
             parameterHeaders: [
@@ -105,7 +106,8 @@ export default {
                 },
                 {
                     text: constants.DISCOVERED,
-                    value: 'added'
+                    value: 'added',
+                    sortKey: 'detectedTs'
                 }
             ]
         }

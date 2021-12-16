@@ -65,7 +65,8 @@ export default {
                 },
                 {
                     text: constants.DISCOVERED,
-                    value: 'added'
+                    value: 'added',
+                    sortKey: 'detectedTs'
                 },
                 {
                     text: 'Location',

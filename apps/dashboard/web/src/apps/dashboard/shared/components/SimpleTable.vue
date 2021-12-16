@@ -1,14 +1,22 @@
 <template>
-    
-    <v-data-table
+    <div>
+        <v-data-table
         :headers="headers"
         :items="items"
         class="board-table-cards keep-scrolling"
         :search="search"
         :sort-by="sortKey"
         :sort-desc="sortDesc"
-        :items-per-page="-1"
-        hide-default-footer
+        :custom-sort="sortFunc"
+        :items-per-page="10"
+        :footer-props="{
+            showFirstLastPage: true,
+            firstIcon: '$fas_angle-double-left',
+            lastIcon: '$fas_angle-double-right',
+            prevIcon: '$fas_angle-left',
+            nextIcon: '$fas_angle-right'
+        }"
+
         hide-default-header>
 
         <template v-slot:header="{}" v-if="items && items.length > 0">
@@ -18,17 +26,10 @@
                     :key="index"
                     :style="index == 0 ? {'padding': '2px !important'} : {}"
             >
-                <div class="table-sub-header clickable" @click="sortKey = header.value" v-if="index > 0">
+                <div class="table-sub-header clickable" @click="setSortOrInvertOrder(header)" v-if="index > 0">
                     {{header.text}} 
-                    <v-icon :class="sortKey == header.value ? 'black-color-entry' : 'grey-color-entry'">$fas_long-arrow-alt-up</v-icon>
                 </div>
             </th>
-        </template>
-        <template v-slot:footer="{}" v-if="items && items.length > 0">
-            <div class="clickable download-csv ma-1">
-                <v-icon :color="$vuetify.theme.themes.dark.themeColor">$fas_file-csv</v-icon>
-                <span class="ml-2" @click="downloadData">Download as CSV</span>
-            </div>
         </template>
 
         <template v-slot:item="{item}">
@@ -48,7 +49,17 @@
             </tr>
 
         </template>
-    </v-data-table>
+        <template v-slot:footer.prepend v-if="items && items.length > 0">
+            <div class="clickable download-csv ma-1">
+                <v-icon :color="$vuetify.theme.themes.dark.themeColor">$fas_file-csv</v-icon>
+                <span class="ml-2" @click="downloadData">Download as CSV</span>
+            </div>
+        </template>
+
+        </v-data-table>
+       
+        
+    </div>
 </template>
 
 <script>
@@ -84,9 +95,43 @@ export default {
                 type: "application/csvcharset=UTF-8"
             });
             saveAs(blob, (this.name || "file") + ".csv");
+        },
+        sortFunc(items, columnToSort, isDesc) {
+
+            if (!items || items.length == 0) {
+                return items
+            }
+
+            if (!columnToSort || columnToSort === '') {
+                return
+            }
+
+            let sortKey = this.headers.find(x => x.value === columnToSort)
+            if (sortKey) {
+                columnToSort = sortKey
+            }
+
+            let ret = items.sort((a, b) => {
+                
+                let ret = a[columnToSort] > b[columnToSort] ? 1 : -1
+                if (isDesc[0]) {
+                    ret = -ret
+                }
+                return ret
+            })
+
+            return ret
+        },
+        setSortOrInvertOrder (header) {
+            let headerSortKey = header.sortKey || header.value
+            if (this.sortKey === headerSortKey) {
+                this.sortDesc = !this.sortDesc
+            } else {
+                this.sortKey = headerSortKey
+            }
+            // return this.sortFunc(this.items, this.sortKey, this.sortDesc)
         }
     }
-
 }
 </script>
 
@@ -152,6 +197,7 @@ export default {
         align-items: center
         color: var(--v-themeColor-base)
         display: flex
+
 </style>
 
 <style scoped>
