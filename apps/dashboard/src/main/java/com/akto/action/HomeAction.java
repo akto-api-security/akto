@@ -15,6 +15,12 @@ public class HomeAction implements Action, SessionAware {
     }
 
     private String accessToken;
+    private String signupInvitationCode;
+    private String signupEmailId;
+
+    // to prevent redirect_uri not found warning
+    public void setRedirect_uri(String redirect_uri) {
+    }
 
     public String getAccessToken() {
         return accessToken;
@@ -23,5 +29,21 @@ public class HomeAction implements Action, SessionAware {
     @Override
     public void setSession(Map<String, Object> session) {
         this.accessToken = (String) session.get(AccessTokenAction.ACCESS_TOKEN_HEADER_NAME);
+    }
+
+    public void setSignupInvitationCode(String signupInvitationCode) {
+        this.signupInvitationCode = signupInvitationCode;
+    }
+
+    public String getSignupInvitationCode() {
+        return signupInvitationCode;
+    }
+
+    public String getSignupEmailId() {
+        return signupEmailId;
+    }
+
+    public void setSignupEmailId(String signupEmailId) {
+        this.signupEmailId = signupEmailId;
     }
 }
