@@ -5,13 +5,18 @@
                 <div class="entry-text">Account ID</div>
                 <div class="entry-value">{{getActiveAccount()}}</div>
             </div>
+             <v-btn @click="sendInvitationEmail">   
+                 Invite
+             </v-btn>
+                  
+            
         </div>
     </simple-layout>
 </template>
 
 <script>
 import SimpleLayout from '@/apps/dashboard/layouts/SimpleLayout'
-
+import api from './api'
 export default {
     name: "PageSettings",
     components: { 
@@ -20,6 +25,14 @@ export default {
     methods: {
         getActiveAccount() {
             return this.$store.state.auth.activeAccount
+        },
+        sendInvitationEmail(){
+            let spec={
+                inviteeName: "Ankush",
+                inviteeEmail: "ankush@akto.io",
+                websiteHostName: window.location.origin
+            }
+            api.inviteUsers(spec)
         }
     }
 }
