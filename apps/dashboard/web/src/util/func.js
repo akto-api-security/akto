@@ -294,8 +294,8 @@ export default {
 
         return ret
     },
-    isSubTypeSensitive(subType) {
-        return subType === "EMAIL" || subType === "CREDIT_CARD" || subType.indexOf("PHONE_NUMBER") === 0 || subType === "SSN" || subType === "ADDRESS" || subType === "PAN_CARD"
+    isSubTypeSensitive(x) {
+        return x.savedAsSensitive || x.subType === "EMAIL" || x.subType === "CREDIT_CARD" || x.subType.indexOf("PHONE_NUMBER") === 0 || x.subType === "SSN" || x.subType === "ADDRESS" || x.subType === "PAN_CARD"
     },
     groupByEndpoint(listParams) {
         let ret = {}
@@ -324,7 +324,7 @@ export default {
             
             let val = ret[key]
 
-            if(this.isSubTypeSensitive(x.subType)) {
+            if(this.isSubTypeSensitive(x)) {
                 val.sensitive ++
                 val.color = "#f44336"
             }

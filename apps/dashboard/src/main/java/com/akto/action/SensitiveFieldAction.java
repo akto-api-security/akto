@@ -8,6 +8,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.Relationship;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.type.SingleTypeInfo;
+import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
@@ -25,14 +26,16 @@ public class SensitiveFieldAction extends UserAction{
     private int responseCode;
     private boolean isHeader;
     private String param;
-    private Boolean sensitive;
-    private List<SingleTypeInfo> relatedSingleTypeInfo = new ArrayList<>();
+    private boolean sensitive;
+    
+    private BasicDBObject ret;
 
     @Override
     public String execute() {
+        ret = new BasicDBObject();
         Bson filter = getFilters(url, method, responseCode, isHeader, param);
         // null means user wants Akto to decide the sensitivity
-        if (sensitive == null)  {
+        if (!sensitive)  {
             SensitiveParamInfoDao.instance.getMCollection().deleteOne(filter);
             return Action.SUCCESS.toUpperCase();
         }
@@ -40,12 +43,16 @@ public class SensitiveFieldAction extends UserAction{
         Bson update = Updates.set("sensitive", sensitive);
         FindOneAndUpdateOptions findOneAndUpdateOptions = new FindOneAndUpdateOptions();
         findOneAndUpdateOptions.upsert(false);
-        SensitiveParamInfoDao.instance.updateOne(filter, update);
+        SensitiveParamInfo param = SensitiveParamInfoDao.instance.updateOne(filter, update);
+
+        ret.append("data", param);
 
         // only if sensitive is marked true then only find other params
         if (!sensitive) {
             return Action.SUCCESS.toUpperCase();
         }
+
+        /*
 
         Bson parentFilters = Filters.and(
                 Filters.eq("parent.url", url),
@@ -117,6 +124,16 @@ public class SensitiveFieldAction extends UserAction{
             }
         }
 
+        */ 
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+
+    public String listAllSensitiveFields() {
+        List<SensitiveParamInfo> sensitiveParams = SensitiveParamInfoDao.instance.findAll(Filters.eq("sensitive", true));
+        ret = new BasicDBObject();
+        ret.append("data", sensitiveParams);
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -149,8 +166,8 @@ public class SensitiveFieldAction extends UserAction{
         this.responseCode = responseCode;
     }
 
-    public void setHeader(boolean header) {
-        isHeader = header;
+    public void setIsHeader(boolean isHeader) {
+        this.isHeader = isHeader;
     }
 
     public void setParam(String param) {
@@ -161,7 +178,11 @@ public class SensitiveFieldAction extends UserAction{
         this.sensitive = sensitive;
     }
 
-    public List<SingleTypeInfo> getRelatedSingleTypeInfo() {
-        return relatedSingleTypeInfo;
+    public void setRet(BasicDBObject ret) {
+        this.ret = ret;
+    }
+
+    public BasicDBObject getRet() {
+        return this.ret;
     }
 }
