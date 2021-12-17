@@ -16,7 +16,7 @@
             prevIcon: '$fas_angle-left',
             nextIcon: '$fas_angle-right'
         }"
-
+        :hide-default-footer="!items || items.length == 0"
         hide-default-header>
 
         <template v-slot:header="{}" v-if="items && items.length > 0">
@@ -33,20 +33,33 @@
         </template>
 
         <template v-slot:item="{item}">
-            <tr class="table-row">
-                <td
-                    class="table-column"
-                    :style="{'background-color':item.color, 'padding' : '0px !important'}"
-                />
-                <td 
-                    v-for="(entry, index) in headers.slice(1)"
-                    :key="index"
-                    class="table-column clickable"
-                    @click="$emit('rowClicked', item)"
-                >
-                    <div class="table-entry">{{item[entry.value]}}</div>
-                </td>
-            </tr>
+            
+            <v-hover
+                v-slot="{ hover }"
+            >
+                <tr class="table-row" >
+                    <td
+                        class="table-column"
+                        :style="{'background-color':item.color, 'padding' : '0px !important'}"
+                    />
+                    <td 
+                        v-for="(entry, index) in headers.slice(1)"
+                        :key="index"
+                        class="table-column clickable"
+                        @click="$emit('rowClicked', item)"
+                    >
+                        <div class="table-entry">{{item[entry.value]}}</div>
+                    </td>
+
+                    <div v-if="actions && hover && actions.length > 0" class="table-row-actions">
+                        <actions-tray :actions="actions || []" :subject=item></actions-tray>
+                    </div>
+                </tr>
+
+
+
+            </v-hover>
+
 
         </template>
         <template v-slot:footer.prepend v-if="items && items.length > 0">
@@ -66,15 +79,20 @@
 
 import obj from "@/util/obj"
 import { saveAs } from 'file-saver'
+import ActionsTray from './ActionsTray'
 
 export default {
     name: "SimpleTable",
+    components: {
+        ActionsTray
+    },
     props: {
         headers: obj.arrR,
         items: obj.arrR,
         name: obj.strN,
         sortKeyDefault: obj.strN,
-        sortDescDefault: obj.boolN
+        sortDescDefault: obj.boolN,
+        actions: obj.arrN
     },
     data () {
         return {
@@ -181,6 +199,7 @@ export default {
 
     .table-row
         border: 0px solid #FFFFFF !important
+        position: relative
 
         &:hover
             background-color: #edecf0 !important
@@ -197,6 +216,11 @@ export default {
         align-items: center
         color: var(--v-themeColor-base)
         display: flex
+
+    .table-row-actions    
+        position: absolute
+        right: 30px
+        padding: 8px 16px !important
 
 </style>
 

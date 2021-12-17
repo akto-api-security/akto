@@ -96,7 +96,7 @@ export default {
         },
         sensitiveParamsForChart(allParams) {
             return Object.entries((allParams || []).reduce((z, e) => {
-                let key = func.isSubTypeSensitive(e.subType) ? e.subType : 'General'
+                let key = func.isSubTypeSensitive(e) ? e.subType : 'General'
                 z[key] = (z[key] || 0) + 1
                 return z
             }, {})).map((x, i) => {
@@ -111,10 +111,10 @@ export default {
     computed: {
         ...mapState('inventory', ['apiCollection']),
         sensitiveParamsInRequestForTable() {
-            return this.apiCollection.filter(x => x.responseCode == -1 && func.isSubTypeSensitive(x.subType)).map(this.prepareItemForTable)
+            return this.apiCollection.filter(x => x.responseCode == -1 && func.isSubTypeSensitive(x)).map(this.prepareItemForTable)
         },
         sensitiveParamsInResponseForTable() {
-            return this.apiCollection.filter(x => x.responseCode > -1 && func.isSubTypeSensitive(x.subType)).map(this.prepareItemForTable)
+            return this.apiCollection.filter(x => x.responseCode > -1 && func.isSubTypeSensitive(x)).map(this.prepareItemForTable)
         },
         sensitiveParamsInRequestForChart() {
             return this.sensitiveParamsForChart(this.apiCollection.filter(x => x.responseCode == -1))
@@ -123,11 +123,11 @@ export default {
             return this.sensitiveParamsForChart(this.apiCollection.filter(x => x.responseCode > -1))
         },
         allSensitiveParams() {
-           return this.apiCollection.filter(x => func.isSubTypeSensitive(x.subType))
+           return this.apiCollection.filter(x => func.isSubTypeSensitive(x))
         },
         newSensitiveParams() {
            let now = func.timeNow()
-           return this.apiCollection.filter(x => func.isSubTypeSensitive(x.subType) && x.timestamp > (now - func.recencyPeriod))
+           return this.apiCollection.filter(x => func.isSubTypeSensitive(x) && x.timestamp > (now - func.recencyPeriod))
         }              
     },
     mounted() {

@@ -23,5 +23,23 @@ export default {
         }).then((resp) => {
             return resp
         })
+    },
+
+    addSensitiveField (x) {
+        return request({
+            url: 'api/addSensitiveField',
+            method: 'post',
+            data: {
+                ...x
+            }
+        })
+    },
+    listAllSensitiveFields () {
+        return request({
+            url: 'api/listAllSensitiveFields',
+            method: 'post',
+            data: {}
+        })
     }
+
 }

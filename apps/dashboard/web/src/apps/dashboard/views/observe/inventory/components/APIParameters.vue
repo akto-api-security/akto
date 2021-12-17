@@ -17,6 +17,7 @@
                 <simple-table 
                     :headers="headers" 
                     :items="requestItems" 
+                    :actions="actions"
                     name="Request" 
                     sortKeyDefault="sensitive" 
                     :sortDescDefault="true"
@@ -26,6 +27,7 @@
                 <simple-table 
                     :headers="headers" 
                     :items="responseItems"  
+                    :actions="actions"
                     name="Response" 
                     sortKeyDefault="sensitive" 
                     :sortDescDefault="true"
@@ -40,9 +42,10 @@ import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import ACard from '@/apps/dashboard/shared/components/ACard'
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import DonutChart from '@/apps/dashboard/shared/components/DonutChart'
-import {mapState} from 'vuex'
+import {mapState, mapGetters} from 'vuex'
 import obj from '@/util/obj'
 import func from '@/util/func'
+import api from '../api'
 import SensitiveParamsCard from './SensitiveParamsCard.vue'
 
 export default {
@@ -85,6 +88,16 @@ export default {
                     value: 'date',
                     sortKey: 'detectedTs'
                 }                
+            ],
+            actions: [
+                {
+                    isValid: item => this.isValid(item),
+                    icon: item => item.x.savedAsSensitive ? '$fas_lock-open' : '$fas_lock',
+                    text: item => item.x.savedAsSensitive ? 'Unmark sensitive' : 'Mark sensitive',
+                    func: item => this.toggleSensitiveFieldFunc(item),
+                    success: (resp, item) => this.toggleSuccessFunc(resp, item),
+                    failure: (err, item) => this.toggleFailureFunc(err, item)
+                }
             ]
         }  
     },
@@ -98,15 +111,40 @@ export default {
         },
         prepareItem(x) {
             return {
-                color: func.isSubTypeSensitive(x.subType) ? this.$vuetify.theme.themes.dark.redMetric: this.$vuetify.theme.themes.dark.greenMetric,
+                color: x.savedAsSensitive || func.isSubTypeSensitive(x) ? this.$vuetify.theme.themes.dark.redMetric: this.$vuetify.theme.themes.dark.greenMetric,
                 name: x.param.replaceAll("#", ".").replaceAll(".$", ""),
-                sensitive: func.isSubTypeSensitive(x.subType) ? 'Yes' : '',
+                sensitive: func.isSubTypeSensitive(x) ? 'Yes' : '',
                 type: x.subType,
                 container: x.isHeader ? 'Headers' : 'Payload ',
                 date: this.prettifyDate(x.timestamp),
                 detectedTs: x.timestamp,
-                location: (x.responseCode == -1 ? 'Request' : 'Response') + ' ' + (x.isHeader ? 'headers' : 'payload')
+                location: (x.responseCode == -1 ? 'Request' : 'Response') + ' ' + (x.isHeader ? 'headers' : 'payload'),
+                x: x
             }
+        },
+        toggleSensitiveFieldFunc (item) {
+            item.x.sensitive = !item.x.savedAsSensitive
+            return this.$store.dispatch('inventory/toggleSensitiveParam', item.x)
+        },
+        toggleSuccessFunc (resp, item) {
+            item.color
+            window._AKTO.$emit('SHOW_SNACKBAR', {
+                show: true,
+                text: `${item.name} `+ (item.x.sensitive ? '' : 'un') +`marked as sensitive successfully!`,
+                color: 'green'
+            })
+        },
+        toggleFailureFunc (err, item) {
+            window._AKTO.$emit('SHOW_SNACKBAR', {
+                show: true,
+                text: `An error occurred while `+ (item.x.sensitive ? '' : 'un')+`marking ${item.name} as sensitive!`,
+                color: 'red'
+            })
+        },
+        isValid (item) {
+            let obj = {...item.x}
+            obj.savedAsSensitive = false
+            return !func.isSubTypeSensitive(obj)
         }
     },
     computed: {
@@ -122,7 +160,7 @@ export default {
         },
         sensitiveParamsForChart() {
             return Object.entries(this.sensitiveParams.reduce((z, e) => {
-                let key = func.isSubTypeSensitive(e.subType) ? e.subType : 'General'
+                let key = func.isSubTypeSensitive(e) ? e.subType : 'General'
                 z[key] = (z[key] || 0) + 1
                 return z
             }, {})).map((x, i) => {

@@ -298,7 +298,19 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json">
-                <param name="root">response</param>
+                <param name="root">ret</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+
+        <action name="api/listAllSensitiveFields" class="com.akto.action.SensitiveFieldAction" method="listAllSensitiveFields">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+                <param name="root">ret</param>
             </result>
             <result name="ERROR" type="httpheader">
                 <param name="status">401</param>

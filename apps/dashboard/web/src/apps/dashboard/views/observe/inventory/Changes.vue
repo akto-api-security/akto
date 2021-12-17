@@ -115,7 +115,7 @@ export default {
     methods: {
         prepareItemForTable(x) {
             return {
-                color: func.isSubTypeSensitive(x.subType) ? this.$vuetify.theme.themes.dark.redMetric : this.$vuetify.theme.themes.dark.greenMetric,
+                color: func.isSubTypeSensitive(x) ? this.$vuetify.theme.themes.dark.redMetric : this.$vuetify.theme.themes.dark.greenMetric,
                 name: x.param.replaceAll("#", ".").replaceAll(".$", ""),
                 endpoint: x.url,
                 method: x.method,
@@ -142,7 +142,7 @@ export default {
         },
         newSensitiveParameters() {
             let now = func.timeNow()
-            return this.apiCollection.filter(x => x.timestamp > now - func.recencyPeriod && func.isSubTypeSensitive(x.subType)).map(this.prepareItemForTable)
+            return this.apiCollection.filter(x => x.timestamp > now - func.recencyPeriod && func.isSubTypeSensitive(x)).map(this.prepareItemForTable)
         },
     },
     mounted() {
