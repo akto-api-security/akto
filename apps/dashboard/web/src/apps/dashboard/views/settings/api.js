@@ -13,12 +13,21 @@ export default {
             }
         })
     },
-    getTeamData (teamId) {
+    getTeamData() {
         return request({
             url: '/api/getTeamData',
             method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    removeUser (email) {
+        return request({
+            url: '/api/removeUser',
+            method: 'post',
             data: {
-                id: teamId
+                email: email
             }
         }).then((resp) => {
             return resp

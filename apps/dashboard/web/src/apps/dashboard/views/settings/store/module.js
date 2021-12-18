@@ -38,8 +38,16 @@ const team = {
     },
     actions: {
         getTeamData({commit, dispatch}, id) {
-            return api.getTeamData(id).then((resp) => {
+            return api.getTeamData().then((resp) => {
                 commit('SET_TEAM_DETAILS', resp)
+            })
+        },
+        removeUser({commit, dispatch}, user) {
+            return api.removeUser(user.login).then(resp => {
+                api.getTeamData().then((resp) => {
+                    commit('SET_TEAM_DETAILS', resp)
+                })
+                return resp
             })
         },
         emptyState({commit, dispatch}) {
