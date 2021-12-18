@@ -1,7 +1,7 @@
 <template>
     <div class="pa-4">
         <a-card title="Members" icon="$fas_users" color="rgba(33, 150, 243)">
-            <div class="email-invite-container">
+            <div v-if="isAdmin()" class="email-invite-container">
                 <v-combobox
                     v-model="allEmails"
                     :items="[]"
@@ -45,25 +45,36 @@
                 </v-btn>
             </div>
             <div class="team-overview-card">
-                <div
-                    v-for="user in users"
-                    :key="user.id"
-                    class="user-details d-flex justify-space-between pa-4"
-                >
-                    <owner-name
-                            :owner-name="user.name"
-                            :owner-id="user.id"
-                            :show-name="false"
-                            class="user-details-avatar"
-                    />
-                    <div class="user-container">
-                        <div class="user-details-name">{{user.name}}</div>
-                        <div class="user-details-login">{{user.login}}</div>
-                    </div>
-                    <div class="user-details-type">
-                        {{user.role || '-'}}
-                    </div>
-                </div>
+                <template v-for="user in users">
+                    <v-hover 
+                        v-slot="{ hover }" 
+                        :key="user.email"
+                        class="user-details d-flex justify-space-between pa-4"
+                    >
+                        <div style="position: relative">
+                            
+                            <owner-name
+                                    :owner-name="user.name"
+                                    :owner-id="user.id"
+                                    :show-name="false"
+                                    class="user-details-avatar"
+                            />
+                            <div class="user-container">
+                                <div class="user-details-name">{{user.name}}</div>
+                                <div class="user-details-login">{{user.login}}</div>
+                            </div>
+                            <div class="user-details-type">
+                                {{user.role || '-'}}
+                            </div>
+                            <actions-tray  
+                                v-if="hover && isAdmin()" 
+                                class="table-row-actions" 
+                                :actions="actions || []" 
+                                :subject=user 
+                            />
+                        </div>
+                    </v-hover>
+                </template>
             </div>
         </a-card>
     </div>
@@ -73,15 +84,15 @@
     import ACard from "@/apps/dashboard/shared/components/ACard"
     import {mapState} from "vuex"
     import OwnerName from "@/apps/dashboard/shared/components/OwnerName"
-    import SimpleTextField from "@/apps/dashboard/shared/components/SimpleTextField"
     import api from "../api"
+    import ActionsTray from '@/apps/dashboard/shared/components/ActionsTray'
 
     export default {
         name: "TeamOverview",
         components: {
             ACard,
             OwnerName,
-            SimpleTextField
+            ActionsTray
         },
         data () {
             let domainName = window.USER_NAME.substr(window.USER_NAME.indexOf("@")+1)
@@ -96,7 +107,17 @@
                         this.disableButtons = !ret
                         return ret
                     }
-                ]                
+                ],
+                actions: [
+                    {
+                        isValid: item => item.login != window.USER_NAME,
+                        icon: item => '$fas_trash',
+                        text: item => 'Remove user',
+                        func: item => this.removeUser(item),
+                        success: (resp, item) => this.removedSuccess(resp, item),
+                        failure: (err, item) => this.removedFailure(err, item)
+                    }
+                ]
             }
         },
         mounted() {
@@ -142,6 +163,26 @@
                     }
                     this.allEmails = []
                 }
+            },
+            removeUser (user) {
+                return this.$store.dispatch('team/removeUser', user)
+            },
+            removedSuccess (resp, user) {
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: `${user.login} removed successfully!`,
+                    color: 'green'
+                })
+            },
+            removedFailure (err, user) {
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: `There was an error while removing ${user.email}!`,
+                    color: 'red'
+                })
+            },
+            isAdmin() {
+                return this.users && this.users.find(x => x.login === window.USER_NAME).role === "ADMIN"
             }
         },
         computed: {
@@ -205,6 +246,7 @@
             color: #2D243480
             font-weight: 400
             width: 20%
+            margin-top: auto
 
 .dashboard
     &-add
@@ -285,4 +327,11 @@
     display: flex
     padding: 16px
     flex-direction: row
+
+.table-row-actions    
+    position: absolute
+    right: 30px
+    padding: 8px 16px !important
+    margin-auto
+
 </style>
