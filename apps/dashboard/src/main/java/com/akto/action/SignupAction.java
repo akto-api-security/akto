@@ -1,12 +1,9 @@
 package com.akto.action;
 
-import com.akto.dao.AccountsDao;
-import com.akto.dao.ConfigsDao;
-import com.akto.dao.SignupDao;
-import com.akto.dao.UsersDao;
-import com.akto.dao.context.Context;
+import com.akto.dao.*;
 import com.akto.dto.*;
 import com.akto.listener.InitializerListener;
+import com.akto.utils.JWT;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeTokenRequest;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
@@ -14,6 +11,9 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleTokenResponse;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Sorts;
 import com.opensymphony.xwork2.Action;
 import com.slack.api.Slack;
 import com.slack.api.methods.SlackApiException;
@@ -21,6 +21,8 @@ import com.slack.api.methods.request.oauth.OAuthV2AccessRequest;
 import com.slack.api.methods.request.users.UsersIdentityRequest;
 import com.slack.api.methods.response.oauth.OAuthV2AccessResponse;
 import com.slack.api.methods.response.users.UsersIdentityResponse;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jws;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
@@ -29,9 +31,7 @@ import org.bson.conversions.Bson;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import static com.mongodb.client.model.Filters.eq;
 import static com.mongodb.client.model.Updates.combine;
@@ -221,32 +221,59 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         return SUCCESS.toUpperCase();
 
     };
+
     String password;
     String email;
+    String invitationCode;
 
-    public String registerViaEmail() throws IOException {
-        System.out.println("Register via email hit");
-
+    public String registerViaEmail() {
         code = "";
         long count = UsersDao.instance.getMCollection().countDocuments();
+        // only 1st user is allowed to signup without invitationCode
         if (count != 0) {
-            code = "Please login using registered email id";
-            return ERROR.toUpperCase();
-        }
+            Jws<Claims> jws;
+            try {
+                jws = JWT.parseJwt(invitationCode, "");
+            } catch (Exception e) {
+                code = "Ask admin to invite you";
+                return ERROR.toUpperCase();
+            }
 
-        if (UsersDao.instance.findOne("login", email) != null) {
-            code = "This email id already exists";
-            System.out.println("User Exists");
-            return ERROR.toUpperCase();
+            String emailFromJwt = jws.getBody().get("email").toString();
+            if (!emailFromJwt.equals(email)) {
+                code = "Ask admin to invite you";
+                return ERROR.toUpperCase();
+            }
+
+            Bson filter = Filters.eq(PendingInviteCode.INVITE_CODE, invitationCode);
+            PendingInviteCode pendingInviteCode = PendingInviteCodesDao.instance.findOne(filter);
+
+            if (pendingInviteCode == null) {
+                code = "Ask admin to invite you. If you are already a user, please click on login";
+                return ERROR.toUpperCase();
+            }
+
+            // deleting the invitation code
+            PendingInviteCodesDao.instance.getMCollection().deleteOne(filter);
+
+            if (UsersDao.instance.findOne("login", email) != null) {
+                code = "This ";
+                return ERROR.toUpperCase();
+            }
         }
 
         String salt = "39yu";
         String passHash = Integer.toString((salt + password).hashCode());
 
         SignupInfo.PasswordHashInfo signupInfo = new SignupInfo.PasswordHashInfo(passHash, salt);
-        createUserAndRedirect(email, email, signupInfo);
+        try {
+            createUserAndRedirect(email, email, signupInfo);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return ERROR.toUpperCase();
+        }
         return SUCCESS.toUpperCase();
-    };
+    }
 
     String companyName, teamName;
     List<String> allEmails;
@@ -298,8 +325,24 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             }
 
             int accountId = account.getId();
-            UsersDao.instance.insertSignUp(userEmail, username, signupInfo, accountId);
-            user = UsersDao.instance.findOne("login", userEmail);
+            user = UsersDao.instance.insertSignUp(userEmail, username, signupInfo, accountId);
+            long count = UsersDao.instance.getMCollection().countDocuments();
+            // if first user then automatic admin
+            // else check if rbac is 0 or not. If 0 then make the user that was created first as admin.
+            // done for customers who were there before rbac feature
+            if (count == 1) {
+                RBACDao.instance.insertOne(new RBAC(user.getId(), RBAC.Role.ADMIN));
+            } else {
+                long rbacCount = RBACDao.instance.getMCollection().countDocuments();
+                if (rbacCount == 0) {
+                    MongoCursor<User> cursor = UsersDao.instance.getMCollection().find().sort(Sorts.ascending("_id")).limit(1).cursor();
+                    if (cursor.hasNext()) {
+                        User firstUser = cursor.next();
+                        RBACDao.instance.insertOne(new RBAC(firstUser.getId(), RBAC.Role.ADMIN));
+                    }
+                }
+            }
+
             servletRequest.getSession().setAttribute("user", user);
             new LoginAction().loginUser(user, servletResponse, true);
             servletResponse.sendRedirect("/dashboard/testing");
@@ -361,5 +404,9 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
     public void setAllEmails(List<String> allEmails) {
         this.allEmails = allEmails;
+    }
+
+    public void setInvitationCode(String invitationCode) {
+        this.invitationCode = invitationCode;
     }
 }

@@ -1,34 +1,49 @@
 package com.akto.action;
 
-import com.akto.dao.TeamsDao;
+import com.akto.dao.PendingInviteCodesDao;
+import com.akto.dao.RBACDao;
+import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.Team;
-import com.akto.dto.User;
+import com.akto.dto.PendingInviteCode;
+import com.akto.dto.RBAC;
+import com.mongodb.BasicDBList;
+import com.mongodb.BasicDBObject;
 
-import java.util.Map;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class TeamAction extends UserAction {
 
     int id;
-    String name;
-    Map<Integer, User> users;
-    Team team;
+    BasicDBList users;
 
     public String fetchTeamData() {
+        List<RBAC> allRoles = RBACDao.instance.findAll(new BasicDBObject());
 
-        team = TeamsDao.instance.findOne("_id", id);
+        Map<Integer, RBAC> userToRBAC = new HashMap<>();
+        for(RBAC rbac: allRoles) {
+            userToRBAC.put(rbac.getUserId(), rbac);
+        }   
 
-        users = new HashMap<>();
+        users = UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get());
+        for(Object obj: users) {
+            BasicDBObject userObj = (BasicDBObject) obj;
+            RBAC rbac = userToRBAC.get(userObj.getInt("id"));
+            String status = rbac == null ? "Member" : rbac.getRole().name();
+            userObj.append("role", status);
+        }
 
-        return SUCCESS.toUpperCase();
-    }
+        List<PendingInviteCode> pendingInviteCodes = PendingInviteCodesDao.instance.findAll(new BasicDBObject());
 
-    public String saveNewTeam() {
-        this.id = Context.getId();
-        int userId = getSUser().getId();
-        Team team = new Team(id, name, userId);
-        TeamsDao.instance.insertOne(team);
+        for(PendingInviteCode pendingInviteCode: pendingInviteCodes) {
+            users.add(
+                new BasicDBObject("id", pendingInviteCode.getIssuer())
+                .append("login", pendingInviteCode.getInviteeEmailId())
+                .append("name", "-")
+                .append("role", "Invitation sent")
+            );
+        }
 
         return SUCCESS.toUpperCase();
     }
@@ -41,27 +56,12 @@ public class TeamAction extends UserAction {
         this.id = id;
     }
 
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public Map<Integer, User> getUsers() {
+    public BasicDBList getUsers() {
         return users;
     }
 
-    public void setUsers(Map<Integer, User> users) {
+    public void setUsers(BasicDBList users) {
         this.users = users;
     }
 
-    public Team getTeam() {
-        return team;
-    }
-
-    public void setTeam(Team team) {
-        this.team = team;
-    }
 }

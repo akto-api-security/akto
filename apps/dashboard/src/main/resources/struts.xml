@@ -167,23 +167,7 @@
             </result>
         </action>
 
-        <action name="signup-slack" class="com.akto.action.SignupAction" method="registerViaSlack">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS"   type="json"/>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
-            </result>
-        </action>
 
-        <action name="signup-google" class="com.akto.action.SignupAction" method="registerViaGoogle">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS"   type="json"/>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
-            </result>
-        </action>
         <action name="signup-email" class="com.akto.action.SignupAction" method="registerViaEmail">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -311,6 +295,16 @@
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json">
                 <param name="root">ret</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/inviteUsers" class="com.akto.action.InviteUserAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
             </result>
             <result name="ERROR" type="httpheader">
                 <param name="status">401</param>

@@ -61,6 +61,11 @@
             <artifactId>slf4j-simple</artifactId>
             <version>1.7.5</version>
         </dependency>
+         <dependency>
+            <groupId>com.sendgrid</groupId>
+            <artifactId>sendgrid-java</artifactId>
+            <version>4.4.1</version>
+        </dependency>
         <dependency>
             <groupId>com.akto.libs.dao</groupId>
             <artifactId>dao</artifactId>
