@@ -19,6 +19,7 @@ import {
   faTimes,
   faEnvelope,
   faLock,
+  faLockOpen,  
   faAngleUp,
   faAngleRight,
   faAngleLeft,
@@ -79,7 +80,7 @@ import {
 } from '@fortawesome/free-brands-svg-icons'
 
 const faIcons = [
-  faBars,faUser,faPlus,faTimes,faEnvelope,faLock,faAngleUp,faAngleRight,faAngleLeft,faComments,faEye,faEllipsisV,faStar,faCalendar,
+  faBars,faUser,faPlus,faTimes,faEnvelope,faLock,faLockOpen,faAngleUp,faAngleRight,faAngleLeft,faComments,faEye,faEllipsisV,faStar,faCalendar,
   faCog,faShare,faEdit,faCheck,faTrash,faSearch,faBell,faChartBar,faFileAlt,faHandPointRight,faChartArea,faExclamationTriangle,
   faInfoCircle,faDownload,faFileCsv,faCircle,faThLarge,faStopwatch,faCheckCircle,faEyeSlash,faArrowLeft,faUsers,faChartLine,
   faHome,faBullseye,faBullhorn,faCheckDouble,faSquare,faBolt,faDatabase,faAngleDoubleRight, faAngleDoubleLeft,faClipboardList,

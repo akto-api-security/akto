@@ -48,12 +48,12 @@ public class SensitiveParamInfo {
         this.responseCode = responseCode;
     }
 
-    public boolean isHeader() {
+    public boolean getIsHeader() {
         return isHeader;
     }
 
-    public void setHeader(boolean header) {
-        isHeader = header;
+    public void setIsHeader(boolean isHeader) {
+        this.isHeader = isHeader;
     }
 
     public String getParam() {

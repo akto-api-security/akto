@@ -404,25 +404,53 @@ public class RequestTemplate {
             return false;
         }
 
-        RequestTemplate aResp = a.getResponseTemplates().get(200);
-        RequestTemplate bResp = b.getResponseTemplates().get(200);
-
-        if (aResp == null || bResp == null) {
-            return false;
+        for (int aStatus: a.getResponseTemplates().keySet()) {
+            if (aStatus >= 200 && aStatus < 300) {
+                if (!b.getResponseTemplates().containsKey(aStatus)) {
+                    return false;
+                }
+            }
         }
 
-        int aRespParamsCount = aResp.parameters.size() + aResp.headers.size();
-        int bRespParamsCount = bResp.parameters.size() + bResp.headers.size();
-
-        if (aRespParamsCount != bRespParamsCount) {
-            return false;
+        for (int bStatus: b.getResponseTemplates().keySet()) {
+            if (bStatus >= 200 && bStatus < 300) {
+                if (!a.getResponseTemplates().containsKey(bStatus)) {
+                    return false;
+                }
+            }
         }
 
-        return 
-            a.headers.keySet().equals(b.headers.keySet()) && 
-            a.parameters.keySet().equals(b.parameters.keySet()) &&
-            aResp.headers.keySet().equals(bResp.headers.keySet()) && 
-            aResp.parameters.keySet().equals(bResp.parameters.keySet());
+        boolean has2XXStatus = false;
+        for (int aStatus: a.getResponseTemplates().keySet()) {
+            if (aStatus >= 200 && aStatus < 300) {
+                has2XXStatus = true;
+                RequestTemplate aResp = a.getResponseTemplates().get(aStatus);
+                RequestTemplate bResp = b.getResponseTemplates().get(aStatus);
+
+                if (aResp == null || bResp == null) {
+                    return false;
+                }
+
+                int aRespParamsCount = aResp.parameters.size() + aResp.headers.size();
+                int bRespParamsCount = bResp.parameters.size() + bResp.headers.size();
+
+                if (aRespParamsCount != bRespParamsCount) {
+                    return false;
+                }
+
+                boolean areEqual = 
+                    a.headers.keySet().equals(b.headers.keySet()) && 
+                    a.parameters.keySet().equals(b.parameters.keySet()) &&
+                    aResp.headers.keySet().equals(bResp.headers.keySet()) && 
+                    aResp.parameters.keySet().equals(bResp.parameters.keySet());
+
+                if (!areEqual) {
+                    return false;
+                }    
+            }
+        }
+
+        return has2XXStatus;
     }
 
     public boolean compare(RequestTemplate that) {

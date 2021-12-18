@@ -23,6 +23,7 @@ import com.akto.runtime.URLAggregator;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +32,7 @@ public class TestDump2 {
 
     private static final Logger logger = LoggerFactory.getLogger(TestDump2.class);
 
-    private String createSimpleResponsePayload() {
+    public static String createSimpleResponsePayload() {
         BasicDBObject ret = new BasicDBObject();
 
         ret.append("a1", 1).append("b1", new BasicDBObject().append("a2", "some string").append("b2", "some number"));
@@ -39,7 +40,7 @@ public class TestDump2 {
         return ret.toJson();
     }
 
-    private String createSimpleRequestPayload() {
+    public static String createSimpleRequestPayload() {
         BasicDBObject ret = new BasicDBObject();
 
         ret.append("id", 1).append("startDate", "some string");
@@ -47,13 +48,13 @@ public class TestDump2 {
         return ret.toJson();
     }
 
-    private List<String> createList(String s) {
+    public static List<String> createList(String s) {
         List<String> ret = new ArrayList<>();
         ret.add(s);
         return ret;
     }
 
-    private HttpResponseParams createSampleParams(String userId, String url) {
+    public static HttpResponseParams createSampleParams(String userId, String url) {
         HttpResponseParams ret = new HttpResponseParams();
         ret.type = "HTTP/1.1";
         ret.statusCode = 200;
@@ -95,6 +96,13 @@ public class TestDump2 {
         return ret;
     }
 
+    public static void assertEquals(int actual, int expected) {
+        Assertions.assertEquals(expected, actual);
+    }
+
+    public static void assertEquals(String actual, String expected) {
+        Assertions.assertEquals(expected, actual);
+    }
 
     @Test
     public void testHappyPath() {
@@ -215,14 +223,6 @@ public class TestDump2 {
 
         sync.computeDelta(aggr, true);
 
-        Map<String, URLMethods> urlMethodsMap = sync.getDelta().getStrictURLToMethods();
-        assertEquals(urlMethodsMap.size(), 1);
-
-        URLMethods urlMethods = urlMethodsMap.get(resp.getRequestParams().url);
-        
-        RequestTemplate reqTemplate = urlMethods.getMethodToRequestTemplate().get(Method.valueOf(resp.getRequestParams().method));
-        assertNotNull(reqTemplate);
-
         Map<URLTemplate, URLMethods> urlTemplateMap = sync.getDelta().getTemplateURLToMethods();
 
         assertEquals(urlTemplateMap.size(), 1);
@@ -231,13 +231,13 @@ public class TestDump2 {
 
         assertEquals(entry.getKey().getTemplateString(), url+"INTEGER");
 
-        reqTemplate = entry.getValue().getMethodToRequestTemplate().get(Method.POST);
+        RequestTemplate reqTemplate = entry.getValue().getMethodToRequestTemplate().get(Method.POST);
 
-        assertEquals(reqTemplate.getUserIds().size(), 29);
+        assertEquals(reqTemplate.getUserIds().size(), 30);
         assertEquals(reqTemplate.getParameters().size(), 2);
         
         RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
-        assertEquals(respTemplate.getUserIds().size(), 29);
+        assertEquals(respTemplate.getUserIds().size(), 30);
         assertEquals(respTemplate.getParameters().size(), 3);
     }
 
