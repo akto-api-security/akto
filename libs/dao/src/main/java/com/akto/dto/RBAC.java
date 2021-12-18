@@ -12,7 +12,7 @@ public class RBAC {
     public static final String ROLE = "role";
 
     public enum Role {
-        ADMIN
+        ADMIN, MEMBER
     }
 
     public RBAC(int userId, Role role) {
