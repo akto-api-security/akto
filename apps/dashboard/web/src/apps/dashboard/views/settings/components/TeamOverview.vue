@@ -1,7 +1,7 @@
 <template>
     <div class="pa-4">
         <a-card title="Members" icon="$fas_users" color="rgba(33, 150, 243)">
-            <div v-if="isAdmin()" class="email-invite-container">
+            <div v-if="isAdmin" class="email-invite-container">
                 <v-combobox
                     v-model="allEmails"
                     :items="[]"
@@ -67,7 +67,7 @@
                                 {{user.role || '-'}}
                             </div>
                             <actions-tray  
-                                v-if="hover && isAdmin()" 
+                                v-if="hover && isAdmin" 
                                 class="table-row-actions" 
                                 :actions="actions || []" 
                                 :subject=user 
@@ -181,12 +181,14 @@
                     color: 'red'
                 })
             },
-            isAdmin() {
-                return this.users && this.users.find(x => x.login === window.USER_NAME).role === "ADMIN"
-            }
         },
         computed: {
-            ...mapState('team', ['users'])
+            ...mapState('team', ['users']),
+            isAdmin() {
+                return this.users && 
+                    Object.entries(this.users).length > 0 &&
+                    this.users.find(x => x.login === window.USER_NAME).role === "ADMIN"
+            }            
         }
     }
 </script>

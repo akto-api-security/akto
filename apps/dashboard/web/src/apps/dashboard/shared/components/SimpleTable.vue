@@ -33,7 +33,6 @@
         </template>
 
         <template v-slot:item="{item}">
-            
             <v-hover
                 v-slot="{ hover }"
             >
@@ -43,12 +42,16 @@
                         :style="{'background-color':item.color, 'padding' : '0px !important'}"
                     />
                     <td 
-                        v-for="(entry, index) in headers.slice(1)"
+                        v-for="(header, index) in headers.slice(1)"
                         :key="index"
                         class="table-column clickable"
                         @click="$emit('rowClicked', item)"
                     >
-                        <div class="table-entry">{{item[entry.value]}}</div>
+                        <slot :name="[`item.${header.value}`]" :item="item">
+                            <div class="table-entry">{{item[header.value]}}</div>
+                        </slot>
+
+                        
                     </td>
 
                     <div v-if="actions && hover && actions.length > 0" class="table-row-actions">

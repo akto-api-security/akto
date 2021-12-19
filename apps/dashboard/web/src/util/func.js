@@ -326,6 +326,11 @@ export default {
 
             if(this.isSubTypeSensitive(x)) {
                 val.sensitive ++
+                if (!val.sensitiveTags) {
+                    val.sensitiveTags = new Set()
+                }
+    
+                val.sensitiveTags.add(x.subType)
                 val.color = "#f44336"
             }
 
@@ -351,5 +356,30 @@ export default {
 
         return Object.values(ret)        
     },
-    recencyPeriod: 60 * 24 * 60 * 60 
+    recencyPeriod: 60 * 24 * 60 * 60,
+    sensitiveTagDetails(tag) {
+        let icon = "$fas_info-circle"
+        switch(tag) {
+            case "EMAIL":
+                icon = "$fas_envelope"
+                break;
+            case "PHONE_NUMBER_INDIA":
+            case "PHONE_NUMBER_US":
+            case "PHONE_NUMBER":      
+                icon = "$fas_phone-alt"          
+                break;
+            case "CREDIT_CARD":
+                icon = "$fas_credit-card"
+                break;
+            case "SSN":
+                icon = "$fas_chalkboard"
+                break;
+            case "PAN_CARD":
+                icon = "$fas_address-card"
+                break;
+            default:
+                break;        
+        }
+        return icon
+    }
 }

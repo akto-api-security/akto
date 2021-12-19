@@ -16,14 +16,22 @@
                     name="All" 
                     sortKeyDefault="sensitive" 
                     :sortDescDefault="true"
-                />
+                >
+                    <template #item.sensitive="{item}">
+                        <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
+                    </template>
+                </simple-table>
             </template>
             <template slot="Sensitive">
                 <simple-table 
                     :headers=tableHeaders 
                     :items=sensitiveEndpoints 
                     @rowClicked=rowClicked name="Sensitive"
-                />
+                >
+                    <template #item.sensitive="{item}">
+                        <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
+                    </template>
+                </simple-table>
             </template>
             <template slot="Shadow">
                 <simple-table 
@@ -33,7 +41,11 @@
                     name="Shadow"  
                     sortKeyDefault="sensitive" 
                     :sortDescDefault="true"
-                />
+                >
+                    <template #item.sensitive="{item}">
+                        <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
+                    </template>
+                </simple-table>
             </template>
             <template slot="Unused">
                 <simple-table 
@@ -55,13 +67,15 @@ import constants from '@/util/constants'
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import api from '../api'
+import SensitiveChipGroup from './SensitiveChipGroup.vue'
 
 export default {
     name: "ApiEndpoints",
     components: { 
         CountBox, 
         LayoutWithTabs,
-        SimpleTable
+        SimpleTable,
+        SensitiveChipGroup        
     },
     data() {
         return {
@@ -166,6 +180,3 @@ export default {
 
 }
 </script>
-
-<style lang="sass" scoped>
-</style>

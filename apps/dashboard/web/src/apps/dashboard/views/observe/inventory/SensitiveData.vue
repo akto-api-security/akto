@@ -11,10 +11,19 @@
         </div> 
         <layout-with-tabs :tabs="['Response', 'Request']">
             <template slot="Request">
-                <simple-table :headers=headers :items=sensitiveParamsInRequestForTable name="Request"/>
+                <simple-table :headers=headers :items=sensitiveParamsInRequestForTable name="Request">
+                    <template #item.type="{item}">
+                        <sensitive-chip-group :sensitiveTags="[item.type]" />
+                    </template>
+                </simple-table>
             </template>
             <template slot="Response">
-                <simple-table :headers=headers :items=sensitiveParamsInResponseForTable name="Response" />
+                <simple-table :headers=headers :items=sensitiveParamsInResponseForTable name="Response">
+                    <template #item.type="{item}">
+                        <sensitive-chip-group :sensitiveTags="[item.type]" />
+                    </template>
+                </simple-table>
+
             </template>
         </layout-with-tabs>  
     </div>
@@ -29,6 +38,7 @@ import { mapState } from 'vuex'
 import func from '@/util/func'
 import constants from '@/util/constants'
 import SimpleLayout from '@/apps/dashboard/layouts/SimpleLayout'
+import SensitiveChipGroup from './components/SensitiveChipGroup'
 
 export default {
     name: "SensitiveData",
@@ -37,7 +47,8 @@ export default {
         LayoutWithTabs,
         SimpleTable,
         SensitiveParamsCard,
-        SimpleLayout        
+        SimpleLayout,
+        SensitiveChipGroup 
     },
     data () {
  
