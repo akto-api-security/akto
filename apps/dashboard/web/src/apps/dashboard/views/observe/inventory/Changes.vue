@@ -18,7 +18,11 @@
                     name="New endpoints" 
                     sortKeyDefault="added" 
                     :sortDescDefault="true" 
-                />
+                >
+                    <template #item.sensitive="{item}">
+                        <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
+                    </template>
+                </simple-table>
             </template>
             <template slot="New parameters">
                 <simple-table 
@@ -27,7 +31,11 @@
                     name="New parameters" 
                     sortKeyDefault="added" 
                     :sortDescDefault="true"
-                />
+                >
+                    <template #item.type="{item}">
+                        <sensitive-chip-group :sensitiveTags="[item.type]" />
+                    </template>
+                </simple-table>
             </template>
         </layout-with-tabs>
     </div>    
@@ -40,6 +48,7 @@ import ACard from '@/apps/dashboard/shared/components/ACard'
 import CountBox from '@/apps/dashboard/shared/components/CountBox'
 import LineChart from '@/apps/dashboard/shared/components/LineChart'
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
+import SensitiveChipGroup from './components/SensitiveChipGroup'
 import func from '@/util/func'
 import constants from '@/util/constants'
 import {mapState} from 'vuex'
@@ -52,7 +61,8 @@ export default {
         ACard, 
         LineChart, 
         LayoutWithTabs,
-        SimpleTable
+        SimpleTable,
+        SensitiveChipGroup
     },
     data () {
         return {
