@@ -92,7 +92,7 @@ public class TestDump2 {
 
         ret.requestParams.setHeaders(headers);
         ret.requestParams.setPayload(createSimpleRequestPayload());
-
+        ret.requestParams.setApiCollectionId(123);
         return ret;
     }
 
@@ -106,7 +106,7 @@ public class TestDump2 {
 
     @Test
     public void testHappyPath() {
-        String message = " {\"akto_account_id\":\"1000000\",\"contentType\":\"application/json;charset=utf-8\",\"ip\":\"49.32.227.133:60118\",\"method\":\"GET\",\"path\":\"/api/books\",\"requestHeaders\":\"{\\\"Accept\\\":[\\\"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9\\\"],\\\"Accept-Encoding\\\":[\\\"gzip, deflate\\\"],\\\"Accept-Language\\\":[\\\"en-US,en;q=0.9,mr;q=0.8\\\"],\\\"Cache-Control\\\":[\\\"no-cache\\\"],\\\"Connection\\\":[\\\"keep-alive\\\"],\\\"Dnt\\\":[\\\"1\\\"],\\\"Pragma\\\":[\\\"no-cache\\\"],\\\"Upgrade-Insecure-Requests\\\":[\\\"1\\\"],\\\"User-Agent\\\":[\\\"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.55 Safari/537.36\\\"]}\",\"requestPayload\":\"\",\"responseHeaders\":\"{\\\"Content-Type\\\":[\\\"application/json;charset=utf-8\\\"]}\",\"responsePayload\":\"{\\\"id\\\":\\\"1\\\",\\\"isbn\\\":\\\"3223\\\",\\\"title\\\":\\\"Book 1\\\",\\\"author\\\":{\\\"firstname\\\":\\\"Avneesh\\\",\\\"lastname\\\":\\\"Hota\\\"}}\\n\",\"status\":\"null\",\"statusCode\":\"201\",\"time\":\"1638940067\",\"type\":\"HTTP/1.1\"}";
+        String message = " {\"akto_account_id\":\"1000000\",\"contentType\":\"application/json;charset=utf-8\",\"ip\":\"49.32.227.133:60118\",\"method\":\"GET\",\"path\":\"/api/books\",\"requestHeaders\":\"{\\\"Accept\\\":[\\\"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9\\\"],\\\"Accept-Encoding\\\":[\\\"gzip, deflate\\\"],\\\"Accept-Language\\\":[\\\"en-US,en;q=0.9,mr;q=0.8\\\"],\\\"Cache-Control\\\":[\\\"no-cache\\\"],\\\"Connection\\\":[\\\"keep-alive\\\"],\\\"Dnt\\\":[\\\"1\\\"],\\\"Pragma\\\":[\\\"no-cache\\\"],\\\"Upgrade-Insecure-Requests\\\":[\\\"1\\\"],\\\"User-Agent\\\":[\\\"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.55 Safari/537.36\\\"]}\",\"requestPayload\":\"\",\"responseHeaders\":\"{\\\"Content-Type\\\":[\\\"application/json;charset=utf-8\\\"]}\",\"responsePayload\":\"{\\\"id\\\":\\\"1\\\",\\\"isbn\\\":\\\"3223\\\",\\\"title\\\":\\\"Book 1\\\",\\\"author\\\":{\\\"firstname\\\":\\\"Avneesh\\\",\\\"lastname\\\":\\\"Hota\\\"}}\\n\",\"status\":\"null\",\"statusCode\":\"201\",\"time\":\"1638940067\",\"type\":\"HTTP/1.1\",\"akto_vxlan_id\":\"123\"}";
         HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(message);
 
         URLAggregator aggr = new URLAggregator();
@@ -115,7 +115,8 @@ public class TestDump2 {
         aggr.addURL(httpResponseParams);
         sync.computeDelta(aggr, false);
         
-        assertEquals(sync.getDBUpdates().size(), 15);
+        assertEquals(sync.getDBUpdatesForParams().size(), 15);
+        assertEquals(sync.getDBUpdatesForUrlToCollection().size(), 0);
         
     }
 
@@ -144,7 +145,9 @@ public class TestDump2 {
         assertEquals(respTemplate.getUserIds().size(), 1);
         assertEquals(respTemplate.getParameters().size(), 3);
 
-        assertEquals(sync.getDBUpdates().size(), 24);
+        assertEquals(sync.getDBUpdatesForParams().size(), 24);
+        assertEquals(sync.getDBUpdatesForUrlToCollection().size(), 1);
+
     }
 
     @Test
@@ -171,6 +174,7 @@ public class TestDump2 {
         assertEquals(reqTemplate.getParameters().size(), 5);
 
 
+        assertEquals(sync.getDBUpdatesForUrlToCollection().size(), 1);
 
         System.out.println("done");
     }
@@ -206,6 +210,8 @@ public class TestDump2 {
         RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
         assertEquals(respTemplate.getUserIds().size(), 5);
         assertEquals(respTemplate.getParameters().size(), 3);
+
+        assertEquals(sync.getDBUpdatesForUrlToCollection().size(), 1);
     }
 
     @Test
@@ -239,6 +245,8 @@ public class TestDump2 {
         RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
         assertEquals(respTemplate.getUserIds().size(), 30);
         assertEquals(respTemplate.getParameters().size(), 3);
+        assertEquals(sync.getDBUpdatesForUrlToCollection().size(), 61);
+
     }
 
     private String createPayloadWithRepetitiveKeys(String i) {
@@ -290,8 +298,10 @@ public class TestDump2 {
         List<SingleTypeInfo> deleted = respTemplate.tryMergeNodesInTrie(url, "POST", resp.statusCode);
         assertEquals(respTemplate.getParameters().size(), 1);
 
-        List updates = sync.getDBUpdates();
+        List updates = sync.getDBUpdatesForParams();
         assertEquals(updates.size(), 22);
+        assertEquals(sync.getDBUpdatesForUrlToCollection().size(), 1);
+
 
     }
 }

@@ -11,7 +11,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.UrlCollectionIdMappingsDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.UrlCollectionIdMapping;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.RequestTemplate;
@@ -21,6 +23,7 @@ import com.akto.dto.type.URLTemplate;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.parsers.HttpCallParser;
+import com.akto.parsers.HttpCallParser.HttpRequestParams;
 import com.akto.parsers.HttpCallParser.HttpResponseParams;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.DeleteOneModel;
@@ -49,8 +52,8 @@ public class APICatalogSync {
     public APICatalogSync(String userIdentifier,int thresh) {
         this.thresh = thresh;
         this.userIdentifier = userIdentifier;
-        this.dbState = new APICatalog(1, new HashMap<>(), new HashMap<>());
-        this.delta = new APICatalog(1, new HashMap<>(), new HashMap<>());
+        this.dbState = new APICatalog(1, new HashMap<>(), new HashMap<>(), new HashMap<>());
+        this.delta = new APICatalog(1, new HashMap<>(), new HashMap<>(), new HashMap<>());
     }
 
 
@@ -65,11 +68,17 @@ public class APICatalogSync {
         }
     }
 
+    public void processCollectionId(String url, int collectionId) {
+        Map<String, Integer> deltaMappings = this.delta.getUrlToCollectionMappings();
+        deltaMappings.put(url, collectionId);
+    }
+
     public void processResponse(URLMethods urlMethods, HttpResponseParams responseParams, List<SingleTypeInfo> deletedInfo) {
-        String urlWithParams = responseParams.getRequestParams().getURL();
+        HttpRequestParams requestParams = responseParams.getRequestParams();
+        String urlWithParams = requestParams.getURL();
         String baseURL = URLAggregator.getBaseURL(urlWithParams);
         BasicDBObject queryParams = URLAggregator.getQueryJSON(urlWithParams);
-        String methodStr = responseParams.getRequestParams().getMethod();
+        String methodStr = requestParams.getMethod();
         int statusCode = responseParams.getStatusCode();
         Method method = Method.valueOf(methodStr);
         String userId = extractUserId(responseParams, userIdentifier);
@@ -80,12 +89,13 @@ public class APICatalogSync {
         }
 
         if (statusCode >= 200 && statusCode < 300) {
-            String reqPayload = responseParams.getRequestParams().getPayload();
-            requestTemplate.processHeaders(responseParams.getRequestParams().getHeaders(), baseURL, method.name(), -1, userId);
+            String reqPayload = requestParams.getPayload();
+            requestTemplate.processHeaders(requestParams.getHeaders(), baseURL, method.name(), -1, userId);
             if (reqPayload.startsWith("{")) {
                 BasicDBObject payload = BasicDBObject.parse(reqPayload);
                 payload.putAll(queryParams.toMap());
                 deletedInfo.addAll(requestTemplate.process2(payload, baseURL, methodStr, -1, userId));
+                processCollectionId(baseURL, requestParams.getApiCollectionId());
             }
         }
 
@@ -195,7 +205,6 @@ public class APICatalogSync {
                 }
             }
         }
-
     }
 
     private void processKnownURLs(URLAggregator aggregator, List<SingleTypeInfo> deletedInfo) {
@@ -311,19 +320,22 @@ public class APICatalogSync {
                 RequestTemplate newTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>());
                 methodToTemplate.put(method, newTemplate);
                 delta.getTemplateURLToMethods().put(sample, new URLMethods(methodToTemplate));
-
                 Iterator<Map.Entry<String, URLMethods>> strictURLIterator = delta.getStrictURLToMethods().entrySet().iterator();
 
                 while(strictURLIterator.hasNext()) {
                     Map.Entry<String, URLMethods> urlAndMethods = strictURLIterator.next();
-                    if (sample.match(urlAndMethods.getKey())) {
+                    String strictURL = urlAndMethods.getKey();
+                    if (sample.match(strictURL)) {
                         Map<Method, RequestTemplate> strictMethods = urlAndMethods.getValue().getMethodToRequestTemplate();
 
                         if (strictMethods != null && strictMethods.containsKey(method)) {
                             newTemplate.mergeFrom(strictMethods.get(method));
                             RequestTemplate removed = strictMethods.remove(method);
                             if (strictMethods.size() == 0) {
-                                logger.info("Removing completely" + urlAndMethods.getKey());
+                                logger.info("Removing completely" + strictURL);
+                                
+                                int collectionId = delta.getUrlToCollectionMappings().getOrDefault(strictURL, 0);
+                                delta.getUrlToCollectionMappings().put(sample.getTemplateString(), collectionId);
                                 strictURLIterator.remove();
                             }
                             deletedInfo.addAll(removed.copy().getAllTypeInfo());
@@ -400,7 +412,16 @@ public class APICatalogSync {
         return ret;
     }
 
-    public ArrayList<WriteModel<SingleTypeInfo>> getDBUpdates() {
+    static Map<String, Integer> buildUrlToCollectionMap(List<UrlCollectionIdMapping> l) {
+        Map<String, Integer> ret = new HashMap<>();
+        for(UrlCollectionIdMapping e: l) {
+            ret.put(e.getUrl(), e.getCollectionId());
+        }
+
+        return ret;
+    }
+
+    public ArrayList<WriteModel<SingleTypeInfo>> getDBUpdatesForParams() {
         APICatalog currentState = dbState;
         APICatalog currentDelta = delta;
 
@@ -477,11 +498,12 @@ public class APICatalogSync {
 
     public void buildFromDB(int id) {
         List<SingleTypeInfo> allParams = SingleTypeInfoDao.instance.fetchAll();
-        this.dbState = build(id, allParams);
+        List<UrlCollectionIdMapping> urlCollectionIdMappings = UrlCollectionIdMappingsDao.instance.findAll(new BasicDBObject());
+        this.dbState = build(id, allParams, urlCollectionIdMappings);
     }
 
-    private static APICatalog build(int id, List<SingleTypeInfo> allParams) {
-        APICatalog ret = new APICatalog(id, new HashMap<>(), new HashMap<>());
+    private static APICatalog build(int id, List<SingleTypeInfo> allParams, List<UrlCollectionIdMapping> urlCollectionIdMappings) {
+        APICatalog ret = new APICatalog(id, new HashMap<>(), new HashMap<>(), buildUrlToCollectionMap(urlCollectionIdMappings));
         
 
         for (SingleTypeInfo param: allParams) {
@@ -559,16 +581,55 @@ public class APICatalogSync {
     }
 
     public void syncWithDB() {
-        List<WriteModel<SingleTypeInfo>> writes = getDBUpdates();
+        List<WriteModel<SingleTypeInfo>> writesForParams = getDBUpdatesForParams();
 
-        logger.info("adding " + writes.size() + " updates");
+        logger.info("adding " + writesForParams.size() + " updates for params");
 
-        if (writes.size() > 0) {
-            SingleTypeInfoDao.instance.getMCollection().bulkWrite(writes);
+        if (writesForParams.size() > 0) {
+            SingleTypeInfoDao.instance.getMCollection().bulkWrite(writesForParams);
         }
 
+        List<WriteModel<UrlCollectionIdMapping>> writesForUrlToCollection = getDBUpdatesForUrlToCollection();
+        logger.info("adding " + writesForUrlToCollection.size() + " updates for urlToCollectionId");
+
+        if (writesForUrlToCollection.size() > 0) {
+            UrlCollectionIdMappingsDao.instance.getMCollection().bulkWrite(writesForUrlToCollection);
+        }
+
+        deletedInfo = new ArrayList<>();
         buildFromDB(1);
     }
+
+    public List<WriteModel<UrlCollectionIdMapping>> getDBUpdatesForUrlToCollection() {
+        Map<String, Integer> dbUrlMap = this.dbState.getUrlToCollectionMappings();
+        Map<String, Integer> deltaUrlMap = this.delta.getUrlToCollectionMappings();
+
+        ArrayList<WriteModel<UrlCollectionIdMapping>> bulkUpdates = new ArrayList<>();
+
+        for(String key: deltaUrlMap.keySet()) {
+            int dbCollId = dbUrlMap.getOrDefault(key, 0);
+            int deltaCollId = deltaUrlMap.getOrDefault(key, 0);
+            Bson update;
+
+            if (dbCollId != deltaCollId) {
+                update = Updates.set("collectionId", deltaCollId);
+                Bson updateKey = Filters.eq("url", key);
+                bulkUpdates.add(new UpdateOneModel<>(updateKey, update, new UpdateOptions().upsert(true)));
+            }
+        }
+
+        HashSet<String> deletedURLs = new HashSet<>();
+        for(SingleTypeInfo deleted: deletedInfo) {
+            deletedURLs.add(deleted.getUrl());
+        }
+
+        for(String url: deletedURLs) {
+            bulkUpdates.add(new DeleteOneModel<>(Filters.eq("url", url), new DeleteOptions()));
+        }
+
+        return bulkUpdates;
+    }
+
 
     public void printNewURLsInDelta() {
         for(String s: delta.getStrictURLToMethods().keySet()) {

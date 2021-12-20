@@ -34,7 +34,7 @@ public class MarkovTest {
     public HttpCallParser.HttpResponseParams generateHttpResponseParamsForMarkov(String url, String method, String userId) {
 
         HttpCallParser.HttpRequestParams  httpRequestParams = new HttpCallParser. HttpRequestParams(
-                method, url, "",generateHeaders(userId),""
+                method, url, "",generateHeaders(userId),"", 0
         );
         return new HttpCallParser.HttpResponseParams(
             "",200,"ok", generateHeaders(userId), "", httpRequestParams, Context.now(), "1111"

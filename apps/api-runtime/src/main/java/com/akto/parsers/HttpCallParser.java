@@ -13,6 +13,8 @@ import com.akto.runtime.URLAggregator;
 
 import com.google.gson.Gson;
 import com.mongodb.ConnectionString;
+
+import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,15 +34,18 @@ public class HttpCallParser {
         String type; // HTTP/1.1
         private Map<String, List<String>> headers = new HashMap<>();
         private String payload;
+        private int apiCollectionId;
 
         public HttpRequestParams() {}
 
-        public HttpRequestParams(String method, String url, String type, Map<String, List<String>> headers, String payload) {
+        public HttpRequestParams(String method, String url, String type, Map<String, List<String>> headers, String payload, int apiCollectionId) {
             this.method = method;
             this.url = url;
             this.type = type;
             this.headers = headers;
             this.payload = payload;
+            this.apiCollectionId = apiCollectionId;
+
         }
 
         public static List<HttpRequestParams> parseRequest(String request) throws IOException {
@@ -115,6 +120,14 @@ public class HttpCallParser {
 
         public String getMethod() {
             return this.method;
+        }
+
+        public int getApiCollectionId() {
+            return this.apiCollectionId;
+        }
+
+        public void setApiCollectionId(int apiCollectionId) {
+            this.apiCollectionId = apiCollectionId;
         }
     }
 
@@ -279,10 +292,15 @@ public class HttpCallParser {
         String url = (String) json.get("path");
         String type = (String) json.get("type");
         String requestPayload = (String) json.get("requestPayload");
-
+        String apiCollectionIdStr = json.getOrDefault("akto_vxlan_id", "0").toString();
+        int apiCollectionId = 0;
+        if (NumberUtils.isDigits(apiCollectionIdStr)) {
+            apiCollectionId = NumberUtils.toInt(apiCollectionIdStr, 0);
+        }
+        
         Map<String,List<String>> requestHeaders = getHeaders(gson, json, "requestHeaders");
         HttpRequestParams requestParams = new HttpRequestParams(
-                method,url,type, requestHeaders, requestPayload
+                method,url,type, requestHeaders, requestPayload, apiCollectionId
         );
 
         int statusCode = Integer.parseInt(json.get("statusCode").toString());
@@ -291,6 +309,7 @@ public class HttpCallParser {
         String payload = (String) json.get("responsePayload");
         int time = Integer.parseInt(json.get("time").toString());
         String accountId = (String) json.get("akto_account_id");
+
 
         return new HttpResponseParams(
                 type,statusCode, status, responseHeaders, payload, requestParams, time, accountId

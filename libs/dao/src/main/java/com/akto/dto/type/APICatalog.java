@@ -12,14 +12,21 @@ public class APICatalog {
     int id;
     Map<String, URLMethods> strictURLToMethods;
     Map<URLTemplate, URLMethods> templateURLToMethods;
+    Map<String, Integer> urlToCollectionMappings;
 
     public APICatalog() {
     }
 
-    public APICatalog(int id, Map<String,URLMethods> strictURLToMethods, Map<URLTemplate,URLMethods> templateURLToMethods) {
+    public APICatalog(
+        int id, 
+        Map<String,URLMethods> strictURLToMethods, 
+        Map<URLTemplate,URLMethods> templateURLToMethods,
+        Map<String, Integer> urlToCollectionMappings
+    ) {
         this.id = id;
         this.strictURLToMethods = strictURLToMethods;
         this.templateURLToMethods = templateURLToMethods;
+        this.urlToCollectionMappings = urlToCollectionMappings;
     }
 
     public List<SingleTypeInfo> getAllTypeInfo() {
@@ -63,12 +70,21 @@ public class APICatalog {
         this.templateURLToMethods = templateURLToMethods;
     }
 
+    public Map<String, Integer> getUrlToCollectionMappings() {
+        return this.urlToCollectionMappings;
+    }
+
+    public void setUrlToCollectionMappings(Map<String, Integer> urlToCollectionMappings) {
+        this.urlToCollectionMappings = urlToCollectionMappings;
+    }
+
     @Override
     public String toString() {
         return "{" +
             " id='" + getId() + "'" +
             ", strictURLToMethods='" + getStrictURLToMethods() + "'" +
             ", templateURLToMethods='" + getTemplateURLToMethods() + "'" +
+            ", urlToCollectionMappings='" + getUrlToCollectionMappings() + "'" +
             "}";
     }
 }
