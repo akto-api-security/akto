@@ -147,6 +147,23 @@ public class Main {
                 }
 
                 main.consumer.commitSync();
+
+                // metrics
+                Set<TopicPartition> assignment = main.consumer.assignment();
+                final Map<TopicPartition, Long> endOffsets = main.consumer.endOffsets(assignment);
+                final Map<TopicPartition, Long> beginningOffsets = main.consumer.beginningOffsets(assignment);
+                assert (endOffsets.size() == beginningOffsets.size());
+                assert (endOffsets.keySet().equals(beginningOffsets.keySet()));
+
+                Long totalCount = beginningOffsets.entrySet().stream().mapToLong(entry -> {
+                    TopicPartition tp = entry.getKey();
+                    Long beginningOffset = entry.getValue();
+                    Long endOffset = endOffsets.get(tp);
+                    return endOffset - beginningOffset;
+                }).sum();
+
+                System.out.println("TOTAL COUNT: " + totalCount);
+
             }
 
         } catch (WakeupException ignored) {
