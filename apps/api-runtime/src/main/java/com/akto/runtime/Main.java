@@ -5,11 +5,16 @@ import java.util.*;
 
 import com.akto.DaoInit;
 import com.akto.dao.APIConfigsDao;
+import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.APIConfig;
+import com.akto.dto.ApiCollection;
 import com.akto.parsers.HttpCallParser;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
@@ -42,7 +47,12 @@ public class Main {
 
         // mongoURI = "mongodb://write_ops:write_ops@cluster0-shard-00-00.yg43a.mongodb.net:27017,cluster0-shard-00-01.yg43a.mongodb.net:27017,cluster0-shard-00-02.yg43a.mongodb.net:27017/myFirstDatabase?ssl=true&replicaSet=atlas-qd3mle-shard-0&authSource=admin&retryWrites=true&w=majority";
         DaoInit.init(new ConnectionString(mongoURI));
+        SingleTypeInfoDao.instance.getMCollection().updateMany(Filters.exists("apiCollectionId", false), Updates.set("apiCollectionId", 0));
 
+        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("id", 0);
+        if (apiCollection == null) {
+            ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now()));
+        }
 
         APIConfig apiConfig;
         apiConfig = APIConfigsDao.instance.findOne(Filters.eq("name", configName));
