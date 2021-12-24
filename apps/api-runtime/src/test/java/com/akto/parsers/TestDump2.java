@@ -118,33 +118,44 @@ public class TestDump2 {
         assertEquals(sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0)).size(), 15);        
     }
 
+
+    public void simpleTestForSingleCollection(int collectionId, APICatalogSync sync) {
+        {
+            String url = "https://someapi.com/link1";
+            HttpResponseParams resp = createSampleParams("user1", url);
+        
+            URLAggregator aggr = new URLAggregator();
+
+            aggr.addURL(resp);
+            sync.computeDelta(aggr, false, collectionId);
+
+            Map<String, URLMethods> urlMethodsMap = sync.getDelta(collectionId).getStrictURLToMethods();
+
+            assertEquals(urlMethodsMap.size(), 1);
+
+            URLMethods urlMethods = urlMethodsMap.get(resp.getRequestParams().url);
+            
+            RequestTemplate reqTemplate = urlMethods.getMethodToRequestTemplate().get(Method.valueOf(resp.getRequestParams().method));
+            assertEquals(reqTemplate.getUserIds().size(), 1);
+            assertEquals(reqTemplate.getParameters().size(), 2);
+            
+            RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
+            assertEquals(respTemplate.getUserIds().size(), 1);
+            assertEquals(respTemplate.getParameters().size(), 3);
+
+            assertEquals(sync.getDBUpdatesForParams(sync.getDelta(collectionId), sync.getDbState(collectionId)).size(), 24);
+        }        
+    }
+
     @Test
     public void simpleTest() {
-        String url = "https://someapi.com/link1";
-        HttpResponseParams resp = createSampleParams("user1", url);
-    
-        URLAggregator aggr = new URLAggregator();
         APICatalogSync sync = new APICatalogSync("access-token", 5);
-
-        aggr.addURL(resp);
-        sync.computeDelta(aggr, false, 0);
-
-        Map<String, URLMethods> urlMethodsMap = sync.getDelta(0).getStrictURLToMethods();
-
-        assertEquals(urlMethodsMap.size(), 1);
-
-        URLMethods urlMethods = urlMethodsMap.get(resp.getRequestParams().url);
-        
-        RequestTemplate reqTemplate = urlMethods.getMethodToRequestTemplate().get(Method.valueOf(resp.getRequestParams().method));
-        assertEquals(reqTemplate.getUserIds().size(), 1);
-        assertEquals(reqTemplate.getParameters().size(), 2);
-        
-        RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
-        assertEquals(respTemplate.getUserIds().size(), 1);
-        assertEquals(respTemplate.getParameters().size(), 3);
-
+        simpleTestForSingleCollection(0, sync);
+        simpleTestForSingleCollection(1, sync);
+        simpleTestForSingleCollection(2, sync);
         assertEquals(sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0)).size(), 24);
-
+        assertEquals(sync.getDBUpdatesForParams(sync.getDelta(1), sync.getDbState(1)).size(), 24);
+        assertEquals(sync.getDBUpdatesForParams(sync.getDelta(2), sync.getDbState(2)).size(), 24);
     }
 
     @Test
