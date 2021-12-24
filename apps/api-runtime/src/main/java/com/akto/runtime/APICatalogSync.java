@@ -11,9 +11,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dao.UrlCollectionIdMappingsDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.UrlCollectionIdMapping;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.RequestTemplate;
