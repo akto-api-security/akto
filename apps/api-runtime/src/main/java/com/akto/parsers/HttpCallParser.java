@@ -241,7 +241,7 @@ public class HttpCallParser {
         this.sync_threshold_count = sync_threshold_count;
         this.sync_threshold_time = sync_threshold_time;
         apiCatalogSync = new APICatalogSync(userIdentifier,thresh);
-        apiCatalogSync.buildFromDB(1);
+        apiCatalogSync.buildFromDB();
     }
     
     public static int counter = 0;
@@ -357,7 +357,10 @@ public class HttpCallParser {
 
         aggregate(responseParams);
 
-        apiCatalogSync.computeDelta(aggregator, false);
+        for (int apiCollectionId: aggregatorMap.keySet()) {
+            URLAggregator aggregator = aggregatorMap.get(apiCollectionId);
+            apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
+        }
 
         this.sync_count += responseParams.size();
         if (this.sync_count >= sync_threshold_count || (Context.now() - this.last_synced) > this.sync_threshold_time) {
@@ -367,11 +370,18 @@ public class HttpCallParser {
         }
     }
 
-    URLAggregator aggregator = new URLAggregator();
+    Map<Integer, URLAggregator> aggregatorMap = new HashMap<>();
     public void aggregate(List<HttpResponseParams> responses) {
         int count = 0;
         for (HttpResponseParams responseParams: responses) {
             try {
+                int collId = responseParams.getRequestParams().getApiCollectionId();
+                URLAggregator aggregator = aggregatorMap.get(collId);
+                if (aggregator == null) {
+                    aggregator = new URLAggregator();
+                    aggregatorMap.put(collId, aggregator);
+                }
+
                 aggregator.addURL(responseParams);
                 count++;
             } catch (Exception  e) {

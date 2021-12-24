@@ -12,7 +12,7 @@ public class APICatalog {
     int id;
     Map<String, URLMethods> strictURLToMethods;
     Map<URLTemplate, URLMethods> templateURLToMethods;
-    Map<String, Integer> urlToCollectionMappings;
+    List<SingleTypeInfo> deletedInfo = new ArrayList<>();
 
     public APICatalog() {
     }
@@ -20,13 +20,11 @@ public class APICatalog {
     public APICatalog(
         int id, 
         Map<String,URLMethods> strictURLToMethods, 
-        Map<URLTemplate,URLMethods> templateURLToMethods,
-        Map<String, Integer> urlToCollectionMappings
+        Map<URLTemplate,URLMethods> templateURLToMethods
     ) {
         this.id = id;
         this.strictURLToMethods = strictURLToMethods;
         this.templateURLToMethods = templateURLToMethods;
-        this.urlToCollectionMappings = urlToCollectionMappings;
     }
 
     public List<SingleTypeInfo> getAllTypeInfo() {
@@ -44,6 +42,13 @@ public class APICatalog {
         }
 
         return ret;
+    }
+
+    public APICatalog(int id, Map<String,URLMethods> strictURLToMethods, Map<URLTemplate,URLMethods> templateURLToMethods, List<SingleTypeInfo> deletedInfo) {
+        this.id = id;
+        this.strictURLToMethods = strictURLToMethods;
+        this.templateURLToMethods = templateURLToMethods;
+        this.deletedInfo = deletedInfo;
     }
 
     public int getId() {
@@ -70,12 +75,17 @@ public class APICatalog {
         this.templateURLToMethods = templateURLToMethods;
     }
 
-    public Map<String, Integer> getUrlToCollectionMappings() {
-        return this.urlToCollectionMappings;
+    public List<SingleTypeInfo> getDeletedInfo() {
+        return this.deletedInfo;
     }
 
-    public void setUrlToCollectionMappings(Map<String, Integer> urlToCollectionMappings) {
-        this.urlToCollectionMappings = urlToCollectionMappings;
+    public void setDeletedInfo(List<SingleTypeInfo> deletedInfo) {
+        this.deletedInfo = deletedInfo;
+    }
+
+    public APICatalog id(int id) {
+        setId(id);
+        return this;
     }
 
     @Override
@@ -84,7 +94,8 @@ public class APICatalog {
             " id='" + getId() + "'" +
             ", strictURLToMethods='" + getStrictURLToMethods() + "'" +
             ", templateURLToMethods='" + getTemplateURLToMethods() + "'" +
-            ", urlToCollectionMappings='" + getUrlToCollectionMappings() + "'" +
+            ", deletedInfo='" + getDeletedInfo() + "'" +
             "}";
     }
+
 }

@@ -43,7 +43,7 @@ public class KeyTypes {
         return ret;
     }
 
-    public void process(String url, String method, int responseCode, boolean isHeader, String param, Object object, String userId) {
+    public void process(String url, String method, int responseCode, boolean isHeader, String param, Object object, String userId, int apiCollectionId) {
 
         SubType subType = findSubType(object);
 
@@ -55,7 +55,7 @@ public class KeyTypes {
             Set<String> userIds = new HashSet<>();
             userIds.add(userId);
             
-            ParamId paramId = new ParamId(url, method, responseCode, isHeader, param, subType);
+            ParamId paramId = new ParamId(url, method, responseCode, isHeader, param, subType, apiCollectionId);
             singleTypeInfo = new SingleTypeInfo(paramId, examples, userIds, 1, Context.now(), 0);
 
             occurrences.put(subType, singleTypeInfo);

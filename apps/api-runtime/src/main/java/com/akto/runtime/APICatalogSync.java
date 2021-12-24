@@ -45,15 +45,14 @@ public class APICatalogSync {
     public int thresh;
     public String userIdentifier;
     private static final Logger logger = LoggerFactory.getLogger(APICatalogSync.class);
-    APICatalog dbState;
-    APICatalog delta;
-    List<SingleTypeInfo> deletedInfo = new ArrayList<>();
+    Map<Integer, APICatalog> dbState;
+    Map<Integer, APICatalog> delta;
 
     public APICatalogSync(String userIdentifier,int thresh) {
         this.thresh = thresh;
         this.userIdentifier = userIdentifier;
-        this.dbState = new APICatalog(1, new HashMap<>(), new HashMap<>(), new HashMap<>());
-        this.delta = new APICatalog(1, new HashMap<>(), new HashMap<>(), new HashMap<>());
+        this.dbState = new HashMap<>();
+        this.delta = new HashMap<>();
     }
 
 
@@ -66,11 +65,6 @@ public class APICatalogSync {
                 // eat all
             }
         }
-    }
-
-    public void processCollectionId(String url, int collectionId) {
-        Map<String, Integer> deltaMappings = this.delta.getUrlToCollectionMappings();
-        deltaMappings.put(url, collectionId);
     }
 
     public void processResponse(URLMethods urlMethods, HttpResponseParams responseParams, List<SingleTypeInfo> deletedInfo) {
@@ -90,12 +84,11 @@ public class APICatalogSync {
 
         if (statusCode >= 200 && statusCode < 300) {
             String reqPayload = requestParams.getPayload();
-            requestTemplate.processHeaders(requestParams.getHeaders(), baseURL, method.name(), -1, userId);
+            requestTemplate.processHeaders(requestParams.getHeaders(), baseURL, method.name(), -1, userId, requestParams.getApiCollectionId());
             if (reqPayload.startsWith("{")) {
                 BasicDBObject payload = BasicDBObject.parse(reqPayload);
                 payload.putAll(queryParams.toMap());
-                deletedInfo.addAll(requestTemplate.process2(payload, baseURL, methodStr, -1, userId));
-                processCollectionId(baseURL, requestParams.getApiCollectionId());
+                deletedInfo.addAll(requestTemplate.process2(payload, baseURL, methodStr, -1, userId, requestParams.getApiCollectionId()));
             }
         }
 
@@ -115,8 +108,8 @@ public class APICatalogSync {
             }
 
             BasicDBObject payload = BasicDBObject.parse(respPayload);
-            deletedInfo.addAll(responseTemplate.process2(payload, baseURL, methodStr, statusCode, userId));
-            responseTemplate.processHeaders(responseParams.getHeaders(), baseURL, method.name(), statusCode, userId);
+            deletedInfo.addAll(responseTemplate.process2(payload, baseURL, methodStr, statusCode, userId, requestParams.getApiCollectionId()));
+            responseTemplate.processHeaders(responseParams.getHeaders(), baseURL, method.name(), statusCode, userId, requestParams.getApiCollectionId());
         } catch (JsonParseException e) {
 
         }
@@ -140,14 +133,29 @@ public class APICatalogSync {
         return users.size();
     }
 
-    public void computeDelta(URLAggregator origAggregator, boolean triggerTemplateGeneration) {
+    public void computeDelta(URLAggregator origAggregator, boolean triggerTemplateGeneration, int apiCollectionId) {
+
+
+
+        APICatalog deltaCatalog = this.delta.get(apiCollectionId);
+        if (deltaCatalog == null) {
+            deltaCatalog = new APICatalog(apiCollectionId, new HashMap<>(), new HashMap<>());
+            this.delta.put(apiCollectionId, deltaCatalog);
+        } 
+
+        APICatalog dbCatalog = this.dbState.get(apiCollectionId);
+        if (dbCatalog == null) {
+            dbCatalog = new APICatalog(apiCollectionId, new HashMap<>(), new HashMap<>());
+            this.dbState.put(apiCollectionId, dbCatalog);
+        } 
+
         URLAggregator aggregator = new URLAggregator(origAggregator.urls);
 
         origAggregator.urls = new ConcurrentHashMap<>();
 
-        processKnownURLs(aggregator, deletedInfo);
+        processKnownURLs(aggregator, deltaCatalog, dbCatalog);
 
-        processUnknownURLs(aggregator, triggerTemplateGeneration, deletedInfo);
+        processUnknownURLs(aggregator, triggerTemplateGeneration, deltaCatalog);
 
         for (String url: aggregator.urls.keySet()) {
             origAggregator.addURL(aggregator.urls.get(url), url);
@@ -157,7 +165,8 @@ public class APICatalogSync {
 
     int tryGenerateURLsTimestamp = 0;
 
-    private void processUnknownURLs(URLAggregator aggregator, boolean triggerTemplateGeneration, List<SingleTypeInfo> deletedInfo) {
+    private void processUnknownURLs(URLAggregator aggregator, boolean triggerTemplateGeneration, APICatalog deltaCatalog) {
+        List<SingleTypeInfo> deletedInfo = deltaCatalog.getDeletedInfo();
         Iterator<Map.Entry<String, Set<HttpResponseParams>>> iterator = aggregator.urls.entrySet().iterator();
         try {
             while (iterator.hasNext()) {
@@ -166,10 +175,10 @@ public class APICatalogSync {
                 Set<HttpResponseParams> responseParamsList = entry.getValue();
 
 
-                URLMethods urlMethods = delta.getStrictURLToMethods().get(url);
+                URLMethods urlMethods = deltaCatalog.getStrictURLToMethods().get(url);
                 if (urlMethods == null) {
                     urlMethods = new URLMethods(new HashMap<>());
-                    delta.getStrictURLToMethods().put(url, urlMethods);
+                    deltaCatalog.getStrictURLToMethods().put(url, urlMethods);
                 }
 
                 logger.info("parsing a new url " + url);
@@ -186,7 +195,7 @@ public class APICatalogSync {
             logger.info("trying to generate url template");
             tryGenerateURLsTimestamp = now;
 
-            tryGenerateURLTemplates();
+            tryGenerateURLTemplates(deltaCatalog);
 
             iterator = aggregator.urls.entrySet().iterator();
         
@@ -195,9 +204,9 @@ public class APICatalogSync {
                 String url = entry.getKey();
                 Set<HttpResponseParams> responseParamsList = entry.getValue();
 
-                for(URLTemplate  urlTemplate: delta.getTemplateURLToMethods().keySet()) {
+                for(URLTemplate  urlTemplate: deltaCatalog.getTemplateURLToMethods().keySet()) {
                     if (urlTemplate.match(url)) {
-                        URLMethods urlMethods = delta.getTemplateURLToMethods().get(urlTemplate);
+                        URLMethods urlMethods = deltaCatalog.getTemplateURLToMethods().get(urlTemplate);
                         processResponse(urlMethods, responseParamsList, deletedInfo);
                         iterator.remove();
                         break;
@@ -207,31 +216,32 @@ public class APICatalogSync {
         }
     }
 
-    private void processKnownURLs(URLAggregator aggregator, List<SingleTypeInfo> deletedInfo) {
+    private void processKnownURLs(URLAggregator aggregator, APICatalog deltaCatalog, APICatalog dbCatalog) {
         Iterator<Map.Entry<String, Set<HttpResponseParams>>> iterator = aggregator.urls.entrySet().iterator();
+        List<SingleTypeInfo> deletedInfo = deltaCatalog.getDeletedInfo();
         try {
             while (iterator.hasNext()) {
                 Map.Entry<String, Set<HttpResponseParams>> entry = iterator.next();
                 String url = entry.getKey();
                 Set<HttpResponseParams> responseParamsList = entry.getValue();
 
-                URLMethods strictMatch = dbState.getStrictURLToMethods().get(url);
+                URLMethods strictMatch = dbCatalog.getStrictURLToMethods().get(url);
                 if (strictMatch != null) {
-                    URLMethods urlMethods = delta.getStrictURLToMethods().get(url);
+                    URLMethods urlMethods = deltaCatalog.getStrictURLToMethods().get(url);
                     if (urlMethods == null) {
                         urlMethods = strictMatch.copy();
-                        delta.getStrictURLToMethods().put(url, urlMethods);
+                        deltaCatalog.getStrictURLToMethods().put(url, urlMethods);
                     }
 
                     processResponse(urlMethods, entry.getValue(), deletedInfo);
                     iterator.remove();
                 } else {
-                    for (URLTemplate  urlTemplate: dbState.getTemplateURLToMethods().keySet()) {
+                    for (URLTemplate  urlTemplate: dbCatalog.getTemplateURLToMethods().keySet()) {
                         if (urlTemplate.match(url)) {
-                            URLMethods urlMethods = delta.getTemplateURLToMethods().get(urlTemplate);
+                            URLMethods urlMethods = deltaCatalog.getTemplateURLToMethods().get(urlTemplate);
                             if (urlMethods == null) {
-                                urlMethods = dbState.getTemplateURLToMethods().get(urlTemplate).copy();
-                                delta.getTemplateURLToMethods().put(urlTemplate, urlMethods);
+                                urlMethods = dbCatalog.getTemplateURLToMethods().get(urlTemplate).copy();
+                                deltaCatalog.getTemplateURLToMethods().put(urlTemplate, urlMethods);
                             }
             
                             processResponse(urlMethods, responseParamsList, deletedInfo);
@@ -252,11 +262,11 @@ public class APICatalogSync {
         return url;
     }
 
-    private Map<Integer, Map<Method, Map<String, RequestTemplate>>> groupByTokenSize() {
+    private Map<Integer, Map<Method, Map<String, RequestTemplate>>> groupByTokenSize(APICatalog deltaCatalog) {
         Map<Integer, Map<Method, Map<String, RequestTemplate>>> sizeToURL = new HashMap<>();
 
-        for(String rawURL: delta.getStrictURLToMethods().keySet()) {
-            URLMethods urlMethods = delta.getStrictURLToMethods().get(rawURL);
+        for(String rawURL: deltaCatalog.getStrictURLToMethods().keySet()) {
+            URLMethods urlMethods = deltaCatalog.getStrictURLToMethods().get(rawURL);
 
             for (Method method: urlMethods.getMethodToRequestTemplate().keySet()) {
                 RequestTemplate reqTemplate = urlMethods.getMethodToRequestTemplate().get(method);
@@ -285,9 +295,9 @@ public class APICatalogSync {
     }
 
 
-    private void tryGenerateURLTemplates() {
+    private void tryGenerateURLTemplates(APICatalog deltaCatalog) {
 
-        Map<Integer, Map<Method, Map<String, RequestTemplate>>> sizeToURL = groupByTokenSize();
+        Map<Integer, Map<Method, Map<String, RequestTemplate>>> sizeToURL = groupByTokenSize(deltaCatalog);
 
         Iterator<Map.Entry<Integer, Map<Method, Map<String, RequestTemplate>>>> iter = sizeToURL.entrySet().iterator();
         while(iter.hasNext()) {
@@ -300,12 +310,12 @@ public class APICatalogSync {
             for(Map.Entry<Method, Map<String, RequestTemplate> > entry2: urlsForEachMethod.entrySet()) {
                 Method method = entry2.getKey();
                 Map<String, RequestTemplate>  urls = entry2.getValue();
-                removeMatchedUrls(method, urls);
+                removeMatchedUrls(method, urls, deltaCatalog);
             }
         }
     }
 
-    private void removeMatchedUrls(Method method, Map<String, RequestTemplate> origUrls) {
+    private void removeMatchedUrls(Method method, Map<String, RequestTemplate> origUrls, APICatalog deltaCatalog){
 
         while (origUrls.size() > 0) {
             Iterator<Map.Entry<String, RequestTemplate>> origUrlsIterator = origUrls.entrySet().iterator();
@@ -319,8 +329,8 @@ public class APICatalogSync {
                 Map<Method, RequestTemplate> methodToTemplate = new HashMap<>();
                 RequestTemplate newTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>());
                 methodToTemplate.put(method, newTemplate);
-                delta.getTemplateURLToMethods().put(sample, new URLMethods(methodToTemplate));
-                Iterator<Map.Entry<String, URLMethods>> strictURLIterator = delta.getStrictURLToMethods().entrySet().iterator();
+                deltaCatalog.getTemplateURLToMethods().put(sample, new URLMethods(methodToTemplate));
+                Iterator<Map.Entry<String, URLMethods>> strictURLIterator = deltaCatalog.getStrictURLToMethods().entrySet().iterator();
 
                 while(strictURLIterator.hasNext()) {
                     Map.Entry<String, URLMethods> urlAndMethods = strictURLIterator.next();
@@ -333,12 +343,9 @@ public class APICatalogSync {
                             RequestTemplate removed = strictMethods.remove(method);
                             if (strictMethods.size() == 0) {
                                 logger.info("Removing completely" + strictURL);
-                                
-                                int collectionId = delta.getUrlToCollectionMappings().getOrDefault(strictURL, 0);
-                                delta.getUrlToCollectionMappings().put(sample.getTemplateString(), collectionId);
                                 strictURLIterator.remove();
                             }
-                            deletedInfo.addAll(removed.copy().getAllTypeInfo());
+                            deltaCatalog.getDeletedInfo().addAll(removed.copy().getAllTypeInfo());
                         }
                     }
                 }
@@ -412,19 +419,7 @@ public class APICatalogSync {
         return ret;
     }
 
-    static Map<String, Integer> buildUrlToCollectionMap(List<UrlCollectionIdMapping> l) {
-        Map<String, Integer> ret = new HashMap<>();
-        for(UrlCollectionIdMapping e: l) {
-            ret.put(e.getUrl(), e.getCollectionId());
-        }
-
-        return ret;
-    }
-
-    public ArrayList<WriteModel<SingleTypeInfo>> getDBUpdatesForParams() {
-        APICatalog currentState = dbState;
-        APICatalog currentDelta = delta;
-
+    public ArrayList<WriteModel<SingleTypeInfo>> getDBUpdatesForParams(APICatalog currentDelta, APICatalog currentState) {
         Map<String, SingleTypeInfo> dbInfoMap = convertToMap(currentState.getAllTypeInfo());
         Map<String, SingleTypeInfo> deltaInfoMap = convertToMap(currentDelta.getAllTypeInfo());
 
@@ -454,7 +449,7 @@ public class APICatalogSync {
             bulkUpdates.add(new UpdateOneModel<>(updateKey, update, new UpdateOptions().upsert(true)));
         }
 
-        for(SingleTypeInfo deleted: deletedInfo) {
+        for(SingleTypeInfo deleted: currentDelta.getDeletedInfo()) {
             bulkUpdates.add(new DeleteOneModel<>(createFilters(deleted), new DeleteOptions()));
         }
 
@@ -468,9 +463,9 @@ public class APICatalogSync {
             Filters.eq("responseCode", info.getResponseCode()),
             Filters.eq("isHeader", info.getIsHeader()),
             Filters.eq("param", info.getParam()),
-            Filters.eq("subType", info.getSubType())
+            Filters.eq("subType", info.getSubType()),
+            Filters.eq("apiCollectionId", info.getApiCollectionId())
         );
-
     }
 
     private static URLTemplate createUrlTemplate(String url) {
@@ -496,34 +491,40 @@ public class APICatalogSync {
         return urlTemplate;
     }
 
-    public void buildFromDB(int id) {
+    public void buildFromDB() {
         List<SingleTypeInfo> allParams = SingleTypeInfoDao.instance.fetchAll();
-        List<UrlCollectionIdMapping> urlCollectionIdMappings = UrlCollectionIdMappingsDao.instance.findAll(new BasicDBObject());
-        this.dbState = build(id, allParams, urlCollectionIdMappings);
+        this.dbState = build(allParams);
     }
 
-    private static APICatalog build(int id, List<SingleTypeInfo> allParams, List<UrlCollectionIdMapping> urlCollectionIdMappings) {
-        APICatalog ret = new APICatalog(id, new HashMap<>(), new HashMap<>(), buildUrlToCollectionMap(urlCollectionIdMappings));
+    private static Map<Integer, APICatalog> build(List<SingleTypeInfo> allParams) {
+        Map<Integer, APICatalog> ret = new HashMap<>();
         
-
         for (SingleTypeInfo param: allParams) {
             String url = param.getUrl();
             URLMethods urlMethods;
+            int collId = param.getApiCollectionId();
+            APICatalog catalog = ret.get(collId);
+
+            if (catalog == null) {
+                catalog = new APICatalog(collId, new HashMap<>(), new HashMap<>());
+                ret.put(collId, catalog);
+            }
+
             if (url.contains("STRING") || url.contains("INTEGER")) {
                 URLTemplate urlTemplate = createUrlTemplate(url);
-                urlMethods = ret.getTemplateURLToMethods().get(urlTemplate);
+                urlMethods = catalog.getTemplateURLToMethods().get(urlTemplate);
 
                 if (urlMethods == null) {
                     urlMethods = new URLMethods(new HashMap<>());
-                    ret.getTemplateURLToMethods().put(urlTemplate, urlMethods);
+                    catalog.getTemplateURLToMethods().put(urlTemplate, urlMethods);
                 }
 
             } else {
-                urlMethods = ret.getStrictURLToMethods().get(url);
+                urlMethods = catalog.getStrictURLToMethods().get(url);
 
                 if (urlMethods == null) {
                     urlMethods = new URLMethods(new HashMap<>());
-                    ret.getStrictURLToMethods().put(url, urlMethods);
+                    catalog.getStrictURLToMethods().put(url, urlMethods);
                 }
             }
 
@@ -567,13 +568,15 @@ public class APICatalogSync {
             keyTypes.getOccurrences().put(param.getSubType(), param);
         }
 
-        for (URLMethods urlMethods: ret.getStrictURLToMethods().values()) {
-            for (RequestTemplate requestTemplate: urlMethods.getMethodToRequestTemplate().values()) {
-                requestTemplate.buildTrie();
+        for (APICatalog catalog: ret.values()) {
+            for (URLMethods urlMethods: catalog.getStrictURLToMethods().values()) {
+                for (RequestTemplate requestTemplate: urlMethods.getMethodToRequestTemplate().values()) {
+                    requestTemplate.buildTrie();
 
-                for (RequestTemplate responseTemplate: requestTemplate.getResponseTemplates().values()) {
-                    responseTemplate.buildTrie();
-                }    
+                    for (RequestTemplate responseTemplate: requestTemplate.getResponseTemplates().values()) {
+                        responseTemplate.buildTrie();
+                    }    
+                }
             }
         }
 
@@ -581,76 +584,40 @@ public class APICatalogSync {
     }
 
     public void syncWithDB() {
-        List<WriteModel<SingleTypeInfo>> writesForParams = getDBUpdatesForParams();
+        List<WriteModel<SingleTypeInfo>> writesForParams = new ArrayList<>();
+        
+        for(int apiCollectionId: this.delta.keySet()) {
+            APICatalog deltaCatalog = this.delta.get(apiCollectionId);
+            APICatalog dbCatalog = this.dbState.getOrDefault(apiCollectionId, new APICatalog(apiCollectionId, new HashMap<>(), new HashMap<>()));
+            writesForParams.addAll(getDBUpdatesForParams(deltaCatalog, dbCatalog));
+            deltaCatalog.setDeletedInfo(new ArrayList<>());
+        }
 
         logger.info("adding " + writesForParams.size() + " updates for params");
 
         if (writesForParams.size() > 0) {
             SingleTypeInfoDao.instance.getMCollection().bulkWrite(writesForParams);
         }
-
-        List<WriteModel<UrlCollectionIdMapping>> writesForUrlToCollection = getDBUpdatesForUrlToCollection();
-        logger.info("adding " + writesForUrlToCollection.size() + " updates for urlToCollectionId");
-
-        if (writesForUrlToCollection.size() > 0) {
-            UrlCollectionIdMappingsDao.instance.getMCollection().bulkWrite(writesForUrlToCollection);
-        }
-
-        deletedInfo = new ArrayList<>();
-        buildFromDB(1);
+        buildFromDB();
     }
 
-    public List<WriteModel<UrlCollectionIdMapping>> getDBUpdatesForUrlToCollection() {
-        Map<String, Integer> dbUrlMap = this.dbState.getUrlToCollectionMappings();
-        Map<String, Integer> deltaUrlMap = this.delta.getUrlToCollectionMappings();
-
-        ArrayList<WriteModel<UrlCollectionIdMapping>> bulkUpdates = new ArrayList<>();
-
-        for(String key: deltaUrlMap.keySet()) {
-            int dbCollId = dbUrlMap.getOrDefault(key, 0);
-            int deltaCollId = deltaUrlMap.getOrDefault(key, 0);
-            Bson update;
-
-            if (dbCollId != deltaCollId) {
-                update = Updates.set("collectionId", deltaCollId);
-                Bson updateKey = Filters.eq("url", key);
-                bulkUpdates.add(new UpdateOneModel<>(updateKey, update, new UpdateOptions().upsert(true)));
-            }
-        }
-
-        HashSet<String> deletedURLs = new HashSet<>();
-        for(SingleTypeInfo deleted: deletedInfo) {
-            deletedURLs.add(deleted.getUrl());
-        }
-
-        for(String url: deletedURLs) {
-            bulkUpdates.add(new DeleteOneModel<>(Filters.eq("url", url), new DeleteOptions()));
-        }
-
-        return bulkUpdates;
-    }
-
-
-    public void printNewURLsInDelta() {
-        for(String s: delta.getStrictURLToMethods().keySet()) {
+    public void printNewURLsInDelta(APICatalog deltaCatalog) {
+        for(String s: deltaCatalog.getStrictURLToMethods().keySet()) {
             logger.info(s);
         }
 
-        for(URLTemplate s: delta.getTemplateURLToMethods().keySet()) {
+        for(URLTemplate s: deltaCatalog.getTemplateURLToMethods().keySet()) {
             logger.info(s.getTemplateString());
         }
     }
 
-    public APICatalog getDelta() {
-        return this.delta;
-    }
 
-    public APICatalog getDBState() {
-        return this.dbState;
+    public APICatalog getDelta(int apiCollectionId) {
+        return this.delta.get(apiCollectionId);
     }
 
 
-    public void setDBState(APICatalog dbState) {
-        this.dbState = dbState;
+    public APICatalog getDbState(int apiCollectionId) {
+        return this.dbState.get(apiCollectionId);
     }
 }

@@ -44,14 +44,16 @@ public class SingleTypeInfo {
         boolean isHeader;
         String param;
         SubType subType;
+        int apiCollectionId;
 
-        public ParamId(String url, String method, int responseCode, boolean isHeader, String param, SubType subType) {
+        public ParamId(String url, String method, int responseCode, boolean isHeader, String param, SubType subType, int apiCollectionId) {
             this.url = url;
             this.method = method;
             this.responseCode = responseCode;
             this.isHeader = isHeader;
             this.param = param;
-            this.subType = subType;    
+            this.subType = subType;  
+            this.apiCollectionId = apiCollectionId; 
         }
 
         public ParamId() {
@@ -69,6 +71,7 @@ public class SingleTypeInfo {
     int count;
     int timestamp;
     int duration;
+    int apiCollectionId;
 
     public SingleTypeInfo() {
     }
@@ -80,15 +83,17 @@ public class SingleTypeInfo {
         this.isHeader = paramId.isHeader;
         this.param = paramId.param;
         this.subType = paramId.subType;    
+        this.apiCollectionId = paramId.apiCollectionId;
         this.examples = examples;
         this.userIds = userIds;
         this.count = count;
         this.timestamp = timestamp;
         this.duration = duration;
+        
     }
 
     public String composeKey() {
-        return StringUtils.joinWith("@", url, method, responseCode, isHeader, param, subType);
+        return StringUtils.joinWith("@", url, method, responseCode, isHeader, param, subType, apiCollectionId);
     }
 
     public void incr(Object object) {
@@ -109,6 +114,7 @@ public class SingleTypeInfo {
         paramId.isHeader = isHeader;
         paramId.param = param;
         paramId.subType = subType;
+        paramId.apiCollectionId = apiCollectionId;
 
         return new SingleTypeInfo(paramId, copyExamples, copyUserIds, this.count, this.timestamp, this.duration);
     }
@@ -204,6 +210,14 @@ public class SingleTypeInfo {
     public void setDuration(int duration) {
         this.duration = duration;
     }
+    
+    public int getApiCollectionId() {
+        return this.apiCollectionId;
+    }
+
+    public void setApiCollectionId(int apiCollectionId) {
+        this.apiCollectionId = apiCollectionId;
+    }
 
     @Override
     public boolean equals(Object o) {
@@ -219,12 +233,13 @@ public class SingleTypeInfo {
             responseCode == singleTypeInfo.responseCode && 
             isHeader == singleTypeInfo.isHeader && 
             param.equals(singleTypeInfo.param) && 
-            subType == singleTypeInfo.subType;
+            subType == singleTypeInfo.subType && 
+            apiCollectionId == singleTypeInfo.apiCollectionId;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(url, method, responseCode, isHeader, param, subType);
+        return Objects.hash(url, method, responseCode, isHeader, param, subType, apiCollectionId);
     }
 
     @Override
@@ -236,6 +251,7 @@ public class SingleTypeInfo {
             ", isHeader='" + isIsHeader() + "'" +
             ", param='" + getParam() + "'" +
             ", subType='" + getSubType() + "'" +
+            ", apiCollectionId='" + getApiCollectionId() + "'" +
             ", examples='" + getExamples() + "'" +
             ", userIds='" + getUserIds() + "'" +
             ", count='" + getCount() + "'" +

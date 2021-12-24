@@ -113,11 +113,9 @@ public class TestDump2 {
         APICatalogSync sync = new APICatalogSync("access-token", 5);
 
         aggr.addURL(httpResponseParams);
-        sync.computeDelta(aggr, false);
+        sync.computeDelta(aggr, false, 0);
         
-        assertEquals(sync.getDBUpdatesForParams().size(), 15);
-        assertEquals(sync.getDBUpdatesForUrlToCollection().size(), 0);
-        
+        assertEquals(sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0)).size(), 15);        
     }
 
     @Test
@@ -129,9 +127,9 @@ public class TestDump2 {
         APICatalogSync sync = new APICatalogSync("access-token", 5);
 
         aggr.addURL(resp);
-        sync.computeDelta(aggr, false);
+        sync.computeDelta(aggr, false, 0);
 
-        Map<String, URLMethods> urlMethodsMap = sync.getDelta().getStrictURLToMethods();
+        Map<String, URLMethods> urlMethodsMap = sync.getDelta(0).getStrictURLToMethods();
 
         assertEquals(urlMethodsMap.size(), 1);
 
@@ -145,8 +143,7 @@ public class TestDump2 {
         assertEquals(respTemplate.getUserIds().size(), 1);
         assertEquals(respTemplate.getParameters().size(), 3);
 
-        assertEquals(sync.getDBUpdatesForParams().size(), 24);
-        assertEquals(sync.getDBUpdatesForUrlToCollection().size(), 1);
+        assertEquals(sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0)).size(), 24);
 
     }
 
@@ -160,9 +157,9 @@ public class TestDump2 {
         APICatalogSync sync = new APICatalogSync("access-token", 5);
 
         aggr.addURL(resp);
-        sync.computeDelta(aggr, false);
+        sync.computeDelta(aggr, false, 0);
 
-        Map<String, URLMethods> urlMethodsMap = sync.getDelta().getStrictURLToMethods();
+        Map<String, URLMethods> urlMethodsMap = sync.getDelta(0).getStrictURLToMethods();
 
         assertEquals(urlMethodsMap.size(), 1);
 
@@ -172,9 +169,6 @@ public class TestDump2 {
         RequestTemplate reqTemplate = urlMethods.getMethodToRequestTemplate().get(Method.valueOf(resp.getRequestParams().method));
         assertEquals(reqTemplate.getUserIds().size(), 1);
         assertEquals(reqTemplate.getParameters().size(), 5);
-
-
-        assertEquals(sync.getDBUpdatesForUrlToCollection().size(), 1);
 
         System.out.println("done");
     }
@@ -196,9 +190,9 @@ public class TestDump2 {
         APICatalogSync sync = new APICatalogSync("access-token", 5);
 
         aggr.addURL(responses, resp.getRequestParams().getURL());
-        sync.computeDelta(aggr, false);
+        sync.computeDelta(aggr, false, 0);
 
-        Map<String, URLMethods> urlMethodsMap = sync.getDelta().getStrictURLToMethods();
+        Map<String, URLMethods> urlMethodsMap = sync.getDelta(0).getStrictURLToMethods();
 
         assertEquals(urlMethodsMap.size(), 1);
         URLMethods urlMethods = urlMethodsMap.get(resp.getRequestParams().url);
@@ -210,8 +204,6 @@ public class TestDump2 {
         RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
         assertEquals(respTemplate.getUserIds().size(), 5);
         assertEquals(respTemplate.getParameters().size(), 3);
-
-        assertEquals(sync.getDBUpdatesForUrlToCollection().size(), 1);
     }
 
     @Test
@@ -227,9 +219,9 @@ public class TestDump2 {
             aggr.addURL(createSampleParams("user"+i, url+i));
         }
 
-        sync.computeDelta(aggr, true);
+        sync.computeDelta(aggr, true, 0);
 
-        Map<URLTemplate, URLMethods> urlTemplateMap = sync.getDelta().getTemplateURLToMethods();
+        Map<URLTemplate, URLMethods> urlTemplateMap = sync.getDelta(0).getTemplateURLToMethods();
 
         assertEquals(urlTemplateMap.size(), 1);
 
@@ -245,8 +237,6 @@ public class TestDump2 {
         RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
         assertEquals(respTemplate.getUserIds().size(), 30);
         assertEquals(respTemplate.getParameters().size(), 3);
-        assertEquals(sync.getDBUpdatesForUrlToCollection().size(), 61);
-
     }
 
     private String createPayloadWithRepetitiveKeys(String i) {
@@ -280,9 +270,9 @@ public class TestDump2 {
         APICatalogSync sync = new APICatalogSync("access-token", 5);
 
         aggr.addURL(responseParams, url);
-        sync.computeDelta(aggr, false);
+        sync.computeDelta(aggr, false, 0);
 
-        Map<String, URLMethods> urlMethodsMap = sync.getDelta().getStrictURLToMethods();
+        Map<String, URLMethods> urlMethodsMap = sync.getDelta(0).getStrictURLToMethods();
         assertEquals(urlMethodsMap.size(), 1);
 
         URLMethods urlMethods = urlMethodsMap.get(resp.getRequestParams().url);
@@ -295,13 +285,10 @@ public class TestDump2 {
         assertEquals(respTemplate.getUserIds().size(), 10);
         assertEquals(respTemplate.getParameters().size(), 29);
 
-        List<SingleTypeInfo> deleted = respTemplate.tryMergeNodesInTrie(url, "POST", resp.statusCode);
+        List<SingleTypeInfo> deleted = respTemplate.tryMergeNodesInTrie(url, "POST", resp.statusCode, resp.getRequestParams().getApiCollectionId());
         assertEquals(respTemplate.getParameters().size(), 1);
 
-        List updates = sync.getDBUpdatesForParams();
+        List updates = sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0));
         assertEquals(updates.size(), 22);
-        assertEquals(sync.getDBUpdatesForUrlToCollection().size(), 1);
-
-
     }
 }

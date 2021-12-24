@@ -51,13 +51,12 @@ public class TestDBSync extends MongoBasedTest {
         for (int i = 2; i <= 30; i ++ ) {
             aggr.addURL(TestDump2.createSampleParams("user"+i, url+i));
         }
-        sync.computeDelta(aggr, true);
-        assertEquals(sync.getDBUpdatesForUrlToCollection().size(), 61);
+        sync.computeDelta(aggr, true, 0);
         sync.syncWithDB(); 
-        Map<String, URLMethods> urlMethodsMap = sync.getDelta().getStrictURLToMethods();
+        Map<String, URLMethods> urlMethodsMap = sync.getDelta(0).getStrictURLToMethods();
         assertEquals(0, urlMethodsMap.size());
 
-        Map<URLTemplate, URLMethods> urlTemplateMap = sync.getDelta().getTemplateURLToMethods();
+        Map<URLTemplate, URLMethods> urlTemplateMap = sync.getDelta(0).getTemplateURLToMethods();
         assertEquals(1, urlTemplateMap.size());
 
         Map.Entry<URLTemplate, URLMethods> entry = urlTemplateMap.entrySet().iterator().next();
