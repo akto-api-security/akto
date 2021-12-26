@@ -2,7 +2,7 @@
     <div>
         <v-data-table
         :headers="headers"
-        :items="items"
+        :items="filteredItems"
         class="board-table-cards keep-scrolling"
         :search="search"
         :sort-by="sortKey"
@@ -26,9 +26,55 @@
                     :key="index"
                     :style="index == 0 ? {'padding': '2px !important'} : {}"
             >
-                <div class="table-sub-header clickable" @click="setSortOrInvertOrder(header)" v-if="index > 0">
-                    {{header.text}} 
-                </div>
+                <v-hover v-slot="{ hover }">
+                    <div v-if="index > 0">
+                        <span class="table-sub-header">
+                            <span class="clickable"  @click="setSortOrInvertOrder(header)">
+                                {{header.text}} 
+                            </span>
+                            <span>
+
+                                <v-menu :key="index" offset-y :close-on-content-click="false"  v-if="hover || filters[header.value].length || showFilterMenu[header.value]" v-model="showFilterMenu[header.value]">
+                                    <template v-slot:activator="{ on, attrs }">                         
+                                        <v-btn 
+                                            :ripple="false" 
+                                            v-bind="attrs" 
+                                            v-on="on"
+                                            primary 
+                                            icon
+                                            class="filter-icon" 
+                                        >
+                                            <v-icon :size="14">$fas_filter</v-icon>
+                                        </v-btn>
+                                    </template>
+                                    <div style="background-color: white; width: 280px">
+                                        <v-list>
+                                        <v-list-item>
+                                            <div v-if="filters.hasOwnProperty(header.value)">
+                                            <v-autocomplete multiple dense clearable chips small-chips color="light-blue lighten-3" :items="columnValueList(header.value)" append-icon="mdi-filter" v-model="filters[header.value]" :label="
+                                            filters[header.value] ? `filter_by: ${header.text}` : ''
+                                            " hide-details>
+                                                <template v-slot:selection="{ item, index }">
+                                                <v-chip small class="caption" v-if="index < 5">
+                                                    <span>
+                                                    {{ item }}
+                                                    </span>
+                                                </v-chip>
+                                                <span v-if="index === 5" class="grey--text caption">
+                                                    (+{{ filters[header.value].length - 5 }} others)
+                                                </span>
+                                                </template>
+                                            </v-autocomplete>
+                                            </div>
+                                        </v-list-item>
+                                        </v-list>
+                                    </div>
+                                </v-menu>
+                            </span>
+
+                        </span>
+                    </div>
+                </v-hover>
             </th>
         </template>
 
@@ -101,10 +147,15 @@ export default {
         return {
             search: null,
             sortKey: this.sortKeyDefault || null,
-            sortDesc: this.sortDescDefault || false
+            sortDesc: this.sortDescDefault || false,
+            filters: this.headers.reduce((map, e) => {map[e.value] = []; return map}, {}),
+            showFilterMenu: this.headers.reduce((map, e) => {map[e.value] = false; return map}, {}),
         }
     },
     methods: {
+        columnValueList(val) {
+            return this.items.map(d => d[val]);
+        },       
         downloadData() {
             let headerTextToValueMap = Object.fromEntries(this.headers.map(x => [x.text, x.value]).filter(x => x[0].length > 0));
 
@@ -152,7 +203,17 @@ export default {
             }
             // return this.sortFunc(this.items, this.sortKey, this.sortDesc)
         }
+    },
+    computed: {
+        filteredItems() {
+            return this.items.filter((d) => {
+                return Object.keys(this.filters).every((f) => {
+                return this.filters[f].length < 1 || this.filters[f].includes(d[f]);
+                });
+            });
+        }
     }
+
 }
 </script>
 
@@ -225,6 +286,15 @@ export default {
         right: 30px
         padding: 8px 16px !important
 
+.table-sub-header
+    position: relative
+
+.filter-icon
+    color: #6200EA !important
+    min-width: 0px !important
+    position: absolute
+    right: -35px
+    top: -5px
 </style>
 
 <style scoped>
