@@ -1,5 +1,5 @@
 <template>
-    <div class="pt-4 pr-4">
+    <div class="pt-4 pr-4 api-endpoints">
         <div class="d-flex">
             <count-box title="Sensitive Endpoints" :count="sensitiveEndpoints.length" colorTitle="Overdue"/>
             <count-box title="Shadow Endpoints" :count="shadowEndpoints.length" colorTitle="Pending"/>
@@ -180,3 +180,32 @@ export default {
 
 }
 </script>
+
+<style lang="sass">
+.api-endpoints
+    & .table-column
+        &:nth-child(1)    
+            width: 4px
+            min-width: 4px
+            max-width: 4px
+        &:nth-child(2)    
+            width: 350px
+            min-width: 350px
+        &:nth-child(3)    
+            width: 150px
+            min-width: 150px
+            max-width: 150px
+        &:nth-child(4)    
+            width: 250px
+            min-width: 250px
+            max-width: 250px
+        &:nth-child(5)    
+            width: 200px
+            min-width: 200px
+            max-width: 200px
+        &:nth-child(6)    
+            width: 200px
+            min-width: 200px
+            max-width: 200px
+
+</style>
