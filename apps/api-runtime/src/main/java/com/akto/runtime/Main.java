@@ -11,8 +11,10 @@ import com.akto.dao.context.Context;
 import com.akto.dto.APIConfig;
 import com.akto.dto.ApiCollection;
 import com.akto.parsers.HttpCallParser;
+import com.google.gson.Gson;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
 import org.apache.kafka.clients.consumer.*;
@@ -24,6 +26,8 @@ import org.slf4j.LoggerFactory;
 
 public class Main {
     private Consumer<String, String> consumer;
+    private static final String GROUP_NAME = "group_name";
+    private static final String VXLAN_ID = "vxlanId";
     private static final Logger logger = LoggerFactory.getLogger(HttpCallParser.class);
 
     private static int debugPrintCounter = 500;
@@ -33,6 +37,26 @@ public class Main {
             System.out.println(o);
         }
     }   
+
+    private static boolean tryForCollectionName(String message) {
+        boolean ret = false;
+        try {
+            Gson gson = new Gson();
+
+            Map<String, Object> json = gson.fromJson(message, Map.class);
+            if (json.size() == 2 && json.containsKey(GROUP_NAME) && json.containsKey(VXLAN_ID)) {
+                ret = true;
+                String groupName = (String) (json.get(GROUP_NAME));
+                String vxlanIdStr = (String) (json.get(VXLAN_ID));
+                int vxlanId = Integer.parseInt(vxlanIdStr);
+                ApiCollectionsDao.instance.updateOne(Filters.eq("id", vxlanId), Updates.set("name", groupName));
+            }
+        } catch (Exception e) {
+            // eat it
+        }
+
+        return ret;
+    }
 
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
@@ -93,6 +117,11 @@ public class Main {
                     try {
                          
                         printL(r.value());
+
+                        if (tryForCollectionName(r.value())) {
+                            continue;
+                        }
+
                         httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
                          
                     } catch (Exception e) {
