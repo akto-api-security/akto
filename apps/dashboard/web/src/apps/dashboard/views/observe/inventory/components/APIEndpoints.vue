@@ -126,7 +126,7 @@ export default {
     },
     methods: {
         rowClicked(row) {
-            this.$emit('selected', row.endpoint + " " + row.method)
+            this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.endpoint + " " + row.method, type: 2})
         },
         groupByEndpoint(listParams) {
             func.groupByEndpoint(listParams)

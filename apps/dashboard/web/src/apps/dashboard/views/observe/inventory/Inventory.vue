@@ -4,10 +4,10 @@
                 <v-breadcrumbs
                     :items="breadcrumbs"
                     class="api-breadcrumbs"
-                >
+                > 
                     <template v-slot:item="{ item }">
                         <v-breadcrumbs-item
-                            @click="item.click"
+                            @click="navigateFromBreadcrumb(item)"
                             :disabled="item.disabled"
                             :class="item.disabled ? '' : 'clickable'"
                         >
@@ -19,12 +19,7 @@
                     </template>
 
                 </v-breadcrumbs>
-                <template v-if="breadcrumbs.length <= 2">
-                    <api-endpoints @selected=selectedEndpoint />
-                </template>
-                <template v-else>
-                    <api-parameters :urlAndMethod="breadcrumbs[2].text"/>
-                </template>   
+                <router-view @selectedItem="selectedItem"/>
         </div>
             
     </div>
@@ -32,7 +27,7 @@
 
 <script>
 
-import ApiCollections from "./components/APICollections"
+import ApiCollections from "../collections/APICollections"
 import ApiParameters from "./components/APIParameters"
 import ApiEndpoints from "./components/APIEndpoints"
 import LayoutWithTabs from "@/apps/dashboard/layouts/LayoutWithTabs"
@@ -50,15 +45,13 @@ export default {
         apiCollectionId: obj.numN
     },
     data () {
+        
         let breadcrumbs = [
                 {
                     text: 'All endpoints',
-                    click: this.unsetBreadcrumb
-
-                },
-                {
-                    text: 'Main',
-                    click: this.unsetBreadcrumb
+                    to: {
+                        path: '/dashboard/observe/inventory'
+                    }
                 }
             ]
 
@@ -67,23 +60,52 @@ export default {
         }
     },
     methods: {
-        unsetBreadcrumb() {
-            this.breadcrumbs = [...this.breadcrumbs.slice(0, 2)]
+        navigateFromBreadcrumb (item) {
+            let bcIndex = this.breadcrumbs.indexOf(item)
+            this.breadcrumbs = this.breadcrumbs.slice(0, bcIndex+1)
+            this.breadcrumbs[bcIndex].disabled = true
+            this.$router.push(item.to)
         },
-        selectedCollection({apiCollectionId}) {
+        selectedItem (event) {
+            let newRouteObject = {}
+            switch (event.type) {
+                case 1:
+                    newRouteObject = {
+                        text: event.collectionName,
+                        to: {
+                            name: 'apiCollection',
+                            params: {
+                                apiCollectionId: event.apiCollectionId
+                            }
+                        }
+                    }
+
+                    break;
+                case 2:
+                    newRouteObject = {
+                        text: event.urlAndMethod,
+                        to: {
+                            name: 'apiCollection/urlAndMethod',
+                            params: {
+                                apiCollectionId: event.apiCollectionId,
+                                urlAndMethod: btoa(event.urlAndMethod)
+                            }
+                        }
+                    }    
+            }
+
+            newRouteObject.disabled = true
+            this.breadcrumbs[this.breadcrumbs.length-1].disabled = false
+            this.breadcrumbs.push(newRouteObject)
+            this.breadcrumbs = [...this.breadcrumbs]
+
+            this.$router.push(newRouteObject.to)
             
-        },
-        selectedEndpoint(endpointName) {
-            let bb = this.breadcrumbs
-            bb.push({
-                text: endpointName,
-                disabled: true,
-                click: () => {}
-            })
-            this.breadcrumbs = [...bb]
         }
     },
     mounted() {
+
+
         this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId})
     },
     computed: {

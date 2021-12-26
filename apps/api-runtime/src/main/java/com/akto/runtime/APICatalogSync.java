@@ -10,8 +10,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.RequestTemplate;
@@ -24,6 +26,7 @@ import com.akto.parsers.HttpCallParser;
 import com.akto.parsers.HttpCallParser.HttpRequestParams;
 import com.akto.parsers.HttpCallParser.HttpResponseParams;
 import com.mongodb.BasicDBObject;
+import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.DeleteOneModel;
 import com.mongodb.client.model.DeleteOptions;
 import com.mongodb.client.model.Filters;
@@ -489,9 +492,33 @@ public class APICatalogSync {
         return urlTemplate;
     }
 
-    public void buildFromDB() {
+    public void buildFromDB(boolean calcDiff) {
         List<SingleTypeInfo> allParams = SingleTypeInfoDao.instance.fetchAll();
         this.dbState = build(allParams);
+        
+        if(calcDiff) {
+            for(int collectionId: this.dbState.keySet()) {
+                APICatalog newCatalog = this.dbState.get(collectionId);
+                Set<String> newURLs = new HashSet<>();
+                for(URLTemplate url: newCatalog.getTemplateURLToMethods().keySet()) { 
+                    newURLs.add(url.getTemplateString());
+                }
+                newURLs.addAll(newCatalog.getStrictURLToMethods().keySet());
+
+
+                Bson findQ = Filters.eq("_id", collectionId);
+                ApiCollection currCollection = ApiCollectionsDao.instance.findOne(findQ);
+                
+
+                if (currCollection == null) {
+                    ApiCollectionsDao.instance.insertOne(new ApiCollection(collectionId, "", Context.now(), newURLs));
+
+                } else {
+                    currCollection.setUrls(newURLs);
+                    ApiCollectionsDao.instance.getMCollection().updateOne(findQ, Updates.set("urls", newURLs));
+                }
+            }
+        }
     }
 
     private static Map<Integer, APICatalog> build(List<SingleTypeInfo> allParams) {
@@ -594,9 +621,11 @@ public class APICatalogSync {
         logger.info("adding " + writesForParams.size() + " updates for params");
 
         if (writesForParams.size() > 0) {
-            SingleTypeInfoDao.instance.getMCollection().bulkWrite(writesForParams);
+            BulkWriteResult res = SingleTypeInfoDao.instance.getMCollection().bulkWrite(writesForParams);
+
+            logger.info(res.getInserts().size() + " " +res.getUpserts().size());
         }
-        buildFromDB();
+        buildFromDB(true);
     }
 
     public void printNewURLsInDelta(APICatalog deltaCatalog) {

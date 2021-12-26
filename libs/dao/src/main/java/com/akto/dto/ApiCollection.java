@@ -1,23 +1,25 @@
 package com.akto.dto;
 
+import java.util.Set;
+
 import org.bson.codecs.pojo.annotations.BsonId;
 
 public class ApiCollection {
     
     @BsonId
     int id;
-
     String name;
-
     int startTs;
+    Set<String> urls;
 
     public ApiCollection() {
     }
 
-    public ApiCollection(int id, String name, int startTs) {
+    public ApiCollection(int id, String name, int startTs, Set<String> urls) {
         this.id = id;
         this.name = name;
         this.startTs = startTs;
+        this.urls = urls;
     }
 
     public int getId() {
@@ -44,12 +46,22 @@ public class ApiCollection {
         this.startTs = startTs;
     }
 
+    public Set<String> getUrls() {
+        return this.urls;
+    }
+
+    public void setUrls(Set<String> urls) {
+        this.urls = urls;
+    }
+
     @Override
     public String toString() {
         return "{" +
             " id='" + getId() + "'" +
             ", name='" + getName() + "'" +
             ", startTs='" + getStartTs() + "'" +
+            ", urls='" + getUrls() + "'" +
             "}";
     }
+    
 }

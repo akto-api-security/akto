@@ -10,6 +10,7 @@ import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.APIConfig;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.parsers.HttpCallParser;
 import com.google.gson.Gson;
 import com.mongodb.ConnectionString;
@@ -21,6 +22,7 @@ import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,7 +51,14 @@ public class Main {
                 String groupName = (String) (json.get(GROUP_NAME));
                 String vxlanIdStr = (String) (json.get(VXLAN_ID));
                 int vxlanId = Integer.parseInt(vxlanIdStr);
-                ApiCollectionsDao.instance.updateOne(Filters.eq("id", vxlanId), Updates.set("name", groupName));
+                Bson findQ = Filters.eq("_id", vxlanId);
+                ApiCollection currCollection = ApiCollectionsDao.instance.findOne(findQ);
+                if (currCollection == null) {
+                    ApiCollection newCollection = new ApiCollection(vxlanId, groupName, Context.now(), new HashSet<>());
+                    ApiCollectionsDao.instance.getMCollection().insertOne(newCollection);
+                } else if (currCollection.getName() == null || currCollection.getName().length() == 0) {
+                    ApiCollectionsDao.instance.getMCollection().updateOne(findQ, Updates.set("name", groupName));
+                }
             }
         } catch (Exception e) {
             // eat it
@@ -73,9 +82,14 @@ public class Main {
         DaoInit.init(new ConnectionString(mongoURI));
         SingleTypeInfoDao.instance.getMCollection().updateMany(Filters.exists("apiCollectionId", false), Updates.set("apiCollectionId", 0));
 
+        Context.accountId.set(1_000_000);
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("id", 0);
         if (apiCollection == null) {
-            ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now()));
+            Set<String> urls = new HashSet<>();
+            for(SingleTypeInfo singleTypeInfo: SingleTypeInfoDao.instance.fetchAll()) {
+                urls.add(singleTypeInfo.getUrl());
+            }
+            ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), urls));
         }
 
         APIConfig apiConfig;

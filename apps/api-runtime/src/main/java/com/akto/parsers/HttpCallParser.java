@@ -241,7 +241,7 @@ public class HttpCallParser {
         this.sync_threshold_count = sync_threshold_count;
         this.sync_threshold_time = sync_threshold_time;
         apiCatalogSync = new APICatalogSync(userIdentifier,thresh);
-        apiCatalogSync.buildFromDB();
+        apiCatalogSync.buildFromDB(false);
     }
     
     public static int counter = 0;

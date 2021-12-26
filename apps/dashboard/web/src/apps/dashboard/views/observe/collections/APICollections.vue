@@ -1,0 +1,79 @@
+<template>
+    <div>         
+        <simple-table
+            :headers="headers" 
+            :items="apiCollectionsForTable"  
+            :actions="actions"
+            name="API Collections" 
+            sortKeyDefault="name" 
+            :sortDescDefault="false"   
+            @rowClicked=rowClicked     
+        />
+    </div>        
+</template>
+
+<script>
+import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
+import { mapState } from 'vuex'
+import func from '@/util/func'
+
+export default {
+    name: "ApiCollections",
+    components: { 
+        SimpleTable 
+    },
+    data() {
+        return { 
+            headers: [
+                {
+                    text: "",
+                    value: "color"
+                },
+                {
+                    text: "API Name",
+                    value: "name"
+                },
+                {
+                    text: "Endpoints",
+                    value: "endpoints"
+                },
+                {
+                    text: "Discovered",
+                    value: "detected"
+                }
+            ],
+            actions: []
+        }
+    },
+    methods: {
+        rowClicked(item) {
+            this.$emit("selectedItem", {type: 1, collectionName: item.name, apiCollectionId: item.id})
+        }
+    },
+    computed: {
+        ...mapState('collections', ['apiCollections']),
+        apiCollectionsForTable () {
+            return this.apiCollections.map(c => {
+                return {
+                    color: "#FFFFFF",
+                    name: c.name,
+                    endpoints: (c.urls || []).length,
+                    detected: func.prettifyEpoch(c.startTs),
+                    detectedTs: c.startTs
+                    
+                }
+            })
+        }
+    },
+    created() {
+        this.$store.dispatch('collections/loadAllApiCollections')
+    }
+}
+</script>
+
+<style lang="sass" scoped>
+    .default-info
+        color: #47466A
+        font-size: 12px
+        margin-top: 16px
+</style>
