@@ -26,15 +26,14 @@
                     :key="index"
                     :style="index == 0 ? {'padding': '2px !important'} : {}"
             >
-                <v-hover v-slot="{ hover }">
-                    <div v-if="index > 0">
+                <div v-if="index > 0">
+                    <v-hover v-slot="{ hover }" >
                         <span class="table-sub-header">
                             <span class="clickable"  @click="setSortOrInvertOrder(header)">
                                 {{header.text}} 
                             </span>
                             <span>
-
-                                <v-menu :key="index" offset-y :close-on-content-click="false"  v-if="hover || filters[header.value].length || showFilterMenu[header.value]" v-model="showFilterMenu[header.value]">
+                                <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.value]"> 
                                     <template v-slot:activator="{ on, attrs }">                         
                                         <v-btn 
                                             :ripple="false" 
@@ -43,38 +42,17 @@
                                             primary 
                                             icon
                                             class="filter-icon" 
+                                            :style="{display: hover || showFilterMenu[header.value] || filters[header.value].size > 0 ? '' : 'none'}"
                                         >
                                             <v-icon :size="14">$fas_filter</v-icon>
                                         </v-btn>
                                     </template>
-                                    <div style="background-color: white; width: 280px">
-                                        <v-list>
-                                        <v-list-item>
-                                            <div v-if="filters.hasOwnProperty(header.value)">
-                                            <v-autocomplete multiple dense clearable chips small-chips color="light-blue lighten-3" :items="columnValueList(header.value)" append-icon="mdi-filter" v-model="filters[header.value]" :label="
-                                            filters[header.value] ? `filter_by: ${header.text}` : ''
-                                            " hide-details>
-                                                <template v-slot:selection="{ item, index }">
-                                                <v-chip small class="caption" v-if="index < 5">
-                                                    <span>
-                                                    {{ item }}
-                                                    </span>
-                                                </v-chip>
-                                                <span v-if="index === 5" class="grey--text caption">
-                                                    (+{{ filters[header.value].length - 5 }} others)
-                                                </span>
-                                                </template>
-                                            </v-autocomplete>
-                                            </div>
-                                        </v-list-item>
-                                        </v-list>
-                                    </div>
+                                    <filter-list :title="header.text" :items="columnValueList[header.value]" @clickedItem="appliedFilter(header.value, $event)" />
                                 </v-menu>
                             </span>
-
                         </span>
-                    </div>
-                </v-hover>
+                    </v-hover>
+                </div>
             </th>
         </template>
 
@@ -129,11 +107,13 @@
 import obj from "@/util/obj"
 import { saveAs } from 'file-saver'
 import ActionsTray from './ActionsTray'
+import FilterList from './FilterList'
 
 export default {
     name: "SimpleTable",
     components: {
-        ActionsTray
+        ActionsTray,
+        FilterList
     },
     props: {
         headers: obj.arrR,
@@ -148,14 +128,19 @@ export default {
             search: null,
             sortKey: this.sortKeyDefault || null,
             sortDesc: this.sortDescDefault || false,
-            filters: this.headers.reduce((map, e) => {map[e.value] = []; return map}, {}),
-            showFilterMenu: this.headers.reduce((map, e) => {map[e.value] = false; return map}, {}),
+            filters: this.headers.reduce((map, e) => {map[e.value] = new Set(); return map}, {}),
+            showFilterMenu: this.headers.reduce((map, e) => {map[e.value] = false; return map}, {})
         }
     },
     methods: {
-        columnValueList(val) {
-            return this.items.map(d => d[val]);
-        },       
+        appliedFilter (hValue, {item, checked}) { 
+            if (checked) {
+                this.filters[hValue].add(item)
+            } else {
+                this.filters[hValue].delete(item)
+            }
+            this.filters = {...this.filters}
+        },
         downloadData() {
             let headerTextToValueMap = Object.fromEntries(this.headers.map(x => [x.text, x.value]).filter(x => x[0].length > 0));
 
@@ -205,10 +190,18 @@ export default {
         }
     },
     computed: {
+        columnValueList: {
+            get () {
+                return this.headers.reduce((m, h) => {
+                    m[h.value] = [...new Set(this.items.map(i => i[h.value]).sort())]
+                    return m
+                }, {})
+            }
+        },
         filteredItems() {
             return this.items.filter((d) => {
                 return Object.keys(this.filters).every((f) => {
-                return this.filters[f].length < 1 || this.filters[f].includes(d[f]);
+                return this.filters[f].size < 1 || this.filters[f].has(d[f]);
                 });
             });
         }
@@ -250,12 +243,10 @@ export default {
         vertical-align: bottom
         text-align: left
         padding: 12px 8px !important
-        z-index: 1
         border: 1px solid #FFFFFF !important
 
     .table-column
         padding: 8px 16px !important
-        z-index: 1
         border-top: 1px solid #FFFFFF !important
         border-bottom: 1px solid #FFFFFF !important
         background: rgba(71, 70, 106, 0.03)

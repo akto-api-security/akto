@@ -76,7 +76,9 @@ import {
   faCalendar as farCalendar,
   faHandPointRight as farHandPointRight,
   faBuilding as farBuilding,
-  faStar as farStar
+  faStar as farStar,
+  faSquare as farSquare,
+  faCheckSquare as farCheckSquare
 } from '@fortawesome/free-regular-svg-icons'
 
 import {
@@ -92,7 +94,7 @@ const faIcons = [
   faUnlockAlt,faStethoscope,faLongArrowAltDown,faLongArrowAltUp,faSyncAlt, faExchangeAlt, faUserLock, faExclamation,faPhoneAlt,
   faCreditCard,faAddressCard,faChalkboard,faFilter,
 
-  farComments,farCalendar, farHandPointRight, farBuilding, farStar,
+  farComments,farCalendar, farHandPointRight, farBuilding, farStar,farSquare, farCheckSquare,
 
   fabSalesforce,fabHubspot
 ]
