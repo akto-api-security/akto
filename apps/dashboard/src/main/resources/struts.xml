@@ -15,6 +15,20 @@
             <result name="SUCCESS">/pages/login.jsp</result>
         </action>
 
+        <action name="metrics" class="com.akto.action.InfraMetricsAction">
+        </action>
+
+        <action name="api/health" class="com.akto.action.InfraMetricsAction" method="health">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="root">akto_health</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
         <action name="auth/login" class="com.akto.action.LoginAction">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
