@@ -51,7 +51,7 @@ const changes = {
             state.loading = true
             return api.loadRecentParameters().then((resp) => {
                 commit('SAVE_API_COLLECTION', {data: resp.data}, options)
-                listAllSensitiveFields().then(allSensitiveFields => {
+                api.listAllSensitiveFields().then(allSensitiveFields => {
                     commit('SAVE_SENSITIVE', allSensitiveFields.data)
                 })
                 state.loading = false

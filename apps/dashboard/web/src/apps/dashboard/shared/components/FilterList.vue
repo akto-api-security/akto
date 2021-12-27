@@ -5,7 +5,19 @@
             <div>{{Object.values(checkedMap).filter(x => x).length}}/{{Object.values(checkedMap).length}}</div>
         </div>
         <v-list dense class="filter-list">
-            <v-list-item v-for="(item, index) in items" :key="index">
+            <v-list-item v-if="items && items.length > 8">
+                <v-text-field
+                    v-model="searchText"
+                    dense
+                    color="#6200EA"
+                    prepend-inner-icon="$fas_search"
+                >
+                    <template v-slot:prepend-inner>
+                        <v-icon size="12" color="#6200EA">$fas_search</v-icon>
+                    </template>
+                </v-text-field>
+            </v-list-item>
+            <v-list-item v-for="(item, index) in filteredItems" :key="index">
                 <span>
                     <v-btn icon primary plain :ripple="false" @click="checkboxClicked(item)" class="checkbox-btn">
                         <v-icon>
@@ -34,13 +46,31 @@ export default {
             checkedMap: this.items.reduce((m, i) => {
                 m[i] = false
                 return m
-            }, {})
+            }, {}),
+            searchText: ""
         }
     },
     methods: {
         checkboxClicked(item) {
             this.checkedMap[item] = !this.checkedMap[item]
             this.$emit('clickedItem', {item: item, checked: this.checkedMap[item]})
+        },
+        textChanged () {
+            if (this.searchText && this.searchText.length > 0) {
+
+            } else {
+
+            }
+        }
+    },
+    computed: {
+        filteredItems () {
+            if (this.searchText && this.searchText.length > 0) {
+                return this.items.filter(x => x.indexOf(this.searchText) != -1)
+            } else {
+                return this.items
+            }
+            
         }
     }
 }
@@ -68,5 +98,18 @@ export default {
     background: white
     opacity: 1
     font-size: 14px
+</style>
 
+<style scoped>
+.v-text-field >>> input {
+    font-size: 13px
+}
+
+.v-text-field >>> .v-input__prepend-inner {
+    margin: auto !important
+}
+
+.v-text-field >>> .v-text-field__details {
+    display: none !important;
+}
 </style>
