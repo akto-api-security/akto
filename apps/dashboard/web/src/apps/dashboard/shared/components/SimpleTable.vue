@@ -20,40 +20,42 @@
         hide-default-header>
 
         <template v-slot:header="{}" v-if="items && items.length > 0">
-            <th
-                    v-for="(header, index) in headers"
-                    class='table-header'
-                    :key="index"
-                    :style="index == 0 ? {'padding': '2px !important'} : {}"
-            >
-                <div v-if="index > 0">
-                    <v-hover v-slot="{ hover }" >
-                        <span class="table-sub-header">
-                            <span class="clickable"  @click="setSortOrInvertOrder(header)">
-                                {{header.text}} 
-                            </span>
-                            <span>
-                                <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.value]"> 
-                                    <template v-slot:activator="{ on, attrs }">                         
-                                        <v-btn 
-                                            :ripple="false" 
-                                            v-bind="attrs" 
-                                            v-on="on"
-                                            primary 
-                                            icon
-                                            class="filter-icon" 
-                                            :style="{display: hover || showFilterMenu[header.value] || filters[header.value].size > 0 ? '' : 'none'}"
-                                        >
-                                            <v-icon :size="14">$fas_filter</v-icon>
-                                        </v-btn>
-                                    </template>
-                                    <filter-list :title="header.text" :items="columnValueList[header.value]" @clickedItem="appliedFilter(header.value, $event)" />
-                                </v-menu>
-                            </span>
-                        </span>
-                    </v-hover>
-                </div>
-            </th>
+            <template v-for="(header, index) in headers">
+                <v-hover v-slot="{ hover }" :key="index">
+                    <th
+                            class='table-header'
+                            :style="index == 0 ? {'padding': '2px !important'} : {}"
+                    >
+                        <div v-if="index > 0">
+                            
+                                <span class="table-sub-header">
+                                    <span class="clickable"  @click="setSortOrInvertOrder(header)">
+                                        {{header.text}} 
+                                    </span>
+                                    <span>
+                                        <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.value]"> 
+                                            <template v-slot:activator="{ on, attrs }">                         
+                                                <v-btn 
+                                                    :ripple="false" 
+                                                    v-bind="attrs" 
+                                                    v-on="on"
+                                                    primary 
+                                                    icon
+                                                    class="filter-icon" 
+                                                    :style="{display: hover || showFilterMenu[header.value] || filters[header.value].size > 0 ? '' : 'none'}"
+                                                >
+                                                    <v-icon :size="14">$fas_filter</v-icon>
+                                                </v-btn>
+                                            </template>
+                                            <filter-list :title="header.text" :items="columnValueList[header.value]" @clickedItem="appliedFilter(header.value, $event)" />
+                                        </v-menu>
+                                    </span>
+                                </span>
+                            
+                        </div>
+                    </th>
+                </v-hover>
+            </template>
         </template>
 
         <template v-slot:item="{item}">
