@@ -14,6 +14,7 @@ const APIEndpoints = () => import("@/apps/dashboard/views/observe/inventory/comp
 const APICollections = () => import("@/apps/dashboard/views/observe/collections/APICollections")
 const SensitiveData = () => import("@/apps/dashboard/views/observe/inventory/SensitiveData")
 const ApiChanges = () => import("@/apps/dashboard/views/observe/inventory/Changes")
+
 Vue.use(Router)
 
 function getId (route) {
@@ -74,6 +75,9 @@ const router =  new Router({
                             path: 'inventory',
                             name: 'inventory',
                             component: Inventory,
+                            beforeEnter (to, from, next) {
+                                store.dispatch('collections/loadAllApiCollections').then(() => next()).catch(() => next())
+                            },
                             children: [
                                 {
                                     path:'',
@@ -83,14 +87,18 @@ const router =  new Router({
                                 {
                                     path:':apiCollectionId',
                                     name:'apiCollection',
-                                    component: APIEndpoints        
+                                    component: APIEndpoints,
+                                    props: route => ({
+                                        apiCollectionId: +route.params.apiCollectionId
+                                    })
                                 },
                                 {
                                     path:':apiCollectionId/:urlAndMethod',
                                     name:'apiCollection/urlAndMethod',
                                     component: APIParameters,
                                     props: route => ({
-                                        urlAndMethod: atob(route.params.urlAndMethod)
+                                        urlAndMethod: atob(route.params.urlAndMethod),
+                                        apiCollectionId: +route.params.apiCollectionId
                                     })
                                 }        
                             ]

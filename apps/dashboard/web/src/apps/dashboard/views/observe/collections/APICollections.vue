@@ -60,18 +60,13 @@ export default {
         apiCollectionsForTable () {
             return this.apiCollections.map(c => {
                 return {
+                    ...c,
                     color: "#FFFFFF",
-                    name: c.name,
                     endpoints: (c.urls || []).length,
-                    detected: func.prettifyEpoch(c.startTs),
-                    detectedTs: c.startTs
-                    
+                    detected: func.prettifyEpoch(c.startTs)
                 }
             })
         }
-    },
-    created() {
-        this.$store.dispatch('collections/loadAllApiCollections')
     }
 }
 </script>

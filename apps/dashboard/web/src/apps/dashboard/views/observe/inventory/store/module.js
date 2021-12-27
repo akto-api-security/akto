@@ -68,6 +68,7 @@ const inventory = {
         },
         loadAPICollection({commit}, {apiCollectionId}, options) {
             commit('EMPTY_STATE')
+            state.loading = true
             return api.getAPICollection(apiCollectionId).then((resp) => {
                 commit('SAVE_API_COLLECTION', {data: resp.data, apiCollectionId: apiCollectionId}, options)
                 api.listAllSensitiveFields().then(allSensitiveFields => {

@@ -1,5 +1,6 @@
 <template>
-    <div class="pt-4 pr-4 api-endpoints">
+    <spinner v-if="loading" />
+    <div class="pt-4 pr-4 api-endpoints" v-else>
         <div class="d-flex">
             <count-box title="Sensitive Endpoints" :count="sensitiveEndpoints.length" colorTitle="Overdue"/>
             <count-box title="Shadow Endpoints" :count="shadowEndpoints.length" colorTitle="Pending"/>
@@ -63,11 +64,13 @@
 import CountBox from '@/apps/dashboard/shared/components/CountBox'
 import { mapState } from 'vuex'
 import func from "@/util/func"
+import obj from "@/util/obj"
 import constants from '@/util/constants'
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import api from '../api'
 import SensitiveChipGroup from './SensitiveChipGroup.vue'
+import Spinner from '@/apps/dashboard/shared/components/Spinner'
 
 export default {
     name: "ApiEndpoints",
@@ -75,7 +78,11 @@ export default {
         CountBox, 
         LayoutWithTabs,
         SimpleTable,
-        SensitiveChipGroup        
+        SensitiveChipGroup,
+        Spinner
+    },
+    props: {
+        apiCollectionId: obj.numR
     },
     data() {
         return {
@@ -145,7 +152,7 @@ export default {
         }
     },
     computed: {
-        ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'apiCollectionId']),
+        ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'loading']),
         allEndpoints () {
             return func.groupByEndpoint(this.apiCollection)
         },
@@ -173,11 +180,14 @@ export default {
         }
     },
     mounted() {
+        if (!this.apiCollection || this.apiCollection.length === 0 || this.$store.state.inventory.apiCollectionId !== this.apiCollectionId) {
+            this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId})
+        }
         api.getAllUrlsAndMethods(this.apiCollectionId).then(resp => {
             this.documentedURLs = resp.data || {}
         })
+        this.$emit('mountedView', {type: 1, apiCollectionId: this.apiCollectionId})
     }
-
 }
 </script>
 

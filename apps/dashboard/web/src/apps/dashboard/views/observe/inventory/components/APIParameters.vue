@@ -58,7 +58,8 @@ export default {
         SensitiveParamsCard
     },
     props: {
-        urlAndMethod: obj.strR
+        urlAndMethod: obj.strR,
+        apiCollectionId: obj.numR
     },
     data () {
         return {
@@ -176,6 +177,12 @@ export default {
         },
         responseItems() {
             return this.sensitiveParams.filter(x => x.responseCode > -1).map(this.prepareItem)
+        }
+    },
+    mounted() {
+        this.$emit('mountedView', {apiCollectionId: this.apiCollectionId, urlAndMethod: this.urlAndMethod, type: 2})
+        if (!this.apiCollection || this.apiCollection.length === 0 || this.$store.state.inventory.apiCollectionId !== this.apiCollectionId) {
+            this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId})
         }
     }
 }
