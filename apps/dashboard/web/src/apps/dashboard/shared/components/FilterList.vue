@@ -66,7 +66,7 @@ export default {
     computed: {
         filteredItems () {
             if (this.searchText && this.searchText.length > 0) {
-                return this.items.filter(x => x.indexOf(this.searchText) != -1)
+                return this.items.filter(x => x.toLowerCase().indexOf(this.searchText) != -1)
             } else {
                 return this.items
             }
