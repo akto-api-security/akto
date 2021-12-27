@@ -69,7 +69,7 @@ import constants from '@/util/constants'
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import api from '../api'
-import SensitiveChipGroup from './SensitiveChipGroup.vue'
+import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
 
 export default {

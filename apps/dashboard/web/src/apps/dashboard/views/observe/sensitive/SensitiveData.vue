@@ -11,14 +11,24 @@
         </div> 
         <layout-with-tabs :tabs="['Response', 'Request']">
             <template slot="Request">
-                <simple-table :headers=headers :items=sensitiveParamsInRequestForTable name="Request">
+                <simple-table 
+                    :headers=headers 
+                    :items=sensitiveParamsInRequestForTable 
+                    name="Request"
+                    @rowClicked="goToEndpoint"
+                >
                     <template #item.type="{item}">
                         <sensitive-chip-group :sensitiveTags="[item.type]" />
                     </template>
                 </simple-table>
             </template>
             <template slot="Response">
-                <simple-table :headers=headers :items=sensitiveParamsInResponseForTable name="Response">
+                <simple-table 
+                    :headers=headers 
+                    :items=sensitiveParamsInResponseForTable 
+                    name="Response"
+                    @rowClicked="goToEndpoint"                    
+                >
                     <template #item.type="{item}">
                         <sensitive-chip-group :sensitiveTags="[item.type]" />
                     </template>
@@ -33,12 +43,12 @@
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import CountBox from '@/apps/dashboard/shared/components/CountBox'
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
-import SensitiveParamsCard from './components/SensitiveParamsCard'
+import SensitiveParamsCard from '@/apps/dashboard/shared/components/SensitiveParamsCard'
 import { mapState } from 'vuex'
 import func from '@/util/func'
 import constants from '@/util/constants'
 import SimpleLayout from '@/apps/dashboard/layouts/SimpleLayout'
-import SensitiveChipGroup from './components/SensitiveChipGroup'
+import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
 
 export default {
     name: "SensitiveData",
@@ -71,6 +81,10 @@ export default {
                     value: 'endpoint'
                 },
                 {
+                    text: 'Collection',
+                    value: 'apiCollectionName'
+                },
+                {
                     text: 'Method',
                     value: 'method'
                 },
@@ -95,7 +109,9 @@ export default {
                 method: x.method,
                 added: this.prettifyDate(x.timestamp),
                 location: x.isHeader ? 'Headers' : 'Payload',
-                type: x.subType
+                type: x.subType,
+                apiCollectionId: x.apiCollectionId,
+                apiCollectionName: this.mapCollectionIdToName[x.apiCollectionId] || '-'
             }
         },
         prettifyDate(ts) {
@@ -117,10 +133,27 @@ export default {
                     color: x[0] === 'General' ? "#7D787838" : (["#6200EAFF", "#6200EADF", "#6200EABF", "#6200EA9F", "#6200EA7F", "#6200EA5F", "#6200EA3F", "#6200EA1F"][i])
                 }
             })
+        },
+        goToEndpoint (row) {
+            let routeObj = {
+                name: 'apiCollection/urlAndMethod',
+                params: {
+                    apiCollectionId: row.apiCollectionId,
+                    urlAndMethod: btoa(row.endpoint+ " " + row.method)
+                }
+            }
+
+            this.$router.push(routeObj)
         }
     },
     computed: {
-        ...mapState('inventory', ['apiCollection']),
+        ...mapState('sensitive', ['apiCollection']),
+        mapCollectionIdToName() {
+            return this.$store.state.collections.apiCollections.reduce((m, e) => {
+                m[e.id] = e.name
+                return m
+            }, {})
+        },
         sensitiveParamsInRequestForTable() {
             return this.apiCollection.filter(x => x.responseCode == -1 && func.isSubTypeSensitive(x)).map(this.prepareItemForTable)
         },
@@ -142,7 +175,7 @@ export default {
         }              
     },
     mounted() {
-        this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId})
+        this.$store.dispatch('sensitive/loadSensitiveParameters')
     }
 }
 </script>

@@ -12,8 +12,8 @@ const Inventory = () => import("@/apps/dashboard/views/observe/inventory/Invento
 const APIParameters = () => import("@/apps/dashboard/views/observe/inventory/components/APIParameters")
 const APIEndpoints = () => import("@/apps/dashboard/views/observe/inventory/components/APIEndpoints")
 const APICollections = () => import("@/apps/dashboard/views/observe/collections/APICollections")
-const SensitiveData = () => import("@/apps/dashboard/views/observe/inventory/SensitiveData")
-const ApiChanges = () => import("@/apps/dashboard/views/observe/inventory/Changes")
+const SensitiveData = () => import("@/apps/dashboard/views/observe/sensitive/SensitiveData")
+const ApiChanges = () => import("@/apps/dashboard/views/observe/changes/Changes")
 
 Vue.use(Router)
 
@@ -70,14 +70,14 @@ const router =  new Router({
                     path: 'observe',
                     name: 'observe',
                     component: Observe,
+                    beforeEnter (to, from, next) {
+                        store.dispatch('collections/loadAllApiCollections').then(() => next()).catch(() => next())
+                    },
                     children:[
                         {
                             path: 'inventory',
                             name: 'inventory',
                             component: Inventory,
-                            beforeEnter (to, from, next) {
-                                store.dispatch('collections/loadAllApiCollections').then(() => next()).catch(() => next())
-                            },
                             children: [
                                 {
                                     path:'',

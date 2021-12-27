@@ -40,6 +40,23 @@ export default {
             method: 'post',
             data: {}
         })
+    },
+    loadRecentParameters () {
+        return request({
+            url: '/api/loadRecentParameters',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    loadSensitiveParameters () {
+        return request({
+            url: '/api/loadSensitiveParameters',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
     }
-
 }

@@ -67,6 +67,9 @@ export default {
                 }
             })
         }
+    },
+    mounted () {
+        this.$emit('mountedView', {type: 0})
     }
 }
 </script>

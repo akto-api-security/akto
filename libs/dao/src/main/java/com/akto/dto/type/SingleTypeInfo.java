@@ -1,6 +1,8 @@
 package com.akto.dto.type;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
@@ -13,27 +15,39 @@ public class SingleTypeInfo {
     }
 
     public enum SubType {
-        TRUE(SuperType.BOOLEAN), 
-        FALSE(SuperType.BOOLEAN), 
-        INTEGER_32(SuperType.INTEGER), 
-        INTEGER_64(SuperType.INTEGER), 
-        FLOAT(SuperType.FLOAT), 
-        NULL(SuperType.NULL), 
-        OTHER(SuperType.OTHER),
-        EMAIL(SuperType.STRING), 
-        URL(SuperType.STRING), 
-        ADDRESS(SuperType.STRING), 
-        SSN(SuperType.STRING), 
-        CREDIT_CARD(SuperType.STRING), 
-        PHONE_NUMBER(SuperType.STRING), 
-        UUID(SuperType.STRING), 
-        GENERIC(SuperType.STRING),
-        DICT(SuperType.OTHER);
+        TRUE(SuperType.BOOLEAN, false), 
+        FALSE(SuperType.BOOLEAN, false), 
+        INTEGER_32(SuperType.INTEGER, false), 
+        INTEGER_64(SuperType.INTEGER, false), 
+        FLOAT(SuperType.FLOAT, false), 
+        NULL(SuperType.NULL, false), 
+        OTHER(SuperType.OTHER, false),
+        EMAIL(SuperType.STRING, true), 
+        URL(SuperType.STRING, false), 
+        ADDRESS(SuperType.STRING, true), 
+        SSN(SuperType.STRING, true), 
+        CREDIT_CARD(SuperType.STRING, true), 
+        PHONE_NUMBER(SuperType.STRING, true), 
+        UUID(SuperType.STRING, false), 
+        GENERIC(SuperType.STRING, false),
+        DICT(SuperType.OTHER, false);
 
         SuperType superType;
+        boolean isSensitive;
 
-        private SubType(SuperType superType) {
+        private SubType(SuperType superType, boolean isSensitive) {
             this.superType = superType;
+            this.isSensitive = isSensitive;
+        }
+
+        public static List<String> getSensitiveTypes() {
+            List<String> ret = new ArrayList<>();
+            for (SubType subType: SubType.values()) {
+                if (subType.isSensitive) {
+                    ret.add(subType.name());
+                }
+            }
+            return ret;
         }
     }
 

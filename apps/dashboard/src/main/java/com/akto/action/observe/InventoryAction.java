@@ -2,12 +2,18 @@ package com.akto.action.observe;
 
 import java.util.List;
 
+import com.akto.action.SensitiveFieldAction;
 import com.akto.action.UserAction;
 import com.akto.dao.APISpecDao;
+import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.APISpec;
+import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 
 import io.swagger.parser.OpenAPIParser;
@@ -25,6 +31,28 @@ public class InventoryAction extends UserAction {
         List<SingleTypeInfo> list = SingleTypeInfoDao.instance.fetchAll();
         response = new BasicDBObject();
         response.put("data", new BasicDBObject("name", "Main application").append("endpoints", list));
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String loadRecentParameters() {
+        int now = Context.now();
+        int twoMonthsAgo = now - 62 * 24 * 60 * 60;
+        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.gt("timestamp", twoMonthsAgo));
+        response = new BasicDBObject();
+        response.put("data", new BasicDBObject("endpoints", list));
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String loadSensitiveParameters() {
+        List list = SingleTypeInfoDao.instance.findAll(Filters.in("subType", SubType.getSensitiveTypes()));
+
+        List<SensitiveParamInfo> customSensitiveList = SensitiveParamInfoDao.instance.findAll(Filters.eq("sensitive", true));
+
+        list.addAll(customSensitiveList);
+        response = new BasicDBObject();
+        response.put("data", new BasicDBObject("endpoints", list));
 
         return Action.SUCCESS.toUpperCase();
     }

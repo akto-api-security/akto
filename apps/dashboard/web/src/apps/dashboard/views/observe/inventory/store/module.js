@@ -14,6 +14,10 @@ var state = {
     sensitiveParams: []
 }
 
+let functionCompareParamObj = (x, p) => {
+    return x.param === p.param && x.url === p.url && x.method === p.method && x.isHeader === p.isHeader && x.responseCode === p.responseCode && x.apiCollectionId === p.apiCollectionId
+}
+
 const inventory = {
     namespaced: true,
     state: state,
@@ -32,11 +36,11 @@ const inventory = {
         },
         TOGGLE_SENSITIVE (state, p) {
             let sensitiveParamIndex = state.sensitiveParams.findIndex(x => {
-                return x.param === p.param && x.url === p.url && x.method === p.method && x.isHeader === p.isHeader && x.responseCode === p.responseCode
+                return functionCompareParamObj(x, p)
             })
 
             let apiCollectionIndex = state.apiCollection.findIndex(x => {
-                return x.param === p.param && x.url === p.url && x.method === p.method && x.isHeader === p.isHeader && x.responseCode === p.responseCode
+                return functionCompareParamObj(x, p)
             })
 
             let savedAsSensitive = sensitiveParamIndex < 0
@@ -54,7 +58,7 @@ const inventory = {
             
             fields.forEach(p => {
                 let apiCollectionIndex = state.apiCollection.findIndex(x => {
-                    return x.param === p.param && x.url === p.url && x.method === p.method && x.isHeader === p.isHeader && x.responseCode === p.responseCode
+                    return functionCompareParamObj(x, p)
                 })
                 
                 state.apiCollection[apiCollectionIndex].savedAsSensitive = true
@@ -93,7 +97,7 @@ const inventory = {
         getAPICollectionId: (state) => state.apiCollectionId,
         getAPICollectionName: (state) => state.apiCollectionName,
         isSensitive: (state) => p => state.sensitiveParams && state.sensitiveParams.findIndex(x => {
-            return x.param === p.param && x.url === p.url && x.method === p.method && x.isHeader === p.isHeader && x.responseCode === p.responseCode
+            return functionCompareParamObj(x, p)
         }) > 0
     }
 }
