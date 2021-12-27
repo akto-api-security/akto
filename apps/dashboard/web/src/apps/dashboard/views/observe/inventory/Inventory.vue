@@ -11,7 +11,7 @@
                             :disabled="item.disabled"
                             :class="item.disabled ? '' : 'clickable'"
                         >
-                            {{ item.text }}
+                            <span>{{ item.text }}</span>
                         </v-breadcrumbs-item>
                     </template>
                     <template v-slot:divider>

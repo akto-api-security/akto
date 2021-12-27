@@ -30,6 +30,7 @@ const collections = {
         },
         loadAllApiCollections({commit}, options) {
             commit('EMPTY_STATE')
+            state.loading = true
             return api.getAllCollections().then((resp) => {
                 commit('SAVE_API_COLLECTION', resp, options)
                 state.loading = false

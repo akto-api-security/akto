@@ -1,6 +1,8 @@
 <template>
-    <div>         
+    <div>   
+        <spinner v-if="loading" />      
         <simple-table
+            v-else
             :headers="headers" 
             :items="apiCollectionsForTable"  
             :actions="actions"
@@ -16,12 +18,15 @@
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import { mapState } from 'vuex'
 import func from '@/util/func'
+import Spinner from '@/apps/dashboard/shared/components/Spinner'
 
 export default {
     name: "ApiCollections",
     components: { 
-        SimpleTable 
+        SimpleTable,
+        Spinner
     },
+    
     data() {
         return { 
             headers: [
@@ -51,7 +56,7 @@ export default {
         }
     },
     computed: {
-        ...mapState('collections', ['apiCollections']),
+        ...mapState('collections', ['apiCollections', 'loading']),
         apiCollectionsForTable () {
             return this.apiCollections.map(c => {
                 return {
