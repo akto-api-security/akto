@@ -241,6 +241,7 @@ export default {
 
 <style lang="sass" scoped>
 .board-table-cards
+    padding-right: 24px
     .table-header
         vertical-align: bottom
         text-align: left
@@ -248,7 +249,7 @@ export default {
         border: 1px solid #FFFFFF !important
 
     .table-column
-        padding: 8px 16px !important
+        padding: 4px 8px !important
         border-top: 1px solid #FFFFFF !important
         border-bottom: 1px solid #FFFFFF !important
         background: rgba(71, 70, 106, 0.03)
@@ -301,6 +302,14 @@ export default {
   font-size: 14px;
   color: #6200EA;
   font-weight: 500;
+}
+
+.v-data-table >>> .table-entry {
+    font-size: 12px !important;
+}
+
+.v-data-table >>> .table-sub-header {
+    font-size: 14px !important;
 }
 
 </style>
