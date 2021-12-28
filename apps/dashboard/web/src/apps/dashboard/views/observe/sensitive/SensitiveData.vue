@@ -109,7 +109,7 @@ export default {
                 method: x.method,
                 added: this.prettifyDate(x.timestamp),
                 location: x.isHeader ? 'Headers' : 'Payload',
-                type: x.subType,
+                type: x.subType || "OTHER",
                 apiCollectionId: x.apiCollectionId,
                 apiCollectionName: this.mapCollectionIdToName[x.apiCollectionId] || '-'
             }
