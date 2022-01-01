@@ -13,7 +13,7 @@
                     </v-btn>
                 </template>
                 <v-list>
-                    <v-list-item @click="showUploadFileModal" style="width: 350px">
+                    <v-list-item style="width: 350px">
                         <v-file-input
                             :rules=rules
                             show-size

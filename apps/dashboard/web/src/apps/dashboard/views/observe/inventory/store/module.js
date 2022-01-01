@@ -89,7 +89,7 @@ const inventory = {
                 return resp
             })
         },
-        uploadHarFile({commit,state},content) {
+        uploadHarFile({commit,state},{content,filename}) {
             return api.uploadHarFile(content,state.apiCollectionId).then(resp => {
                 return resp
             })

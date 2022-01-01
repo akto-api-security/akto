@@ -3,7 +3,7 @@ import request from '@/util/request'
 export default {
     uploadHarFile(content, apiCollectionId) {
         return request({
-            url: '/api/uploadHarFile',
+            url: '/api/uploadHar',
             method: 'post',
             data: {
                 content, apiCollectionId

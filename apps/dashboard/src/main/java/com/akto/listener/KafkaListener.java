@@ -11,7 +11,9 @@ public class KafkaListener implements ServletContextListener {
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
         String brokerIP = System.getenv("AKTO_KAFKA_BROKER_URL");
 //        String brokerIP = "172.18.0.4:9092";
-        kafka = new Kafka(brokerIP);
+        if (brokerIP != null) {
+            kafka = new Kafka(brokerIP);
+        }
 
     }
 }

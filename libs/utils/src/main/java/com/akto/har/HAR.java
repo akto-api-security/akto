@@ -14,10 +14,8 @@ public class HAR {
     private final static ObjectMapper mapper = new ObjectMapper();
     private final List<String> errors = new ArrayList<>();
     private static final Logger logger = LoggerFactory.getLogger(Har.class);
-    public List<String> getMessages(String harString) throws HarReaderException {
+    public List<String> getMessages(String harString, int collection_id) throws HarReaderException {
         HarReader harReader = new HarReader();
-//        Har har = harReader.readFromFile(new File("/home/avneesh/Downloads/localhost_Archive [21-12-28 01-30-51].har"));
-//        Har har = harReader.readFromFile(new File("/home/avneesh/Downloads/localhost_Archive [21-12-28 18-01-36].har"));
         Har har = harReader.readFromString(harString);
         HarLog log = har.getLog();
         List<HarEntry> entries = log.getEntries();
@@ -29,6 +27,7 @@ public class HAR {
             try {
                 Map<String,String> result = getResultMap(entry);
                 if (result != null) {
+                    result.put("akto_vxlan_id", collection_id+"");
                     entriesList.add(mapper.writeValueAsString(result));
                 }
             } catch (Exception e) {
