@@ -28,7 +28,7 @@ public class InventoryAction extends UserAction {
     BasicDBObject response;
 
     public String getAPICollection() {
-        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.fetchAll();
+        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.eq("apiCollectionId", apiCollectionId));
         response = new BasicDBObject();
         response.put("data", new BasicDBObject("name", "Main application").append("endpoints", list));
 

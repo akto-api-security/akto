@@ -1,16 +1,24 @@
 <template>
     <div>   
         <spinner v-if="loading" />      
-        <simple-table
-            v-else
-            :headers="headers" 
-            :items="apiCollectionsForTable"  
-            :actions="actions"
-            name="API Collections" 
-            sortKeyDefault="name" 
-            :sortDescDefault="false"   
-            @rowClicked=rowClicked     
-        />
+        <div v-else>
+            <simple-text-field 
+            :readOutsideClick="true"
+            placeholder="New collection name"
+            @changed="createCollection"
+            class="add-collection-field"
+            />
+            <simple-table
+                :headers="headers" 
+                :items="apiCollectionsForTable"  
+                :actions="actions"
+                name="API Collections" 
+                sortKeyDefault="name" 
+                :sortDescDefault="false"   
+                @rowClicked=rowClicked     
+            />
+
+        </div>
     </div>        
 </template>
 
@@ -19,12 +27,14 @@ import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import { mapState } from 'vuex'
 import func from '@/util/func'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
+import SimpleTextField from '@/apps/dashboard/shared/components/SimpleTextField'
 
 export default {
     name: "ApiCollections",
     components: { 
         SimpleTable,
-        Spinner
+        Spinner,
+        SimpleTextField
     },
     
     data() {
@@ -53,7 +63,18 @@ export default {
     methods: {
         rowClicked(item) {
             this.$emit("selectedItem", {type: 1, collectionName: item.name, apiCollectionId: item.id})
+        },
+        createCollection(name) {
+            console.log(name);
+          this.$store.dispatch('collections/createCollection', {name}).then(resp => {
+            window._AKTO.$emit('SHOW_SNACKBAR', {
+                show: true,
+                text: `${name} ` +`added successfully!`,
+                color: 'green'
+            })
+          })
         }
+
     },
     computed: {
         ...mapState('collections', ['apiCollections', 'loading']),
@@ -79,4 +100,7 @@ export default {
         color: #47466A
         font-size: 12px
         margin-top: 16px
+    .add-collection-field
+        width: 350px
+        padding: 32px
 </style>

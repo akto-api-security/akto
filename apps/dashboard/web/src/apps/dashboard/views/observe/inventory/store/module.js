@@ -88,6 +88,11 @@ const inventory = {
                 commit('TOGGLE_SENSITIVE', paramInfo)
                 return resp
             })
+        },
+        uploadHarFile({commit,state},content) {
+            return api.uploadHarFile(content,state.apiCollectionId).then(resp => {
+                return resp
+            })
         }
     },
     getters: {

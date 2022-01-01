@@ -1,6 +1,32 @@
 <template>
     <spinner v-if="loading" />
-    <div class="pt-4 pr-4 api-endpoints" v-else>
+    <div class="pr-4 api-endpoints" v-else>
+        <div class="menu">
+            <v-menu
+                v-model="showMenu"
+                :close-on-content-click="false"
+                transition="v-expand-transition"
+            >
+                <template v-slot:activator="{ on, attrs }">
+                    <v-btn icon v-bind="attrs" v-on="on">
+                        <v-icon>$fas_bars</v-icon>
+                    </v-btn>
+                </template>
+                <v-list>
+                    <v-list-item @click="showUploadFileModal" style="width: 350px">
+                        <v-file-input
+                            :rules=rules
+                            show-size
+                            label="Upload HAR file"
+                            accept=".har"
+                            @change="handleFileChange"
+                            v-model=file
+                        />
+                    </v-list-item>
+                </v-list>
+            </v-menu>
+        </div>
+
         <div class="d-flex">
             <count-box title="Sensitive Endpoints" :count="sensitiveEndpoints.length" colorTitle="Overdue"/>
             <count-box title="Shadow Endpoints" :count="shadowEndpoints.length" colorTitle="Pending"/>
@@ -86,6 +112,11 @@ export default {
     },
     data() {
         return {
+            file: null,
+            rules: [
+                value => !value || value.size < 2e6 || 'HAR file size should be less than 2 MB!',
+            ],
+            showMenu: false,
             tableHeaders: [
                 {
                     text: '',
@@ -149,6 +180,17 @@ export default {
         },
         isUnused(url, method) {
             return this.allEndpoints.filter(e => e.endpoint === url && e.method == method).length == 0
+        },
+        handleFileChange() {
+            if (!this.file) {this.content = null}
+            var reader = new FileReader();
+            
+            // Use the javascript reader object to load the contents
+            // of the file in the v-model prop
+            reader.readAsText(this.file);
+            reader.onload = () => {
+                this.$store.dispatch('inventory/uploadHarFile', { content: JSON.parse(reader.result), filename: this.file.name})
+            }
         }
     },
     computed: {
@@ -217,5 +259,8 @@ export default {
             width: 200px
             min-width: 200px
             max-width: 200px
+.menu
+    display: flex
+    justify-content: right
 
 </style>

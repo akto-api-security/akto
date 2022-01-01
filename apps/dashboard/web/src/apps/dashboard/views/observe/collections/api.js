@@ -9,5 +9,15 @@ export default {
         }).then((resp) => {
             return resp
         })
+    },
+
+    createCollection(name) {
+        return request({
+            url: '/api/createCollection',
+            method: 'post',
+            data: {collectionName:name}
+        }).then((resp) => {
+            return resp
+        })
     }
 }
