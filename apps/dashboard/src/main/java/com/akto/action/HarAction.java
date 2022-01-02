@@ -5,11 +5,8 @@ import com.akto.listener.KafkaListener;
 import com.mongodb.BasicDBObject;
 
 import de.sstoehr.harreader.HarReaderException;
-import org.apache.commons.io.FileUtils;
 
-import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 public class HarAction extends UserAction {
@@ -31,9 +28,8 @@ public class HarAction extends UserAction {
             HAR har = new HAR();
             List<String> messages = har.getMessages(harString, apiCollectionId);
             harErrors = har.getErrors();
-            System.out.println(messages.size());
             for (String message: messages){
-                // KafkaListener.kafka.send(message,topic);
+                KafkaListener.kafka.send(message,topic);
             }
         } catch (HarReaderException e) {
             e.printStackTrace();

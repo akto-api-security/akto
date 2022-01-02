@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.sstoehr.harreader.HarReader;
 import de.sstoehr.harreader.HarReaderException;
+import de.sstoehr.harreader.HarReaderMode;
 import de.sstoehr.harreader.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,7 +17,7 @@ public class HAR {
     private static final Logger logger = LoggerFactory.getLogger(Har.class);
     public List<String> getMessages(String harString, int collection_id) throws HarReaderException {
         HarReader harReader = new HarReader();
-        Har har = harReader.readFromString(harString);
+        Har har = harReader.readFromString(harString, HarReaderMode.LAX);
         HarLog log = har.getLog();
         List<HarEntry> entries = log.getEntries();
 
