@@ -1,16 +1,15 @@
 package com.akto.parsers;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.net.URLDecoder;
+import java.util.*;
 
 import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.ConnectionString;
 
@@ -22,6 +21,9 @@ public class HttpCallParser {
     
     private static final String AKTO_REQUEST = "##AKTO_REQUEST##";
     private static final String AKTO_RESPONSE = "##AKTO_RESPONSE##";
+    public static final String JSON_CONTENT_TYPE = "application/json";
+    public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
+    private final static ObjectMapper mapper = new ObjectMapper();
     private final int sync_threshold_count;
     private final int sync_threshold_time;
     private int sync_count = 0;
@@ -282,7 +284,7 @@ public class HttpCallParser {
 
     }
 
-    public static HttpResponseParams parseKafkaMessage(String message) {
+    public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
         Gson gson = new Gson();
 
         //convert java object to JSON format
@@ -291,14 +293,33 @@ public class HttpCallParser {
         String method = (String) json.get("method");
         String url = (String) json.get("path");
         String type = (String) json.get("type");
+        Map<String,List<String>> requestHeaders = getHeaders(gson, json, "requestHeaders");
+
         String requestPayload = (String) json.get("requestPayload");
+        requestPayload = requestPayload.trim();
+        if (requestPayload.length() > 0) {
+            String acceptableContentType = getAcceptableContentType(requestHeaders);
+            if (acceptableContentType.equals(FORM_URL_ENCODED_CONTENT_TYPE)) {
+                String myStringDecoded = URLDecoder.decode((String) json.get("requestPayload"), "UTF-8");
+                String[] parts = myStringDecoded.split("&");
+                Map<String,String> valueMap = new HashMap<>();
+
+                for(String part: parts){
+                    String[] keyVal = part.split("="); // The equal separates key and values
+                    if (keyVal.length == 2) {
+                        valueMap.put(keyVal[0], keyVal[1]);
+                    }
+                }
+                requestPayload = mapper.writeValueAsString(valueMap);
+            }
+        }
+
         String apiCollectionIdStr = json.getOrDefault("akto_vxlan_id", "0").toString();
         int apiCollectionId = 0;
         if (NumberUtils.isDigits(apiCollectionIdStr)) {
             apiCollectionId = NumberUtils.toInt(apiCollectionIdStr, 0);
         }
-        
-        Map<String,List<String>> requestHeaders = getHeaders(gson, json, "requestHeaders");
+
         HttpRequestParams requestParams = new HttpRequestParams(
                 method,url,type, requestHeaders, requestPayload, apiCollectionId
         );
@@ -328,7 +349,25 @@ public class HttpCallParser {
         return headers;
     }
 
-    public static void main(String[] args) throws IOException {
+    public static String getAcceptableContentType(Map<String,List<String>> headers) throws Exception {
+        List<String> acceptableContentTypes = Arrays.asList(JSON_CONTENT_TYPE, FORM_URL_ENCODED_CONTENT_TYPE);
+        List<String> contentTypeValues = new ArrayList<>();
+        for (String k: headers.keySet()) {
+            if (k.equalsIgnoreCase("content-type")) {
+                contentTypeValues = headers.get(k);
+                for (String value: contentTypeValues) {
+                    for (String acceptableContentType: acceptableContentTypes) {
+                        if (value.contains(acceptableContentType)) {
+                            return acceptableContentType;
+                        }
+                    }
+                }
+            }
+        }
+        throw new Exception("Invalid content type: " + contentTypeValues);
+    }
+
+    public static void main(String[] args) throws IOException{
         String mongoURI = "mongodb://write_ops:write_ops@cluster0-shard-00-00.yg43a.mongodb.net:27017,cluster0-shard-00-01.yg43a.mongodb.net:27017,cluster0-shard-00-02.yg43a.mongodb.net:27017/myFirstDatabase?ssl=true&replicaSet=atlas-qd3mle-shard-0&authSource=admin&retryWrites=true&w=majority";
         DaoInit.init(new ConnectionString(mongoURI));
         Context.accountId.set(77);
@@ -348,7 +387,9 @@ public class HttpCallParser {
         HttpCallParser h =  new HttpCallParser("access-token", 0,0,10);
         List<HttpCallParser.HttpResponseParams> hh = new ArrayList<>();
         for (String p: kk) {
-            hh.add(h.parseKafkaMessage(p));
+            try {
+                hh.add(parseKafkaMessage(p));
+            } catch (Exception ignored) {}
         }
         h.syncFunction(hh);
     }

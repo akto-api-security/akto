@@ -139,7 +139,7 @@ public class Main {
                         httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
                          
                     } catch (Exception e) {
-                        logger.info("Error while parsing kafka message " + e);
+                        logger.error("Error while parsing kafka message " + e);
                         continue;
                     }
                     String accountId = httpResponseParams.getAccountId();

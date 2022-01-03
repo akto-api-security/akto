@@ -9,15 +9,20 @@ import de.sstoehr.harreader.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.net.URLDecoder;
 import java.util.*;
 
 public class HAR {
     private final static ObjectMapper mapper = new ObjectMapper();
     private final List<String> errors = new ArrayList<>();
     private static final Logger logger = LoggerFactory.getLogger(Har.class);
+    public static final String JSON_CONTENT_TYPE = "application/json";
+    public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
     public List<String> getMessages(String harString, int collection_id) throws HarReaderException {
         HarReader harReader = new HarReader();
         Har har = harReader.readFromString(harString, HarReaderMode.LAX);
+
         HarLog log = har.getLog();
         List<HarEntry> entries = log.getEntries();
 
@@ -55,16 +60,42 @@ public class HAR {
         Map<String,String> requestHeaderMap = convertHarHeadersToMap(requestHarHeaders);
         Map<String,String> responseHeaderMap = convertHarHeadersToMap(responseHarHeaders);
 
-        Map<String,String> paramMap = mapper.readValue(request.getPostData().getText(), new TypeReference<HashMap<String, String>>() {});
-        addQueryStringToMap(request.getQueryString(), paramMap);
+        String requestContentType = getContentType(requestHarHeaders);
+        if (requestContentType == null) {
+            return null;
+        }
+
+        String requestPayload;
+        if (requestContentType.contains(JSON_CONTENT_TYPE)) {
+            String postData = request.getPostData().getText();
+            if (postData == null) {
+                postData = "{}";
+            }
+            if (postData.startsWith("[")) {
+                requestPayload = postData;
+            } else {
+                Map<String,Object> paramMap = mapper.readValue(postData, new TypeReference<HashMap<String,Object>>() {});
+                addQueryStringToMap(request.getQueryString(), paramMap);
+                requestPayload = mapper.writeValueAsString(paramMap);
+            }
+        } else if (requestContentType.contains(FORM_URL_ENCODED_CONTENT_TYPE)) {
+            String postText = request.getPostData().getText();
+            if (postText == null) {
+                postText = "";
+            }
+
+            requestPayload = postText;
+        } else {
+            return null;
+        }
+
 
         String akto_account_id = 1_000_000 + ""; // TODO:
         String path = getPath(request);
         String requestHeaders = mapper.writeValueAsString(requestHeaderMap);
         String responseHeaders = mapper.writeValueAsString(responseHeaderMap);
         String method = request.getMethod().toString();
-        String requestPayload = mapper.writeValueAsString(paramMap);
-        String responsePayload = response.getContent().getText();
+        String responsePayload = response.getContent().getText();;
         String ip = "null"; // TODO:
         String time = (int) (dateTime.getTime() / 1000) + "";
         String statusCode = response.getStatus() + "";
@@ -95,7 +126,7 @@ public class HAR {
         if (contentType == null) {
             return false;
         }
-        return contentType.contains("application/json");
+        return contentType.contains(JSON_CONTENT_TYPE);
      }
 
      public static String getContentType(List<HarHeader> headers) {
@@ -119,7 +150,8 @@ public class HAR {
         return headerMap;
      }
 
-    public static void addQueryStringToMap(List<HarQueryParam> params, Map<String, String> paramsMap) {
+    public static void addQueryStringToMap(List<HarQueryParam> params, Map<String,Object> paramsMap) {
+        // TODO: which will take preference querystring or post value
         for (HarQueryParam param: params) {
             paramsMap.put(param.getName(), param.getValue());
         }
