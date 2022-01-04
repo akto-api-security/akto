@@ -83,7 +83,7 @@ public class Main {
         SingleTypeInfoDao.instance.getMCollection().updateMany(Filters.exists("apiCollectionId", false), Updates.set("apiCollectionId", 0));
 
         Context.accountId.set(1_000_000);
-        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("id", 0);
+        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("_id", 0);
         if (apiCollection == null) {
             Set<String> urls = new HashSet<>();
             for(SingleTypeInfo singleTypeInfo: SingleTypeInfoDao.instance.fetchAll()) {
@@ -95,7 +95,7 @@ public class Main {
         APIConfig apiConfig;
         apiConfig = APIConfigsDao.instance.findOne(Filters.eq("name", configName));
         if (apiConfig == null) {
-            apiConfig = new APIConfig(configName,"access-token", 0,1, 60);
+            apiConfig = new APIConfig(configName,"access-token", 1,1, 60);
         }
 
         final Main main = new Main();
