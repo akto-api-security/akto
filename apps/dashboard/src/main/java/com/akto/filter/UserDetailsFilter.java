@@ -72,11 +72,10 @@ public class UserDetailsFilter implements Filter {
             username = jws.getBody().get("username").toString();
             signedUp = jws.getBody().get("signedUp").toString();
         } catch (Exception e) {
-            System.out.println(e.getMessage());
-            // if (httpServletRequest.getRequestURI().contains(API_URI)) {
-            //     ((HttpServletResponse) servletResponse).sendError(403);
-            //     return ;
-            // }
+             if (httpServletRequest.getRequestURI().contains(API_URI)) {
+                 ((HttpServletResponse) servletResponse).sendError(403);
+                 return ;
+             }
             Token token = AccessTokenAction.generateAccessTokenFromServletRequest(httpServletRequest);
             if (token == null) {
                 redirectIfNotLoginURI(filterChain,httpServletRequest,httpServletResponse);
