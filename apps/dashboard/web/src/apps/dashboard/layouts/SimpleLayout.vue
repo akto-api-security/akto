@@ -1,6 +1,6 @@
 <template>
     <div>
-        <div class="brdb pl-8">
+        <div class="layout-border pl-8">
             <div v-if="title" class="pt-6">
                 <div>
                     <span class="board-name">{{ title || 'Loading...' }}</span>
@@ -44,4 +44,6 @@
     color: #47466A
     opacity: 0.7
     padding-top: 4px
+.layout-border
+    border-bottom: 1px solid #47466A19
 </style>
