@@ -22,6 +22,9 @@ const collections = {
         },
         SAVE_API_COLLECTION (state, {apiCollections}) {
             state.apiCollections = apiCollections
+        },
+        CREATE_COLLECTION (state, {apiCollections}) {
+            state.apiCollections.push(apiCollections[0])
         }
     },
     actions: {
@@ -36,6 +39,12 @@ const collections = {
                 state.loading = false
             }).catch(() => {
                 state.loading = false
+            })
+        },
+        createCollection({commit}, {name}, options) {
+            return api.createCollection(name).then((resp) => {
+                commit('CREATE_COLLECTION', resp, options)
+            }).catch(() => {
             })
         }
     },
