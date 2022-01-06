@@ -84,9 +84,9 @@ public class Main {
 
         // mongoURI = "mongodb://write_ops:write_ops@cluster0-shard-00-00.yg43a.mongodb.net:27017,cluster0-shard-00-01.yg43a.mongodb.net:27017,cluster0-shard-00-02.yg43a.mongodb.net:27017/myFirstDatabase?ssl=true&replicaSet=atlas-qd3mle-shard-0&authSource=admin&retryWrites=true&w=majority";
         DaoInit.init(new ConnectionString(mongoURI));
+        Context.accountId.set(1_000_000);
         SingleTypeInfoDao.instance.getMCollection().updateMany(Filters.exists("apiCollectionId", false), Updates.set("apiCollectionId", 0));
 
-        Context.accountId.set(1_000_000);
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("_id", 0);
         if (apiCollection == null) {
             Set<String> urls = new HashSet<>();
