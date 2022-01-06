@@ -2,11 +2,15 @@ package com.akto.runtime;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import com.akto.DaoInit;
 import com.akto.dao.APIConfigsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.APIConfig;
+import com.akto.dto.KafkaHealthMetric;
 import com.akto.parsers.HttpCallParser;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -69,6 +73,11 @@ public class Main {
 
         Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
         Map<String, Flow> flowMap = new HashMap<>();
+
+        // sync infra metrics thread
+        ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
+        KafkaHealthMetricSyncTask task = new KafkaHealthMetricSyncTask();
+        executor.scheduleAtFixedRate(task, 2, 60, TimeUnit.SECONDS);
 
         try {
             main.consumer.subscribe(Collections.singleton(topicName));
@@ -140,13 +149,22 @@ public class Main {
                 }
 
                 for (TopicPartition tp: main.consumer.assignment()) {
+                    String tpName = tp.topic();
                     long position = main.consumer.position(tp);
+                    long endOffset = main.consumer.endOffsets(Collections.singleton(tp)).get(tp);
+                    int partition = tp.partition();
+
                     if (position < 100 || position % 100 == 0) {
-                        System.out.println("Committing offset at position: " + main.consumer.position(tp) + " for partition " + tp.partition());
+                        System.out.println("Committing offset at position: " + position + " for partition " + partition);
                     }
+
+                    KafkaHealthMetric kafkaHealthMetric = new KafkaHealthMetric(tpName, partition,
+                            position,endOffset,Context.now());
+                    task.kafkaHealthMetricsMap.put(kafkaHealthMetric.hashCode()+"", kafkaHealthMetric);
                 }
 
                 main.consumer.commitSync();
+
             }
 
         } catch (WakeupException ignored) {
