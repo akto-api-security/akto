@@ -68,7 +68,8 @@ import {
   faCreditCard,
   faAddressCard,
   faChalkboard,
-  faFilter
+  faFilter,
+  faKey,
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -92,7 +93,7 @@ const faIcons = [
   faInfoCircle,faDownload,faFileCsv,faCircle,faThLarge,faStopwatch,faCheckCircle,faEyeSlash,faArrowLeft,faUsers,faChartLine,
   faHome,faBullseye,faBullhorn,faCheckDouble,faSquare,faBolt,faDatabase,faAngleDoubleRight, faAngleDoubleLeft,faClipboardList,
   faUnlockAlt,faStethoscope,faLongArrowAltDown,faLongArrowAltUp,faSyncAlt, faExchangeAlt, faUserLock, faExclamation,faPhoneAlt,
-  faCreditCard,faAddressCard,faChalkboard,faFilter,
+  faCreditCard,faAddressCard,faChalkboard,faFilter,faKey,
 
   farComments,farCalendar, farHandPointRight, farBuilding, farStar,farSquare, farCheckSquare,
 

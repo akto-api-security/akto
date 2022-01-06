@@ -30,10 +30,11 @@ public class SingleTypeInfo {
         PHONE_NUMBER(SuperType.STRING, true), 
         UUID(SuperType.STRING, false), 
         GENERIC(SuperType.STRING, false),
-        DICT(SuperType.OTHER, false);
+        DICT(SuperType.OTHER, false),
+        JWT(SuperType.STRING, true);
 
         SuperType superType;
-        boolean isSensitive;
+        public boolean isSensitive;
 
         private SubType(SuperType superType, boolean isSensitive) {
             this.superType = superType;
