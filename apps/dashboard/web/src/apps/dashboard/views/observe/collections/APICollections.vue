@@ -1,13 +1,7 @@
 <template>
     <div>   
         <spinner v-if="loading" />      
-        <div v-else>
-            <simple-text-field 
-            :readOutsideClick="true"
-            placeholder="New collection name"
-            @changed="createCollection"
-            class="add-collection-field"
-            />
+        <div v-else class="pt-8">
             <simple-table
                 :headers="headers" 
                 :items="apiCollectionsForTable"  
@@ -15,7 +9,14 @@
                 name="API Collections" 
                 sortKeyDefault="name" 
                 :sortDescDefault="false"   
-                @rowClicked=rowClicked     
+                @rowClicked=rowClicked
+                hide-default-footer ="true"
+            />
+               <simple-text-field 
+            :readOutsideClick="true"
+            placeholder="New collection name"
+            @changed="createCollection"
+            class="add-collection-field"
             />
 
         </div>

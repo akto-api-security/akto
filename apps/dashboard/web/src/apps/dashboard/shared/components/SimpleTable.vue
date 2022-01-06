@@ -8,13 +8,16 @@
         :sort-by="sortKey"
         :sort-desc="sortDesc"
         :custom-sort="sortFunc"
-        :items-per-page="10"
+        :items-per-page="30"
         :footer-props="{
             showFirstLastPage: true,
-            firstIcon: '$fas_angle-double-left',
-            lastIcon: '$fas_angle-double-right',
+  //          firstIcon: '$fas_angle-double-left',
+//            lastIcon: '$fas_angle-double-right',
             prevIcon: '$fas_angle-left',
-            nextIcon: '$fas_angle-right'
+            nextIcon: '$fas_angle-right',
+            'hide-items-per-page': 'false',
+
+
         }"
         :hide-default-footer="!items || items.length == 0"
         hide-default-header>
@@ -94,7 +97,7 @@
         <template v-slot:footer.prepend v-if="items && items.length > 0">
             <div class="clickable download-csv ma-1">
                 <v-icon :color="$vuetify.theme.themes.dark.themeColor">$fas_file-csv</v-icon>
-                <span class="ml-2" @click="downloadData">Download as CSV</span>
+                <span class="ml-2" @click="downloadData"></span>
             </div>
         </template>
 
@@ -285,6 +288,7 @@ export default {
 
 .filter-icon
     color: #6200EA !important
+    opacity:0.8
     min-width: 0px !important
     position: absolute
     right: -35px
