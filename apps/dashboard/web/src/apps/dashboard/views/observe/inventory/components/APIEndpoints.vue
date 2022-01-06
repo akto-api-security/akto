@@ -114,7 +114,7 @@ export default {
         return {
             file: null,
             rules: [
-                value => !value || value.size < 2e6 || 'HAR file size should be less than 2 MB!',
+                value => !value || value.size < 50e6 || 'HAR file size should be less than 50 MB!',
             ],
             showMenu: false,
             tableHeaders: [
