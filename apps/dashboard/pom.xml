@@ -134,6 +134,11 @@
             <artifactId>google-api-services-drive</artifactId>
             <version>v3-rev197-1.25.0</version>
         </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+            <version>1.8.1</version>
+        </dependency>
     </dependencies>
     <build>
         <sourceDirectory>src/main/java</sourceDirectory>

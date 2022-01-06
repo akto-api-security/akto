@@ -32,5 +32,14 @@ export default {
         }).then((resp) => {
             return resp
         })
-    }    
+    },
+    health() {
+        return request({
+            url: '/api/health',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
+    }
 }
