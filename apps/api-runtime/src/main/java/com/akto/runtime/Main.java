@@ -120,7 +120,7 @@ public class Main {
 
         try {
             main.consumer.subscribe(Collections.singleton(topicName));
-
+            main.consumer.commitSync();
             while (true) {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
 
@@ -198,8 +198,6 @@ public class Main {
                         System.out.println("Committing offset at position: " + main.consumer.position(tp) + " for partition " + tp.partition());
                     }
                 }
-
-                main.consumer.commitSync();
             }
 
         } catch (WakeupException ignored) {
