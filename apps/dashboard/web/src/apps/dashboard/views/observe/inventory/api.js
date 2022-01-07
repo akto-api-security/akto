@@ -1,6 +1,15 @@
 import request from '@/util/request'
 
 export default {
+    uploadHarFile(content, apiCollectionId) {
+        return request({
+            url: '/api/uploadHar',
+            method: 'post',
+            data: {
+                content, apiCollectionId
+            }
+        })
+    },
     getAPICollection (apiCollectionId) {
         return request({
             url: '/api/getAPICollection',
@@ -40,6 +49,23 @@ export default {
             method: 'post',
             data: {}
         })
+    },
+    loadRecentParameters () {
+        return request({
+            url: '/api/loadRecentParameters',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    loadSensitiveParameters () {
+        return request({
+            url: '/api/loadSensitiveParameters',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
     }
-
 }

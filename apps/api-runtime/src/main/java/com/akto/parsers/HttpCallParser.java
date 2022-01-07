@@ -1,18 +1,19 @@
 package com.akto.parsers;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.net.URLDecoder;
+import java.util.*;
 
 import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.ConnectionString;
+
+import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,6 +21,9 @@ public class HttpCallParser {
     
     private static final String AKTO_REQUEST = "##AKTO_REQUEST##";
     private static final String AKTO_RESPONSE = "##AKTO_RESPONSE##";
+    public static final String JSON_CONTENT_TYPE = "application/json";
+    public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
+    private final static ObjectMapper mapper = new ObjectMapper();
     private final int sync_threshold_count;
     private final int sync_threshold_time;
     private int sync_count = 0;
@@ -32,15 +36,18 @@ public class HttpCallParser {
         String type; // HTTP/1.1
         private Map<String, List<String>> headers = new HashMap<>();
         private String payload;
+        private int apiCollectionId;
 
         public HttpRequestParams() {}
 
-        public HttpRequestParams(String method, String url, String type, Map<String, List<String>> headers, String payload) {
+        public HttpRequestParams(String method, String url, String type, Map<String, List<String>> headers, String payload, int apiCollectionId) {
             this.method = method;
             this.url = url;
             this.type = type;
             this.headers = headers;
             this.payload = payload;
+            this.apiCollectionId = apiCollectionId;
+
         }
 
         public static List<HttpRequestParams> parseRequest(String request) throws IOException {
@@ -115,6 +122,14 @@ public class HttpCallParser {
 
         public String getMethod() {
             return this.method;
+        }
+
+        public int getApiCollectionId() {
+            return this.apiCollectionId;
+        }
+
+        public void setApiCollectionId(int apiCollectionId) {
+            this.apiCollectionId = apiCollectionId;
         }
     }
 
@@ -228,7 +243,7 @@ public class HttpCallParser {
         this.sync_threshold_count = sync_threshold_count;
         this.sync_threshold_time = sync_threshold_time;
         apiCatalogSync = new APICatalogSync(userIdentifier,thresh);
-        apiCatalogSync.buildFromDB(1);
+        apiCatalogSync.buildFromDB(false);
     }
     
     public static int counter = 0;
@@ -269,7 +284,7 @@ public class HttpCallParser {
 
     }
 
-    public static HttpResponseParams parseKafkaMessage(String message) {
+    public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
         Gson gson = new Gson();
 
         //convert java object to JSON format
@@ -278,11 +293,35 @@ public class HttpCallParser {
         String method = (String) json.get("method");
         String url = (String) json.get("path");
         String type = (String) json.get("type");
-        String requestPayload = (String) json.get("requestPayload");
-
         Map<String,List<String>> requestHeaders = getHeaders(gson, json, "requestHeaders");
+
+        String requestPayload = (String) json.get("requestPayload");
+        requestPayload = requestPayload.trim();
+        if (requestPayload.length() > 0) {
+            String acceptableContentType = getAcceptableContentType(requestHeaders);
+            if (acceptableContentType.equals(FORM_URL_ENCODED_CONTENT_TYPE)) {
+                String myStringDecoded = URLDecoder.decode((String) json.get("requestPayload"), "UTF-8");
+                String[] parts = myStringDecoded.split("&");
+                Map<String,String> valueMap = new HashMap<>();
+
+                for(String part: parts){
+                    String[] keyVal = part.split("="); // The equal separates key and values
+                    if (keyVal.length == 2) {
+                        valueMap.put(keyVal[0], keyVal[1]);
+                    }
+                }
+                requestPayload = mapper.writeValueAsString(valueMap);
+            }
+        }
+
+        String apiCollectionIdStr = json.getOrDefault("akto_vxlan_id", "0").toString();
+        int apiCollectionId = 0;
+        if (NumberUtils.isDigits(apiCollectionIdStr)) {
+            apiCollectionId = NumberUtils.toInt(apiCollectionIdStr, 0);
+        }
+
         HttpRequestParams requestParams = new HttpRequestParams(
-                method,url,type, requestHeaders, requestPayload
+                method,url,type, requestHeaders, requestPayload, apiCollectionId
         );
 
         int statusCode = Integer.parseInt(json.get("statusCode").toString());
@@ -291,6 +330,7 @@ public class HttpCallParser {
         String payload = (String) json.get("responsePayload");
         int time = Integer.parseInt(json.get("time").toString());
         String accountId = (String) json.get("akto_account_id");
+
 
         return new HttpResponseParams(
                 type,statusCode, status, responseHeaders, payload, requestParams, time, accountId
@@ -309,7 +349,25 @@ public class HttpCallParser {
         return headers;
     }
 
-    public static void main(String[] args) throws IOException {
+    public static String getAcceptableContentType(Map<String,List<String>> headers) throws Exception {
+        List<String> acceptableContentTypes = Arrays.asList(JSON_CONTENT_TYPE, FORM_URL_ENCODED_CONTENT_TYPE);
+        List<String> contentTypeValues = new ArrayList<>();
+        for (String k: headers.keySet()) {
+            if (k.equalsIgnoreCase("content-type")) {
+                contentTypeValues = headers.get(k);
+                for (String value: contentTypeValues) {
+                    for (String acceptableContentType: acceptableContentTypes) {
+                        if (value.contains(acceptableContentType)) {
+                            return acceptableContentType;
+                        }
+                    }
+                }
+            }
+        }
+        throw new Exception("Invalid content type: " + contentTypeValues);
+    }
+
+    public static void main(String[] args) throws IOException{
         String mongoURI = "mongodb://write_ops:write_ops@cluster0-shard-00-00.yg43a.mongodb.net:27017,cluster0-shard-00-01.yg43a.mongodb.net:27017,cluster0-shard-00-02.yg43a.mongodb.net:27017/myFirstDatabase?ssl=true&replicaSet=atlas-qd3mle-shard-0&authSource=admin&retryWrites=true&w=majority";
         DaoInit.init(new ConnectionString(mongoURI));
         Context.accountId.set(77);
@@ -329,7 +387,9 @@ public class HttpCallParser {
         HttpCallParser h =  new HttpCallParser("access-token", 0,0,10);
         List<HttpCallParser.HttpResponseParams> hh = new ArrayList<>();
         for (String p: kk) {
-            hh.add(h.parseKafkaMessage(p));
+            try {
+                hh.add(parseKafkaMessage(p));
+            } catch (Exception ignored) {}
         }
         h.syncFunction(hh);
     }
@@ -338,7 +398,10 @@ public class HttpCallParser {
 
         aggregate(responseParams);
 
-        apiCatalogSync.computeDelta(aggregator, false);
+        for (int apiCollectionId: aggregatorMap.keySet()) {
+            URLAggregator aggregator = aggregatorMap.get(apiCollectionId);
+            apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
+        }
 
         this.sync_count += responseParams.size();
         if (this.sync_count >= sync_threshold_count || (Context.now() - this.last_synced) > this.sync_threshold_time) {
@@ -348,11 +411,18 @@ public class HttpCallParser {
         }
     }
 
-    URLAggregator aggregator = new URLAggregator();
+    Map<Integer, URLAggregator> aggregatorMap = new HashMap<>();
     public void aggregate(List<HttpResponseParams> responses) {
         int count = 0;
         for (HttpResponseParams responseParams: responses) {
             try {
+                int collId = responseParams.getRequestParams().getApiCollectionId();
+                URLAggregator aggregator = aggregatorMap.get(collId);
+                if (aggregator == null) {
+                    aggregator = new URLAggregator();
+                    aggregatorMap.put(collId, aggregator);
+                }
+
                 aggregator.addURL(responseParams);
                 count++;
             } catch (Exception  e) {

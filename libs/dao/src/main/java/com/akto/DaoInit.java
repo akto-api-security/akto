@@ -34,11 +34,12 @@ public class DaoInit {
         ClassModel<PendingInviteCode> pendingInviteCodeClassModel = ClassModel.builder(PendingInviteCode.class).enableDiscriminator(true).build();
         ClassModel<RBAC> rbacClassModel = ClassModel.builder(RBAC.class).enableDiscriminator(true).build();
         ClassModel<SingleTypeInfo> singleTypeInfoClassModel = ClassModel.builder(SingleTypeInfo.class).enableDiscriminator(true).build();
+        ClassModel<KafkaHealthMetric>  kafkaHealthMetricClassModel = ClassModel.builder(KafkaHealthMetric.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(queueEntryClassModel, configClassModel, 
             signupInfoClassModel, contentClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
-                pendingInviteCodeClassModel, rbacClassModel, singleTypeInfoClassModel).automatic(true).build());
-            
+                pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel,singleTypeInfoClassModel).automatic(true).build());
+
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
             new EnumCodec<>(SingleTypeInfo.SubType.class),
             new EnumCodec<>(SingleTypeInfo.SuperType.class),

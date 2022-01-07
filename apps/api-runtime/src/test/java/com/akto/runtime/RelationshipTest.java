@@ -85,7 +85,7 @@ public class RelationshipTest {
                                                                                        String reqPayload, String respPayload) {
 
         HttpCallParser.HttpRequestParams  httpRequestParams = new HttpCallParser. HttpRequestParams(
-                method, url, "",generateHeaders(userId),reqPayload
+                method, url, "",generateHeaders(userId),reqPayload, 0
         );
         return new HttpCallParser.HttpResponseParams(
                 "",statusCode,"ok", generateHeaders(userId), respPayload, httpRequestParams, Context.now(), "1111"

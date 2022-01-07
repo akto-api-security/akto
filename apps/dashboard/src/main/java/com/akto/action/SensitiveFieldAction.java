@@ -26,6 +26,7 @@ public class SensitiveFieldAction extends UserAction{
     private int responseCode;
     private boolean isHeader;
     private String param;
+    private int apiCollectionId;
     private boolean sensitive;
     
     private BasicDBObject ret;
@@ -33,7 +34,7 @@ public class SensitiveFieldAction extends UserAction{
     @Override
     public String execute() {
         ret = new BasicDBObject();
-        Bson filter = getFilters(url, method, responseCode, isHeader, param);
+        Bson filter = getFilters(url, method, responseCode, isHeader, param, apiCollectionId);
         // null means user wants Akto to decide the sensitivity
         if (!sensitive)  {
             SensitiveParamInfoDao.instance.getMCollection().deleteOne(filter);
@@ -137,21 +138,22 @@ public class SensitiveFieldAction extends UserAction{
         return Action.SUCCESS.toUpperCase();
     }
 
-    private static Bson getFilters(String url, String method, int responseCode, boolean isHeader, String param) {
+    public static Bson getFilters(String url, String method, int responseCode, boolean isHeader, String param, int apiCollectionId) {
         List<Bson> defaultFilters = new ArrayList<>();
         defaultFilters.add(Filters.eq("url", url));
         defaultFilters.add(Filters.eq("method", method));
         defaultFilters.add(Filters.eq("isHeader", isHeader));
         defaultFilters.add(Filters.eq("param", param));
         defaultFilters.add(Filters.eq("responseCode", responseCode));
+        defaultFilters.add(Filters.eq("apiCollectionId", apiCollectionId));
 
         return Filters.and(defaultFilters);
     }
 
-    private static Bson getFiltersForApiRelation(Relationship.ApiRelationInfo apiRelationInfo) {
-        return getFilters(apiRelationInfo.getUrl(), apiRelationInfo.getMethod(), apiRelationInfo.getResponseCode(),
-                apiRelationInfo.isHeader(), apiRelationInfo.getParam());
-    }
+    // private static Bson getFiltersForApiRelation(Relationship.ApiRelationInfo apiRelationInfo) {
+    //     return getFilters(apiRelationInfo.getUrl(), apiRelationInfo.getMethod(), apiRelationInfo.getResponseCode(),
+    //             apiRelationInfo.isHeader(), apiRelationInfo.getParam());
+    // }
 
 
     public void setUrl(String url) {
@@ -172,6 +174,10 @@ public class SensitiveFieldAction extends UserAction{
 
     public void setParam(String param) {
         this.param = param;
+    }
+
+    public void setApiCollectionId (int apiCollectionId) {
+        this.apiCollectionId = apiCollectionId;
     }
 
     public void setSensitive(Boolean sensitive) {

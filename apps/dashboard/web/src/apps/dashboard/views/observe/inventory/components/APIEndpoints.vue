@@ -1,5 +1,32 @@
 <template>
-    <div class="pt-4 pr-4">
+    <spinner v-if="loading" />
+    <div class="pr-4 api-endpoints" v-else>
+        <div class="menu">
+            <v-menu
+                v-model="showMenu"
+                :close-on-content-click="false"
+                transition="v-expand-transition"
+            >
+                <template v-slot:activator="{ on, attrs }">
+                    <v-btn icon v-bind="attrs" v-on="on">
+                        <v-icon>$fas_bars</v-icon>
+                    </v-btn>
+                </template>
+                <v-list>
+                    <v-list-item style="width: 350px">
+                        <v-file-input
+                            :rules=rules
+                            show-size
+                            label="Upload HAR file"
+                            accept=".har"
+                            @change="handleFileChange"
+                            v-model=file
+                        />
+                    </v-list-item>
+                </v-list>
+            </v-menu>
+        </div>
+
         <div class="d-flex">
             <count-box title="Sensitive Endpoints" :count="sensitiveEndpoints.length" colorTitle="Overdue"/>
             <count-box title="Shadow Endpoints" :count="shadowEndpoints.length" colorTitle="Pending"/>
@@ -63,11 +90,13 @@
 import CountBox from '@/apps/dashboard/shared/components/CountBox'
 import { mapState } from 'vuex'
 import func from "@/util/func"
+import obj from "@/util/obj"
 import constants from '@/util/constants'
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import api from '../api'
-import SensitiveChipGroup from './SensitiveChipGroup.vue'
+import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
+import Spinner from '@/apps/dashboard/shared/components/Spinner'
 
 export default {
     name: "ApiEndpoints",
@@ -75,10 +104,19 @@ export default {
         CountBox, 
         LayoutWithTabs,
         SimpleTable,
-        SensitiveChipGroup        
+        SensitiveChipGroup,
+        Spinner
+    },
+    props: {
+        apiCollectionId: obj.numR
     },
     data() {
         return {
+            file: null,
+            rules: [
+                value => !value || value.size < 50e6 || 'HAR file size should be less than 50 MB!',
+            ],
+            showMenu: false,
             tableHeaders: [
                 {
                     text: '',
@@ -126,7 +164,7 @@ export default {
     },
     methods: {
         rowClicked(row) {
-            this.$emit('selected', row.endpoint + " " + row.method)
+            this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.endpoint + " " + row.method, type: 2})
         },
         groupByEndpoint(listParams) {
             func.groupByEndpoint(listParams)
@@ -142,10 +180,21 @@ export default {
         },
         isUnused(url, method) {
             return this.allEndpoints.filter(e => e.endpoint === url && e.method == method).length == 0
+        },
+        handleFileChange() {
+            if (!this.file) {this.content = null}
+            var reader = new FileReader();
+            
+            // Use the javascript reader object to load the contents
+            // of the file in the v-model prop
+            reader.readAsText(this.file);
+            reader.onload = () => {
+                this.$store.dispatch('inventory/uploadHarFile', { content: JSON.parse(reader.result), filename: this.file.name})
+            }
         }
     },
     computed: {
-        ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'apiCollectionId']),
+        ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'loading']),
         allEndpoints () {
             return func.groupByEndpoint(this.apiCollection)
         },
@@ -173,10 +222,45 @@ export default {
         }
     },
     mounted() {
+        if (!this.apiCollection || this.apiCollection.length === 0 || this.$store.state.inventory.apiCollectionId !== this.apiCollectionId) {
+            this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId})
+        }
         api.getAllUrlsAndMethods(this.apiCollectionId).then(resp => {
             this.documentedURLs = resp.data || {}
         })
+        this.$emit('mountedView', {type: 1, apiCollectionId: this.apiCollectionId})
     }
-
 }
 </script>
+
+<style lang="sass">
+.api-endpoints
+    & .table-column
+        &:nth-child(1)    
+            width: 4px
+            min-width: 4px
+            max-width: 4px
+        &:nth-child(2)    
+            width: 350px
+            min-width: 350px
+        &:nth-child(3)    
+            width: 150px
+            min-width: 150px
+            max-width: 150px
+        &:nth-child(4)    
+            width: 250px
+            min-width: 250px
+            max-width: 250px
+        &:nth-child(5)    
+            width: 200px
+            min-width: 200px
+            max-width: 200px
+        &:nth-child(6)    
+            width: 200px
+            min-width: 200px
+            max-width: 200px
+.menu
+    display: flex
+    justify-content: right
+
+</style>

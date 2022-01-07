@@ -7,13 +7,11 @@
             v-for="tag in sensitiveTags.slice(0,2)"
             :key="tag"
             small
-            outlined
-            label
-            color="#6200EA"
+            color="#47466ACC"
             class="sensitive-tag-chip"
         >
-            <v-icon color="#6200EA">{{getTagIcon(tag)}}</v-icon>
-            <span style="color: #6200EA">{{ tag }}</span>
+            <v-icon color="#FFFFFF" size ="14">{{getTagIcon(tag)}}</v-icon>
+            <span style="color: #FFFFFF">{{ toTitleCase(tag) }}</span>
         </v-chip>
         <span v-if="sensitiveTags.length > 2" color="#6200EA">
             + {{sensitiveTags.length-2}} more
@@ -35,7 +33,15 @@ export default {
     methods: {
         getTagIcon(tag) {
             return func.sensitiveTagDetails(tag)
-        }        
+        },
+        toTitleCase(str) {
+            return str.replace(
+                /\w\S*/g,
+                function(txt) {
+                    return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+                 }
+            )       
+        } 
     }
 }
 </script>
@@ -48,5 +54,5 @@ export default {
 <style scoped lang="sass">
 .sensitive-tag-chip
     margin: 0px 4px !important
-    padding: 4px
+    padding: 8px 8px 8px 4px 
 </style>

@@ -1,6 +1,8 @@
 package com.akto.dto.type;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
@@ -13,27 +15,40 @@ public class SingleTypeInfo {
     }
 
     public enum SubType {
-        TRUE(SuperType.BOOLEAN), 
-        FALSE(SuperType.BOOLEAN), 
-        INTEGER_32(SuperType.INTEGER), 
-        INTEGER_64(SuperType.INTEGER), 
-        FLOAT(SuperType.FLOAT), 
-        NULL(SuperType.NULL), 
-        OTHER(SuperType.OTHER),
-        EMAIL(SuperType.STRING), 
-        URL(SuperType.STRING), 
-        ADDRESS(SuperType.STRING), 
-        SSN(SuperType.STRING), 
-        CREDIT_CARD(SuperType.STRING), 
-        PHONE_NUMBER(SuperType.STRING), 
-        UUID(SuperType.STRING), 
-        GENERIC(SuperType.STRING),
-        DICT(SuperType.OTHER);
+        TRUE(SuperType.BOOLEAN, false), 
+        FALSE(SuperType.BOOLEAN, false), 
+        INTEGER_32(SuperType.INTEGER, false), 
+        INTEGER_64(SuperType.INTEGER, false), 
+        FLOAT(SuperType.FLOAT, false), 
+        NULL(SuperType.NULL, false), 
+        OTHER(SuperType.OTHER, false),
+        EMAIL(SuperType.STRING, true), 
+        URL(SuperType.STRING, false), 
+        ADDRESS(SuperType.STRING, true), 
+        SSN(SuperType.STRING, true), 
+        CREDIT_CARD(SuperType.STRING, true), 
+        PHONE_NUMBER(SuperType.STRING, true), 
+        UUID(SuperType.STRING, false), 
+        GENERIC(SuperType.STRING, false),
+        DICT(SuperType.OTHER, false),
+        JWT(SuperType.STRING, true);
 
         SuperType superType;
+        public boolean isSensitive;
 
-        private SubType(SuperType superType) {
+        private SubType(SuperType superType, boolean isSensitive) {
             this.superType = superType;
+            this.isSensitive = isSensitive;
+        }
+
+        public static List<String> getSensitiveTypes() {
+            List<String> ret = new ArrayList<>();
+            for (SubType subType: SubType.values()) {
+                if (subType.isSensitive) {
+                    ret.add(subType.name());
+                }
+            }
+            return ret;
         }
     }
 
@@ -44,14 +59,16 @@ public class SingleTypeInfo {
         boolean isHeader;
         String param;
         SubType subType;
+        int apiCollectionId;
 
-        public ParamId(String url, String method, int responseCode, boolean isHeader, String param, SubType subType) {
+        public ParamId(String url, String method, int responseCode, boolean isHeader, String param, SubType subType, int apiCollectionId) {
             this.url = url;
             this.method = method;
             this.responseCode = responseCode;
             this.isHeader = isHeader;
             this.param = param;
-            this.subType = subType;    
+            this.subType = subType;  
+            this.apiCollectionId = apiCollectionId; 
         }
 
         public ParamId() {
@@ -69,6 +86,7 @@ public class SingleTypeInfo {
     int count;
     int timestamp;
     int duration;
+    int apiCollectionId;
 
     public SingleTypeInfo() {
     }
@@ -80,15 +98,17 @@ public class SingleTypeInfo {
         this.isHeader = paramId.isHeader;
         this.param = paramId.param;
         this.subType = paramId.subType;    
+        this.apiCollectionId = paramId.apiCollectionId;
         this.examples = examples;
         this.userIds = userIds;
         this.count = count;
         this.timestamp = timestamp;
         this.duration = duration;
+        
     }
 
     public String composeKey() {
-        return StringUtils.joinWith("@", url, method, responseCode, isHeader, param, subType);
+        return StringUtils.joinWith("@", url, method, responseCode, isHeader, param, subType, apiCollectionId);
     }
 
     public void incr(Object object) {
@@ -109,6 +129,7 @@ public class SingleTypeInfo {
         paramId.isHeader = isHeader;
         paramId.param = param;
         paramId.subType = subType;
+        paramId.apiCollectionId = apiCollectionId;
 
         return new SingleTypeInfo(paramId, copyExamples, copyUserIds, this.count, this.timestamp, this.duration);
     }
@@ -204,6 +225,14 @@ public class SingleTypeInfo {
     public void setDuration(int duration) {
         this.duration = duration;
     }
+    
+    public int getApiCollectionId() {
+        return this.apiCollectionId;
+    }
+
+    public void setApiCollectionId(int apiCollectionId) {
+        this.apiCollectionId = apiCollectionId;
+    }
 
     @Override
     public boolean equals(Object o) {
@@ -219,12 +248,13 @@ public class SingleTypeInfo {
             responseCode == singleTypeInfo.responseCode && 
             isHeader == singleTypeInfo.isHeader && 
             param.equals(singleTypeInfo.param) && 
-            subType == singleTypeInfo.subType;
+            subType == singleTypeInfo.subType && 
+            apiCollectionId == singleTypeInfo.apiCollectionId;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(url, method, responseCode, isHeader, param, subType);
+        return Objects.hash(url, method, responseCode, isHeader, param, subType, apiCollectionId);
     }
 
     @Override
@@ -236,6 +266,7 @@ public class SingleTypeInfo {
             ", isHeader='" + isIsHeader() + "'" +
             ", param='" + getParam() + "'" +
             ", subType='" + getSubType() + "'" +
+            ", apiCollectionId='" + getApiCollectionId() + "'" +
             ", examples='" + getExamples() + "'" +
             ", userIds='" + getUserIds() + "'" +
             ", count='" + getCount() + "'" +

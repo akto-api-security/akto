@@ -295,9 +295,9 @@ export default {
         return ret
     },
     isSubTypeSensitive(x) {
-        return x.savedAsSensitive || x.subType === "EMAIL" || x.subType === "CREDIT_CARD" || x.subType.indexOf("PHONE_NUMBER") === 0 || x.subType === "SSN" || x.subType === "ADDRESS" || x.subType === "PAN_CARD"
+        return x.savedAsSensitive || x.sensitive || x.subType === "EMAIL" || x.subType === "CREDIT_CARD" || x.subType.indexOf("PHONE_NUMBER") === 0 || x.subType === "SSN" || x.subType === "ADDRESS" || x.subType === "PAN_CARD" || x.subType === "JWT"
     },
-    groupByEndpoint(listParams) {
+    groupByEndpoint(listParams, idToName) {
         let ret = {}
 
         if (!listParams) {
@@ -312,12 +312,13 @@ export default {
                     endpoint: x.url,
                     method: x.method,
                     color: "#00bfa5",
-
+                    apiCollectionId: x.apiCollectionId,
                     detectedTs: null,
                     added: '-',
 
                     changesCount: 0,
-                    changes: '-'
+                    changes: '-',
+                    apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-'
                 }
 
             }
@@ -376,6 +377,9 @@ export default {
                 break;
             case "PAN_CARD":
                 icon = "$fas_address-card"
+                break;
+            case "JWT":
+                icon = "$fas_key"
                 break;
             default:
                 break;        

@@ -17,7 +17,7 @@ public class FlowTest {
         String value = "fwefwieofjweofiew";
         headers.put(name, Arrays.asList(value, "wefiowjefew"));
         HttpCallParser.HttpRequestParams requestParams = new HttpCallParser.HttpRequestParams(
-                "get", "/api/some", "Http",headers ,""
+                "get", "/api/some", "Http",headers ,"", 0
         );
         String u = null;
         try {
@@ -36,7 +36,7 @@ public class FlowTest {
         String value = "fwefwieofjweofiew";
         headers.put(name, Arrays.asList(value));
         HttpCallParser.HttpRequestParams requestParams = new HttpCallParser.HttpRequestParams(
-                "get", "/api/some", "Http",headers ,""
+                "get", "/api/some", "Http",headers ,"", 0
         );
         String u = null;
         try {
@@ -53,7 +53,7 @@ public class FlowTest {
         String name = "Access-Token";
         headers.put(name, new ArrayList<>());
         HttpCallParser.HttpRequestParams requestParams = new HttpCallParser.HttpRequestParams(
-                "get", "/api/some", "Http",headers ,""
+                "get", "/api/some", "Http",headers ,"",0 
         );
         String u = null;
         try {

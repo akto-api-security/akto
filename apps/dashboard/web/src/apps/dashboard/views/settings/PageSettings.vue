@@ -1,5 +1,5 @@
 <template>
-    <layout-with-tabs title="Settings" :tabs="['Account', 'Users']">
+    <layout-with-tabs title="Settings" :tabs="['Account', 'Users', 'Health']">
         <template slot="Account">
             <div class="pa-8">
                 <div class="d-flex">
@@ -11,18 +11,23 @@
         <template slot="Users">
             <team-overview/>
         </template>
+        <template slot="Health">
+            <health/>
+        </template>
     </layout-with-tabs>
 </template>
 
 <script>
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import TeamOverview from './components/TeamOverview'
+import Health from './components/Health'
 import api from './api'
 export default {
     name: "PageSettings",
     components: { 
         LayoutWithTabs,
-        TeamOverview
+        TeamOverview,
+        Health
     },
     methods: {
         getActiveAccount() {

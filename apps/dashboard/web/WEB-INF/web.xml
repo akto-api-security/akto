@@ -49,6 +49,16 @@
     </filter-mapping>
 
     <filter>
+        <filter-name>InfraMetricsFilter</filter-name>
+        <filter-class>com.akto.filter.InfraMetricsFilter</filter-class>
+    </filter>
+
+    <filter-mapping>
+        <filter-name>InfraMetricsFilter</filter-name>
+        <url-pattern>/api/*</url-pattern>
+    </filter-mapping>
+
+    <filter>
         <filter-name>struts2</filter-name>
         <filter-class>org.apache.struts2.dispatcher.ng.filter.StrutsPrepareAndExecuteFilter</filter-class>
     </filter>
@@ -60,5 +70,11 @@
 
     <listener>
         <listener-class>com.akto.listener.InitializerListener</listener-class>
+    </listener>
+    <listener>
+        <listener-class>com.akto.listener.KafkaListener</listener-class>
+    </listener>
+    <listener>
+        <listener-class>com.akto.listener.InfraMetricsListener</listener-class>
     </listener>
 </web-app>

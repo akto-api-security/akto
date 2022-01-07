@@ -1,18 +1,14 @@
 package com.akto.dto.type;
 
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Pattern;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.type.SingleTypeInfo.ParamId;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 
 import org.apache.commons.lang3.math.NumberUtils;
+import org.json.JSONObject;
 
 public class KeyTypes {
 
@@ -43,7 +39,7 @@ public class KeyTypes {
         return ret;
     }
 
-    public void process(String url, String method, int responseCode, boolean isHeader, String param, Object object, String userId) {
+    public void process(String url, String method, int responseCode, boolean isHeader, String param, Object object, String userId, int apiCollectionId) {
 
         SubType subType = findSubType(object);
 
@@ -55,7 +51,7 @@ public class KeyTypes {
             Set<String> userIds = new HashSet<>();
             userIds.add(userId);
             
-            ParamId paramId = new ParamId(url, method, responseCode, isHeader, param, subType);
+            ParamId paramId = new ParamId(url, method, responseCode, isHeader, param, subType, apiCollectionId);
             singleTypeInfo = new SingleTypeInfo(paramId, examples, userIds, 1, Context.now(), 0);
 
             occurrences.put(subType, singleTypeInfo);
@@ -108,6 +104,10 @@ public class KeyTypes {
                     return subType;
                 }
             }
+            boolean isJwt = isJWT(str);
+            if (isJwt) {
+                return SubType.JWT;
+            }
             return SubType.GENERIC;
         }
 
@@ -149,5 +149,22 @@ public class KeyTypes {
             " occurrences='" + getOccurrences() + "'" +
             ", isSensitive='" + isIsSensitive() + "'" +
             "}";
+    }
+
+    public static boolean isJWT(String jwt) {
+        try {
+            String[] jwtList = jwt.split("\\.");
+            if (jwtList.length != 3) // The JWT is composed of three parts
+                return false;
+            String jsonFirstPart = new String(Base64.getDecoder().decode(jwtList[0]));
+            JSONObject firstPart = new JSONObject(jsonFirstPart); // The first part of the JWT is a JSON
+            if (!firstPart.has("alg")) // The first part has the attribute "alg"
+                return false;
+            String jsonSecondPart = new String(Base64.getDecoder().decode(jwtList[1]));
+            JSONObject secondPart = new JSONObject(jsonSecondPart); // The first part of the JWT is a JSON
+        }catch (Exception err){
+            return false;
+        }
+        return true;
     }
 }

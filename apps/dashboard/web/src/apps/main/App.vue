@@ -1,6 +1,6 @@
 <template>
     <v-app>
-        <router-view :key="$route.fullPath"></router-view>
+        <router-view></router-view>
         <v-snackbar
                 :timeout="100000"
                 app
