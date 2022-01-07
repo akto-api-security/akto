@@ -22,6 +22,8 @@ import java.util.regex.Pattern;
 import static com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL;
 
 public class Main {
+
+    private static final ObjectMapper mapper = new ObjectMapper();
     public static void main1(String[] args) throws URISyntaxException {
         Pattern pattern = Pattern.compile("^((((https?|ftps?|gopher|telnet|nntp)://)|(mailto:|news:))(%[0-9A-Fa-f]{2}|[-()_.!~*';/?:@&=+$,A-Za-z0-9])+)([).!';/?:,][[:blank:|:blank:]])?$");
         String url = "https://petstore.swagger.io/v2/user/STRING";
@@ -45,15 +47,12 @@ public class Main {
 
 
     public static void main(String[] args) throws Exception{
-        String mongoURI = "";
+        String mongoURI = "mongodb://avneesh:UkhcXqXc74w6K9V@cluster0-shard-00-00.4s18x.mongodb.net:27017,cluster0-shard-00-01.4s18x.mongodb.net:27017,cluster0-shard-00-02.4s18x.mongodb.net:27017/myFirstDatabase?ssl=true&replicaSet=atlas-k5j1ae-shard-0&authSource=admin&retryWrites=true&w=majority";
         DaoInit.init(new ConnectionString(mongoURI));
         Context.accountId.set(1_000_000);
 
         OpenAPI openAPI = init(30);
-
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.setSerializationInclusion(NON_NULL);
-        String f = mapper.writeValueAsString(openAPI);
+        String f = convertOpenApiToJSON(openAPI);
         System.out.println(f);
     }
 
@@ -121,6 +120,12 @@ public class Main {
         server.setUrl(url);
         serversList.add(server);
         openAPI.servers(serversList);
+    }
+
+
+    public static String convertOpenApiToJSON(OpenAPI openAPI) throws Exception {
+        mapper.setSerializationInclusion(NON_NULL);
+        return mapper.writeValueAsString(openAPI);
     }
 
 }

@@ -320,6 +320,16 @@
             </result>
         </action>
 
+        <action name="api/generateOpenApiFile" class="com.akto.action.OpenApiAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
 
     </package>
 
