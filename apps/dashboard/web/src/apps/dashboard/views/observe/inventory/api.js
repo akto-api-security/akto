@@ -10,6 +10,15 @@ export default {
             }
         })
     },
+    downloadOpenApiFile(apiCollectionId) {
+        return request({
+            url: '/api/generateOpenApiFile',
+            method: 'post',
+            data: {
+                apiCollectionId
+            }
+        })
+    },
     getAPICollection (apiCollectionId) {
         return request({
             url: '/api/getAPICollection',

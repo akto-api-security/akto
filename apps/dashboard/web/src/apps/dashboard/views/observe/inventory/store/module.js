@@ -93,6 +93,11 @@ const inventory = {
             return api.uploadHarFile(content,state.apiCollectionId).then(resp => {
                 return resp
             })
+        },
+        downloadOpenApiFile({commit,state}) {
+            return api.downloadOpenApiFile(state.apiCollectionId).then(resp => {
+                return resp
+            })
         }
     },
     getters: {

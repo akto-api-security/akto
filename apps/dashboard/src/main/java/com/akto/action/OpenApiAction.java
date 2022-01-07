@@ -2,9 +2,12 @@ package com.akto.action;
 
 import com.akto.open_api.Main;
 import io.swagger.v3.oas.models.OpenAPI;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class OpenApiAction extends UserAction{
 
+    private static final Logger logger = LoggerFactory.getLogger(OpenApiAction.class);
     private int apiCollectionId;
     private String openAPIString = null;
     @Override
@@ -12,9 +15,9 @@ public class OpenApiAction extends UserAction{
         try {
             OpenAPI openAPI = Main.init(apiCollectionId);
             openAPIString = Main.convertOpenApiToJSON(openAPI);
-            System.out.println(openAPIString);
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("ERROR while downloading openApi file " + e);
+            return ERROR.toUpperCase();
         }
 
         return SUCCESS.toUpperCase();

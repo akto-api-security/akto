@@ -23,6 +23,9 @@
                             v-model=file
                         />
                     </v-list-item>
+                    <v-list-item style="width: 350px">
+                      <div @click="downloadOpenApiFile">Download OpenApi File</div>
+                    </v-list-item>
                 </v-list>
             </v-menu>
         </div>
@@ -97,6 +100,7 @@ import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import api from '../api'
 import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
+import { saveAs } from 'file-saver'
 
 export default {
     name: "ApiEndpoints",
@@ -191,6 +195,14 @@ export default {
             reader.onload = () => {
                 this.$store.dispatch('inventory/uploadHarFile', { content: JSON.parse(reader.result), filename: this.file.name})
             }
+        },
+        async downloadOpenApiFile() {
+          var result = await this.$store.dispatch('inventory/downloadOpenApiFile')
+          let openApiString = result["openAPIString"]
+          var blob = new Blob([openApiString], {
+            type: "application/json",
+          });
+          saveAs(blob, "openApi_["+new Date().toISOString()+"].json");
         }
     },
     computed: {
