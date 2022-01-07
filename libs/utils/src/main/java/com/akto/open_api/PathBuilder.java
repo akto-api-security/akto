@@ -3,18 +3,42 @@ package com.akto.open_api;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.Paths;
-import io.swagger.v3.oas.models.media.Content;
-import io.swagger.v3.oas.models.media.MediaType;
-import io.swagger.v3.oas.models.media.Schema;
+import io.swagger.v3.oas.models.media.*;
+import io.swagger.v3.oas.models.parameters.Parameter;
+import io.swagger.v3.oas.models.parameters.RequestBody;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.responses.ApiResponses;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class PathBuilder {
 
     public static void addPathItem(Paths paths, String url, String method , int responseCode, Schema<?> schema) throws Exception {
         PathItem pathItem = paths.getOrDefault(url, new PathItem());
         Operation operation = getOperation(pathItem,method);
-        if (operation == null) operation = new Operation();
+        if (operation == null) {
+            operation = new Operation();
+            operation.setOperationId(generateOperationId(url, method));
+            operation.setSummary(generateSummary(url, method));
+        }
+
+        if (responseCode == -1) {
+            RequestBody requestBody = new RequestBody();
+            Content requestBodyContent = requestBody.getContent();
+            if (requestBodyContent == null) requestBodyContent = new Content();
+
+            MediaType mediaType = new MediaType();
+            mediaType.setSchema(schema);
+            requestBodyContent.put("application/json", mediaType);
+
+            requestBody.setContent(requestBodyContent);
+            operation.setRequestBody(requestBody);
+
+            setOperation(pathItem, method, operation);
+            paths.addPathItem(url, pathItem);
+            return ;
+        }
 
         ApiResponses apiResponses = operation.getResponses();
         if (apiResponses == null) apiResponses = new ApiResponses();
@@ -28,8 +52,79 @@ public class PathBuilder {
         apiResponses.put(responseCode+"", apiResponse);
 
         operation.setResponses(apiResponses);
-        pathItem.setPost(operation);
+        setOperation(pathItem, method, operation);
         paths.addPathItem(url, pathItem);
+    }
+
+    public static Paths parameterizePath(Paths paths) {
+        Paths newPaths = new Paths();
+        for (String url: paths.keySet()) {
+            PathItem pathItem = paths.get(url);
+            List<Parameter> parameters = new ArrayList<>();
+            String[] urlList = url.split("/");
+            int idx = 0;
+            for (int i=0;i< urlList.length; i++) {
+                String u = urlList[i];
+                if (u.equals("INTEGER") || u.equals("STRING")) {
+                    idx += 1;
+                    String paramName = "{param" + idx + "}";
+                    urlList[i] = paramName;
+                    Parameter parameter = new Parameter();
+                    parameter.setIn("path");
+                    parameter.setName(paramName);
+                    if (u.equals("INTEGER")) {
+                        parameter.setSchema(new IntegerSchema());
+                    } else {
+                        parameter.setSchema(new StringSchema());
+                    }
+                    parameters.add(parameter);
+                }
+            }
+            String newUrl = String.join( "/",urlList);
+
+            pathItem.setParameters(parameters);
+            newPaths.put(newUrl, pathItem);
+        }
+        return newPaths;
+    }
+
+    public static String generateOperationId(String url, String method) {
+        return url + "-" + method;
+    }
+
+    public static String generateSummary(String url, String method) {
+        return method + " request for endpoint " + url;
+    }
+
+    public static void setOperation(PathItem pathItem, String method, Operation operation) throws Exception {
+        switch (method.toLowerCase()) {
+            case "get":
+                pathItem.setGet(operation);
+                return ;
+            case "post":
+                pathItem.setPost(operation);
+                return ;
+            case "delete":
+                pathItem.setDelete(operation);
+                return ;
+            case "put":
+                pathItem.setPut(operation);
+                return ;
+            case "patch":
+                pathItem.setPatch(operation);
+                return ;
+            case "head":
+                pathItem.setHead(operation);
+                return ;
+            case "options":
+                pathItem.setOptions(operation);
+                return ;
+            case "trace":
+                pathItem.setTrace(operation);
+                return ;
+            default:
+                throw new Exception("invalid operation");
+        }
     }
 
     public static Operation getOperation(PathItem pathItem, String method) throws Exception {
