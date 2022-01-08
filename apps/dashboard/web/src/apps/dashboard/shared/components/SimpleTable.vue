@@ -1,13 +1,5 @@
 <template>
     <div>
-        <div class="d-flex board-table-cards jc-end">
-            <div class="clickable download-csv ma-1">
-                <v-btn icon  :color="$vuetify.theme.themes.dark.themeColor"  @click="downloadData">
-                    <v-icon>$fas_file-csv</v-icon>
-                </v-btn>
-            </div>            
-            <slot name="add-new-row-btn"/>
-        </div>
         <v-data-table
             :headers="headers"
             :items="filteredItems"
@@ -16,15 +8,50 @@
             :sort-by="sortKey"
             :sort-desc="sortDesc"
             :custom-sort="sortFunc"
-            :items-per-page="10"
+            :items-per-page="rowsPerPage"
             :footer-props="{
                 showFirstLastPage: true,
                 prevIcon: '$fas_angle-left',
-                nextIcon: '$fas_angle-right'
+                nextIcon: '$fas_angle-right',
+                'items-per-page-options': itemsPerPage
+                
             }"
-            :hide-default-footer="!items || items.length == 0"
-            hide-default-header>
+            :hide-default-footer="!enablePagination"
+            hide-default-header
+        >
+            <template v-slot:top="{ pagination, options, updateOptions }" v-if="items && items.length > 0">
+                <div class="d-flex jc-end">
+                    <div class="d-flex board-table-cards jc-end">
+                        <div class="clickable download-csv ma-1">
+                            <v-btn icon  :color="$vuetify.theme.themes.dark.themeColor"  @click="downloadData">
+                                <v-icon>$fas_file-csv</v-icon>
+                            </v-btn>
+                            <v-btn icon  :color="$vuetify.theme.themes.dark.themeColor"  @click="itemsPerPage = [-1]" v-if="enablePagination && itemsPerPage[0] != -1">
+                                <v-icon>$fas_angle-double-down</v-icon>
+                            </v-btn>
+                            <v-btn icon  :color="$vuetify.theme.themes.dark.themeColor"  @click="itemsPerPage = [rowsPerPage]" v-if="enablePagination && itemsPerPage[0] == -1">
+                                <v-icon>$fas_angle-double-up</v-icon>
+                            </v-btn>
+                        </div>            
+                        <slot name="add-new-row-btn"/>
+                    </div>
 
+                    <v-data-footer 
+                        :pagination="pagination" 
+                        :options="options"
+                        @update:options="updateOptions"
+                        prev-icon='$fas_angle-left'
+                        next-icon='$fas_angle-right'               
+                        items-per-page-text="$vuetify.dataTable.itemsPerPageText"
+                        :items-per-page-options="itemsPerPage"
+                        class="no-border"
+                        v-if="enablePagination"
+                    />
+                </div>
+            </template>
+            <template v-slot:footer.prepend="{}">
+                <v-spacer/>
+            </template>
             <template v-slot:header="{}" v-if="items && items.length > 0">
                 <template v-for="(header, index) in headers">
                     <v-hover v-slot="{ hover }" :key="index">
@@ -124,7 +151,11 @@ export default {
         allowNewRow: obj.boolN
     },
     data () {
+        let rowsPerPage = 50
         return {
+            rowsPerPage: rowsPerPage,
+            itemsPerPage: [rowsPerPage],
+            enablePagination: this.items && this.items.length > rowsPerPage,
             search: null,
             sortKey: this.sortKeyDefault || null,
             sortDesc: this.sortDescDefault || false,
@@ -309,6 +340,10 @@ export default {
 
 .v-data-table >>> .table-sub-header {
     font-size: 14px !important;
+}
+
+.board-table-cards >>> .v-data-footer__select {
+    display: none;
 }
 
 </style>
