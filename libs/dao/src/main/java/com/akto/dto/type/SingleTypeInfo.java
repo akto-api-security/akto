@@ -31,7 +31,7 @@ public class SingleTypeInfo {
         UUID(SuperType.STRING, false), 
         GENERIC(SuperType.STRING, false),
         DICT(SuperType.OTHER, false),
-        JWT(SuperType.STRING, true);
+        JWT(SuperType.STRING, false);
 
         SuperType superType;
         public boolean isSensitive;
