@@ -153,4 +153,7 @@
     margin-bottom: auto
     color: #47466A3D
     font-size: 13px
+
+.jc-end
+    justify-content: end    
 </style>
