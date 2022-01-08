@@ -20,10 +20,6 @@
             </v-menu>
         </div> -->
 
-        <div class="d-flex jc-end">
-            <upload-file fileFormat="*.har" @fileChanged="handleFileChange" label="HAR"/>
-        </div>
-
         <div class="d-flex">
             <count-box title="Sensitive Endpoints" :count="sensitiveEndpoints.length" colorTitle="Overdue"/>
             <count-box title="Shadow Endpoints" :count="shadowEndpoints.length" colorTitle="Pending"/>
@@ -32,6 +28,11 @@
         </div>    
 
         <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Shadow', 'Unused']">
+            <template slot="actions-tray">
+                <div class="d-flex jc-end">
+                    <upload-file fileFormat="*.har" @fileChanged="handleFileChange" label="HAR"/>
+                </div>
+            </template>
             <template slot="All">
                 <simple-table 
                     :headers=tableHeaders 

@@ -54,5 +54,4 @@ export default {
 
 .upload-file-container
   position: relative  
-  margin-bottom: 10px
 </style>
