@@ -1,28 +1,6 @@
 <template>
     <spinner v-if="loading" />
     <div class="pr-4 api-endpoints" v-else>
-        <!-- <div class="menu">
-            <v-menu
-                v-model="showMenu"
-                :close-on-content-click="false"
-                transition="v-expand-transition"
-            >
-                <template v-slot:activator="{ on, attrs }">
-                    <v-btn icon v-bind="attrs" v-on="on">
-                        <v-icon>$fas_bars</v-icon>
-                    </v-btn>
-                </template>
-                <v-list>
-                    <v-list-item style="">
-                        <upload-file fileFormat="*.har" @fileChanged="handleFileChange"/>
-                    </v-list-item>
-                    <v-list-item style="width: 350px">
-                      <div @click="downloadOpenApiFile">Download OpenApi File</div>
-                    </v-list-item>
-                </v-list>
-            </v-menu>
-        </div> -->
-
         <div class="d-flex">
             <count-box title="Sensitive Endpoints" :count="sensitiveEndpoints.length" colorTitle="Overdue"/>
             <count-box title="Shadow Endpoints" :count="shadowEndpoints.length" colorTitle="Pending"/>
