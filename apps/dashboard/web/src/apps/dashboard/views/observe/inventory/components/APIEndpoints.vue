@@ -1,7 +1,7 @@
 <template>
     <spinner v-if="loading" />
     <div class="pr-4 api-endpoints" v-else>
-        <div class="menu">
+        <!-- <div class="menu">
             <v-menu
                 v-model="showMenu"
                 :close-on-content-click="false"
@@ -13,18 +13,15 @@
                     </v-btn>
                 </template>
                 <v-list>
-                    <v-list-item style="width: 350px">
-                        <v-file-input
-                            :rules=rules
-                            show-size
-                            label="Upload HAR file"
-                            accept=".har"
-                            @change="handleFileChange"
-                            v-model=file
-                        />
+                    <v-list-item style="">
+                        <upload-file fileFormat="*.har" @fileChanged="handleFileChange"/>
                     </v-list-item>
                 </v-list>
             </v-menu>
+        </div> -->
+
+        <div class="d-flex jc-end">
+            <upload-file fileFormat="*.har" @fileChanged="handleFileChange"/>
         </div>
 
         <div class="d-flex">
@@ -97,6 +94,7 @@ import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import api from '../api'
 import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
+import UploadFile from '@/apps/dashboard/shared/components/UploadFile'
 
 export default {
     name: "ApiEndpoints",
@@ -105,7 +103,8 @@ export default {
         LayoutWithTabs,
         SimpleTable,
         SensitiveChipGroup,
-        Spinner
+        Spinner,
+        UploadFile
     },
     props: {
         apiCollectionId: obj.numR
@@ -181,15 +180,18 @@ export default {
         isUnused(url, method) {
             return this.allEndpoints.filter(e => e.endpoint === url && e.method == method).length == 0
         },
-        handleFileChange() {
-            if (!this.file) {this.content = null}
-            var reader = new FileReader();
-            
-            // Use the javascript reader object to load the contents
-            // of the file in the v-model prop
-            reader.readAsText(this.file);
-            reader.onload = () => {
-                this.$store.dispatch('inventory/uploadHarFile', { content: JSON.parse(reader.result), filename: this.file.name})
+        handleFileChange(file) {
+            if (!file) {
+                this.content = null
+            } else {
+                var reader = new FileReader();
+                
+                // Use the javascript reader object to load the contents
+                // of the file in the v-model prop
+                reader.readAsText(file);
+                reader.onload = () => {
+                    this.$store.dispatch('inventory/uploadHarFile', { content: JSON.parse(reader.result), filename: file.name})
+                }
             }
         }
     },
