@@ -8,14 +8,13 @@
         :sort-by="sortKey"
         :sort-desc="sortDesc"
         :custom-sort="sortFunc"
-        :items-per-page="30"
+        :items-per-page="10"
         :footer-props="{
             showFirstLastPage: true,
   //          firstIcon: '$fas_angle-double-left',
 //            lastIcon: '$fas_angle-double-right',
             prevIcon: '$fas_angle-left',
-            nextIcon: '$fas_angle-right',
-            'hide-items-per-page': 'false',
+            nextIcon: '$fas_angle-right'
 
 
         }"
@@ -96,8 +95,7 @@
         </template>
         <template v-slot:footer.prepend v-if="items && items.length > 0">
             <div class="clickable download-csv ma-1">
-                <v-icon :color="$vuetify.theme.themes.dark.themeColor">$fas_file-csv</v-icon>
-                <span class="ml-2" @click="downloadData"></span>
+                <v-icon :color="$vuetify.theme.themes.dark.themeColor"  @click="downloadData">$fas_file-csv</v-icon>
             </div>
         </template>
 
