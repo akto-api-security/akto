@@ -53,7 +53,7 @@ public class Main {
             if (json.size() == 2 && json.containsKey(GROUP_NAME) && json.containsKey(VXLAN_ID)) {
                 ret = true;
                 String groupName = (String) (json.get(GROUP_NAME));
-                String vxlanIdStr = (String) (json.get(VXLAN_ID));
+                String vxlanIdStr = ((Double) json.get(VXLAN_ID)).intValue() + "";
                 int vxlanId = Integer.parseInt(vxlanIdStr);
                 Bson findQ = Filters.eq("_id", vxlanId);
                 ApiCollection currCollection = ApiCollectionsDao.instance.findOne(findQ);
@@ -65,7 +65,7 @@ public class Main {
                 }
             }
         } catch (Exception e) {
-            // eat it
+            logger.error("error in try collection", e);
         }
 
         return ret;
