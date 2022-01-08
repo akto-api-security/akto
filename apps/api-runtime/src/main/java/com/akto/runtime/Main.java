@@ -129,9 +129,9 @@ public class Main {
 
         try {
             main.consumer.subscribe(Collections.singleton(topicName));
-            main.consumer.commitSync();
             while (true) {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
+                main.consumer.commitSync();
 
                 // TODO: what happens if exception
                 Map<String, List<HttpCallParser.HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
