@@ -1,5 +1,5 @@
 <template>
-    <div>
+    <div class="upload-file-container">
       <v-btn
         color="#6200EA"
         icon
@@ -8,6 +8,8 @@
         <v-icon>
           $fas_upload
         </v-icon>
+        <span class="label-btn">{{label}}</span>
+
       </v-btn>
       <input
         type="file"
@@ -26,7 +28,8 @@ import obj from "@/util/obj"
 export default {
     name: "UploadFile",
     props: {
-      fileFormat: obj.strR
+      fileFormat: obj.strR,
+      label: obj.strN
     },
     methods: {
       onPickFile () {
@@ -42,5 +45,14 @@ export default {
 </script>
 
 <style lang="sass" scoped>
+.label-btn
+  color: #6200EA
+  font-size: 9px
+  position: absolute
+  right: 0px
+  bottom: -10px
 
+.upload-file-container
+  position: relative  
+  margin-bottom: 10px
 </style>

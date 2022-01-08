@@ -21,7 +21,7 @@
         </div> -->
 
         <div class="d-flex jc-end">
-            <upload-file fileFormat="*.har" @fileChanged="handleFileChange"/>
+            <upload-file fileFormat="*.har" @fileChanged="handleFileChange" label="HAR"/>
         </div>
 
         <div class="d-flex">
