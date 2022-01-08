@@ -156,4 +156,10 @@
 
 .jc-end
     justify-content: end    
+
+.jc-sb
+    justify-content: space-between    
+
+.no-border
+    border: unset! important    
 </style>
