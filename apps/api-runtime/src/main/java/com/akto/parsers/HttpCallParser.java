@@ -297,8 +297,9 @@ public class HttpCallParser {
 
         String requestPayload = (String) json.get("requestPayload");
         requestPayload = requestPayload.trim();
-        if (requestPayload.length() > 0) {
-            String acceptableContentType = getAcceptableContentType(requestHeaders);
+        String acceptableContentType = getAcceptableContentType(requestHeaders);
+        if (acceptableContentType != null && requestPayload.length() > 0) {
+            // only if request payload is of FORM_URL_ENCODED_CONTENT_TYPE we convert it to json
             if (acceptableContentType.equals(FORM_URL_ENCODED_CONTENT_TYPE)) {
                 String myStringDecoded = URLDecoder.decode((String) json.get("requestPayload"), "UTF-8");
                 String[] parts = myStringDecoded.split("&");
@@ -349,7 +350,7 @@ public class HttpCallParser {
         return headers;
     }
 
-    public static String getAcceptableContentType(Map<String,List<String>> headers) throws Exception {
+    public static String getAcceptableContentType(Map<String,List<String>> headers) {
         List<String> acceptableContentTypes = Arrays.asList(JSON_CONTENT_TYPE, FORM_URL_ENCODED_CONTENT_TYPE);
         List<String> contentTypeValues = new ArrayList<>();
         for (String k: headers.keySet()) {
@@ -364,7 +365,7 @@ public class HttpCallParser {
                 }
             }
         }
-        throw new Exception("Invalid content type: " + contentTypeValues);
+        return null;
     }
 
     public static void main(String[] args) throws IOException{
