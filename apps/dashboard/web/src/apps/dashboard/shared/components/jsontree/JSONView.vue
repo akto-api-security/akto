@@ -58,7 +58,7 @@ export default Vue.extend({
       let errorMap = {}
       let pathVal = includeKey ? path + key : path.slice(0, -1)
 
-      if (this.errors[pathVal]) {
+      if (this.errors!==null && this.errors[pathVal]) {
         errorMap[pathVal] = this.errors[pathVal]
       }
 

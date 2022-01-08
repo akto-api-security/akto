@@ -42,11 +42,10 @@ import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import ACard from '@/apps/dashboard/shared/components/ACard'
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import DonutChart from '@/apps/dashboard/shared/components/DonutChart'
-import {mapState, mapGetters} from 'vuex'
+import {mapState} from 'vuex'
 import obj from '@/util/obj'
 import func from '@/util/func'
-import api from '../api'
-import SensitiveParamsCard from './SensitiveParamsCard.vue'
+import SensitiveParamsCard from '@/apps/dashboard/shared/components/SensitiveParamsCard'
 
 export default {
     name: "ApiParameters",
@@ -58,7 +57,8 @@ export default {
         SensitiveParamsCard
     },
     props: {
-        urlAndMethod: obj.strR
+        urlAndMethod: obj.strR,
+        apiCollectionId: obj.numR
     },
     data () {
         return {
@@ -176,6 +176,12 @@ export default {
         },
         responseItems() {
             return this.sensitiveParams.filter(x => x.responseCode > -1).map(this.prepareItem)
+        }
+    },
+    mounted() {
+        this.$emit('mountedView', {apiCollectionId: this.apiCollectionId, urlAndMethod: this.urlAndMethod, type: 2})
+        if (!this.apiCollection || this.apiCollection.length === 0 || this.$store.state.inventory.apiCollectionId !== this.apiCollectionId) {
+            this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId})
         }
     }
 }

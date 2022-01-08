@@ -4,14 +4,14 @@
                 <v-breadcrumbs
                     :items="breadcrumbs"
                     class="api-breadcrumbs"
-                >
+                > 
                     <template v-slot:item="{ item }">
                         <v-breadcrumbs-item
-                            @click="item.click"
+                            @click="navigateFromBreadcrumb(item)"
                             :disabled="item.disabled"
                             :class="item.disabled ? '' : 'clickable'"
                         >
-                            {{ item.text }}
+                            <span>{{ item.text }}</span>
                         </v-breadcrumbs-item>
                     </template>
                     <template v-slot:divider>
@@ -19,12 +19,7 @@
                     </template>
 
                 </v-breadcrumbs>
-                <template v-if="breadcrumbs.length <= 2">
-                    <api-endpoints @selected=selectedEndpoint />
-                </template>
-                <template v-else>
-                    <api-parameters :urlAndMethod="breadcrumbs[2].text"/>
-                </template>   
+                <router-view @selectedItem="selectedItem" @mountedView="mountedView"/>
         </div>
             
     </div>
@@ -32,10 +27,11 @@
 
 <script>
 
-import ApiCollections from "./components/APICollections"
+import ApiCollections from "../collections/APICollections"
 import ApiParameters from "./components/APIParameters"
 import ApiEndpoints from "./components/APIEndpoints"
 import LayoutWithTabs from "@/apps/dashboard/layouts/LayoutWithTabs"
+import {mapState} from "vuex"
 import obj from "@/util/obj"
 
 export default {
@@ -50,44 +46,86 @@ export default {
         apiCollectionId: obj.numN
     },
     data () {
-        let breadcrumbs = [
-                {
-                    text: 'All endpoints',
-                    click: this.unsetBreadcrumb
-
-                },
-                {
-                    text: 'Main',
-                    click: this.unsetBreadcrumb
-                }
-            ]
-
         return {
-            breadcrumbs: breadcrumbs
+            breadcrumbs: []
         }
     },
     methods: {
-        unsetBreadcrumb() {
-            this.breadcrumbs = [...this.breadcrumbs.slice(0, 2)]
+        navigateFromBreadcrumb (item) {
+            let bcIndex = this.breadcrumbs.indexOf(item)
+            this.breadcrumbs = this.breadcrumbs.slice(0, bcIndex+1)
+            this.breadcrumbs[bcIndex].disabled = true
+            this.$router.push(item.to)
         },
-        selectedCollection({apiCollectionId}) {
+        mountedView (event) {
+            this.breadcrumbs = [
+                {
+                    text: 'All endpoints',
+                    to: {
+                        path: '/dashboard/observe/inventory'
+                    }
+                }
+            ]
             
+            if (event.type >= 1) {
+                let coll = this.apiCollections.find(x => x.id === event.apiCollectionId)                    
+                if (coll) {
+                    let newRouteObject = this.getRouteObject({collectionName: coll.name, apiCollectionId: coll.id, type: 1})
+                    this.breadcrumbs.push(newRouteObject)
+                } else {
+                    return
+                }
+            }
+
+            if (event.type >= 2) {
+                let newRouteObject = this.getRouteObject({...event})
+                this.breadcrumbs.push(newRouteObject)
+            }
+
+            this.breadcrumbs.forEach(b => b.disabled = false)
+            this.breadcrumbs[this.breadcrumbs.length-1].disabled = true
+            this.breadcrumbs = [...this.breadcrumbs]
         },
-        selectedEndpoint(endpointName) {
-            let bb = this.breadcrumbs
-            bb.push({
-                text: endpointName,
-                disabled: true,
-                click: () => {}
-            })
-            this.breadcrumbs = [...bb]
+        getRouteObject (event) {
+            let newRouteObject = {}
+            switch (event.type) {
+                case 1:
+                    newRouteObject = {
+                        text: event.collectionName,
+                        to: {
+                            name: 'apiCollection',
+                            params: {
+                                apiCollectionId: event.apiCollectionId
+                            }
+                        }
+                    }
+
+                    break;
+                case 2:
+                    newRouteObject = {
+                        text: event.urlAndMethod,
+                        to: {
+                            name: 'apiCollection/urlAndMethod',
+                            params: {
+                                apiCollectionId: event.apiCollectionId,
+                                urlAndMethod: btoa(event.urlAndMethod)
+                            }
+                        }
+                    }    
+            }
+
+            newRouteObject.disabled = true
+            return newRouteObject
+        },
+        selectedItem (event) {
+            this.$router.push(this.getRouteObject(event).to)
         }
     },
-    mounted() {
-        this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId})
+    created () {
+        this.mountedView({type: 0})
     },
     computed: {
-        
+        ...mapState('collections', ['apiCollections'])
     }
     
 }

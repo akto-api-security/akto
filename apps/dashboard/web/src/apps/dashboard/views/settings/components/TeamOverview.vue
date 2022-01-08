@@ -334,6 +334,6 @@
     position: absolute
     right: 30px
     padding: 8px 16px !important
-    margin-auto
+    margin: auto
 
 </style>
