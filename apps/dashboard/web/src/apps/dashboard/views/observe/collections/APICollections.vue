@@ -11,13 +11,25 @@
                 :sortDescDefault="false"   
                 @rowClicked=rowClicked
                 hide-default-footer ="true"
-            />
-               <simple-text-field 
-            :readOutsideClick="true"
-            placeholder="New collection name"
-            @changed="createCollection"
-            class="add-collection-field"
-            />
+            >
+                <template v-slot:add-new-row-btn="{}">
+                    <div class="clickable download-csv ma-1">
+                        <v-btn icon :disabled=showNewRow :color="$vuetify.theme.themes.dark.themeColor"  @click="showNewRow = true">
+                            <v-icon>$fas_plus</v-icon>
+                        </v-btn>
+                    </div>            
+                </template>
+                <template v-slot:add-new-row="{}">
+                    <template><td/><td>
+                    <simple-text-field 
+                        :readOutsideClick="true"
+                        placeholder="New collection name"
+                        @changed="createCollection"
+                        @aborted="showNewRow = false"
+                        v-if="showNewRow"
+                    /></td></template>
+                </template>
+            </simple-table>
 
         </div>
     </div>        
@@ -58,7 +70,8 @@ export default {
                     value: "detected"
                 }
             ],
-            actions: []
+            actions: [],
+            showNewRow: false
         }
     },
     methods: {
@@ -66,7 +79,6 @@ export default {
             this.$emit("selectedItem", {type: 1, collectionName: item.name, apiCollectionId: item.id})
         },
         createCollection(name) {
-            console.log(name);
           this.$store.dispatch('collections/createCollection', {name}).then(resp => {
             window._AKTO.$emit('SHOW_SNACKBAR', {
                 show: true,
@@ -74,6 +86,7 @@ export default {
                 color: 'green'
             })
           })
+          this.showNewRow = false
         }
 
     },
@@ -101,7 +114,4 @@ export default {
         color: #47466A
         font-size: 12px
         margin-top: 16px
-    .add-collection-field
-        width: 350px
-        padding: 32px
 </style>

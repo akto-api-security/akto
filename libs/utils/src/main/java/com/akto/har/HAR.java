@@ -61,16 +61,19 @@ public class HAR {
         Map<String,String> responseHeaderMap = convertHarHeadersToMap(responseHarHeaders);
 
         String requestContentType = getContentType(requestHarHeaders);
-        if (requestContentType == null) {
-            return null;
-        }
 
         String requestPayload;
-        if (requestContentType.contains(JSON_CONTENT_TYPE)) {
+        if (requestContentType == null) {
+            // get request data from querystring
+            Map<String,Object> paramMap = new HashMap<>();
+            addQueryStringToMap(request.getQueryString(), paramMap);
+            requestPayload = mapper.writeValueAsString(paramMap);
+        } else if (requestContentType.contains(JSON_CONTENT_TYPE)) {
             String postData = request.getPostData().getText();
             if (postData == null) {
                 postData = "{}";
             }
+
             if (postData.startsWith("[")) {
                 requestPayload = postData;
             } else {
