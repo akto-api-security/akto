@@ -13,7 +13,7 @@
                 <slot name="title"/>
             </div>
             <div class="d-flex justify-space-between">
-                <div class="pt-4">
+                <div class="pt-4 d-flex jc-sb" style="width: 100%">
                     <div class="tabs-container">
                         <v-tabs
                             active-class="active-tab"
@@ -24,6 +24,9 @@
                         >
                             <v-tab class="right-pane-tab" v-for="tab in tabs" :key="tab">{{tab}}</v-tab>
                         </v-tabs>
+                    </div>
+                    <div>
+                        <slot name="actions-tray"/>
                     </div>
                 </div>
             </div>
