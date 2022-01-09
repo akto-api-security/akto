@@ -39,7 +39,7 @@ export default {
       openPassword: false,
       formValid: false,
       formModel: {
-        username: null,
+        username: window.window.SIGNUP_EMAIL_ID,
         password: null
       },
       formRule: {

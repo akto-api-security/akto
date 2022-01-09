@@ -1,36 +1,84 @@
 package com.akto.action;
 
-import com.akto.dao.TeamsDao;
+import com.akto.dao.PendingInviteCodesDao;
+import com.akto.dao.RBACDao;
+import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.Team;
-import com.akto.dto.User;
+import com.akto.dto.PendingInviteCode;
+import com.akto.dto.RBAC;
+import com.akto.dto.RBAC.Role;
+import com.mongodb.BasicDBList;
+import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+import com.mongodb.client.result.DeleteResult;
+import com.opensymphony.xwork2.Action;
 
-import java.util.Map;
+import org.bson.conversions.Bson;
+
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class TeamAction extends UserAction {
 
     int id;
-    String name;
-    Map<Integer, User> users;
-    Team team;
+    BasicDBList users;
 
     public String fetchTeamData() {
+        List<RBAC> allRoles = RBACDao.instance.findAll(new BasicDBObject());
 
-        team = TeamsDao.instance.findOne("_id", id);
+        Map<Integer, RBAC> userToRBAC = new HashMap<>();
+        for(RBAC rbac: allRoles) {
+            userToRBAC.put(rbac.getUserId(), rbac);
+        }   
 
-        users = new HashMap<>();
+        users = UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get());
+        for(Object obj: users) {
+            BasicDBObject userObj = (BasicDBObject) obj;
+            RBAC rbac = userToRBAC.get(userObj.getInt("id"));
+            String status = rbac == null ? "Member" : rbac.getRole().name();
+            userObj.append("role", status);
+        }
+
+        List<PendingInviteCode> pendingInviteCodes = PendingInviteCodesDao.instance.findAll(new BasicDBObject());
+
+        for(PendingInviteCode pendingInviteCode: pendingInviteCodes) {
+            users.add(
+                new BasicDBObject("id", pendingInviteCode.getIssuer())
+                .append("login", pendingInviteCode.getInviteeEmailId())
+                .append("name", "-")
+                .append("role", "Invitation sent")
+            );
+        }
 
         return SUCCESS.toUpperCase();
     }
 
-    public String saveNewTeam() {
-        this.id = Context.getId();
-        int userId = getSUser().getId();
-        Team team = new Team(id, name, userId);
-        TeamsDao.instance.insertOne(team);
+    String email;
+    public String removeUser() {
+        int currUserId = getSUser().getId();
+        RBAC record = RBACDao.instance.findOne("userId", currUserId, "role", Role.ADMIN);
+        if (record == null || getSUser().getLogin().equals(email) || email == null) {
+            return Action.ERROR.toUpperCase();
+        } else {
+            int accId = Context.accountId.get();
 
-        return SUCCESS.toUpperCase();
+            Bson findQ = Filters.eq("login", email);
+            boolean userExists = UsersDao.instance.findOne(findQ) != null;
+            
+            if (userExists) {
+                UsersDao.instance.updateOne(findQ, Updates.unset("accounts."+accId));
+                return Action.SUCCESS.toUpperCase();
+            } else {
+                DeleteResult delResult = PendingInviteCodesDao.instance.getMCollection().deleteMany(Filters.eq("inviteeEmailId", email));
+                if (delResult.getDeletedCount() > 0) {
+                    return Action.SUCCESS.toUpperCase();
+                } else {
+                    return Action.ERROR.toUpperCase();
+                }
+            }
+        }
     }
 
     public int getId() {
@@ -41,27 +89,20 @@ public class TeamAction extends UserAction {
         this.id = id;
     }
 
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public Map<Integer, User> getUsers() {
+    public BasicDBList getUsers() {
         return users;
     }
 
-    public void setUsers(Map<Integer, User> users) {
+    public void setUsers(BasicDBList users) {
         this.users = users;
     }
 
-    public Team getTeam() {
-        return team;
+    public void setEmail(String email) {
+        this.email = email;
     }
 
-    public void setTeam(Team team) {
-        this.team = team;
+    public String getEmail() {
+        return this.email;
     }
+
 }

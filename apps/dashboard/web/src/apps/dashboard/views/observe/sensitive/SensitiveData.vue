@@ -11,10 +11,29 @@
         </div> 
         <layout-with-tabs :tabs="['Response', 'Request']">
             <template slot="Request">
-                <simple-table :headers=headers :items=sensitiveParamsInRequestForTable name="Request"/>
+                <simple-table 
+                    :headers=headers 
+                    :items=sensitiveParamsInRequestForTable 
+                    name="Request"
+                    @rowClicked="goToEndpoint"
+                >
+                    <template #item.type="{item}">
+                        <sensitive-chip-group :sensitiveTags="[item.type]" />
+                    </template>
+                </simple-table>
             </template>
             <template slot="Response">
-                <simple-table :headers=headers :items=sensitiveParamsInResponseForTable name="Response" />
+                <simple-table 
+                    :headers=headers 
+                    :items=sensitiveParamsInResponseForTable 
+                    name="Response"
+                    @rowClicked="goToEndpoint"                    
+                >
+                    <template #item.type="{item}">
+                        <sensitive-chip-group :sensitiveTags="[item.type]" />
+                    </template>
+                </simple-table>
+
             </template>
         </layout-with-tabs>  
     </div>
@@ -24,11 +43,12 @@
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import CountBox from '@/apps/dashboard/shared/components/CountBox'
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
-import SensitiveParamsCard from './components/SensitiveParamsCard'
+import SensitiveParamsCard from '@/apps/dashboard/shared/components/SensitiveParamsCard'
 import { mapState } from 'vuex'
 import func from '@/util/func'
 import constants from '@/util/constants'
 import SimpleLayout from '@/apps/dashboard/layouts/SimpleLayout'
+import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
 
 export default {
     name: "SensitiveData",
@@ -37,7 +57,8 @@ export default {
         LayoutWithTabs,
         SimpleTable,
         SensitiveParamsCard,
-        SimpleLayout        
+        SimpleLayout,
+        SensitiveChipGroup 
     },
     data () {
  
@@ -60,12 +81,17 @@ export default {
                     value: 'endpoint'
                 },
                 {
+                    text: 'Collection',
+                    value: 'apiCollectionName'
+                },
+                {
                     text: 'Method',
                     value: 'method'
                 },
                 {
                     text: constants.DISCOVERED,
-                    value: 'added'
+                    value: 'added',
+                    sortKey: 'detectedTs'
                 },
                 {
                     text: 'Location',
@@ -83,7 +109,9 @@ export default {
                 method: x.method,
                 added: this.prettifyDate(x.timestamp),
                 location: x.isHeader ? 'Headers' : 'Payload',
-                type: x.subType
+                type: x.subType || "OTHER",
+                apiCollectionId: x.apiCollectionId,
+                apiCollectionName: this.mapCollectionIdToName[x.apiCollectionId] || '-'
             }
         },
         prettifyDate(ts) {
@@ -95,7 +123,7 @@ export default {
         },
         sensitiveParamsForChart(allParams) {
             return Object.entries((allParams || []).reduce((z, e) => {
-                let key = func.isSubTypeSensitive(e.subType) ? e.subType : 'General'
+                let key = func.isSubTypeSensitive(e) ? e.subType : 'General'
                 z[key] = (z[key] || 0) + 1
                 return z
             }, {})).map((x, i) => {
@@ -105,15 +133,32 @@ export default {
                     color: x[0] === 'General' ? "#7D787838" : (["#6200EAFF", "#6200EADF", "#6200EABF", "#6200EA9F", "#6200EA7F", "#6200EA5F", "#6200EA3F", "#6200EA1F"][i])
                 }
             })
+        },
+        goToEndpoint (row) {
+            let routeObj = {
+                name: 'apiCollection/urlAndMethod',
+                params: {
+                    apiCollectionId: row.apiCollectionId,
+                    urlAndMethod: btoa(row.endpoint+ " " + row.method)
+                }
+            }
+
+            this.$router.push(routeObj)
         }
     },
     computed: {
-        ...mapState('inventory', ['apiCollection']),
+        ...mapState('sensitive', ['apiCollection']),
+        mapCollectionIdToName() {
+            return this.$store.state.collections.apiCollections.reduce((m, e) => {
+                m[e.id] = e.name
+                return m
+            }, {})
+        },
         sensitiveParamsInRequestForTable() {
-            return this.apiCollection.filter(x => x.responseCode == -1 && func.isSubTypeSensitive(x.subType)).map(this.prepareItemForTable)
+            return this.apiCollection.filter(x => x.responseCode == -1 && func.isSubTypeSensitive(x)).map(this.prepareItemForTable)
         },
         sensitiveParamsInResponseForTable() {
-            return this.apiCollection.filter(x => x.responseCode > -1 && func.isSubTypeSensitive(x.subType)).map(this.prepareItemForTable)
+            return this.apiCollection.filter(x => x.responseCode > -1 && func.isSubTypeSensitive(x)).map(this.prepareItemForTable)
         },
         sensitiveParamsInRequestForChart() {
             return this.sensitiveParamsForChart(this.apiCollection.filter(x => x.responseCode == -1))
@@ -122,15 +167,15 @@ export default {
             return this.sensitiveParamsForChart(this.apiCollection.filter(x => x.responseCode > -1))
         },
         allSensitiveParams() {
-           return this.apiCollection.filter(x => func.isSubTypeSensitive(x.subType))
+           return this.apiCollection.filter(x => func.isSubTypeSensitive(x))
         },
         newSensitiveParams() {
            let now = func.timeNow()
-           return this.apiCollection.filter(x => func.isSubTypeSensitive(x.subType) && x.timestamp > (now - func.recencyPeriod))
+           return this.apiCollection.filter(x => func.isSubTypeSensitive(x) && x.timestamp > (now - func.recencyPeriod))
         }              
     },
     mounted() {
-        this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId})
+        this.$store.dispatch('sensitive/loadSensitiveParameters')
     }
 }
 </script>

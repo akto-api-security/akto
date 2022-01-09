@@ -81,7 +81,9 @@
     methods: {
       login() {
         this.loadingLogin = true
-        this.$store.dispatch('auth/login', this.formModel)
+        var a = this.$store.dispatch('auth/login', this.formModel).catch((e) => {
+          this.loadingLogin = false
+        })
       },
       register() {
         this.$router.push('/signup')

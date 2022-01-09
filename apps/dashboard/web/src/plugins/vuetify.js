@@ -18,7 +18,9 @@ import {
   faPlus,
   faTimes,
   faEnvelope,
+  faPhoneAlt,
   faLock,
+  faLockOpen,  
   faAngleUp,
   faAngleRight,
   faAngleLeft,
@@ -59,10 +61,18 @@ import {
   faDatabase,
   faAngleDoubleRight,
   faAngleDoubleLeft,
+  faAngleDoubleDown,
+  faAngleDoubleUp,
   faSyncAlt,
   faExchangeAlt,
   faUserLock,
-  faExclamation
+  faExclamation,
+  faCreditCard,
+  faAddressCard,
+  faChalkboard,
+  faFilter,
+  faKey,
+  faUpload
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -70,7 +80,9 @@ import {
   faCalendar as farCalendar,
   faHandPointRight as farHandPointRight,
   faBuilding as farBuilding,
-  faStar as farStar
+  faStar as farStar,
+  faSquare as farSquare,
+  faCheckSquare as farCheckSquare
 } from '@fortawesome/free-regular-svg-icons'
 
 import {
@@ -79,14 +91,14 @@ import {
 } from '@fortawesome/free-brands-svg-icons'
 
 const faIcons = [
-  faBars,faUser,faPlus,faTimes,faEnvelope,faLock,faAngleUp,faAngleRight,faAngleLeft,faComments,faEye,faEllipsisV,faStar,faCalendar,
+  faBars,faUser,faPlus,faTimes,faEnvelope,faLock,faLockOpen,faAngleUp,faAngleRight,faAngleLeft,faComments,faEye,faEllipsisV,faStar,faCalendar,
   faCog,faShare,faEdit,faCheck,faTrash,faSearch,faBell,faChartBar,faFileAlt,faHandPointRight,faChartArea,faExclamationTriangle,
   faInfoCircle,faDownload,faFileCsv,faCircle,faThLarge,faStopwatch,faCheckCircle,faEyeSlash,faArrowLeft,faUsers,faChartLine,
   faHome,faBullseye,faBullhorn,faCheckDouble,faSquare,faBolt,faDatabase,faAngleDoubleRight, faAngleDoubleLeft,faClipboardList,
-  faUnlockAlt,faStethoscope,faLongArrowAltDown,faLongArrowAltUp,faSyncAlt, faExchangeAlt, faUserLock, faExclamation,
+  faUnlockAlt,faStethoscope,faLongArrowAltDown,faLongArrowAltUp,faSyncAlt, faExchangeAlt, faUserLock, faExclamation,faPhoneAlt,
+  faCreditCard,faAddressCard,faChalkboard,faFilter,faKey,faAngleDoubleDown,faAngleDoubleUp,faUpload,
 
-
-  farComments,farCalendar, farHandPointRight, farBuilding, farStar,
+  farComments,farCalendar, farHandPointRight, farBuilding, farStar,farSquare, farCheckSquare,
 
   fabSalesforce,fabHubspot
 ]

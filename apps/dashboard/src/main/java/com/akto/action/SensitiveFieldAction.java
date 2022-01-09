@@ -8,6 +8,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.Relationship;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.type.SingleTypeInfo;
+import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
@@ -25,14 +26,17 @@ public class SensitiveFieldAction extends UserAction{
     private int responseCode;
     private boolean isHeader;
     private String param;
-    private Boolean sensitive;
-    private List<SingleTypeInfo> relatedSingleTypeInfo = new ArrayList<>();
+    private int apiCollectionId;
+    private boolean sensitive;
+    
+    private BasicDBObject ret;
 
     @Override
     public String execute() {
-        Bson filter = getFilters(url, method, responseCode, isHeader, param);
+        ret = new BasicDBObject();
+        Bson filter = getFilters(url, method, responseCode, isHeader, param, apiCollectionId);
         // null means user wants Akto to decide the sensitivity
-        if (sensitive == null)  {
+        if (!sensitive)  {
             SensitiveParamInfoDao.instance.getMCollection().deleteOne(filter);
             return Action.SUCCESS.toUpperCase();
         }
@@ -40,12 +44,16 @@ public class SensitiveFieldAction extends UserAction{
         Bson update = Updates.set("sensitive", sensitive);
         FindOneAndUpdateOptions findOneAndUpdateOptions = new FindOneAndUpdateOptions();
         findOneAndUpdateOptions.upsert(false);
-        SensitiveParamInfoDao.instance.updateOne(filter, update);
+        SensitiveParamInfo param = SensitiveParamInfoDao.instance.updateOne(filter, update);
+
+        ret.append("data", param);
 
         // only if sensitive is marked true then only find other params
         if (!sensitive) {
             return Action.SUCCESS.toUpperCase();
         }
+
+        /*
 
         Bson parentFilters = Filters.and(
                 Filters.eq("parent.url", url),
@@ -117,24 +125,35 @@ public class SensitiveFieldAction extends UserAction{
             }
         }
 
+        */ 
+
         return Action.SUCCESS.toUpperCase();
     }
 
-    private static Bson getFilters(String url, String method, int responseCode, boolean isHeader, String param) {
+
+    public String listAllSensitiveFields() {
+        List<SensitiveParamInfo> sensitiveParams = SensitiveParamInfoDao.instance.findAll(Filters.eq("sensitive", true));
+        ret = new BasicDBObject();
+        ret.append("data", sensitiveParams);
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public static Bson getFilters(String url, String method, int responseCode, boolean isHeader, String param, int apiCollectionId) {
         List<Bson> defaultFilters = new ArrayList<>();
         defaultFilters.add(Filters.eq("url", url));
         defaultFilters.add(Filters.eq("method", method));
         defaultFilters.add(Filters.eq("isHeader", isHeader));
         defaultFilters.add(Filters.eq("param", param));
         defaultFilters.add(Filters.eq("responseCode", responseCode));
+        defaultFilters.add(Filters.eq("apiCollectionId", apiCollectionId));
 
         return Filters.and(defaultFilters);
     }
 
-    private static Bson getFiltersForApiRelation(Relationship.ApiRelationInfo apiRelationInfo) {
-        return getFilters(apiRelationInfo.getUrl(), apiRelationInfo.getMethod(), apiRelationInfo.getResponseCode(),
-                apiRelationInfo.isHeader(), apiRelationInfo.getParam());
-    }
+    // private static Bson getFiltersForApiRelation(Relationship.ApiRelationInfo apiRelationInfo) {
+    //     return getFilters(apiRelationInfo.getUrl(), apiRelationInfo.getMethod(), apiRelationInfo.getResponseCode(),
+    //             apiRelationInfo.isHeader(), apiRelationInfo.getParam());
+    // }
 
 
     public void setUrl(String url) {
@@ -149,19 +168,27 @@ public class SensitiveFieldAction extends UserAction{
         this.responseCode = responseCode;
     }
 
-    public void setHeader(boolean header) {
-        isHeader = header;
+    public void setIsHeader(boolean isHeader) {
+        this.isHeader = isHeader;
     }
 
     public void setParam(String param) {
         this.param = param;
     }
 
+    public void setApiCollectionId (int apiCollectionId) {
+        this.apiCollectionId = apiCollectionId;
+    }
+
     public void setSensitive(Boolean sensitive) {
         this.sensitive = sensitive;
     }
 
-    public List<SingleTypeInfo> getRelatedSingleTypeInfo() {
-        return relatedSingleTypeInfo;
+    public void setRet(BasicDBObject ret) {
+        this.ret = ret;
+    }
+
+    public BasicDBObject getRet() {
+        return this.ret;
     }
 }

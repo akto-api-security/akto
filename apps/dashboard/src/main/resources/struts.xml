@@ -15,6 +15,20 @@
             <result name="SUCCESS">/pages/login.jsp</result>
         </action>
 
+        <action name="metrics" class="com.akto.action.InfraMetricsAction">
+        </action>
+
+        <action name="api/health" class="com.akto.action.InfraMetricsAction" method="health">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="root">akto_health</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
         <action name="auth/login" class="com.akto.action.LoginAction">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -167,23 +181,16 @@
             </result>
         </action>
 
-        <action name="signup-slack" class="com.akto.action.SignupAction" method="registerViaSlack">
+        <action name="api/removeUser" class="com.akto.action.TeamAction" method="removeUser">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS"   type="json"/>
+            <result name="SUCCESS" type="json"/>
             <result name="ERROR" type="httpheader">
                 <param name="status">401</param>
             </result>
         </action>
 
-        <action name="signup-google" class="com.akto.action.SignupAction" method="registerViaGoogle">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS"   type="json"/>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
-            </result>
-        </action>
+
         <action name="signup-email" class="com.akto.action.SignupAction" method="registerViaEmail">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -272,6 +279,30 @@
         </action>
 
 
+        <action name="api/loadRecentParameters" class="com.akto.action.observe.InventoryAction" method="loadRecentParameters">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+
+        <action name="api/loadSensitiveParameters" class="com.akto.action.observe.InventoryAction" method="loadSensitiveParameters">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+
         <action name="api/getAllUrlsAndMethods" class="com.akto.action.observe.InventoryAction" method="getAllUrlsAndMethods">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -298,13 +329,73 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json">
-                <param name="root">response</param>
+                <param name="root">ret</param>
             </result>
             <result name="ERROR" type="httpheader">
                 <param name="status">401</param>
             </result>
         </action>
 
+
+        <action name="api/listAllSensitiveFields" class="com.akto.action.SensitiveFieldAction" method="listAllSensitiveFields">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+                <param name="root">ret</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/inviteUsers" class="com.akto.action.InviteUserAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/generateOpenApiFile" class="com.akto.action.OpenApiAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+        <action name="api/getAllCollections" class="com.akto.action.ApiCollectionsAction" method="fetchAllCollections">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/uploadHar" class="com.akto.action.HarAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/createCollection" class="com.akto.action.ApiCollectionsAction" method="createCollection">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
 
     </package>
 

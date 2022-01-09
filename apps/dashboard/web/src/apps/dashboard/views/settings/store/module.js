@@ -10,14 +10,15 @@ const team = {
     state: {
         id: null,
         users: {},
+        name: '',
         fetchTs: 0,
-        details: {}
+        team: {}
     },
     getters: {
         getId: (state) => state.id,
         getUsers: (state) => state.users,
         getName: (state) => state.name,
-        getDetails: (state) => state.details
+        getTeam: (state) => state.team
     },
     mutations: {
         SET_TEAM_DETAILS(state, details) {
@@ -25,20 +26,28 @@ const team = {
             state.users = details.users
             state.name = details.name
             state.fetchTs = parseInt(new Date().getTime()/1000)
-            state.details = details.team
+            state.team = details.team
         },
         EMPTY_STATE(state) {
             state.id = null
             state.users = {}
             state.name = ''
             state.fetchTs = 0
-            state.details = {}
+            state.team = {}
         }
     },
     actions: {
         getTeamData({commit, dispatch}, id) {
-            return api.getTeamData(id).then((resp) => {
+            return api.getTeamData().then((resp) => {
                 commit('SET_TEAM_DETAILS', resp)
+            })
+        },
+        removeUser({commit, dispatch}, user) {
+            return api.removeUser(user.login).then(resp => {
+                api.getTeamData().then((resp) => {
+                    commit('SET_TEAM_DETAILS', resp)
+                })
+                return resp
             })
         },
         emptyState({commit, dispatch}) {

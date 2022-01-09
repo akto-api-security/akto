@@ -117,10 +117,13 @@ public class URLTemplate {
     public String getTemplateString() {
         String str = "";
         for(int i = 0;i < tokens.length; i++) {
+            if (i > 0) {
+                str += "/";
+            }
             if (tokens[i] == null) {
-                str += "/"+types[i].name();
+                str += types[i].name();
             } else {
-                str += "/"+tokens[i];
+                str += tokens[i];
             }
         }
         return str;

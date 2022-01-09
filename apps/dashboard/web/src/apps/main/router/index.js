@@ -7,9 +7,14 @@ import store from '@/apps/main/store/module'
 const PageSignup = () => import("@/apps/signup/PageSignup")
 const PageOnboard = () => import("@/apps/signup/PageOnboard")
 const PageSettings = () => import("@/apps/dashboard/views/settings/PageSettings")
+const Observe = () => import( "@/apps/dashboard/views/observe/inventory/Observe")
 const Inventory = () => import("@/apps/dashboard/views/observe/inventory/Inventory")
-const SensitiveData = () => import("@/apps/dashboard/views/observe/inventory/SensitiveData")
-const ApiChanges = () => import("@/apps/dashboard/views/observe/inventory/Changes")
+const APIParameters = () => import("@/apps/dashboard/views/observe/inventory/components/APIParameters")
+const APIEndpoints = () => import("@/apps/dashboard/views/observe/inventory/components/APIEndpoints")
+const APICollections = () => import("@/apps/dashboard/views/observe/collections/APICollections")
+const SensitiveData = () => import("@/apps/dashboard/views/observe/sensitive/SensitiveData")
+const ApiChanges = () => import("@/apps/dashboard/views/observe/changes/Changes")
+
 Vue.use(Router)
 
 function getId (route) {
@@ -62,19 +67,53 @@ const router =  new Router({
                     }
                 },
                 {
-                    path: 'observe/inventory',
-                    name: 'observe/inventory',
-                    component: Inventory
-                },
-                {
-                    path: 'observe/changes',
-                    name: 'observe/changes',
-                    component: ApiChanges
-                },
-                {
-                    path: 'observe/sensitive',
-                    name: 'observe/sensitive',
-                    component: SensitiveData
+                    path: 'observe',
+                    name: 'observe',
+                    component: Observe,
+                    beforeEnter (to, from, next) {
+                        store.dispatch('collections/loadAllApiCollections').then(() => next()).catch(() => next())
+                    },
+                    children:[
+                        {
+                            path: 'inventory',
+                            name: 'inventory',
+                            component: Inventory,
+                            children: [
+                                {
+                                    path:'',
+                                    name:'default',
+                                    component: APICollections        
+                                },
+                                {
+                                    path:':apiCollectionId',
+                                    name:'apiCollection',
+                                    component: APIEndpoints,
+                                    props: route => ({
+                                        apiCollectionId: +route.params.apiCollectionId
+                                    })
+                                },
+                                {
+                                    path:':apiCollectionId/:urlAndMethod',
+                                    name:'apiCollection/urlAndMethod',
+                                    component: APIParameters,
+                                    props: route => ({
+                                        urlAndMethod: atob(route.params.urlAndMethod),
+                                        apiCollectionId: +route.params.apiCollectionId
+                                    })
+                                }        
+                            ]
+                        },                        
+                        {
+                            path: 'changes',
+                            name: 'changes',
+                            component: ApiChanges
+                        },
+                        {
+                            path: 'sensitive',
+                            name: 'sensitive',
+                            component: SensitiveData
+                        }        
+                    ]
                 }
             ]
         },

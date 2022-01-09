@@ -47,7 +47,7 @@ public class RequestTemplate {
         if (set.size() < 10) set.add(userId);
     }
 
-    private void insert(Object obj, String userId, Trie.Node<String, Pair<KeyTypes, Set<String>>> root, String url, String method, int responseCode, String prefix) {        
+    private void insert(Object obj, String userId, Trie.Node<String, Pair<KeyTypes, Set<String>>> root, String url, String method, int responseCode, String prefix, int apiCollectionId) {        
 
         prefix += ("#"+root.getPathElem());
         if (prefix.startsWith("#")) {
@@ -66,22 +66,22 @@ public class RequestTemplate {
                 }
 
                 add(curr.getValue().getSecond(), userId);
-                insert(value, userId, curr, url, method, responseCode, prefix);
+                insert(value, userId, curr, url, method, responseCode, prefix, apiCollectionId);
             }
         } else if (obj instanceof BasicDBList) {
             for(Object elem: (BasicDBList) obj) {
                 Trie.Node<String, Pair<KeyTypes, Set<String>>> listNode = root.getOrCreate("$", new Pair<>(new KeyTypes(new HashMap<>(), false), new HashSet<String>()));
                 add(listNode.getValue().getSecond(), userId);
-                insert(elem, userId, listNode, url, method, responseCode, prefix);
+                insert(elem, userId, listNode, url, method, responseCode, prefix, apiCollectionId);
             }
         } else {
             //url, method, responseCode, true, header, value, userId
-            root.getValue().getFirst().process(url, method, responseCode, false, prefix, obj, userId);
+            root.getValue().getFirst().process(url, method, responseCode, false, prefix, obj, userId, apiCollectionId);
             add(root.getValue().getSecond(), userId);   
         }
     }
 
-    public void processHeaders(Map<String, List<String>> headerPayload, String url, String method, int responseCode, String userId) {
+    public void processHeaders(Map<String, List<String>> headerPayload, String url, String method, int responseCode, String userId, int apiCollectionId) {
         for (String header: headerPayload.keySet()) {
             KeyTypes keyTypes = this.headers.get(header);
             if (keyTypes == null) {
@@ -90,19 +90,19 @@ public class RequestTemplate {
             }
 
             for(String value: headerPayload.get(header)) {
-                keyTypes.process(url, method, responseCode, true, header, value, userId);
+                keyTypes.process(url, method, responseCode, true, header, value, userId, apiCollectionId);
             }
         }
     }
 
-    public List<SingleTypeInfo> process2(BasicDBObject payload, String url, String method, int responseCode, String userId) {
+    public List<SingleTypeInfo> process2(BasicDBObject payload, String url, String method, int responseCode, String userId, int apiCollectionId) {
             List<SingleTypeInfo> deleted = new ArrayList<>();
         
             if(userIds.size() < 10) userIds.add(userId);
 
             Trie.Node<String, Pair<KeyTypes, Set<String>>> root = this.keyTrie.getRoot();
 
-            insert(payload, userId, root, url, method, responseCode, "");
+            insert(payload, userId, root, url, method, responseCode, "", apiCollectionId);
 
             int now = Context.now();
 
@@ -132,20 +132,20 @@ public class RequestTemplate {
                     }
                 }
 
-                keyTypes.process(url, method, responseCode, false, param, flattened.get(param), userId);
+                keyTypes.process(url, method, responseCode, false, param, flattened.get(param), userId, apiCollectionId);
             }
 
             if (now - mergeTimestamp > 60 * 5) {
-                deleted = tryMergeNodesInTrie(url, method, responseCode);
+                deleted = tryMergeNodesInTrie(url, method, responseCode, apiCollectionId);
                 mergeTimestamp = now;
             }
 
             return deleted;
     }
     
-    public List<SingleTypeInfo> tryMergeNodesInTrie(String url, String method, int responseCode) {
+    public List<SingleTypeInfo> tryMergeNodesInTrie(String url, String method, int responseCode, int apiCollectionId) {
         List<SingleTypeInfo> deletedInfo = new ArrayList<>();
-        List<String> mergedNodes = tryMergeNodes(keyTrie.getRoot(), 5, url, method, "", responseCode);
+        List<String> mergedNodes = tryMergeNodes(keyTrie.getRoot(), 5, url, method, "", responseCode, apiCollectionId);
 
         if (mergedNodes == null) {
             mergedNodes = new ArrayList<>();
@@ -269,7 +269,7 @@ public class RequestTemplate {
         return currVariance - mergeVariance;
     }
 
-    private List<String> tryMergeNodesHelper(Node<String, Pair<KeyTypes, Set<String>>> node, int thresh, String url, String method, String prefix, int responseCode) {
+    private List<String> tryMergeNodesHelper(Node<String, Pair<KeyTypes, Set<String>>> node, int thresh, String url, String method, String prefix, int responseCode, int apiCollectionId) {
 
         double diff = varianceDecrease(node.getChildren().keySet(), thresh);
 
@@ -279,7 +279,7 @@ public class RequestTemplate {
 
         Map<SubType, SingleTypeInfo> occ = new HashMap<>();
 
-        ParamId paramId = new ParamId(url, method, responseCode, false, prefix + "#" + node.getPathElem(), SubType.DICT);
+        ParamId paramId = new ParamId(url, method, responseCode, false, prefix + "#" + node.getPathElem(), SubType.DICT, apiCollectionId);
         occ.put(SubType.DICT, new SingleTypeInfo(paramId, new HashSet<>(), node.getValue().getSecond(), 1, Context.now(), 0));
         node.getValue().setFirst(new KeyTypes(occ, false));
 
@@ -290,18 +290,18 @@ public class RequestTemplate {
         return ret;
     }
 
-    public List<String> tryMergeNodes(Node<String, Pair<KeyTypes, Set<String>>> node, int thresh, String url, String method, String prefix, int responseCode) {
+    public List<String> tryMergeNodes(Node<String, Pair<KeyTypes, Set<String>>> node, int thresh, String url, String method, String prefix, int responseCode, int apiCollectionId) {
         prefix += ("#"+node.getPathElem());
         if (prefix.startsWith("#")) {
             prefix = prefix.substring(1);
         }
 
-        List<String> mergedNodes = tryMergeNodesHelper(node, thresh, url, method, prefix, responseCode);
+        List<String> mergedNodes = tryMergeNodesHelper(node, thresh, url, method, prefix, responseCode, apiCollectionId);
         boolean merged = mergedNodes != null && mergedNodes.size() > 0;
 
         if (!merged && node.getChildren().size() > 0) {
             for(Node<String, Pair<KeyTypes, Set<String>>> child: node.getChildren().keySet()) {
-                List<String> childMerges = tryMergeNodes(child, thresh, url, method, prefix, responseCode);
+                List<String> childMerges = tryMergeNodes(child, thresh, url, method, prefix, responseCode, apiCollectionId);
                 if (childMerges != null) {
                     if (mergedNodes == null) {
                         mergedNodes = childMerges;

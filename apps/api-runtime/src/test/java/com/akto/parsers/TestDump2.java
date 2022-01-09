@@ -92,7 +92,7 @@ public class TestDump2 {
 
         ret.requestParams.setHeaders(headers);
         ret.requestParams.setPayload(createSimpleRequestPayload());
-
+        ret.requestParams.setApiCollectionId(123);
         return ret;
     }
 
@@ -107,44 +107,61 @@ public class TestDump2 {
     @Test
     public void testHappyPath() {
         String message = " {\"akto_account_id\":\"1000000\",\"contentType\":\"application/json;charset=utf-8\",\"ip\":\"49.32.227.133:60118\",\"method\":\"GET\",\"path\":\"/api/books\",\"requestHeaders\":\"{\\\"Accept\\\":[\\\"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9\\\"],\\\"Accept-Encoding\\\":[\\\"gzip, deflate\\\"],\\\"Accept-Language\\\":[\\\"en-US,en;q=0.9,mr;q=0.8\\\"],\\\"Cache-Control\\\":[\\\"no-cache\\\"],\\\"Connection\\\":[\\\"keep-alive\\\"],\\\"Dnt\\\":[\\\"1\\\"],\\\"Pragma\\\":[\\\"no-cache\\\"],\\\"Upgrade-Insecure-Requests\\\":[\\\"1\\\"],\\\"User-Agent\\\":[\\\"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.55 Safari/537.36\\\"]}\",\"requestPayload\":\"\",\"responseHeaders\":\"{\\\"Content-Type\\\":[\\\"application/json;charset=utf-8\\\"]}\",\"responsePayload\":\"{\\\"id\\\":\\\"1\\\",\\\"isbn\\\":\\\"3223\\\",\\\"title\\\":\\\"Book 1\\\",\\\"author\\\":{\\\"firstname\\\":\\\"Avneesh\\\",\\\"lastname\\\":\\\"Hota\\\"}}\\n\",\"status\":\"null\",\"statusCode\":\"201\",\"time\":\"1638940067\",\"type\":\"HTTP/1.1\"}";
-        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(message);
+        HttpResponseParams httpResponseParams = null;
+        try {
+            httpResponseParams = HttpCallParser.parseKafkaMessage(message);
+        } catch (Exception e) {
+            assertEquals(1,2);
+            return;
+        }
 
         URLAggregator aggr = new URLAggregator();
         APICatalogSync sync = new APICatalogSync("access-token", 5);
 
         aggr.addURL(httpResponseParams);
-        sync.computeDelta(aggr, false);
+        sync.computeDelta(aggr, false, 0);
         
-        assertEquals(sync.getDBUpdates().size(), 15);
+        assertEquals(sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0)).size(), 15);        
+    }
+
+
+    public void simpleTestForSingleCollection(int collectionId, APICatalogSync sync) {
+        {
+            String url = "https://someapi.com/link1";
+            HttpResponseParams resp = createSampleParams("user1", url);
         
+            URLAggregator aggr = new URLAggregator();
+
+            aggr.addURL(resp);
+            sync.computeDelta(aggr, false, collectionId);
+
+            Map<String, URLMethods> urlMethodsMap = sync.getDelta(collectionId).getStrictURLToMethods();
+
+            assertEquals(urlMethodsMap.size(), 1);
+
+            URLMethods urlMethods = urlMethodsMap.get(resp.getRequestParams().url);
+            
+            RequestTemplate reqTemplate = urlMethods.getMethodToRequestTemplate().get(Method.valueOf(resp.getRequestParams().method));
+            assertEquals(reqTemplate.getUserIds().size(), 1);
+            assertEquals(reqTemplate.getParameters().size(), 2);
+            
+            RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
+            assertEquals(respTemplate.getUserIds().size(), 1);
+            assertEquals(respTemplate.getParameters().size(), 3);
+
+            assertEquals(sync.getDBUpdatesForParams(sync.getDelta(collectionId), sync.getDbState(collectionId)).size(), 24);
+        }        
     }
 
     @Test
     public void simpleTest() {
-        String url = "https://someapi.com/link1";
-        HttpResponseParams resp = createSampleParams("user1", url);
-    
-        URLAggregator aggr = new URLAggregator();
         APICatalogSync sync = new APICatalogSync("access-token", 5);
-
-        aggr.addURL(resp);
-        sync.computeDelta(aggr, false);
-
-        Map<String, URLMethods> urlMethodsMap = sync.getDelta().getStrictURLToMethods();
-
-        assertEquals(urlMethodsMap.size(), 1);
-
-        URLMethods urlMethods = urlMethodsMap.get(resp.getRequestParams().url);
-        
-        RequestTemplate reqTemplate = urlMethods.getMethodToRequestTemplate().get(Method.valueOf(resp.getRequestParams().method));
-        assertEquals(reqTemplate.getUserIds().size(), 1);
-        assertEquals(reqTemplate.getParameters().size(), 2);
-        
-        RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
-        assertEquals(respTemplate.getUserIds().size(), 1);
-        assertEquals(respTemplate.getParameters().size(), 3);
-
-        assertEquals(sync.getDBUpdates().size(), 24);
+        simpleTestForSingleCollection(0, sync);
+        simpleTestForSingleCollection(1, sync);
+        simpleTestForSingleCollection(2, sync);
+        assertEquals(sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0)).size(), 24);
+        assertEquals(sync.getDBUpdatesForParams(sync.getDelta(1), sync.getDbState(1)).size(), 24);
+        assertEquals(sync.getDBUpdatesForParams(sync.getDelta(2), sync.getDbState(2)).size(), 24);
     }
 
     @Test
@@ -157,9 +174,9 @@ public class TestDump2 {
         APICatalogSync sync = new APICatalogSync("access-token", 5);
 
         aggr.addURL(resp);
-        sync.computeDelta(aggr, false);
+        sync.computeDelta(aggr, false, 0);
 
-        Map<String, URLMethods> urlMethodsMap = sync.getDelta().getStrictURLToMethods();
+        Map<String, URLMethods> urlMethodsMap = sync.getDelta(0).getStrictURLToMethods();
 
         assertEquals(urlMethodsMap.size(), 1);
 
@@ -169,8 +186,6 @@ public class TestDump2 {
         RequestTemplate reqTemplate = urlMethods.getMethodToRequestTemplate().get(Method.valueOf(resp.getRequestParams().method));
         assertEquals(reqTemplate.getUserIds().size(), 1);
         assertEquals(reqTemplate.getParameters().size(), 5);
-
-
 
         System.out.println("done");
     }
@@ -192,9 +207,9 @@ public class TestDump2 {
         APICatalogSync sync = new APICatalogSync("access-token", 5);
 
         aggr.addURL(responses, resp.getRequestParams().getURL());
-        sync.computeDelta(aggr, false);
+        sync.computeDelta(aggr, false, 0);
 
-        Map<String, URLMethods> urlMethodsMap = sync.getDelta().getStrictURLToMethods();
+        Map<String, URLMethods> urlMethodsMap = sync.getDelta(0).getStrictURLToMethods();
 
         assertEquals(urlMethodsMap.size(), 1);
         URLMethods urlMethods = urlMethodsMap.get(resp.getRequestParams().url);
@@ -210,7 +225,7 @@ public class TestDump2 {
 
     @Test
     public void testParameterizedURLsTest() {
-        String url = "/link/";
+        String url = "link/";
         HttpResponseParams resp = createSampleParams("user1", url+1);
         URLAggregator aggr = new URLAggregator();
         resp.requestParams.getHeaders().put("newHeader", new ArrayList<String>());
@@ -221,9 +236,9 @@ public class TestDump2 {
             aggr.addURL(createSampleParams("user"+i, url+i));
         }
 
-        sync.computeDelta(aggr, true);
+        sync.computeDelta(aggr, true, 0);
 
-        Map<URLTemplate, URLMethods> urlTemplateMap = sync.getDelta().getTemplateURLToMethods();
+        Map<URLTemplate, URLMethods> urlTemplateMap = sync.getDelta(0).getTemplateURLToMethods();
 
         assertEquals(urlTemplateMap.size(), 1);
 
@@ -272,9 +287,9 @@ public class TestDump2 {
         APICatalogSync sync = new APICatalogSync("access-token", 5);
 
         aggr.addURL(responseParams, url);
-        sync.computeDelta(aggr, false);
+        sync.computeDelta(aggr, false, 0);
 
-        Map<String, URLMethods> urlMethodsMap = sync.getDelta().getStrictURLToMethods();
+        Map<String, URLMethods> urlMethodsMap = sync.getDelta(0).getStrictURLToMethods();
         assertEquals(urlMethodsMap.size(), 1);
 
         URLMethods urlMethods = urlMethodsMap.get(resp.getRequestParams().url);
@@ -287,11 +302,10 @@ public class TestDump2 {
         assertEquals(respTemplate.getUserIds().size(), 10);
         assertEquals(respTemplate.getParameters().size(), 29);
 
-        List<SingleTypeInfo> deleted = respTemplate.tryMergeNodesInTrie(url, "POST", resp.statusCode);
+        List<SingleTypeInfo> deleted = respTemplate.tryMergeNodesInTrie(url, "POST", resp.statusCode, resp.getRequestParams().getApiCollectionId());
         assertEquals(respTemplate.getParameters().size(), 1);
 
-        List updates = sync.getDBUpdates();
+        List updates = sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0));
         assertEquals(updates.size(), 22);
-
     }
 }

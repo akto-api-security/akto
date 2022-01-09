@@ -17,6 +17,7 @@
                 <simple-table 
                     :headers="headers" 
                     :items="requestItems" 
+                    :actions="actions"
                     name="Request" 
                     sortKeyDefault="sensitive" 
                     :sortDescDefault="true"
@@ -26,6 +27,7 @@
                 <simple-table 
                     :headers="headers" 
                     :items="responseItems"  
+                    :actions="actions"
                     name="Response" 
                     sortKeyDefault="sensitive" 
                     :sortDescDefault="true"
@@ -43,7 +45,7 @@ import DonutChart from '@/apps/dashboard/shared/components/DonutChart'
 import {mapState} from 'vuex'
 import obj from '@/util/obj'
 import func from '@/util/func'
-import SensitiveParamsCard from './SensitiveParamsCard.vue'
+import SensitiveParamsCard from '@/apps/dashboard/shared/components/SensitiveParamsCard'
 
 export default {
     name: "ApiParameters",
@@ -55,7 +57,8 @@ export default {
         SensitiveParamsCard
     },
     props: {
-        urlAndMethod: obj.strR
+        urlAndMethod: obj.strR,
+        apiCollectionId: obj.numR
     },
     data () {
         return {
@@ -82,8 +85,19 @@ export default {
                 },
                 {
                     text: 'Added on',
-                    value: 'date'
+                    value: 'date',
+                    sortKey: 'detectedTs'
                 }                
+            ],
+            actions: [
+                {
+                    isValid: item => this.isValid(item),
+                    icon: item => item.x.savedAsSensitive ? '$fas_lock-open' : '$fas_lock',
+                    text: item => item.x.savedAsSensitive ? 'Unmark sensitive' : 'Mark sensitive',
+                    func: item => this.toggleSensitiveFieldFunc(item),
+                    success: (resp, item) => this.toggleSuccessFunc(resp, item),
+                    failure: (err, item) => this.toggleFailureFunc(err, item)
+                }
             ]
         }  
     },
@@ -97,14 +111,40 @@ export default {
         },
         prepareItem(x) {
             return {
-                color: func.isSubTypeSensitive(x.subType) ? this.$vuetify.theme.themes.dark.redMetric: this.$vuetify.theme.themes.dark.greenMetric,
+                color: x.savedAsSensitive || func.isSubTypeSensitive(x) ? this.$vuetify.theme.themes.dark.redMetric: this.$vuetify.theme.themes.dark.greenMetric,
                 name: x.param.replaceAll("#", ".").replaceAll(".$", ""),
-                sensitive: func.isSubTypeSensitive(x.subType) ? 'Yes' : '',
+                sensitive: func.isSubTypeSensitive(x) ? 'Yes' : '',
                 type: x.subType,
                 container: x.isHeader ? 'Headers' : 'Payload ',
                 date: this.prettifyDate(x.timestamp),
-                location: (x.responseCode == -1 ? 'Request' : 'Response') + ' ' + (x.isHeader ? 'headers' : 'payload')
+                detectedTs: x.timestamp,
+                location: (x.responseCode == -1 ? 'Request' : 'Response') + ' ' + (x.isHeader ? 'headers' : 'payload'),
+                x: x
             }
+        },
+        toggleSensitiveFieldFunc (item) {
+            item.x.sensitive = !item.x.savedAsSensitive
+            return this.$store.dispatch('inventory/toggleSensitiveParam', item.x)
+        },
+        toggleSuccessFunc (resp, item) {
+            item.color
+            window._AKTO.$emit('SHOW_SNACKBAR', {
+                show: true,
+                text: `${item.name} `+ (item.x.sensitive ? '' : 'un') +`marked as sensitive successfully!`,
+                color: 'green'
+            })
+        },
+        toggleFailureFunc (err, item) {
+            window._AKTO.$emit('SHOW_SNACKBAR', {
+                show: true,
+                text: `An error occurred while `+ (item.x.sensitive ? '' : 'un')+`marking ${item.name} as sensitive!`,
+                color: 'red'
+            })
+        },
+        isValid (item) {
+            let obj = {...item.x}
+            obj.savedAsSensitive = false
+            return !func.isSubTypeSensitive(obj)
         }
     },
     computed: {
@@ -120,7 +160,7 @@ export default {
         },
         sensitiveParamsForChart() {
             return Object.entries(this.sensitiveParams.reduce((z, e) => {
-                let key = func.isSubTypeSensitive(e.subType) ? e.subType : 'General'
+                let key = func.isSubTypeSensitive(e) ? e.subType : 'General'
                 z[key] = (z[key] || 0) + 1
                 return z
             }, {})).map((x, i) => {
@@ -136,6 +176,12 @@ export default {
         },
         responseItems() {
             return this.sensitiveParams.filter(x => x.responseCode > -1).map(this.prepareItem)
+        }
+    },
+    mounted() {
+        this.$emit('mountedView', {apiCollectionId: this.apiCollectionId, urlAndMethod: this.urlAndMethod, type: 2})
+        if (!this.apiCollection || this.apiCollection.length === 0 || this.$store.state.inventory.apiCollectionId !== this.apiCollectionId) {
+            this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId})
         }
     }
 }

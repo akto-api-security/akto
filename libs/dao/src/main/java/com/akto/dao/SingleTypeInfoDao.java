@@ -1,9 +1,12 @@
 package com.akto.dao;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.DistinctIterable;
+import com.mongodb.client.MongoCursor;
 
 public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
@@ -23,6 +26,15 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
     public List<SingleTypeInfo> fetchAll() {
         return this.findAll(new BasicDBObject());
+    }
+    public List<String> getUniqueValues() {
+        DistinctIterable<String> r = getMCollection().distinct("url",String.class);
+        List<String> result = new ArrayList<>();
+        MongoCursor<String> cursor = r.cursor();
+        while (cursor.hasNext()) {
+            result.add(cursor.next());
+        }
+        return result;
     }
     
 }

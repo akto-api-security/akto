@@ -46,6 +46,8 @@ navigator.serviceWorker.register('/sw.js').then(function(reg) {
     window.ACCOUNTS = JSON.parse('${requestScope.accounts}' || '{}');
     window.ACTIVE_ACCOUNT = +'${requestScope.activeAccount}';
     window.ACCESS_TOKEN = '${accessToken}';
+    window.SIGNUP_INVITATION_CODE = '${signupInvitationCode}'
+    window.SIGNUP_EMAIL_ID = '${signupEmailId}'
     // Enabling the debug mode flag is useful during implementation,
     // but it's recommended you remove it for production
     mixpanel.init('c403d0b00353cc31d7e33d68dc778806', {debug: false, ignore_dnt:true}); 

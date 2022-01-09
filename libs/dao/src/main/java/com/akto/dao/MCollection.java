@@ -4,6 +4,7 @@ import com.mongodb.client.*;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.result.InsertManyResult;
 import com.mongodb.client.result.InsertOneResult;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.*;
@@ -17,6 +18,11 @@ public abstract class MCollection<T> {
     abstract public String getDBName();
     abstract public String getCollName();
     abstract public Class<T> getClassT();
+
+    public Document getStats() {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+        return mongoDatabase.runCommand(new Document("serverStatus",1));
+    }
 
     public MongoCollection<T> getMCollection() {
         MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());

@@ -294,10 +294,10 @@ export default {
 
         return ret
     },
-    isSubTypeSensitive(subType) {
-        return subType === "EMAIL" || subType === "CREDIT_CARD" || subType.indexOf("PHONE_NUMBER") === 0 || subType === "SSN" || subType === "ADDRESS" || subType === "PAN_CARD"
+    isSubTypeSensitive(x) {
+        return x.savedAsSensitive || x.sensitive || x.subType === "EMAIL" || x.subType === "CREDIT_CARD" || x.subType.indexOf("PHONE_NUMBER") === 0 || x.subType === "SSN" || x.subType === "ADDRESS" || x.subType === "PAN_CARD"
     },
-    groupByEndpoint(listParams) {
+    groupByEndpoint(listParams, idToName) {
         let ret = {}
 
         if (!listParams) {
@@ -312,20 +312,26 @@ export default {
                     endpoint: x.url,
                     method: x.method,
                     color: "#00bfa5",
-
+                    apiCollectionId: x.apiCollectionId,
                     detectedTs: null,
                     added: '-',
 
                     changesCount: 0,
-                    changes: '-'
+                    changes: '-',
+                    apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-'
                 }
 
             }
             
             let val = ret[key]
 
-            if(this.isSubTypeSensitive(x.subType)) {
+            if(this.isSubTypeSensitive(x)) {
                 val.sensitive ++
+                if (!val.sensitiveTags) {
+                    val.sensitiveTags = new Set()
+                }
+    
+                val.sensitiveTags.add(x.subType)
                 val.color = "#f44336"
             }
 
@@ -351,5 +357,33 @@ export default {
 
         return Object.values(ret)        
     },
-    recencyPeriod: 60 * 24 * 60 * 60 
+    recencyPeriod: 60 * 24 * 60 * 60,
+    sensitiveTagDetails(tag) {
+        let icon = "$fas_info-circle"
+        switch(tag) {
+            case "EMAIL":
+                icon = "$fas_envelope"
+                break;
+            case "PHONE_NUMBER_INDIA":
+            case "PHONE_NUMBER_US":
+            case "PHONE_NUMBER":      
+                icon = "$fas_phone-alt"          
+                break;
+            case "CREDIT_CARD":
+                icon = "$fas_credit-card"
+                break;
+            case "SSN":
+                icon = "$fas_chalkboard"
+                break;
+            case "PAN_CARD":
+                icon = "$fas_address-card"
+                break;
+            case "JWT":
+                icon = "$fas_key"
+                break;
+            default:
+                break;        
+        }
+        return icon
+    }
 }

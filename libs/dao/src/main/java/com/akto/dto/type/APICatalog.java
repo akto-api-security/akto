@@ -12,11 +12,16 @@ public class APICatalog {
     int id;
     Map<String, URLMethods> strictURLToMethods;
     Map<URLTemplate, URLMethods> templateURLToMethods;
+    List<SingleTypeInfo> deletedInfo = new ArrayList<>();
 
     public APICatalog() {
     }
 
-    public APICatalog(int id, Map<String,URLMethods> strictURLToMethods, Map<URLTemplate,URLMethods> templateURLToMethods) {
+    public APICatalog(
+        int id, 
+        Map<String,URLMethods> strictURLToMethods, 
+        Map<URLTemplate,URLMethods> templateURLToMethods
+    ) {
         this.id = id;
         this.strictURLToMethods = strictURLToMethods;
         this.templateURLToMethods = templateURLToMethods;
@@ -37,6 +42,13 @@ public class APICatalog {
         }
 
         return ret;
+    }
+
+    public APICatalog(int id, Map<String,URLMethods> strictURLToMethods, Map<URLTemplate,URLMethods> templateURLToMethods, List<SingleTypeInfo> deletedInfo) {
+        this.id = id;
+        this.strictURLToMethods = strictURLToMethods;
+        this.templateURLToMethods = templateURLToMethods;
+        this.deletedInfo = deletedInfo;
     }
 
     public int getId() {
@@ -63,12 +75,27 @@ public class APICatalog {
         this.templateURLToMethods = templateURLToMethods;
     }
 
+    public List<SingleTypeInfo> getDeletedInfo() {
+        return this.deletedInfo;
+    }
+
+    public void setDeletedInfo(List<SingleTypeInfo> deletedInfo) {
+        this.deletedInfo = deletedInfo;
+    }
+
+    public APICatalog id(int id) {
+        setId(id);
+        return this;
+    }
+
     @Override
     public String toString() {
         return "{" +
             " id='" + getId() + "'" +
             ", strictURLToMethods='" + getStrictURLToMethods() + "'" +
             ", templateURLToMethods='" + getTemplateURLToMethods() + "'" +
+            ", deletedInfo='" + getDeletedInfo() + "'" +
             "}";
     }
+
 }
