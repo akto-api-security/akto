@@ -71,7 +71,7 @@ public class PathBuilder {
                     urlList[i] = paramName;
                     Parameter parameter = new Parameter();
                     parameter.setIn("path");
-                    parameter.setName(paramName);
+                    parameter.setName("param"+idx);
                     if (u.equals("INTEGER")) {
                         parameter.setSchema(new IntegerSchema());
                     } else {

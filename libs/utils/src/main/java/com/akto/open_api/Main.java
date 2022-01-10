@@ -11,18 +11,18 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Paths;
 import io.swagger.v3.oas.models.media.*;
 import io.swagger.v3.oas.models.servers.Server;
-import org.apache.commons.lang3.StringUtils;
 
-import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL;
 
 public class Main {
-
+    private static final Logger logger = LoggerFactory.getLogger(Main.class);
     private static final ObjectMapper mapper = new ObjectMapper();
     public static void main1(String[] args) throws URISyntaxException {
         Pattern pattern = Pattern.compile("^((((https?|ftps?|gopher|telnet|nntp)://)|(mailto:|news:))(%[0-9A-Fa-f]{2}|[-()_.!~*';/?:@&=+$,A-Za-z0-9])+)([).!';/?:,][[:blank:|:blank:]])?$");
@@ -38,7 +38,7 @@ public class Main {
 
     public static OpenAPI init(int apiCollectionId) throws Exception {
         OpenAPI openAPI = new OpenAPI();
-        addPath(openAPI, apiCollectionId);
+        addPaths(openAPI, apiCollectionId);
         Paths paths = PathBuilder.parameterizePath(openAPI.getPaths());
         openAPI.setPaths(paths);
 
@@ -51,28 +51,47 @@ public class Main {
         DaoInit.init(new ConnectionString(mongoURI));
         Context.accountId.set(1_000_000);
 
-        OpenAPI openAPI = init(30);
+        OpenAPI openAPI = init(0);
         String f = convertOpenApiToJSON(openAPI);
         System.out.println(f);
     }
 
-    public static void addPath(OpenAPI openAPI, int apiCollectionId) throws Exception {
-        // TODO: handle empty collections
-        // TODO: write test cases
+    public static void addPaths(OpenAPI openAPI, int apiCollectionId) {
         Paths paths = new Paths();
         List<String> uniqueUrls = SingleTypeInfoDao.instance.getUniqueValues();
         for (String url: uniqueUrls) {
             Map<String, Map<Integer, List<SingleTypeInfo>>> stiMap = getCorrespondingSingleTypeInfo(url,apiCollectionId);
-            for (String method: stiMap.keySet()) {
-                Map<Integer,List<SingleTypeInfo>> responseWiseMap = stiMap.get(method);
-                for (Integer responseCode: responseWiseMap.keySet()) {
-                    List<SingleTypeInfo> singleTypeInfoList = responseWiseMap.get(responseCode);
-                    Schema<?> schema = buildSchema(singleTypeInfoList);
-                    PathBuilder.addPathItem(paths, url, method, responseCode, schema);
-                    openAPI.setPaths(paths);
+            buildPathsFromSingleTypeInfosPerUrl(stiMap, url, paths);
+        }
+        openAPI.setPaths(paths);
+    }
+
+    public static void buildPathsFromSingleTypeInfosPerUrl(Map<String, Map<Integer, List<SingleTypeInfo>>> stiMap, String url, Paths paths ) {
+        for (String method: stiMap.keySet()) {
+            Map<Integer,List<SingleTypeInfo>> responseWiseMap = stiMap.get(method);
+            for (Integer responseCode: responseWiseMap.keySet()) {
+                List<SingleTypeInfo> singleTypeInfoList = responseWiseMap.get(responseCode);
+                try {
+                    addPathItems(responseCode, paths, url, method, singleTypeInfoList);
+                } catch (Exception e) {
+                    logger.error("ERROR in buildPathsFromSingleTypeInfosPerUrl  " + e);
                 }
             }
         }
+    }
+
+    public static void addPathItems(int responseCode, Paths paths, String url, String method, List<SingleTypeInfo> singleTypeInfoList) throws Exception {
+        Schema<?> schema = null;
+        try {
+            schema = buildSchema(singleTypeInfoList);
+        } catch (Exception e) {
+            logger.error("ERROR in addPathItems " + e);
+        }
+        if (schema == null) {
+            schema = new ObjectSchema();
+            schema.setDescription("AKTO_ERROR while building schema");
+        }
+        PathBuilder.addPathItem(paths, url, method, responseCode, schema);
     }
 
     public static Map<String, Map<Integer, List<SingleTypeInfo>>> getCorrespondingSingleTypeInfo(String url,
