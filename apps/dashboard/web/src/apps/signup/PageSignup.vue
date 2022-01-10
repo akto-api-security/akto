@@ -39,8 +39,8 @@
 <!--        </v-btn>-->
         <!-- <div class="or">or</div> -->
 
-        <login-fields @fieldsChanged="fieldsChanged"/>
-        <v-btn class="signup-btn" :disabled="disableButtons" @click="signupUser" style="background-color:  #6200EA !important; color: #FFFFFF !important">
+        <login-fields @fieldsChanged="fieldsChanged" @enterPressed="signupUser"/>
+        <v-btn class="signup-btn" :disabled="disableButtons" :loading="signupLoading" @click="signupUser" style="background-color:  #6200EA !important; color: #FFFFFF !important">
           Sign up
         </v-btn>
         <div class="legal-docs">
@@ -84,7 +84,8 @@ export default {
       role: null,
       employees: null,
       newEmail: null,
-      allEmails: []
+      allEmails: [],
+      signupLoading: false
     }
   },
   methods: {
@@ -107,11 +108,13 @@ export default {
       }
     },
     signupUser () {
+      this.signupLoading = true
       request({
         url: '/signup-email',
         method: 'post',
         data: {email: this.formModel.username, password: this.formModel.password, invitationCode:window.SIGNUP_INVITATION_CODE}
       }).then((resp) => {
+        this.signupLoading = false
         if (resp && resp.indexOf("<")== -1) {
           window._AKTO.$emit('SHOW_SNACKBAR', {
             show: true,

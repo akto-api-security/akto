@@ -41,6 +41,7 @@
               <div class="ma-4">
                 <login-fields
                   @fieldsChanged="fieldsChanged"
+                  @enterPressed="login"
                 />
               </div>
               <v-card-actions>
