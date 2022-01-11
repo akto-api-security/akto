@@ -24,6 +24,8 @@ import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 
+import static com.akto.action.LoginAction.REFRESH_TOKEN_COOKIE_NAME;
+
 // This is the first filter which will hit for every request to server
 // First checks if the access token is valid or not (from header)
 // If not then checks if it can generate valid access token using the refresh token
@@ -31,8 +33,8 @@ import java.security.spec.InvalidKeySpecException;
 // Using the username from the access token it sets the user details in session to be used by other filters/action
 public class UserDetailsFilter implements Filter {
 
-    private static final String LOGIN_URI = "/login";
-    private static final String API_URI = "/api";
+    public static final String LOGIN_URI = "/login";
+    public static final String API_URI = "/api";
 
     @Override
     public void init(FilterConfig filterConfig) { }
@@ -78,6 +80,8 @@ public class UserDetailsFilter implements Filter {
              }
             Token token = AccessTokenAction.generateAccessTokenFromServletRequest(httpServletRequest);
             if (token == null) {
+                Cookie cookie = AccessTokenAction.generateDeleteCookie();
+                httpServletResponse.addCookie(cookie);
                 redirectIfNotLoginURI(filterChain,httpServletRequest,httpServletResponse);
                 return ;
             }

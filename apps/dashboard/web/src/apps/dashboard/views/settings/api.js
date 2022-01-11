@@ -41,5 +41,14 @@ export default {
         }).then((resp) => {
             return resp
         })
+    },
+    logout() {
+        return request({
+            url: '/api/logout',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
     }
 }

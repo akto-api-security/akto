@@ -397,6 +397,13 @@
             </result>
         </action>
 
+        <action name="api/logout" class="com.akto.action.LogoutAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS">
+            </result>
+        </action>
+
     </package>
 
 </struts>

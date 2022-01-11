@@ -5,6 +5,7 @@
                 <div class="d-flex">
                     <div class="entry-text">Account ID</div>
                     <div class="entry-value">{{getActiveAccount()}}</div>
+                    <v-btn color="primary" @click="logout">Logout</v-btn>
                 </div>
             </div>
         </template>
@@ -40,6 +41,11 @@ export default {
                 websiteHostName: window.location.origin
             }
             api.inviteUsers(spec)
+        },
+        logout() {
+          api.logout().then((resp) => {
+            window.location.href = "/login"
+          })
         }
     }
 }
