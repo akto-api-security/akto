@@ -19,7 +19,7 @@ public class APISpecDao extends AccountsContextDao<APISpec> {
     }
     
     public APISpec findById(int id) {
-        return this.findOne("_id", id);
+        return this.findOne("apiCollectionId", id);
     }
 
 }

@@ -1,30 +1,25 @@
-package com.akto.dto;
-
-import com.akto.dao.context.Context;
-
-import org.bson.codecs.pojo.annotations.BsonId;
+package com.akto.dto;   
 
 public class APISpec {
     public enum Type {
         YAML, JSON
     }
 
-    @BsonId
-    int id;
     Type type;
     int userId;
     String filename;
     String content;
+    int apiCollectionId;
 
     public APISpec() {
     }
 
-    public APISpec(Type type, int userId, String filename, String content) {
+    public APISpec(Type type, int userId, String filename, String content, int apiCollectionId) {
         this.type = type;
         this.userId = userId;
         this.filename = filename;
-        this.id = Context.now();
         this.content = content;
+        this.apiCollectionId = apiCollectionId;
     }
 
     public Type getType() {
@@ -51,19 +46,19 @@ public class APISpec {
         this.filename = filename;
     }
 
-    public int getId() {
-        return this.id;
-    }
-
-    public void setId(int id) {
-        this.id = id;
-    }
-
     public String getContent() {
         return this.content;
     }
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public int getApiCollectionId() {
+        return this.apiCollectionId;
+    }
+
+    public void setApiCollectionId(int apiCollectionId) {
+        this.apiCollectionId = apiCollectionId;
     }
 }

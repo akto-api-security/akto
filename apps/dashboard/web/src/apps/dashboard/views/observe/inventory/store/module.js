@@ -11,7 +11,8 @@ var state = {
     apiCollectionId: 0,
     apiCollectionName: '',
     apiCollection: [],
-    sensitiveParams: []
+    sensitiveParams: [],
+    swaggerContent : null
 }
 
 let functionCompareParamObj = (x, p) => {
@@ -28,6 +29,7 @@ const inventory = {
             state.apiCollectionId = 0
             state.apiCollection = []
             state.apiCollectionName = ''
+            state.swaggerContent = null
         },
         SAVE_API_COLLECTION (state, info) {
             state.apiCollectionId = info.apiCollectionId
@@ -78,6 +80,10 @@ const inventory = {
                 api.listAllSensitiveFields().then(allSensitiveFields => {
                     commit('SAVE_SENSITIVE', allSensitiveFields.data)
                 })
+                api.loadContent(apiCollectionId).then(resp => {
+                    if(resp && resp.data && resp.data.content)
+                        state.swaggerContent = JSON.parse(resp.data.content)
+                })
                 state.loading = false
             }).catch(() => {
                 state.loading = false
@@ -97,6 +103,17 @@ const inventory = {
         downloadOpenApiFile({commit,state}) {
             return api.downloadOpenApiFile(state.apiCollectionId).then(resp => {
                 return resp
+            })
+        },
+        saveContent({ commit, dispatch, state }, {swaggerContent, filename, apiCollectionId}) {
+            state.loading = true
+            api.saveContent({swaggerContent, filename, apiCollectionId}).then(resp => {
+                state.filename = filename
+                state.swaggerContent = swaggerContent
+                state.apiCollectionId = apiCollectionId
+                state.loading = false
+            }).catch(() => {
+                state.loading = false
             })
         }
     },

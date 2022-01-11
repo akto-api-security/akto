@@ -8,6 +8,7 @@
             <count-box title="All Endpoints" :count="allEndpoints.length" colorTitle="Total"/>
         </div>    
 
+<<<<<<< HEAD
         <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Shadow', 'Unused']">
             <template slot="actions-tray">
                 <div class="d-flex jc-end">
@@ -20,6 +21,9 @@
                     <upload-file fileFormat="*.har" @fileChanged="handleFileChange" label="HAR"/>
                 </div>
             </template>
+=======
+        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Shadow', 'Unused','Upload']">
+>>>>>>> added feature to allow collections to have different swagger files
             <template slot="All">
                 <simple-table 
                     :headers=tableHeaders 
@@ -66,6 +70,22 @@
                     name="Unused"
                 />
             </template>
+            <template slot="Upload">
+                <v-file-input
+                    :rules=swaggerUploadRules
+                    show-size
+                    label="Upload JSON file"
+                    prepend-icon="$curlyBraces"
+                    accept=".json"
+                    @change="handleSwaggerFileUpload"
+                    v-model=swaggerFile
+                ></v-file-input>
+                <json-viewer
+                    v-if="swaggerContent"
+                    :contentJSON="swaggerContent"
+                    :errors="{}"
+                />
+            </template>
         </layout-with-tabs>
 
     </div>
@@ -82,8 +102,13 @@ import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import api from '../api'
 import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
+<<<<<<< HEAD
 import { saveAs } from 'file-saver'
 import UploadFile from '@/apps/dashboard/shared/components/UploadFile'
+=======
+import JsonViewer from "@/apps/dashboard/shared/components/JSONViewer"
+
+>>>>>>> added feature to allow collections to have different swagger files
 
 export default {
     name: "ApiEndpoints",
@@ -93,7 +118,11 @@ export default {
         SimpleTable,
         SensitiveChipGroup,
         Spinner,
+<<<<<<< HEAD
         UploadFile
+=======
+        JsonViewer
+>>>>>>> added feature to allow collections to have different swagger files
     },
     props: {
         apiCollectionId: obj.numR
@@ -104,6 +133,10 @@ export default {
             rules: [
                 value => !value || value.size < 50e6 || 'HAR file size should be less than 50 MB!',
             ],
+            swaggerUploadRules: [
+                    value => !value || value.size < 2e6 || 'JSON file size should be less than 2 MB!',
+                ],
+            swaggerFile: null,
             showMenu: false,
             tableHeaders: [
                 {
@@ -183,6 +216,7 @@ export default {
                 }
             }
         },
+<<<<<<< HEAD
         async downloadOpenApiFile() {
           var result = await this.$store.dispatch('inventory/downloadOpenApiFile')
           let openApiString = result["openAPIString"]
@@ -190,10 +224,20 @@ export default {
             type: "application/json",
           });
           saveAs(blob, "open_api_" +this.apiCollectionName+ ".json");
+=======
+        handleSwaggerFileUpload() {
+            if (!this.swaggerFile) {this.swaggerContent = null}
+            var reader = new FileReader();
+            
+            reader.readAsText(this.swaggerFile);
+            reader.onload = () => {
+                this.$store.dispatch('inventory/saveContent', { swaggerContent: JSON.parse(reader.result), filename: this.swaggerFile.name, apiCollectionId : this.apiCollectionId})
+            }
+>>>>>>> added feature to allow collections to have different swagger files
         }
     },
     computed: {
-        ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'loading']),
+        ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'loading', 'swaggerContent']),
         allEndpoints () {
             return func.groupByEndpoint(this.apiCollection)
         },
