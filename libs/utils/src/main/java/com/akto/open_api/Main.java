@@ -1,14 +1,17 @@
 package com.akto.open_api;
 
 import com.akto.DaoInit;
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.type.SingleTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Paths;
+import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.media.*;
 import io.swagger.v3.oas.models.servers.Server;
 
@@ -39,9 +42,14 @@ public class Main {
     public static OpenAPI init(int apiCollectionId) throws Exception {
         OpenAPI openAPI = new OpenAPI();
         addPaths(openAPI, apiCollectionId);
+        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("_id", apiCollectionId);
+        if (apiCollection == null) {
+            addInfo(openAPI,"Invalid apiCollectionId");
+            return openAPI;
+        }
         Paths paths = PathBuilder.parameterizePath(openAPI.getPaths());
         openAPI.setPaths(paths);
-
+        addInfo(openAPI, apiCollection.getName());
         return openAPI;
     }
 
@@ -144,7 +152,14 @@ public class Main {
 
     public static String convertOpenApiToJSON(OpenAPI openAPI) throws Exception {
         mapper.setSerializationInclusion(NON_NULL);
-        return mapper.writeValueAsString(openAPI);
+        return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(openAPI);
     }
 
+    public static void addInfo(OpenAPI openAPI, String collectionName) {
+        Info info = new Info();
+        info.setDescription("Akto generated openAPI file");
+        info.setTitle(collectionName);
+        info.setVersion("1.0.0");
+        openAPI.setInfo(info);
+    }
 }
