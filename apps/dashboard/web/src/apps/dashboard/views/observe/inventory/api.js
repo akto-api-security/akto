@@ -1,6 +1,26 @@
 import request from '@/util/request'
 
 export default {
+    saveContent(apiSpec) {
+        return request({
+            url: '/api/saveContent',
+            method: 'post',
+            data: {
+                apiSpec: apiSpec.swaggerContent,
+                filename: apiSpec.filename,
+                apiCollectionId: apiSpec.apiCollectionId
+            }
+        })
+    },
+    loadContent(apiCollectionId) {
+        return request({
+            url: '/api/loadContent',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId
+            }
+        })
+    },
     uploadHarFile(content, apiCollectionId) {
         return request({
             url: '/api/uploadHar',

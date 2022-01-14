@@ -2,9 +2,12 @@ package com.akto.dao;
 
 import com.mongodb.client.*;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.ReplaceOptions;
 import com.mongodb.client.result.InsertManyResult;
 import com.mongodb.client.result.InsertOneResult;
 import org.bson.Document;
+import com.mongodb.client.result.UpdateResult;
+
 import org.bson.conversions.Bson;
 
 import java.util.*;
@@ -99,6 +102,10 @@ public abstract class MCollection<T> {
 
     public T updateOne(Bson q, Bson obj) {
         return this.getMCollection().findOneAndUpdate(q, obj, new FindOneAndUpdateOptions().upsert(true));
+    }
+
+    public UpdateResult replaceOne(Bson q, T obj) {
+        return this.getMCollection().replaceOne(q, obj, new ReplaceOptions().upsert(true));
     }
 
     public InsertOneResult insertOne(T elem) {

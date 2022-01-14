@@ -8,7 +8,7 @@
             <count-box title="All Endpoints" :count="allEndpoints.length" colorTitle="Total"/>
         </div>    
 
-        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Shadow', 'Unused']">
+        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Shadow', 'Unused', 'Upload']">
             <template slot="actions-tray">
                 <div class="d-flex jc-end">
                     <v-tooltip bottom>
@@ -66,6 +66,22 @@
                     name="Unused"
                 />
             </template>
+            <template slot="Upload">
+                <v-file-input
+                    :rules=swaggerUploadRules
+                    show-size
+                    label="Upload JSON file"
+                    prepend-icon="$curlyBraces"
+                    accept=".json"
+                    @change="handleSwaggerFileUpload"
+                    v-model=swaggerFile
+                ></v-file-input>
+                <json-viewer
+                    v-if="swaggerContent"
+                    :contentJSON="swaggerContent"
+                    :errors="{}"
+                />
+            </template>
         </layout-with-tabs>
 
     </div>
@@ -84,6 +100,8 @@ import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChip
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
 import { saveAs } from 'file-saver'
 import UploadFile from '@/apps/dashboard/shared/components/UploadFile'
+import JsonViewer from "@/apps/dashboard/shared/components/JSONViewer"
+
 
 export default {
     name: "ApiEndpoints",
@@ -93,7 +111,8 @@ export default {
         SimpleTable,
         SensitiveChipGroup,
         Spinner,
-        UploadFile
+        UploadFile,
+        JsonViewer
     },
     props: {
         apiCollectionId: obj.numR
@@ -104,6 +123,10 @@ export default {
             rules: [
                 value => !value || value.size < 50e6 || 'HAR file size should be less than 50 MB!',
             ],
+            swaggerUploadRules: [
+                    value => !value || value.size < 2e6 || 'JSON file size should be less than 2 MB!',
+                ],
+            swaggerFile: null,
             showMenu: false,
             tableHeaders: [
                 {
@@ -190,10 +213,19 @@ export default {
             type: "application/json",
           });
           saveAs(blob, "open_api_" +this.apiCollectionName+ ".json");
+        },
+        handleSwaggerFileUpload() {
+            if (!this.swaggerFile) {this.swaggerContent = null}
+            var reader = new FileReader();
+            
+            reader.readAsText(this.swaggerFile);
+            reader.onload = () => {
+                this.$store.dispatch('inventory/saveContent', { swaggerContent: JSON.parse(reader.result), filename: this.swaggerFile.name, apiCollectionId : this.apiCollectionId})
+            }
         }
     },
     computed: {
-        ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'loading']),
+        ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'loading', 'swaggerContent']),
         allEndpoints () {
             return func.groupByEndpoint(this.apiCollection)
         },
