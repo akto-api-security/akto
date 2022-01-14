@@ -8,8 +8,7 @@
             <count-box title="All Endpoints" :count="allEndpoints.length" colorTitle="Total"/>
         </div>    
 
-<<<<<<< HEAD
-        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Shadow', 'Unused']">
+        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Shadow', 'Unused', 'Upload']">
             <template slot="actions-tray">
                 <div class="d-flex jc-end">
                     <v-tooltip bottom>
@@ -21,9 +20,6 @@
                     <upload-file fileFormat="*.har" @fileChanged="handleFileChange" label="HAR"/>
                 </div>
             </template>
-=======
-        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Shadow', 'Unused','Upload']">
->>>>>>> added feature to allow collections to have different swagger files
             <template slot="All">
                 <simple-table 
                     :headers=tableHeaders 
@@ -102,13 +98,10 @@ import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import api from '../api'
 import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
-<<<<<<< HEAD
 import { saveAs } from 'file-saver'
 import UploadFile from '@/apps/dashboard/shared/components/UploadFile'
-=======
 import JsonViewer from "@/apps/dashboard/shared/components/JSONViewer"
 
->>>>>>> added feature to allow collections to have different swagger files
 
 export default {
     name: "ApiEndpoints",
@@ -118,11 +111,8 @@ export default {
         SimpleTable,
         SensitiveChipGroup,
         Spinner,
-<<<<<<< HEAD
-        UploadFile
-=======
+        UploadFile,
         JsonViewer
->>>>>>> added feature to allow collections to have different swagger files
     },
     props: {
         apiCollectionId: obj.numR
@@ -216,7 +206,6 @@ export default {
                 }
             }
         },
-<<<<<<< HEAD
         async downloadOpenApiFile() {
           var result = await this.$store.dispatch('inventory/downloadOpenApiFile')
           let openApiString = result["openAPIString"]
@@ -224,7 +213,7 @@ export default {
             type: "application/json",
           });
           saveAs(blob, "open_api_" +this.apiCollectionName+ ".json");
-=======
+        },
         handleSwaggerFileUpload() {
             if (!this.swaggerFile) {this.swaggerContent = null}
             var reader = new FileReader();
@@ -233,7 +222,6 @@ export default {
             reader.onload = () => {
                 this.$store.dispatch('inventory/saveContent', { swaggerContent: JSON.parse(reader.result), filename: this.swaggerFile.name, apiCollectionId : this.apiCollectionId})
             }
->>>>>>> added feature to allow collections to have different swagger files
         }
     },
     computed: {
