@@ -419,6 +419,15 @@
             </result>
         </action>
 
+        <action name="api/fetchEndpointTrafficData" class="com.akto.action.TrafficAction" method="fetchEndpointTrafficData">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
     </package>
 
 </struts>

@@ -420,9 +420,9 @@ public class RequestTemplate {
     public List<TrafficInfo> removeAllTrafficInfo(int apiCollectionId, String url, Method method, int responseCode) {
         List<TrafficInfo> ret = new ArrayList<>();
         if (!trafficRecorder.isEmpty()) {
-            Set<Integer> hoursSince1970 = trafficRecorder.getTrafficMapSinceLastSync().keySet();
-            int start = hoursSince1970.iterator().next()/24/30;
-            int end = start + 24 * 30;
+            Set<String> hoursSince1970 = trafficRecorder.getTrafficMapSinceLastSync().keySet();
+            int start = Integer.parseInt(hoursSince1970.iterator().next())/24/30;
+            int end = start + 1;
             TrafficInfo trafficInfo = new TrafficInfo(new TrafficInfo.Key(apiCollectionId, url, method, responseCode, start, end), trafficRecorder.getTrafficMapSinceLastSync());
             ret.add(trafficInfo);
         }

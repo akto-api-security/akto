@@ -79,12 +79,12 @@ public class TrafficInfo {
 
     @BsonId
     Key _id;
-    public Map<Integer, Integer> mapHoursToCount;
+    public Map<String, Integer> mapHoursToCount;
 
     public TrafficInfo() {
     }
 
-    public TrafficInfo(Key _id, Map<Integer,Integer> mapHoursToCount) {
+    public TrafficInfo(Key _id, Map<String,Integer> mapHoursToCount) {
         this._id = _id;
         this.mapHoursToCount = mapHoursToCount;
     }
@@ -97,11 +97,11 @@ public class TrafficInfo {
         this._id = _id;
     }
 
-    public Map<Integer,Integer> getMapHoursToCount() {
+    public Map<String,Integer> getMapHoursToCount() {
         return this.mapHoursToCount;
     }
 
-    public void setMapHoursToCount(Map<Integer,Integer> mapHoursToCount) {
+    public void setMapHoursToCount(Map<String,Integer> mapHoursToCount) {
         this.mapHoursToCount = mapHoursToCount;
     }
 

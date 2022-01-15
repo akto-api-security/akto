@@ -444,7 +444,7 @@ public class APICatalogSync {
         for (TrafficInfo trafficInfo: trafficInfos) {
             List<Bson> updates = new ArrayList<>();
 
-            for (Map.Entry<Integer, Integer> entry: trafficInfo.mapHoursToCount.entrySet()) {
+            for (Map.Entry<String, Integer> entry: trafficInfo.mapHoursToCount.entrySet()) {
                 updates.add(Updates.inc("mapHoursToCount."+entry.getKey(), entry.getValue())); 
             }
 

@@ -5,11 +5,11 @@ import java.util.Map;
 
 public class TrafficRecorder {
     
-    Map<Integer, Integer> trafficMapSinceLastSync = new HashMap<>();
+    Map<String, Integer> trafficMapSinceLastSync = new HashMap<>();
 
     public void incr(int timestamp) {
         int hoursSinceEpoch = timestamp/3600;
-        trafficMapSinceLastSync.compute(hoursSinceEpoch, (k,v) -> { return v == null ? 1 : ++v;});
+        trafficMapSinceLastSync.compute(""+hoursSinceEpoch, (k,v) -> { return v == null ? 1 : ++v;});
     }
 
     public TrafficRecorder() {
@@ -19,15 +19,15 @@ public class TrafficRecorder {
         return trafficMapSinceLastSync.isEmpty();
     }
 
-    public TrafficRecorder(Map<Integer,Integer> trafficMapSinceLastSync) {
+    public TrafficRecorder(Map<String,Integer> trafficMapSinceLastSync) {
         this.trafficMapSinceLastSync = trafficMapSinceLastSync;
     }
 
-    public Map<Integer,Integer> getTrafficMapSinceLastSync() {
+    public Map<String,Integer> getTrafficMapSinceLastSync() {
         return this.trafficMapSinceLastSync;
     }
 
-    public void setTrafficMapSinceLastSync(Map<Integer,Integer> trafficMapSinceLastSync) {
+    public void setTrafficMapSinceLastSync(Map<String,Integer> trafficMapSinceLastSync) {
         this.trafficMapSinceLastSync = trafficMapSinceLastSync;
     }
 

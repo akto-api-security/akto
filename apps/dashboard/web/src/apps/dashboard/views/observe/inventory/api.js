@@ -96,5 +96,16 @@ export default {
         }).then((resp) => {
             return resp
         })
+    },
+    fetchEndpointTrafficData (url, apiCollectionId, method, startEpoch, endEpoch) {
+        return request({
+            url: '/api/fetchEndpointTrafficData',
+            method: 'post',
+            data: {
+                url, apiCollectionId, method, startEpoch, endEpoch
+            }
+        }).then((resp) => {
+            return resp
+        })
     }
 }

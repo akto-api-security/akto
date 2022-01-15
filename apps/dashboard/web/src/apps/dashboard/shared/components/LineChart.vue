@@ -117,14 +117,15 @@ export default {
                 title: this.title,
                 visible: this.text,
                 height: `${this.height}px`,
-                gridLineWidth: '0px'
+                gridLineWidth: '0px',
+                min : 0
               },
               ...this.inputMetrics.map((x,i) => {
                 return {
                   title: '',
                   visible: true,
-                  opposite: true
-
+                  opposite: true,
+                  min : 0
                 }
               })
           ],
