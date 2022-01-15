@@ -38,11 +38,6 @@ export default {
       }
     }
   },
-  data () {
-    return {
-      inputMetricHeight: 90
-    }
-  },
   components: {
     Chart
   },
@@ -61,7 +56,7 @@ export default {
         var basicOpts = {
           chart: {
             type: this.type,
-            height: (this.height + this.inputMetricHeight * this.inputMetrics.length)+'px',
+            height: (this.height)+'px',
             spacing: [5,0,0,0],
             backgroundColor: this.backgroundColor
           },
@@ -82,12 +77,13 @@ export default {
               fillColor: this.areaFillHex ? fillColor : {},
               marker: {
                 enabled: this.data.length <= 2
-              }
+              },
+              yAxis: 0
             },
             ...this.inputMetrics.map((x, i) => {
               return {
                 data: x.data,
-                color: func.chartColors()[i % func.chartColors().length],
+                color: "#FF4DCA",
                 name: x.name,
                 marker: {
                   enabled: false,
@@ -126,11 +122,9 @@ export default {
               ...this.inputMetrics.map((x,i) => {
                 return {
                   title: '',
-                  visible: false,
-                  top: `${this.height + this.inputMetricHeight * i + 40}px`,
-                  height: ((this.inputMetricHeight - 40) + 'px'),
-                  gridLineWidth: '0px',
-                  lineWidth: 1
+                  visible: true,
+                  opposite: true
+
                 }
               })
           ],
