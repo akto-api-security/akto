@@ -10,8 +10,10 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.SingleTypeInfo.ParamId;
 import com.akto.dto.type.SingleTypeInfo.SubType;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.akto.util.Trie;
@@ -30,15 +32,22 @@ public class RequestTemplate {
     Map<String, KeyTypes> headers;
     Map<Integer, RequestTemplate> responseTemplates;
     Set<String> userIds = new HashSet<>();
+    TrafficRecorder trafficRecorder = new TrafficRecorder();
     Trie keyTrie = new Trie();
 
     public RequestTemplate() {
     }
 
-    public RequestTemplate(Map<String,KeyTypes> parameters, Map<Integer, RequestTemplate> responseTemplates, Map<String,KeyTypes> headers) {
+    public RequestTemplate(
+        Map<String,KeyTypes> parameters, 
+        Map<Integer, RequestTemplate> responseTemplates, 
+        Map<String,KeyTypes> headers,
+        TrafficRecorder trafficRecorder
+    ) {
         this.parameters = parameters;
         this.headers = headers;
         this.responseTemplates = responseTemplates;
+        this.trafficRecorder = trafficRecorder;
     }
 
     int mergeTimestamp = 0;
@@ -93,6 +102,10 @@ public class RequestTemplate {
                 keyTypes.process(url, method, responseCode, true, header, value, userId, apiCollectionId);
             }
         }
+    }
+
+    public void processTraffic(int timestamp) {
+        trafficRecorder.incr(timestamp);
     }
 
     public List<SingleTypeInfo> process2(BasicDBObject payload, String url, String method, int responseCode, String userId, int apiCollectionId) {
@@ -221,8 +234,16 @@ public class RequestTemplate {
         this.headers = headers;
     }
 
+    public TrafficRecorder getTrafficRecorder() {
+        return this.trafficRecorder;
+    }
+
+    public void setTrafficRecorder(TrafficRecorder trafficRecorder) {
+        this.trafficRecorder = trafficRecorder;
+    }
+
     public RequestTemplate copy() {
-        RequestTemplate ret = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>());
+        RequestTemplate ret = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>()));
         
         for(String parameter: parameters.keySet()) {
             ret.parameters.put(parameter, parameters.get(parameter).copy());
@@ -393,6 +414,27 @@ public class RequestTemplate {
                 ret.addAll(responseParams.getAllTypeInfo());
             }
         }
+        return ret;
+    }
+
+    public List<TrafficInfo> removeAllTrafficInfo(int apiCollectionId, String url, Method method, int responseCode) {
+        List<TrafficInfo> ret = new ArrayList<>();
+        if (!trafficRecorder.isEmpty()) {
+            Set<Integer> hoursSince1970 = trafficRecorder.getTrafficMapSinceLastSync().keySet();
+            int start = hoursSince1970.iterator().next()/24/30;
+            int end = start + 24 * 30;
+            TrafficInfo trafficInfo = new TrafficInfo(new TrafficInfo.Key(apiCollectionId, url, method, responseCode, start, end), trafficRecorder.getTrafficMapSinceLastSync());
+            ret.add(trafficInfo);
+        }
+
+        trafficRecorder.setTrafficMapSinceLastSync(new HashMap<>());
+
+        if (responseTemplates != null && responseTemplates.size() > 0) {
+            for(Map.Entry<Integer, RequestTemplate> entry: responseTemplates.entrySet()) {
+                ret.addAll(entry.getValue().removeAllTrafficInfo(apiCollectionId, url, method, entry.getKey()));
+            }
+        }
+
         return ret;
     }
 

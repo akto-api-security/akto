@@ -12,12 +12,15 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.TrafficRecorder;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
@@ -63,7 +66,7 @@ public class APICatalogSync {
             try {
                 processResponse(urlMethods, iter.next(), deletedInfo);
             } catch (Exception e) {
-                // eat all
+                logger.error("processResponse", e);
             }
         }
     }
@@ -79,10 +82,13 @@ public class APICatalogSync {
         String userId = extractUserId(responseParams, userIdentifier);
         RequestTemplate requestTemplate = urlMethods.getMethodToRequestTemplate().get(method);
         if (requestTemplate == null) {
-            requestTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>());
+            requestTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>()));
             urlMethods.getMethodToRequestTemplate().put(method, requestTemplate);
         }
 
+        if (!responseParams.getIsPending()) {
+            requestTemplate.processTraffic(responseParams.getTime());
+        }
         if (statusCode >= 200 && statusCode < 300) {
             String reqPayload = requestParams.getPayload();
             requestTemplate.processHeaders(requestParams.getHeaders(), baseURL, method.name(), -1, userId, requestParams.getApiCollectionId());
@@ -97,7 +103,7 @@ public class APICatalogSync {
         
         RequestTemplate responseTemplate = responseTemplates.get(statusCode);
         if (responseTemplate == null) {
-            responseTemplate = new RequestTemplate(new HashMap<>(), null, new HashMap<>());
+            responseTemplate = new RequestTemplate(new HashMap<>(), null, new HashMap<>(), new TrafficRecorder(new HashMap<>()));
             responseTemplates.put(statusCode, responseTemplate);
         }
 
@@ -111,6 +117,9 @@ public class APICatalogSync {
             BasicDBObject payload = BasicDBObject.parse(respPayload);
             deletedInfo.addAll(responseTemplate.process2(payload, baseURL, methodStr, statusCode, userId, requestParams.getApiCollectionId()));
             responseTemplate.processHeaders(responseParams.getHeaders(), baseURL, method.name(), statusCode, userId, requestParams.getApiCollectionId());
+            if (!responseParams.getIsPending()) {
+                responseTemplate.processTraffic(responseParams.getTime());
+            }
         } catch (JsonParseException e) {
 
         }
@@ -328,7 +337,7 @@ public class APICatalogSync {
             if (count > thresh) {
                 logger.info("Merging in a single URL template" + sample.getTemplateString());
                 Map<Method, RequestTemplate> methodToTemplate = new HashMap<>();
-                RequestTemplate newTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>());
+                RequestTemplate newTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>()));
                 methodToTemplate.put(method, newTemplate);
                 deltaCatalog.getTemplateURLToMethods().put(sample, new URLMethods(methodToTemplate));
                 Iterator<Map.Entry<String, URLMethods>> strictURLIterator = deltaCatalog.getStrictURLToMethods().entrySet().iterator();
@@ -418,6 +427,33 @@ public class APICatalogSync {
         }
 
         return ret;
+    }
+
+    public ArrayList<WriteModel<TrafficInfo>> getDBUpdatesForTraffic(int apiCollectionId, APICatalog currentDelta) {
+
+        List<TrafficInfo> trafficInfos = new ArrayList<>();
+        for(Map.Entry<String, URLMethods> entry: currentDelta.getStrictURLToMethods().entrySet()) {
+            trafficInfos.addAll(entry.getValue().removeAllTrafficInfo(apiCollectionId, entry.getKey()));
+        }
+
+        for(Map.Entry<URLTemplate, URLMethods> entry: currentDelta.getTemplateURLToMethods().entrySet()) {
+            trafficInfos.addAll(entry.getValue().removeAllTrafficInfo(apiCollectionId, entry.getKey().getTemplateString()));
+        }
+
+        ArrayList<WriteModel<TrafficInfo>> bulkUpdates = new ArrayList<>();
+        for (TrafficInfo trafficInfo: trafficInfos) {
+            List<Bson> updates = new ArrayList<>();
+
+            for (Map.Entry<Integer, Integer> entry: trafficInfo.mapHoursToCount.entrySet()) {
+                updates.add(Updates.inc("mapHoursToCount."+entry.getKey(), entry.getValue())); 
+            }
+
+            bulkUpdates.add(
+                new UpdateOneModel<>(Filters.eq("_id", trafficInfo.get_id()), Updates.combine(updates), new UpdateOptions().upsert(true))
+            );
+        }
+
+        return bulkUpdates;
     }
 
     public ArrayList<WriteModel<SingleTypeInfo>> getDBUpdatesForParams(APICatalog currentDelta, APICatalog currentState) {
@@ -558,14 +594,14 @@ public class APICatalogSync {
             RequestTemplate reqTemplate = urlMethods.getMethodToRequestTemplate().get(method);
 
             if (reqTemplate == null) {
-                reqTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>());
+                reqTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>()));
                 urlMethods.getMethodToRequestTemplate().put(method, reqTemplate);
             }
 
             if (param.getResponseCode() > 0) {
                 RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(param.getResponseCode());
                 if (respTemplate == null) {
-                    respTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>());
+                    respTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>()));
                     reqTemplate.getResponseTemplates().put(param.getResponseCode(), respTemplate);
                 }
 
@@ -610,11 +646,13 @@ public class APICatalogSync {
 
     public void syncWithDB() {
         List<WriteModel<SingleTypeInfo>> writesForParams = new ArrayList<>();
-        
+        List<WriteModel<TrafficInfo>> writesForTraffic = new ArrayList<>();
+
         for(int apiCollectionId: this.delta.keySet()) {
             APICatalog deltaCatalog = this.delta.get(apiCollectionId);
             APICatalog dbCatalog = this.dbState.getOrDefault(apiCollectionId, new APICatalog(apiCollectionId, new HashMap<>(), new HashMap<>()));
             writesForParams.addAll(getDBUpdatesForParams(deltaCatalog, dbCatalog));
+            writesForTraffic.addAll(getDBUpdatesForTraffic(apiCollectionId, deltaCatalog));
             deltaCatalog.setDeletedInfo(new ArrayList<>());
         }
 
@@ -625,6 +663,16 @@ public class APICatalogSync {
 
             logger.info(res.getInserts().size() + " " +res.getUpserts().size());
         }
+
+        logger.info("adding " + writesForTraffic.size() + " updates for traffic");
+        if(writesForTraffic.size() > 0) {
+            BulkWriteResult res = TrafficInfoDao.instance.getMCollection().bulkWrite(writesForTraffic);
+
+            logger.info(res.getInserts().size() + " " +res.getUpserts().size());
+
+        }
+        
+
         buildFromDB(true);
     }
 

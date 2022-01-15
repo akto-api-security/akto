@@ -1,9 +1,5 @@
 package com.akto.parsers;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -12,7 +8,6 @@ import java.util.Map;
 import java.util.Set;
 
 import com.akto.dto.type.RequestTemplate;
-import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
 import com.akto.dto.type.URLMethods.Method;
@@ -25,12 +20,9 @@ import com.mongodb.BasicDBObject;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class TestDump2 {
 
-    private static final Logger logger = LoggerFactory.getLogger(TestDump2.class);
 
     public static String createSimpleResponsePayload() {
         BasicDBObject ret = new BasicDBObject();
@@ -122,6 +114,7 @@ public class TestDump2 {
         sync.computeDelta(aggr, false, 0);
         
         assertEquals(sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0)).size(), 15);        
+        assertEquals(sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size(), 2);        
     }
 
 
@@ -150,6 +143,7 @@ public class TestDump2 {
             assertEquals(respTemplate.getParameters().size(), 3);
 
             assertEquals(sync.getDBUpdatesForParams(sync.getDelta(collectionId), sync.getDbState(collectionId)).size(), 24);
+            assertEquals(sync.getDBUpdatesForTraffic(collectionId, sync.getDelta(collectionId)).size(), 2);        
         }        
     }
 
@@ -188,6 +182,7 @@ public class TestDump2 {
         assertEquals(reqTemplate.getParameters().size(), 5);
 
         System.out.println("done");
+        assertEquals(sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size(), 2);        
     }
 
 
@@ -221,6 +216,7 @@ public class TestDump2 {
         RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
         assertEquals(respTemplate.getUserIds().size(), 5);
         assertEquals(respTemplate.getParameters().size(), 3);
+        assertEquals(sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size(), 2);        
     }
 
     @Test
@@ -254,6 +250,7 @@ public class TestDump2 {
         RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
         assertEquals(respTemplate.getUserIds().size(), 30);
         assertEquals(respTemplate.getParameters().size(), 3);
+        assertEquals(sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size(), 0);        
     }
 
     private String createPayloadWithRepetitiveKeys(String i) {
@@ -302,7 +299,7 @@ public class TestDump2 {
         assertEquals(respTemplate.getUserIds().size(), 10);
         assertEquals(respTemplate.getParameters().size(), 29);
 
-        List<SingleTypeInfo> deleted = respTemplate.tryMergeNodesInTrie(url, "POST", resp.statusCode, resp.getRequestParams().getApiCollectionId());
+        respTemplate.tryMergeNodesInTrie(url, "POST", resp.statusCode, resp.getRequestParams().getApiCollectionId());
         assertEquals(respTemplate.getParameters().size(), 1);
 
         List updates = sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0));

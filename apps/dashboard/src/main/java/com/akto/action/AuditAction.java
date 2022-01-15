@@ -48,7 +48,7 @@ public class AuditAction extends UserAction {
 
         APISpec spec = APISpecDao.instance.findById(0);
 
-        int specId =  spec == null ? 0 : spec.getId();
+        int specId =  spec == null ? 0 : spec.getApiCollectionId();
         ret.append("auditId", Context.now()).append("contentId", specId).append("errors", errors);
         if (spec != null) {
             List<Issue> issues = new OpenAPIValidator().validateMain(spec.getContent());
