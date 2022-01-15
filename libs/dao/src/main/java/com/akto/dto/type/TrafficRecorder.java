@@ -9,7 +9,7 @@ public class TrafficRecorder {
 
     public void incr(int timestamp) {
         int hoursSinceEpoch = timestamp/3600;
-        trafficMapSinceLastSync.compute(hoursSinceEpoch, (k,v) -> { return v == null ? 1 : v++;});
+        trafficMapSinceLastSync.compute(hoursSinceEpoch, (k,v) -> { return v == null ? 1 : ++v;});
     }
 
     public TrafficRecorder() {

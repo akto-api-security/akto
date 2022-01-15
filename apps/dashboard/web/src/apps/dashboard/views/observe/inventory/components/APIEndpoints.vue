@@ -202,7 +202,7 @@ export default {
                 // of the file in the v-model prop
                 reader.readAsText(file);
                 reader.onload = () => {
-                    this.$store.dispatch('inventory/uploadHarFile', { content: JSON.parse(reader.result), filename: file.name})
+                    this.$store.dispatch('inventory/uploadHarFile', { content: JSON.parse(reader.result), filename: file.name, skipKafka: window.location.href.indexOf("http://localhost") != -1})
                 }
             }
         },

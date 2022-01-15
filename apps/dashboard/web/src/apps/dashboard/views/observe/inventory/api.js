@@ -21,12 +21,12 @@ export default {
             }
         })
     },
-    uploadHarFile(content, apiCollectionId) {
+    uploadHarFile(content, apiCollectionId, skipKafka) {
         return request({
             url: '/api/uploadHar',
             method: 'post',
             data: {
-                content, apiCollectionId
+                content, apiCollectionId, skipKafka
             }
         })
     },
