@@ -92,13 +92,7 @@ const err = async (error) => {
 // For every request that is sent from the vue app, automatically attach the accessToken from the store
 service.interceptors.request.use((config) => {
   config.headers['Access-Control-Allow-Origin'] = '*'
-
-  if (typeof config.headers['Content-Type'] === "undefined") {
-    config.headers['Content-Type'] = 'application/json'
-  } else if (config.headers['Content-Type'] === null){
-    delete(config.headers['Content-Type'])
-  }
-  
+  config.headers['Content-Type'] = 'application/json'
   config.headers["access-token"] = store.getters["auth/getAccessToken"]
 
   if (window.ACTIVE_ACCOUNT) {

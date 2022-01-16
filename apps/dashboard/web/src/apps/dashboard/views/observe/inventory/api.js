@@ -34,7 +34,6 @@ export default {
         return request({
             url: '/api/uploadTcp',
             method: 'post',
-            headers: {"Content-Type": null},
             data: {
                 tcpContent: content, apiCollectionId, skipKafka
             }
