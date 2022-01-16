@@ -68,7 +68,7 @@ typedef struct { void *data; GoInt len; GoInt cap; } GoSlice;
 extern "C" {
 #endif
 
-extern void readTcpDumpFile(GoString filepath, GoString kafkaURL);
+extern void readTcpDumpFile(GoString filepath, GoString kafkaURL, GoInt apiCollectionId);
 
 #ifdef __cplusplus
 }
