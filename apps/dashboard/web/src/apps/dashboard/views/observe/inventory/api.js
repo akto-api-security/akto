@@ -30,6 +30,16 @@ export default {
             }
         })
     },
+    uploadTcpFile(content, apiCollectionId, skipKafka) {
+        return request({
+            url: '/api/uploadTcp',
+            method: 'post',
+            headers: {"Content-Type": null},
+            data: {
+                harString: content, apiCollectionId, skipKafka
+            }
+        })
+    },
     downloadOpenApiFile(apiCollectionId) {
         return request({
             url: '/api/generateOpenApiFile',

@@ -17,7 +17,8 @@
                         </template>
                         Download OpenAPI file
                     </v-tooltip>
-                    <upload-file fileFormat="*.har" @fileChanged="handleFileChange" label="HAR"/>
+                    <upload-file fileFormat=".har" @fileChanged="handleFileChange" label="HAR"/>
+                    <upload-file fileFormat=".pcap" @fileChanged="handleFileChange" label="PCAP"/>
                 </div>
             </template>
             <template slot="All">
@@ -192,7 +193,7 @@ export default {
         isUnused(url, method) {
             return this.allEndpoints.filter(e => e.endpoint === url && e.method == method).length == 0
         },
-        handleFileChange(file) {
+        handleFileChange({file, label}) {
             if (!file) {
                 this.content = null
             } else {
@@ -201,8 +202,13 @@ export default {
                 // Use the javascript reader object to load the contents
                 // of the file in the v-model prop
                 reader.readAsText(file);
-                reader.onload = () => {
-                    this.$store.dispatch('inventory/uploadHarFile', { content: JSON.parse(reader.result), filename: file.name, skipKafka: window.location.href.indexOf("http://localhost") != -1})
+                reader.onload = async () => {
+                    let skipKafka = window.location.href.indexOf("http://localhost") != -1
+                    if (label === "HAR") {
+                        await this.$store.dispatch('inventory/uploadHarFile', { content: JSON.parse(reader.result), filename: file.name, skipKafka})
+                    } else if (label === "PCAP") {
+                        await api.uploadTcpFile((reader.result), this.apiCollectionId, skipKafka)
+                    }
                 }
             }
         },
