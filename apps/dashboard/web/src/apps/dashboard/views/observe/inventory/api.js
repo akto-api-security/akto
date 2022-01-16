@@ -36,7 +36,7 @@ export default {
             method: 'post',
             headers: {"Content-Type": null},
             data: {
-                harString: content, apiCollectionId, skipKafka
+                tcpContent: content, apiCollectionId, skipKafka
             }
         })
     },

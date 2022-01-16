@@ -25,6 +25,7 @@ public class HarAction extends UserAction {
     private BasicDBObject content;
     private int apiCollectionId;
     private boolean skipKafka;
+    private byte[] tcpContent;
 
     @Override
     public String execute() throws IOException {
@@ -99,6 +100,10 @@ public class HarAction extends UserAction {
         this.skipKafka = skipKafka;
     }
 
+    public void setTcpContent(byte[] tcpContent) {
+        this.tcpContent = tcpContent;
+    }
+
     Awesome awesome = null;
 
     public String uploadTcp() {
@@ -107,7 +112,7 @@ public class HarAction extends UserAction {
         String filename = UUID.randomUUID().toString() + ".pcap";
         File tcpDump = new File(tmpDir, filename);
         try {
-            FileUtils.writeStringToFile(tcpDump, harString);
+            FileUtils.writeByteArrayToFile(tcpDump, tcpContent);
             Awesome awesome =  (Awesome) Native.load("awesome", Awesome.class);
             Awesome.GoString.ByValue str = new Awesome.GoString.ByValue();
             str.p = tcpDump.getAbsolutePath();
