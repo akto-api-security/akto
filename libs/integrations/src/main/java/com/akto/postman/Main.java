@@ -85,12 +85,12 @@ public class Main {
     }
 
 
-    public void fetchApiCollections() {
+    public JsonNode fetchApiCollections() {
         String url = BASE_URL + "collections";
         JsonNode jsonNode = ApiRequest.getRequest(generateHeadersWithAuth(), url);
-        if (jsonNode == null) return ;
+        if (jsonNode == null) return null;
 
-        System.out.println(jsonNode.get("collections"));
+        return jsonNode.get("collections");
     }
 
     public JsonNode fetchPostmanCollectionString(String collectionId) {
@@ -101,12 +101,12 @@ public class Main {
         return jsonNode;
     }
 
-    public void fetchWorkspaces() {
+    public JsonNode fetchWorkspaces() {
         String url = BASE_URL + "workspaces";
         JsonNode jsonNode = ApiRequest.getRequest(generateHeadersWithAuth(), url);
-        if (jsonNode == null) return ;
+        if (jsonNode == null) return null;
 
-        System.out.println(jsonNode.get("workspaces"));
+        return jsonNode.get("workspaces");
     }
 
     public Map<String,String> generateHeadersWithAuth() {

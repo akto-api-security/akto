@@ -11,7 +11,13 @@
         <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Shadow', 'Unused', 'Upload']">
             <template slot="actions-tray">
                 <div class="d-flex jc-end">
-                    <v-tooltip bottom>
+                  <v-tooltip bottom>
+                    <template v-slot:activator="{on,attrs}">
+                      <v-btn v-bind="attrs" v-on="on" icon color="red" @click="exportToPostman"><v-icon>$fas_download</v-icon></v-btn>
+                    </template>
+                    Export to Postman collection
+                  </v-tooltip>
+                  <v-tooltip bottom>
                         <template v-slot:activator="{on,attrs}">
                             <v-btn v-bind="attrs" v-on="on" icon color="#6200EA" @click="downloadOpenApiFile"><v-icon>$fas_download</v-icon></v-btn>
                         </template>
@@ -214,7 +220,11 @@ export default {
           });
           saveAs(blob, "open_api_" +this.apiCollectionName+ ".json");
         },
-        handleSwaggerFileUpload() {
+        async exportToPostman() {
+          var result = await this.$store.dispatch('inventory/exportToPostman')
+        },
+
+      handleSwaggerFileUpload() {
             if (!this.swaggerFile) {this.swaggerContent = null}
             var reader = new FileReader();
             
