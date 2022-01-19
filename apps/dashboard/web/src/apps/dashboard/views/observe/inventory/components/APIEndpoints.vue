@@ -18,6 +18,7 @@
                         Download OpenAPI file
                     </v-tooltip>
                     <upload-file fileFormat="*.har" @fileChanged="handleFileChange" label="HAR"/>
+                    <v-btn icon color="#6200EA" @click="testFunc"><v-icon>$fas_sync</v-icon></v-btn>
                 </div>
             </template>
             <template slot="All">
@@ -222,6 +223,15 @@ export default {
             reader.onload = () => {
                 this.$store.dispatch('inventory/saveContent', { swaggerContent: JSON.parse(reader.result), filename: this.swaggerFile.name, apiCollectionId : this.apiCollectionId})
             }
+        },
+        testFunc() {
+            // if (!this.apiCollection || this.apiCollection.length === 0 || this.$store.state.inventory.apiCollectionId !== this.apiCollectionId) {
+            this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId})
+
+            api.getAllUrlsAndMethods(this.apiCollectionId).then(resp => {
+                this.documentedURLs = resp.data || {}
+            })
+            this.$emit('mountedView', {type: 1, apiCollectionId: this.apiCollectionId})
         }
     },
     computed: {
@@ -253,13 +263,7 @@ export default {
         }
     },
     mounted() {
-        if (!this.apiCollection || this.apiCollection.length === 0 || this.$store.state.inventory.apiCollectionId !== this.apiCollectionId) {
-            this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId})
-        }
-        api.getAllUrlsAndMethods(this.apiCollectionId).then(resp => {
-            this.documentedURLs = resp.data || {}
-        })
-        this.$emit('mountedView', {type: 1, apiCollectionId: this.apiCollectionId})
+        this.testFunc()
     }
 }
 </script>

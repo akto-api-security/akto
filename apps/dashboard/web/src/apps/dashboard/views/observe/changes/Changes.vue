@@ -11,6 +11,11 @@
             <div class="pa-4 coming-soon">Coming soon...</div>
         </a-card>
         <layout-with-tabs title="" :tabs="['New endpoints', 'New parameters']">
+            <template slot="actions-tray">
+                <div class="d-flex jc-end">
+                    <v-btn icon color="#6200EA" @click="testFunc"><v-icon>$fas_sync</v-icon></v-btn>
+                </div>
+            </template>
             <template slot="New endpoints">
                 <simple-table 
                     :headers="endpointHeaders" 
@@ -158,6 +163,9 @@ export default {
             }
 
             this.$router.push(routeObj)
+        },
+        testFunc() {
+            this.$store.dispatch('changes/loadRecentParameters')
         } 
     },
     computed: {
@@ -186,7 +194,7 @@ export default {
         },
     },
     mounted() {
-        this.$store.dispatch('changes/loadRecentParameters')
+        this.testFunc()
     }    
 
 }
