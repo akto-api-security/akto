@@ -7,16 +7,21 @@ import com.akto.dao.context.Context;
 import com.akto.dto.type.SingleTypeInfo.ParamId;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 
+import com.google.i18n.phonenumbers.PhoneNumberUtil;
+import com.google.i18n.phonenumbers.Phonenumber;
 import org.apache.commons.lang3.math.NumberUtils;
+import org.apache.commons.validator.routines.CreditCardValidator;
+import org.apache.commons.validator.routines.InetAddressValidator;
 import org.json.JSONObject;
 
 public class KeyTypes {
 
+    public static CreditCardValidator creditCardValidator = new CreditCardValidator();
+    public static InetAddressValidator ipAddressValidator = InetAddressValidator.getInstance();
     public static final Map<SubType, Pattern> patternToSubType = new HashMap<>();
     static {
         patternToSubType.put(SubType.EMAIL, Pattern.compile("^[a-zA-Z0-9_+&*-]+(?:\\.[a-zA-Z0-9_+&*-]+)*@(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,7}$"));
         patternToSubType.put(SubType.URL, Pattern.compile("^((((https?|ftps?|gopher|telnet|nntp)://)|(mailto:|news:))(%[0-9A-Fa-f]{2}|[-()_.!~*';/?:@&=+$,A-Za-z0-9])+)([).!';/?:,][[:blank:|:blank:]])?$"));
-        patternToSubType.put(SubType.CREDIT_CARD, Pattern.compile("^((4\\d{3})|(5[1-5]\\d{2})|(6011)|(7\\d{3}))-?\\d{4}-?\\d{4}-?\\d{4}|3[4,7]\\d{13}$"));
         patternToSubType.put(SubType.SSN, Pattern.compile("^\\d{3}-\\d{2}-\\d{4}$"));
         patternToSubType.put(SubType.UUID, Pattern.compile("^[A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{12}$"));
 
@@ -104,10 +109,21 @@ public class KeyTypes {
                     return subType;
                 }
             }
-            boolean isJwt = isJWT(str);
-            if (isJwt) {
+            if (isJWT(str)) {
                 return SubType.JWT;
             }
+
+            if (isPhoneNumber(str)) {
+                return SubType.PHONE_NUMBER;
+            }
+
+            if (isCreditCard(str)) {
+                return SubType.CREDIT_CARD;
+            }
+            if (isIP(str)) {
+                return SubType.IP_ADDRESS;
+            }
+
             return SubType.GENERIC;
         }
 
@@ -151,6 +167,19 @@ public class KeyTypes {
             "}";
     }
 
+    public static boolean isPhoneNumber(String mobileNumber) {
+        PhoneNumberUtil phoneNumberUtil = PhoneNumberUtil.getInstance();
+        try {
+            Phonenumber.PhoneNumber phone = phoneNumberUtil.parse(mobileNumber,
+                    Phonenumber.PhoneNumber.CountryCodeSource.UNSPECIFIED.name());
+            return phoneNumberUtil.isValidNumber(phone);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+
+    }
+
     public static boolean isJWT(String jwt) {
         try {
             String[] jwtList = jwt.split("\\.");
@@ -167,4 +196,13 @@ public class KeyTypes {
         }
         return true;
     }
+
+    public static boolean isCreditCard(String s) {
+        return creditCardValidator.isValid(s);
+    }
+
+    public static boolean isIP(String s) {
+        return ipAddressValidator.isValid(s);
+    }
+
 }
