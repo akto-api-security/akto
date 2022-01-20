@@ -12,7 +12,7 @@
         <layout-with-tabs :tabs="['Response', 'Request']">
             <template slot="actions-tray">
                 <div class="d-flex jc-end">
-                    <v-btn icon color="#6200EA" @click="testFunc"><v-icon>$fas_sync</v-icon></v-btn>
+                    <v-btn icon color="#6200EA" @click="testFunc(false)"><v-icon>$fas_sync</v-icon></v-btn>
                 </div>
             </template>
             <template slot="Request">
@@ -150,8 +150,8 @@ export default {
 
             this.$router.push(routeObj)
         },
-        testFunc() {
-            this.$store.dispatch('sensitive/loadSensitiveParameters')
+        testFunc(shouldLoad) {
+            this.$store.dispatch('sensitive/loadSensitiveParameters', {shouldLoad:shouldLoad})
         }
     },
     computed: {
@@ -183,7 +183,7 @@ export default {
         }              
     },
     mounted() {
-        this.testFunc()
+        this.testFunc(true)
     }
 }
 </script>
