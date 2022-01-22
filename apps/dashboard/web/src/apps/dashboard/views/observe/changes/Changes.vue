@@ -13,7 +13,7 @@
         <layout-with-tabs title="" :tabs="['New endpoints', 'New parameters']">
             <template slot="actions-tray">
                 <div class="d-flex jc-end">
-                    <v-btn icon color="#6200EA" @click="testFunc"><v-icon>$fas_sync</v-icon></v-btn>
+                    <v-btn icon color="#6200EA" @click="refreshPage"><v-icon>$fas_sync</v-icon></v-btn>
                 </div>
             </template>
             <template slot="New endpoints">
@@ -164,7 +164,7 @@ export default {
 
             this.$router.push(routeObj)
         },
-        testFunc() {
+        refreshPage() {
             this.$store.dispatch('changes/loadRecentParameters')
         } 
     },
@@ -194,7 +194,7 @@ export default {
         },
     },
     mounted() {
-        this.testFunc()
+        this.refreshPage()
     }    
 
 }

@@ -18,7 +18,7 @@
                         Download OpenAPI file
                     </v-tooltip>
                     <upload-file fileFormat="*.har" @fileChanged="handleFileChange" label="HAR"/>
-                    <v-btn icon color="#6200EA" @click="testFunc(false)"><v-icon>$fas_sync</v-icon></v-btn>
+                    <v-btn icon color="#6200EA" @click="refreshPage(false)"><v-icon>$fas_sync</v-icon></v-btn>
                 </div>
             </template>
             <template slot="All">
@@ -224,7 +224,7 @@ export default {
                 this.$store.dispatch('inventory/saveContent', { swaggerContent: JSON.parse(reader.result), filename: this.swaggerFile.name, apiCollectionId : this.apiCollectionId})
             }
         },
-        testFunc(shouldLoad) {
+        refreshPage(shouldLoad) {
             // if (!this.apiCollection || this.apiCollection.length === 0 || this.$store.state.inventory.apiCollectionId !== this.apiCollectionId) {
             this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId, shouldLoad: shouldLoad})
 
@@ -263,7 +263,7 @@ export default {
         }
     },
     mounted() {
-        this.testFunc(true)
+        this.refreshPage(true)
     }
 }
 </script>
