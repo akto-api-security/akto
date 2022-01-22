@@ -70,8 +70,18 @@ export default {
                     value: "detected"
                 }
             ],
-            actions: [],
-            showNewRow: false
+            actions: [ 
+                {
+                    isValid: item => this.isValid(item),
+                    icon: item => '$fas_trash',
+                    text: item => 'Delete Collection',
+                    func: item => this.deleteCollection(item),
+                    success: (resp, item) => this.successfullyDeleted(resp, item),
+                    failure: (err, item) => this.unsuccessfullyDeleted(err, item)
+                }
+            ],
+            showNewRow: false,
+            dummystuff: 0
         }
     },
     methods: {
@@ -87,8 +97,19 @@ export default {
             })
           })
           this.showNewRow = false
-        }
+        },
+        deleteCollection(item) {
+            this.$store.dispatch('collections/deleteCollection', {apiCollection: item})
+        },
+        successfullyDeleted(resp,item) {
+            this.dummystuff = 1
+        },
+        unsuccessfullyDeleted(resp,item) {
 
+        },
+        isValid(item) {
+            return true
+        }  
     },
     computed: {
         ...mapState('collections', ['apiCollections', 'loading']),

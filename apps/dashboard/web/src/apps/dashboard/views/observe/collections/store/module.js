@@ -25,6 +25,9 @@ const collections = {
         },
         CREATE_COLLECTION (state, {apiCollections}) {
             state.apiCollections.push(apiCollections[0])
+        },
+        DELETE_COLLECTION (state, apiCollectionId) {
+            state.apiCollections.splice(state.apiCollections.indexOf(apiCollectionId),1)
         }
     },
     actions: {
@@ -44,6 +47,19 @@ const collections = {
         createCollection({commit}, {name}, options) {
             return api.createCollection(name).then((resp) => {
                 commit('CREATE_COLLECTION', resp, options)
+            }).catch(() => {
+            })
+        },
+        deleteCollection({commit}, apiCollection, options) {
+            //console.log(apiCollection.apiCollection.id)
+            console.log(state.apiCollections)
+            console.log(state.apiCollections[1])
+            console.log(apiCollection.apiCollection)
+            console.log(state.apiCollections.indexOf(apiCollection.apiCollection))
+            return api.deleteCollection(apiCollection.apiCollection.id).then((resp) => {
+                console.log(indexOf(apiCollection.apiCollection))
+                state.apiCollections.splice(state.apiCollections.indexOf(apiCollection.apiCollection),1)
+                // console.log(state.apiCollections)
             }).catch(() => {
             })
         }
