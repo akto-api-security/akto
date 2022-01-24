@@ -27,7 +27,8 @@ const collections = {
             state.apiCollections.push(apiCollections[0])
         },
         DELETE_COLLECTION (state, apiCollectionId) {
-            state.apiCollections.splice(state.apiCollections.indexOf(apiCollectionId),1)
+            const index = state.apiCollections.findIndex(collection => collection.id === apiCollectionId)
+            state.apiCollections.splice(index,1)
         }
     },
     actions: {
@@ -51,15 +52,8 @@ const collections = {
             })
         },
         deleteCollection({commit}, apiCollection, options) {
-            //console.log(apiCollection.apiCollection.id)
-            console.log(state.apiCollections)
-            console.log(state.apiCollections[1])
-            console.log(apiCollection.apiCollection)
-            console.log(state.apiCollections.indexOf(apiCollection.apiCollection))
             return api.deleteCollection(apiCollection.apiCollection.id).then((resp) => {
-                console.log(indexOf(apiCollection.apiCollection))
-                state.apiCollections.splice(state.apiCollections.indexOf(apiCollection.apiCollection),1)
-                // console.log(state.apiCollections)
+                commit('DELETE_COLLECTION', apiCollection.apiCollection.id, options)
             }).catch(() => {
             })
         }
