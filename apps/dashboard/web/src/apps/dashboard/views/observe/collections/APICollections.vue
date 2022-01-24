@@ -81,7 +81,7 @@ export default {
                 }
             ],
             showNewRow: false,
-            dummystuff: 0
+            deletedCollection: null
         }
     },
     methods: {
@@ -99,16 +99,34 @@ export default {
           this.showNewRow = false
         },
         deleteCollection(item) {
-            this.$store.dispatch('collections/deleteCollection', {apiCollection: item})
+            this.deletedCollection = item.name
+            if(confirm("Are you sure you want to delete this collection?")) {
+                const summ = this.$store.dispatch('collections/deleteCollection', {apiCollection: item})
+                console.log(summ)
+                return summ
+            }
         },
         successfullyDeleted(resp,item) {
-            this.dummystuff = 1
+            window._AKTO.$emit('SHOW_SNACKBAR', {
+                show: true,
+                text: `${this.deletedCollection}` + ` deleted successfully!`,
+                color: 'green'
+            })
+            this.deletedCollection = null
         },
         unsuccessfullyDeleted(resp,item) {
-
+            window._AKTO.$emit('SHOW_SNACKBAR', {
+                show: true,
+                text: `${this.deletedCollection}` + ` could not be deleted`,
+                color: 'red'
+            })
+            this.deletedCollection = null
         },
         isValid(item) {
-            return true
+            if(item.id != 0)
+                return true;
+            else
+                return false;
         }  
     },
     computed: {

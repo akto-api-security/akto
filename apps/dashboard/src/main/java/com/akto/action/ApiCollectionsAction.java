@@ -1,6 +1,5 @@
 package com.akto.action;
 
-import java.io.Console;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -38,6 +37,9 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String deleteCollection() {
+        if(apiCollectionId == 0) {
+            return Action.SUCCESS.toUpperCase();
+        }
         ApiCollectionsDao.instance.deleteAll(Filters.eq("_id", apiCollectionId));
         SingleTypeInfoDao.instance.deleteAll(Filters.eq("apiCollectionId", apiCollectionId));
         APISpecDao.instance.deleteAll(Filters.eq("apiCollectionId", apiCollectionId));
