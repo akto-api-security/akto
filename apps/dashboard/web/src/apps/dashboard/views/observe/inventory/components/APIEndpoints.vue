@@ -17,7 +17,8 @@
                         </template>
                         Download OpenAPI file
                     </v-tooltip>
-                    <upload-file fileFormat="*.har" @fileChanged="handleFileChange" label="HAR"/>
+                    <upload-file fileFormat=".har" @fileChanged="handleFileChange" label="HAR"/>
+                    <upload-file fileFormat=".pcap" @fileChanged="handleFileChange" label="PCAP"/>
                 </div>
             </template>
             <template slot="All">
@@ -192,7 +193,7 @@ export default {
         isUnused(url, method) {
             return this.allEndpoints.filter(e => e.endpoint === url && e.method == method).length == 0
         },
-        handleFileChange(file) {
+        handleFileChange({file, label}) {
             if (!file) {
                 this.content = null
             } else {
@@ -200,9 +201,22 @@ export default {
                 
                 // Use the javascript reader object to load the contents
                 // of the file in the v-model prop
-                reader.readAsText(file);
-                reader.onload = () => {
-                    this.$store.dispatch('inventory/uploadHarFile', { content: JSON.parse(reader.result), filename: file.name})
+
+                if (label === "HAR") {
+                    reader.readAsText(file)
+                } else if (label === "PCAP") {
+                    reader.readAsArrayBuffer(new Blob([file]))
+                }
+                reader.onload = async () => {
+                    let skipKafka = window.location.href.indexOf("http://localhost") != -1
+                    if (label === "HAR") {
+                        await this.$store.dispatch('inventory/uploadHarFile', { content: JSON.parse(reader.result), filename: file.name, skipKafka})
+                    } else if (label === "PCAP") {
+                        var arrayBuffer = reader.result
+                        var bytes = new Uint8Array(arrayBuffer);
+
+                        await api.uploadTcpFile([...bytes], this.apiCollectionId, skipKafka)
+                    }
                 }
             }
         },

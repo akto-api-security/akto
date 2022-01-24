@@ -44,7 +44,7 @@ export default {
       onFilePicked (event) {
         const files = event.target.files
         
-        this.$emit("fileChanged", files[0])
+        this.$emit("fileChanged", {file: files[0], label: this.label})
       }
     }
 }

@@ -21,12 +21,21 @@ export default {
             }
         })
     },
-    uploadHarFile(content, apiCollectionId) {
+    uploadHarFile(content, apiCollectionId, skipKafka) {
         return request({
             url: '/api/uploadHar',
             method: 'post',
             data: {
-                content, apiCollectionId
+                content, apiCollectionId, skipKafka
+            }
+        })
+    },
+    uploadTcpFile(content, apiCollectionId, skipKafka) {
+        return request({
+            url: '/api/uploadTcp',
+            method: 'post',
+            data: {
+                tcpContent: content, apiCollectionId, skipKafka
             }
         })
     },
@@ -93,6 +102,17 @@ export default {
             url: '/api/loadSensitiveParameters',
             method: 'post',
             data: {}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    fetchEndpointTrafficData (url, apiCollectionId, method, startEpoch, endEpoch) {
+        return request({
+            url: '/api/fetchEndpointTrafficData',
+            method: 'post',
+            data: {
+                url, apiCollectionId, method, startEpoch, endEpoch
+            }
         }).then((resp) => {
             return resp
         })
