@@ -65,3 +65,10 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY-api-runtime:$IMAGE_TAG
           echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-api-runtime:$IMAGE_TAG"
        
+      - name: Deploy to AWS CloudFormation
+        uses: aws-actions/aws-cloudformation-github-deploy@v1
+        with:
+          name: ${{ instance-github.sha }}
+          template: https://cf-templates-3jie41lht0xk-us-east-1.s3.amazonaws.com/templates/akto-instance-template.json
+          no-fail-on-empty-changeset: "1"
+          parameter-overrides: "VPC=vpc-6d399810&SubnetId=subnet-e79809b8"
