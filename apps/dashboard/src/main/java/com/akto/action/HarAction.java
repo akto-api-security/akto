@@ -41,7 +41,7 @@ public class HarAction extends UserAction {
         for(int i = 1; i < 2;i++) {
             try {
                 HAR har = new HAR();
-                harString = origHarString.replaceAll("2022-01-03", "2022-01-" + (i>9?i:("0"+i)));
+                harString = origHarString;//.replaceAll("2022-01-03", "2022-01-" + (i>9?i:("0"+i)));
 
                 List<String> messages = har.getMessages(harString, apiCollectionId);
                 harErrors = har.getErrors();
