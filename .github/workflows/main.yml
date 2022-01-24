@@ -71,4 +71,4 @@ jobs:
           name: ${{ github.sha }}
           template: https://cf-templates-3jie41lht0xk-us-east-1.s3.amazonaws.com/templates/akto-instance-template.json
           no-fail-on-empty-changeset: "1"
-          parameter-overrides: "VPC=vpc-6d399810&SubnetId=subnet-e79809b8"
+          parameter-overrides: "VPC=vpc-6d399810,SubnetId=subnet-e79809b8"
