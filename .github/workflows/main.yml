@@ -91,7 +91,7 @@ jobs:
       - name: DockerHub login
         if: ${{ github.event.inputs.Environment == 'prod' }}
         env:
-          DOCKER_USER: ${{secrets.DOCKER_USERNAME}}
+          DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
           DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
         run: |
           docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD 
