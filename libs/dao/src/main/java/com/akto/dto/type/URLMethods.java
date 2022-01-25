@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.akto.dto.traffic.TrafficInfo;
+
 public class URLMethods {
 
     public enum Method {
@@ -52,6 +54,14 @@ public class URLMethods {
             ret.addAll(requestTemplate.getAllTypeInfo());
         }
 
+        return ret;
+    }
+
+    public List<TrafficInfo> removeAllTrafficInfo(int apiCollectionId, String url) {
+        List<TrafficInfo> ret = new ArrayList<>();
+        for(Map.Entry<Method, RequestTemplate> entry: methodToRequestTemplate.entrySet()) {
+            ret.addAll(entry.getValue().removeAllTrafficInfo(apiCollectionId, url, entry.getKey(), -1));
+        }
         return ret;
     }
 }

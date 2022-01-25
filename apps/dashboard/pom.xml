@@ -46,6 +46,11 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>com.akto.apps.api-runtime</groupId>
+            <artifactId>api-runtime</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>com.akto.libs.dao</groupId>
             <artifactId>dao</artifactId>
             <version>${project.version}</version>
