@@ -48,14 +48,17 @@ const collections = {
         createCollection({commit}, {name}, options) {
             return api.createCollection(name).then((resp) => {
                 commit('CREATE_COLLECTION', resp, options)
-            }).catch(() => {
-            })
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: `${name} ` +`added successfully!`,
+                    color: 'green'
+                })
+            }).catch((err) => {})
         },
         deleteCollection({commit}, apiCollection, options) {
             return api.deleteCollection(apiCollection.apiCollection.id).then((resp) => {
                 commit('DELETE_COLLECTION', apiCollection.apiCollection.id, options)
-            }).catch(() => {
-            })
+            }).catch((err) => {})
         }
     },
     getters: {

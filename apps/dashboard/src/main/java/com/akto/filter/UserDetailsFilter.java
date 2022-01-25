@@ -2,9 +2,11 @@ package com.akto.filter;
 
 import com.akto.action.AccessTokenAction;
 import com.akto.action.ProfileAction;
+import com.akto.dao.ApiTokensDao;
 import com.akto.dao.SignupDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiToken;
 import com.akto.dto.SignupUserInfo;
 import com.akto.dto.User;
 import com.akto.utils.JWT;
@@ -56,13 +58,41 @@ public class UserDetailsFilter implements Filter {
         HttpServletResponse httpServletResponse = (HttpServletResponse) servletResponse;
         String accessTokenFromResponse = httpServletResponse.getHeader(AccessTokenAction.ACCESS_TOKEN_HEADER_NAME);
         String accessTokenFromRequest = httpServletRequest.getHeader(AccessTokenAction.ACCESS_TOKEN_HEADER_NAME);
-        if ("null".equalsIgnoreCase(accessTokenFromRequest)) {
-            accessTokenFromRequest = null;
-        }
+        String requestURI = httpServletRequest.getRequestURI();
 
-        String accessToken = accessTokenFromResponse;
-        if (accessToken == null) {
-            accessToken = accessTokenFromRequest;
+        // get api key header
+        String apiKey = httpServletRequest.getHeader("X-API-KEY");
+        String accessToken;
+
+        // if api key present then check if valid api key or not and generate access token
+        // else find access token from request header
+        if (apiKey != null) {
+            // check if valid key for path
+            ApiToken apiToken = ApiTokensDao.instance.findByKeyForPath(apiKey,requestURI);
+            if (apiToken == null) {
+                httpServletResponse.sendError(403);
+                return;
+            }
+            Context.accountId.set(apiToken.getAccountId());
+
+            // convert apiKey to accessToken
+            try {
+                accessToken = Token.generateAccessToken(apiToken.getUsername(),"true");
+            } catch (Exception e) {
+                e.printStackTrace();
+                httpServletResponse.sendError(403);
+                return;
+            }
+
+        } else {
+            if ("null".equalsIgnoreCase(accessTokenFromRequest)) {
+                accessTokenFromRequest = null;
+            }
+
+            accessToken = accessTokenFromResponse;
+            if (accessToken == null) {
+                accessToken = accessTokenFromRequest;
+            }
         }
 
         String username, signedUp;
@@ -72,7 +102,7 @@ public class UserDetailsFilter implements Filter {
             username = jws.getBody().get("username").toString();
             signedUp = jws.getBody().get("signedUp").toString();
         } catch (Exception e) {
-             if (httpServletRequest.getRequestURI().contains(API_URI)) {
+             if (requestURI.contains(API_URI)) {
                  ((HttpServletResponse) servletResponse).sendError(403);
                  return ;
              }

@@ -29,6 +29,13 @@ public class ApiCollectionsAction extends UserAction {
 
     private String collectionName;
     public String createCollection() {
+        // unique names
+        ApiCollection sameNameCollection = ApiCollectionsDao.instance.findByName(collectionName);
+        if (sameNameCollection != null){
+            addActionError("Collection names must be unique");
+            return ERROR.toUpperCase();
+        }
+
         ApiCollection apiCollection = new ApiCollection(Context.now(), collectionName,Context.now(),new HashSet<>());
         ApiCollectionsDao.instance.insertOne(apiCollection);
         this.apiCollections = new ArrayList<>();

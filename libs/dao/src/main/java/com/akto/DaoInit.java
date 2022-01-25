@@ -2,6 +2,8 @@ package com.akto;
 
 import com.akto.dto.*;
 import com.akto.dto.notifications.content.Content;
+import com.akto.dto.third_party_access.Credential;
+import com.akto.dto.third_party_access.ThirdPartyAccess;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
@@ -35,16 +37,22 @@ public class DaoInit {
         ClassModel<RBAC> rbacClassModel = ClassModel.builder(RBAC.class).enableDiscriminator(true).build();
         ClassModel<SingleTypeInfo> singleTypeInfoClassModel = ClassModel.builder(SingleTypeInfo.class).enableDiscriminator(true).build();
         ClassModel<KafkaHealthMetric>  kafkaHealthMetricClassModel = ClassModel.builder(KafkaHealthMetric.class).enableDiscriminator(true).build();
+        ClassModel<ThirdPartyAccess>  thirdPartyAccessClassModel = ClassModel.builder(ThirdPartyAccess.class).enableDiscriminator(true).build();
+        ClassModel<Credential>   credentialClassModel = ClassModel.builder(Credential.class).enableDiscriminator(true).build();
+        ClassModel<ApiToken> apiTokenClassModel = ClassModel.builder(ApiToken.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(queueEntryClassModel, configClassModel, 
             signupInfoClassModel, contentClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
-                pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel,singleTypeInfoClassModel).automatic(true).build());
+                pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel,singleTypeInfoClassModel,
+                thirdPartyAccessClassModel, credentialClassModel, apiTokenClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
             new EnumCodec<>(SingleTypeInfo.SubType.class),
             new EnumCodec<>(SingleTypeInfo.SuperType.class),
             new EnumCodec<>(URLMethods.Method.class),
-            new EnumCodec<>(RBAC.Role.class)
+            new EnumCodec<>(RBAC.Role.class),
+            new EnumCodec<>(Credential.Type.class),
+            new EnumCodec<>(ApiToken.Utility.class)
         );
 
         CodecRegistry codecRegistry = fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry, customEnumCodecs);

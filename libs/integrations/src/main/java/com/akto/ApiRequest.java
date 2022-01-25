@@ -65,4 +65,16 @@ public class ApiRequest {
         return common(request);
     }
 
+    public static JsonNode putRequest(Map<String, String> headersMap, String url, String json) {
+        RequestBody body = RequestBody.create( json, MediaType.parse("application/json; charset=utf-8"));
+
+        Request.Builder builder = new Request.Builder().put(body).url(url);
+        for (String key: headersMap.keySet()) {
+            builder.addHeader(key, headersMap.get(key));
+        }
+        Request request = builder.build();
+
+        return common(request);
+    }
+
 }

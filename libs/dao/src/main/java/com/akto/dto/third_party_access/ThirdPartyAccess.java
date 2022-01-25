@@ -1,18 +1,19 @@
 package com.akto.dto.third_party_access;
 
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
+import org.bson.types.ObjectId;
 
 @BsonDiscriminator
 public class ThirdPartyAccess {
-    private int timestamp, owner, id, status;
+    private ObjectId id;
+    private int timestamp, owner, status;
     Credential credential;
 
     public ThirdPartyAccess() {}
 
-    public ThirdPartyAccess(int timestamp, int owner, int id, int status, Credential credential) {
+    public ThirdPartyAccess(int timestamp, int owner, int status, Credential credential) {
         this.timestamp = timestamp;
         this.owner = owner;
-        this.id = id;
         this.status = status;
         this.credential = credential;
     }
@@ -33,14 +34,6 @@ public class ThirdPartyAccess {
         this.owner = owner;
     }
 
-    public int getId() {
-        return id;
-    }
-
-    public void setId(int id) {
-        this.id = id;
-    }
-
     public int getStatus() {
         return status;
     }
@@ -55,5 +48,13 @@ public class ThirdPartyAccess {
 
     public void setCredential(Credential credential) {
         this.credential = credential;
+    }
+
+    public ObjectId getId() {
+        return id;
+    }
+
+    public void setId(ObjectId id) {
+        this.id = id;
     }
 }

@@ -72,9 +72,11 @@ const inventory = {
         emptyState({commit}, payload, options) {
             commit('EMPTY_STATE', payload, options)
         },
-        loadAPICollection({commit}, {apiCollectionId}, options) {
+        loadAPICollection({commit}, {apiCollectionId, shouldLoad}, options) {
             commit('EMPTY_STATE')
-            state.loading = true
+            if (shouldLoad) {
+                state.loading = true
+            }
             return api.getAPICollection(apiCollectionId).then((resp) => {
                 commit('SAVE_API_COLLECTION', {data: resp.data, apiCollectionId: apiCollectionId}, options)
                 api.listAllSensitiveFields().then(allSensitiveFields => {
@@ -95,13 +97,18 @@ const inventory = {
                 return resp
             })
         },
-        uploadHarFile({commit,state},{content,filename}) {
-            return api.uploadHarFile(content,state.apiCollectionId).then(resp => {
+        uploadHarFile({commit,state},{content,filename, skipKafka}) {
+            return api.uploadHarFile(content,state.apiCollectionId,skipKafka).then(resp => {
                 return resp
             })
         },
         downloadOpenApiFile({commit,state}) {
             return api.downloadOpenApiFile(state.apiCollectionId).then(resp => {
+                return resp
+            })
+        },
+        exportToPostman({commit,state}) {
+            return api.exportToPostman(state.apiCollectionId).then(resp => {
                 return resp
             })
         },
