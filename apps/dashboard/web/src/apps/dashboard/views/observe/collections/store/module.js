@@ -25,6 +25,10 @@ const collections = {
         },
         CREATE_COLLECTION (state, {apiCollections}) {
             state.apiCollections.push(apiCollections[0])
+        },
+        DELETE_COLLECTION (state, apiCollectionId) {
+            const index = state.apiCollections.findIndex(collection => collection.id === apiCollectionId)
+            state.apiCollections.splice(index,1)
         }
     },
     actions: {
@@ -49,7 +53,12 @@ const collections = {
                     text: `${name} ` +`added successfully!`,
                     color: 'green'
                 })
-            }).catch(err => {})
+            }).catch((err) => {})
+        },
+        deleteCollection({commit}, apiCollection, options) {
+            return api.deleteCollection(apiCollection.apiCollection.id).then((resp) => {
+                commit('DELETE_COLLECTION', apiCollection.apiCollection.id, options)
+            }).catch((err) => {})
         }
     },
     getters: {

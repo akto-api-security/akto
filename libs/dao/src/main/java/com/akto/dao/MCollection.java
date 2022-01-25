@@ -3,6 +3,7 @@ package com.akto.dao;
 import com.mongodb.client.*;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReplaceOptions;
+import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.InsertManyResult;
 import com.mongodb.client.result.InsertOneResult;
 import org.bson.Document;
@@ -115,6 +116,11 @@ public abstract class MCollection<T> {
     public InsertManyResult insertMany(List<T> elems) {
         return getMCollection().insertMany(elems);
     }
+    
+    public DeleteResult deleteAll(Bson q) {
+        return this.getMCollection().deleteMany(q);
+    }
+ 
 
     public <TResult> Set<TResult> findDistinctFields(String fieldName, Class<TResult> resultClass, Bson filter) {
         DistinctIterable<TResult> r = getMCollection().distinct(fieldName,filter,resultClass);

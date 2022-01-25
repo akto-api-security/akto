@@ -70,8 +70,18 @@ export default {
                     value: "detected"
                 }
             ],
-            actions: [],
-            showNewRow: false
+            actions: [ 
+                {
+                    isValid: item => this.isValid(item),
+                    icon: item => '$fas_trash',
+                    text: item => 'Delete Collection',
+                    func: item => this.deleteCollection(item),
+                    success: (resp, item) => this.successfullyDeleted(resp, item),
+                    failure: (err, item) => this.unsuccessfullyDeleted(err, item)
+                }
+            ],
+            showNewRow: false,
+            deletedCollection: null
         }
     },
     methods: {
@@ -81,8 +91,37 @@ export default {
         createCollection(name) {
           this.$store.dispatch('collections/createCollection', {name})
           this.showNewRow = false
-        }
-
+        },
+        deleteCollection(item) {
+            this.deletedCollection = item.name
+            if(confirm("Are you sure you want to delete this collection?")) {
+                const summ = this.$store.dispatch('collections/deleteCollection', {apiCollection: item})
+                console.log(summ)
+                return summ
+            }
+        },
+        successfullyDeleted(resp,item) {
+            window._AKTO.$emit('SHOW_SNACKBAR', {
+                show: true,
+                text: `${this.deletedCollection}` + ` deleted successfully!`,
+                color: 'green'
+            })
+            this.deletedCollection = null
+        },
+        unsuccessfullyDeleted(resp,item) {
+            window._AKTO.$emit('SHOW_SNACKBAR', {
+                show: true,
+                text: `${this.deletedCollection}` + ` could not be deleted`,
+                color: 'red'
+            })
+            this.deletedCollection = null
+        },
+        isValid(item) {
+            if(item.id != 0)
+                return true;
+            else
+                return false;
+        }  
     },
     computed: {
         ...mapState('collections', ['apiCollections', 'loading']),
