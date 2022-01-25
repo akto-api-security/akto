@@ -18,6 +18,22 @@ public class Token {
     private String username = null;
 
     private String signedUp = "false";
+
+    public static String generateAccessToken(String username, String signedUp) throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
+        Map<String,Object> claims = new HashMap<>();
+        claims.put("username", username);
+        claims.put("signedUp", signedUp);
+
+        return JWT.createJWT(
+                "/home/avneesh/Desktop/akto/dashboard/private.pem",
+                claims,
+                "Akto",
+                "login",
+                Calendar.MINUTE,
+                15
+        );
+
+    }
     
     public Token(String refreshToken) throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
         Jws<Claims> jws = JWT.parseJwt(refreshToken, "/home/avneesh/Desktop/akto/dashboard/public.pem");
@@ -26,18 +42,7 @@ public class Token {
         this.signedUp = jws.getBody().get("signedUp").toString();
         this.refreshToken = refreshToken;
 
-        Map<String,Object> claims = new HashMap<>();
-        claims.put("username", username);
-        claims.put("signedUp", signedUp);
-
-        this.accessToken = JWT.createJWT(
-                "/home/avneesh/Desktop/akto/dashboard/private.pem",
-                claims,
-                "Akto",
-                "login",
-                Calendar.MINUTE,
-                15
-        );
+        this.accessToken = generateAccessToken(this.username, this.signedUp);
     }
 
     public String getAccessToken() {

@@ -79,20 +79,14 @@ export default {
             this.$emit("selectedItem", {type: 1, collectionName: item.name, apiCollectionId: item.id})
         },
         createCollection(name) {
-          this.$store.dispatch('collections/createCollection', {name}).then(resp => {
-            window._AKTO.$emit('SHOW_SNACKBAR', {
-                show: true,
-                text: `${name} ` +`added successfully!`,
-                color: 'green'
-            })
-          })
+          this.$store.dispatch('collections/createCollection', {name})
           this.showNewRow = false
         }
 
     },
     computed: {
         ...mapState('collections', ['apiCollections', 'loading']),
-        apiCollectionsForTable () {
+        apiCollectionsForTable() {
             return this.apiCollections.map(c => {
                 return {
                     ...c,

@@ -11,14 +11,9 @@
         <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Shadow', 'Unused', 'Upload']">
             <template slot="actions-tray">
                 <div class="d-flex jc-end">
-                    <v-tooltip bottom>
-                        <template v-slot:activator="{on,attrs}">
-                            <v-btn v-bind="attrs" v-on="on" icon color="#6200EA" @click="downloadOpenApiFile"><v-icon>$fas_download</v-icon></v-btn>
-                        </template>
-                        Download OpenAPI file
-                    </v-tooltip>
-                    <upload-file fileFormat="*.har" @fileChanged="handleFileChange" label="HAR"/>
                     <v-btn icon color="#6200EA" @click="refreshPage(false)"><v-icon>$fas_sync</v-icon></v-btn>
+                    <upload-file fileFormat=".har,.pcap" @fileChanged="handleFileChange" label=""/>
+                    <icon-menu icon="$fas_download" :items="downloadFileItems"/>
                 </div>
             </template>
             <template slot="All">
@@ -102,6 +97,7 @@ import Spinner from '@/apps/dashboard/shared/components/Spinner'
 import { saveAs } from 'file-saver'
 import UploadFile from '@/apps/dashboard/shared/components/UploadFile'
 import JsonViewer from "@/apps/dashboard/shared/components/JSONViewer"
+import IconMenu from '@/apps/dashboard/shared/components/IconMenu'
 
 
 export default {
@@ -113,7 +109,8 @@ export default {
         SensitiveChipGroup,
         Spinner,
         UploadFile,
-        JsonViewer
+        JsonViewer,
+        IconMenu
     },
     props: {
         apiCollectionId: obj.numR
@@ -171,7 +168,21 @@ export default {
                     value: 'method'
                 }
             ],
-            documentedURLs: {}
+            documentedURLs: {},
+            downloadFileItems: [
+                {
+                    label: "Download OpenAPI Spec",
+                    click: this.downloadOpenApiFile
+                },
+                {
+                    label: "Export to Postman",
+                    click: this.exportToPostman
+                },
+                {
+                    label: "Download CSV file",
+                    click: this.downloadData
+                }
+            ]
         }
     },
     methods: {
@@ -180,6 +191,18 @@ export default {
         },
         groupByEndpoint(listParams) {
             func.groupByEndpoint(listParams)
+        },
+        downloadData() {
+            let headerTextToValueMap = Object.fromEntries(this.tableHeaders.map(x => [x.text, x.value]).filter(x => x[0].length > 0));
+
+            let csv = Object.keys(headerTextToValueMap).join(",")+"\r\n"
+            this.allEndpoints.forEach(i => {
+                csv += Object.values(headerTextToValueMap).map(h => (i[h] || "-")).join(",") + "\r\n"
+            })
+            let blob = new Blob([csv], {
+                type: "application/csvcharset=UTF-8"
+            });
+            saveAs(blob, (this.apiCollectionName || "All endopints") + ".csv");
         },
         prettifyDate(ts) {
             if (ts)
@@ -193,7 +216,7 @@ export default {
         isUnused(url, method) {
             return this.allEndpoints.filter(e => e.endpoint === url && e.method == method).length == 0
         },
-        handleFileChange(file) {
+        handleFileChange({file}) {
             if (!file) {
                 this.content = null
             } else {
@@ -201,9 +224,24 @@ export default {
                 
                 // Use the javascript reader object to load the contents
                 // of the file in the v-model prop
-                reader.readAsText(file);
-                reader.onload = () => {
-                    this.$store.dispatch('inventory/uploadHarFile', { content: JSON.parse(reader.result), filename: file.name})
+                
+                let isHar = file.name.endsWith(".har")
+                let isPcap = file.name.endsWith(".pcap")
+                if (isHar) {
+                    reader.readAsText(file)
+                } else if (isPcap) {
+                    reader.readAsArrayBuffer(new Blob([file]))
+                }
+                reader.onload = async () => {
+                    let skipKafka = window.location.href.indexOf("http://localhost") != -1
+                    if (isHar) {
+                        await this.$store.dispatch('inventory/uploadHarFile', { content: JSON.parse(reader.result), filename: file.name, skipKafka})
+                    } else if (isPcap) {
+                        var arrayBuffer = reader.result
+                        var bytes = new Uint8Array(arrayBuffer);
+
+                        await api.uploadTcpFile([...bytes], this.apiCollectionId, skipKafka)
+                    }
                 }
             }
         },
@@ -213,9 +251,24 @@ export default {
           var blob = new Blob([openApiString], {
             type: "application/json",
           });
-          saveAs(blob, "open_api_" +this.apiCollectionName+ ".json");
+          const fileName = "open_api_" +this.apiCollectionName+ ".json";
+          saveAs(blob, fileName);
+          window._AKTO.$emit('SHOW_SNACKBAR', {
+            show: true,
+            text: fileName + " downloaded !",
+            color: 'green'
+          })
         },
-        handleSwaggerFileUpload() {
+        async exportToPostman() {
+          var result = await this.$store.dispatch('inventory/exportToPostman')
+          window._AKTO.$emit('SHOW_SNACKBAR', {
+            show: true,
+            text: "Exported to Postman!",
+            color: 'green'
+          })
+        },
+
+      handleSwaggerFileUpload() {
             if (!this.swaggerFile) {this.swaggerContent = null}
             var reader = new FileReader();
             

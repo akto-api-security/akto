@@ -97,13 +97,18 @@ const inventory = {
                 return resp
             })
         },
-        uploadHarFile({commit,state},{content,filename}) {
-            return api.uploadHarFile(content,state.apiCollectionId).then(resp => {
+        uploadHarFile({commit,state},{content,filename, skipKafka}) {
+            return api.uploadHarFile(content,state.apiCollectionId,skipKafka).then(resp => {
                 return resp
             })
         },
         downloadOpenApiFile({commit,state}) {
             return api.downloadOpenApiFile(state.apiCollectionId).then(resp => {
+                return resp
+            })
+        },
+        exportToPostman({commit,state}) {
+            return api.exportToPostman(state.apiCollectionId).then(resp => {
                 return resp
             })
         },
