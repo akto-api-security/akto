@@ -25,6 +25,8 @@
                     </v-tooltip>
                     <upload-file fileFormat=".har" @fileChanged="handleFileChange" label="HAR"/>
                     <upload-file fileFormat=".pcap" @fileChanged="handleFileChange" label="PCAP"/>
+                    <upload-file fileFormat=".har,.pcap" @fileChanged="handleFileChange" label=""/>
+                    <icon-menu icon="$fas_download" :items="downloadFileItems"/>
                 </div>
             </template>
             <template slot="All">
@@ -108,6 +110,7 @@ import Spinner from '@/apps/dashboard/shared/components/Spinner'
 import { saveAs } from 'file-saver'
 import UploadFile from '@/apps/dashboard/shared/components/UploadFile'
 import JsonViewer from "@/apps/dashboard/shared/components/JSONViewer"
+import IconMenu from '@/apps/dashboard/shared/components/IconMenu'
 
 
 export default {
@@ -119,7 +122,8 @@ export default {
         SensitiveChipGroup,
         Spinner,
         UploadFile,
-        JsonViewer
+        JsonViewer,
+        IconMenu
     },
     props: {
         apiCollectionId: obj.numR
@@ -177,7 +181,21 @@ export default {
                     value: 'method'
                 }
             ],
-            documentedURLs: {}
+            documentedURLs: {},
+            downloadFileItems: [
+                {
+                    label: "Download OpenAPI Spec",
+                    click: this.downloadOpenApiFile
+                },
+                {
+                    label: "Export to Postman",
+                    click: this.downloadOpenApiFile
+                },
+                {
+                    label: "Download CSV file",
+                    click: this.downloadData
+                }
+            ]
         }
     },
     methods: {
@@ -186,6 +204,18 @@ export default {
         },
         groupByEndpoint(listParams) {
             func.groupByEndpoint(listParams)
+        },
+        downloadData() {
+            let headerTextToValueMap = Object.fromEntries(this.tableHeaders.map(x => [x.text, x.value]).filter(x => x[0].length > 0));
+
+            let csv = Object.keys(headerTextToValueMap).join(",")+"\r\n"
+            this.allEndpoints.forEach(i => {
+                csv += Object.values(headerTextToValueMap).map(h => (i[h] || "-")).join(",") + "\r\n"
+            })
+            let blob = new Blob([csv], {
+                type: "application/csvcharset=UTF-8"
+            });
+            saveAs(blob, (this.apiCollectionName || "All endopints") + ".csv");
         },
         prettifyDate(ts) {
             if (ts)
@@ -199,7 +229,7 @@ export default {
         isUnused(url, method) {
             return this.allEndpoints.filter(e => e.endpoint === url && e.method == method).length == 0
         },
-        handleFileChange({file, label}) {
+        handleFileChange({file}) {
             if (!file) {
                 this.content = null
             } else {
@@ -207,17 +237,19 @@ export default {
                 
                 // Use the javascript reader object to load the contents
                 // of the file in the v-model prop
-
-                if (label === "HAR") {
+                
+                let isHar = file.name.endsWith(".har")
+                let isPcap = file.name.endsWith(".pcap")
+                if (isHar) {
                     reader.readAsText(file)
-                } else if (label === "PCAP") {
+                } else if (isPcap) {
                     reader.readAsArrayBuffer(new Blob([file]))
                 }
                 reader.onload = async () => {
                     let skipKafka = window.location.href.indexOf("http://localhost") != -1
-                    if (label === "HAR") {
+                    if (isHar) {
                         await this.$store.dispatch('inventory/uploadHarFile', { content: JSON.parse(reader.result), filename: file.name, skipKafka})
-                    } else if (label === "PCAP") {
+                    } else if (isPcap) {
                         var arrayBuffer = reader.result
                         var bytes = new Uint8Array(arrayBuffer);
 
