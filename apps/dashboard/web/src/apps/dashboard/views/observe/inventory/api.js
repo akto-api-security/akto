@@ -48,6 +48,15 @@ export default {
             }
         })
     },
+    exportToPostman(apiCollectionId) {
+        return request({
+            url: '/api/createPostmanApi',
+            method: 'post',
+            data: {
+                apiCollectionId
+            }
+        })
+    },
     getAPICollection (apiCollectionId) {
         return request({
             url: '/api/getAPICollection',

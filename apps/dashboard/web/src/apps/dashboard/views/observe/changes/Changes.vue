@@ -23,6 +23,11 @@
             />
         </a-card>
         <layout-with-tabs title="" :tabs="['New endpoints', 'New parameters']">
+            <template slot="actions-tray">
+                <div class="d-flex jc-end">
+                    <v-btn icon color="#6200EA" @click="refreshPage"><v-icon>$fas_sync</v-icon></v-btn>
+                </div>
+            </template>
             <template slot="New endpoints">
                 <simple-table 
                     :headers="endpointHeaders" 
@@ -172,6 +177,9 @@ export default {
 
             this.$router.push(routeObj)
         },
+        refreshPage() {
+            this.$store.dispatch('changes/loadRecentParameters')
+        },
         changesTrend (data) {
             let todayDate = func.todayDate()
             let twoMonthsAgo = func.incrDays(todayDate, -61)
@@ -222,7 +230,7 @@ export default {
         },
     },
     mounted() {
-        this.$store.dispatch('changes/loadRecentParameters')
+        this.refreshPage()
     }    
 
 }

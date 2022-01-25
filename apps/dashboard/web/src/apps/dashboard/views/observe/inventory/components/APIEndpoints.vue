@@ -3,6 +3,7 @@
     <div class="pr-4 api-endpoints" v-else>
         <div>
             <div class="d-flex jc-end">
+                <v-btn icon color="#6200EA" @click="refreshPage(false)"><v-icon>$fas_sync</v-icon></v-btn>
                 <upload-file fileFormat=".har,.pcap" @fileChanged="handleFileChange" label=""/>
                 <icon-menu icon="$fas_download" :items="downloadFileItems"/>
             </div>
@@ -177,7 +178,7 @@ export default {
                 },
                 {
                     label: "Export to Postman",
-                    click: this.downloadOpenApiFile
+                    click: this.exportToPostman
                 },
                 {
                     label: "Download CSV file",
@@ -252,9 +253,24 @@ export default {
           var blob = new Blob([openApiString], {
             type: "application/json",
           });
-          saveAs(blob, "open_api_" +this.apiCollectionName+ ".json");
+          const fileName = "open_api_" +this.apiCollectionName+ ".json";
+          saveAs(blob, fileName);
+          window._AKTO.$emit('SHOW_SNACKBAR', {
+            show: true,
+            text: fileName + " downloaded !",
+            color: 'green'
+          })
         },
-        handleSwaggerFileUpload() {
+        async exportToPostman() {
+          var result = await this.$store.dispatch('inventory/exportToPostman')
+          window._AKTO.$emit('SHOW_SNACKBAR', {
+            show: true,
+            text: "Exported to Postman!",
+            color: 'green'
+          })
+        },
+
+      handleSwaggerFileUpload() {
             if (!this.swaggerFile) {this.swaggerContent = null}
             var reader = new FileReader();
             
@@ -262,6 +278,15 @@ export default {
             reader.onload = () => {
                 this.$store.dispatch('inventory/saveContent', { swaggerContent: JSON.parse(reader.result), filename: this.swaggerFile.name, apiCollectionId : this.apiCollectionId})
             }
+        },
+        refreshPage(shouldLoad) {
+            // if (!this.apiCollection || this.apiCollection.length === 0 || this.$store.state.inventory.apiCollectionId !== this.apiCollectionId) {
+            this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId, shouldLoad: shouldLoad})
+
+            api.getAllUrlsAndMethods(this.apiCollectionId).then(resp => {
+                this.documentedURLs = resp.data || {}
+            })
+            this.$emit('mountedView', {type: 1, apiCollectionId: this.apiCollectionId})
         }
     },
     computed: {
@@ -293,13 +318,7 @@ export default {
         }
     },
     mounted() {
-        if (!this.apiCollection || this.apiCollection.length === 0 || this.$store.state.inventory.apiCollectionId !== this.apiCollectionId) {
-            this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId})
-        }
-        api.getAllUrlsAndMethods(this.apiCollectionId).then(resp => {
-            this.documentedURLs = resp.data || {}
-        })
-        this.$emit('mountedView', {type: 1, apiCollectionId: this.apiCollectionId})
+        this.refreshPage(true)
     }
 }
 </script>

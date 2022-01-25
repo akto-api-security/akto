@@ -1,9 +1,10 @@
 package com.akto.action;
 
+import com.akto.dao.ApiCollectionsDao;
+import com.akto.dto.ApiCollection;
 import com.akto.har.HAR;
+import com.akto.kafka.Kafka;
 import com.akto.listener.KafkaListener;
-import com.akto.parsers.HttpCallParser;
-import com.akto.parsers.HttpCallParser.HttpResponseParams;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 import com.sun.jna.*;
@@ -14,7 +15,6 @@ import de.sstoehr.harreader.HarReaderException;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -24,55 +24,40 @@ public class HarAction extends UserAction {
     private List<String> harErrors;
     private BasicDBObject content;
     private int apiCollectionId;
+    private String apiCollectionName;
+
     private boolean skipKafka;
     private byte[] tcpContent;
 
     @Override
     public String execute() throws IOException {
+        if (apiCollectionName != null) {
+            ApiCollection apiCollection =  ApiCollectionsDao.instance.findByName(apiCollectionName);
+            if (apiCollectionName == null) return ERROR.toUpperCase();
+            apiCollectionId = apiCollection.getId();
+        }
+
         if (harString == null) {
             harString = this.content.toString();
         }
-        List<HttpResponseParams> responseParams = new ArrayList<>();
-
         String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
         if (topic == null) topic = "akto.api.logs";
         if (harString == null) return ERROR.toUpperCase();
-        String origHarString = harString;
-        for(int i = 1; i < 2;i++) {
-            try {
-                HAR har = new HAR();
-                harString = origHarString;//.replaceAll("2022-01-03", "2022-01-" + (i>9?i:("0"+i)));
-
-                List<String> messages = har.getMessages(harString, apiCollectionId);
-                harErrors = har.getErrors();
-                for (String message: messages){
-                    
-                    try {
-                        
-                        for(int j = 0; j < 1; j++) {
-                            responseParams.add(HttpCallParser.parseKafkaMessage(message));
-                            if (!skipKafka) {
-                                KafkaListener.kafka.send(message,topic);
-                            }
-                        }
-                        
-                    } catch (Exception e) {
-                        // TODO Auto-generated catch block
-                        e.printStackTrace();
-                    }                
+        try {
+            HAR har = new HAR();
+            List<String> messages = har.getMessages(harString, apiCollectionId);
+            harErrors = har.getErrors();
+            for (String message: messages){
+                if (message.length() < 0.8 * Kafka.BATCH_SIZE_CONFIG) {
+                    KafkaListener.kafka.send(message,topic);
+                } else {
+                    harErrors.add("Message too big size: " + message.length());
                 }
-
-            } catch (HarReaderException e) {
-                e.printStackTrace();
-                return SUCCESS.toUpperCase();
             }
+        } catch (HarReaderException e) {
+            e.printStackTrace();
+            return SUCCESS.toUpperCase();
         }
-
-        if (skipKafka) {
-            HttpCallParser parser = new HttpCallParser("access-token", 1, 1, 60);
-            parser.syncFunction(responseParams);    
-        }
-
         return SUCCESS.toUpperCase();
     }
 
@@ -86,6 +71,10 @@ public class HarAction extends UserAction {
 
     public void setHarString(String harString) {
         this.harString = harString;
+    }
+
+    public void setApiCollectionName(String apiCollectionName) {
+        this.apiCollectionName = apiCollectionName;
     }
 
     public List<String> getHarErrors() {
