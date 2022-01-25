@@ -70,7 +70,7 @@ public class PostmanAction extends UserAction {
         if (postmanCredential == null) return ERROR.toUpperCase();
 
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq("_id", apiCollectionId));
-        String apiName = apiCollection.getName();
+        String apiName = "AKTO " + apiCollection.getName();
 
         Set<String> allEndpoints = SingleTypeInfoDao.instance.getUniqueEndpoints(apiCollectionId);
         OpenAPI openAPI = com.akto.open_api.Main.init(apiCollectionId, new ArrayList<>(allEndpoints));

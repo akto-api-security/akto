@@ -120,7 +120,7 @@ public class Main {
 
     public void createApiWithSchema(String workspaceId, String apiName, Map<String, String> openApiSchemaMap) {
         // Get akto_<collectionName> API
-        String url = BASE_URL +  "apis?name=" + apiName; // TODO: created by me
+        String url = BASE_URL +  "apis?name=" + apiName + "&" + "workspace=" + workspaceId; // TODO: created by me
         JsonNode jsonNode = ApiRequest.getRequest(generateHeadersWithAuth(), url);
         JsonNode apisNode = jsonNode.get("apis"); // TODO:
         String apiId;
