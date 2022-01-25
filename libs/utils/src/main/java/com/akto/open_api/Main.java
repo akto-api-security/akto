@@ -1,15 +1,12 @@
 package com.akto.open_api;
 
-import com.akto.DaoInit;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.type.SingleTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
 import com.fasterxml.jackson.databind.introspect.JacksonAnnotationIntrospector;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.PathItem;
@@ -47,9 +44,9 @@ public class Main {
 
     }
 
-    public static OpenAPI init(int apiCollectionId) throws Exception {
+    public static OpenAPI init(int apiCollectionId, List<String> uniqueUrls) throws Exception {
         OpenAPI openAPI = new OpenAPI();
-        addPaths(openAPI, apiCollectionId);
+        addPaths(openAPI, apiCollectionId, uniqueUrls);
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("_id", apiCollectionId);
         if (apiCollection == null) {
             addInfo(openAPI,"Invalid apiCollectionId");
@@ -63,19 +60,8 @@ public class Main {
     }
 
 
-    public static void main(String[] args) throws Exception{
-        String mongoURI = "mongodb://avneesh:UkhcXqXc74w6K9V@cluster0-shard-00-00.4s18x.mongodb.net:27017,cluster0-shard-00-01.4s18x.mongodb.net:27017,cluster0-shard-00-02.4s18x.mongodb.net:27017/myFirstDatabase?ssl=true&replicaSet=atlas-k5j1ae-shard-0&authSource=admin&retryWrites=true&w=majority";
-        DaoInit.init(new ConnectionString(mongoURI));
-        Context.accountId.set(1_000_000);
-
-        OpenAPI openAPI = init(0);
-        String f = convertOpenApiToJSON(openAPI);
-        System.out.println(f);
-    }
-
-    public static void addPaths(OpenAPI openAPI, int apiCollectionId) {
+    public static void addPaths(OpenAPI openAPI, int apiCollectionId, List<String> uniqueUrls) {
         Paths paths = new Paths();
-        List<String> uniqueUrls = SingleTypeInfoDao.instance.getUniqueValues();
         for (String url: uniqueUrls) {
             Map<String, Map<Integer, List<SingleTypeInfo>>> stiMap = getCorrespondingSingleTypeInfo(url,apiCollectionId);
             buildPathsFromSingleTypeInfosPerUrl(stiMap, url, paths);

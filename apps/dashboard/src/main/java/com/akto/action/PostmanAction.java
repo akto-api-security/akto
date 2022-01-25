@@ -1,9 +1,8 @@
 package com.akto.action;
 
 import com.akto.ApiRequest;
-import com.akto.dao.APISpecDao;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.ThirdPartyAccessDao;
+import com.akto.DaoInit;
+import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.APISpec;
 import com.akto.dto.ApiCollection;
@@ -15,14 +14,13 @@ import com.akto.postman.Main;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.ReplaceOptions;
+import io.swagger.v3.oas.models.OpenAPI;
 import org.json.JSONObject;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 
 public class PostmanAction extends UserAction {
     private static final ObjectMapper mapper = new ObjectMapper();
@@ -67,20 +65,29 @@ public class PostmanAction extends UserAction {
 
 
     private int apiCollectionId;
-    public String createPostmanApi() {
+    public String createPostmanApi() throws Exception { // TODO: remove exception
         PostmanCredential postmanCredential = fetchPostmanCredential();
         if (postmanCredential == null) return ERROR.toUpperCase();
 
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq("_id", apiCollectionId));
         String apiName = apiCollection.getName();
 
-        OpenApiAction openApiAction = new OpenApiAction();
-        openApiAction.setApiCollectionId(apiCollectionId);
-        openApiAction.execute();
-        String openApiSchema = openApiAction.getOpenAPIString();
+        Set<String> allEndpoints = SingleTypeInfoDao.instance.getUniqueEndpoints(apiCollectionId);
+        OpenAPI openAPI = com.akto.open_api.Main.init(apiCollectionId, new ArrayList<>(allEndpoints));
+        String openAPIStringAll = com.akto.open_api.Main.convertOpenApiToJSON(openAPI);
+
+        Set<String> sensitiveEndpoints = SingleTypeInfoDao.instance.getSensitiveEndpoints(apiCollectionId);
+        Set<String> customSensitiveEndpoints = SensitiveParamInfoDao.instance.getUniqueEndpoints(apiCollectionId);
+        sensitiveEndpoints.addAll(customSensitiveEndpoints);
+        openAPI = com.akto.open_api.Main.init(apiCollectionId, new ArrayList<>(sensitiveEndpoints));
+        String openAPIStringSensitive = com.akto.open_api.Main.convertOpenApiToJSON(openAPI);
 
         Main main = new Main(postmanCredential.getApiKey());
-        main.createApiWithSchema(postmanCredential.getWorkspaceId(),apiName, openApiSchema);
+        Map<String, String> openApiSchemaMap = new HashMap<>();
+        openApiSchemaMap.put("All", openAPIStringAll);
+        openApiSchemaMap.put("Sensitive", openAPIStringSensitive);
+
+        main.createApiWithSchema(postmanCredential.getWorkspaceId(),apiName, openApiSchemaMap);
 
         return SUCCESS.toUpperCase();
     }
@@ -91,7 +98,6 @@ public class PostmanAction extends UserAction {
 
     private String postmanCollectionId;
     public String savePostmanCollection() {
-        // {"postmanCollectionId":"17608338-49f72f29-ef37-404f-a8ac-374fba8c8ab0"}
         int userId = getSUser().getId();
         PostmanCredential postmanCredential = fetchPostmanCredential();
         if (postmanCredential == null) return ERROR.toUpperCase();
@@ -102,7 +108,11 @@ public class PostmanAction extends UserAction {
         String collectionName = postmanCollection.get("collection").get("info").get("name").asText();
         String postmanCollectionString = postmanCollection.get("collection").toString();
 
-        String url =  "http://localhost:3000/api/postman/endpoints";
+        String node_url = System.getenv("AKTO_NODE_URL");
+        if (node_url == null) {
+            // TODO:
+        }
+        String url =  node_url+ "/api/postman/endpoints";
 
         JSONObject requestBody = new JSONObject();
         requestBody.put("postman_string", postmanCollectionString);
@@ -115,6 +125,16 @@ public class PostmanAction extends UserAction {
         APISpec apiSpec = new APISpec(APISpec.Type.JSON, userId,collectionName,open_api_from_postman, apiCollectionId);
         APISpecDao.instance.replaceOne(Filters.eq("apiCollectionId", apiCollectionId), apiSpec);
 
+        return SUCCESS.toUpperCase();
+    }
+
+    private final BasicDBObject postmanCred = new BasicDBObject();
+    public String fetchPostmanCred() {
+        PostmanCredential postmanCredential = fetchPostmanCredential();
+        if (postmanCredential != null) {
+            postmanCred.put("api_key",postmanCredential.getApiKey());
+            postmanCred.put("workspace_id",postmanCredential.getWorkspaceId());
+        }
         return SUCCESS.toUpperCase();
     }
 
@@ -139,8 +159,8 @@ public class PostmanAction extends UserAction {
     public String fetchWorkspaces() {
         Main main = new Main(api_key);
         JsonNode postmanCollection = main.fetchWorkspaces();
-        if (postmanCollection == null) return ERROR.toUpperCase();
         workspaces = new ArrayList<>();
+        if (postmanCollection == null) return SUCCESS.toUpperCase();
         Iterator<JsonNode> a = postmanCollection.elements();
         while (a.hasNext()) {
             JsonNode node = a.next();
@@ -165,7 +185,6 @@ public class PostmanAction extends UserAction {
         while (a.hasNext()) {
             JsonNode node = a.next();
             BasicDBObject collection = new BasicDBObject();
-            System.out.println(node.toString());
             collection.put("uid", node.get("uid").asText());
             collection.put("name", node.get("name").asText());
             collections.add(collection);
@@ -184,5 +203,9 @@ public class PostmanAction extends UserAction {
 
     public List<BasicDBObject> getWorkspaces() {
         return workspaces;
+    }
+
+    public BasicDBObject getPostmanCred() {
+        return postmanCred;
     }
 }

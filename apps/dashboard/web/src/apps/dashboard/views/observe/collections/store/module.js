@@ -44,8 +44,12 @@ const collections = {
         createCollection({commit}, {name}, options) {
             return api.createCollection(name).then((resp) => {
                 commit('CREATE_COLLECTION', resp, options)
-            }).catch(() => {
-            })
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: `${name} ` +`added successfully!`,
+                    color: 'green'
+                })
+            }).catch(err => {})
         }
     },
     getters: {

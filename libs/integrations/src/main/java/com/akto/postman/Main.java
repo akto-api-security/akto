@@ -4,8 +4,7 @@ import com.akto.ApiRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.json.JSONObject;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 
 public class Main {
@@ -21,7 +20,8 @@ public class Main {
 //        main.fetchWorkspaces();
         String workspaceId = "d0510f32-2e14-4f87-8024-b85bd85de3f1";
         String collectionId = "223645de-9ede-4f12-93c4-1dcf80487ee6";
-//        main.createApiWithSchema();
+
+//        main.createApiWithSchema(workspaceId,"Test", );
 //        String apiId = main.createApi(workspaceId,"sixth API");
 //        System.out.println(apiId);
     }
@@ -50,37 +50,99 @@ public class Main {
         return apiId;
     }
 
-    public String getVersion(String apiId) {
+    public Map<String,String> getVersion(String apiId, Set<String> versionNameList) {
         String url = BASE_URL + "apis/"+apiId+"/versions";
         JsonNode node = ApiRequest.getRequest(generateHeadersWithAuth(), url);
-        String version = node.get("versions").get(0).get("id").textValue();
-        return version;
+        Iterator<JsonNode> versionNodes = node.get("versions").elements();
+        Map<String, String> versionNameIdMap = new HashMap<>();
+        for (String name: versionNameList) {
+            versionNameIdMap.put(name, null);
+        }
+        while (versionNodes.hasNext()) {
+            JsonNode n = versionNodes.next();
+            String versionName = n.get("name").textValue();
+            for (String v: versionNameList) {
+                if (versionName.equals(v)) {
+                    versionNameIdMap.put(v, n.get("id").textValue());
+                }
+            }
+        }
+
+        for (String name: versionNameIdMap.keySet()) {
+            if (versionNameIdMap.get(name) == null) {
+                // create version
+                String vId = createVersion(name, apiId);
+                versionNameIdMap.put(name, vId);
+            }
+        }
+
+
+        return versionNameIdMap;
+    }
+
+    public String createVersion(String versionName, String apiId) {
+        String url = BASE_URL +  "apis/" + apiId + "/versions"; // TODO: created by me
+
+        JSONObject child = new JSONObject();
+        child.put("name", versionName);
+        JSONObject requestBody = new JSONObject();
+        requestBody.put("version", child);
+        String json = requestBody.toString();
+
+        JsonNode jsonNode = ApiRequest.postRequest(generateHeadersWithAuth(),url,json);
+
+        return jsonNode.get("version").get("id").textValue();
     }
 
     public void addSchema(String apiId, String version, String openApiSchema) {
-        String url = BASE_URL + "apis/"+apiId+"/versions/" + version + "/schemas";
+        String url1 = BASE_URL + "apis/" + apiId + "/versions/" + version;
+        JsonNode getNode = ApiRequest.getRequest(generateHeadersWithAuth(),url1);
+        Iterator<JsonNode> versions = getNode.get("version").get("schema").elements();
 
         JSONObject child = new JSONObject();
         child.put("language", "json");
         child.put("schema", openApiSchema);
         child.put("type", "openapi3");
-
         JSONObject requestBody = new JSONObject();
         requestBody.put("schema", child);
-
         String json = requestBody.toString();
 
-//        String json = "{\"schema\": { \"language\": \"json\", \"schema\": \"{   \\\"openapi\\\" : \\\"3.0.1\\\",   \\\"info\\\" : {     \\\"title\\\" : \\\"Default\\\",     \\\"description\\\" : \\\"Akto generated openAPI file\\\",     \\\"version\\\" : \\\"1.0.0\\\"   },   \\\"paths\\\" : {     \\\"/v2/pet\\\" : {       \\\"description\\\" : \\\"description\\\",       \\\"put\\\" : {         \\\"summary\\\" : \\\"PUT request for endpoint https://petstore.swagger.io/v2/pet\\\",         \\\"operationId\\\" : \\\"https://petstore.swagger.io/v2/pet-PUT\\\",         \\\"requestBody\\\" : {           \\\"content\\\" : {             \\\"application/json\\\" : {               \\\"schema\\\" : {                 \\\"type\\\" : \\\"object\\\",                 \\\"properties\\\" : {                   \\\"photoUrls\\\" : {                     \\\"type\\\" : \\\"array\\\",                     \\\"items\\\" : {                       \\\"type\\\" : \\\"string\\\"                     }                   },                   \\\"name\\\" : {                     \\\"type\\\" : \\\"string\\\"                   },                   \\\"id\\\" : {                     \\\"type\\\" : \\\"integer\\\",                     \\\"format\\\" : \\\"int32\\\"                   },                   \\\"category\\\" : {                     \\\"type\\\" : \\\"object\\\",                     \\\"properties\\\" : {                       \\\"name\\\" : {                         \\\"type\\\" : \\\"string\\\"                       },                       \\\"id\\\" : {                         \\\"type\\\" : \\\"integer\\\",                         \\\"format\\\" : \\\"int32\\\"                       }                     }                   },                   \\\"tags\\\" : {                     \\\"type\\\" : \\\"array\\\",                     \\\"items\\\" : {                       \\\"type\\\" : \\\"object\\\",                       \\\"properties\\\" : {                         \\\"name\\\" : {                           \\\"type\\\" : \\\"string\\\"                         },                         \\\"id\\\" : {                           \\\"type\\\" : \\\"integer\\\",                           \\\"format\\\" : \\\"int32\\\"                         }                       }                     }                   },                   \\\"status\\\" : {                     \\\"type\\\" : \\\"string\\\"                   }                 },                 \\\"description\\\" : \\\"Sample description\\\"               }             }           }         },         \\\"responses\\\" : {           \\\"200\\\" : {             \\\"description\\\" : \\\"description\\\",             \\\"content\\\" : {               \\\"application/json\\\" : {                 \\\"schema\\\" : {                   \\\"type\\\" : \\\"object\\\",                   \\\"properties\\\" : {                     \\\"photoUrls\\\" : {                       \\\"type\\\" : \\\"array\\\",                       \\\"items\\\" : {                         \\\"type\\\" : \\\"string\\\"                       }                     },                     \\\"name\\\" : {                       \\\"type\\\" : \\\"string\\\"                     },                     \\\"id\\\" : {                       \\\"type\\\" : \\\"integer\\\",                       \\\"format\\\" : \\\"int32\\\"                     },                     \\\"category\\\" : {                       \\\"type\\\" : \\\"object\\\",                       \\\"properties\\\" : {                         \\\"name\\\" : {                           \\\"type\\\" : \\\"string\\\"                         },                         \\\"id\\\" : {                           \\\"type\\\" : \\\"integer\\\",                           \\\"format\\\" : \\\"int32\\\"                         }                       }                     },                     \\\"tags\\\" : {                       \\\"type\\\" : \\\"array\\\",                       \\\"items\\\" : {                         \\\"type\\\" : \\\"object\\\",                         \\\"properties\\\" : {                           \\\"name\\\" : {                             \\\"type\\\" : \\\"string\\\"                           },                           \\\"id\\\" : {                             \\\"type\\\" : \\\"integer\\\",                             \\\"format\\\" : \\\"int32\\\"                           }                         }                       }                     },                     \\\"status\\\" : {                       \\\"type\\\" : \\\"string\\\"                     }                   },                   \\\"description\\\" : \\\"Sample description\\\"                 }               }             }           }         }       },       \\\"post\\\" : {         \\\"summary\\\" : \\\"POST request for endpoint https://petstore.swagger.io/v2/pet\\\",         \\\"operationId\\\" : \\\"https://petstore.swagger.io/v2/pet-POST\\\",         \\\"requestBody\\\" : {           \\\"content\\\" : {             \\\"application/json\\\" : {               \\\"schema\\\" : {                 \\\"type\\\" : \\\"object\\\",                 \\\"properties\\\" : {                   \\\"photoUrls\\\" : {                     \\\"type\\\" : \\\"array\\\",                     \\\"items\\\" : {                       \\\"type\\\" : \\\"string\\\"                     }                   },                   \\\"name\\\" : {                     \\\"type\\\" : \\\"string\\\"                   },                   \\\"id\\\" : {                     \\\"type\\\" : \\\"integer\\\",                     \\\"format\\\" : \\\"int32\\\"                   },                   \\\"category\\\" : {                     \\\"type\\\" : \\\"object\\\",                     \\\"properties\\\" : {                       \\\"name\\\" : {                         \\\"type\\\" : \\\"string\\\"                       },                       \\\"id\\\" : {                         \\\"type\\\" : \\\"integer\\\",                         \\\"format\\\" : \\\"int32\\\"                       }                     }                   },                   \\\"status\\\" : {                     \\\"type\\\" : \\\"string\\\"                   },                   \\\"tags\\\" : {                     \\\"type\\\" : \\\"array\\\",                     \\\"items\\\" : {                       \\\"type\\\" : \\\"object\\\",                       \\\"properties\\\" : {                         \\\"name\\\" : {                           \\\"type\\\" : \\\"string\\\"                         },                         \\\"id\\\" : {                           \\\"type\\\" : \\\"integer\\\",                           \\\"format\\\" : \\\"int32\\\"                         }                       }                     }                   }                 },                 \\\"description\\\" : \\\"Sample description\\\"               }             }           }         },         \\\"responses\\\" : {           \\\"200\\\" : {             \\\"description\\\" : \\\"description\\\",             \\\"content\\\" : {               \\\"application/json\\\" : {                 \\\"schema\\\" : {                   \\\"type\\\" : \\\"object\\\",                   \\\"properties\\\" : {                     \\\"photoUrls\\\" : {                       \\\"type\\\" : \\\"array\\\",                       \\\"items\\\" : {                         \\\"type\\\" : \\\"string\\\"                       }                     },                     \\\"name\\\" : {                       \\\"type\\\" : \\\"string\\\"                     },                     \\\"id\\\" : {                       \\\"type\\\" : \\\"integer\\\",                       \\\"format\\\" : \\\"int32\\\"                     },                     \\\"category\\\" : {                       \\\"type\\\" : \\\"object\\\",                       \\\"properties\\\" : {                         \\\"name\\\" : {                           \\\"type\\\" : \\\"string\\\"                         },                         \\\"id\\\" : {                           \\\"type\\\" : \\\"integer\\\",                           \\\"format\\\" : \\\"int32\\\"                         }                       }                     },                     \\\"status\\\" : {                       \\\"type\\\" : \\\"string\\\"                     },                     \\\"tags\\\" : {                       \\\"type\\\" : \\\"array\\\",                       \\\"items\\\" : {                         \\\"type\\\" : \\\"object\\\",                         \\\"properties\\\" : {                           \\\"name\\\" : {                             \\\"type\\\" : \\\"string\\\"                           },                           \\\"id\\\" : {                             \\\"type\\\" : \\\"integer\\\",                             \\\"format\\\" : \\\"int32\\\"                           }                         }                       }                     }                   },                   \\\"description\\\" : \\\"Sample description\\\"                 }               }             }           }         }       },       \\\"servers\\\" : [ {         \\\"url\\\" : \\\"https://petstore.swagger.io\\\"       } ],       \\\"parameters\\\" : [ ]     },     \\\"/v2/pet/{param1}\\\" : {       \\\"description\\\" : \\\"description\\\",       \\\"post\\\" : {         \\\"summary\\\" : \\\"POST request for endpoint https://petstore.swagger.io/v2/pet/INTEGER\\\",         \\\"operationId\\\" : \\\"https://petstore.swagger.io/v2/pet/INTEGER-POST\\\",         \\\"requestBody\\\" : {           \\\"content\\\" : {             \\\"application/json\\\" : {               \\\"schema\\\" : {                 \\\"type\\\" : \\\"object\\\",                 \\\"properties\\\" : {                   \\\"name\\\" : {                     \\\"type\\\" : \\\"string\\\"                   },                   \\\"status\\\" : {                     \\\"type\\\" : \\\"string\\\"                   }                 },                 \\\"description\\\" : \\\"Sample description\\\"               }             }           }         },         \\\"responses\\\" : {           \\\"404\\\" : {             \\\"description\\\" : \\\"description\\\",             \\\"content\\\" : {               \\\"application/json\\\" : {                 \\\"schema\\\" : {                   \\\"type\\\" : \\\"object\\\",                   \\\"properties\\\" : {                     \\\"code\\\" : {                       \\\"type\\\" : \\\"integer\\\",                       \\\"format\\\" : \\\"int32\\\"                     },                     \\\"message\\\" : {                       \\\"type\\\" : \\\"string\\\"                     },                     \\\"type\\\" : {                       \\\"type\\\" : \\\"string\\\"                     }                   },                   \\\"description\\\" : \\\"Sample description\\\"                 }               }             }           },           \\\"200\\\" : {             \\\"description\\\" : \\\"description\\\",             \\\"content\\\" : {               \\\"application/json\\\" : {                 \\\"schema\\\" : {                   \\\"type\\\" : \\\"object\\\",                   \\\"properties\\\" : {                     \\\"code\\\" : {                       \\\"type\\\" : \\\"integer\\\",                       \\\"format\\\" : \\\"int32\\\"                     },                     \\\"type\\\" : {                       \\\"type\\\" : \\\"string\\\"                     },                     \\\"message\\\" : {                       \\\"type\\\" : \\\"integer\\\",                       \\\"format\\\" : \\\"int32\\\"                     }                   },                   \\\"description\\\" : \\\"Sample description\\\"                 }               }             }           }         }       },       \\\"servers\\\" : [ {         \\\"url\\\" : \\\"https://petstore.swagger.io\\\"       } ],       \\\"parameters\\\" : [ {         \\\"name\\\" : \\\"param1\\\",         \\\"in\\\" : \\\"path\\\",         \\\"required\\\" : true,         \\\"schema\\\" : {           \\\"type\\\" : \\\"integer\\\",           \\\"format\\\" : \\\"int32\\\"         }       } ]     },     \\\"/v2/store/order\\\" : {       \\\"description\\\" : \\\"description\\\",       \\\"post\\\" : {         \\\"summary\\\" : \\\"POST request for endpoint https://petstore.swagger.io/v2/store/order\\\",         \\\"operationId\\\" : \\\"https://petstore.swagger.io/v2/store/order-POST\\\",         \\\"requestBody\\\" : {           \\\"content\\\" : {             \\\"application/json\\\" : {               \\\"schema\\\" : {                 \\\"type\\\" : \\\"object\\\",                 \\\"properties\\\" : {                   \\\"quantity\\\" : {                     \\\"type\\\" : \\\"integer\\\",                     \\\"format\\\" : \\\"int32\\\"                   },                   \\\"petId\\\" : {                     \\\"type\\\" : \\\"integer\\\",                     \\\"format\\\" : \\\"int32\\\"                   },                   \\\"id\\\" : {                     \\\"type\\\" : \\\"integer\\\",                     \\\"format\\\" : \\\"int32\\\"                   },                   \\\"complete\\\" : {                     \\\"type\\\" : \\\"boolean\\\"                   },                   \\\"shipDate\\\" : {                     \\\"type\\\" : \\\"string\\\"                   },                   \\\"status\\\" : {                     \\\"type\\\" : \\\"string\\\"                   }                 },                 \\\"description\\\" : \\\"Sample description\\\"               }             }           }         },         \\\"responses\\\" : {           \\\"200\\\" : {             \\\"description\\\" : \\\"description\\\",             \\\"content\\\" : {               \\\"application/json\\\" : {                 \\\"schema\\\" : {                   \\\"type\\\" : \\\"object\\\",                   \\\"properties\\\" : {                     \\\"petId\\\" : {                       \\\"type\\\" : \\\"integer\\\",                       \\\"format\\\" : \\\"int32\\\"                     },                     \\\"quantity\\\" : {                       \\\"type\\\" : \\\"integer\\\",                       \\\"format\\\" : \\\"int32\\\"                     },                     \\\"id\\\" : {                       \\\"type\\\" : \\\"integer\\\",                       \\\"format\\\" : \\\"int32\\\"                     },                     \\\"shipDate\\\" : {                       \\\"type\\\" : \\\"string\\\"                     },                     \\\"complete\\\" : {                       \\\"type\\\" : \\\"boolean\\\"                     },                     \\\"status\\\" : {                       \\\"type\\\" : \\\"string\\\"                     }                   },                   \\\"description\\\" : \\\"Sample description\\\"                 }               }             }           }         }       },       \\\"servers\\\" : [ {         \\\"url\\\" : \\\"https://petstore.swagger.io\\\"       } ],       \\\"parameters\\\" : [ ]     },     \\\"/v2/user\\\" : {       \\\"description\\\" : \\\"description\\\",       \\\"post\\\" : {         \\\"summary\\\" : \\\"POST request for endpoint https://petstore.swagger.io/v2/user\\\",         \\\"operationId\\\" : \\\"https://petstore.swagger.io/v2/user-POST\\\",         \\\"requestBody\\\" : {           \\\"content\\\" : {             \\\"application/json\\\" : {               \\\"schema\\\" : {                 \\\"type\\\" : \\\"object\\\",                 \\\"properties\\\" : {                   \\\"lastName\\\" : {                     \\\"type\\\" : \\\"string\\\"                   },                   \\\"firstName\\\" : {                     \\\"type\\\" : \\\"string\\\"                   },                   \\\"password\\\" : {                     \\\"type\\\" : \\\"string\\\"                   },                   \\\"userStatus\\\" : {                     \\\"type\\\" : \\\"integer\\\",                     \\\"format\\\" : \\\"int32\\\"                   },                   \\\"phone\\\" : {                     \\\"type\\\" : \\\"string\\\"                   },                   \\\"id\\\" : {                     \\\"type\\\" : \\\"integer\\\",                     \\\"format\\\" : \\\"int32\\\"                   },                   \\\"email\\\" : {                     \\\"type\\\" : \\\"string\\\"                   },                   \\\"username\\\" : {                     \\\"type\\\" : \\\"string\\\"                   }                 },                 \\\"description\\\" : \\\"Sample description\\\"               }             }           }         },         \\\"responses\\\" : {           \\\"200\\\" : {             \\\"description\\\" : \\\"description\\\",             \\\"content\\\" : {               \\\"application/json\\\" : {                 \\\"schema\\\" : {                   \\\"type\\\" : \\\"object\\\",                   \\\"properties\\\" : {                     \\\"code\\\" : {                       \\\"type\\\" : \\\"integer\\\",                       \\\"format\\\" : \\\"int32\\\"                     },                     \\\"message\\\" : {                       \\\"type\\\" : \\\"integer\\\",                       \\\"format\\\" : \\\"int32\\\"                     },                     \\\"type\\\" : {                       \\\"type\\\" : \\\"string\\\"                     }                   },                   \\\"description\\\" : \\\"Sample description\\\"                 }               }             }           }         }       },       \\\"servers\\\" : [ {         \\\"url\\\" : \\\"https://petstore.swagger.io\\\"       } ],       \\\"parameters\\\" : [ ]     },     \\\"/v2/user/{param1}\\\" : {       \\\"description\\\" : \\\"description\\\",       \\\"post\\\" : {         \\\"summary\\\" : \\\"POST request for endpoint https://petstore.swagger.io/v2/user/STRING\\\",         \\\"operationId\\\" : \\\"https://petstore.swagger.io/v2/user/STRING-POST\\\",         \\\"responses\\\" : {           \\\"200\\\" : {             \\\"description\\\" : \\\"description\\\",             \\\"content\\\" : {               \\\"application/json\\\" : {                 \\\"schema\\\" : {                   \\\"type\\\" : \\\"object\\\",                   \\\"properties\\\" : {                     \\\"code\\\" : {                       \\\"type\\\" : \\\"integer\\\",                       \\\"format\\\" : \\\"int32\\\"                     },                     \\\"message\\\" : {                       \\\"type\\\" : \\\"string\\\"                     },                     \\\"type\\\" : {                       \\\"type\\\" : \\\"string\\\"                     }                   },                   \\\"description\\\" : \\\"Sample description\\\"                 }               }             }           }         }       },       \\\"servers\\\" : [ {         \\\"url\\\" : \\\"https://petstore.swagger.io\\\"       } ],       \\\"parameters\\\" : [ {         \\\"name\\\" : \\\"param1\\\",         \\\"in\\\" : \\\"path\\\",         \\\"required\\\" : true,         \\\"schema\\\" : {           \\\"type\\\" : \\\"string\\\"         }       } ]     }   } } \", \"type\": \"openapi3\"  }}";
+        // if version exists update it else create new one
+        if (versions.hasNext()) {
+            String url = BASE_URL + "apis/"+apiId+"/versions/" + version + "/schemas/" + versions.next().textValue();
+            JsonNode node = ApiRequest.putRequest(generateHeadersWithAuth(), url,json);
+        } else {
+            String url = BASE_URL + "apis/"+apiId+"/versions/" + version + "/schemas";
+            JsonNode node = ApiRequest.postRequest(generateHeadersWithAuth(), url,json);
+        }
 
-        // {"schema": { "language": "json", "schema": "", "type": "openapi3"  }}
-
-        JsonNode node = ApiRequest.postRequest(generateHeadersWithAuth(), url,json);
     }
 
-    public void createApiWithSchema(String workspaceId,String apiName, String openApiSchema) {
-        String apiId = createApi(workspaceId,apiName);
-        String version = getVersion(apiId);
-        addSchema(apiId, version, openApiSchema);
+    public void createApiWithSchema(String workspaceId, String apiName, Map<String, String> openApiSchemaMap) {
+        // Get akto_<collectionName> API
+        String url = BASE_URL +  "apis?name=" + apiName; // TODO: created by me
+        JsonNode jsonNode = ApiRequest.getRequest(generateHeadersWithAuth(), url);
+        JsonNode apisNode = jsonNode.get("apis"); // TODO:
+        String apiId;
+
+        if (apisNode.elements().hasNext()) {
+            // get apiId
+            apiId = apisNode.get(0).get("id").textValue();
+        } else {
+            // Create New API
+            apiId = createApi(workspaceId,apiName);
+        }
+
+        // get versions (if not present create them)
+        Map<String, String> apiVersionNameMap = getVersion(apiId,openApiSchemaMap.keySet());
+
+
+        for (String name: apiVersionNameMap.keySet()) {
+            // Finally, replace schema for all versions
+            addSchema(apiId, apiVersionNameMap.get(name), openApiSchemaMap.get(name));
+        }
+
+
 
     }
 

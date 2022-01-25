@@ -218,10 +218,21 @@ export default {
           var blob = new Blob([openApiString], {
             type: "application/json",
           });
-          saveAs(blob, "open_api_" +this.apiCollectionName+ ".json");
+          const fileName = "open_api_" +this.apiCollectionName+ ".json";
+          saveAs(blob, fileName);
+          window._AKTO.$emit('SHOW_SNACKBAR', {
+            show: true,
+            text: fileName + " downloaded !",
+            color: 'green'
+          })
         },
         async exportToPostman() {
           var result = await this.$store.dispatch('inventory/exportToPostman')
+          window._AKTO.$emit('SHOW_SNACKBAR', {
+            show: true,
+            text: "Exported to Postman!",
+            color: 'green'
+          })
         },
 
       handleSwaggerFileUpload() {

@@ -12,9 +12,10 @@ const service = axios.create({
 const err = async (error) => {
   const { status, data } = error.response
   const { errors } = data
-  let message = []
-  for (let field in errors) {
-    message.push(errors[field])
+  const { actionErrors } = data
+  let message = "OOPS! Something went wrong"
+  if (actionErrors !== null && actionErrors !== undefined && actionErrors.length > 0) {
+    message = actionErrors[0]
   }
   switch (status) {
     case 400:

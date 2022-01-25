@@ -1,6 +1,9 @@
 package com.akto.action;
 
+import com.akto.dao.ApiCollectionsDao;
+import com.akto.dto.ApiCollection;
 import com.akto.har.HAR;
+import com.akto.kafka.Kafka;
 import com.akto.listener.KafkaListener;
 import com.mongodb.BasicDBObject;
 
@@ -14,10 +17,17 @@ public class HarAction extends UserAction {
     private List<String> harErrors;
     private BasicDBObject content;
     private int apiCollectionId;
+    private String apiCollectionName;
 
 
     @Override
     public String execute() throws IOException {
+        if (apiCollectionName != null) {
+            ApiCollection apiCollection =  ApiCollectionsDao.instance.findByName(apiCollectionName);
+            if (apiCollectionName == null) return ERROR.toUpperCase();
+            apiCollectionId = apiCollection.getId();
+        }
+
         if (harString == null) {
             harString = this.content.toString();
         }
@@ -29,7 +39,11 @@ public class HarAction extends UserAction {
             List<String> messages = har.getMessages(harString, apiCollectionId);
             harErrors = har.getErrors();
             for (String message: messages){
-                KafkaListener.kafka.send(message,topic);
+                if (message.length() < 0.8 * Kafka.BATCH_SIZE_CONFIG) {
+                    KafkaListener.kafka.send(message,topic);
+                } else {
+                    harErrors.add("Message too big size: " + message.length());
+                }
             }
         } catch (HarReaderException e) {
             e.printStackTrace();
@@ -48,6 +62,10 @@ public class HarAction extends UserAction {
 
     public void setHarString(String harString) {
         this.harString = harString;
+    }
+
+    public void setApiCollectionName(String apiCollectionName) {
+        this.apiCollectionName = apiCollectionName;
     }
 
     public List<String> getHarErrors() {
