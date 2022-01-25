@@ -175,7 +175,7 @@ export default {
                 },
                 {
                     label: "Export to Postman",
-                    click: this.downloadOpenApiFile
+                    click: this.exportToPostman
                 },
                 {
                     label: "Download CSV file",
@@ -250,9 +250,24 @@ export default {
           var blob = new Blob([openApiString], {
             type: "application/json",
           });
-          saveAs(blob, "open_api_" +this.apiCollectionName+ ".json");
+          const fileName = "open_api_" +this.apiCollectionName+ ".json";
+          saveAs(blob, fileName);
+          window._AKTO.$emit('SHOW_SNACKBAR', {
+            show: true,
+            text: fileName + " downloaded !",
+            color: 'green'
+          })
         },
-        handleSwaggerFileUpload() {
+        async exportToPostman() {
+          var result = await this.$store.dispatch('inventory/exportToPostman')
+          window._AKTO.$emit('SHOW_SNACKBAR', {
+            show: true,
+            text: "Exported to Postman!",
+            color: 'green'
+          })
+        },
+
+      handleSwaggerFileUpload() {
             if (!this.swaggerFile) {this.swaggerContent = null}
             var reader = new FileReader();
             

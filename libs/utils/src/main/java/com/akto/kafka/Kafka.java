@@ -6,14 +6,16 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import java.util.Properties;
 
 public class Kafka {
-    private final Properties kafkaProps = new Properties();
+    public static final int BATCH_SIZE_CONFIG = 999900;
     private final KafkaProducer<String, String> producer;
     public Kafka(String brokerIP) {
+        Properties kafkaProps = new Properties();
         kafkaProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, brokerIP);
         kafkaProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         kafkaProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        kafkaProps.put(ProducerConfig.BATCH_SIZE_CONFIG, 16_384 * 400);
+        kafkaProps.put(ProducerConfig.BATCH_SIZE_CONFIG, BATCH_SIZE_CONFIG);
         kafkaProps.put(ProducerConfig.LINGER_MS_CONFIG, 1000);
+        kafkaProps.put(ProducerConfig.RETRIES_CONFIG, 5);
         producer = new KafkaProducer<String, String>(kafkaProps);
     }
 

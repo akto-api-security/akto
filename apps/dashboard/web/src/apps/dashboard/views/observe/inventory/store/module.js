@@ -105,6 +105,11 @@ const inventory = {
                 return resp
             })
         },
+        exportToPostman({commit,state}) {
+            return api.exportToPostman(state.apiCollectionId).then(resp => {
+                return resp
+            })
+        },
         saveContent({ commit, dispatch, state }, {swaggerContent, filename, apiCollectionId}) {
             state.loading = true
             api.saveContent({swaggerContent, filename, apiCollectionId}).then(resp => {

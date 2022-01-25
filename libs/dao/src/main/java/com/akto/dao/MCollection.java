@@ -115,4 +115,14 @@ public abstract class MCollection<T> {
     public InsertManyResult insertMany(List<T> elems) {
         return getMCollection().insertMany(elems);
     }
+
+    public <TResult> Set<TResult> findDistinctFields(String fieldName, Class<TResult> resultClass, Bson filter) {
+        DistinctIterable<TResult> r = getMCollection().distinct(fieldName,filter,resultClass);
+        Set<TResult> result = new HashSet<>();
+        MongoCursor<TResult> cursor = r.cursor();
+        while (cursor.hasNext()) {
+            result.add(cursor.next());
+        }
+        return result;
+    }
 }
