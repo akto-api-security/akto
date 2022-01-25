@@ -22,6 +22,7 @@ import {
   faLock,
   faLockOpen,  
   faAngleUp,
+  faAngleDown,
   faAngleRight,
   faAngleLeft,
   faComments,
@@ -97,7 +98,7 @@ const faIcons = [
   faInfoCircle,faDownload,faFileCsv,faCircle,faThLarge,faStopwatch,faCheckCircle,faEyeSlash,faArrowLeft,faUsers,faChartLine,
   faHome,faBullseye,faBullhorn,faCheckDouble,faSquare,faBolt,faDatabase,faAngleDoubleRight, faAngleDoubleLeft,faClipboardList,
   faUnlockAlt,faStethoscope,faLongArrowAltDown,faLongArrowAltUp,faSyncAlt, faExchangeAlt, faUserLock, faExclamation,faPhoneAlt,
-  faCreditCard,faAddressCard,faChalkboard,faFilter,faKey,faAngleDoubleDown,faAngleDoubleUp,faUpload,faGlobe,
+  faCreditCard,faAddressCard,faChalkboard,faFilter,faKey,faAngleDoubleDown,faAngleDoubleUp,faUpload,faGlobe,faAngleDown,
 
   farComments,farCalendar, farHandPointRight, farBuilding, farStar,farSquare, farCheckSquare,
 

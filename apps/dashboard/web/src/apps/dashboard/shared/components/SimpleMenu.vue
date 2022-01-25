@@ -1,5 +1,5 @@
 <template>
-    <v-menu top offset-x min-width="150" max-width="150">
+    <v-menu bottom offset-x offset-y min-width="150">
         <template v-slot:activator="{on, attrs}">
             <div v-on="on" v-bind="attrs">
                 <slot name="activator2"/>
@@ -63,7 +63,6 @@ export default {
 
 .gray-menu
   background-color: #73728D
-  width: 150px
 
 .active-item
   &:before
