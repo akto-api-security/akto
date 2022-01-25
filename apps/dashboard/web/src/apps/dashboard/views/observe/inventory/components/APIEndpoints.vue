@@ -11,6 +11,7 @@
         <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Shadow', 'Unused', 'Upload']">
             <template slot="actions-tray">
                 <div class="d-flex jc-end">
+                    <v-btn icon color="#6200EA" @click="refreshPage(false)"><v-icon>$fas_sync</v-icon></v-btn>
                     <upload-file fileFormat=".har,.pcap" @fileChanged="handleFileChange" label=""/>
                     <icon-menu icon="$fas_download" :items="downloadFileItems"/>
                 </div>
@@ -275,6 +276,15 @@ export default {
             reader.onload = () => {
                 this.$store.dispatch('inventory/saveContent', { swaggerContent: JSON.parse(reader.result), filename: this.swaggerFile.name, apiCollectionId : this.apiCollectionId})
             }
+        },
+        refreshPage(shouldLoad) {
+            // if (!this.apiCollection || this.apiCollection.length === 0 || this.$store.state.inventory.apiCollectionId !== this.apiCollectionId) {
+            this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId, shouldLoad: shouldLoad})
+
+            api.getAllUrlsAndMethods(this.apiCollectionId).then(resp => {
+                this.documentedURLs = resp.data || {}
+            })
+            this.$emit('mountedView', {type: 1, apiCollectionId: this.apiCollectionId})
         }
     },
     computed: {
@@ -306,13 +316,7 @@ export default {
         }
     },
     mounted() {
-        if (!this.apiCollection || this.apiCollection.length === 0 || this.$store.state.inventory.apiCollectionId !== this.apiCollectionId) {
-            this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId})
-        }
-        api.getAllUrlsAndMethods(this.apiCollectionId).then(resp => {
-            this.documentedURLs = resp.data || {}
-        })
-        this.$emit('mountedView', {type: 1, apiCollectionId: this.apiCollectionId})
+        this.refreshPage(true)
     }
 }
 </script>
