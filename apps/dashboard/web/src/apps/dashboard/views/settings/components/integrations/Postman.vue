@@ -1,8 +1,8 @@
 <template>
   <div style="min-height:200px;margin-bottom:30px">
     <div class="d-flex" style="padding-bottom:10px">
-      <v-avatar size="40px" style="padding-right: 15px">
-        <img src="https://iconape.com/wp-content/png_logo_vector/postman.png">
+      <v-avatar size="40px" style="margin-right: 15px">
+        <img src="@/assets/getpostman-icon.svg"/>
       </v-avatar>
       <h2>Postman</h2>
     </div>
