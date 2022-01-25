@@ -11,20 +11,6 @@
         <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Shadow', 'Unused', 'Upload']">
             <template slot="actions-tray">
                 <div class="d-flex jc-end">
-                  <v-tooltip bottom>
-                    <template v-slot:activator="{on,attrs}">
-                      <v-btn v-bind="attrs" v-on="on" icon color="red" @click="exportToPostman"><v-icon>$fas_download</v-icon></v-btn>
-                    </template>
-                    Export to Postman collection
-                  </v-tooltip>
-                  <v-tooltip bottom>
-                        <template v-slot:activator="{on,attrs}">
-                            <v-btn v-bind="attrs" v-on="on" icon color="#6200EA" @click="downloadOpenApiFile"><v-icon>$fas_download</v-icon></v-btn>
-                        </template>
-                        Download OpenAPI file
-                    </v-tooltip>
-                    <upload-file fileFormat=".har" @fileChanged="handleFileChange" label="HAR"/>
-                    <upload-file fileFormat=".pcap" @fileChanged="handleFileChange" label="PCAP"/>
                     <upload-file fileFormat=".har,.pcap" @fileChanged="handleFileChange" label=""/>
                     <icon-menu icon="$fas_download" :items="downloadFileItems"/>
                 </div>
@@ -189,7 +175,7 @@ export default {
                 },
                 {
                     label: "Export to Postman",
-                    click: this.downloadOpenApiFile
+                    click: this.exportToPostman
                 },
                 {
                     label: "Download CSV file",
