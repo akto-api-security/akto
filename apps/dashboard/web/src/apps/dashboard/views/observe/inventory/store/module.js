@@ -1,6 +1,7 @@
 import Vue from 'vue'
 import Vuex from 'vuex'
 import api from '../api'
+import func from "@/util/func"
 
 
 Vue.use(Vuex)
@@ -34,6 +35,7 @@ const inventory = {
         SAVE_API_COLLECTION (state, info) {
             state.apiCollectionId = info.apiCollectionId
             state.apiCollection = info.data.endpoints.filter(x => x.subType !== "NULL")
+            state.apiCollection.forEach(e => e.url = func.parameterizeUrl(e.url));
             state.apiCollectionName = info.data.name
         },
         TOGGLE_SENSITIVE (state, p) {

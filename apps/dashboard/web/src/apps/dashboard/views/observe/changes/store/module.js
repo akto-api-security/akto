@@ -1,6 +1,7 @@
 import Vue from 'vue'
 import Vuex from 'vuex'
 import api from '../../inventory/api'
+import func from "@/util/func"
 
 
 Vue.use(Vuex)
@@ -28,6 +29,7 @@ const changes = {
         },
         SAVE_API_COLLECTION (state, info) {
             state.apiCollection = info.data.endpoints.filter(x => x.subType !== "NULL")
+            state.apiCollection.forEach(e => e.url = func.parameterizeUrl(e.url));
         },
         SAVE_SENSITIVE (state, fields) {
             state.sensitiveParams = fields
