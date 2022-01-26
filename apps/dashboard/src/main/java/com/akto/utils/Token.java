@@ -37,7 +37,6 @@ public class Token {
     
     public Token(String refreshToken) throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
         Jws<Claims> jws = JWT.parseJwt(refreshToken, "/home/avneesh/Desktop/akto/dashboard/public.pem");
-        // TODO: CHECK AGAINST DB
         this.username = jws.getBody().get("username").toString();
         this.signedUp = jws.getBody().get("signedUp").toString();
         this.refreshToken = refreshToken;

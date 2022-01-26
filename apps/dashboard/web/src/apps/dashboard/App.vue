@@ -174,7 +174,11 @@
           },
           {
             label: "Logout",
-            click: () => this.$router.push('/api/logout')
+            click: () => {
+              api.logout().then((resp) => {
+                window.location.href = "/login"
+              })
+            }
           }
         ]
       }
