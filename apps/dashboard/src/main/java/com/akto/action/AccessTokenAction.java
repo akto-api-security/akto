@@ -69,6 +69,10 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
             return null;
         }
 
+        if (token.getSignedUp().equalsIgnoreCase("false")) {
+            return token;
+        }
+
         String username = token.getUsername();
         User user = UsersDao.instance.findOne("login", username);
         if (user == null) {
