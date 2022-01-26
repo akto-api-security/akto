@@ -15,9 +15,7 @@ import de.sstoehr.harreader.HarReaderException;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 public class HarAction extends UserAction {
     private String harString;
@@ -33,7 +31,10 @@ public class HarAction extends UserAction {
     public String execute() throws IOException {
         if (apiCollectionName != null) {
             ApiCollection apiCollection =  ApiCollectionsDao.instance.findByName(apiCollectionName);
-            if (apiCollectionName == null) return ERROR.toUpperCase();
+            if (apiCollection == null) {
+                addActionError("Invalid collection name");
+                return ERROR.toUpperCase();
+            }
             apiCollectionId = apiCollection.getId();
         }
 
@@ -42,7 +43,10 @@ public class HarAction extends UserAction {
         }
         String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
         if (topic == null) topic = "akto.api.logs";
-        if (harString == null) return ERROR.toUpperCase();
+        if (harString == null) {
+            addActionError("Empty content");
+            return ERROR.toUpperCase();
+        }
         try {
             HAR har = new HAR();
             List<String> messages = har.getMessages(harString, apiCollectionId);
