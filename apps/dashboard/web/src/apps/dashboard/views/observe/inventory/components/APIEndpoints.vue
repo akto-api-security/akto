@@ -3,7 +3,7 @@
     <div class="pr-4 api-endpoints" v-else>
         <div>
             <div class="d-flex jc-end">
-                <v-btn icon color="#6200EA" @click="refreshPage(false)"><v-icon>$fas_sync</v-icon></v-btn>
+                <v-btn icon color="#47466A" @click="refreshPage(false)"><v-icon>$fas_sync</v-icon></v-btn>
                 <upload-file fileFormat=".har,.pcap" @fileChanged="handleFileChange" label=""/>
                 <icon-menu icon="$fas_download" :items="downloadFileItems"/>
             </div>

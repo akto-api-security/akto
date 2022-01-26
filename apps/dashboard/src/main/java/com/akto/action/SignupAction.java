@@ -3,6 +3,7 @@ package com.akto.action;
 import com.akto.dao.*;
 import com.akto.dto.*;
 import com.akto.listener.InitializerListener;
+import com.akto.notifications.email.WelcomeEmail;
 import com.akto.utils.JWT;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeTokenRequest;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
@@ -15,6 +16,7 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
 import com.opensymphony.xwork2.Action;
+import com.sendgrid.helpers.mail.Mail;
 import com.slack.api.Slack;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.request.oauth.OAuthV2AccessRequest;
@@ -297,6 +299,15 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         } else {
             shouldLogin = "true";
             createUserAndRedirect(email, email, updatedUserInfo.getUser().getSignupInfoMap().entrySet().iterator().next().getValue());
+            Mail welcomeEmail = WelcomeEmail.buildWelcomeEmail("there", email);
+            try {
+                WelcomeEmail.send(welcomeEmail);
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+                return ERROR.toUpperCase();
+            }
+            
         }
         return "SUCCESS";
     }
