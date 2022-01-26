@@ -99,7 +99,7 @@ public class Main {
         APIConfig apiConfig;
         apiConfig = APIConfigsDao.instance.findOne(Filters.eq("name", configName));
         if (apiConfig == null) {
-            apiConfig = new APIConfig(configName,"access-token", 1,1, 60);
+            apiConfig = new APIConfig(configName,"access-token", 1, 10000, 120);
         }
 
         final Main main = new Main();

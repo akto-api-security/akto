@@ -3,6 +3,8 @@ package com.akto.runtime;
 import com.akto.dao.context.Context;
 import com.akto.dto.Markov;
 import com.akto.parsers.HttpCallParser;
+import com.akto.parsers.HttpCallParser.HttpResponseParams.Source;
+
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -37,7 +39,7 @@ public class MarkovTest {
                 method, url, "",generateHeaders(userId),"", 0
         );
         return new HttpCallParser.HttpResponseParams(
-            "",200,"ok", generateHeaders(userId), "", httpRequestParams, Context.now(), "1111", false
+            "",200,"ok", generateHeaders(userId), "", httpRequestParams, Context.now(), "1111", false, Source.OTHER
         );
     }
 
