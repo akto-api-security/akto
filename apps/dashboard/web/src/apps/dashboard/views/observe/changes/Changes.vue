@@ -25,7 +25,7 @@
         <layout-with-tabs title="" :tabs="['New endpoints', 'New parameters']">
             <template slot="actions-tray">
                 <div class="d-flex jc-end">
-                    <v-btn icon color="#6200EA" @click="refreshPage"><v-icon>$fas_sync</v-icon></v-btn>
+                    <v-btn icon color="#47466A" @click="refreshPage"><v-icon>$fas_sync</v-icon></v-btn>
                 </div>
             </template>
             <template slot="New endpoints">
