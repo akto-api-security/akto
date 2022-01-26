@@ -25,7 +25,6 @@ import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
-import com.akto.parsers.HttpCallParser;
 import com.akto.parsers.HttpCallParser.HttpRequestParams;
 import com.akto.parsers.HttpCallParser.HttpResponseParams;
 import com.mongodb.BasicDBObject;
@@ -128,7 +127,7 @@ public class APICatalogSync {
     public static String extractUserId(HttpResponseParams responseParams, String userIdentifier) {
         List<String> token = responseParams.getRequestParams().getHeaders().get(userIdentifier);
         if (token == null || token.size() == 0) {
-            return "HC_"+HttpCallParser.counter;
+            return "HC";
         } else {
             return token.get(0);
         }
@@ -167,9 +166,9 @@ public class APICatalogSync {
 
         processUnknownURLs(aggregator, triggerTemplateGeneration, deltaCatalog);
 
-        for (String url: aggregator.urls.keySet()) {
-            origAggregator.addURL(aggregator.urls.get(url), url);
-        }
+        // for (String url: aggregator.urls.keySet()) {
+        //     origAggregator.addURL(aggregator.urls.get(url), url);
+        // }
     }
 
 
@@ -200,7 +199,7 @@ public class APICatalogSync {
         }
 
         int now = Context.now();
-        if (now - tryGenerateURLsTimestamp > 60 * 5 || triggerTemplateGeneration) {
+        if (now - tryGenerateURLsTimestamp > 120 || triggerTemplateGeneration) {
 
             logger.info("trying to generate url template");
             tryGenerateURLsTimestamp = now;
