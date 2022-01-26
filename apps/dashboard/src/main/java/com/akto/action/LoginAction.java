@@ -115,10 +115,12 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             cookie.setHttpOnly(true);
             cookie.setPath("/");
             servletResponse.addCookie(cookie);
-            UsersDao.instance.updateOne(
-                    Filters.eq("_id", user.getId()),
-                    Updates.set("refreshTokens", refreshTokens)
-            );
+            if (signedUp) {
+                UsersDao.instance.getMCollection().findOneAndUpdate(
+                        Filters.eq("_id", user.getId()),
+                        Updates.set("refreshTokens", refreshTokens)
+                );
+            }
             return Action.SUCCESS.toUpperCase();
         } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
             e.printStackTrace();
