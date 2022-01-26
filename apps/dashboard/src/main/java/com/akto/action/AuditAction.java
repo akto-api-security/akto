@@ -38,6 +38,7 @@ public class AuditAction extends UserAction {
     String filename = null;
     BasicDBObject apiSpec = null;
     BasicDBObject auditResult = null;
+    int apiCollectionId;
 
     public String fetchAuditResults() {
         BasicDBObject ret = new BasicDBObject();
@@ -47,7 +48,7 @@ public class AuditAction extends UserAction {
 
         APISpec spec = APISpecDao.instance.findById(0);
 
-        int specId =  spec == null ? 0 : spec.getId();
+        int specId =  spec == null ? 0 : spec.getApiCollectionId();
         ret.append("auditId", Context.now()).append("contentId", specId).append("errors", errors);
         if (spec != null) {
             List<Issue> issues = new OpenAPIValidator().validateMain(spec.getContent());
@@ -85,14 +86,37 @@ public class AuditAction extends UserAction {
 
     }
 
+    public String loadContent() {
+        APISpec apiSpec = APISpecDao.instance.findOne(Filters.eq("apiCollectionId", apiCollectionId));
+
+        auditResult = new BasicDBObject().append("data", apiSpec);
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String saveContent() {
+        int userId = getSUser().getId();
+        Type type = Type.JSON;
+        String content = apiSpec.toJson();
+
+        APISpec spec = new APISpec(type, userId, filename, content, apiCollectionId);
+
+        // Need to convert to replace in case there are multiple swagger files for the same collection.
+        APISpecDao.instance.replaceOne(Filters.eq("apiCollectionId", apiCollectionId), spec);
+
+        // A dummy value to make sure null is not returned.
+        auditResult = new BasicDBObject().append("data", new BasicDBObject());
+        return Action.SUCCESS.toUpperCase();
+    }
+    
+    // Function no longer in use.
     public String saveContentAndFetchAuditResults() {
         int userId = getSUser().getId();
         Type type = Type.JSON;
         String content = apiSpec.toJson();
 
-        APISpec spec = new APISpec(type, userId, filename, content);
+        //APISpec spec = new APISpec(type, userId, filename, content);
 
-        spec.setId(0);
+        //spec.setId(0);
 
         Bson updates = 
             Updates.combine(
@@ -182,6 +206,13 @@ public class AuditAction extends UserAction {
         this.attemptIds = attemptIds;
     }
 
+    public int getApiCollectionId() {
+        return this.apiCollectionId;
+    }
+    
+    public void setApiCollectionId(int apiCollectionId) {
+        this.apiCollectionId = apiCollectionId;
+    }
 
     public BasicDBObject getApiSpec() {
         return this.apiSpec;

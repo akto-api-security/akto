@@ -4,13 +4,16 @@ import com.akto.dao.context.Context;
 import com.akto.dto.messaging.Message;
 import com.mongodb.BasicDBObject;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class User {
     private String name;
     private String login;
     private int id;
+    private List<String> refreshTokens;
 
     private Map<String, UserAccountEntry> accounts;
 
@@ -27,6 +30,7 @@ public class User {
         this.accounts = accounts;
         this.signupInfoMap = signupInfoMap;
         this.preferredChannel = preferredChannel;
+        this.refreshTokens = new ArrayList<>();
     }
 
     public static User create(String name, String login, SignupInfo info, Map<String, UserAccountEntry> accountEntryMap) {
@@ -95,5 +99,13 @@ public class User {
 
     public void setSignupInfoMap(Map<String, SignupInfo> signupInfoMap) {
         this.signupInfoMap = signupInfoMap;
+    }
+
+    public List<String> getRefreshTokens() {
+        return refreshTokens;
+    }
+
+    public void setRefreshTokens(List<String> refreshTokens) {
+        this.refreshTokens = refreshTokens;
     }
 }

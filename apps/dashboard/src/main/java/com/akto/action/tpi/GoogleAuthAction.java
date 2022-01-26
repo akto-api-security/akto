@@ -75,7 +75,6 @@ public class GoogleAuthAction extends UserAction {
                 new ThirdPartyAccess(
                         Context.now(),
                         getSUser().getId(),
-                        id,
                         0,
                         new GoogleCredential(accessToken, refreshToken, tokenResponse.getExpiresInSeconds(), userId+"")
                 )

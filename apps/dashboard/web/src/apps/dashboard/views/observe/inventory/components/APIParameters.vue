@@ -6,9 +6,22 @@
             </v-col>
             
             <v-col md="6">
-                <a-card title="Traffic" icon="$fas_chart-line">
-                    <div class="pa-4 coming-soon">Coming soon...
-                    </div>
+                <a-card title="Traffic" icon="$fas_chart-line" style="height: 330px">
+                    <spinner v-if="loadingTrafficData"/>
+                    <line-chart
+                        type='spline'
+                        color='#6200EA'
+                        :areaFillHex="true"
+                        :height="230"
+                        title="Traffic"
+                        :data="trafficTrend"
+                        :defaultChartOptions="{legend:{enabled: false}}"
+                        background-color="rgba(0,0,0,0.0)"
+                        :text="true"
+                        :input-metrics="[]"
+                        class="pa-5"
+                        v-else
+                    />
                 </a-card>
             </v-col>
         </v-row>
@@ -46,6 +59,10 @@ import {mapState} from 'vuex'
 import obj from '@/util/obj'
 import func from '@/util/func'
 import SensitiveParamsCard from '@/apps/dashboard/shared/components/SensitiveParamsCard'
+import LineChart from '@/apps/dashboard/shared/components/LineChart'
+import Spinner from '@/apps/dashboard/shared/components/Spinner'
+
+import api from '../api'
 
 export default {
     name: "ApiParameters",
@@ -54,7 +71,9 @@ export default {
         ACard,
         LayoutWithTabs,
         DonutChart,
-        SensitiveParamsCard
+        SensitiveParamsCard,
+        LineChart,
+        Spinner
     },
     props: {
         urlAndMethod: obj.strR,
@@ -98,7 +117,9 @@ export default {
                     success: (resp, item) => this.toggleSuccessFunc(resp, item),
                     failure: (err, item) => this.toggleFailureFunc(err, item)
                 }
-            ]
+            ],
+            loadingTrafficData: false,
+            trafficInfo: {}
         }  
     },
     methods: {
@@ -158,6 +179,23 @@ export default {
         sensitiveParams() {
             return this.apiCollection.filter(x => x.url === this.url && x.method == this.method)
         },
+        trafficTrend () {
+            let dateToCount = this.trafficInfo
+            let todayDate = func.todayDate()
+
+            if (!dateToCount || Object.keys(dateToCount).length == 0) {
+                return []
+            }
+
+            let currDate = new Date(func.toDate(Math.min(...Object.keys(dateToCount))))
+            let ret = []
+
+            while (currDate <= todayDate) {
+                ret.push([func.toDate(func.toYMD(currDate)), dateToCount[func.toYMD(currDate)] || 0])
+                currDate = func.incrDays(currDate, 1)
+            }
+            return ret
+        },
         sensitiveParamsForChart() {
             return Object.entries(this.sensitiveParams.reduce((z, e) => {
                 let key = func.isSubTypeSensitive(e) ? e.subType : 'General'
@@ -178,11 +216,18 @@ export default {
             return this.sensitiveParams.filter(x => x.responseCode > -1).map(this.prepareItem)
         }
     },
-    mounted() {
+    async mounted() {
         this.$emit('mountedView', {apiCollectionId: this.apiCollectionId, urlAndMethod: this.urlAndMethod, type: 2})
         if (!this.apiCollection || this.apiCollection.length === 0 || this.$store.state.inventory.apiCollectionId !== this.apiCollectionId) {
             this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId})
         }
+
+        let now = func.timeNow()
+        this.loadingTrafficData = true
+        let resp = await api.fetchEndpointTrafficData(this.url, this.apiCollectionId, this.method, now - 60 * 24 * 60 * 60, now)
+        this.loadingTrafficData = false
+        this.trafficInfo = resp.traffic
+        
     }
 }
 </script>

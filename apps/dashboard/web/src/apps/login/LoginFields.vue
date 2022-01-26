@@ -14,6 +14,8 @@
         outlined
         :rules="formRule.username"
         v-model="formModel.username"
+        ref="username"
+        @keyup.enter="usernameEnter"
     />
     <v-text-field
         :append-icon="openPassword ? '$fas_eye' : '$fas_eye-slash'"
@@ -27,6 +29,8 @@
         outlined
         v-model="formModel.password"
         @click:append="openPassword = !openPassword"
+        ref="password"
+        @keyup.enter="passwordEnter"
     />
   </v-form>
 </template>
@@ -69,6 +73,16 @@ export default {
         valid
       }
       this.$emit('fieldsChanged', ret)
+    },
+    usernameEnter() {
+      if (this.$refs.username.valid) {
+        this.$refs.password.focus()
+      }
+    },
+    passwordEnter() {
+      if (this.$refs.username.valid && this.$refs.password.valid ) {
+        this.$emit('enterPressed')
+      }
     }
   },
   watch: {
@@ -78,6 +92,9 @@ export default {
     'formModel.password': function () {
       this.disableButtons()
     }
+  },
+  mounted() {
+    this.$refs.username.focus()
   }
 }
 </script>

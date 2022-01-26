@@ -120,6 +120,7 @@ public class HAR {
         result.put("type",type);
         result.put("status",status);
         result.put("contentType",contentType);
+        result.put("source", "HAR");
 
         return result;
     }

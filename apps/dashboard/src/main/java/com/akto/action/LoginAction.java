@@ -10,6 +10,7 @@ import com.akto.utils.Token;
 import com.akto.utils.JWT;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
@@ -20,9 +21,9 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
-import java.util.Calendar;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+
+import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
 
 // Validates user from the supplied username and password
 // Generates refresh token jwt using the username if valid user
@@ -99,7 +100,14 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                     6
             );
 
-            // TODO: ADD IT TO DB
+            List<String> refreshTokens = user.getRefreshTokens();
+            if (refreshTokens == null) {
+                refreshTokens = new ArrayList<>();
+            }
+            if (refreshTokens.size() > 10) {
+                refreshTokens = refreshTokens.subList(refreshTokens.size()-10, refreshTokens.size());
+            }
+            refreshTokens.add(refreshToken);
 
             Token token = new Token(refreshToken);
             servletResponse.addHeader(AccessTokenAction.ACCESS_TOKEN_HEADER_NAME,token.getAccessToken());
@@ -107,6 +115,12 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             cookie.setHttpOnly(true);
             cookie.setPath("/");
             servletResponse.addCookie(cookie);
+            if (signedUp) {
+                UsersDao.instance.getMCollection().findOneAndUpdate(
+                        Filters.eq("_id", user.getId()),
+                        Updates.set("refreshTokens", refreshTokens)
+                );
+            }
             return Action.SUCCESS.toUpperCase();
         } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
             e.printStackTrace();

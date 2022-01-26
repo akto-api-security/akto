@@ -2,9 +2,11 @@ package com.akto.filter;
 
 import com.akto.action.AccessTokenAction;
 import com.akto.action.ProfileAction;
+import com.akto.dao.ApiTokensDao;
 import com.akto.dao.SignupDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiToken;
 import com.akto.dto.SignupUserInfo;
 import com.akto.dto.User;
 import com.akto.utils.JWT;
@@ -24,6 +26,8 @@ import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 
+import static com.akto.action.LoginAction.REFRESH_TOKEN_COOKIE_NAME;
+
 // This is the first filter which will hit for every request to server
 // First checks if the access token is valid or not (from header)
 // If not then checks if it can generate valid access token using the refresh token
@@ -31,8 +35,8 @@ import java.security.spec.InvalidKeySpecException;
 // Using the username from the access token it sets the user details in session to be used by other filters/action
 public class UserDetailsFilter implements Filter {
 
-    private static final String LOGIN_URI = "/login";
-    private static final String API_URI = "/api";
+    public static final String LOGIN_URI = "/login";
+    public static final String API_URI = "/api";
 
     @Override
     public void init(FilterConfig filterConfig) { }
@@ -56,13 +60,41 @@ public class UserDetailsFilter implements Filter {
         HttpServletResponse httpServletResponse = (HttpServletResponse) servletResponse;
         String accessTokenFromResponse = httpServletResponse.getHeader(AccessTokenAction.ACCESS_TOKEN_HEADER_NAME);
         String accessTokenFromRequest = httpServletRequest.getHeader(AccessTokenAction.ACCESS_TOKEN_HEADER_NAME);
-        if ("null".equalsIgnoreCase(accessTokenFromRequest)) {
-            accessTokenFromRequest = null;
-        }
+        String requestURI = httpServletRequest.getRequestURI();
 
-        String accessToken = accessTokenFromResponse;
-        if (accessToken == null) {
-            accessToken = accessTokenFromRequest;
+        // get api key header
+        String apiKey = httpServletRequest.getHeader("X-API-KEY");
+        String accessToken;
+
+        // if api key present then check if valid api key or not and generate access token
+        // else find access token from request header
+        if (apiKey != null) {
+            // check if valid key for path
+            ApiToken apiToken = ApiTokensDao.instance.findByKeyForPath(apiKey,requestURI);
+            if (apiToken == null) {
+                httpServletResponse.sendError(403);
+                return;
+            }
+            Context.accountId.set(apiToken.getAccountId());
+
+            // convert apiKey to accessToken
+            try {
+                accessToken = Token.generateAccessToken(apiToken.getUsername(),"true");
+            } catch (Exception e) {
+                e.printStackTrace();
+                httpServletResponse.sendError(403);
+                return;
+            }
+
+        } else {
+            if ("null".equalsIgnoreCase(accessTokenFromRequest)) {
+                accessTokenFromRequest = null;
+            }
+
+            accessToken = accessTokenFromResponse;
+            if (accessToken == null) {
+                accessToken = accessTokenFromRequest;
+            }
         }
 
         String username, signedUp;
@@ -72,12 +104,14 @@ public class UserDetailsFilter implements Filter {
             username = jws.getBody().get("username").toString();
             signedUp = jws.getBody().get("signedUp").toString();
         } catch (Exception e) {
-             if (httpServletRequest.getRequestURI().contains(API_URI)) {
+             if (requestURI.contains(API_URI)) {
                  ((HttpServletResponse) servletResponse).sendError(403);
                  return ;
              }
             Token token = AccessTokenAction.generateAccessTokenFromServletRequest(httpServletRequest);
             if (token == null) {
+                Cookie cookie = AccessTokenAction.generateDeleteCookie();
+                httpServletResponse.addCookie(cookie);
                 redirectIfNotLoginURI(filterChain,httpServletRequest,httpServletResponse);
                 return ;
             }

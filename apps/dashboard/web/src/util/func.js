@@ -297,6 +297,13 @@ export default {
     isSubTypeSensitive(x) {
         return x.savedAsSensitive || x.sensitive || x.subType === "EMAIL" || x.subType === "CREDIT_CARD" || x.subType.indexOf("PHONE_NUMBER") === 0 || x.subType === "SSN" || x.subType === "ADDRESS" || x.subType === "PAN_CARD"
     },
+    parameterizeUrl(x) {
+        let re = /INTEGER|STRING/gi;
+        let newStr = x.replace(re, (match) => { 
+            return "{param_" + match + "}";
+        });
+        return newStr
+    },
     groupByEndpoint(listParams, idToName) {
         let ret = {}
 
@@ -380,6 +387,9 @@ export default {
                 break;
             case "JWT":
                 icon = "$fas_key"
+                break;
+            case "IP_ADDRESS":
+                icon = "$fas_globe"
                 break;
             default:
                 break;        

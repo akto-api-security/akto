@@ -21,5 +21,14 @@ export default {
         }).then(resp => {
             window.location.href = '/dashboard/testing'
         })
-    }
+    },
+    logout() {
+        return request({
+            url: '/api/logout',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
+    },
 }

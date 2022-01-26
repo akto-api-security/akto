@@ -5,6 +5,7 @@ import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.Relationship;
 import com.akto.parsers.HttpCallParser;
+import com.akto.parsers.HttpCallParser.HttpResponseParams.Source;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -88,7 +89,7 @@ public class RelationshipTest {
                 method, url, "",generateHeaders(userId),reqPayload, 0
         );
         return new HttpCallParser.HttpResponseParams(
-                "",statusCode,"ok", generateHeaders(userId), respPayload, httpRequestParams, Context.now(), "1111"
+                "",statusCode,"ok", generateHeaders(userId), respPayload, httpRequestParams, Context.now(), "1111",false, Source.OTHER
         );
     }
 

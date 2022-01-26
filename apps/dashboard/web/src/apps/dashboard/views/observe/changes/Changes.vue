@@ -7,10 +7,27 @@
             <count-box title="New parameters" :count="newParameters.length" colorTitle="Total" />
             <count-box title="New sensitive parameters" :count="newSensitiveParameters.length" colorTitle="Overdue" />
         </div>
-        <a-card title="Changes" icon="$fas_chart-line">
-            <div class="pa-4 coming-soon">Coming soon...</div>
+        <a-card title="Changes" icon="$fas_chart-line" class="ma-5">
+            <line-chart
+                type='spline'
+                color='#6200EA'
+                :areaFillHex="true"
+                :height="250"
+                title="New Endpoints"
+                :data="newEndpointsTrend"
+                :defaultChartOptions="{legend:{enabled: false}}"
+                background-color="rgba(0,0,0,0.0)"
+                :text="true"
+                :input-metrics="[{data: newParamsTrend, name: 'New Parameters'}]"
+                class="pa-5"
+            />
         </a-card>
         <layout-with-tabs title="" :tabs="['New endpoints', 'New parameters']">
+            <template slot="actions-tray">
+                <div class="d-flex jc-end">
+                    <v-btn icon color="#47466A" @click="refreshPage"><v-icon>$fas_sync</v-icon></v-btn>
+                </div>
+            </template>
             <template slot="New endpoints">
                 <simple-table 
                     :headers="endpointHeaders" 
@@ -64,7 +81,8 @@ export default {
         LineChart, 
         LayoutWithTabs,
         SimpleTable,
-        SensitiveChipGroup
+        SensitiveChipGroup,
+        LineChart
     },
     data () {
         return {
@@ -158,7 +176,27 @@ export default {
             }
 
             this.$router.push(routeObj)
-        } 
+        },
+        refreshPage() {
+            this.$store.dispatch('changes/loadRecentParameters')
+        },
+        changesTrend (data) {
+            let todayDate = func.todayDate()
+            let twoMonthsAgo = func.incrDays(todayDate, -61)
+            
+            let currDate = twoMonthsAgo
+            let ret = []
+            let dateToCount = data.reduce((m, e) => { 
+                let detectDate = func.toYMD(new Date(e.detectedTs*1000))
+                m[detectDate] = (m[detectDate] || 0 ) + 1
+                return m
+            }, {})
+            while (currDate <= todayDate) {
+                ret.push([func.toDate(func.toYMD(currDate)), dateToCount[func.toYMD(currDate)] || 0])
+                currDate = func.incrDays(currDate, 1)
+            }
+            return ret
+        }
     },
     computed: {
         ...mapState('changes', ['apiCollection']),
@@ -172,9 +210,15 @@ export default {
             let now = func.timeNow()
             return func.groupByEndpoint(this.apiCollection, this.mapCollectionIdToName).filter(x => x.detectedTs > now - func.recencyPeriod)
         },
+        newEndpointsTrend() {
+            return this.changesTrend(this.newEndpoints)
+        },
         newParameters() {
             let now = func.timeNow()
             return this.apiCollection.filter(x => x.timestamp > now - func.recencyPeriod).map(this.prepareItemForTable)
+        },
+        newParamsTrend() {
+            return this.changesTrend(this.newParameters)
         },
         newSensitiveEndpoints() {
             let now = func.timeNow()
@@ -186,7 +230,7 @@ export default {
         },
     },
     mounted() {
-        this.$store.dispatch('changes/loadRecentParameters')
+        this.refreshPage()
     }    
 
 }
