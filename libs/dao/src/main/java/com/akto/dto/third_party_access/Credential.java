@@ -6,7 +6,7 @@ import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 @BsonDiscriminator
 public abstract class Credential {
     public enum Type {
-        GOOGLE, MYSQL, SALESFORCE, POSTGRESQL
+        GOOGLE, MYSQL, SALESFORCE, POSTGRESQL, POSTMAN
     }
 
     private Type type;

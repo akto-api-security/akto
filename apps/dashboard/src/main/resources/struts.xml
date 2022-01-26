@@ -211,6 +211,28 @@
             </result>
         </action>
 
+        <action name="api/loadContent" class="com.akto.action.AuditAction" method="loadContent">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">auditResult</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/saveContent" class="com.akto.action.AuditAction" method="saveContent">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">auditResult</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
         <action name="api/saveContentAndFetchAuditResults" class="com.akto.action.AuditAction" method="saveContentAndFetchAuditResults">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -377,6 +399,7 @@
             </result>
         </action>
 
+        <!--   NEVER CHANGE VALUE OF api/uploadHar (path) this is used in ApiToken     -->
         <action name="api/uploadHar" class="com.akto.action.HarAction">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -387,7 +410,69 @@
             </result>
         </action>
 
+        <action name="api/uploadTcp" class="com.akto.action.HarAction" method="uploadTcp">
+            <interceptor-ref name="defaultStack"/>
+            <interceptor-ref name="json"/>
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
         <action name="api/createCollection" class="com.akto.action.ApiCollectionsAction" method="createCollection">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/addOrUpdatePostmanCred" class="com.akto.action.PostmanAction" method="addOrUpdateApiKey">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/createPostmanApi" class="com.akto.action.PostmanAction" method="createPostmanApi">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/savePostmanCollection" class="com.akto.action.PostmanAction" method="savePostmanCollection">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/fetchPostmanWorkspaces" class="com.akto.action.PostmanAction" method="fetchWorkspaces">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/fetchCollections" class="com.akto.action.PostmanAction" method="fetchCollections">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json">
@@ -404,6 +489,64 @@
             </result>
         </action>
 
+        <action name="api/getPostmanCredential" class="com.akto.action.PostmanAction" method="fetchPostmanCred">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/addBurpToken" class="com.akto.action.ApiTokenAction" method="addBurpToken">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/deleteApiToken" class="com.akto.action.ApiTokenAction" method="deleteApiToken">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/fetchBurpTokens" class="com.akto.action.ApiTokenAction" method="fetchBurpTokens">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/fetchEndpointTrafficData" class="com.akto.action.TrafficAction" method="fetchEndpointTrafficData">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+        
+        <action name="api/deleteCollection" class="com.akto.action.ApiCollectionsAction" method="deleteCollection">
+           <interceptor-ref name="json"/>
+           <interceptor-ref name="defaultStack" />
+           <result name="SUCCESS"  type="json">
+           </result>
+           <result name="ERROR" type="httpheader">
+               <param name="status">401</param>
+           </result>
+       </action>
     </package>
 
 </struts>

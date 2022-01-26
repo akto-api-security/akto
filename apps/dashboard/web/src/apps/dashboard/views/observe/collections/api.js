@@ -19,5 +19,15 @@ export default {
         }).then((resp) => {
             return resp
         })
+    },
+
+    deleteCollection(apiCollectionId) {
+        return request({
+            url: '/api/deleteCollection',
+            method: 'post',
+            data: {apiCollectionId}
+        }).then((resp) => {
+            return resp
+        })
     }
 }

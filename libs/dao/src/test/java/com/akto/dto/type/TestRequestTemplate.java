@@ -28,7 +28,7 @@ public class TestRequestTemplate {
             responseTemplates.put(200, createRequestTemplate(false));
         }
 
-        return new RequestTemplate(parameters, responseTemplates, headers);
+        return new RequestTemplate(parameters, responseTemplates, headers, new TrafficRecorder(new HashMap<>()));
     }
 
     @Test

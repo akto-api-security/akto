@@ -79,29 +79,25 @@
         </v-list>
       </div>
 
-      <v-list dense nav class="left-nav" style="margin-top: auto">
-          <v-list-item class='row-nav-drawer' to="/dashboard/settings">
-            <v-list-item-icon class="icon-nav-drawer">
-              <v-icon>$fas_cog</v-icon>
-            </v-list-item-icon>
-              <v-list-item-content class="content-nav-drawer">
-                <v-list-item-title class="title-nav-drawer">Settings</v-list-item-title>
-              </v-list-item-content>
-          </v-list-item>
+        <v-list dense>
+          <simple-menu :items="myAccountItems">
+            <template v-slot:activator2>
+              <v-list-item class='row-nav-drawer'>
+                <v-list-item-icon class="icon-nav-drawer">
+                  <owner-name
+                    :owner-name="getUsername()"
+                    :owner-id="0"
+                    :show-name="false"
+                  />
+                </v-list-item-icon>
+                  <v-list-item-content class="content-nav-drawer">
+                    <v-list-item-title class="title-nav-drawer">My accounts</v-list-item-title>
+                  </v-list-item-content>
+              </v-list-item>
+            </template>
+          </simple-menu>
 
-          <v-list-item class='row-nav-drawer'>
-            <v-list-item-icon class="icon-nav-drawer">
-              <owner-name
-                :owner-name="getUsername()"
-                :owner-id="0"
-                :show-name="false"
-              />
-            </v-list-item-icon>
-              <v-list-item-content class="content-nav-drawer">
-                <v-list-item-title class="title-nav-drawer">My accounts</v-list-item-title>
-              </v-list-item-content>
-          </v-list-item>
-      </v-list>
+        </v-list>
     </v-navigation-drawer>
 
     <v-main class="akto-background" :style="{ 'padding-left': mini ? '56px' : '200px'}">
@@ -121,13 +117,15 @@
   import api from "./appbar/api"
   import OwnerName from "./shared/components/OwnerName";
   import SimpleTextField from "./shared/components/SimpleTextField";
+  import SimpleMenu from "./shared/components/SimpleMenu"
 
   export default {
     name: 'PageDashboard',
     components: {
       SimpleTextField,
       OwnerName,
-      'create-account-dialog': CreateAccountDialog
+      'create-account-dialog': CreateAccountDialog,
+      SimpleMenu
     },
     data () {
       const myItems = [
@@ -168,7 +166,21 @@
         myOrgs: this.getAccounts(),
         showField: {},
         showTeamField: false,
-        newName: ''
+        newName: '',
+        myAccountItems: [
+          {
+            label: "Settings",
+            click: () => this.$router.push('/dashboard/settings')
+          },
+          {
+            label: "Logout",
+            click: () => {
+              api.logout().then((resp) => {
+                window.location.href = "/login"
+              })
+            }
+          }
+        ]
       }
     },
     methods: {

@@ -1,18 +1,56 @@
 import request from '@/util/request'
 
 export default {
-    uploadHarFile(content, apiCollectionId) {
+    saveContent(apiSpec) {
+        return request({
+            url: '/api/saveContent',
+            method: 'post',
+            data: {
+                apiSpec: apiSpec.swaggerContent,
+                filename: apiSpec.filename,
+                apiCollectionId: apiSpec.apiCollectionId
+            }
+        })
+    },
+    loadContent(apiCollectionId) {
+        return request({
+            url: '/api/loadContent',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId
+            }
+        })
+    },
+    uploadHarFile(content, apiCollectionId, skipKafka) {
         return request({
             url: '/api/uploadHar',
             method: 'post',
             data: {
-                content, apiCollectionId
+                content, apiCollectionId, skipKafka
+            }
+        })
+    },
+    uploadTcpFile(content, apiCollectionId, skipKafka) {
+        return request({
+            url: '/api/uploadTcp',
+            method: 'post',
+            data: {
+                tcpContent: content, apiCollectionId, skipKafka
             }
         })
     },
     downloadOpenApiFile(apiCollectionId) {
         return request({
             url: '/api/generateOpenApiFile',
+            method: 'post',
+            data: {
+                apiCollectionId
+            }
+        })
+    },
+    exportToPostman(apiCollectionId) {
+        return request({
+            url: '/api/createPostmanApi',
             method: 'post',
             data: {
                 apiCollectionId
@@ -73,6 +111,17 @@ export default {
             url: '/api/loadSensitiveParameters',
             method: 'post',
             data: {}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    fetchEndpointTrafficData (url, apiCollectionId, method, startEpoch, endEpoch) {
+        return request({
+            url: '/api/fetchEndpointTrafficData',
+            method: 'post',
+            data: {
+                url, apiCollectionId, method, startEpoch, endEpoch
+            }
         }).then((resp) => {
             return resp
         })

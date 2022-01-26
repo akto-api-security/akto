@@ -16,6 +16,7 @@ public class PathBuilder {
 
     public static void addPathItem(Paths paths, String url, String method , int responseCode, Schema<?> schema) throws Exception {
         PathItem pathItem = paths.getOrDefault(url, new PathItem());
+        pathItem.setDescription("description");
         Operation operation = getOperation(pathItem,method);
         if (operation == null) {
             operation = new Operation();
@@ -49,6 +50,7 @@ public class PathBuilder {
         mediaType.setSchema(schema);
         content.put("application/json", mediaType);
         apiResponse.setContent(content);
+        apiResponse.setDescription("description");
         apiResponses.put(responseCode+"", apiResponse);
 
         operation.setResponses(apiResponses);

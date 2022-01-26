@@ -142,11 +142,12 @@ public class HttpCallParser {
         private String payload;
         private int time;
         HttpRequestParams requestParams;
+        boolean isPending;
 
         public HttpResponseParams() {}
 
         public HttpResponseParams(String type, int statusCode, String status, Map<String, List<String>> headers,
-                                  String payload, HttpRequestParams requestParams, int time, String accountId) {
+                                  String payload, HttpRequestParams requestParams, int time, String accountId, boolean isPending) {
             this.type = type;
             this.statusCode = statusCode;
             this.status = status;
@@ -155,6 +156,7 @@ public class HttpCallParser {
             this.requestParams = requestParams;
             this.time = time;
             this.accountId = accountId;
+            this.isPending = isPending;
         }
 
         public static List<HttpResponseParams> parseResponse(String response) throws IOException {
@@ -234,6 +236,14 @@ public class HttpCallParser {
 
         public String getAccountId() {
             return accountId;
+        }
+
+        public boolean getIsPending() {
+            return this.isPending;
+        }
+
+        public void setIsPending(boolean isPending) {
+            this.isPending = isPending;
         }
     }
 
@@ -332,9 +342,11 @@ public class HttpCallParser {
         int time = Integer.parseInt(json.get("time").toString());
         String accountId = (String) json.get("akto_account_id");
 
+        String isPendingStr = (String) json.getOrDefault("is_pending", "false");
+        boolean isPending = !isPendingStr.toLowerCase().equals("false");
 
         return new HttpResponseParams(
-                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId
+                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending
         );
 
     }

@@ -1,11 +1,13 @@
 <template>
-    <layout-with-tabs title="Settings" :tabs="['Account', 'Users', 'Health']">
-        <template slot="Account">
+    <layout-with-tabs title="Settings" :tabs="['Integrations','Account', 'Users', 'Health']">
+      <template slot="Integrations">
+        <integrations/>
+      </template>
+      <template slot="Account">
             <div class="pa-8">
                 <div class="d-flex">
                     <div class="entry-text">Account ID</div>
                     <div class="entry-value">{{getActiveAccount()}}</div>
-                    <v-btn color="primary" @click="logout">Logout</v-btn>
                 </div>
             </div>
         </template>
@@ -22,13 +24,15 @@
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import TeamOverview from './components/TeamOverview'
 import Health from './components/Health'
+import Integrations from './components/Integrations'
 import api from './api'
 export default {
     name: "PageSettings",
     components: { 
         LayoutWithTabs,
         TeamOverview,
-        Health
+        Health,
+        Integrations
     },
     methods: {
         getActiveAccount() {
@@ -41,11 +45,6 @@ export default {
                 websiteHostName: window.location.origin
             }
             api.inviteUsers(spec)
-        },
-        logout() {
-          api.logout().then((resp) => {
-            window.location.href = "/login"
-          })
         }
     }
 }

@@ -18,18 +18,13 @@ public class Token {
     private String username = null;
 
     private String signedUp = "false";
-    
-    public Token(String refreshToken) throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
-        Jws<Claims> jws = JWT.parseJwt(refreshToken, "/home/avneesh/Desktop/akto/dashboard/public.pem");
-        this.username = jws.getBody().get("username").toString();
-        this.signedUp = jws.getBody().get("signedUp").toString();
-        this.refreshToken = refreshToken;
 
+    public static String generateAccessToken(String username, String signedUp) throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
         Map<String,Object> claims = new HashMap<>();
         claims.put("username", username);
         claims.put("signedUp", signedUp);
 
-        this.accessToken = JWT.createJWT(
+        return JWT.createJWT(
                 "/home/avneesh/Desktop/akto/dashboard/private.pem",
                 claims,
                 "Akto",
@@ -37,6 +32,16 @@ public class Token {
                 Calendar.MINUTE,
                 15
         );
+
+    }
+    
+    public Token(String refreshToken) throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
+        Jws<Claims> jws = JWT.parseJwt(refreshToken, "/home/avneesh/Desktop/akto/dashboard/public.pem");
+        this.username = jws.getBody().get("username").toString();
+        this.signedUp = jws.getBody().get("signedUp").toString();
+        this.refreshToken = refreshToken;
+
+        this.accessToken = generateAccessToken(this.username, this.signedUp);
     }
 
     public String getAccessToken() {
