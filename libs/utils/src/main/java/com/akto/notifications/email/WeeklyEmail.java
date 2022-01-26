@@ -18,15 +18,13 @@ import java.util.List;
 public class WeeklyEmail{
 
   public static Mail buildWeeklyEmail (
-    String allSensitive, 
-    String newLastWeek, 
-    String newLastMonth,
+    int allSensitive, 
+    int newLastWeek, 
+    int newLastMonth,
     String sendTo,
     List <String> newEpList,
-    String seeMoreNew,
-    List <String> sEpList,
-    String seeMoreSensitive 
-    ) {
+    List <String> sEpList
+  ) {
     Mail mail = new Mail();
 
     Email fromEmail = new Email();
@@ -58,8 +56,6 @@ public class WeeklyEmail{
     personalization.addDynamicTemplateData("newLastMonth",newLastMonth);
     personalization.addDynamicTemplateData("newEpList",newEpList);
     personalization.addDynamicTemplateData("sEpList",sEpList);
-    personalization.addDynamicTemplateData("seeMoreNew",seeMoreNew);
-    personalization.addDynamicTemplateData("seeMoreSensitive", seeMoreSensitive);
     
     return mail;
   }
@@ -85,9 +81,9 @@ public class WeeklyEmail{
   //  User user = UserAction.getSUser();
 
 
-    String allSensitive = "5";
-    String newLastWeek = "10";
-    String newLastMonth = "20";
+    int allSensitive = 5;
+    int newLastWeek = 10;
+    int newLastMonth = 20;
     String sendTo ="ankita@akto.io";
     List <String> newEpList = new ArrayList<>();
     List <String> sEpList = new ArrayList<>();
@@ -101,7 +97,7 @@ public class WeeklyEmail{
 
    // String sendTo = getSUser().getName(user)
 
-    Mail email = WeeklyEmail.buildWeeklyEmail(allSensitive, newLastWeek, newLastMonth, sendTo, newEpList, seeMoreNew,sEpList, seeMoreSensitive);
+    Mail email = WeeklyEmail.buildWeeklyEmail(allSensitive, newLastWeek, newLastMonth, sendTo, newEpList,sEpList);
     
     try {
             WeeklyEmail.send(email);
