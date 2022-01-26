@@ -297,6 +297,13 @@ export default {
     isSubTypeSensitive(x) {
         return x.savedAsSensitive || x.sensitive || x.subType === "EMAIL" || x.subType === "CREDIT_CARD" || x.subType.indexOf("PHONE_NUMBER") === 0 || x.subType === "SSN" || x.subType === "ADDRESS" || x.subType === "PAN_CARD" || x.subType === "IP_ADDRESS"
     },
+    parameterizeUrl(x) {
+        let re = /INTEGER|STRING/gi;
+        let newStr = x.replace(re, (match) => { 
+            return "{param_" + match + "}";
+        });
+        return newStr
+    },
     groupByEndpoint(listParams, idToName) {
         let ret = {}
 
