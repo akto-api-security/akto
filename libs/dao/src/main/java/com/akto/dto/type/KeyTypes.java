@@ -174,7 +174,7 @@ public class KeyTypes {
                     Phonenumber.PhoneNumber.CountryCodeSource.UNSPECIFIED.name());
             return phoneNumberUtil.isValidNumber(phone);
         } catch (Exception e) {
-            e.printStackTrace();
+            // eat it
             return false;
         }
 

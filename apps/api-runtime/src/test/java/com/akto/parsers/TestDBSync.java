@@ -1,13 +1,17 @@
 package com.akto.parsers;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.akto.MongoBasedTest;
 import com.akto.dao.UsersDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.User;
 import com.akto.dto.messaging.Message.Mode;
 import com.akto.dto.type.RequestTemplate;
@@ -15,6 +19,7 @@ import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.parsers.HttpCallParser.HttpResponseParams;
+import com.akto.parsers.HttpCallParser.HttpResponseParams.Source;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
 
@@ -70,5 +75,34 @@ public class TestDBSync extends MongoBasedTest {
         RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
         assertEquals(30, respTemplate.getUserIds().size());
         assertEquals(3, respTemplate.getParameters().size());
+    }    
+
+    @Test
+    public void testImmediateSync() {
+        String url = "link/";
+
+        List<HttpResponseParams> responseParams = new ArrayList<>();
+
+        HttpResponseParams resp = TestDump2.createSampleParams("user1", url+1);
+        ArrayList<String> newHeader = new ArrayList<>();
+        newHeader.add("hnew");
+        resp.headers.put("new header", newHeader);
+        responseParams.add(resp);
+
+        for (int i = 2; i <= 30; i ++ ) {
+            responseParams.add(TestDump2.createSampleParams("user"+i, url+i));
+        }
+
+        HttpCallParser parser = new HttpCallParser("access-token", 10,40,10);
+
+        parser.syncFunction(responseParams);
+        assertTrue(parser.getSyncCount() == 0);
+        
+        parser.syncFunction(responseParams);
+        assertFalse(parser.getSyncCount() == 0);
+
+        responseParams.get(0).setSource(Source.HAR);
+        parser.syncFunction(responseParams);
+        assertTrue(parser.getSyncCount() == 0);
     }    
 }

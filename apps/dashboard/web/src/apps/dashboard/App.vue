@@ -79,7 +79,7 @@
         </v-list>
       </div>
 
-        <v-list dense>
+        <v-list dense nav class="left-nav" style="margin-top: auto">
           <simple-menu :items="myAccountItems">
             <template v-slot:activator2>
               <v-list-item class='row-nav-drawer'>

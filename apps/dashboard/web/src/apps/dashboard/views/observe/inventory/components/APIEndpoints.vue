@@ -1,6 +1,13 @@
 <template>
     <spinner v-if="loading" />
     <div class="pr-4 api-endpoints" v-else>
+        <div>
+            <div class="d-flex jc-end">
+                <v-btn icon color="#6200EA" @click="refreshPage(false)"><v-icon>$fas_sync</v-icon></v-btn>
+                <upload-file fileFormat=".har,.pcap" @fileChanged="handleFileChange" label=""/>
+                <icon-menu icon="$fas_download" :items="downloadFileItems"/>
+            </div>
+        </div>
         <div class="d-flex">
             <count-box title="Sensitive Endpoints" :count="sensitiveEndpoints.length" colorTitle="Overdue"/>
             <count-box title="Shadow Endpoints" :count="shadowEndpoints.length" colorTitle="Pending"/>
@@ -10,11 +17,6 @@
 
         <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Shadow', 'Unused', 'Upload']">
             <template slot="actions-tray">
-                <div class="d-flex jc-end">
-                    <v-btn icon color="#6200EA" @click="refreshPage(false)"><v-icon>$fas_sync</v-icon></v-btn>
-                    <upload-file fileFormat=".har,.pcap" @fileChanged="handleFileChange" label=""/>
-                    <icon-menu icon="$fas_download" :items="downloadFileItems"/>
-                </div>
             </template>
             <template slot="All">
                 <simple-table 

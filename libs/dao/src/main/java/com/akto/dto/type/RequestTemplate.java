@@ -148,7 +148,7 @@ public class RequestTemplate {
                 keyTypes.process(url, method, responseCode, false, param, flattened.get(param), userId, apiCollectionId);
             }
 
-            if (now - mergeTimestamp > 60 * 5) {
+            if (now - mergeTimestamp > 60 * 2) {
                 deleted = tryMergeNodesInTrie(url, method, responseCode, apiCollectionId);
                 mergeTimestamp = now;
             }
