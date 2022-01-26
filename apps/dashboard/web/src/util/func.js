@@ -295,7 +295,7 @@ export default {
         return ret
     },
     isSubTypeSensitive(x) {
-        return x.savedAsSensitive || x.sensitive || x.subType === "EMAIL" || x.subType === "CREDIT_CARD" || x.subType.indexOf("PHONE_NUMBER") === 0 || x.subType === "SSN" || x.subType === "ADDRESS" || x.subType === "PAN_CARD" || x.subType === "IP_ADDRESS"
+        return x.savedAsSensitive || x.sensitive || x.subType === "EMAIL" || x.subType === "CREDIT_CARD" || x.subType.indexOf("PHONE_NUMBER") === 0 || x.subType === "SSN" || x.subType === "ADDRESS" || x.subType === "PAN_CARD"
     },
     parameterizeUrl(x) {
         let re = /INTEGER|STRING/gi;
