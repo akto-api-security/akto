@@ -25,7 +25,7 @@
                 </a-card>
             </v-col>
         </v-row>
-        <layout-with-tabs :tabs="['Request', 'Response']">
+        <layout-with-tabs :tabs="['Request', 'Response', 'Values']">
             <template slot="Request">
                 <simple-table 
                     :headers="headers" 
@@ -46,6 +46,10 @@
                     :sortDescDefault="true"
                 />
             </template>
+            <template slot="Values">
+                <sample-data :messages="sampleData" v-if="sampleData"/>
+                <spinner v-else/>
+            </template>
         </layout-with-tabs>
     </div>    
 </template>
@@ -60,6 +64,7 @@ import obj from '@/util/obj'
 import func from '@/util/func'
 import SensitiveParamsCard from '@/apps/dashboard/shared/components/SensitiveParamsCard'
 import LineChart from '@/apps/dashboard/shared/components/LineChart'
+import SampleData from './SampleData.vue'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
 
 import api from '../api'
@@ -73,7 +78,8 @@ export default {
         DonutChart,
         SensitiveParamsCard,
         LineChart,
-        Spinner
+        Spinner,
+        SampleData
     },
     props: {
         urlAndMethod: obj.strR,
@@ -119,7 +125,8 @@ export default {
                 }
             ],
             loadingTrafficData: false,
-            trafficInfo: {}
+            trafficInfo: {},
+            sampleData: null
         }  
     },
     methods: {
@@ -227,7 +234,8 @@ export default {
         let resp = await api.fetchEndpointTrafficData(this.url, this.apiCollectionId, this.method, now - 60 * 24 * 60 * 60, now)
         this.loadingTrafficData = false
         this.trafficInfo = resp.traffic
-        
+        let sampleDataResp = await api.fetchSampleData(this.url, this.apiCollectionId, this.method)
+        this.sampleData = sampleDataResp.sampleDataList.length > 0 ? sampleDataResp.sampleDataList[0].samples : []
     }
 }
 </script>

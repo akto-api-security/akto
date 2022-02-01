@@ -125,5 +125,16 @@ export default {
         }).then((resp) => {
             return resp
         })
+    },
+    fetchSampleData (url, apiCollectionId, method) {
+        return request({
+            url: '/api/fetchSampleData',
+            method: 'post',
+            data: {
+                url, apiCollectionId, method
+            }
+        }).then((resp) => {
+            return resp
+        })
     }
 }

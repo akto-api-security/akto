@@ -162,4 +162,7 @@
 
 .no-border
     border: unset! important    
+
+.float-right
+    float: right    
 </style>

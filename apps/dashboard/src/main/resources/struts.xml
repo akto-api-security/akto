@@ -540,6 +540,15 @@
             </result>
         </action>
         
+        <action name="api/fetchSampleData" class="com.akto.action.TrafficAction" method="fetchSampleData">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+        
         <action name="api/deleteCollection" class="com.akto.action.ApiCollectionsAction" method="deleteCollection">
            <interceptor-ref name="json"/>
            <interceptor-ref name="defaultStack" />
