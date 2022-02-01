@@ -85,6 +85,7 @@ public class TestDump2 {
         ret.requestParams.setHeaders(headers);
         ret.requestParams.setPayload(createSimpleRequestPayload());
         ret.requestParams.setApiCollectionId(123);
+        ret.setOrig(ret.toString());
         return ret;
     }
 
@@ -115,6 +116,7 @@ public class TestDump2 {
         
         assertEquals(sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0)).size(), 15);        
         assertEquals(sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size(), 2);        
+        assertEquals(sync.getDBUpdatesForSampleData(0, sync.getDelta(0)).size(), 1);        
     }
 
 

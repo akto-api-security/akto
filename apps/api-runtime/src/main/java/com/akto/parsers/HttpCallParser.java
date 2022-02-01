@@ -150,11 +150,12 @@ public class HttpCallParser {
         HttpRequestParams requestParams;
         boolean isPending;
         Source source = Source.OTHER;
+        String orig;
 
         public HttpResponseParams() {}
 
         public HttpResponseParams(String type, int statusCode, String status, Map<String, List<String>> headers, String payload, 
-                                    HttpRequestParams requestParams, int time, String accountId, boolean isPending, Source source) {
+                                    HttpRequestParams requestParams, int time, String accountId, boolean isPending, Source source, String orig) {
             this.type = type;
             this.statusCode = statusCode;
             this.status = status;
@@ -165,6 +166,7 @@ public class HttpCallParser {
             this.accountId = accountId;
             this.isPending = isPending;
             this.source = source;
+            this.orig = orig;
         }
 
         public String getPayload() {
@@ -209,6 +211,14 @@ public class HttpCallParser {
 
         public void setSource(Source source) {
             this.source = source;
+        }
+
+        public String getOrig() {
+            return this.orig;
+        }
+
+        public void setOrig(String orig) {
+            this.orig = orig;
         }
     }
 
@@ -275,7 +285,7 @@ public class HttpCallParser {
         Source source = Source.valueOf(sourceStr);
         
         return new HttpResponseParams(
-                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source
+                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message
         );
 
     }

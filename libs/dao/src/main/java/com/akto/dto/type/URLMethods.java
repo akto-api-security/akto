@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.akto.dto.traffic.Key;
+import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 
 public class URLMethods {
@@ -61,6 +63,17 @@ public class URLMethods {
         List<TrafficInfo> ret = new ArrayList<>();
         for(Map.Entry<Method, RequestTemplate> entry: methodToRequestTemplate.entrySet()) {
             ret.addAll(entry.getValue().removeAllTrafficInfo(apiCollectionId, url, entry.getKey(), -1));
+        }
+        return ret;
+    }
+
+    public List<SampleData> removeAllSampleData(int apiCollectionId, String url) {
+        List<SampleData> ret = new ArrayList<>();
+        for(Map.Entry<Method, RequestTemplate> entry: methodToRequestTemplate.entrySet()) {
+
+            Key key = new Key(apiCollectionId, url, entry.getKey(), -1, 0, 0);
+
+            ret.add(new SampleData(key, entry.getValue().removeAllSampleMessage()));
         }
         return ret;
     }
