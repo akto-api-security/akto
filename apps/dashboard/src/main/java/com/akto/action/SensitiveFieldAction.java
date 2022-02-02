@@ -8,11 +8,16 @@ import com.akto.dao.context.Context;
 import com.akto.dto.Relationship;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.type.SingleTypeInfo;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
+import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.UpdateOneModel;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.WriteModel;
 import com.opensymphony.xwork2.Action;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -155,6 +160,32 @@ public class SensitiveFieldAction extends UserAction{
     //             apiRelationInfo.isHeader(), apiRelationInfo.getParam());
     // }
 
+    private BasicDBList items;
+    public String bulkMarkSensitive() {
+        ArrayList<WriteModel<SensitiveParamInfo>> bulkUpdates = new ArrayList<>();
+        for (Object item: items) {
+            HashMap<String, Object> itemObj = (HashMap) item;
+            HashMap <String, Object>xObj = (HashMap) (itemObj.get("x"));
+            String url = xObj.get("url").toString();
+            String method = xObj.get("method").toString();
+            long responseCode = (Long) xObj.get("responseCode");
+            boolean isHeader =  (Boolean) xObj.get("isHeader");
+            String param = xObj.get("param").toString();
+            long apiCollectionId = (Long) xObj.get("apiCollectionId");
+            Bson filter = getFilters(url, method, (int) responseCode, isHeader, param, (int) apiCollectionId);
+
+            Bson bson = Updates.set("sensitive", true);
+            
+            bulkUpdates.add(
+                new UpdateOneModel<>(filter, bson, new UpdateOptions().upsert(true))
+            );
+        }
+
+        BulkWriteResult res = SensitiveParamInfoDao.instance.getMCollection().bulkWrite(bulkUpdates);
+        ret = new BasicDBObject();
+        ret.append("updates", res.getModifiedCount()).append("inserts", res.getInsertedCount());
+        return Action.SUCCESS.toUpperCase();
+    }
 
     public void setUrl(String url) {
         this.url = url;
@@ -190,5 +221,9 @@ public class SensitiveFieldAction extends UserAction{
 
     public BasicDBObject getRet() {
         return this.ret;
+    }
+
+    public void setItems(BasicDBList items) {
+        this.items = items;
     }
 }

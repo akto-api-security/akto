@@ -54,6 +54,38 @@
                     <template #item.type="{item}">
                         <sensitive-chip-group :sensitiveTags="[item.type]" />
                     </template>
+                    <template #add-new-row-btn>
+                        <div class="ma-1">
+                            <v-dialog
+                                :model="showDialog"
+                                width="600px"
+                            >
+                            <template v-slot:activator="{ on, attrs }">
+                                <v-btn
+                                    color="#6200EA"
+                                    icon
+                                    dark
+                                    v-bind="attrs"
+                                    v-on="on"
+                                    @click="showDialog = !showDialog"
+                                >
+                                <v-tooltip bottom>
+                                    <template v-slot:activator='{ on, attrs }'>
+                                        <v-icon color="#6200EA" size="16" v-bind="attrs" v-on="on" >$fas_lock</v-icon>
+                                    </template>
+                                    Mark sensitive
+                                </v-tooltip>
+                                </v-btn>
+                            </template>
+                                <batch-operation 
+                                    title="Parameters" 
+                                    :items="newParameters.map(toFilterListObj)" 
+                                    operation-name="Mark sensitive"
+                                    @btnClicked="markAllSensitive"
+                                />
+                            </v-dialog>
+                        </div>
+                    </template>
                 </simple-table>
             </template>
         </layout-with-tabs>
@@ -71,6 +103,8 @@ import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChip
 import func from '@/util/func'
 import constants from '@/util/constants'
 import {mapState} from 'vuex'
+import BatchOperation from './components/BatchOperation'
+import api from './api.js'
 
 export default {
     name: "ApiChanges",
@@ -82,10 +116,12 @@ export default {
         LayoutWithTabs,
         SimpleTable,
         SensitiveChipGroup,
-        LineChart
+        LineChart,
+        BatchOperation
     },
     data () {
         return {
+            showDialog: false,
             endpointHeaders: [
                 {
                     text: '',
@@ -151,6 +187,30 @@ export default {
         }
     },
     methods: {
+        markAllSensitive ({items}) {
+            let valueSet = new Set([...items.map(x => x.value)])
+            api.bulkMarkSensitive(this.newParameters.filter(n => valueSet.has(this.toFilterListObj(n).value))).then(resp => {
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: `${items.length}` + ` items marked sensitive`,
+                    color: 'green'
+                })
+            }).catch(() => {
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: `Error in marking sensitive!`,
+                    color: 'red'
+                })
+
+            })
+        },
+        toFilterListObj(x) {
+            return {
+                value: x.name + " " + x.location + " " + x.method + " " + x.endpoint + " " + x.apiCollectionName,
+                title: x.name,
+                subtitle: x.location + " " + x.method + " " + x.endpoint + " (" + x.apiCollectionName + ")"
+            }
+        },
         prepareItemForTable(x) {
             let idToNameMap = this.mapCollectionIdToName
             return {
@@ -163,7 +223,8 @@ export default {
                 type: x.subType,
                 detectedTs: x.timestamp,
                 apiCollectionId: x.apiCollectionId,
-                apiCollectionName: idToNameMap[x.apiCollectionId] || '-'
+                apiCollectionName: idToNameMap[x.apiCollectionId] || '-',
+                x: x
             }
         },
         goToEndpoint (row) {

@@ -4,8 +4,16 @@
             <div>{{title}}</div>
             <div>{{Object.values(checkedMap).filter(x => x).length}}/{{Object.values(checkedMap).length}}</div>
         </div>
-        <v-list dense class="filter-list">
+        <v-list dense class="filter-list" :style="{'width':  width || '250px'}">
             <v-list-item v-if="items && items.length > 8">
+                <span>
+                    <v-btn icon primary plain :ripple="false" @click="globalCheckboxClicked" class="checkbox-btn">
+                        <v-icon>
+                            {{globalCheckbox? '$far_check-square': '$far_square'}}
+                        </v-icon>
+                    </v-btn>
+                </span>
+
                 <v-text-field
                     v-model="searchText"
                     dense
@@ -17,15 +25,18 @@
                     </template>
                 </v-text-field>
             </v-list-item>
-            <v-list-item v-for="(item, index) in filteredItems" :key="index">
+            <v-list-item v-for="(item, index) in filteredItems.slice(0, 100)" :key="index">
                 <span>
                     <v-btn icon primary plain :ripple="false" @click="checkboxClicked(item)" class="checkbox-btn">
                         <v-icon>
-                            {{checkedMap[item]? '$far_check-square': '$far_square'}}
+                            {{checkedMap[item.value]? '$far_check-square': '$far_square'}}
                         </v-icon>
                     </v-btn>
                 </span>
-                <v-list-item-content class="item-label">{{item}}</v-list-item-content>
+                <v-list-item-content>
+                    <span class="item-label">{{item.title}}</span>
+                    <span class="item-subtitle">{{item.subtitle}}</span>
+                </v-list-item-content>
             </v-list-item>
         </v-list>
     </div>    
@@ -39,21 +50,23 @@ export default {
     name: "FilterList",
     props: {
         title: obj.strR,
-        items: obj.arrN
+        items: obj.arrN,
+        width: obj.strN
     },
     data () {
         return {
             checkedMap: this.items.reduce((m, i) => {
-                m[i] = false
+                m[i.value] = false
                 return m
             }, {}),
-            searchText: ""
+            searchText: "",
+            globalCheckbox: false
         }
     },
     methods: {
         checkboxClicked(item) {
-            this.checkedMap[item] = !this.checkedMap[item]
-            this.$emit('clickedItem', {item: item, checked: this.checkedMap[item]})
+            this.checkedMap[item.value] = !this.checkedMap[item.value]
+            this.$emit('clickedItem', {item: item, checked: this.checkedMap[item.value]})
         },
         textChanged () {
             if (this.searchText && this.searchText.length > 0) {
@@ -61,12 +74,19 @@ export default {
             } else {
 
             }
+        },
+        globalCheckboxClicked () {
+            this.globalCheckbox = !this.globalCheckbox
+            for(var index in this.filteredItems) {
+                this.checkedMap[this.filteredItems[index].value] = this.globalCheckbox
+            }
+            this.$emit('selectedAll', {items: this.filteredItems,checked: this.globalCheckbox})
         }
     },
     computed: {
         filteredItems () {
             if (this.searchText && this.searchText.length > 0) {
-                return this.items.filter(x => x.toLowerCase().indexOf(this.searchText) != -1)
+                return this.items.filter(x => x.title.toLowerCase().indexOf(this.searchText) != -1)
             } else {
                 return this.items
             }
@@ -80,16 +100,18 @@ export default {
 .item-label
     font-size: 12px
     padding: 0px !important
+.item-subtitle
+    font-size: 9px
+    color: #47466A99
 .checkbox-btn
     min-height: 24px !important
-    color: #6200EA !important
+    color: #47466A !important
 .filter-list
     height: 350px
-    width: 250px    
     overflow-y: scrollbar
     overflow-x: hidden
 .list-header
-    border-bottom: 1px solid #6200EA    
+    border-bottom: 1px solid #47466A    
     font-weight: 500
     display: flex
     justify-content: space-between
