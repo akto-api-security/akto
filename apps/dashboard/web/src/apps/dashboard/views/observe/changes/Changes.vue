@@ -55,9 +55,9 @@
                         <sensitive-chip-group :sensitiveTags="[item.type]" />
                     </template>
                     <template #add-new-row-btn>
-                        <div class="ma-1">
+                        <div class="ma-1 d-flex">
                             <v-dialog
-                                :model="showDialog"
+                                :model="showDialog1"
                                 width="600px"
                             >
                             <template v-slot:activator="{ on, attrs }">
@@ -67,7 +67,7 @@
                                     dark
                                     v-bind="attrs"
                                     v-on="on"
-                                    @click="showDialog = !showDialog"
+                                    @click="showDialog1 = !showDialog1"
                                 >
                                 <v-tooltip bottom>
                                     <template v-slot:activator='{ on, attrs }'>
@@ -81,7 +81,36 @@
                                     title="Parameters" 
                                     :items="newParameters.map(toFilterListObj)" 
                                     operation-name="Mark sensitive"
-                                    @btnClicked="markAllSensitive"
+                                    @btnClicked="markAllSensitive(true, $event)"
+                                />
+                            </v-dialog>
+
+                            <v-dialog
+                                :model="showDialog2"
+                                width="600px"
+                            >
+                            <template v-slot:activator="{ on, attrs }">
+                                <v-btn
+                                    color="#6200EA"
+                                    icon
+                                    dark
+                                    v-bind="attrs"
+                                    v-on="on"
+                                    @click="showDialog2 = !showDialog2"
+                                >
+                                <v-tooltip bottom>
+                                    <template v-slot:activator='{ on, attrs }'>
+                                        <v-icon color="#6200EA" size="16" v-bind="attrs" v-on="on" >$fas_lock-open</v-icon>
+                                    </template>
+                                    Unmark sensitive
+                                </v-tooltip>
+                                </v-btn>
+                            </template>
+                                <batch-operation 
+                                    title="Parameters" 
+                                    :items="newParameters.map(toFilterListObj)" 
+                                    operation-name="Unmark sensitive"
+                                    @btnClicked="markAllSensitive(false, $event)"
                                 />
                             </v-dialog>
                         </div>
@@ -121,7 +150,8 @@ export default {
     },
     data () {
         return {
-            showDialog: false,
+            showDialog1: false,
+            showDialog2: false,
             endpointHeaders: [
                 {
                     text: '',
@@ -187,22 +217,24 @@ export default {
         }
     },
     methods: {
-        markAllSensitive ({items}) {
+        markAllSensitive (sensitive, {items}) {
             let valueSet = new Set([...items.map(x => x.value)])
-            api.bulkMarkSensitive(this.newParameters.filter(n => valueSet.has(this.toFilterListObj(n).value))).then(resp => {
+            api.bulkMarkSensitive(sensitive, this.newParameters.filter(n => valueSet.has(this.toFilterListObj(n).value))).then(resp => {
                 window._AKTO.$emit('SHOW_SNACKBAR', {
                     show: true,
-                    text: `${items.length}` + ` items marked sensitive`,
+                    text: `${items.length}` + ` items ${sensitive ? '':'un'}marked sensitive`,
                     color: 'green'
                 })
+                this.refreshPage()
             }).catch(() => {
                 window._AKTO.$emit('SHOW_SNACKBAR', {
                     show: true,
-                    text: `Error in marking sensitive!`,
+                    text: `Error in ${sensitive ? '':'un'}marking sensitive!`,
                     color: 'red'
                 })
-
             })
+            this.showDialog1 = false
+            this.showDialog2 = false
         },
         toFilterListObj(x) {
             return {

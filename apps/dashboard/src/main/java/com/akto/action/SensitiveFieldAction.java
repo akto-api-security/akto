@@ -174,7 +174,7 @@ public class SensitiveFieldAction extends UserAction{
             long apiCollectionId = (Long) xObj.get("apiCollectionId");
             Bson filter = getFilters(url, method, (int) responseCode, isHeader, param, (int) apiCollectionId);
 
-            Bson bson = Updates.set("sensitive", true);
+            Bson bson = Updates.set("sensitive", sensitive);
             
             bulkUpdates.add(
                 new UpdateOneModel<>(filter, bson, new UpdateOptions().upsert(true))
