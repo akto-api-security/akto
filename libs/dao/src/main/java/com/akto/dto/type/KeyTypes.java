@@ -21,7 +21,7 @@ public class KeyTypes {
     public static final Map<SubType, Pattern> patternToSubType = new HashMap<>();
     static {
         patternToSubType.put(SubType.EMAIL, Pattern.compile("^[a-zA-Z0-9_+&*-]+(?:\\.[a-zA-Z0-9_+&*-]+)*@(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,7}$"));
-        patternToSubType.put(SubType.URL, Pattern.compile("^((((https?|ftps?|gopher|telnet|nntp)://)|(mailto:|news:))(%[0-9A-Fa-f]{2}|[-()_.!~*';/?:@&=+$,A-Za-z0-9])+)([).!';/?:,][[:blank:|:blank:]])?$"));
+        patternToSubType.put(SubType.URL, Pattern.compile("^((((https?|ftps?|gopher|telnet|nntp)://)|(mailto:|news:))([-%()_.!~*';/?:@&=+$,A-Za-z0-9])+)$"));
         patternToSubType.put(SubType.SSN, Pattern.compile("^\\d{3}-\\d{2}-\\d{4}$"));
         patternToSubType.put(SubType.UUID, Pattern.compile("^[A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{12}$"));
 
