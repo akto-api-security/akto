@@ -4,9 +4,9 @@
 
         <div v-if="limitedItems.length < Object.values(allItems).filter(x => x.selected).length" class="info-text">
             <v-icon size="12">$fas_exclamation</v-icon>
-            You have selected {{Object.values(allItems).filter(x => x.selected).length}} items. 
-            Only {{maxN}} items are allowed for this operation. 
-            We will limit the operation to first {{maxN}} items.
+            You have selected more than {{maxN}} params. We will limit the selection to first {{maxN}} params. 
+            You can come back and select more.
+
         </div>
 
         <div class="d-flex jc-end pa-3">
@@ -41,7 +41,7 @@ export default {
         }
         return {
             allItems: allItems,
-            maxN: 100
+            maxN: 1000
         }
     },
     methods: {

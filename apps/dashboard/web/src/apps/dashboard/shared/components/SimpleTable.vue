@@ -27,7 +27,7 @@
                     <div class="d-flex jc-end">
                         <div class="d-flex board-table-cards jc-end">
                             <div class="clickable download-csv ma-1">
-                                <v-btn icon  :color="$vuetify.theme.themes.dark.themeColor"  @click="downloadData">
+                                <v-btn icon  :color="$vuetify.theme.themes.dark.themeColor"  @click="downloadData" v-if="!hideDownloadCSVIcon">
                                     <v-icon>$fas_file-csv</v-icon>
                                 </v-btn>
                                 <v-btn icon  :color="$vuetify.theme.themes.dark.themeColor"  @click="itemsPerPage = [-1]" v-if="enablePagination && itemsPerPage[0] != -1">
@@ -39,18 +39,6 @@
                             </div>            
                             <slot name="add-new-row-btn"/>
                         </div>
-
-                        <v-data-footer 
-                            :pagination="pagination" 
-                            :options="options"
-                            @update:options="updateOptions"
-                            prev-icon='$fas_angle-left'
-                            next-icon='$fas_angle-right'               
-                            items-per-page-text="$vuetify.dataTable.itemsPerPageText"
-                            :items-per-page-options="itemsPerPage"
-                            class="no-border"
-                            v-if="enablePagination"
-                        />
                     </div>
                 </div>
             </template>
@@ -158,7 +146,8 @@ export default {
         sortKeyDefault: obj.strN,
         sortDescDefault: obj.boolN,
         actions: obj.arrN,
-        allowNewRow: obj.boolN
+        allowNewRow: obj.boolN,
+        hideDownloadCSVIcon: obj.boolN
     },
     data () {
         let rowsPerPage = 50

@@ -25,7 +25,7 @@
                     </template>
                 </v-text-field>
             </v-list-item>
-            <v-list-item v-for="(item, index) in filteredItems.slice(0, 100)" :key="index">
+            <v-list-item v-for="(item, index) in filteredItems.slice(0, 1000)" :key="index">
                 <span>
                     <v-btn icon primary plain :ripple="false" @click="checkboxClicked(item)" class="checkbox-btn">
                         <v-icon>
@@ -36,6 +36,11 @@
                 <v-list-item-content>
                     <span class="item-label">{{item.title}}</span>
                     <span class="item-subtitle">{{item.subtitle}}</span>
+                </v-list-item-content>
+            </v-list-item>
+            <v-list-item v-if="filteredItems.length > 1000">
+                <v-list-item-content>
+                    <span class="item-label">Showing 1000 results only</span>
                 </v-list-item-content>
             </v-list-item>
         </v-list>
