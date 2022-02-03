@@ -27,14 +27,14 @@
               
               </v-text-field>
             </div>
-            <div v-if="hover">
+            <div v-if="hover" class="pt-4">
               <actions-tray :actions="actions || []" :subject=item></actions-tray>
             </div>
           </div>
         </v-hover>
       </div>
     </div>
-    <div>
+    <div class="pt-2">
       <v-btn color="#6200EA" style="color:white" @click="addBurpToken">Generate Token</v-btn>
     </div>
 

@@ -53,6 +53,7 @@
             @click="save"
             :disabled="!can_be_saved"
             :loading="save_loading"
+            style="color:white" 
         >Save
         </v-btn>
       </div>
