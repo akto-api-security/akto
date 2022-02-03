@@ -15,7 +15,7 @@
             <count-box title="All Endpoints" :count="allEndpoints.length" colorTitle="Total"/>
         </div>    
 
-        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Shadow', 'Unused', 'Upload']">
+        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Shadow', 'Unused', 'Documented']">
             <template slot="actions-tray">
             </template>
             <template slot="All">
@@ -64,7 +64,7 @@
                     name="Unused"
                 />
             </template>
-            <template slot="Upload">
+            <template slot="Documented">
                 <v-file-input
                     :rules=swaggerUploadRules
                     show-size
