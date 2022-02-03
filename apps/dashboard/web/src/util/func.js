@@ -324,7 +324,7 @@ export default {
                     added: '-',
 
                     changesCount: 0,
-                    changes: '-',
+                    changes: '',
                     apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-'
                 }
 

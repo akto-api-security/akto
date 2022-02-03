@@ -33,7 +33,7 @@
                     :actions="actions"
                     name="Request" 
                     sortKeyDefault="sensitive" 
-                    :sortDescDefault="true"
+                    :sortDescDefault="true" 
                 />
             </template>
             <template slot="Response">
@@ -109,7 +109,7 @@ export default {
                     value: 'location'  
                 },
                 {
-                    text: 'Added on',
+                    text: 'Discovered',
                     value: 'date',
                     sortKey: 'detectedTs'
                 }                

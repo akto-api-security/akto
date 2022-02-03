@@ -25,7 +25,20 @@
         <layout-with-tabs title="" :tabs="['New endpoints', 'New parameters']">
             <template slot="actions-tray">
                 <div class="d-flex jc-end">
-                    <v-btn icon color="#47466A" @click="refreshPage"><v-icon>$fas_sync</v-icon></v-btn>
+                    <v-tooltip bottom>
+                        <template v-slot:activator='{on, attrs}'>
+                            <v-btn 
+                                icon 
+                                color="#47466A" 
+                                @click="refreshPage"
+                                v-on="on"
+                                v-bind="attrs"
+                            >
+                                    <v-icon>$fas_redo</v-icon>
+                            </v-btn>
+                        </template>
+                        Refresh
+                    </v-tooltip>
                 </div>
             </template>
             <template slot="New endpoints">
@@ -62,7 +75,7 @@
                             >
                             <template v-slot:activator="{ on, attrs }">
                                 <v-btn
-                                    color="#6200EA"
+                                    color="#47466A"
                                     icon
                                     dark
                                     v-bind="attrs"
@@ -71,7 +84,7 @@
                                 >
                                 <v-tooltip bottom>
                                     <template v-slot:activator='{ on, attrs }'>
-                                        <v-icon color="#6200EA" size="16" v-bind="attrs" v-on="on" >$fas_lock</v-icon>
+                                        <v-icon color="#47466A" size="16" v-bind="attrs" v-on="on" >$fas_lock</v-icon>
                                     </template>
                                     Mark sensitive
                                 </v-tooltip>
@@ -79,7 +92,7 @@
                             </template>
                                 <batch-operation 
                                     title="Parameters" 
-                                    :items="newParameters.map(toFilterListObj)" 
+                                    :items="newParameters.filter(x => !isSubTypeSensitive(x.x)).map(toFilterListObj)" 
                                     operation-name="Mark sensitive"
                                     @btnClicked="markAllSensitive(true, $event)"
                                 />
@@ -91,7 +104,7 @@
                             >
                             <template v-slot:activator="{ on, attrs }">
                                 <v-btn
-                                    color="#6200EA"
+                                    color="#47466A"
                                     icon
                                     dark
                                     v-bind="attrs"
@@ -100,7 +113,7 @@
                                 >
                                 <v-tooltip bottom>
                                     <template v-slot:activator='{ on, attrs }'>
-                                        <v-icon color="#6200EA" size="16" v-bind="attrs" v-on="on" >$fas_lock-open</v-icon>
+                                        <v-icon color="#47466A" size="16" v-bind="attrs" v-on="on" >$fas_lock-open</v-icon>
                                     </template>
                                     Unmark sensitive
                                 </v-tooltip>
@@ -108,7 +121,7 @@
                             </template>
                                 <batch-operation 
                                     title="Parameters" 
-                                    :items="newParameters.map(toFilterListObj)" 
+                                    :items="newParameters.filter(x => isSubTypeSensitive(x.x)).map(toFilterListObj)" 
                                     operation-name="Unmark sensitive"
                                     @btnClicked="markAllSensitive(false, $event)"
                                 />
@@ -217,6 +230,9 @@ export default {
         }
     },
     methods: {
+        isSubTypeSensitive(x) {
+            return func.isSubTypeSensitive(x)
+        },
         markAllSensitive (sensitive, {items}) {
             let valueSet = new Set([...items.map(x => x.value)])
             api.bulkMarkSensitive(sensitive, this.newParameters.filter(n => valueSet.has(this.toFilterListObj(n).value))).then(resp => {

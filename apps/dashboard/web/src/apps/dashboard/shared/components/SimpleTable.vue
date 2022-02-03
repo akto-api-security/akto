@@ -27,15 +27,40 @@
                     <div class="d-flex jc-end">
                         <div class="d-flex board-table-cards jc-end">
                             <div class="clickable download-csv ma-1">
-                                <v-btn icon color="#47466A" @click="downloadData" v-if="!hideDownloadCSVIcon">
-                                    <v-icon>$fas_file-csv</v-icon>
-                                </v-btn>
-                                <v-btn icon color="#47466A" @click="itemsPerPage = [-1]" v-if="enablePagination && itemsPerPage[0] != -1">
-                                    <v-icon>$fas_angle-double-down</v-icon>
-                                </v-btn>
-                                <v-btn icon color="#47466A" @click="itemsPerPage = [rowsPerPage]" v-if="enablePagination && itemsPerPage[0] == -1">
-                                    <v-icon>$fas_angle-double-up</v-icon>
-                                </v-btn>
+                                <v-tooltip bottom>
+                                    <template v-slot:activator="{on, attrs}">
+                                        <v-btn 
+                                            v-on="on"
+                                            v-bind="attrs" 
+                                            icon color="#47466A" @click="downloadData" v-if="!hideDownloadCSVIcon">
+                                                <v-icon>$fas_file-csv</v-icon>
+                                        </v-btn>
+                                    </template>
+                                    Download as CSV
+                                </v-tooltip>
+                                <v-tooltip bottom>
+                                    <template v-slot:activator="{on, attrs}">
+                                        <v-btn 
+                                            v-on="on"
+                                            v-bind="attrs"
+                                            icon 
+                                            color="#47466A" 
+                                            @click="itemsPerPage = [-1]" 
+                                            v-if="enablePagination && itemsPerPage[0] != -1"
+                                        >
+                                            <v-icon>$fas_angle-double-down</v-icon>
+                                        </v-btn>
+                                    </template>
+                                    Show all
+                                </v-tooltip>
+                                        <v-btn 
+                                            icon 
+                                            color="#47466A" 
+                                            @click="itemsPerPage = [rowsPerPage]" 
+                                            v-if="enablePagination && itemsPerPage[0] == -1"
+                                        >
+                                            <v-icon>$fas_angle-double-up</v-icon>
+                                        </v-btn>
                             </div>            
                             <slot name="add-new-row-btn"/>
                         </div>
