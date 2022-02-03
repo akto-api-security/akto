@@ -4,30 +4,31 @@
       <v-avatar size="40px" style="margin-right: 15px">
         <img src="@/assets/getpostman-icon.svg"/>
       </v-avatar>
-      <h2>Postman</h2>
+      <h2 style="color: #47466A; font-size: 16px; font-weight: 500" class="fd-column jc-sa">Postman</h2>
     </div>
-    <div style="padding-top: 20px;">
+    <div>
       <div class="d-flex">
-        <div style="width: 150px">
-          <h3 style="">API Key</h3>
+        <div style="width: 150px" class="fd-column jc-sa">
+          <h3 style="color: #47466A; font-size: 13px">API Key</h3>
         </div>
         <div style="width: 550px">
           <v-text-field
-              :append-icon="openPassword ? '$fas_eye' : '$fas_eye-slash'"
               @click:append="openPassword = !openPassword"
               :type="openPassword ? 'text' : 'password'"
-              v-model="postman_api_key"
-              outlined
+              v-model="postman_api_key"  
               clearable
-              height="32px"
               @change="postman_key_changed"
-          />
+          >
+            <template v-slot:append>  
+              <v-icon class="icon-nav-drawer" @click="openPassword = !openPassword">{{openPassword ? '$fas_eye' : '$fas_eye-slash'}}</v-icon>
+            </template>
+          </v-text-field>
         </div>
       </div>
 
-      <div class="d-flex">
+      <div class="d-flex"  v-if="postman_api_key && postman_api_key.length > 0">
         <div style="width: 150px">
-          <h3 style="">Workspace</h3>
+          <h3 style="color: #47466A; font-size: 13px">Workspace</h3>
         </div>
         <div style="width: 550px">
           <v-select
@@ -48,10 +49,11 @@
 
       <div style="padding-top:20px">
         <v-btn
-            color="success"
+            color="#6200EA"
             @click="save"
             :disabled="!can_be_saved"
             :loading="save_loading"
+            style="color:white" 
         >Save
         </v-btn>
       </div>
@@ -128,5 +130,11 @@ export default {
   width: 1px;
   margin-right: 15px;
 }
+
+</style>
+
+<style lang="sass" scoped>
+.icon-nav-drawer
+  padding-top: 25px  
 
 </style>

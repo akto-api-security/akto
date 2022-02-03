@@ -39,7 +39,9 @@ const changes = {
                     return functionCompareParamObj(x, p)
                 })
                 
-                state.apiCollection[apiCollectionIndex].savedAsSensitive = true
+                if (apiCollectionIndex > -1) {
+                    state.apiCollection[apiCollectionIndex].savedAsSensitive = true
+                }
             })
             state.apiCollection = [...state.apiCollection]
         }

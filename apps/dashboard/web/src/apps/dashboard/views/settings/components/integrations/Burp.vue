@@ -4,36 +4,38 @@
       <v-avatar size="40px" style="margin-right: 15px">
         <img src="@/assets/burpsuite.svg"/>
       </v-avatar>
-      <h2>Burp</h2>
+      <h2 style="color: #47466A; font-size: 16px; font-weight: 500" class="fd-column jc-sa">Burp</h2>
     </div>
     <div style="padding-top: 20px;">
       <div class="d-flex" v-for="item in burpTokensForTable" :key="item.id" style="padding-bottom: 30px">
         <v-hover v-slot="{ hover }">
           <div class="d-flex" style="height: 34px;   line-height: 34px;">
-            <div style="width: 150px;">
-              <h4 style="font-weight: normal">{{item.computedTime}}</h4>
+            <div style="width: 150px; padding-top: 20px;">
+              <h4 style="font-weight: normal; color: #47466A; font-size: 13px">{{item.computedTime}}</h4>
             </div>
             <div style="width: 500px">
               <v-text-field
-                  :append-icon="openPasswordMap[item.id] ? '$fas_eye' : '$fas_eye-slash'"
-                  @click:append="eyeClicked(item)"
                   :type="openPasswordMap[item.id] ? 'text' : 'password'"
                   :value="item.key"
-                  outlined
                   clearable
                   height="32px"
                   readonly
-              />
+              >
+                <template v-slot:append>
+                  <v-icon @click="eyeClicked(item)" class="icon-nav-drawer">{{openPasswordMap[item.id] ? '$fas_eye' : '$fas_eye-slash'}}</v-icon>
+                </template>
+              
+              </v-text-field>
             </div>
-            <div v-if="hover">
+            <div v-if="hover" class="pt-4">
               <actions-tray :actions="actions || []" :subject=item></actions-tray>
             </div>
           </div>
         </v-hover>
       </div>
     </div>
-    <div>
-      <v-btn color="green" style="color:white" @click="addBurpToken">Generate Token</v-btn>
+    <div class="pt-2">
+      <v-btn color="#6200EA" style="color:white" @click="addBurpToken">Generate Token</v-btn>
     </div>
 
   </div>
@@ -104,6 +106,7 @@ export default {
 }
 </script>
 
-<style scoped>
-
+<style scoped lang="sass">
+.icon-nav-drawer
+  padding-top: 25px  
 </style>

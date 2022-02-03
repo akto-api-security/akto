@@ -80,6 +80,15 @@
       </div>
 
         <v-list dense nav class="left-nav" style="margin-top: auto">
+          <v-list-item class='row-nav-drawer' @click="openDocs">
+            <v-list-item-icon class="icon-nav-drawer">
+              <v-icon>$fas_user-secret</v-icon>
+            </v-list-item-icon>
+              <v-list-item-content class="content-nav-drawer">
+                <v-list-item-title class="title-nav-drawer">Help</v-list-item-title>
+              </v-list-item-content>
+          </v-list-item>
+
           <simple-menu :items="myAccountItems">
             <template v-slot:activator2>
               <v-list-item class='row-nav-drawer'>
@@ -96,7 +105,6 @@
               </v-list-item>
             </template>
           </simple-menu>
-
         </v-list>
     </v-navigation-drawer>
 
@@ -185,6 +193,9 @@
     },
     methods: {
       ...mapGetters('auth', ['getUsername', 'getAvatar', 'getActiveAccount', 'getAccounts']),
+      openDocs() {
+        window.open('https://docs.akto.io/deploy/self-hosted-deployment/aws-deploy', '_blank')
+      },
       goToAccount (accId) {
         api.goToAccount(+accId)
       },

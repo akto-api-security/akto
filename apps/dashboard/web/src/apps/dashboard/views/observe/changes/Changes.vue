@@ -25,7 +25,20 @@
         <layout-with-tabs title="" :tabs="['New endpoints', 'New parameters']">
             <template slot="actions-tray">
                 <div class="d-flex jc-end">
-                    <v-btn icon color="#47466A" @click="refreshPage"><v-icon>$fas_sync</v-icon></v-btn>
+                    <v-tooltip bottom>
+                        <template v-slot:activator='{on, attrs}'>
+                            <v-btn 
+                                icon 
+                                color="#47466A" 
+                                @click="refreshPage"
+                                v-on="on"
+                                v-bind="attrs"
+                            >
+                                    <v-icon>$fas_redo</v-icon>
+                            </v-btn>
+                        </template>
+                        Refresh
+                    </v-tooltip>
                 </div>
             </template>
             <template slot="New endpoints">
@@ -54,6 +67,67 @@
                     <template #item.type="{item}">
                         <sensitive-chip-group :sensitiveTags="[item.type]" />
                     </template>
+                    <template #add-new-row-btn>
+                        <div class="ma-1 d-flex">
+                            <v-dialog
+                                :model="showDialog1"
+                                width="600px"
+                            >
+                            <template v-slot:activator="{ on, attrs }">
+                                <v-btn
+                                    color="#47466A"
+                                    icon
+                                    dark
+                                    v-bind="attrs"
+                                    v-on="on"
+                                    @click="showDialog1 = !showDialog1"
+                                >
+                                <v-tooltip bottom>
+                                    <template v-slot:activator='{ on, attrs }'>
+                                        <v-icon color="#47466A" size="16" v-bind="attrs" v-on="on" >$fas_lock</v-icon>
+                                    </template>
+                                    Mark sensitive
+                                </v-tooltip>
+                                </v-btn>
+                            </template>
+                                <batch-operation 
+                                    title="Parameters" 
+                                    :items="newParameters.filter(x => !isSubTypeSensitive(x.x)).map(toFilterListObj)" 
+                                    operation-name="Mark sensitive"
+                                    @btnClicked="markAllSensitive(true, $event)"
+                                />
+                            </v-dialog>
+
+                            <v-dialog
+                                :model="showDialog2"
+                                width="600px"
+                            >
+                            <template v-slot:activator="{ on, attrs }">
+                                <v-btn
+                                    color="#47466A"
+                                    icon
+                                    dark
+                                    v-bind="attrs"
+                                    v-on="on"
+                                    @click="showDialog2 = !showDialog2"
+                                >
+                                <v-tooltip bottom>
+                                    <template v-slot:activator='{ on, attrs }'>
+                                        <v-icon color="#47466A" size="16" v-bind="attrs" v-on="on" >$fas_lock-open</v-icon>
+                                    </template>
+                                    Unmark sensitive
+                                </v-tooltip>
+                                </v-btn>
+                            </template>
+                                <batch-operation 
+                                    title="Parameters" 
+                                    :items="newParameters.filter(x => isSubTypeSensitive(x.x)).map(toFilterListObj)" 
+                                    operation-name="Unmark sensitive"
+                                    @btnClicked="markAllSensitive(false, $event)"
+                                />
+                            </v-dialog>
+                        </div>
+                    </template>
                 </simple-table>
             </template>
         </layout-with-tabs>
@@ -71,6 +145,8 @@ import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChip
 import func from '@/util/func'
 import constants from '@/util/constants'
 import {mapState} from 'vuex'
+import BatchOperation from './components/BatchOperation'
+import api from './api.js'
 
 export default {
     name: "ApiChanges",
@@ -82,10 +158,13 @@ export default {
         LayoutWithTabs,
         SimpleTable,
         SensitiveChipGroup,
-        LineChart
+        LineChart,
+        BatchOperation
     },
     data () {
         return {
+            showDialog1: false,
+            showDialog2: false,
             endpointHeaders: [
                 {
                     text: '',
@@ -151,6 +230,35 @@ export default {
         }
     },
     methods: {
+        isSubTypeSensitive(x) {
+            return func.isSubTypeSensitive(x)
+        },
+        markAllSensitive (sensitive, {items}) {
+            let valueSet = new Set([...items.map(x => x.value)])
+            api.bulkMarkSensitive(sensitive, this.newParameters.filter(n => valueSet.has(this.toFilterListObj(n).value))).then(resp => {
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: `${items.length}` + ` items ${sensitive ? '':'un'}marked sensitive`,
+                    color: 'green'
+                })
+                this.refreshPage()
+            }).catch(() => {
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: `Error in ${sensitive ? '':'un'}marking sensitive!`,
+                    color: 'red'
+                })
+            })
+            this.showDialog1 = false
+            this.showDialog2 = false
+        },
+        toFilterListObj(x) {
+            return {
+                value: x.name + " " + x.location + " " + x.method + " " + x.endpoint + " " + x.apiCollectionName,
+                title: x.name,
+                subtitle: x.location + " " + x.method + " " + x.endpoint + " (" + x.apiCollectionName + ")"
+            }
+        },
         prepareItemForTable(x) {
             let idToNameMap = this.mapCollectionIdToName
             return {
@@ -163,7 +271,8 @@ export default {
                 type: x.subType,
                 detectedTs: x.timestamp,
                 apiCollectionId: x.apiCollectionId,
-                apiCollectionName: idToNameMap[x.apiCollectionId] || '-'
+                apiCollectionName: idToNameMap[x.apiCollectionId] || '-',
+                x: x
             }
         },
         goToEndpoint (row) {

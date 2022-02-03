@@ -20,33 +20,51 @@
             hide-default-header
         >
             <template v-slot:top="{ pagination, options, updateOptions }" v-if="items && items.length > 0">
-                <div class="d-flex jc-end">
-                    <div class="d-flex board-table-cards jc-end">
-                        <div class="clickable download-csv ma-1">
-                            <v-btn icon  color="#47466A" @click="downloadData">
-                                <v-icon>$fas_file-csv</v-icon>
-                            </v-btn>
-                            <v-btn icon  color="#47466A"  @click="itemsPerPage = [-1]" v-if="enablePagination && itemsPerPage[0] != -1">
-                                <v-icon>$fas_angle-double-down</v-icon>
-                            </v-btn>
-                            <v-btn icon  color="#47466A"  @click="itemsPerPage = [rowsPerPage]" v-if="enablePagination && itemsPerPage[0] == -1">
-                                <v-icon>$fas_angle-double-up</v-icon>
-                            </v-btn>
-                        </div>            
-                        <slot name="add-new-row-btn"/>
+                <div class="d-flex jc-sb"> 
+                    <div>
+                        <slot name="massActions"/>
                     </div>
-
-                    <v-data-footer 
-                        :pagination="pagination" 
-                        :options="options"
-                        @update:options="updateOptions"
-                        prev-icon='$fas_angle-left'
-                        next-icon='$fas_angle-right'               
-                        items-per-page-text="$vuetify.dataTable.itemsPerPageText"
-                        :items-per-page-options="itemsPerPage"
-                        class="no-border"
-                        v-if="enablePagination"
-                    />
+                    <div class="d-flex jc-end">
+                        <div class="d-flex board-table-cards jc-end">
+                            <div class="clickable download-csv ma-1">
+                                <v-tooltip bottom>
+                                    <template v-slot:activator="{on, attrs}">
+                                        <v-btn 
+                                            v-on="on"
+                                            v-bind="attrs" 
+                                            icon color="#47466A" @click="downloadData" v-if="!hideDownloadCSVIcon">
+                                                <v-icon>$fas_file-csv</v-icon>
+                                        </v-btn>
+                                    </template>
+                                    Download as CSV
+                                </v-tooltip>
+                                <v-tooltip bottom>
+                                    <template v-slot:activator="{on, attrs}">
+                                        <v-btn 
+                                            v-on="on"
+                                            v-bind="attrs"
+                                            icon 
+                                            color="#47466A" 
+                                            @click="itemsPerPage = [-1]" 
+                                            v-if="enablePagination && itemsPerPage[0] != -1"
+                                        >
+                                            <v-icon>$fas_angle-double-down</v-icon>
+                                        </v-btn>
+                                    </template>
+                                    Show all
+                                </v-tooltip>
+                                        <v-btn 
+                                            icon 
+                                            color="#47466A" 
+                                            @click="itemsPerPage = [rowsPerPage]" 
+                                            v-if="enablePagination && itemsPerPage[0] == -1"
+                                        >
+                                            <v-icon>$fas_angle-double-up</v-icon>
+                                        </v-btn>
+                            </div>            
+                            <slot name="add-new-row-btn"/>
+                        </div>
+                    </div>
                 </div>
             </template>
             <template v-slot:footer.prepend="{}">
@@ -80,7 +98,12 @@
                                                         <v-icon :size="14">$fas_filter</v-icon>
                                                     </v-btn>
                                                 </template>
-                                                <filter-list :title="header.text" :items="columnValueList[header.value]" @clickedItem="appliedFilter(header.value, $event)" />
+                                                <filter-list 
+                                                    :title="header.text" 
+                                                    :items="columnValueList[header.value]" 
+                                                    @clickedItem="appliedFilter(header.value, $event)" 
+                                                    @selectedAll="selectedAll(header.value, $event)"
+                                                />
                                             </v-menu>
                                         </span>
                                     </span>
@@ -148,14 +171,14 @@ export default {
         sortKeyDefault: obj.strN,
         sortDescDefault: obj.boolN,
         actions: obj.arrN,
-        allowNewRow: obj.boolN
+        allowNewRow: obj.boolN,
+        hideDownloadCSVIcon: obj.boolN
     },
     data () {
         let rowsPerPage = 50
         return {
             rowsPerPage: rowsPerPage,
             itemsPerPage: [rowsPerPage],
-            enablePagination: this.items && this.items.length > rowsPerPage,
             search: null,
             sortKey: this.sortKeyDefault || null,
             sortDesc: this.sortDescDefault || false,
@@ -164,11 +187,21 @@ export default {
         }
     },
     methods: {
+        selectedAll (hValue, {items, checked}) {
+            for(var index in items) {
+                if (checked) {
+                    this.filters[hValue].add(items[index].value)
+                } else {
+                    this.filters[hValue].delete(items[index].value)
+                }
+            }
+            this.filters = {...this.filters}
+        },
         appliedFilter (hValue, {item, checked}) { 
             if (checked) {
-                this.filters[hValue].add(item)
+                this.filters[hValue].add(item.value)
             } else {
-                this.filters[hValue].delete(item)
+                this.filters[hValue].delete(item.value)
             }
             this.filters = {...this.filters}
         },
@@ -224,7 +257,7 @@ export default {
         columnValueList: {
             get () {
                 return this.headers.reduce((m, h) => {
-                    m[h.value] = [...new Set(this.items.map(i => i[h.value]).sort())]
+                    m[h.value] = [...new Set(this.items.map(i => i[h.value]).sort())].map(x => {return {title: x, subtitle: '', value: x}})
                     return m
                 }, {})
             }
@@ -235,7 +268,10 @@ export default {
                 return this.filters[f].size < 1 || this.filters[f].has(d[f]);
                 });
             });
-        }
+        },
+        enablePagination() {
+            return this.items && this.items.length > this.rowsPerPage
+        } 
     }
 
 }

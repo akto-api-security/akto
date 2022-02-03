@@ -54,7 +54,9 @@ const inventory = {
                 state.sensitiveParams.splice(sensitiveParamIndex, 1)
             }
 
-            state.apiCollection[apiCollectionIndex].savedAsSensitive = savedAsSensitive
+            if (apiCollectionIndex > -1) {
+                state.apiCollection[apiCollectionIndex].savedAsSensitive = savedAsSensitive
+            }
             state.apiCollection = [...state.apiCollection]
         },
         SAVE_SENSITIVE (state, fields) {
@@ -65,7 +67,9 @@ const inventory = {
                     return functionCompareParamObj(x, p)
                 })
                 
-                state.apiCollection[apiCollectionIndex].savedAsSensitive = true
+                if (apiCollectionIndex > -1) {
+                    state.apiCollection[apiCollectionIndex].savedAsSensitive = true
+                }
             })
             state.apiCollection = [...state.apiCollection]
         }

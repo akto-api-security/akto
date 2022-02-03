@@ -11,10 +11,12 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.KeyTypes;
@@ -27,11 +29,13 @@ import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.parsers.HttpCallParser.HttpRequestParams;
 import com.akto.parsers.HttpCallParser.HttpResponseParams;
+import com.akto.types.CappedList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.DeleteOneModel;
 import com.mongodb.client.model.DeleteOptions;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.PushOptions;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
@@ -96,6 +100,7 @@ public class APICatalogSync {
                 payload.putAll(queryParams.toMap());
                 deletedInfo.addAll(requestTemplate.process2(payload, baseURL, methodStr, -1, userId, requestParams.getApiCollectionId()));
             }
+            requestTemplate.recordMessage(responseParams.getOrig());
         }
 
         Map<Integer, RequestTemplate> responseTemplates = requestTemplate.getResponseTemplates();
@@ -428,6 +433,34 @@ public class APICatalogSync {
         return ret;
     }
 
+    public ArrayList<WriteModel<SampleData>> getDBUpdatesForSampleData(int apiCollectionId, APICatalog currentDelta) {
+        List<SampleData> sampleData = new ArrayList<>();
+        for(Map.Entry<String, URLMethods> entry: currentDelta.getStrictURLToMethods().entrySet()) {
+            sampleData.addAll(entry.getValue().removeAllSampleData(apiCollectionId, entry.getKey()));
+        }
+
+        for(Map.Entry<URLTemplate, URLMethods> entry: currentDelta.getTemplateURLToMethods().entrySet()) {
+            sampleData.addAll(entry.getValue().removeAllSampleData(apiCollectionId, entry.getKey().getTemplateString()));
+        }
+
+        ArrayList<WriteModel<SampleData>> bulkUpdates = new ArrayList<>();
+        for (SampleData sample: sampleData) {
+            if (sample.getSamples().size() == 0) {
+                continue;
+            }
+            Bson bson = Updates.pushEach("samples", sample.getSamples(), new PushOptions().slice(-10));
+
+            bulkUpdates.add(
+                new UpdateOneModel<>(Filters.eq("_id", sample.getId()), bson, new UpdateOptions().upsert(true))
+            );
+        }
+
+        return bulkUpdates;        
+    }
+
+
+
+
     public ArrayList<WriteModel<TrafficInfo>> getDBUpdatesForTraffic(int apiCollectionId, APICatalog currentDelta) {
 
         List<TrafficInfo> trafficInfos = new ArrayList<>();
@@ -643,16 +676,22 @@ public class APICatalogSync {
         return ret;
     }
 
+    int counter = 0;
+
     public void syncWithDB() {
         List<WriteModel<SingleTypeInfo>> writesForParams = new ArrayList<>();
         List<WriteModel<TrafficInfo>> writesForTraffic = new ArrayList<>();
-
+        List<WriteModel<SampleData>> writesForSampleData = new ArrayList<>();
+        counter++;
         for(int apiCollectionId: this.delta.keySet()) {
             APICatalog deltaCatalog = this.delta.get(apiCollectionId);
             APICatalog dbCatalog = this.dbState.getOrDefault(apiCollectionId, new APICatalog(apiCollectionId, new HashMap<>(), new HashMap<>()));
             writesForParams.addAll(getDBUpdatesForParams(deltaCatalog, dbCatalog));
             writesForTraffic.addAll(getDBUpdatesForTraffic(apiCollectionId, deltaCatalog));
             deltaCatalog.setDeletedInfo(new ArrayList<>());
+            if (counter < 10 || counter % 10 == 0) {
+                writesForSampleData.addAll(getDBUpdatesForSampleData(apiCollectionId, deltaCatalog));
+            }
         }
 
         logger.info("adding " + writesForParams.size() + " updates for params");
@@ -666,6 +705,15 @@ public class APICatalogSync {
         logger.info("adding " + writesForTraffic.size() + " updates for traffic");
         if(writesForTraffic.size() > 0) {
             BulkWriteResult res = TrafficInfoDao.instance.getMCollection().bulkWrite(writesForTraffic);
+
+            logger.info(res.getInserts().size() + " " +res.getUpserts().size());
+
+        }
+        
+
+        logger.info("adding " + writesForSampleData.size() + " updates for samples");
+        if(writesForSampleData.size() > 0) {
+            BulkWriteResult res = SampleDataDao.instance.getMCollection().bulkWrite(writesForSampleData);
 
             logger.info(res.getInserts().size() + " " +res.getUpserts().size());
 

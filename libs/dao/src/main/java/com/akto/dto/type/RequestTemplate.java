@@ -10,10 +10,12 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.SingleTypeInfo.ParamId;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.types.CappedList;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.akto.util.Trie;
@@ -106,6 +108,12 @@ public class RequestTemplate {
 
     public void processTraffic(int timestamp) {
         trafficRecorder.incr(timestamp);
+    }
+
+    public void recordMessage(String message) {
+        if (message != null && message.length() > 0) {
+            trafficRecorder.recordMessage(message);
+        }
     }
 
     public List<SingleTypeInfo> process2(BasicDBObject payload, String url, String method, int responseCode, String userId, int apiCollectionId) {
@@ -423,7 +431,7 @@ public class RequestTemplate {
             Set<String> hoursSince1970 = trafficRecorder.getTrafficMapSinceLastSync().keySet();
             int start = Integer.parseInt(hoursSince1970.iterator().next())/24/30;
             int end = start + 1;
-            TrafficInfo trafficInfo = new TrafficInfo(new TrafficInfo.Key(apiCollectionId, url, method, responseCode, start, end), trafficRecorder.getTrafficMapSinceLastSync());
+            TrafficInfo trafficInfo = new TrafficInfo(new Key(apiCollectionId, url, method, responseCode, start, end), trafficRecorder.getTrafficMapSinceLastSync());
             ret.add(trafficInfo);
         }
 
@@ -435,6 +443,13 @@ public class RequestTemplate {
             }
         }
 
+        return ret;
+    }
+
+    public List<String> removeAllSampleMessage() {
+        List<String> ret = new ArrayList<>();
+        ret.addAll(trafficRecorder.getSampleMessages().get());
+        trafficRecorder.getSampleMessages().get().clear();
         return ret;
     }
 

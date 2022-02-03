@@ -10,10 +10,15 @@ import java.util.List;
 import java.util.Map;
 
 import com.akto.MongoBasedTest;
+import com.akto.dao.SampleDataDao;
+import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.User;
 import com.akto.dto.messaging.Message.Mode;
+import com.akto.dto.traffic.Key;
+import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
@@ -22,6 +27,9 @@ import com.akto.parsers.HttpCallParser.HttpResponseParams;
 import com.akto.parsers.HttpCallParser.HttpResponseParams.Source;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
+import com.akto.types.BasicDBListL;
+import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 
 import org.junit.Test;
 
@@ -58,6 +66,7 @@ public class TestDBSync extends MongoBasedTest {
         }
         sync.computeDelta(aggr, true, 0);
         sync.syncWithDB(); 
+
         Map<String, URLMethods> urlMethodsMap = sync.getDelta(0).getStrictURLToMethods();
         assertEquals(0, urlMethodsMap.size());
 
@@ -104,5 +113,9 @@ public class TestDBSync extends MongoBasedTest {
         responseParams.get(0).setSource(Source.HAR);
         parser.syncFunction(responseParams);
         assertTrue(parser.getSyncCount() == 0);
-    }    
+
+        SampleData sd = SampleDataDao.instance.findAll(new BasicDBObject()).get(0);
+        assertEquals(10, sd.getSamples().size());
+
+    }  
 }

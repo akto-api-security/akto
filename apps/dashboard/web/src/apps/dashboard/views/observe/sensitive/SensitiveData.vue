@@ -12,7 +12,20 @@
         <layout-with-tabs :tabs="['Response', 'Request']">
             <template slot="actions-tray">
                 <div class="d-flex jc-end">
-                    <v-btn icon color="#47466A" @click="refreshPage(false)"><v-icon>$fas_sync</v-icon></v-btn>
+                    <v-tooltip bottom>
+                        <template v-slot:activator='{on, attrs}'>
+                            <v-btn 
+                                icon 
+                                color="#47466A" 
+                                @click="refreshPage(false)"
+                                v-on="on"
+                                v-bind="attrs"
+                            >
+                                    <v-icon>$fas_redo</v-icon>
+                            </v-btn>
+                        </template>
+                        Refresh
+                    </v-tooltip>
                 </div>
             </template>
             <template slot="Request">

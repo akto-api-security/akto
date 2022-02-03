@@ -359,6 +359,18 @@
         </action>
 
 
+        <action name="api/bulkMarkSensitive" class="com.akto.action.SensitiveFieldAction" method="bulkMarkSensitive">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+                <param name="root">ret</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+
         <action name="api/listAllSensitiveFields" class="com.akto.action.SensitiveFieldAction" method="listAllSensitiveFields">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -532,6 +544,15 @@
         </action>
 
         <action name="api/fetchEndpointTrafficData" class="com.akto.action.TrafficAction" method="fetchEndpointTrafficData">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+        
+        <action name="api/fetchSampleData" class="com.akto.action.TrafficAction" method="fetchSampleData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json"/>

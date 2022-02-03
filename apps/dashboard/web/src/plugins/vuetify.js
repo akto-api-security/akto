@@ -74,8 +74,9 @@ import {
   faFilter,
   faKey,
   faUpload,
-  faSync,
-  faGlobe
+  faRedo,
+  faGlobe,
+  faUserSecret
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -99,8 +100,9 @@ const faIcons = [
   faInfoCircle,faDownload,faFileCsv,faCircle,faThLarge,faStopwatch,faCheckCircle,faEyeSlash,faArrowLeft,faUsers,faChartLine,
   faHome,faBullseye,faBullhorn,faCheckDouble,faSquare,faBolt,faDatabase,faAngleDoubleRight, faAngleDoubleLeft,faClipboardList,
   faUnlockAlt,faStethoscope,faLongArrowAltDown,faLongArrowAltUp,faSyncAlt, faExchangeAlt, faUserLock, faExclamation,faPhoneAlt,
-  faCreditCard,faAddressCard,faChalkboard,faFilter,faKey,faAngleDoubleDown,faAngleDoubleUp,faUpload,faSync,faGlobe,faAngleDown,
-
+  faCreditCard,faAddressCard,faChalkboard,faFilter,faKey,faAngleDoubleDown,faAngleDoubleUp,faUpload,faRedo,faGlobe,faAngleDown,
+  faUserSecret,
+  
   farComments,farCalendar, farHandPointRight, farBuilding, farStar,farSquare, farCheckSquare,
 
   fabSalesforce,fabHubspot

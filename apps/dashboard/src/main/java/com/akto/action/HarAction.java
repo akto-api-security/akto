@@ -47,6 +47,7 @@ public class HarAction extends UserAction {
             addActionError("Empty content");
             return ERROR.toUpperCase();
         }
+
         try {
             HAR har = new HAR();
             List<String> messages = har.getMessages(harString, apiCollectionId);
@@ -58,7 +59,8 @@ public class HarAction extends UserAction {
                     harErrors.add("Message too big size: " + message.length());
                 }
             }
-        } catch (HarReaderException e) {
+
+        } catch (Exception e) {
             e.printStackTrace();
             return SUCCESS.toUpperCase();
         }

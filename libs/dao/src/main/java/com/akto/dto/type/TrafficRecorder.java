@@ -3,16 +3,22 @@ package com.akto.dto.type;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.akto.types.CappedList;
+
 public class TrafficRecorder {
     
     Map<String, Integer> trafficMapSinceLastSync = new HashMap<>();
-
+    CappedList<String> sampleMessages = new CappedList<String>(10, true);
     public void incr(int timestamp) {
         int hoursSinceEpoch = timestamp/3600;
         trafficMapSinceLastSync.compute(""+hoursSinceEpoch, (k,v) -> { return v == null ? 1 : ++v;});
     }
 
     public TrafficRecorder() {
+    }
+
+    public void recordMessage(String message) {
+        this.sampleMessages.add(message);
     }
 
     public boolean isEmpty() {
@@ -29,6 +35,10 @@ public class TrafficRecorder {
 
     public void setTrafficMapSinceLastSync(Map<String,Integer> trafficMapSinceLastSync) {
         this.trafficMapSinceLastSync = trafficMapSinceLastSync;
+    }
+
+    public CappedList<String> getSampleMessages() {
+        return this.sampleMessages;
     }
 
     @Override
