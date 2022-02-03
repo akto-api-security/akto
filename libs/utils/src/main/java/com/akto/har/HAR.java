@@ -36,6 +36,7 @@ public class HAR {
                     result.put("akto_vxlan_id", collection_id+"");
                     entriesList.add(mapper.writeValueAsString(result));
                 }
+                
             } catch (Exception e) {
                 logger.error("Error while parsing har file on entry: " + idx + " ERROR: " + e);
                 errors.add("Error in entry " + idx);

@@ -1,12 +1,16 @@
 package com.akto.action;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.akto.dao.SampleDataDao;
 import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
+import com.itextpdf.text.pdf.PdfStructTreeController.returnType;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 
@@ -43,6 +47,22 @@ public class TrafficAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    List<SampleData> sampleDataList;
+    public String fetchSampleData() {
+        traffic = new HashMap<>();
+        sampleDataList = new ArrayList<>();
+        sampleDataList = SampleDataDao.instance.findAll(Filters.and(
+            Filters.eq("_id.url", url),
+            Filters.eq("_id.apiCollectionId", apiCollectionId),
+            Filters.eq("_id.responseCode", -1),
+            Filters.eq("_id.method", method),
+            Filters.gte("_id.bucketStartEpoch", 0),
+            Filters.lte("_id.bucketEndEpoch", 0)
+        ));
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
 
     public void setApiCollectionId(int apiCollectionId) {
         this.apiCollectionId = apiCollectionId;
@@ -70,5 +90,13 @@ public class TrafficAction {
     
     public Map<Integer, Integer> getTraffic() {
         return this.traffic;
+    }
+
+    public void setSampleDataList(List<SampleData> sampleDataList) {
+        this.sampleDataList = sampleDataList;
+    }
+
+    public List<SampleData> getSampleDataList() {
+        return this.sampleDataList;
     }
 }

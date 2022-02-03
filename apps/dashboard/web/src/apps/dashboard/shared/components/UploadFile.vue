@@ -23,7 +23,7 @@
           />
         </div>
       </template>
-      Upload {{label}} file
+      Upload traffic (.har, .pcap)
   </v-tooltip>
 </template>
 

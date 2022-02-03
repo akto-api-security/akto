@@ -1,5 +1,7 @@
 package com.akto.parsers;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -7,9 +9,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
+import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.parsers.HttpCallParser.HttpRequestParams;
 import com.akto.parsers.HttpCallParser.HttpResponseParams;
@@ -85,6 +89,7 @@ public class TestDump2 {
         ret.requestParams.setHeaders(headers);
         ret.requestParams.setPayload(createSimpleRequestPayload());
         ret.requestParams.setApiCollectionId(123);
+        ret.setOrig(ret.toString());
         return ret;
     }
 
@@ -115,6 +120,7 @@ public class TestDump2 {
         
         assertEquals(sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0)).size(), 15);        
         assertEquals(sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size(), 2);        
+        assertEquals(sync.getDBUpdatesForSampleData(0, sync.getDelta(0)).size(), 1);        
     }
 
 
@@ -304,5 +310,11 @@ public class TestDump2 {
 
         List updates = sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0));
         assertEquals(updates.size(), 22);
+    }
+
+    @Test
+    public void testURLMatch() {
+        String url = "https://amazonpay.amazon.in/ap/signin?openid.return_to=https%3A%2F%2Famazonpay.amazon.in%2Fv1%2Finitiate-payment%3FredirectUrl%3Dhttps%253A%252F%252Fsandbox.juspay.in%252Fv2%252Fpay%252Fresponse-amazonpay%252Fmpl_qa%26payload%3DqpZtIG4rQa0Ru6HR1RSOlDtxA61%252BVNb0WLLwzMgLnsStcLU9nD%252FbQ2XZLKvWNqdViQ5YZujSRCPagD%252FVME0JWyl3fhlh1s69%252FCaKfQiDnTg42Ofgqxj5CN86Mv45MhbmzJFVZ0JRM1yECFrLkdLnGJOr4c%252FZQoWJ3CeRGl3XcYF807JC%252F0iidvC62N3qQm97ketMo9af%252FQjTL4NTOkzPVwv1bNeI%252F8Ea5uQxWtBdZATV6ogzHgFMeM4tzcbJY5E0XxeTjhJ1SijDXLtgSOoERFCPxLzudyb9%252B2IoF9cxNWb8yi9RJuqn%252BMvU4BC%252FFrgJaLn9DJ9r4RE%253D%26iv%3DE2XGT7As7Kdo50sj%26key%3DFoXRG7XfML%252B9UAO88iH7hfSyNfNbhgdPT7d3%252F8G%252B9sqovuZOct4ZNf88yR%252FtgbRedAsVG%252BZJHjeOHlKlFZoomrm2IWweysOvMQrDyIL35hT2NUoG4ZCG94ZFC2b7TII4XEFId%252Bkpj0qMUreKQafh0NXu2jg58ogzAWgpU5uskZBUg3WDITJMQXdGqaOPO6gooIEtKmLV6gQx4%252F%252B9K18XKofG2fZQ5bNlvpuFbyn4%252Brs3J%252BtJxPsxnuSiPrJwGEk36rDjhW1LOgssrAAUv%252BSfExHQ3KfmFnBdbK2rWM0CkwgYZ95cteVxRDl7f7SdpgBCmrlVVcPvM2moUiWOTW9aHA%253D%253D&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=amazon_pay_in_mobile&openid.mode=checkid_setup&marketPlaceId=A3FDG49KKM823Y&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&pageId=amzn_pay_in&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0&openid.pape.max_auth_age=5400&siteState=clientContext%3D257-1861896-6931844%2CsourceUrl%3Dhttps%253A%252F%252Famazonpay.amazon.in%252Fv1%252Finitiate-payment%253FredirectUrl%253Dhttps%25253A%25252F%25252Fsandbox.juspay.in%25252Fv2%25252Fpay%25252Fresponse-amazonpay%25252Fmpl_qa%2526payload%253DqpZtIG4rQa0Ru6HR1RSOlDtxA61%25252BVNb0WLLwzMgLnsStcLU9nD%25252FbQ2XZLKvWNqdViQ5YZujSRCPagD%25252FVME0JWyl3fhlh1s69%25252FCaKfQiDnTg42Ofgqxj5CN86Mv45MhbmzJFVZ0JRM1yECFrLkdLnGJOr4c%25252FZQoWJ3CeRGl3XcYF807JC%25252F0iidvC62N3qQm97ketMo9af%25252FQjTL4NTOkzPVwv1bNeI%25252F8Ea5uQxWtBdZATV6ogzHgFMeM4tzcbJY5E0XxeTjhJ1SijDXLtgSOoERFCPxLzudyb9%25252B2IoF9cxNWb8yi9RJuqn%25252BMvU4BC%25252FFrgJaLn9DJ9r4RE%25253D%2526iv%253DE2XGT7As7Kdo50sj%2526key%253DFoXRG7XfML%25252B9UAO88iH7hfSyNfNbhgdPT7d3%25252F8G%25252B9sqovuZOct4ZNf88yR%25252FtgbRedAsVG%25252BZJHjeOHlKlFZoomrm2IWweysOvMQrDyIL35hT2NUoG4ZCG94ZFC2b7TII4XEFId%25252Bkpj0qMUreKQafh0NXu2jg58ogzAWgpU5uskZBUg3WDITJMQXdGqaOPO6gooIEtKmLV6gQx4%25252F%25252B9K18XKofG2fZQ5bNlvpuFbyn4%25252Brs3J%25252BtJxPsxnuSiPrJwGEk36rDjhW1LOgssrAAUv%25252BSfExHQ3KfmFnBdbK2rWM0CkwgYZ95cteVxRDl7f7SdpgBCmrlVVcPvM2moUiWOTW9aHA%25253D%25253D%2Csignature%3Dj2BY7ki63y4rphlJZ6WQZhGj2F5fMyEj3D";
+        assertTrue(KeyTypes.patternToSubType.get(SubType.URL).matcher(url).matches());
     }
 }

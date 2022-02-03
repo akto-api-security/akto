@@ -3,7 +3,21 @@
     <div class="pr-4 api-endpoints" v-else>
         <div>
             <div class="d-flex jc-end">
-                <v-btn icon color="#47466A" @click="refreshPage(false)"><v-icon>$fas_sync</v-icon></v-btn>
+                    <v-tooltip bottom>
+                        <template v-slot:activator='{on, attrs}'>
+                            <v-btn 
+                                icon 
+                                color="#47466A" 
+                                @click="refreshPage(false)"
+                                v-on="on"
+                                v-bind="attrs"
+                            >
+                                    <v-icon>$fas_redo</v-icon>
+                            </v-btn>
+                        </template>
+                        Refresh
+                    </v-tooltip>
+
                 <upload-file fileFormat=".har,.pcap" @fileChanged="handleFileChange" label=""/>
                 <icon-menu icon="$fas_download" :items="downloadFileItems"/>
             </div>
@@ -15,7 +29,7 @@
             <count-box title="All Endpoints" :count="allEndpoints.length" colorTitle="Total"/>
         </div>    
 
-        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Shadow', 'Unused', 'Upload']">
+        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Shadow', 'Unused', 'Documented']">
             <template slot="actions-tray">
             </template>
             <template slot="All">
@@ -64,7 +78,7 @@
                     name="Unused"
                 />
             </template>
-            <template slot="Upload">
+            <template slot="Documented">
                 <v-file-input
                     :rules=swaggerUploadRules
                     show-size
