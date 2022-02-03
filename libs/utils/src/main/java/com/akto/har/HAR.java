@@ -30,15 +30,11 @@ public class HAR {
         int idx=0;
         for (HarEntry entry: entries) {
             idx += 1;
-            logger.info("processing entry: " + idx);
             try {
                 Map<String,String> result = getResultMap(entry);
                 if (result != null) {
                     result.put("akto_vxlan_id", collection_id+"");
                     entriesList.add(mapper.writeValueAsString(result));
-                    logger.info("completed processing entry: " + idx);
-                } else {
-                    logger.info("skipped entry: " + idx);
                 }
                 
             } catch (Exception e) {
