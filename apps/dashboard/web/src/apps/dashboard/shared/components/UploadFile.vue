@@ -4,7 +4,7 @@
       <template v-slot:activator="{on,attrs}">
         <div class="upload-file-container" v-bind="attrs" v-on="on">
           <v-btn
-            color="#6200EA"
+            color="#47466A"
             icon
             @click="onPickFile"
           >
@@ -52,7 +52,7 @@ export default {
 
 <style lang="sass" scoped>
 .label-btn
-  color: #6200EA
+  color: #47466A
   font-size: 9px
   position: absolute
   right: 0px

@@ -35,13 +35,18 @@ public class InventoryAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String loadRecentParameters() {
+    public List<SingleTypeInfo> fetchRecentParams(int deltaPeriod) {
         int now = Context.now();
-        int twoMonthsAgo = now - 62 * 24 * 60 * 60;
+        int twoMonthsAgo = now - deltaPeriod;
         List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.gt("timestamp", twoMonthsAgo));
-        response = new BasicDBObject();
-        response.put("data", new BasicDBObject("endpoints", list));
 
+        return list;
+    }
+
+    public String loadRecentParameters() {
+        response = new BasicDBObject();
+        List<SingleTypeInfo> list = fetchRecentParams(62 * 24 * 60 * 60);
+        response.put("data", new BasicDBObject("endpoints", list));
         return Action.SUCCESS.toUpperCase();
     }
 

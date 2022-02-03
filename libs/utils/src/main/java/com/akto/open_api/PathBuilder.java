@@ -83,6 +83,10 @@ public class PathBuilder {
                 }
             }
             String newUrl = String.join( "/",urlList);
+            if (!newUrl.startsWith("/")) {
+                newUrl = "/" + newUrl;
+            }
+
 
             pathItem.setParameters(parameters);
             newPaths.put(newUrl, pathItem);

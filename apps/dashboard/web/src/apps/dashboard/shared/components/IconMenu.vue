@@ -3,7 +3,7 @@
         <template v-slot:activator2>
             <v-btn
                 icon
-                color="#6200EA"
+                color="#47466A"
             >
                 <div style="position: relative">
                     <v-icon size="16" class="main-icon">{{icon}}</v-icon>

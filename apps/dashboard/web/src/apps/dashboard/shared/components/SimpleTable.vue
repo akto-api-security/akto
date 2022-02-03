@@ -27,13 +27,13 @@
                     <div class="d-flex jc-end">
                         <div class="d-flex board-table-cards jc-end">
                             <div class="clickable download-csv ma-1">
-                                <v-btn icon  :color="$vuetify.theme.themes.dark.themeColor"  @click="downloadData" v-if="!hideDownloadCSVIcon">
+                                <v-btn icon color="#47466A" @click="downloadData" v-if="!hideDownloadCSVIcon">
                                     <v-icon>$fas_file-csv</v-icon>
                                 </v-btn>
-                                <v-btn icon  :color="$vuetify.theme.themes.dark.themeColor"  @click="itemsPerPage = [-1]" v-if="enablePagination && itemsPerPage[0] != -1">
+                                <v-btn icon color="#47466A" @click="itemsPerPage = [-1]" v-if="enablePagination && itemsPerPage[0] != -1">
                                     <v-icon>$fas_angle-double-down</v-icon>
                                 </v-btn>
-                                <v-btn icon  :color="$vuetify.theme.themes.dark.themeColor"  @click="itemsPerPage = [rowsPerPage]" v-if="enablePagination && itemsPerPage[0] == -1">
+                                <v-btn icon color="#47466A" @click="itemsPerPage = [rowsPerPage]" v-if="enablePagination && itemsPerPage[0] == -1">
                                     <v-icon>$fas_angle-double-up</v-icon>
                                 </v-btn>
                             </div>            
