@@ -160,6 +160,13 @@
 .jc-sb
     justify-content: space-between    
 
+.jc-sa
+    justify-content: space-around
+
+.fd-column
+    flex-direction: column
+    display: flex
+
 .no-border
     border: unset! important    
 
