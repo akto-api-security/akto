@@ -4,7 +4,10 @@ import com.akto.dao.context.Context;
 import com.mongodb.ConnectionString;
 
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
+
 import de.flapdoodle.embed.mongo.MongodExecutable;
 import de.flapdoodle.embed.mongo.MongodProcess;
 import de.flapdoodle.embed.mongo.MongodStarter;
@@ -16,28 +19,28 @@ public class MongoBasedTest {
 
     public static final int ACCOUNT_ID = 12389;
 
-    MongodExecutable mongodExe;
-    MongodProcess mongod;
+    public static MongodExecutable mongodExe;
+    public static MongodProcess mongod;
 
-    @Before
-    public final void beforeEach() throws Exception {
+    @BeforeClass
+    public static void beforeClass() throws Exception {
         MongodStarter starter = MongodStarter.getDefaultInstance();
         String bindIp = "localhost";
         ImmutableMongodConfig mongodConfig = ImmutableMongodConfig.builder()
         .version(Version.Main.PRODUCTION)
         .net(new Net(bindIp, 27017, false))
         .build();
-        this.mongodExe = starter.prepare(mongodConfig);
-        this.mongod = mongodExe.start();
+        mongodExe = starter.prepare(mongodConfig);
+        mongod = mongodExe.start();
         DaoInit.init(new ConnectionString("mongodb://localhost:27017"));
         Context.accountId.set(ACCOUNT_ID);
     }
 
-    @After
-    public void afterEach() throws Exception {
-        if (this.mongod != null) {
-            this.mongod.stop();
-            this.mongodExe.stop();
+    @AfterClass
+    public static void afterClass() throws Exception {
+        if (mongod != null) {
+            mongod.stop();
+            mongodExe.stop();
         }
     }
 

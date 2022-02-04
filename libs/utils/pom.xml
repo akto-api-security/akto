@@ -132,6 +132,11 @@
             <artifactId>kafka-clients</artifactId>
             <version>3.0.0</version>
         </dependency>
+        <dependency>
+            <groupId>de.flapdoodle.embed</groupId>
+            <artifactId>de.flapdoodle.embed.mongo</artifactId>
+            <version>3.2.3</version>
+        </dependency>
 
     </dependencies>
     <build>
@@ -145,6 +150,20 @@
                     <target>8</target>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>2.6</version>
+                <executions>
+                <execution>
+                <phase>package</phase>
+                    <goals>
+                    <goal>test-jar</goal>
+                    </goals>
+                </execution>
+                </executions>
+            </plugin>
+        
         </plugins>
         <sourceDirectory>src/main/java</sourceDirectory>
         <testSourceDirectory>src/test/java</testSourceDirectory>

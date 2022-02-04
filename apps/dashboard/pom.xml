@@ -149,9 +149,17 @@
             <artifactId>micrometer-registry-prometheus</artifactId>
             <version>1.8.1</version>
         </dependency>
+        <dependency>
+            <groupId>com.akto.libs.utils</groupId>
+            <artifactId>utils</artifactId>
+            <type>test-jar</type>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
     <build>
         <sourceDirectory>src/main/java</sourceDirectory>
+        <testSourceDirectory>src/test/java</testSourceDirectory>
         <plugins>
             <plugin>
                 <artifactId>maven-war-plugin</artifactId>
