@@ -60,7 +60,7 @@ public class URLTemplate {
                         if (!NumberUtils.isParsable(thatToken) || !thatToken.contains(".")) return false;
                         break;
                     default:
-                        return true;
+                        continue;
 
                 }
 
