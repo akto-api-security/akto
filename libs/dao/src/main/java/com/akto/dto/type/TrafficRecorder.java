@@ -21,6 +21,17 @@ public class TrafficRecorder {
         this.sampleMessages.add(message);
     }
 
+    public void mergeFrom(TrafficRecorder that) {
+        for(String sampleMessage: that.getSampleMessages().get()) {
+            this.sampleMessages.add(sampleMessage);
+        }
+        
+        for(String hourSinceEpoch: trafficMapSinceLastSync.keySet()) {
+            int count = trafficMapSinceLastSync.get(hourSinceEpoch);
+            trafficMapSinceLastSync.compute(hourSinceEpoch, (k,v) -> {return (v == null ? 0 : v) + count;});
+        }
+    }
+
     public boolean isEmpty() {
         return trafficMapSinceLastSync.isEmpty();
     }

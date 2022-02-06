@@ -249,7 +249,7 @@ export default {
                     reader.readAsArrayBuffer(new Blob([file]))
                 }
                 reader.onload = async () => {
-                    let skipKafka = window.location.href.indexOf("http://localhost") != -1
+                    let skipKafka = false;//window.location.href.indexOf("http://localhost") != -1
                     if (isHar) {
                         await this.$store.dispatch('inventory/uploadHarFile', { content: JSON.parse(reader.result), filename: file.name, skipKafka})
                     } else if (isPcap) {

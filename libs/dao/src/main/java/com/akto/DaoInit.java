@@ -5,7 +5,7 @@ import com.akto.dto.notifications.content.Content;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.type.URLTemplate;
 import com.akto.util.EnumCodec;
 import com.akto.dto.Attempt.AttemptResult;
@@ -49,7 +49,7 @@ public class DaoInit {
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
             new EnumCodec<>(SingleTypeInfo.SubType.class),
             new EnumCodec<>(SingleTypeInfo.SuperType.class),
-            new EnumCodec<>(URLMethods.Method.class),
+            new EnumCodec<>(Method.class),
             new EnumCodec<>(RBAC.Role.class),
             new EnumCodec<>(Credential.Type.class),
             new EnumCodec<>(ApiToken.Utility.class)

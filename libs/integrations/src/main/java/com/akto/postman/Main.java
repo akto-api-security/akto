@@ -2,6 +2,8 @@ package com.akto.postman;
 
 import com.akto.ApiRequest;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+
 import org.json.JSONObject;
 
 import java.util.*;
@@ -175,6 +177,37 @@ public class Main {
         Map<String,String> headersMap = new HashMap<>();
         headersMap.put("X-API-Key",apiKey);
         return headersMap;
+    }
+
+    public String createWorkspace() {
+        String url = BASE_URL + "workspaces";
+        JSONObject json = new JSONObject();
+        JSONObject workspace = new JSONObject();
+        json.put("workspace", workspace);
+
+        workspace.put("name", UUID.randomUUID().toString());
+        workspace.put("type", "personal");
+        workspace.put("description", "test");
+        JsonNode jsonNode = ApiRequest.postRequest(generateHeadersWithAuth(), url, json.toString());
+        return jsonNode.get("workspace").get("id").asText();
+    }
+
+    public String fetchOneApiFromWorkspace(String workspaceId) {
+        String url = BASE_URL + "apis?workspace=" + workspaceId;
+        JsonNode jsonNode = ApiRequest.getRequest(generateHeadersWithAuth(), url);
+
+        ArrayNode apiList = (ArrayNode) jsonNode.get("apis");
+        String apiId = apiList.get(0).get("id").asText();
+        
+        url = BASE_URL + "apis/" + apiId;
+        return ApiRequest.getRequest(generateHeadersWithAuth(), url).toString();
+        
+    }
+
+    public String deleteWorkspace(String workspaceId) {
+        String url = BASE_URL + "workspaces/" + workspaceId;
+        JsonNode jsonNode = ApiRequest.deleteRequest(generateHeadersWithAuth(), url);
+        return jsonNode.toString();
     }
 
 }

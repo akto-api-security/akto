@@ -77,4 +77,15 @@ public class ApiRequest {
         return common(request);
     }
 
+    public static JsonNode deleteRequest(Map<String, String> headersMap, String url) {
+        Request.Builder builder = new Request.Builder().url(url).delete();
+        for (String key: headersMap.keySet()) {
+            builder.addHeader(key, headersMap.get(key));
+        }
+
+        
+        Request request = builder.build();
+        return common(request);
+    }
+
 }

@@ -5,13 +5,13 @@ import com.akto.dto.ApiCollection;
 import com.akto.har.HAR;
 import com.akto.kafka.Kafka;
 import com.akto.listener.KafkaListener;
+import com.akto.parsers.HttpCallParser;
+import com.akto.parsers.HttpCallParser.HttpResponseParams;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 import com.sun.jna.*;
 
 import org.apache.commons.io.FileUtils;
-
-import de.sstoehr.harreader.HarReaderException;
 
 import java.io.File;
 import java.io.IOException;
@@ -47,19 +47,29 @@ public class HarAction extends UserAction {
             addActionError("Empty content");
             return ERROR.toUpperCase();
         }
+        HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1);
 
         try {
             HAR har = new HAR();
             List<String> messages = har.getMessages(harString, apiCollectionId);
             harErrors = har.getErrors();
+            List<HttpResponseParams> responses = new ArrayList<>();
             for (String message: messages){
                 if (message.length() < 0.8 * Kafka.BATCH_SIZE_CONFIG) {
-                    KafkaListener.kafka.send(message,topic);
+                    if (!skipKafka) {
+                        KafkaListener.kafka.send(message,topic);
+                    } else {
+                        HttpResponseParams responseParams =  HttpCallParser.parseKafkaMessage(message);
+                        responseParams.getRequestParams().setApiCollectionId(1234);
+                        responses.add(responseParams);
+                    }
                 } else {
                     harErrors.add("Message too big size: " + message.length());
                 }
             }
-
+            
+            if(skipKafka)
+                parser.syncFunction(responses);
         } catch (Exception e) {
             e.printStackTrace();
             return SUCCESS.toUpperCase();

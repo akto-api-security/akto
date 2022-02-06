@@ -71,7 +71,9 @@ public class KeyTypes {
         } 
 
         if (NumberUtils.isDigits(o.toString())) {
-            o = Long.parseLong(o.toString());
+            if (o.toString().length() < 19) {
+                o = Long.parseLong(o.toString());
+            }
         }
 
         if (o instanceof Long) {

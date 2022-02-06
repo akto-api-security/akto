@@ -4,6 +4,7 @@ import java.util.UUID;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
+import com.akto.dto.type.URLMethods.Method;
 
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 import org.bson.codecs.pojo.annotations.BsonId;
@@ -18,27 +19,36 @@ public class URLTemplate {
     int lastUpdateTs;
     String[] tokens;
     SuperType[] types;
+    Method method;
 
     public URLTemplate() {
     }
 
-    public URLTemplate(String[] tokens, SuperType[] types) {
+    public URLTemplate(String[] tokens, SuperType[] types, Method method) {
         this.tokens = tokens;
         this.types = types;
         this.id = UUID.randomUUID().toString();
         this.creationTs = Context.now();
         this.lastUpdateTs = creationTs;
+        this.method = method;
     }
 
-    public boolean match(String url) {
+    public boolean match(String url, Method urlMethod) {
         if (url.startsWith("/")) url = url.substring(1, url.length());
         if (url.endsWith("/")) url = url.substring(0, url.length()-1);
         String[] thatTokens = url.split("/");
 
-        return match(thatTokens);
+        return match(thatTokens, urlMethod);
     }
 
-    public boolean match(String[] url) {
+    public boolean match(URLStatic urlStatic) {
+        return this.match(urlStatic.getUrl(), urlStatic.getMethod());
+    }
+
+    public boolean match(String[] url, Method urlMethod) {
+        if (urlMethod != method) {
+            return false;
+        }
         String[] thatTokens = url;
         if (thatTokens.length != this.tokens.length) return false;
 
@@ -60,7 +70,7 @@ public class URLTemplate {
                         if (!NumberUtils.isParsable(thatToken) || !thatToken.contains(".")) return false;
                         break;
                     default:
-                        return true;
+                        continue;
 
                 }
 
@@ -74,6 +84,21 @@ public class URLTemplate {
         return true;
     }
 
+    public String getTemplateString() {
+        String str = "";
+        for(int i = 0;i < tokens.length; i++) {
+            if (i > 0) {
+                str += "/";
+            }
+            if (tokens[i] == null) {
+                str += types[i].name();
+            } else {
+                str += tokens[i];
+            }
+        }
+        return str;
+    }
+    
     public String[] getTokens() {
         return this.tokens;
     }
@@ -114,19 +139,12 @@ public class URLTemplate {
         this.lastUpdateTs = lastUpdateTs;
     }
 
-    public String getTemplateString() {
-        String str = "";
-        for(int i = 0;i < tokens.length; i++) {
-            if (i > 0) {
-                str += "/";
-            }
-            if (tokens[i] == null) {
-                str += types[i].name();
-            } else {
-                str += tokens[i];
-            }
-        }
-        return str;
+    public Method getMethod() {
+        return this.method;
+    }
+
+    public void setMethod(Method method) {
+        this.method = method;
     }
 
     @Override
@@ -137,6 +155,7 @@ public class URLTemplate {
             ", id='" + getId() + "'" +
             ", creationTs='" + getCreationTs() + "'" +
             ", lastUpdateTs='" + getLastUpdateTs() + "'" +                        
+            ", method='" + getMethod() + "'" +                        
             "}";
     }
 
@@ -148,8 +167,13 @@ public class URLTemplate {
         if (!(o instanceof URLTemplate)) {
             return false;
         }
+        
         URLTemplate that = (URLTemplate) o;
         
+        if (that.getMethod() != this.getMethod()) {
+            return false;
+        }
+
         for(int i = 0; i < tokens.length; i ++) {
             if(that.tokens[i] == null ? this.types[i] != that.types[i] : !this.tokens[i].equals(that.tokens[i])){
                 return false;
@@ -170,6 +194,6 @@ public class URLTemplate {
             }
         }
 
-        return ret;
+        return ret + method.hashCode();
     }
 }
