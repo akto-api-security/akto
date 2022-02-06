@@ -13,8 +13,6 @@ import com.sun.jna.*;
 
 import org.apache.commons.io.FileUtils;
 
-import de.sstoehr.harreader.HarReaderException;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.*;

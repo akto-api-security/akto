@@ -69,5 +69,10 @@ public class Key {
         this.bucketEndEpoch = bucketEndEpoch;
     }
 
+    @Override
+    public String toString() {
+        return apiCollectionId + " " + url + " " + method + " " + responseCode;
+    }
+
 }
 

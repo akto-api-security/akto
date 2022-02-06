@@ -11,23 +11,16 @@ import java.util.Map;
 
 import com.akto.MongoBasedTest;
 import com.akto.dao.SampleDataDao;
-import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.UsersDao;
-import com.akto.dao.context.Context;
 import com.akto.dto.User;
 import com.akto.dto.messaging.Message.Mode;
-import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.RequestTemplate;
-import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
-import com.akto.dto.type.URLMethods.Method;
 import com.akto.parsers.HttpCallParser.HttpResponseParams;
 import com.akto.parsers.HttpCallParser.HttpResponseParams.Source;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
-import com.akto.types.BasicDBListL;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
@@ -67,28 +60,25 @@ public class TestDBSync extends MongoBasedTest {
         sync.computeDelta(aggr, true, 0);
         sync.syncWithDB(); 
 
-        Map<String, URLMethods> urlMethodsMap = sync.getDelta(0).getStrictURLToMethods();
-        assertEquals(0, urlMethodsMap.size());
+        assertEquals(1, sync.getDelta(0).getStrictURLToMethods().size());
+        assertEquals(1, sync.getDelta(0).getTemplateURLToMethods().size());
 
-        Map<URLTemplate, URLMethods> urlTemplateMap = sync.getDelta(0).getTemplateURLToMethods();
-        assertEquals(1, urlTemplateMap.size());
-
-        Map.Entry<URLTemplate, URLMethods> entry = urlTemplateMap.entrySet().iterator().next();
+        Map.Entry<URLTemplate, RequestTemplate> entry = sync.getDelta(0).getTemplateURLToMethods().entrySet().iterator().next();
 
         assertEquals(url+"INTEGER", entry.getKey().getTemplateString());
-        RequestTemplate reqTemplate = entry.getValue().getMethodToRequestTemplate().get(Method.POST);
+        RequestTemplate reqTemplate = entry.getValue();
 
-        assertEquals(30, reqTemplate.getUserIds().size());
+        assertEquals(29, reqTemplate.getUserIds().size());
         assertEquals(2, reqTemplate.getParameters().size());
         
         RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
-        assertEquals(30, respTemplate.getUserIds().size());
+        assertEquals(29, respTemplate.getUserIds().size());
         assertEquals(3, respTemplate.getParameters().size());
     }    
 
     @Test
     public void testImmediateSync() {
-        String url = "link/";
+        String url = "immediate/";
 
         List<HttpResponseParams> responseParams = new ArrayList<>();
 
@@ -102,7 +92,7 @@ public class TestDBSync extends MongoBasedTest {
             responseParams.add(TestDump2.createSampleParams("user"+i, url+i));
         }
 
-        HttpCallParser parser = new HttpCallParser("access-token", 10,40,10);
+        HttpCallParser parser = new HttpCallParser("access-token", 1,40,10);
 
         parser.syncFunction(responseParams);
         assertTrue(parser.getSyncCount() == 0);
@@ -114,8 +104,90 @@ public class TestDBSync extends MongoBasedTest {
         parser.syncFunction(responseParams);
         assertTrue(parser.getSyncCount() == 0);
 
-        SampleData sd = SampleDataDao.instance.findAll(new BasicDBObject()).get(0);
+        SampleData sd = SampleDataDao.instance.findOne(Filters.eq("_id.url", "immediate/INTEGER"));
         assertEquals(10, sd.getSamples().size());
 
     }  
+
+    @Test
+    public void testAllPaths() {
+        String url = "link/";
+
+        List<HttpResponseParams> responseParams = new ArrayList<>();
+
+        HttpResponseParams resp = TestDump2.createSampleParams("user1", url+1);
+        ArrayList<String> newHeader = new ArrayList<>();
+        newHeader.add("hnew");
+        resp.headers.put("new header", newHeader);
+        responseParams.add(resp);
+        resp.setSource(Source.HAR);
+        HttpCallParser parser = new HttpCallParser("access-token", 10,40,10);
+
+        /* tryMergingWithKnownStrictURLs - put in delta-static */
+        parser.syncFunction(responseParams);
+        assertTrue(parser.getSyncCount() == 0);
+
+        /* processKnownStaticURLs */
+        parser.syncFunction(responseParams);
+
+        /* tryMergingWithKnownStrictURLs - merge with delta-static */        
+        responseParams.add(TestDump2.createSampleParams("user"+2, url+2));
+        responseParams.add(TestDump2.createSampleParams("user"+3, url+3));
+
+        /* tryMergingWithKnownStrictURLs - merge with delta-template */  
+        responseParams.add(TestDump2.createSampleParams("user"+4, url+4));
+        parser.syncFunction(responseParams);
+        assertTrue(parser.getSyncCount() == 0);
+        
+        /* tryMergingWithKnownTemplates */
+        parser.syncFunction(responseParams);
+        assertTrue(parser.getSyncCount() == 0);
+
+        /* tryMergingWithKnownStrictURLs - merge with Db url */
+        url = "payment/";
+        responseParams = new ArrayList<>();
+        responseParams.add(TestDump2.createSampleParams("user"+2, url+2));
+        responseParams.get(0).setSource(Source.HAR);
+        parser.syncFunction(responseParams);
+        responseParams = new ArrayList<>();
+        responseParams.add(TestDump2.createSampleParams("user"+3, url+3));
+
+        /* tryMergingWithKnownStrictURLs - merge with Db url - template already exists in delta */
+        responseParams.add(TestDump2.createSampleParams("user"+4, url+4));
+        responseParams.get(0).setSource(Source.HAR);
+        parser.syncFunction(responseParams);
+
+    }  
+
+    @Test
+    public void testInvalidMergeParameterizedURL() {
+        URLAggregator aggr = new URLAggregator();
+        APICatalogSync sync = new APICatalogSync("access-token", 1);
+
+        for (int i = 1; i <= 30; i ++ ) {
+            aggr.addURL(TestDump2.createSampleParams("user"+i, "payment/id"+i));
+        }
+        sync.computeDelta(aggr, true, 0);
+        sync.syncWithDB(); 
+
+
+        assertEquals(0, sync.getDelta(0).getStrictURLToMethods().size());
+        assertEquals(1, sync.getDelta(0).getTemplateURLToMethods().size());
+
+        HttpResponseParams resp2 = TestDump2.createSampleParams("user1", "payment/history");
+        ArrayList<String> newHeader = new ArrayList<>();
+        newHeader.add("hnew");
+        resp2.headers.put("new header", newHeader);
+        URLAggregator aggr2 = new URLAggregator();
+        aggr2.addURL(resp2);
+        
+        sync.computeDelta(aggr2, true, 0);
+        sync.syncWithDB(); 
+
+        assertEquals(1, sync.getDelta(0).getStrictURLToMethods().size());
+        assertEquals(1, sync.getDelta(0).getTemplateURLToMethods().size());
+
+
+    }    
+
 }

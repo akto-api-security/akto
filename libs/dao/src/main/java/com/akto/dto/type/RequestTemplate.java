@@ -73,7 +73,7 @@ public class RequestTemplate {
 
                 if (curr == null) {
                     curr = root.getOrCreate(key, new Pair<>(new KeyTypes(new HashMap<>(), false), new HashSet<String>()));
-                    logger.info("creating new node for " + key + " in " + url);
+                    // logger.info("creating new node for " + key + " in " + url);
                 }
 
                 add(curr.getValue().getSecond(), userId);
@@ -116,6 +116,8 @@ public class RequestTemplate {
         }
     }
 
+    public static long insertTime = 0, processTime = 0, deleteTime = 0;
+
     public List<SingleTypeInfo> process2(BasicDBObject payload, String url, String method, int responseCode, String userId, int apiCollectionId) {
             List<SingleTypeInfo> deleted = new ArrayList<>();
         
@@ -123,12 +125,13 @@ public class RequestTemplate {
 
             Trie.Node<String, Pair<KeyTypes, Set<String>>> root = this.keyTrie.getRoot();
 
-            insert(payload, userId, root, url, method, responseCode, "", apiCollectionId);
-
+            long s = System.currentTimeMillis();
+            // insert(payload, userId, root, url, method, responseCode, "", apiCollectionId);
+            insertTime += (System.currentTimeMillis() - s);
             int now = Context.now();
 
             BasicDBObject flattened = JSONUtils.flatten(payload);
-
+            s = System.currentTimeMillis();
             for(String param: flattened.keySet()) {
                 KeyTypes keyTypes = parameters.get(param);
                 if (keyTypes == null) {
@@ -156,11 +159,15 @@ public class RequestTemplate {
                 keyTypes.process(url, method, responseCode, false, param, flattened.get(param), userId, apiCollectionId);
             }
 
+            processTime += (System.currentTimeMillis() - s);
+
+            s = System.currentTimeMillis();
             if (now - mergeTimestamp > 60 * 2) {
                 deleted = tryMergeNodesInTrie(url, method, responseCode, apiCollectionId);
                 mergeTimestamp = now;
             }
 
+            deleteTime += (System.currentTimeMillis() - s);
             return deleted;
     }
     
@@ -271,6 +278,7 @@ public class RequestTemplate {
         ret.userIds.addAll(this.userIds);
 
         ret.keyTrie = this.keyTrie;
+        ret.trafficRecorder = this.trafficRecorder;
 
         return ret;
     }
@@ -392,6 +400,8 @@ public class RequestTemplate {
         this.userIds.addAll(that.userIds);
 
         this.keyTrie.getRoot().mergeFrom(that.keyTrie.getRoot(), MergeTrieKeyFunc.instance);
+
+        this.trafficRecorder.mergeFrom(that.getTrafficRecorder());
     }
 
     private static class MergeTrieKeyFunc implements BiConsumer<Pair<KeyTypes,Set<String>>,Pair<KeyTypes,Set<String>>> {
