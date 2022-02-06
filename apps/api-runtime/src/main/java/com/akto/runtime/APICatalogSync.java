@@ -18,18 +18,18 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
+import com.akto.dto.traffic.Key;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.TrafficRecorder;
-import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLStatic;
 import com.akto.dto.type.URLTemplate;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.parsers.HttpCallParser.HttpRequestParams;
 import com.akto.parsers.HttpCallParser.HttpResponseParams;
-import com.akto.types.CappedList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.DeleteOneModel;
@@ -41,11 +41,11 @@ import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
 
+import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
 import org.bson.json.JsonParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.commons.lang3.math.NumberUtils;
 
 public class APICatalogSync {
     
@@ -63,42 +63,40 @@ public class APICatalogSync {
     }
 
 
-    public void processResponse(URLMethods urlMethods, Collection<HttpResponseParams> responses, List<SingleTypeInfo> deletedInfo) {
+    public void processResponse(RequestTemplate requestTemplate, Collection<HttpResponseParams> responses, List<SingleTypeInfo> deletedInfo) {
         Iterator<HttpResponseParams> iter = responses.iterator();
         while(iter.hasNext()) {
             try {
-                processResponse(urlMethods, iter.next(), deletedInfo);
+                processResponse(requestTemplate, iter.next(), deletedInfo);
             } catch (Exception e) {
-                logger.error("processResponse", e);
+                logger.error("processResponse: " + e.getMessage());
             }
         }
     }
 
-    public void processResponse(URLMethods urlMethods, HttpResponseParams responseParams, List<SingleTypeInfo> deletedInfo) {
+    public void processResponse(RequestTemplate requestTemplate, HttpResponseParams responseParams, List<SingleTypeInfo> deletedInfo) {
         HttpRequestParams requestParams = responseParams.getRequestParams();
         String urlWithParams = requestParams.getURL();
-        String baseURL = URLAggregator.getBaseURL(urlWithParams);
-        BasicDBObject queryParams = URLAggregator.getQueryJSON(urlWithParams);
         String methodStr = requestParams.getMethod();
+        URLStatic baseURL = URLAggregator.getBaseURL(urlWithParams, methodStr);
+        BasicDBObject queryParams = URLAggregator.getQueryJSON(urlWithParams);
         int statusCode = responseParams.getStatusCode();
         Method method = Method.valueOf(methodStr);
         String userId = extractUserId(responseParams, userIdentifier);
-        RequestTemplate requestTemplate = urlMethods.getMethodToRequestTemplate().get(method);
-        if (requestTemplate == null) {
-            requestTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>()));
-            urlMethods.getMethodToRequestTemplate().put(method, requestTemplate);
-        }
 
         if (!responseParams.getIsPending()) {
             requestTemplate.processTraffic(responseParams.getTime());
         }
         if (statusCode >= 200 && statusCode < 300) {
             String reqPayload = requestParams.getPayload();
-            requestTemplate.processHeaders(requestParams.getHeaders(), baseURL, method.name(), -1, userId, requestParams.getApiCollectionId());
+            requestTemplate.processHeaders(requestParams.getHeaders(), baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId());
+            if(reqPayload.startsWith("[")) {
+                reqPayload = "{\"json\": "+reqPayload+"}";
+            }
             if (reqPayload.startsWith("{")) {
                 BasicDBObject payload = BasicDBObject.parse(reqPayload);
                 payload.putAll(queryParams.toMap());
-                deletedInfo.addAll(requestTemplate.process2(payload, baseURL, methodStr, -1, userId, requestParams.getApiCollectionId()));
+                deletedInfo.addAll(requestTemplate.process2(payload, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId()));
             }
             requestTemplate.recordMessage(responseParams.getOrig());
         }
@@ -119,8 +117,8 @@ public class APICatalogSync {
             }
 
             BasicDBObject payload = BasicDBObject.parse(respPayload);
-            deletedInfo.addAll(responseTemplate.process2(payload, baseURL, methodStr, statusCode, userId, requestParams.getApiCollectionId()));
-            responseTemplate.processHeaders(responseParams.getHeaders(), baseURL, method.name(), statusCode, userId, requestParams.getApiCollectionId());
+            deletedInfo.addAll(responseTemplate.process2(payload, baseURL.getUrl(), methodStr, statusCode, userId, requestParams.getApiCollectionId()));
+            responseTemplate.processHeaders(responseParams.getHeaders(), baseURL.getUrl(), method.name(), statusCode, userId, requestParams.getApiCollectionId());
             if (!responseParams.getIsPending()) {
                 responseTemplate.processTraffic(responseParams.getTime());
             }
@@ -148,8 +146,7 @@ public class APICatalogSync {
     }
 
     public void computeDelta(URLAggregator origAggregator, boolean triggerTemplateGeneration, int apiCollectionId) {
-
-
+        long start = System.currentTimeMillis();
 
         APICatalog deltaCatalog = this.delta.get(apiCollectionId);
         if (deltaCatalog == null) {
@@ -164,105 +161,258 @@ public class APICatalogSync {
         } 
 
         URLAggregator aggregator = new URLAggregator(origAggregator.urls);
-
+        System.out.println("aggregator: " + (System.currentTimeMillis() - start));
         origAggregator.urls = new ConcurrentHashMap<>();
 
-        processKnownURLs(aggregator, deltaCatalog, dbCatalog);
+        start = System.currentTimeMillis();
+        processKnownStaticURLs(aggregator, deltaCatalog, dbCatalog);
+        System.out.println("processKnownStaticURLs: " + (System.currentTimeMillis() - start));
 
-        processUnknownURLs(aggregator, triggerTemplateGeneration, deltaCatalog);
+        start = System.currentTimeMillis();
+        Map<URLStatic, RequestTemplate> pendingRequests = createRequestTemplates(aggregator);
+        System.out.println("pendingRequests: " + (System.currentTimeMillis() - start));
 
-        // for (String url: aggregator.urls.keySet()) {
-        //     origAggregator.addURL(aggregator.urls.get(url), url);
-        // }
+        start = System.currentTimeMillis();
+        tryWithKnownURLTemplates(pendingRequests, deltaCatalog, dbCatalog);
+        System.out.println("tryWithKnownURLTemplates: " + (System.currentTimeMillis() - start));
+
+        start = System.currentTimeMillis();
+        tryMergingWithKnownStrictURLs(pendingRequests, dbCatalog, deltaCatalog);
+        System.out.println("tryMergingWithKnownStrictURLs: " + (System.currentTimeMillis() - start));
+
+        System.out.println("processTime: " + RequestTemplate.insertTime + " " + RequestTemplate.processTime + " " + RequestTemplate.deleteTime);
+
+    }
+
+    private void tryMergingWithKnownStrictURLs(
+        Map<URLStatic, RequestTemplate> pendingRequests,
+        APICatalog dbCatalog,
+        APICatalog deltaCatalog
+    ) {
+        Iterator<Map.Entry<URLStatic, RequestTemplate>> iterator = pendingRequests.entrySet().iterator();
+        Map<Integer, Map<URLStatic, RequestTemplate>> dbSizeToUrlToTemplate = groupByTokenSize(dbCatalog);
+        Map<URLStatic, RequestTemplate> deltaTemplates = deltaCatalog.getStrictURLToMethods();
+        while (iterator.hasNext()) {
+            Map.Entry<URLStatic, RequestTemplate> entry = iterator.next();
+            URLStatic newUrl = entry.getKey();
+            RequestTemplate newTemplate = entry.getValue();
+            String[] tokens = tokenize(newUrl.getUrl());
+
+            if (tokens.length == 1) {
+                deltaTemplates.put(newUrl, newTemplate);
+                iterator.remove();
+                continue;
+            }
+
+            boolean matchedInDeltaTemplate = false;
+            for(URLTemplate urlTemplate: deltaCatalog.getTemplateURLToMethods().keySet()){
+                RequestTemplate deltaTemplate = deltaCatalog.getTemplateURLToMethods().get(urlTemplate);
+                if (urlTemplate.match(newUrl) && deltaTemplate.compare(newTemplate)) {
+                    matchedInDeltaTemplate = true;
+                    deltaTemplate.mergeFrom(newTemplate);
+                    break;
+                }
+            }
+
+            if (matchedInDeltaTemplate) {
+                iterator.remove();
+                continue;
+            }
+
+            Map<URLStatic, RequestTemplate> dbTemplates = dbSizeToUrlToTemplate.get(tokens.length);
+            if (dbTemplates != null && dbTemplates.size() > 0) {
+                boolean newUrlMatchedInDb = false;
+                for(URLStatic dbUrl: dbTemplates.keySet()) {
+                    RequestTemplate dbTemplate = dbTemplates.get(dbUrl);
+                    URLTemplate mergedTemplate = tryMergeUrls(dbUrl, newUrl);
+                    if (mergedTemplate == null) {
+                        continue;
+                    }
+
+                    if (dbTemplate.compare(newTemplate)) {
+                        deltaCatalog.getDeletedInfo().addAll(dbTemplate.getAllTypeInfo());
+                        RequestTemplate alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(mergedTemplate);
+
+                        if (alreadyInDelta != null) {
+                            alreadyInDelta.mergeFrom(newTemplate);
+                        } else {
+                            RequestTemplate dbCopy = dbTemplate.copy();
+                            dbCopy.mergeFrom(newTemplate);    
+                            deltaCatalog.getTemplateURLToMethods().put(mergedTemplate, dbCopy);
+                        }
+                        
+                        newUrlMatchedInDb = true;
+                        break;
+                    }
+                }
+
+                if (newUrlMatchedInDb) {
+                    iterator.remove();
+                    continue;
+                }
+            }
+
+            boolean newUrlMatchedInDelta = false;
+
+            for (URLStatic deltaUrl: deltaCatalog.getStrictURLToMethods().keySet()) {
+                RequestTemplate deltaTemplate = deltaTemplates.get(deltaUrl);
+                URLTemplate mergedTemplate = tryMergeUrls(deltaUrl, newUrl);
+                if (mergedTemplate == null) {
+                    continue;
+                }
+
+                if (deltaTemplate.compare(newTemplate)) {
+                    newUrlMatchedInDelta = true;
+                    deltaCatalog.getDeletedInfo().addAll(deltaTemplate.getAllTypeInfo());
+                    RequestTemplate alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(mergedTemplate);
+
+                    if (alreadyInDelta != null) {
+                        alreadyInDelta.mergeFrom(newTemplate);
+                    } else {
+                        RequestTemplate deltaCopy = deltaTemplate.copy();
+                        deltaCopy.mergeFrom(newTemplate);    
+                        deltaCatalog.getTemplateURLToMethods().put(mergedTemplate, deltaCopy);
+                    }
+                    
+                    deltaCatalog.getStrictURLToMethods().remove(deltaUrl);
+                    break;
+                }                
+            }
+            
+            if (newUrlMatchedInDelta) {
+                iterator.remove();
+                continue;
+            }
+
+            deltaTemplates.put(newUrl, newTemplate);
+            iterator.remove();
+        }
     }
 
 
-    int tryGenerateURLsTimestamp = 0;
+    private URLTemplate tryMergeUrls(URLStatic dbUrl, URLStatic newUrl) {
+        if (dbUrl.getMethod() != newUrl.getMethod()) {
+            return null;
+        }
+        String[] dbTokens = tokenize(dbUrl.getUrl());
+        String[] newTokens = tokenize(newUrl.getUrl());
 
-    private void processUnknownURLs(URLAggregator aggregator, boolean triggerTemplateGeneration, APICatalog deltaCatalog) {
-        List<SingleTypeInfo> deletedInfo = deltaCatalog.getDeletedInfo();
-        Iterator<Map.Entry<String, Set<HttpResponseParams>>> iterator = aggregator.urls.entrySet().iterator();
+        if (dbTokens.length != newTokens.length) {
+            return null;
+        }
+
+        SuperType[] newTypes = new SuperType[newTokens.length];
+        int templatizedTokens = 0;
+        for(int i = 0; i < newTokens.length; i ++) {
+            String tempToken = newTokens[i];
+            String dbToken = dbTokens[i];
+
+            if (tempToken.equalsIgnoreCase(dbToken)) {
+                continue;
+            }
+            
+            if (NumberUtils.isParsable(tempToken) && NumberUtils.isParsable(dbToken)) {
+                newTypes[i] = SuperType.INTEGER;
+                newTokens[i] = null;
+                templatizedTokens++;
+            } else {
+                newTypes[i] = SuperType.STRING;
+                newTokens[i] = null;
+                templatizedTokens++;
+            }
+        }
+
+        if (templatizedTokens == 1) {
+            return new URLTemplate(newTokens, newTypes, newUrl.getMethod());
+        }
+
+        return null;
+
+    }
+
+
+    private void tryWithKnownURLTemplates(
+        Map<URLStatic, RequestTemplate> pendingRequests, 
+        APICatalog deltaCatalog,
+        APICatalog dbCatalog
+    ) {
+        Iterator<Map.Entry<URLStatic, RequestTemplate>> iterator = pendingRequests.entrySet().iterator();
         try {
             while (iterator.hasNext()) {
-                Map.Entry<String, Set<HttpResponseParams>> entry = iterator.next();
-                String url = entry.getKey();
-                Set<HttpResponseParams> responseParamsList = entry.getValue();
+                Map.Entry<URLStatic, RequestTemplate> entry = iterator.next();
+                URLStatic newUrl = entry.getKey();
+                RequestTemplate newRequestTemplate = entry.getValue();
 
+                for (URLTemplate  urlTemplate: dbCatalog.getTemplateURLToMethods().keySet()) {
+                    if (urlTemplate.match(newUrl)) {
+                        RequestTemplate dbTemplate = dbCatalog.getTemplateURLToMethods().get(urlTemplate);
 
-                URLMethods urlMethods = deltaCatalog.getStrictURLToMethods().get(url);
-                if (urlMethods == null) {
-                    urlMethods = new URLMethods(new HashMap<>());
-                    deltaCatalog.getStrictURLToMethods().put(url, urlMethods);
+                        if (newRequestTemplate.compare(dbTemplate)) {
+                            RequestTemplate alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(urlTemplate);
+
+                            if (alreadyInDelta != null) {
+                                alreadyInDelta.mergeFrom(newRequestTemplate);
+                            } else {
+                                RequestTemplate dbCopy = dbTemplate.copy();
+                                dbCopy.mergeFrom(newRequestTemplate);    
+                                deltaCatalog.getTemplateURLToMethods().put(urlTemplate, dbCopy);
+                            }
+                            iterator.remove();
+                            break;
+                        }
+                        
+                    }
                 }
+            }
+        } catch (Exception e) {
 
-                logger.info("parsing a new url " + url);
-                processResponse(urlMethods, responseParamsList, deletedInfo);
+        }
+    }
+
+
+    private Map<URLStatic, RequestTemplate> createRequestTemplates(URLAggregator aggregator) {
+        Map<URLStatic, RequestTemplate> ret = new HashMap<>();
+        List<SingleTypeInfo> deletedInfo = new ArrayList<>();
+        Iterator<Map.Entry<URLStatic, Set<HttpResponseParams>>> iterator = aggregator.urls.entrySet().iterator();
+        try {
+            while (iterator.hasNext()) {
+                Map.Entry<URLStatic, Set<HttpResponseParams>> entry = iterator.next();
+                URLStatic url = entry.getKey();
+                Set<HttpResponseParams> responseParamsList = entry.getValue();
+                RequestTemplate requestTemplate = ret.get(url);
+                if (requestTemplate == null) {
+                    requestTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>()));
+                    ret.put(url, requestTemplate);
+                }
+                processResponse(requestTemplate, responseParamsList, deletedInfo);
                 iterator.remove();
             }
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
         }
 
-        int now = Context.now();
-        if (now - tryGenerateURLsTimestamp > 120 || triggerTemplateGeneration) {
-
-            logger.info("trying to generate url template");
-            tryGenerateURLsTimestamp = now;
-
-            tryGenerateURLTemplates(deltaCatalog);
-
-            iterator = aggregator.urls.entrySet().iterator();
-        
-            while (iterator.hasNext()) {
-                Map.Entry<String, Set<HttpResponseParams>> entry = iterator.next();
-                String url = entry.getKey();
-                Set<HttpResponseParams> responseParamsList = entry.getValue();
-
-                for(URLTemplate  urlTemplate: deltaCatalog.getTemplateURLToMethods().keySet()) {
-                    if (urlTemplate.match(url)) {
-                        URLMethods urlMethods = deltaCatalog.getTemplateURLToMethods().get(urlTemplate);
-                        processResponse(urlMethods, responseParamsList, deletedInfo);
-                        iterator.remove();
-                        break;
-                    }                
-                }
-            }
-        }
+        return ret;
     }
 
-    private void processKnownURLs(URLAggregator aggregator, APICatalog deltaCatalog, APICatalog dbCatalog) {
-        Iterator<Map.Entry<String, Set<HttpResponseParams>>> iterator = aggregator.urls.entrySet().iterator();
+    private void processKnownStaticURLs(URLAggregator aggregator, APICatalog deltaCatalog, APICatalog dbCatalog) {
+        Iterator<Map.Entry<URLStatic, Set<HttpResponseParams>>> iterator = aggregator.urls.entrySet().iterator();
         List<SingleTypeInfo> deletedInfo = deltaCatalog.getDeletedInfo();
         try {
             while (iterator.hasNext()) {
-                Map.Entry<String, Set<HttpResponseParams>> entry = iterator.next();
-                String url = entry.getKey();
+                Map.Entry<URLStatic, Set<HttpResponseParams>> entry = iterator.next();
+                URLStatic url = entry.getKey();
                 Set<HttpResponseParams> responseParamsList = entry.getValue();
 
-                URLMethods strictMatch = dbCatalog.getStrictURLToMethods().get(url);
+                RequestTemplate strictMatch = dbCatalog.getStrictURLToMethods().get(url);
                 if (strictMatch != null) {
-                    URLMethods urlMethods = deltaCatalog.getStrictURLToMethods().get(url);
-                    if (urlMethods == null) {
-                        urlMethods = strictMatch.copy();
-                        deltaCatalog.getStrictURLToMethods().put(url, urlMethods);
+                    RequestTemplate requestTemplate = deltaCatalog.getStrictURLToMethods().get(url);
+                    if (requestTemplate == null) {
+                        requestTemplate = strictMatch.copy();
+                        deltaCatalog.getStrictURLToMethods().put(url, requestTemplate);
                     }
 
-                    processResponse(urlMethods, entry.getValue(), deletedInfo);
+                    processResponse(requestTemplate, responseParamsList, deletedInfo);
                     iterator.remove();
-                } else {
-                    for (URLTemplate  urlTemplate: dbCatalog.getTemplateURLToMethods().keySet()) {
-                        if (urlTemplate.match(url)) {
-                            URLMethods urlMethods = deltaCatalog.getTemplateURLToMethods().get(urlTemplate);
-                            if (urlMethods == null) {
-                                urlMethods = dbCatalog.getTemplateURLToMethods().get(urlTemplate).copy();
-                                deltaCatalog.getTemplateURLToMethods().put(urlTemplate, urlMethods);
-                            }
-            
-                            processResponse(urlMethods, responseParamsList, deletedInfo);
-                            iterator.remove();
-                            break;
-                        }
-                    }
                 }
             }
         } catch (Exception e) {
@@ -276,152 +426,29 @@ public class APICatalogSync {
         return url;
     }
 
-    private Map<Integer, Map<Method, Map<String, RequestTemplate>>> groupByTokenSize(APICatalog deltaCatalog) {
-        Map<Integer, Map<Method, Map<String, RequestTemplate>>> sizeToURL = new HashMap<>();
-
-        for(String rawURL: deltaCatalog.getStrictURLToMethods().keySet()) {
-            URLMethods urlMethods = deltaCatalog.getStrictURLToMethods().get(rawURL);
-
-            for (Method method: urlMethods.getMethodToRequestTemplate().keySet()) {
-                RequestTemplate reqTemplate = urlMethods.getMethodToRequestTemplate().get(method);
-                if (reqTemplate.getUserIds().size() < 5) {
-                    String url = trim(rawURL);
-                    String[] tokens = url.split("/");
-                    Map<Method, Map<String, RequestTemplate>> urlSet = sizeToURL.get(tokens.length);
-                    urlSet = sizeToURL.get(tokens.length);
-                    if (urlSet == null) {
-                        urlSet = new HashMap<>();
-                        sizeToURL.put(tokens.length, urlSet);
-                    }
-        
-                    Map<String, RequestTemplate> urlsForThisMethod = urlSet.get(method);      
-                    if (urlsForThisMethod == null) {
-                        urlsForThisMethod = new HashMap<>();
-                        urlSet.put(method, urlsForThisMethod);
-                    }
-
-                    urlsForThisMethod.put(rawURL, urlMethods.getMethodToRequestTemplate().get(method));
+    private Map<Integer, Map<URLStatic, RequestTemplate>> groupByTokenSize(APICatalog catalog) {
+        Map<Integer, Map<URLStatic, RequestTemplate>> sizeToURL = new HashMap<>();
+        for(URLStatic rawURL: catalog.getStrictURLToMethods().keySet()) {
+            RequestTemplate reqTemplate = catalog.getStrictURLToMethods().get(rawURL);
+            if (reqTemplate.getUserIds().size() < 5) {
+                String url = trim(rawURL.getUrl());
+                String[] tokens = url.split("/");
+                Map<URLStatic, RequestTemplate> urlSet = sizeToURL.get(tokens.length);
+                urlSet = sizeToURL.get(tokens.length);
+                if (urlSet == null) {
+                    urlSet = new HashMap<>();
+                    sizeToURL.put(tokens.length, urlSet);
                 }
+
+                urlSet.put(rawURL, reqTemplate);
             }
         }
 
         return sizeToURL;
     }
 
-
-    private void tryGenerateURLTemplates(APICatalog deltaCatalog) {
-
-        Map<Integer, Map<Method, Map<String, RequestTemplate>>> sizeToURL = groupByTokenSize(deltaCatalog);
-
-        Iterator<Map.Entry<Integer, Map<Method, Map<String, RequestTemplate>>>> iter = sizeToURL.entrySet().iterator();
-        while(iter.hasNext()) {
-            Map.Entry<Integer, Map<Method, Map<String, RequestTemplate> >> entry = iter.next();
-            int tLen = entry.getKey();
-            Map<Method, Map<String, RequestTemplate>> urlsForEachMethod = entry.getValue();
-
-            if (tLen == 1) continue;
-
-            for(Map.Entry<Method, Map<String, RequestTemplate> > entry2: urlsForEachMethod.entrySet()) {
-                Method method = entry2.getKey();
-                Map<String, RequestTemplate>  urls = entry2.getValue();
-                removeMatchedUrls(method, urls, deltaCatalog);
-            }
-        }
-    }
-
-    private void removeMatchedUrls(Method method, Map<String, RequestTemplate> origUrls, APICatalog deltaCatalog){
-
-        while (origUrls.size() > 0) {
-            Iterator<Map.Entry<String, RequestTemplate>> origUrlsIterator = origUrls.entrySet().iterator();
-            Map.Entry<String, RequestTemplate> urlAndTemplate = origUrlsIterator.next();
-            String[] sampleUrl = tokenize(urlAndTemplate.getKey());
-
-            URLTemplate sample = new URLTemplate(sampleUrl, new SuperType[sampleUrl.length]);
-            int count = tryPatternsHelper(sample, urlAndTemplate.getValue(), 0, origUrls, thresh);
-            if (count > thresh) {
-                logger.info("Merging in a single URL template" + sample.getTemplateString());
-                Map<Method, RequestTemplate> methodToTemplate = new HashMap<>();
-                RequestTemplate newTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>()));
-                methodToTemplate.put(method, newTemplate);
-                deltaCatalog.getTemplateURLToMethods().put(sample, new URLMethods(methodToTemplate));
-                Iterator<Map.Entry<String, URLMethods>> strictURLIterator = deltaCatalog.getStrictURLToMethods().entrySet().iterator();
-
-                while(strictURLIterator.hasNext()) {
-                    Map.Entry<String, URLMethods> urlAndMethods = strictURLIterator.next();
-                    String strictURL = urlAndMethods.getKey();
-                    if (sample.match(strictURL)) {
-                        Map<Method, RequestTemplate> strictMethods = urlAndMethods.getValue().getMethodToRequestTemplate();
-
-                        if (strictMethods != null && strictMethods.containsKey(method)) {
-                            newTemplate.mergeFrom(strictMethods.get(method));
-                            RequestTemplate removed = strictMethods.remove(method);
-                            if (strictMethods.size() == 0) {
-                                logger.info("Removing completely" + strictURL);
-                                strictURLIterator.remove();
-                            }
-                            deltaCatalog.getDeletedInfo().addAll(removed.copy().getAllTypeInfo());
-                        }
-                    }
-                }
-
-                Iterator<Map.Entry<String, RequestTemplate>> matchIterator = origUrls.entrySet().iterator();
-                while(matchIterator.hasNext()) {
-                    Map.Entry<String, RequestTemplate> matchingUrlAndTemplate = matchIterator.next();
-                    String url = matchingUrlAndTemplate.getKey();
-                    if (sample.match(url)) {
-                        matchIterator.remove();
-                    }
-                }
-            } else {
-                origUrlsIterator.remove();
-            }
-        }
-    }
-
-
     public static String[] tokenize(String url) {
         return trim(url).split("/");
-    }
-
-    int tryPatternsHelper(URLTemplate urlTemplate, RequestTemplate requestTemplate, int index, Map<String, RequestTemplate> urls, int thresh) {
-
-        if (index == urlTemplate.getTypes().length) {
-            int count = 0;
-            for(Map.Entry<String, RequestTemplate> entry: urls.entrySet()) {
-                if (urlTemplate.match(tokenize(entry.getKey())) && requestTemplate.compare(entry.getValue())) {
-                    count++;
-
-                    if (count > thresh) {
-                        break;
-                    }
-                }
-            }
-            return count;
-        }
-    
-        String tempToken = urlTemplate.getTokens()[index];
-        int countAsItIs = tryPatternsHelper(urlTemplate, requestTemplate, index+1, urls, thresh);
-
-        if (countAsItIs >  thresh) {
-            return countAsItIs;
-        }
-
-        urlTemplate.getTokens()[index] = null;
-        int countWithPattern = 0;
-        if (NumberUtils.isParsable(tempToken)) {
-            urlTemplate.getTypes()[index] = SuperType.INTEGER;
-            countWithPattern = tryPatternsHelper(urlTemplate, requestTemplate, index+1, urls, thresh);
-        } else {
-            urlTemplate.getTypes()[index] = SuperType.STRING;
-            countWithPattern = tryPatternsHelper(urlTemplate, requestTemplate, index+1, urls, thresh);
-        }
-
-        if (countWithPattern >  thresh) {
-            return countWithPattern;
-        }
-
-        urlTemplate.getTokens()[index] = tempToken;
-        return -1;
     }
 
     Map<String, SingleTypeInfo> convertToMap(List<SingleTypeInfo> l) {
@@ -435,12 +462,14 @@ public class APICatalogSync {
 
     public ArrayList<WriteModel<SampleData>> getDBUpdatesForSampleData(int apiCollectionId, APICatalog currentDelta) {
         List<SampleData> sampleData = new ArrayList<>();
-        for(Map.Entry<String, URLMethods> entry: currentDelta.getStrictURLToMethods().entrySet()) {
-            sampleData.addAll(entry.getValue().removeAllSampleData(apiCollectionId, entry.getKey()));
+        for(Map.Entry<URLStatic, RequestTemplate> entry: currentDelta.getStrictURLToMethods().entrySet()) {
+            Key key = new Key(apiCollectionId, entry.getKey().getUrl(), entry.getKey().getMethod(), -1, 0, 0);
+            sampleData.add(new SampleData(key, entry.getValue().removeAllSampleMessage()));
         }
 
-        for(Map.Entry<URLTemplate, URLMethods> entry: currentDelta.getTemplateURLToMethods().entrySet()) {
-            sampleData.addAll(entry.getValue().removeAllSampleData(apiCollectionId, entry.getKey().getTemplateString()));
+        for(Map.Entry<URLTemplate, RequestTemplate> entry: currentDelta.getTemplateURLToMethods().entrySet()) {
+            Key key = new Key(apiCollectionId, entry.getKey().getTemplateString(), entry.getKey().getMethod(), -1, 0, 0);
+            sampleData.add(new SampleData(key, entry.getValue().removeAllSampleMessage()));
         }
 
         ArrayList<WriteModel<SampleData>> bulkUpdates = new ArrayList<>();
@@ -464,12 +493,12 @@ public class APICatalogSync {
     public ArrayList<WriteModel<TrafficInfo>> getDBUpdatesForTraffic(int apiCollectionId, APICatalog currentDelta) {
 
         List<TrafficInfo> trafficInfos = new ArrayList<>();
-        for(Map.Entry<String, URLMethods> entry: currentDelta.getStrictURLToMethods().entrySet()) {
-            trafficInfos.addAll(entry.getValue().removeAllTrafficInfo(apiCollectionId, entry.getKey()));
+        for(Map.Entry<URLStatic, RequestTemplate> entry: currentDelta.getStrictURLToMethods().entrySet()) {
+            trafficInfos.addAll(entry.getValue().removeAllTrafficInfo(apiCollectionId, entry.getKey().getUrl(), entry.getKey().getMethod(), -1));
         }
 
-        for(Map.Entry<URLTemplate, URLMethods> entry: currentDelta.getTemplateURLToMethods().entrySet()) {
-            trafficInfos.addAll(entry.getValue().removeAllTrafficInfo(apiCollectionId, entry.getKey().getTemplateString()));
+        for(Map.Entry<URLTemplate, RequestTemplate> entry: currentDelta.getTemplateURLToMethods().entrySet()) {
+            trafficInfos.addAll(entry.getValue().removeAllTrafficInfo(apiCollectionId, entry.getKey().getTemplateString(), entry.getKey().getMethod(), -1));
         }
 
         ArrayList<WriteModel<TrafficInfo>> bulkUpdates = new ArrayList<>();
@@ -537,7 +566,7 @@ public class APICatalogSync {
         );
     }
 
-    private static URLTemplate createUrlTemplate(String url) {
+    private static URLTemplate createUrlTemplate(String url, Method method) {
         String[] tokens = trim(url).split("/");
         SuperType[] types = new SuperType[tokens.length];
         for(int i = 0; i < tokens.length; i ++ ) {
@@ -555,7 +584,7 @@ public class APICatalogSync {
 
         }
 
-        URLTemplate urlTemplate = new URLTemplate(tokens, types);
+        URLTemplate urlTemplate = new URLTemplate(tokens, types, method);
 
         return urlTemplate;
     }
@@ -569,10 +598,11 @@ public class APICatalogSync {
                 APICatalog newCatalog = this.dbState.get(collectionId);
                 Set<String> newURLs = new HashSet<>();
                 for(URLTemplate url: newCatalog.getTemplateURLToMethods().keySet()) { 
-                    newURLs.add(url.getTemplateString());
+                    newURLs.add(url.getTemplateString()+ " "+ url.getMethod().name());
                 }
-                newURLs.addAll(newCatalog.getStrictURLToMethods().keySet());
-
+                for(URLStatic url: newCatalog.getStrictURLToMethods().keySet()) { 
+                    newURLs.add(url.getUrl()+ " "+ url.getMethod().name());
+                }
 
                 Bson findQ = Filters.eq("_id", collectionId);
                 ApiCollection currCollection = ApiCollectionsDao.instance.findOne(findQ);
@@ -594,7 +624,6 @@ public class APICatalogSync {
         
         for (SingleTypeInfo param: allParams) {
             String url = param.getUrl();
-            URLMethods urlMethods;
             int collId = param.getApiCollectionId();
             APICatalog catalog = ret.get(collId);
 
@@ -602,32 +631,23 @@ public class APICatalogSync {
                 catalog = new APICatalog(collId, new HashMap<>(), new HashMap<>());
                 ret.put(collId, catalog);
             }
-
+            RequestTemplate reqTemplate;
             if (url.contains("STRING") || url.contains("INTEGER")) {
-                URLTemplate urlTemplate = createUrlTemplate(url);
-                urlMethods = catalog.getTemplateURLToMethods().get(urlTemplate);
+                URLTemplate urlTemplate = createUrlTemplate(url, Method.valueOf(param.getMethod()));
+                reqTemplate = catalog.getTemplateURLToMethods().get(urlTemplate);
 
-                if (urlMethods == null) {
-                    urlMethods = new URLMethods(new HashMap<>());
-                    catalog.getTemplateURLToMethods().put(urlTemplate, urlMethods);
+                if (reqTemplate == null) {
+                    reqTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>()));
+                    catalog.getTemplateURLToMethods().put(urlTemplate, reqTemplate);
                 }
 
             } else {
-                urlMethods = catalog.getStrictURLToMethods().get(url);
-
-                if (urlMethods == null) {
-                    urlMethods = new URLMethods(new HashMap<>());
-                    catalog.getStrictURLToMethods().put(url, urlMethods);
+                URLStatic urlStatic = new URLStatic(url, Method.valueOf(param.getMethod()));
+                reqTemplate = catalog.getStrictURLToMethods().get(urlStatic);
+                if (reqTemplate == null) {
+                    reqTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>()));
+                    catalog.getStrictURLToMethods().put(urlStatic, reqTemplate);
                 }
-            }
-
-            Method method = Method.valueOf(param.getMethod());
-
-            RequestTemplate reqTemplate = urlMethods.getMethodToRequestTemplate().get(method);
-
-            if (reqTemplate == null) {
-                reqTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>()));
-                urlMethods.getMethodToRequestTemplate().put(method, reqTemplate);
             }
 
             if (param.getResponseCode() > 0) {
@@ -662,14 +682,12 @@ public class APICatalogSync {
         }
 
         for (APICatalog catalog: ret.values()) {
-            for (URLMethods urlMethods: catalog.getStrictURLToMethods().values()) {
-                for (RequestTemplate requestTemplate: urlMethods.getMethodToRequestTemplate().values()) {
-                    requestTemplate.buildTrie();
+            for (RequestTemplate requestTemplate: catalog.getStrictURLToMethods().values()) {
+                requestTemplate.buildTrie();
 
-                    for (RequestTemplate responseTemplate: requestTemplate.getResponseTemplates().values()) {
-                        responseTemplate.buildTrie();
-                    }    
-                }
+                for (RequestTemplate responseTemplate: requestTemplate.getResponseTemplates().values()) {
+                    responseTemplate.buildTrie();
+                }    
             }
         }
 
@@ -696,10 +714,16 @@ public class APICatalogSync {
 
         logger.info("adding " + writesForParams.size() + " updates for params");
 
-        if (writesForParams.size() > 0) {
-            BulkWriteResult res = SingleTypeInfoDao.instance.getMCollection().bulkWrite(writesForParams);
+        long start = System.currentTimeMillis();
 
-            logger.info(res.getInserts().size() + " " +res.getUpserts().size());
+        if (writesForParams.size() >0) {
+            
+            BulkWriteResult res = 
+                SingleTypeInfoDao.instance.getMCollection().bulkWrite(
+                    writesForParams
+                );
+
+            logger.info((System.currentTimeMillis() - start) + ": " + res.getInserts().size() + " " +res.getUpserts().size());
         }
 
         logger.info("adding " + writesForTraffic.size() + " updates for traffic");
@@ -724,8 +748,8 @@ public class APICatalogSync {
     }
 
     public void printNewURLsInDelta(APICatalog deltaCatalog) {
-        for(String s: deltaCatalog.getStrictURLToMethods().keySet()) {
-            logger.info(s);
+        for(URLStatic s: deltaCatalog.getStrictURLToMethods().keySet()) {
+            logger.info(s.getUrl());
         }
 
         for(URLTemplate s: deltaCatalog.getTemplateURLToMethods().keySet()) {

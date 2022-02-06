@@ -1,5 +1,6 @@
 package com.akto.parsers;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -12,7 +13,7 @@ import java.util.Set;
 
 import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.RequestTemplate;
-import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLStatic;
 import com.akto.dto.type.URLTemplate;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
@@ -95,14 +96,6 @@ public class TestDump2 {
         return ret;
     }
 
-    public static void assertEquals(int actual, int expected) {
-        Assertions.assertEquals(expected, actual);
-    }
-
-    public static void assertEquals(String actual, String expected) {
-        Assertions.assertEquals(expected, actual);
-    }
-
     @Test
     public void testHappyPath() {
         String message = " {\"akto_account_id\":\"1000000\",\"contentType\":\"application/json;charset=utf-8\",\"ip\":\"49.32.227.133:60118\",\"method\":\"GET\",\"path\":\"/api/books\",\"requestHeaders\":\"{\\\"Accept\\\":[\\\"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9\\\"],\\\"Accept-Encoding\\\":[\\\"gzip, deflate\\\"],\\\"Accept-Language\\\":[\\\"en-US,en;q=0.9,mr;q=0.8\\\"],\\\"Cache-Control\\\":[\\\"no-cache\\\"],\\\"Connection\\\":[\\\"keep-alive\\\"],\\\"Dnt\\\":[\\\"1\\\"],\\\"Pragma\\\":[\\\"no-cache\\\"],\\\"Upgrade-Insecure-Requests\\\":[\\\"1\\\"],\\\"User-Agent\\\":[\\\"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.55 Safari/537.36\\\"]}\",\"requestPayload\":\"\",\"responseHeaders\":\"{\\\"Content-Type\\\":[\\\"application/json;charset=utf-8\\\"]}\",\"responsePayload\":\"{\\\"id\\\":\\\"1\\\",\\\"isbn\\\":\\\"3223\\\",\\\"title\\\":\\\"Book 1\\\",\\\"author\\\":{\\\"firstname\\\":\\\"Avneesh\\\",\\\"lastname\\\":\\\"Hota\\\"}}\\n\",\"status\":\"null\",\"statusCode\":\"201\",\"time\":\"1638940067\",\"type\":\"HTTP/1.1\"}";
@@ -110,7 +103,7 @@ public class TestDump2 {
         try {
             httpResponseParams = HttpCallParser.parseKafkaMessage(message);
         } catch (Exception e) {
-            assertEquals(1,2);
+            assertEquals(2, 1);
             return;
         }
 
@@ -120,9 +113,9 @@ public class TestDump2 {
         aggr.addURL(httpResponseParams);
         sync.computeDelta(aggr, false, 0);
         
-        assertEquals(sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0)).size(), 15);        
-        assertEquals(sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size(), 2);        
-        assertEquals(sync.getDBUpdatesForSampleData(0, sync.getDelta(0)).size(), 1);        
+        assertEquals(15, sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0)).size());        
+        assertEquals(2, sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size());        
+        assertEquals(1, sync.getDBUpdatesForSampleData(0, sync.getDelta(0)).size());        
     }
 
 
@@ -136,22 +129,21 @@ public class TestDump2 {
             aggr.addURL(resp);
             sync.computeDelta(aggr, false, collectionId);
 
-            Map<String, URLMethods> urlMethodsMap = sync.getDelta(collectionId).getStrictURLToMethods();
+            Map<URLStatic, RequestTemplate> urlMethodsMap = sync.getDelta(collectionId).getStrictURLToMethods();
+            assertEquals(1, urlMethodsMap.size());
 
-            assertEquals(urlMethodsMap.size(), 1);
-
-            URLMethods urlMethods = urlMethodsMap.get(resp.getRequestParams().url);
+            Method method = Method.valueOf(resp.getRequestParams().method);
+            RequestTemplate reqTemplate = urlMethodsMap.get(new URLStatic(resp.getRequestParams().url, method));
             
-            RequestTemplate reqTemplate = urlMethods.getMethodToRequestTemplate().get(Method.valueOf(resp.getRequestParams().method));
-            assertEquals(reqTemplate.getUserIds().size(), 1);
-            assertEquals(reqTemplate.getParameters().size(), 2);
+            assertEquals(1, reqTemplate.getUserIds().size());
+            assertEquals(2, reqTemplate.getParameters().size());
             
             RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
-            assertEquals(respTemplate.getUserIds().size(), 1);
-            assertEquals(respTemplate.getParameters().size(), 3);
+            assertEquals(1, respTemplate.getUserIds().size());
+            assertEquals(3, respTemplate.getParameters().size());
 
-            assertEquals(sync.getDBUpdatesForParams(sync.getDelta(collectionId), sync.getDbState(collectionId)).size(), 24);
-            assertEquals(sync.getDBUpdatesForTraffic(collectionId, sync.getDelta(collectionId)).size(), 2);        
+            assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(collectionId), sync.getDbState(collectionId)).size());
+            assertEquals(2, sync.getDBUpdatesForTraffic(collectionId, sync.getDelta(collectionId)).size());        
         }        
     }
 
@@ -161,9 +153,9 @@ public class TestDump2 {
         simpleTestForSingleCollection(0, sync);
         simpleTestForSingleCollection(1, sync);
         simpleTestForSingleCollection(2, sync);
-        assertEquals(sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0)).size(), 24);
-        assertEquals(sync.getDBUpdatesForParams(sync.getDelta(1), sync.getDbState(1)).size(), 24);
-        assertEquals(sync.getDBUpdatesForParams(sync.getDelta(2), sync.getDbState(2)).size(), 24);
+        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0)).size());
+        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(1), sync.getDbState(1)).size());
+        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(2), sync.getDbState(2)).size());
     }
 
     @Test
@@ -178,19 +170,16 @@ public class TestDump2 {
         aggr.addURL(resp);
         sync.computeDelta(aggr, false, 0);
 
-        Map<String, URLMethods> urlMethodsMap = sync.getDelta(0).getStrictURLToMethods();
+        Map<URLStatic, RequestTemplate> urlMethodsMap = sync.getDelta(0).getStrictURLToMethods();
+        assertEquals(1, urlMethodsMap.size());
 
-        assertEquals(urlMethodsMap.size(), 1);
-
-        URLMethods urlMethods = urlMethodsMap.get(baseurl);
-
-        assertEquals(urlMethodsMap.keySet().iterator().next(), baseurl);
-        RequestTemplate reqTemplate = urlMethods.getMethodToRequestTemplate().get(Method.valueOf(resp.getRequestParams().method));
-        assertEquals(reqTemplate.getUserIds().size(), 1);
-        assertEquals(reqTemplate.getParameters().size(), 5);
+        assertEquals(baseurl, urlMethodsMap.keySet().iterator().next().getUrl());
+        RequestTemplate reqTemplate = urlMethodsMap.get(new URLStatic(baseurl, Method.valueOf(resp.getRequestParams().method)));
+        assertEquals(1, reqTemplate.getUserIds().size());
+        assertEquals(5, reqTemplate.getParameters().size());
 
         System.out.println("done");
-        assertEquals(sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size(), 2);        
+        assertEquals(2, sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size());        
     }
 
 
@@ -208,23 +197,21 @@ public class TestDump2 {
     
         URLAggregator aggr = new URLAggregator();
         APICatalogSync sync = new APICatalogSync("access-token", 5);
-
-        aggr.addURL(responses, resp.getRequestParams().getURL());
+        Method method = Method.valueOf(resp.getRequestParams().method);
+        aggr.addURL(responses, new URLStatic(resp.getRequestParams().getURL(), method));
         sync.computeDelta(aggr, false, 0);
 
-        Map<String, URLMethods> urlMethodsMap = sync.getDelta(0).getStrictURLToMethods();
-
-        assertEquals(urlMethodsMap.size(), 1);
-        URLMethods urlMethods = urlMethodsMap.get(resp.getRequestParams().url);
+        Map<URLStatic, RequestTemplate> urlMethodsMap = sync.getDelta(0).getStrictURLToMethods();
+        assertEquals(1, urlMethodsMap.size());
         
-        RequestTemplate reqTemplate = urlMethods.getMethodToRequestTemplate().get(Method.valueOf(resp.getRequestParams().method));
-        assertEquals(reqTemplate.getUserIds().size(), 5);
-        assertEquals(reqTemplate.getParameters().size(), 2);
+        RequestTemplate reqTemplate = urlMethodsMap.get(new URLStatic(resp.getRequestParams().getURL(), method));
+        assertEquals(5, reqTemplate.getUserIds().size());
+        assertEquals(2, reqTemplate.getParameters().size());
         
         RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
-        assertEquals(respTemplate.getUserIds().size(), 5);
-        assertEquals(respTemplate.getParameters().size(), 3);
-        assertEquals(sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size(), 2);        
+        assertEquals(5, respTemplate.getUserIds().size());
+        assertEquals(3, respTemplate.getParameters().size());
+        assertEquals(2, sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size());        
     }
 
     @Test
@@ -242,23 +229,22 @@ public class TestDump2 {
 
         sync.computeDelta(aggr, true, 0);
 
-        Map<URLTemplate, URLMethods> urlTemplateMap = sync.getDelta(0).getTemplateURLToMethods();
+        Map<URLTemplate, RequestTemplate> urlTemplateMap = sync.getDelta(0).getTemplateURLToMethods();
 
-        assertEquals(urlTemplateMap.size(), 1);
+        assertEquals(1, urlTemplateMap.size());
 
-        Map.Entry<URLTemplate, URLMethods> entry = urlTemplateMap.entrySet().iterator().next();
+        Map.Entry<URLTemplate, RequestTemplate> entry = urlTemplateMap.entrySet().iterator().next();
+        assertEquals(url+"INTEGER", entry.getKey().getTemplateString());
 
-        assertEquals(entry.getKey().getTemplateString(), url+"INTEGER");
+        RequestTemplate reqTemplate = entry.getValue();
 
-        RequestTemplate reqTemplate = entry.getValue().getMethodToRequestTemplate().get(Method.POST);
-
-        assertEquals(reqTemplate.getUserIds().size(), 30);
-        assertEquals(reqTemplate.getParameters().size(), 2);
+        assertEquals(29, reqTemplate.getUserIds().size());
+        assertEquals(2, reqTemplate.getParameters().size());
         
         RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
-        assertEquals(respTemplate.getUserIds().size(), 30);
-        assertEquals(respTemplate.getParameters().size(), 3);
-        assertEquals(sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size(), 0);        
+        assertEquals(29, respTemplate.getUserIds().size());
+        assertEquals(3, respTemplate.getParameters().size());
+        assertEquals(4, sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size());        
     }
 
     private String createPayloadWithRepetitiveKeys(String i) {
@@ -288,30 +274,30 @@ public class TestDump2 {
             responseParams.add(resp);    
         }
 
+        Method method = Method.valueOf(resp.getRequestParams().method);
+
         URLAggregator aggr = new URLAggregator();
         APICatalogSync sync = new APICatalogSync("access-token", 5);
 
-        aggr.addURL(responseParams, url);
+        aggr.addURL(responseParams, new URLStatic(url, method));
         sync.computeDelta(aggr, false, 0);
 
-        Map<String, URLMethods> urlMethodsMap = sync.getDelta(0).getStrictURLToMethods();
-        assertEquals(urlMethodsMap.size(), 1);
-
-        URLMethods urlMethods = urlMethodsMap.get(resp.getRequestParams().url);
+        Map<URLStatic, RequestTemplate> urlMethodsMap = sync.getDelta(0).getStrictURLToMethods();
+        assertEquals(1, urlMethodsMap.size());
         
-        RequestTemplate reqTemplate = urlMethods.getMethodToRequestTemplate().get(Method.valueOf(resp.getRequestParams().method));
-        assertEquals(reqTemplate.getUserIds().size(), 10);
-        assertEquals(reqTemplate.getParameters().size(), 2);
+        RequestTemplate reqTemplate = urlMethodsMap.get(new URLStatic(resp.getRequestParams().url, method));
+        assertEquals(10, reqTemplate.getUserIds().size());
+        assertEquals(2, reqTemplate.getParameters().size());
         
         RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
-        assertEquals(respTemplate.getUserIds().size(), 10);
-        assertEquals(respTemplate.getParameters().size(), 29);
+        assertEquals(10, respTemplate.getUserIds().size());
+        assertEquals(29, respTemplate.getParameters().size());
 
         respTemplate.tryMergeNodesInTrie(url, "POST", resp.statusCode, resp.getRequestParams().getApiCollectionId());
-        assertEquals(respTemplate.getParameters().size(), 1);
+        assertEquals(1, respTemplate.getParameters().size());
 
         List updates = sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0));
-        assertEquals(updates.size(), 22);
+        assertEquals(22, updates.size());
     }
 
     @Test
@@ -326,10 +312,11 @@ public class TestDump2 {
         urlTokens[3] = null;
         SuperType[] types = new SuperType[urlTokens.length];
         types[3] = SuperType.STRING;
-        URLTemplate urlTemplate = new URLTemplate(urlTokens, types);
-        assertFalse(urlTemplate.match("https://qapi.mpl.live:443/kyc/for-payments"));
+        URLTemplate urlTemplate = new URLTemplate(urlTokens, types, Method.POST);
+        assertFalse(urlTemplate.match("https://qapi.mpl.live:443/kyc/for-payments", Method.POST));
 
-        assertTrue(urlTemplate.match("https://qapi.mpl.live:443/12312/pending-invites"));
-        assertFalse(urlTemplate.match("https://qapi.mpl.live:443/12312/sdfdasfa"));
+        assertTrue(urlTemplate.match("https://qapi.mpl.live:443/12312/pending-invites", Method.POST));
+        assertFalse(urlTemplate.match("https://qapi.mpl.live:443/12312/sdfdasfa", Method.POST));
+        assertFalse(urlTemplate.match("https://qapi.mpl.live:443/abc/pending-invites", Method.GET));
     }
 }

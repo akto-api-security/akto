@@ -7,6 +7,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import com.akto.dto.type.URLStatic;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.parsers.HttpCallParser.HttpResponseParams;
 import com.mongodb.BasicDBObject;
 
@@ -17,14 +19,14 @@ public class URLAggregator {
 
     private static final Logger logger = LoggerFactory.getLogger(URLAggregator.class);
 
-    ConcurrentMap<String, Set<HttpResponseParams>> urls;
+    ConcurrentMap<URLStatic, Set<HttpResponseParams>> urls;
 
-    public static String getBaseURL(String url) {
+    public static URLStatic getBaseURL(String url, String method) {
         if (url == null) {
             return null;
         }
 
-        return url.split("\\?")[0];
+        return new URLStatic(url.split("\\?")[0], Method.valueOf(method));
     }
 
     public static BasicDBObject getQueryJSON(String url) {
@@ -68,12 +70,12 @@ public class URLAggregator {
         this.urls = new ConcurrentHashMap<>();
     }
 
-    public URLAggregator(ConcurrentMap<String, Set<HttpResponseParams>> urls) {
+    public URLAggregator(ConcurrentMap<URLStatic, Set<HttpResponseParams>> urls) {
         this.urls = urls;
     }
 
     public void addURL(HttpResponseParams responseParams) {
-        String url = getBaseURL(responseParams.getRequestParams().getURL());
+        URLStatic url = getBaseURL(responseParams.getRequestParams().getURL(), responseParams.getRequestParams().getMethod());
 
         Set<HttpResponseParams> responses = urls.get(url);
         if (responses == null) {
@@ -85,7 +87,7 @@ public class URLAggregator {
 
     }
 
-    public void addURL(Set<HttpResponseParams> responseParams, String url) {
+    public void addURL(Set<HttpResponseParams> responseParams, URLStatic url) {
         Set<HttpResponseParams> responses = urls.get(url);
         if (responses == null) {
             responses = Collections.newSetFromMap(new ConcurrentHashMap<HttpResponseParams, Boolean>());
@@ -95,9 +97,10 @@ public class URLAggregator {
         responses.addAll(responseParams);
 
     }
+    
 
     public void printPendingURLs() {
-        for(String s: urls.keySet()) {
+        for(URLStatic s: urls.keySet()) {
             logger.info(s+":"+urls.get(s).size());
         }
     }

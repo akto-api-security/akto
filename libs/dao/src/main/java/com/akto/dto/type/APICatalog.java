@@ -10,8 +10,8 @@ public class APICatalog {
 
     @BsonId
     int id;
-    Map<String, URLMethods> strictURLToMethods;
-    Map<URLTemplate, URLMethods> templateURLToMethods;
+    Map<URLStatic, RequestTemplate> strictURLToMethods;
+    Map<URLTemplate, RequestTemplate> templateURLToMethods;
     List<SingleTypeInfo> deletedInfo = new ArrayList<>();
 
     public APICatalog() {
@@ -19,8 +19,8 @@ public class APICatalog {
 
     public APICatalog(
         int id, 
-        Map<String,URLMethods> strictURLToMethods, 
-        Map<URLTemplate,URLMethods> templateURLToMethods
+        Map<URLStatic, RequestTemplate> strictURLToMethods, 
+        Map<URLTemplate,RequestTemplate> templateURLToMethods
     ) {
         this.id = id;
         this.strictURLToMethods = strictURLToMethods;
@@ -29,11 +29,11 @@ public class APICatalog {
 
     public List<SingleTypeInfo> getAllTypeInfo() {
         List<SingleTypeInfo> ret = new ArrayList<>();
-        for(URLMethods urlMethods: strictURLToMethods.values()) {
-            ret.addAll(urlMethods.getAllTypeInfo());
+        for(RequestTemplate requestTemplate: strictURLToMethods.values()) {
+            ret.addAll(requestTemplate.getAllTypeInfo());
         }
 
-        for(Map.Entry<URLTemplate, URLMethods> urlTemplateAndMethods: templateURLToMethods.entrySet()) {
+        for(Map.Entry<URLTemplate, RequestTemplate> urlTemplateAndMethods: templateURLToMethods.entrySet()) {
             List<SingleTypeInfo> singleTypeInfos = urlTemplateAndMethods.getValue().getAllTypeInfo();
             for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
                 singleTypeInfo.setUrl(urlTemplateAndMethods.getKey().getTemplateString());
@@ -44,7 +44,7 @@ public class APICatalog {
         return ret;
     }
 
-    public APICatalog(int id, Map<String,URLMethods> strictURLToMethods, Map<URLTemplate,URLMethods> templateURLToMethods, List<SingleTypeInfo> deletedInfo) {
+    public APICatalog(int id, Map<URLStatic, RequestTemplate> strictURLToMethods, Map<URLTemplate, RequestTemplate> templateURLToMethods, List<SingleTypeInfo> deletedInfo) {
         this.id = id;
         this.strictURLToMethods = strictURLToMethods;
         this.templateURLToMethods = templateURLToMethods;
@@ -59,19 +59,19 @@ public class APICatalog {
         this.id = id;
     }
 
-    public Map<String,URLMethods> getStrictURLToMethods() {
+    public Map<URLStatic, RequestTemplate> getStrictURLToMethods() {
         return this.strictURLToMethods;
     }
 
-    public void setStrictURLToMethods(Map<String,URLMethods> strictURLToMethods) {
+    public void setStrictURLToMethods(Map<URLStatic, RequestTemplate> strictURLToMethods) {
         this.strictURLToMethods = strictURLToMethods;
     }
 
-    public Map<URLTemplate,URLMethods> getTemplateURLToMethods() {
+    public Map<URLTemplate, RequestTemplate> getTemplateURLToMethods() {
         return this.templateURLToMethods;
     }
 
-    public void setTemplateURLToMethods(Map<URLTemplate,URLMethods> templateURLToMethods) {
+    public void setTemplateURLToMethods(Map<URLTemplate, RequestTemplate> templateURLToMethods) {
         this.templateURLToMethods = templateURLToMethods;
     }
 
