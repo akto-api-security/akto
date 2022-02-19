@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.Set;
 
 
+import io.swagger.v3.oas.models.media.*;
 import org.apache.commons.lang3.StringUtils;
 
 public class SingleTypeInfo {
@@ -15,31 +16,34 @@ public class SingleTypeInfo {
     }
 
     public enum SubType {
-        TRUE(SuperType.BOOLEAN, false), 
-        FALSE(SuperType.BOOLEAN, false), 
-        INTEGER_32(SuperType.INTEGER, false), 
-        INTEGER_64(SuperType.INTEGER, false), 
-        FLOAT(SuperType.FLOAT, false), 
-        NULL(SuperType.NULL, false), 
-        OTHER(SuperType.OTHER, false),
-        EMAIL(SuperType.STRING, true), 
-        URL(SuperType.STRING, false), 
-        ADDRESS(SuperType.STRING, true), 
-        SSN(SuperType.STRING, true), 
-        CREDIT_CARD(SuperType.STRING, true), 
-        PHONE_NUMBER(SuperType.STRING, true), 
-        UUID(SuperType.STRING, false), 
-        GENERIC(SuperType.STRING, false),
-        DICT(SuperType.OTHER, false),
-        JWT(SuperType.STRING, false),
-        IP_ADDRESS(SuperType.STRING,false);
+        TRUE(SuperType.BOOLEAN, false, BooleanSchema.class),
+        FALSE(SuperType.BOOLEAN, false, BooleanSchema.class),
+        INTEGER_32(SuperType.INTEGER, false, IntegerSchema.class),
+        INTEGER_64(SuperType.INTEGER, false, IntegerSchema.class),
+        FLOAT(SuperType.FLOAT, false, NumberSchema.class),
+        NULL(SuperType.NULL, false, StringSchema.class),
+        OTHER(SuperType.OTHER, false, StringSchema.class),
+        EMAIL(SuperType.STRING, true, EmailSchema.class),
+        URL(SuperType.STRING, false, StringSchema.class),
+        ADDRESS(SuperType.STRING, true, StringSchema.class),
+        SSN(SuperType.STRING, true, StringSchema.class),
+        CREDIT_CARD(SuperType.STRING, true, StringSchema.class),
+        PHONE_NUMBER(SuperType.STRING, true, StringSchema.class),
+        UUID(SuperType.STRING, false, StringSchema.class),
+        GENERIC(SuperType.STRING, false, StringSchema.class),
+        DICT(SuperType.OTHER, false, MapSchema.class),
+        JWT(SuperType.STRING, false, StringSchema.class),
+        IP_ADDRESS(SuperType.STRING,false, StringSchema.class);
 
         SuperType superType;
         public boolean isSensitive;
+        public Class<? extends Schema> swaggerSchemaClass;
 
-        private SubType(SuperType superType, boolean isSensitive) {
+
+        SubType(SuperType superType, boolean isSensitive, Class<? extends Schema> swaggerSchemaClass) {
             this.superType = superType;
             this.isSensitive = isSensitive;
+            this.swaggerSchemaClass = swaggerSchemaClass;
         }
 
         public static List<String> getSensitiveTypes() {
