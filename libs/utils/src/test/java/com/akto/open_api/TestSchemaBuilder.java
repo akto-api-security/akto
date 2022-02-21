@@ -15,6 +15,21 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class TestSchemaBuilder {
 
     @Test
+    public void testComplexParams() throws Exception{
+        SingleTypeInfo s1 = generateSingleTypeInfo("accessToken", SingleTypeInfo.SubType.JWT);
+        SingleTypeInfo s2 = generateSingleTypeInfo("ip", SingleTypeInfo.SubType.IP_ADDRESS);
+        List<SingleTypeInfo> singleTypeInfoList = Arrays.asList(s1,s2);
+
+        Schema<?> schema =  Main.buildSchema(singleTypeInfoList);
+        assertEquals(schema.getClass(), ObjectSchema.class);
+        //noinspection rawtypes
+        Map<String,Schema> propertiesMap = schema.getProperties();
+
+        assertEquals(propertiesMap.get("accessToken").getClass(), StringSchema.class);
+        assertEquals(propertiesMap.get("ip").getClass(), StringSchema.class);
+    }
+
+    @Test
     public void testSimpleObject() throws Exception {
         SingleTypeInfo s1 = generateSingleTypeInfo("user#name#first", SingleTypeInfo.SubType.GENERIC);
         SingleTypeInfo s2 = generateSingleTypeInfo("user#name#last", SingleTypeInfo.SubType.GENERIC);
