@@ -18,8 +18,8 @@ import com.akto.dto.type.URLTemplate;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
-import com.akto.parsers.HttpCallParser.HttpRequestParams;
-import com.akto.parsers.HttpCallParser.HttpResponseParams;
+import com.akto.dto.HttpResponseParams;
+import com.akto.dto.HttpRequestParams;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
 import com.mongodb.BasicDBList;
@@ -132,8 +132,8 @@ public class TestDump2 {
             Map<URLStatic, RequestTemplate> urlMethodsMap = sync.getDelta(collectionId).getStrictURLToMethods();
             assertEquals(1, urlMethodsMap.size());
 
-            Method method = Method.valueOf(resp.getRequestParams().method);
-            RequestTemplate reqTemplate = urlMethodsMap.get(new URLStatic(resp.getRequestParams().url, method));
+            Method method = Method.valueOf(resp.getRequestParams().getMethod());
+            RequestTemplate reqTemplate = urlMethodsMap.get(new URLStatic(resp.getRequestParams().getURL(), method));
             
             assertEquals(1, reqTemplate.getUserIds().size());
             assertEquals(2, reqTemplate.getParameters().size());
@@ -197,7 +197,7 @@ public class TestDump2 {
     
         URLAggregator aggr = new URLAggregator();
         APICatalogSync sync = new APICatalogSync("access-token", 5);
-        Method method = Method.valueOf(resp.getRequestParams().method);
+        Method method = Method.valueOf(resp.getRequestParams().getMethod());
         aggr.addURL(responses, new URLStatic(resp.getRequestParams().getURL(), method));
         sync.computeDelta(aggr, false, 0);
 
@@ -274,7 +274,7 @@ public class TestDump2 {
             responseParams.add(resp);    
         }
 
-        Method method = Method.valueOf(resp.getRequestParams().method);
+        Method method = Method.valueOf(resp.getRequestParams().getMethod());
 
         URLAggregator aggr = new URLAggregator();
         APICatalogSync sync = new APICatalogSync("access-token", 5);
@@ -285,7 +285,7 @@ public class TestDump2 {
         Map<URLStatic, RequestTemplate> urlMethodsMap = sync.getDelta(0).getStrictURLToMethods();
         assertEquals(1, urlMethodsMap.size());
         
-        RequestTemplate reqTemplate = urlMethodsMap.get(new URLStatic(resp.getRequestParams().url, method));
+        RequestTemplate reqTemplate = urlMethodsMap.get(new URLStatic(resp.getRequestParams().getURL(), method));
         assertEquals(10, reqTemplate.getUserIds().size());
         assertEquals(2, reqTemplate.getParameters().size());
         

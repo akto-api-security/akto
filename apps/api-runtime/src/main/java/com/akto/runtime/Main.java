@@ -16,6 +16,8 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.KafkaHealthMetric;
 import com.akto.parsers.HttpCallParser;
+import com.akto.dto.HttpResponseParams;
+import com.akto.dto.HttpRequestParams;
 import com.google.gson.Gson;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -141,9 +143,9 @@ public class Main {
                 main.consumer.commitSync();
 
                 // TODO: what happens if exception
-                Map<String, List<HttpCallParser.HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
+                Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
                 for (ConsumerRecord<String,String> r: records) {
-                    HttpCallParser.HttpResponseParams httpResponseParams;
+                    HttpResponseParams httpResponseParams;
                     try {
                          
                         printL(r.value());
@@ -200,7 +202,7 @@ public class Main {
                     Flow flow = flowMap.get(accountId);
 
                     try {
-                        List<HttpCallParser.HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
+                        List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
                         parser.syncFunction(accWiseResponse);
                         flow.init(accWiseResponse);
                     } catch (Exception e) {

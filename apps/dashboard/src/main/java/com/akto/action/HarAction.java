@@ -6,7 +6,7 @@ import com.akto.har.HAR;
 import com.akto.kafka.Kafka;
 import com.akto.listener.KafkaListener;
 import com.akto.parsers.HttpCallParser;
-import com.akto.parsers.HttpCallParser.HttpResponseParams;
+import com.akto.dto.HttpResponseParams;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 import com.sun.jna.*;

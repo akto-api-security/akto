@@ -3,7 +3,6 @@ package com.akto.runtime;
 import com.akto.dao.RelationshipDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Relationship;
-import com.akto.parsers.HttpCallParser;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -13,6 +12,8 @@ import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.akto.dto.HttpResponseParams;
+import com.akto.dto.HttpRequestParams;
 
 import java.util.*;
 
@@ -130,8 +131,8 @@ public class RelationshipSync {
         return true;
     }
 
-    public void init(List<HttpCallParser.HttpResponseParams> httpResponseParams, String userIdentifierName) {
-        for (HttpCallParser.HttpResponseParams httpResponseParam: httpResponseParams) {
+    public void init(List<HttpResponseParams> httpResponseParams, String userIdentifierName) {
+        for (HttpResponseParams httpResponseParam: httpResponseParams) {
             try {
                 buildParameterMap(httpResponseParam, userIdentifierName);
             } catch (Exception e) {
@@ -150,8 +151,8 @@ public class RelationshipSync {
         }
     }
 
-    public void buildParameterMap(HttpCallParser.HttpResponseParams httpResponseParams, String userIdentifierName) throws Exception {
-        HttpCallParser.HttpRequestParams httpRequestParams = httpResponseParams.getRequestParams();
+    public void buildParameterMap(HttpResponseParams httpResponseParams, String userIdentifierName) throws Exception {
+        HttpRequestParams httpRequestParams = httpResponseParams.getRequestParams();
         String userIdentifier = Flow.getUserIdentifier(userIdentifierName, httpRequestParams);
 
         String path = httpRequestParams.getURL();

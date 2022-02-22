@@ -1,9 +1,11 @@
 package com.akto.runtime;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.HttpResponseParams;
 import com.akto.dto.Markov;
-import com.akto.parsers.HttpCallParser;
-import com.akto.parsers.HttpCallParser.HttpResponseParams.Source;
+import com.akto.dto.HttpResponseParams.Source;
+import com.akto.dto.HttpRequestParams;
+
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -33,12 +35,12 @@ public class MarkovTest {
         return headers;
     }
 
-    public HttpCallParser.HttpResponseParams generateHttpResponseParamsForMarkov(String url, String method, String userId) {
+    public HttpResponseParams generateHttpResponseParamsForMarkov(String url, String method, String userId) {
 
-        HttpCallParser.HttpRequestParams  httpRequestParams = new HttpCallParser. HttpRequestParams(
+        HttpRequestParams  httpRequestParams = new HttpRequestParams(
                 method, url, "",generateHeaders(userId),"", 0
         );
-        return new HttpCallParser.HttpResponseParams(
+        return new HttpResponseParams(
             "",200,"ok", generateHeaders(userId), "", httpRequestParams, Context.now(), "1111", false, Source.OTHER, ""
         );
     }
@@ -52,7 +54,7 @@ public class MarkovTest {
 
     @Test
     public void safd() {
-        List<HttpCallParser.HttpResponseParams> resp = new ArrayList<>();
+        List<HttpResponseParams> resp = new ArrayList<>();
         resp.add(generateHttpResponseParamsForMarkov("api/a", "get", "1"));
         resp.add(generateHttpResponseParamsForMarkov("api/b", "post", "1"));
         resp.add(generateHttpResponseParamsForMarkov("api/c", "get", "1"));
