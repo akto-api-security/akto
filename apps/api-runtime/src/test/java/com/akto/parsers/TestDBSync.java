@@ -17,8 +17,8 @@ import com.akto.dto.messaging.Message.Mode;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.URLTemplate;
-import com.akto.parsers.HttpCallParser.HttpResponseParams;
-import com.akto.parsers.HttpCallParser.HttpResponseParams.Source;
+import com.akto.dto.HttpResponseParams;
+import com.akto.dto.HttpResponseParams.Source;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
 import com.mongodb.BasicDBObject;
@@ -50,7 +50,7 @@ public class TestDBSync extends MongoBasedTest {
         URLAggregator aggr = new URLAggregator();
         ArrayList<String> newHeader = new ArrayList<>();
         newHeader.add("hnew");
-        resp.headers.put("new header", newHeader);
+        resp.getHeaders().put("new header", newHeader);
         aggr.addURL(resp);
         APICatalogSync sync = new APICatalogSync("access-token", 5);
 
@@ -71,7 +71,7 @@ public class TestDBSync extends MongoBasedTest {
         assertEquals(29, reqTemplate.getUserIds().size());
         assertEquals(2, reqTemplate.getParameters().size());
         
-        RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
+        RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.getStatusCode());
         assertEquals(29, respTemplate.getUserIds().size());
         assertEquals(3, respTemplate.getParameters().size());
     }    
@@ -85,7 +85,7 @@ public class TestDBSync extends MongoBasedTest {
         HttpResponseParams resp = TestDump2.createSampleParams("user1", url+1);
         ArrayList<String> newHeader = new ArrayList<>();
         newHeader.add("hnew");
-        resp.headers.put("new header", newHeader);
+        resp.getHeaders().put("new header", newHeader);
         responseParams.add(resp);
 
         for (int i = 2; i <= 30; i ++ ) {
@@ -118,7 +118,7 @@ public class TestDBSync extends MongoBasedTest {
         HttpResponseParams resp = TestDump2.createSampleParams("user1", url+1);
         ArrayList<String> newHeader = new ArrayList<>();
         newHeader.add("hnew");
-        resp.headers.put("new header", newHeader);
+        resp.getHeaders().put("new header", newHeader);
         responseParams.add(resp);
         resp.setSource(Source.HAR);
         HttpCallParser parser = new HttpCallParser("access-token", 10,40,10);
@@ -177,7 +177,7 @@ public class TestDBSync extends MongoBasedTest {
         HttpResponseParams resp2 = TestDump2.createSampleParams("user1", "payment/history");
         ArrayList<String> newHeader = new ArrayList<>();
         newHeader.add("hnew");
-        resp2.headers.put("new header", newHeader);
+        resp2.getHeaders().put("new header", newHeader);
         URLAggregator aggr2 = new URLAggregator();
         aggr2.addURL(resp2);
         

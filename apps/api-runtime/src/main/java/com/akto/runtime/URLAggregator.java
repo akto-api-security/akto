@@ -9,7 +9,7 @@ import java.util.concurrent.ConcurrentMap;
 
 import com.akto.dto.type.URLStatic;
 import com.akto.dto.type.URLMethods.Method;
-import com.akto.parsers.HttpCallParser.HttpResponseParams;
+import com.akto.dto.HttpResponseParams;
 import com.mongodb.BasicDBObject;
 
 import org.slf4j.Logger;

@@ -2,8 +2,9 @@ package com.akto.runtime;
 
 import com.akto.dao.MarkovDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.HttpRequestParams;
+import com.akto.dto.HttpResponseParams;
 import com.akto.dto.Markov;
-import com.akto.parsers.HttpCallParser;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
@@ -103,10 +104,10 @@ public class MarkovSync {
 
     }
 
-    public void buildMarkov(List<HttpCallParser.HttpResponseParams> httpResponseParams, String userIdentifierName) {
+    public void buildMarkov(List<HttpResponseParams> httpResponseParams, String userIdentifierName) {
         if (httpResponseParams == null) return;
-        for (HttpCallParser.HttpResponseParams httpResponseParam: httpResponseParams) {
-            HttpCallParser.HttpRequestParams httpRequestParams = httpResponseParam.getRequestParams();
+        for (HttpResponseParams httpResponseParam: httpResponseParams) {
+            HttpRequestParams httpRequestParams = httpResponseParam.getRequestParams();
             Markov.State nextState = new Markov.State(httpRequestParams.getURL(), httpRequestParams.getMethod());
             String userIdentifier;
             try {
