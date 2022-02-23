@@ -5,7 +5,9 @@ import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.Relationship;
 import com.akto.parsers.HttpCallParser;
-import com.akto.parsers.HttpCallParser.HttpResponseParams.Source;
+import com.akto.dto.HttpResponseParams;
+import com.akto.dto.HttpResponseParams.Source;
+import com.akto.dto.HttpRequestParams;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -81,21 +83,21 @@ public class RelationshipTest {
         return headers;
     }
 
-    public HttpCallParser.HttpResponseParams generateHttpResponseParamsForRelationship(String url, String method,
+    public HttpResponseParams generateHttpResponseParamsForRelationship(String url, String method,
                                                                                        String userId, int statusCode,
                                                                                        String reqPayload, String respPayload) {
 
-        HttpCallParser.HttpRequestParams  httpRequestParams = new HttpCallParser. HttpRequestParams(
+        HttpRequestParams  httpRequestParams = new HttpRequestParams(
                 method, url, "",generateHeaders(userId),reqPayload, 0
         );
-        return new HttpCallParser.HttpResponseParams(
+        return new HttpResponseParams(
                 "",statusCode,"ok", generateHeaders(userId), respPayload, httpRequestParams, Context.now(), "1111",false, Source.OTHER, ""
         );
     }
 
     @Test
     public void testBuildParameterMap() throws Exception {
-        List<HttpCallParser.HttpResponseParams> respList = new ArrayList<>();
+        List<HttpResponseParams> respList = new ArrayList<>();
         String req, resp;
 
         req = "{\"name\":\"avneesh\", \"age\":99}";
@@ -123,7 +125,7 @@ public class RelationshipTest {
         respList.add(generateHttpResponseParamsForRelationship("api/c", "get", "2",200,req,resp));
 
         RelationshipSync relationshipSync = new RelationshipSync(2,100,1000000);
-        for (HttpCallParser.HttpResponseParams responseParams: respList) {
+        for (HttpResponseParams responseParams: respList) {
             relationshipSync.buildParameterMap(responseParams,"Access-Token");
         }
 

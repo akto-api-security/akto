@@ -61,31 +61,14 @@ public class SchemaBuilder {
 
     public static Schema<?> getSchema(CustomSchema customSchema) throws Exception {
         Class<?> schemaClass = customSchema.type;
-        if (schemaClass == EmailSchema.class) {
-            return new EmailSchema();
-        } else if (schemaClass == StringSchema.class) {
-            return new StringSchema();
-        } else if (schemaClass == NumberSchema.class) {
-            return new NumberSchema();
-        } else if (schemaClass == IntegerSchema.class) {
-            return new IntegerSchema();
-        } else if (schemaClass == ObjectSchema.class) {
-            return new ObjectSchema();
-        } else if (schemaClass == ArraySchema.class) {
-            return new ArraySchema();
-        } else if (schemaClass == BooleanSchema.class) {
-            return new BooleanSchema();
-        } else if (schemaClass == MapSchema.class) {
-            return new MapSchema();
-        } else
-            throw new Exception("Invalid schema class " + schemaClass);
+        return (Schema<?>) schemaClass.getDeclaredConstructor().newInstance();
     }
 
     public static class CustomSchema {
-        public Class type;
+        public Class<? extends Schema> type;
         public String name;
 
-        public CustomSchema(Class type, String name) {
+        public CustomSchema(Class<? extends Schema> type, String name) {
             this.type = type;
             this.name = name;
         }
@@ -132,54 +115,8 @@ public class SchemaBuilder {
         return customSchemas;
     }
 
-    public static CustomSchema customSchemaFromSubType(SingleTypeInfo.SubType subType, String name) throws Exception {
-        Class<?> type;
-        switch (subType) {
-            case TRUE:
-            case FALSE:
-                type = BooleanSchema.class;
-                break;
-            case INTEGER_32:
-            case INTEGER_64:
-                type = IntegerSchema.class;
-                break;
-            case FLOAT:
-                type = NumberSchema.class;
-                break;
-            case NULL: // TODO:
-            case OTHER:
-                type = StringSchema.class;
-                break;
-            case EMAIL:
-                type = EmailSchema.class;
-                break;
-            case URL:
-                type = StringSchema.class;
-                break;
-            case ADDRESS:
-                type = StringSchema.class;
-                break;
-            case SSN:
-                type = StringSchema.class;
-                break;
-            case CREDIT_CARD:
-                type = StringSchema.class;
-                break;
-            case PHONE_NUMBER:
-                type = StringSchema.class;
-                break;
-            case UUID:
-                type = StringSchema.class;
-                break;
-            case GENERIC:
-                type = StringSchema.class;
-                break;
-            case DICT:
-                type = MapSchema.class;
-                break;
-            default:
-                throw new Exception("Invalid subtype");
-        }
+    public static CustomSchema customSchemaFromSubType(SingleTypeInfo.SubType subType, String name) {
+        Class<? extends Schema> type = subType.swaggerSchemaClass;
 
         return new CustomSchema(type,name);
     }

@@ -1,6 +1,6 @@
 package com.akto.runtime;
 
-import com.akto.parsers.HttpCallParser;
+import com.akto.dto.HttpRequestParams;
 import org.junit.jupiter.api.Test;
 
 import java.util.*;
@@ -16,7 +16,7 @@ public class FlowTest {
         String name = "Access-Token";
         String value = "fwefwieofjweofiew";
         headers.put(name, Arrays.asList(value, "wefiowjefew"));
-        HttpCallParser.HttpRequestParams requestParams = new HttpCallParser.HttpRequestParams(
+        HttpRequestParams requestParams = new HttpRequestParams(
                 "get", "/api/some", "Http",headers ,"", 0
         );
         String u = null;
@@ -35,7 +35,7 @@ public class FlowTest {
         String name = "Access-Token";
         String value = "fwefwieofjweofiew";
         headers.put(name, Arrays.asList(value));
-        HttpCallParser.HttpRequestParams requestParams = new HttpCallParser.HttpRequestParams(
+        HttpRequestParams requestParams = new HttpRequestParams(
                 "get", "/api/some", "Http",headers ,"", 0
         );
         String u = null;
@@ -52,7 +52,7 @@ public class FlowTest {
         Map<String, List<String>> headers = new HashMap<>();
         String name = "Access-Token";
         headers.put(name, new ArrayList<>());
-        HttpCallParser.HttpRequestParams requestParams = new HttpCallParser.HttpRequestParams(
+        HttpRequestParams requestParams = new HttpRequestParams(
                 "get", "/api/some", "Http",headers ,"",0 
         );
         String u = null;
