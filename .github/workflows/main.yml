@@ -86,7 +86,7 @@ jobs:
           name: instance-${{ github.sha }}
           template: https://cf-templates-3jie41lht0xk-us-east-1.s3.amazonaws.com/templates/akto-instance-template.json
           no-fail-on-empty-changeset: "1"
-          parameter-overrides: "VPC=vpc-6d399810,SubnetId=subnet-e79809b8"
+          parameter-overrides: "VPC=vpc-004dbe2e7c81a2256,SubnetId=subnet-0d3ff2356d5470899"
 
       - name: DockerHub login
         if: ${{ github.event.inputs.Environment == 'prod' }}
