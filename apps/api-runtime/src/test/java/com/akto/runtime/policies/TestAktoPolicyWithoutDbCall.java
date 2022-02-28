@@ -59,4 +59,14 @@ public class TestAktoPolicyWithoutDbCall {
         ApiInfo.ApiInfoKey matchedKey = AktoPolicy.getApiInfoMapKey(apiInfoKey, apiInfoMap.keySet() );
         Assertions.assertNull(matchedKey);
     }
+
+    @Test
+    public void testGetApiInfoMapKeyTemplateWithLeadingSlashHappy() {
+        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(0,"api/books/3/cars/7/books", URLMethods.Method.GET);
+        Map<ApiInfo.ApiInfoKey, ApiInfo> apiInfoMap = new HashMap<>();
+        ApiInfo.ApiInfoKey inMapKey1 = new ApiInfo.ApiInfoKey(0,"/api/books/INTEGER/cars/INTEGER/books", URLMethods.Method.GET);
+        apiInfoMap.put(inMapKey1, null);
+        ApiInfo.ApiInfoKey matchedKey = AktoPolicy.getApiInfoMapKey(apiInfoKey, apiInfoMap.keySet() );
+        Assertions.assertEquals(matchedKey, inMapKey1);
+    }
 }

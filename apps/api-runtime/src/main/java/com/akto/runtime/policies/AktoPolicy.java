@@ -204,11 +204,10 @@ public class AktoPolicy {
 
     public static ApiInfo.ApiInfoKey getApiInfoMapKey(ApiInfo.ApiInfoKey apiInfoKey, Set<ApiInfo.ApiInfoKey> apiInfoKeySet)  {
         // strict check
+        String apiInfoKeyUrl = apiInfoKey.getUrl();
         if (apiInfoKeySet.contains(apiInfoKey)) {
-            logger.info("Found strict key: " + apiInfoKey.url);
             return apiInfoKey;
         }
-        System.out.println("strict check failed for " + apiInfoKey.getUrl());
 
         // template check
         for (ApiInfo.ApiInfoKey key: apiInfoKeySet) {
@@ -221,9 +220,14 @@ public class AktoPolicy {
             // a. check if template url
             if (! (keyUrl.contains("STRING") || keyUrl.contains("INTEGER"))) continue;
             // b. check if template url matches
-            System.out.println("checking template url");
+            if (!keyUrl.startsWith("/")) {
+                keyUrl = "/" + keyUrl;
+            }
+            if (!apiInfoKeyUrl.startsWith("/")) {
+                apiInfoKeyUrl = "/" + apiInfoKeyUrl;
+            }
             String[] a = keyUrl.split("/");
-            String[] b = apiInfoKey.getUrl().split("/");
+            String[] b = apiInfoKeyUrl.split("/");
             if (a.length != b.length) continue;
             boolean flag = true;
             for (int i =0; i < a.length; i++) {
@@ -235,7 +239,6 @@ public class AktoPolicy {
             }
 
             if (flag) {
-                logger.info("SUCCESS in template: " + key.getUrl());
                 return key;
             }
 
