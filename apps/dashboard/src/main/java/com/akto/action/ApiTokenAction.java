@@ -28,16 +28,14 @@ public class ApiTokenAction extends UserAction{
         return SUCCESS.toUpperCase();
     }
 
+    public static final String FULL_STRING_ALLOWED_API = "*";
     public String addExternalApiToken() {
         String username = getSUser().getLogin();
         String apiKey = randomString.nextString();
         if (apiKey == null || apiKey.length() != keyLength) return ERROR.toUpperCase();
 
         List<String> allowedApis = new ArrayList<>();
-        allowedApis.add("/api/getAPICollection");
-        allowedApis.add("/api/loadSensitiveParameters");
-        allowedApis.add("/api/loadRecentParameters");
-        allowedApis.add("/api/fetchEndpointTrafficData");
+        allowedApis.add(FULL_STRING_ALLOWED_API);
 
         ApiToken apiToken = new ApiToken(Context.now(),Context.accountId.get(),"external_key",apiKey, Context.now(),
                 username, ApiToken.Utility.EXTERNAL_API, allowedApis);

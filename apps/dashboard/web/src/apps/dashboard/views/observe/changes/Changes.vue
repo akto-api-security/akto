@@ -172,7 +172,7 @@ export default {
                 },
                 {
                     text: 'Endpoint',
-                    value: 'endpoint'
+                    value: 'parameterisedEndpoint'
                 },
                 {
                     text: 'Collection',

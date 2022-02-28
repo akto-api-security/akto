@@ -83,10 +83,11 @@ public class HarAction extends UserAction {
                 }
             }
             
-            // AktoPolicy aktoPolicy = new AktoPolicy();
-            if(skipKafka)
+            if(skipKafka) {
                 parser.syncFunction(responses);
-                // aktoPolicy.main(responses);
+                AktoPolicy aktoPolicy = new AktoPolicy(); // keep inside if condition statement because db call when initialised
+                aktoPolicy.main(responses);
+            }
         } catch (Exception e) {
             e.printStackTrace();
             return SUCCESS.toUpperCase();

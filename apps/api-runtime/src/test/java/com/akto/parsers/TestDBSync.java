@@ -4,10 +4,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import com.akto.MongoBasedTest;
 import com.akto.dao.RuntimeFilterDao;
@@ -29,6 +26,7 @@ import com.mongodb.client.model.Filters;
 
 import org.bson.conversions.Bson;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 
 public class TestDBSync extends MongoBasedTest {
 
@@ -207,6 +205,35 @@ public class TestDBSync extends MongoBasedTest {
         runtimeFilters = RuntimeFilterDao.instance.findAll(filter);
         assertEquals(runtimeFilters.size(), 0);
 
+    }
+
+    @Test
+    public void testFilterHttpResponseParamsEmpty() {
+        List<HttpResponseParams> ss = HttpCallParser.filterHttpResponseParams(new ArrayList<>());
+        assertEquals(ss.size(),0);
+    }
+
+    @Test
+    public void testFilterHttpResponseParams() {
+        HttpResponseParams h1 = new HttpResponseParams();
+        h1.statusCode = 300;
+        HttpResponseParams h2 = new HttpResponseParams();
+        h2.statusCode = 499;
+        HttpResponseParams h3 = new HttpResponseParams();
+        h3.statusCode = 200;
+        HttpResponseParams h4 = new HttpResponseParams();
+        h4.statusCode = 199;
+        HttpResponseParams h5 = new HttpResponseParams();
+        h5.statusCode = 233;
+        HttpResponseParams h6 = new HttpResponseParams();
+        h6.statusCode = 299;
+
+        List<HttpResponseParams> httpResponseParamsList = Arrays.asList(h1,h2,h3,h4,h5,h6);
+
+        List<HttpResponseParams> filterHttpResponseParamsList = HttpCallParser.filterHttpResponseParams(httpResponseParamsList);
+
+        Assertions.assertEquals(filterHttpResponseParamsList.size(), 3);
+        Assertions.assertTrue(filterHttpResponseParamsList.containsAll(Arrays.asList(h3,h5,h6)));
     }
 
 }

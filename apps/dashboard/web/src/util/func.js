@@ -337,8 +337,8 @@ export default {
 
                 ret[key] = {
                     sensitive: 0,
-                    endpoint: this.parameterizeUrl(x.url),
-                    originalUrl: x.url,
+                    endpoint: x.url,
+                    parameterisedEndpoint: this.parameterizeUrl(x.url),
                     open: apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].indexOf("UNAUTHENTICATED") !== -1 : false,
                     access_type: access_type,
                     method: x.method,

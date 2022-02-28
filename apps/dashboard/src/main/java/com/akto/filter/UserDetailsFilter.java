@@ -1,6 +1,7 @@
 package com.akto.filter;
 
 import com.akto.action.AccessTokenAction;
+import com.akto.action.ApiTokenAction;
 import com.akto.action.ProfileAction;
 import com.akto.dao.ApiTokensDao;
 import com.akto.dao.SignupDao;
@@ -70,10 +71,17 @@ public class UserDetailsFilter implements Filter {
         // else find access token from request header
         if (apiKey != null) {
             // check if valid key for path
-            ApiToken apiToken = ApiTokensDao.instance.findByKeyForPath(apiKey,requestURI);
+            ApiToken apiToken = ApiTokensDao.instance.findByKey(apiKey);
             if (apiToken == null) {
                 httpServletResponse.sendError(403);
                 return;
+            } else {
+                boolean allCondition = apiToken.getAccessList().contains(ApiTokenAction.FULL_STRING_ALLOWED_API);
+                boolean pathCondition = apiToken.getAccessList().contains(requestURI);
+                if (!(allCondition || pathCondition)) {
+                    httpServletResponse.sendError(403);
+                    return;
+                }
             }
             Context.accountId.set(apiToken.getAccountId());
 
