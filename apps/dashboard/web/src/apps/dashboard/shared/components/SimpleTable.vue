@@ -354,7 +354,7 @@ export default {
         display: flex
 
     .table-row-actions
-      position: absolute
+        position: absolute
         right: 30px
         padding: 8px 16px !important
 
