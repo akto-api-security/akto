@@ -76,7 +76,8 @@ import {
   faUpload,
   faRedo,
   faGlobe,
-  faUserSecret
+  faUserSecret,
+  faCopy
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -101,7 +102,7 @@ const faIcons = [
   faHome,faBullseye,faBullhorn,faCheckDouble,faSquare,faBolt,faDatabase,faAngleDoubleRight, faAngleDoubleLeft,faClipboardList,
   faUnlockAlt,faStethoscope,faLongArrowAltDown,faLongArrowAltUp,faSyncAlt, faExchangeAlt, faUserLock, faExclamation,faPhoneAlt,
   faCreditCard,faAddressCard,faChalkboard,faFilter,faKey,faAngleDoubleDown,faAngleDoubleUp,faUpload,faRedo,faGlobe,faAngleDown,
-  faUserSecret,
+  faUserSecret,faCopy,
   
   farComments,farCalendar, farHandPointRight, farBuilding, farStar,farSquare, farCheckSquare,
 

@@ -9,6 +9,7 @@ import java.util.concurrent.TimeUnit;
 import com.akto.DaoInit;
 import com.akto.dao.APIConfigsDao;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.RuntimeFilterDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.APIConfig;
@@ -17,7 +18,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.KafkaHealthMetric;
 import com.akto.parsers.HttpCallParser;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.HttpRequestParams;
+import com.akto.runtime.policies.AktoPolicy;
 import com.google.gson.Gson;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -78,6 +79,10 @@ public class Main {
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
     }
 
+    public static void insertRuntimeFilters() {
+        RuntimeFilterDao.instance.initialiseFilters();
+    }
+
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
@@ -95,6 +100,7 @@ public class Main {
         SingleTypeInfoDao.instance.getMCollection().updateMany(Filters.exists("apiCollectionId", false), Updates.set("apiCollectionId", 0));
 
         createIndices();
+        insertRuntimeFilters();
 
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("_id", 0);
         if (apiCollection == null) {
@@ -130,6 +136,7 @@ public class Main {
 
         Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
         Map<String, Flow> flowMap = new HashMap<>();
+        Map<String, AktoPolicy> aktoPolicyMap = new HashMap<>();
 
         // sync infra metrics thread
         ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
@@ -198,13 +205,20 @@ public class Main {
                         flowMap.put(accountId, flow);
                     }
 
+                    if (!aktoPolicyMap.containsKey(accountId)) {
+                        AktoPolicy aktoPolicy = new AktoPolicy();
+                        aktoPolicyMap.put(accountId, aktoPolicy);
+                    }
+
                     HttpCallParser parser = httpCallParserMap.get(accountId);
                     Flow flow = flowMap.get(accountId);
+                    AktoPolicy aktoPolicy = aktoPolicyMap.get(accountId);
 
                     try {
                         List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
                         parser.syncFunction(accWiseResponse);
                         flow.init(accWiseResponse);
+                        aktoPolicy.main(accWiseResponse);
                     } catch (Exception e) {
                         // TODO:
                     }

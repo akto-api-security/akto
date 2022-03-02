@@ -14,6 +14,7 @@ import de.flapdoodle.embed.mongo.MongodStarter;
 import de.flapdoodle.embed.mongo.config.ImmutableMongodConfig;
 import de.flapdoodle.embed.mongo.config.Net;
 import de.flapdoodle.embed.mongo.distribution.Version;
+import org.junit.jupiter.api.BeforeEach;
 
 public class MongoBasedTest {
 
@@ -22,17 +23,19 @@ public class MongoBasedTest {
     public static MongodExecutable mongodExe;
     public static MongodProcess mongod;
 
+    @BeforeEach
+
     @BeforeClass
     public static void beforeClass() throws Exception {
         MongodStarter starter = MongodStarter.getDefaultInstance();
         String bindIp = "localhost";
         ImmutableMongodConfig mongodConfig = ImmutableMongodConfig.builder()
         .version(Version.Main.PRODUCTION)
-        .net(new Net(bindIp, 27017, false))
+        .net(new Net(bindIp, 27019, false))
         .build();
         mongodExe = starter.prepare(mongodConfig);
         mongod = mongodExe.start();
-        DaoInit.init(new ConnectionString("mongodb://localhost:27017"));
+        DaoInit.init(new ConnectionString("mongodb://localhost:27019"));
         Context.accountId.set(ACCOUNT_ID);
     }
 

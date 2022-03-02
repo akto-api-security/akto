@@ -13,7 +13,9 @@ var state = {
     apiCollectionName: '',
     apiCollection: [],
     sensitiveParams: [],
-    swaggerContent : null
+    swaggerContent : null,
+    apiInfoList: [],
+    filters: [],
 }
 
 let functionCompareParamObj = (x, p) => {
@@ -35,7 +37,6 @@ const inventory = {
         SAVE_API_COLLECTION (state, info) {
             state.apiCollectionId = info.apiCollectionId
             state.apiCollection = info.data.endpoints.filter(x => x.subType !== "NULL")
-            state.apiCollection.forEach(e => e.url = func.parameterizeUrl(e.url));
             state.apiCollectionName = info.data.name
         },
         TOGGLE_SENSITIVE (state, p) {
@@ -128,6 +129,19 @@ const inventory = {
             }).catch(() => {
                 state.loading = false
             })
+        },
+        fetchApiInfoList({commit,dispatch, state}, {apiCollectionId}) {
+            api.fetchApiInfoList(apiCollectionId).then(resp => {
+              state.apiInfoList = resp.apiInfoList
+            })
+        },
+        fetchFilters({commit, dispatch, state}) {
+            api.fetchFilters().then(resp => {
+              let a = resp.runtimeFilters
+              a.forEach(x => {
+                state.filters[x.customFieldName] = x
+              })
+            })
         }
     },
     getters: {
@@ -138,7 +152,9 @@ const inventory = {
         getAPICollectionName: (state) => state.apiCollectionName,
         isSensitive: (state) => p => state.sensitiveParams && state.sensitiveParams.findIndex(x => {
             return functionCompareParamObj(x, p)
-        }) > 0
+        }) > 0,
+        getApiInfoList: (state) => state.apiInfoList,
+        getFilters: (state) => state.filters,
     }
 }
 

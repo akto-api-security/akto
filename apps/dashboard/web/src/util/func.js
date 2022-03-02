@@ -304,28 +304,54 @@ export default {
         });
         return newStr
     },
-    groupByEndpoint(listParams, idToName) {
+    groupByEndpoint(listParams, apiInfoList,idToName) {
         let ret = {}
+        let apiInfoMap = {}
 
         if (!listParams) {
             return []
         }
 
+        if (apiInfoList) {
+            apiInfoList.forEach(x => {
+                apiInfoMap[x["id"]["url"] + "-" + x["id"]["method"]] = x
+            })
+        }
+
         listParams.forEach(x => {
             let key = x.url + "-" + x.method
             if (!ret[key]) {
+                let access_type = null
+                if (apiInfoMap[key]) {
+                    let access_types = apiInfoMap[key]["apiAccessTypes"]
+                    if (!access_types || access_types.length == 0) {
+                        access_type = null
+                    } else if (access_types.indexOf("PUBLIC") !== -1) {
+                        access_type = "PUBLIC"
+                    } else {
+                        access_type = "PRIVATE"
+                    }
+                }
+
+                let authType = apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].join(" or ") : ""
+
                 ret[key] = {
                     sensitive: 0,
-                    endpoint: x.url,
+                    endpoint: this.parameterizeUrl(x.url),
+                    originalUrl: x.url,
+                    open: apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].indexOf("UNAUTHENTICATED") !== -1 : false,
+                    access_type: access_type,
                     method: x.method,
                     color: "#00bfa5",
                     apiCollectionId: x.apiCollectionId,
+                    last_seen: apiInfoMap[key] ? this.prettifyEpoch(apiInfoMap[key]["lastSeen"]) : 0,
                     detectedTs: null,
                     added: '-',
-
+                    violations: apiInfoMap[key] ? apiInfoMap[key]["violations"] : {},
                     changesCount: 0,
                     changes: '',
-                    apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-'
+                    apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
+                    auth_type: authType
                 }
 
             }

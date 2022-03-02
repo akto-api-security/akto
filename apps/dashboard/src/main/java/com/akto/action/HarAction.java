@@ -6,6 +6,7 @@ import com.akto.har.HAR;
 import com.akto.kafka.Kafka;
 import com.akto.listener.KafkaListener;
 import com.akto.parsers.HttpCallParser;
+import com.akto.runtime.policies.AktoPolicy;
 import com.akto.dto.HttpResponseParams;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
@@ -60,7 +61,7 @@ public class HarAction extends UserAction {
                         KafkaListener.kafka.send(message,topic);
                     } else {
                         HttpResponseParams responseParams =  HttpCallParser.parseKafkaMessage(message);
-                        responseParams.getRequestParams().setApiCollectionId(1234);
+                        responseParams.getRequestParams().setApiCollectionId(apiCollectionId);
                         responses.add(responseParams);
                     }
                 } else {
@@ -68,8 +69,10 @@ public class HarAction extends UserAction {
                 }
             }
             
+            // AktoPolicy aktoPolicy = new AktoPolicy();
             if(skipKafka)
                 parser.syncFunction(responses);
+                // aktoPolicy.main(responses);
         } catch (Exception e) {
             e.printStackTrace();
             return SUCCESS.toUpperCase();

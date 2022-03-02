@@ -13,6 +13,8 @@
                     :firstLine='json.method + " " + json.path + " " + json.type'
                     :headers="JSON.parse(json.requestHeaders)" 
                     :data="json.requestPayload"
+                    :complete-data="json"
+                    :simpleCopy="false"
                 />
                 <sample-single-side 
                     class="flex-equal"                
@@ -20,6 +22,8 @@
                     :firstLine='json.statusCode + " " + json.status' 
                     :headers="JSON.parse(json.responseHeaders)" 
                     :data="json.responsePayload"
+                    :simpleCopy="true"
+                    :complete-data="json"
                 />
             </div>
         </div>

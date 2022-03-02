@@ -10,10 +10,12 @@ import java.util.List;
 import java.util.Map;
 
 import com.akto.MongoBasedTest;
+import com.akto.dao.RuntimeFilterDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.UsersDao;
 import com.akto.dto.User;
 import com.akto.dto.messaging.Message.Mode;
+import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.URLTemplate;
@@ -24,6 +26,7 @@ import com.akto.runtime.URLAggregator;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
+import org.bson.conversions.Bson;
 import org.junit.Test;
 
 public class TestDBSync extends MongoBasedTest {
@@ -188,6 +191,24 @@ public class TestDBSync extends MongoBasedTest {
         assertEquals(1, sync.getDelta(0).getTemplateURLToMethods().size());
 
 
-    }    
+    }
+
+    @Test
+    public void testInitialiseFilters() {
+        int totalFilters = 2;
+        RuntimeFilterDao.instance.initialiseFilters();
+        List<RuntimeFilter> runtimeFilters = RuntimeFilterDao.instance.findAll(new BasicDBObject());
+        assertEquals(runtimeFilters.size(), totalFilters);
+
+        Bson filter = Filters.eq(RuntimeFilter.NAME, RuntimeFilter.OPEN_ENDPOINTS_FILTER);
+        RuntimeFilterDao.instance.getMCollection().deleteOne(filter);
+        runtimeFilters = RuntimeFilterDao.instance.findAll(filter);
+        assertEquals(runtimeFilters.size(), 0);
+
+        RuntimeFilterDao.instance.initialiseFilters();
+        runtimeFilters = RuntimeFilterDao.instance.findAll(filter);
+        assertEquals(runtimeFilters.size(), 1);
+
+    }
 
 }

@@ -29,7 +29,7 @@
             <count-box title="All Endpoints" :count="allEndpoints.length" colorTitle="Total"/>
         </div>    
 
-        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Shadow', 'Unused', 'Documented']">
+        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Open', 'Shadow', 'Unused', 'Documented']">
             <template slot="actions-tray">
             </template>
             <template slot="All">
@@ -94,6 +94,29 @@
                     :errors="{}"
                 />
             </template>
+            <template slot="Open">
+                <simple-table 
+                    :headers=tableHeaders 
+                    :items=openEndpoints
+                    @rowClicked=rowClicked 
+                    name="Open" 
+                    sortKeyDefault="sensitive" 
+                    :sortDescDefault="true"
+                >
+                    <template #item.sensitive="{item}">
+                        <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
+                    </template>
+                </simple-table>
+            </template>
+            <!-- <template slot="Policies">
+                <filters
+                    :tableHeaders=tableHeaders
+                    :items=allEndpoints
+                    :filters=filters
+                    @rowClicked=rowClicked
+                >
+                </filters>
+            </template> -->
         </layout-with-tabs>
 
     </div>
@@ -160,6 +183,11 @@ export default {
                     value: 'sensitive'
                 },
                 {
+                  text: 'Last Seen',
+                  value: 'last_seen',
+                  sortKey: 'last_seen'
+                },
+                {
                     text: constants.DISCOVERED,
                     value: 'added',
                     sortKey: 'detectedTs'
@@ -168,6 +196,16 @@ export default {
                     text: 'Changes',
                     value: 'changes',
                     sortKey: 'changesCount'
+                },
+                {
+                  text: 'Access Type',
+                  value: 'access_type',
+                  sortKey: 'access_type'
+                },
+                {
+                  text: 'Auth Type',
+                  value: 'auth_type',
+                  sortKey: 'auth_type'
                 }
             ],
             unusedHeaders: [
@@ -205,8 +243,8 @@ export default {
         rowClicked(row) {
             this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.endpoint + " " + row.method, type: 2})
         },
-        groupByEndpoint(listParams) {
-            func.groupByEndpoint(listParams)
+        groupByEndpoint(listParams, apiInfoList ) {
+            func.groupByEndpoint(listParams, apiInfoList)
         },
         downloadData() {
             let headerTextToValueMap = Object.fromEntries(this.tableHeaders.map(x => [x.text, x.value]).filter(x => x[0].length > 0));
@@ -300,19 +338,25 @@ export default {
             api.getAllUrlsAndMethods(this.apiCollectionId).then(resp => {
                 this.documentedURLs = resp.data || {}
             })
+            this.$store.dispatch('inventory/fetchApiInfoList', {apiCollectionId: this.apiCollectionId})
+            this.$store.dispatch('inventory/fetchFilters')
+
             this.$emit('mountedView', {type: 1, apiCollectionId: this.apiCollectionId})
         }
     },
     computed: {
-        ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'loading', 'swaggerContent']),
+        ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'loading', 'swaggerContent', 'apiInfoList', 'filters']),
+        openEndpoints() {
+          return func.groupByEndpoint(this.apiCollection, this.apiInfoList).filter(x => x.open)
+        },
         allEndpoints () {
-            return func.groupByEndpoint(this.apiCollection)
+            return func.groupByEndpoint(this.apiCollection, this.apiInfoList )
         },
         sensitiveEndpoints() {
-            return func.groupByEndpoint(this.apiCollection).filter(x => x.sensitive > 0)
+            return func.groupByEndpoint(this.apiCollection, this.apiInfoList).filter(x => x.sensitive > 0)
         },
         shadowEndpoints () {
-            return func.groupByEndpoint(this.apiCollection).filter(x => this.isShadow(x))
+            return func.groupByEndpoint(this.apiCollection, this.apiInfoList).filter(x => this.isShadow(x))
         },
         unusedEndpoints () {
             let ret = []

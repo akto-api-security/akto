@@ -179,8 +179,18 @@ export default {
                     value: 'apiCollectionName'
                 },
                 {
+                  text: 'Last Seen',
+                  value: 'last_seen',
+                  sortKey: 'last_seen'
+                },
+                {
                     text: 'Method',
                     value: 'method'
+                },
+                {
+                  text: 'Access Type',
+                  value: 'access_type',
+                  sortKey: 'access_type'
                 },
                 {
                     text: 'Sensitive Params',
@@ -190,7 +200,13 @@ export default {
                     text: constants.DISCOVERED,
                     value: 'added',
                     sortKey: 'detectedTs'
+                },
+                {
+                  text: 'Auth Type',
+                  value: 'auth_type',
+                  sortKey: 'auth_type'
                 }
+
             ],
             parameterHeaders: [
                 {
@@ -288,6 +304,7 @@ export default {
         },
         refreshPage() {
             this.$store.dispatch('changes/loadRecentParameters')
+            this.$store.dispatch('changes/fetchApiInfoListForRecentEndpoints')
         },
         changesTrend (data) {
             let todayDate = func.todayDate()
@@ -308,7 +325,7 @@ export default {
         }
     },
     computed: {
-        ...mapState('changes', ['apiCollection']),
+        ...mapState('changes', ['apiCollection', 'apiInfoList']),
         mapCollectionIdToName() {
             return this.$store.state.collections.apiCollections.reduce((m, e) => {
                 m[e.id] = e.name
@@ -317,7 +334,7 @@ export default {
         },
         newEndpoints() {
             let now = func.timeNow()
-            return func.groupByEndpoint(this.apiCollection, this.mapCollectionIdToName).filter(x => x.detectedTs > now - func.recencyPeriod)
+            return func.groupByEndpoint(this.apiCollection,this.apiInfoList, this.mapCollectionIdToName).filter(x => x.detectedTs > now - func.recencyPeriod)
         },
         newEndpointsTrend() {
             return this.changesTrend(this.newEndpoints)
@@ -331,7 +348,7 @@ export default {
         },
         newSensitiveEndpoints() {
             let now = func.timeNow()
-            return func.groupByEndpoint(this.apiCollection, this.mapCollectionIdToName).filter(x => x.detectedTs > now - func.recencyPeriod && x.sensitive > 0)
+            return func.groupByEndpoint(this.apiCollection,this.apiInfoList, this.mapCollectionIdToName).filter(x => x.detectedTs > now - func.recencyPeriod && x.sensitive > 0)
         },
         newSensitiveParameters() {
             let now = func.timeNow()
