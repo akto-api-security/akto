@@ -333,19 +333,21 @@ export default {
         },
         refreshPage(shouldLoad) {
             // if (!this.apiCollection || this.apiCollection.length === 0 || this.$store.state.inventory.apiCollectionId !== this.apiCollectionId) {
-            this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId, shouldLoad: shouldLoad})
+            if (!shouldLoad || ((new Date() / 1000) - this.lastFetched > 60*5)) {
+                this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId, shouldLoad: shouldLoad})
 
-            api.getAllUrlsAndMethods(this.apiCollectionId).then(resp => {
-                this.documentedURLs = resp.data || {}
-            })
-            this.$store.dispatch('inventory/fetchApiInfoList', {apiCollectionId: this.apiCollectionId})
-            this.$store.dispatch('inventory/fetchFilters')
+                api.getAllUrlsAndMethods(this.apiCollectionId).then(resp => {
+                    this.documentedURLs = resp.data || {}
+                })
+                this.$store.dispatch('inventory/fetchApiInfoList', {apiCollectionId: this.apiCollectionId})
+                this.$store.dispatch('inventory/fetchFilters')
+            }
 
             this.$emit('mountedView', {type: 1, apiCollectionId: this.apiCollectionId})
         }
     },
     computed: {
-        ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'loading', 'swaggerContent', 'apiInfoList', 'filters']),
+        ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'loading', 'swaggerContent', 'apiInfoList', 'filters', 'lastFetched']),
         openEndpoints() {
           return func.groupByEndpoint(this.apiCollection, this.apiInfoList).filter(x => x.open)
         },

@@ -15,7 +15,8 @@ var state = {
     fetchTs: 0,
     apiCollection: [],
     sensitiveParams: [],
-    apiInfoList: []
+    apiInfoList: [],
+    lastFetched: 0
 }
 
 const changes = {
@@ -53,6 +54,7 @@ const changes = {
         loadRecentParameters({commit}, options) {
             commit('EMPTY_STATE')
             state.loading = true
+            state.lastFetched = new Date() / 1000
             return api.loadRecentParameters().then((resp) => {
                 commit('SAVE_API_COLLECTION', {data: resp.data}, options)
                 api.listAllSensitiveFields().then(allSensitiveFields => {

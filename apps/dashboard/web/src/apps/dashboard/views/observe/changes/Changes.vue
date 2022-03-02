@@ -30,7 +30,7 @@
                             <v-btn 
                                 icon 
                                 color="#47466A" 
-                                @click="refreshPage"
+                                @click="refreshPage(true)"
                                 v-on="on"
                                 v-bind="attrs"
                             >
@@ -257,7 +257,7 @@ export default {
                     text: `${items.length}` + ` items ${sensitive ? '':'un'}marked sensitive`,
                     color: 'green'
                 })
-                this.refreshPage()
+                this.refreshPage(true)
             }).catch(() => {
                 window._AKTO.$emit('SHOW_SNACKBAR', {
                     show: true,
@@ -302,9 +302,11 @@ export default {
 
             this.$router.push(routeObj)
         },
-        refreshPage() {
-            this.$store.dispatch('changes/loadRecentParameters')
-            this.$store.dispatch('changes/fetchApiInfoListForRecentEndpoints')
+        refreshPage(hardRefresh) {
+            if (hardRefresh || ((new Date() / 1000) - this.lastFetched > 60*5)) {
+                this.$store.dispatch('changes/loadRecentParameters')
+                this.$store.dispatch('changes/fetchApiInfoListForRecentEndpoints')
+            }
         },
         changesTrend (data) {
             let todayDate = func.todayDate()
@@ -325,7 +327,7 @@ export default {
         }
     },
     computed: {
-        ...mapState('changes', ['apiCollection', 'apiInfoList']),
+        ...mapState('changes', ['apiCollection', 'apiInfoList', 'lastFetched']),
         mapCollectionIdToName() {
             return this.$store.state.collections.apiCollections.reduce((m, e) => {
                 m[e.id] = e.name
@@ -356,7 +358,7 @@ export default {
         },
     },
     mounted() {
-        this.refreshPage()
+        this.refreshPage(false)
     }    
 
 }

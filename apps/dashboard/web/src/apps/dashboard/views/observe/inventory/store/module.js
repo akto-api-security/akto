@@ -16,6 +16,7 @@ var state = {
     swaggerContent : null,
     apiInfoList: [],
     filters: [],
+    lastFetched: 0
 }
 
 let functionCompareParamObj = (x, p) => {
@@ -80,6 +81,7 @@ const inventory = {
             commit('EMPTY_STATE', payload, options)
         },
         loadAPICollection({commit}, {apiCollectionId, shouldLoad}, options) {
+            state.lastFetched = new Date() / 1000
             commit('EMPTY_STATE')
             if (shouldLoad) {
                 state.loading = true
