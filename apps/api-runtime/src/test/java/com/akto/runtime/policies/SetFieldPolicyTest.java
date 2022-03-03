@@ -2,6 +2,8 @@ package com.akto.runtime.policies;
 
 import com.akto.dto.ApiInfo;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.type.URLMethods.Method;
+
 import org.checkerframework.checker.units.qual.A;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -20,7 +22,7 @@ public class SetFieldPolicyTest {
 
     @Test
     public void happyExisting() {
-        ApiInfo apiInfo = new ApiInfo();
+        ApiInfo apiInfo = new ApiInfo(0,"",Method.DELETE);
         apiInfo.getViolations().put("field", 0);
         RuntimeFilter runtimeFilter = new RuntimeFilter();
         runtimeFilter.setCustomFieldName("field");
