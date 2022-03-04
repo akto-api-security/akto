@@ -4,7 +4,6 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.type.URLMethods.Method;
 
-import org.checkerframework.checker.units.qual.A;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
