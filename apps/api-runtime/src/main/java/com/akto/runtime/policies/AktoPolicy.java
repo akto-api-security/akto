@@ -51,8 +51,12 @@ public class AktoPolicy {
             List<WriteModel<ApiInfo>> writesForApiInfo = AktoPolicy.getUpdates(apiInfoMap, apiInfoRemoveList);
             List<WriteModel<FilterSampleData>> writesForSampleData = getUpdatesForSampleData();
             logger.info("Writing to db: " + "writesForApiInfoSize="+writesForApiInfo.size() + " writesForSampleData="+ writesForSampleData.size());
-            if (writesForApiInfo.size() > 0) ApiInfoDao.instance.getMCollection().bulkWrite(writesForApiInfo);
-            if (writesForSampleData.size() > 0) FilterSampleDataDao.instance.getMCollection().bulkWrite(writesForSampleData);
+            try {
+                if (writesForApiInfo.size() > 0) ApiInfoDao.instance.getMCollection().bulkWrite(writesForApiInfo);
+                if (writesForSampleData.size() > 0) FilterSampleDataDao.instance.getMCollection().bulkWrite(writesForSampleData);
+            } catch (Exception e) {
+                logger.error(e.toString());
+            }
         }
 
         fetchFilters();
@@ -97,7 +101,7 @@ public class AktoPolicy {
         logger.info("ApiInfoMap keys not null " + i);
 
         sampleDataRemoveList = new ArrayList<>();
-        List<ApiInfo.ApiInfoKey> filterSampleDataIdList = FilterSampleDataDao.instance.getIds();
+        List<ApiInfo.ApiInfoKey> filterSampleDataIdList = FilterSampleDataDao.instance.getApiInfoKeys();
         for (ApiInfo.ApiInfoKey apiInfoKey: filterSampleDataIdList) {
             if (apiInfoMap.containsKey(apiInfoKey)) {
                 sampleMessages.put(apiInfoKey, new HashMap<>());
@@ -114,7 +118,12 @@ public class AktoPolicy {
         boolean syncImmediately = false;
 
         for (HttpResponseParams httpResponseParams: httpResponseParamsList) {
-            process(httpResponseParams);
+            try {
+                process(httpResponseParams);
+            } catch (Exception e) {
+                logger.error(e.toString());
+                e.printStackTrace();
+            }
             if (httpResponseParams.getSource().equals(Source.HAR) || httpResponseParams.getSource().equals(Source.PCAP)) {
                 syncImmediately = true;
             }
@@ -261,10 +270,12 @@ public class AktoPolicy {
         for (ApiInfo.ApiInfoKey key: apiInfoMap.keySet()) {
             ApiInfo apiInfo = apiInfoMap.get(key);
             if (apiInfo == null) {
+                // this case happens we apiInfo is present in apiCollections collection in db, but we didn't find any apiInfo class locally
                 apiInfo = new ApiInfo(key);
             }
             ApiInfo originalApiInfo = dbApiInfoMap.get(key);
             if (originalApiInfo == null) {
+                // this happens when there is no apiInfo in apiInfo collection in db, but we found apiInfo locally
                 originalApiInfo = new ApiInfo(key);
             }
 
@@ -336,10 +347,7 @@ public class AktoPolicy {
                 Bson bson = Updates.pushEach(FilterSampleData.SAMPLES, sampleData, new PushOptions().slice(-1 * FilterSampleData.cap));
                 bulkUpdates.add(
                         new UpdateOneModel<>(
-                                Filters.and(
-                                        Filters.eq(FilterSampleData.FILTER_ID,  filterId),
-                                        ApiInfoDao.getFilter(apiInfoKey)
-                                ),
+                                FilterSampleDataDao.getFilter(apiInfoKey, filterId),
                                 bson,
                                 new UpdateOptions().upsert(true)
                         )
@@ -349,9 +357,7 @@ public class AktoPolicy {
 
         for (ApiInfo.ApiInfoKey apiInfoKey: sampleDataRemoveList) {
             bulkUpdates.add(
-                    new DeleteOneModel<>(
-                            ApiInfoDao.getFilter(apiInfoKey.getUrl(), apiInfoKey.getMethod() +"", apiInfoKey.getApiCollectionId())
-                    )
+                    new DeleteOneModel<>(FilterSampleDataDao.getFilterForApiInfoKey(apiInfoKey))
             );
         }
 

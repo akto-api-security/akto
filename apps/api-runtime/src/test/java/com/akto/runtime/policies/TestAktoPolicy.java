@@ -1,5 +1,6 @@
 package com.akto.runtime.policies;
 
+import com.akto.DaoInit;
 import com.akto.MongoBasedTest;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
@@ -163,79 +164,87 @@ public class TestAktoPolicy extends MongoBasedTest {
     @Test
     public void testSampleDataUpdates() {
         FilterSampleData filterSampleData1 = new FilterSampleData(new ApiInfo.ApiInfoKey(0,"/api/books", URLMethods.Method.GET), 0);
-        FilterSampleData filterSampleDataRemove = new FilterSampleData(new ApiInfo.ApiInfoKey(0,"/api/delete", URLMethods.Method.GET), 0);
         FilterSampleData filterSampleData2 = new FilterSampleData(new ApiInfo.ApiInfoKey(0,"/api/books", URLMethods.Method.POST), 0);
         filterSampleData2.getSamples().addAll(Arrays.asList("1", "2"));
         FilterSampleData filterSampleData3 = new FilterSampleData(new ApiInfo.ApiInfoKey(0,"/api/toys", URLMethods.Method.PUT), 1);
         filterSampleData3.getSamples().addAll(Arrays.asList("1", "2", "3", "4", "5", "6", "7", "8", "9", "10"));
+        FilterSampleData filterSampleData4 = new FilterSampleData(new ApiInfo.ApiInfoKey(0,"/api/cars", URLMethods.Method.POST), 1);
+        FilterSampleData filterSampleDataRemove = new FilterSampleData(new ApiInfo.ApiInfoKey(0,"/api/delete", URLMethods.Method.GET), 0);
 
-        FilterSampleDataDao.instance.insertMany(Arrays.asList(filterSampleData1, filterSampleData2, filterSampleData3, filterSampleDataRemove));
+        FilterSampleDataDao.instance.insertMany(Arrays.asList(filterSampleData1, filterSampleData2, filterSampleData3, filterSampleData4,filterSampleDataRemove));
         List<FilterSampleData> filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
-        Assertions.assertEquals(filterSampleDataList.size(),4);
+        Assertions.assertEquals(filterSampleDataList.size(),5);
 
+        FilterSampleData filterSampleData1Db = FilterSampleDataDao.instance.findOne(FilterSampleDataDao.getFilter(filterSampleData1.getId().getApiInfoKey(), filterSampleData1.getId().getFilterId()));
+        Assertions.assertNotNull(filterSampleData1Db);
+        FilterSampleData filterSampleData2Db = FilterSampleDataDao.instance.findOne(FilterSampleDataDao.getFilter(filterSampleData2.getId().getApiInfoKey(), filterSampleData2.getId().getFilterId()));
+        Assertions.assertNotNull(filterSampleData2Db);
 
         FilterSampleData filterSampleDataNew = new FilterSampleData(new ApiInfo.ApiInfoKey(0,"/api/new", URLMethods.Method.GET), 0);
 
         Map<ApiInfo.ApiInfoKey, ApiInfo> apiInfoMap = new HashMap<>();
-        apiInfoMap.put(filterSampleData1.getId(),null);
-        apiInfoMap.put(filterSampleData2.getId(),null);
-        apiInfoMap.put(filterSampleData3.getId(),null);
-        apiInfoMap.put(filterSampleDataNew.getId(),null);
+        apiInfoMap.put(filterSampleData1.getId().getApiInfoKey(),null);
+        apiInfoMap.put(filterSampleData2.getId().getApiInfoKey(),null);
+        apiInfoMap.put(filterSampleData3.getId().getApiInfoKey(),null);
+        apiInfoMap.put(filterSampleData4.getId().getApiInfoKey(),null);
+        apiInfoMap.put(filterSampleDataNew.getId().getApiInfoKey(),null);
 
         AktoPolicy aktoPolicy = new AktoPolicy();
         aktoPolicy.setApiInfoMap(apiInfoMap);
 
         Map<ApiInfo.ApiInfoKey, Map<Integer, CappedList<String>> > m = new HashMap<>();
 
-        m.put(filterSampleData1.getId(), new HashMap<>());
-        m.get(filterSampleData1.getId()).put(0, new CappedList<>(10, true));
-        m.get(filterSampleData1.getId()).put(1, new CappedList<>(10, true));
-        m.get(filterSampleData1.getId()).get(1).add("1");
-        m.get(filterSampleData1.getId()).get(1).add("2");
+        m.put(filterSampleData1.getId().getApiInfoKey(), new HashMap<>());
+        m.get(filterSampleData1.getId().getApiInfoKey()).put(0, new CappedList<>(10, true));
+        m.get(filterSampleData1.getId().getApiInfoKey()).put(1, new CappedList<>(10, true));
+        m.get(filterSampleData1.getId().getApiInfoKey()).get(1).add("1");
+        m.get(filterSampleData1.getId().getApiInfoKey()).get(1).add("2");
 
-        m.put(filterSampleData2.getId(), new HashMap<>());
-        m.get(filterSampleData2.getId()).put(0, new CappedList<>(10, true));
-        m.get(filterSampleData2.getId()).get(0).add("3");
-        m.get(filterSampleData2.getId()).get(0).add("4");
+        m.put(filterSampleData2.getId().getApiInfoKey(), new HashMap<>());
+        m.get(filterSampleData2.getId().getApiInfoKey()).put(0, new CappedList<>(10, true));
+        m.get(filterSampleData2.getId().getApiInfoKey()).get(0).add("3");
+        m.get(filterSampleData2.getId().getApiInfoKey()).get(0).add("4");
 
-        m.put(filterSampleData3.getId(), new HashMap<>());
-        m.get(filterSampleData3.getId()).put(1, new CappedList<>(10, true));
-        m.get(filterSampleData3.getId()).get(1).add("11");
-        m.get(filterSampleData3.getId()).get(1).add("12");
+        m.put(filterSampleData3.getId().getApiInfoKey(), new HashMap<>());
+        m.get(filterSampleData3.getId().getApiInfoKey()).put(1, new CappedList<>(10, true));
+        m.get(filterSampleData3.getId().getApiInfoKey()).get(1).add("11");
+        m.get(filterSampleData3.getId().getApiInfoKey()).get(1).add("12");
 
-        m.put(filterSampleDataNew.getId(), new HashMap<>());
-        m.get(filterSampleDataNew.getId()).put(0, new CappedList<>(10, true));
+        m.put(filterSampleDataNew.getId().getApiInfoKey(), new HashMap<>());
+        m.get(filterSampleDataNew.getId().getApiInfoKey()).put(0, new CappedList<>(10, true));
 
         aktoPolicy.setSampleMessages(m);
-        aktoPolicy.setSampleDataRemoveList(Collections.singletonList(filterSampleDataRemove.getId()));
+        aktoPolicy.setSampleDataRemoveList(Collections.singletonList(filterSampleDataRemove.getId().getApiInfoKey()));
 
         aktoPolicy.syncWithDb(false);
 
         filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
+        Assertions.assertEquals(filterSampleDataList.size(),6);
 
-        Assertions.assertEquals(filterSampleDataList.size(),5);
+        FilterSampleData removed = FilterSampleDataDao.instance.findOne(FilterSampleDataDao.getFilter(filterSampleDataRemove.getId().getApiInfoKey(), filterSampleDataRemove.getId().getFilterId()));
+        Assertions.assertNull(removed);
 
         Map<ApiInfo.ApiInfoKey, Map<Integer, List<String>> > n = new HashMap<>();
         for (FilterSampleData f: filterSampleDataList) {
-            if (!n.containsKey(f.getId())) {
-                n.put(f.getId(), new HashMap<>());
+            if (!n.containsKey(f.getId().getApiInfoKey())) {
+                n.put(f.getId().getApiInfoKey(), new HashMap<>());
             }
-            n.get(f.getId()).put(f.getFilterId(), f.getSamples());
+            n.get(f.getId().getApiInfoKey()).put(f.getId().getFilterId(), f.getSamples());
         }
 
-        Assertions.assertEquals(n.get(filterSampleData1.getId()).keySet().size(),2);
-        Assertions.assertEquals(n.get(filterSampleData1.getId()).get(0).size(),0);
-        Assertions.assertEquals(n.get(filterSampleData1.getId()).get(1).size(),2);
+        Assertions.assertEquals(n.get(filterSampleData1.getId().getApiInfoKey()).keySet().size(),2);
+        Assertions.assertEquals(n.get(filterSampleData1.getId().getApiInfoKey()).get(0).size(),0);
+        Assertions.assertEquals(n.get(filterSampleData1.getId().getApiInfoKey()).get(1).size(),2);
 
-        Assertions.assertEquals(n.get(filterSampleData2.getId()).keySet().size(),1);
-        Assertions.assertEquals(n.get(filterSampleData2.getId()).get(0).size(),4);
+        Assertions.assertEquals(n.get(filterSampleData2.getId().getApiInfoKey()).keySet().size(),1);
+        Assertions.assertEquals(n.get(filterSampleData2.getId().getApiInfoKey()).get(0).size(),4);
 
-        Assertions.assertEquals(n.get(filterSampleData3.getId()).keySet().size(),1);
-        Assertions.assertEquals(n.get(filterSampleData3.getId()).get(1).size(),10);
-        Assertions.assertEquals(n.get(filterSampleData3.getId()).get(1), Arrays.asList("3", "4", "5", "6", "7", "8", "9", "10", "11", "12") );
+        Assertions.assertEquals(n.get(filterSampleData3.getId().getApiInfoKey()).keySet().size(),1);
+        Assertions.assertEquals(n.get(filterSampleData3.getId().getApiInfoKey()).get(1).size(),10);
+        Assertions.assertEquals(n.get(filterSampleData3.getId().getApiInfoKey()).get(1), Arrays.asList("3", "4", "5", "6", "7", "8", "9", "10", "11", "12") );
 
-        Assertions.assertEquals(n.get(filterSampleDataNew.getId()).keySet().size(),1);
-        Assertions.assertEquals(n.get(filterSampleDataNew.getId()).get(0).size(), 0);
+        Assertions.assertEquals(n.get(filterSampleDataNew.getId().getApiInfoKey()).keySet().size(),1);
+        Assertions.assertEquals(n.get(filterSampleDataNew.getId().getApiInfoKey()).get(0).size(), 0);
 
     }
 
@@ -249,7 +258,7 @@ public class TestAktoPolicy extends MongoBasedTest {
         filterSampleData3.getSamples().addAll(Arrays.asList("1", "2", "3", "4", "5", "6", "7", "8", "9", "10"));
 
         FilterSampleDataDao.instance.insertMany(Arrays.asList(filterSampleData1, filterSampleData2, filterSampleData3, filterSampleDataRemove));
-        List<ApiInfo.ApiInfoKey> filterSampleDataIdList = FilterSampleDataDao.instance.getIds();
+        List<ApiInfo.ApiInfoKey> filterSampleDataIdList = FilterSampleDataDao.instance.getApiInfoKeys();
 
         Assertions.assertEquals(filterSampleDataIdList.size(),4);
         Assertions.assertNotNull(filterSampleDataIdList.get(0));

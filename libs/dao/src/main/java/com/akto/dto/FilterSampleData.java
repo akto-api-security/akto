@@ -5,9 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class FilterSampleData {
-    private ApiInfo.ApiInfoKey id;
-    public static final String FILTER_ID = "filterId";
-    private int filterId;
+    private FilterKey id;
     public static final String SAMPLES = "samples";
     private List<String> samples;
 
@@ -16,18 +14,46 @@ public class FilterSampleData {
     public FilterSampleData() {
     }
 
+    public static class FilterKey {
+        public ApiInfo.ApiInfoKey apiInfoKey;
+        public int filterId;
+
+        public FilterKey() {
+        }
+
+        public FilterKey(ApiInfo.ApiInfoKey apiInfoKey, int filterId) {
+            this.apiInfoKey = apiInfoKey;
+            this.filterId = filterId;
+        }
+
+        public ApiInfo.ApiInfoKey getApiInfoKey() {
+            return apiInfoKey;
+        }
+
+        public void setApiInfoKey(ApiInfo.ApiInfoKey apiInfoKey) {
+            this.apiInfoKey = apiInfoKey;
+        }
+
+        public int getFilterId() {
+            return filterId;
+        }
+
+        public void setFilterId(int filterId) {
+            this.filterId = filterId;
+        }
+    }
+
 
     public FilterSampleData(ApiInfo.ApiInfoKey id, Integer filterId) {
-        this.id = id;
-        this.filterId = filterId;
+        this.id = new FilterKey(id,filterId);
         this.samples = new ArrayList<>();
     }
 
-    public ApiInfo.ApiInfoKey getId() {
+    public FilterKey getId() {
         return id;
     }
 
-    public void setId(ApiInfo.ApiInfoKey id) {
+    public void setId(FilterKey id) {
         this.id = id;
     }
 
@@ -39,11 +65,4 @@ public class FilterSampleData {
         this.samples = samples;
     }
 
-    public int getFilterId() {
-        return filterId;
-    }
-
-    public void setFilterId(int filterId) {
-        this.filterId = filterId;
-    }
 }
