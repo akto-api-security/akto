@@ -237,7 +237,7 @@ public class Main {
                         flow.init(accWiseResponse);
                         aktoPolicy.main(accWiseResponse);
                     } catch (Exception e) {
-                        // TODO:
+                        logger.error(e.toString());
                     }
                 }
 
