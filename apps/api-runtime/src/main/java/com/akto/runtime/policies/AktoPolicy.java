@@ -234,7 +234,6 @@ public class AktoPolicy {
                 }
             }
 
-            // TODO: case when empty list
             if (flag) {
                 logger.info("SUCCESS in template: " + key.getUrl());
                 return key;
@@ -259,24 +258,15 @@ public class AktoPolicy {
     }
 
     public static List<WriteModel<ApiInfo>> getUpdates(Map<ApiInfo.ApiInfoKey, ApiInfo> apiInfoMap , List<ApiInfo.ApiInfoKey> apiInfoRemoveList) {
-        List<ApiInfo> apiInfoList =  ApiInfoDao.instance.findAll(new BasicDBObject());
-        Map<ApiInfo.ApiInfoKey, ApiInfo> dbApiInfoMap = new HashMap<>();
-        for (ApiInfo apiInfo: apiInfoList) {
-            dbApiInfoMap.put(apiInfo.getId(), apiInfo);
-        }
-
         List<WriteModel<ApiInfo>> updates = new ArrayList<>();
 
         for (ApiInfo.ApiInfoKey key: apiInfoMap.keySet()) {
             ApiInfo apiInfo = apiInfoMap.get(key);
             if (apiInfo == null) {
-                // this case happens we apiInfo is present in apiCollections collection in db, but we didn't find any apiInfo class locally
-                apiInfo = new ApiInfo(key);
-            }
-            ApiInfo originalApiInfo = dbApiInfoMap.get(key);
-            if (originalApiInfo == null) {
-                // this happens when there is no apiInfo in apiInfo collection in db, but we found apiInfo locally
-                originalApiInfo = new ApiInfo(key);
+                // this case happens we apiInfo.Key is present in apiCollections collection in db,
+                // but we didn't find any apiInfo class locally (i.e. no traffic came for that apiInfo.key)
+                // So we discard till we get apiInfo from traffic
+                continue;
             }
 
             List<Bson> subUpdates = new ArrayList<>();
@@ -284,33 +274,30 @@ public class AktoPolicy {
             // allAuthTypesFound
             Set<Set<ApiInfo.AuthType>> allAuthTypesFound = apiInfo.getAllAuthTypesFound();
             if (allAuthTypesFound.isEmpty()) {
-                subUpdates.add(Updates.set(ApiInfo.ALL_AUTH_TYPES_FOUND, new HashSet<>()));
-            }
-            for (Set<ApiInfo.AuthType> authTypes: allAuthTypesFound) {
-                Set<Set<ApiInfo.AuthType>> originalAllAuthTypesFound = originalApiInfo.getAllAuthTypesFound();
-                if (!originalAllAuthTypesFound.contains(authTypes)) {
-                    subUpdates.add(Updates.addToSet(ApiInfo.ALL_AUTH_TYPES_FOUND, authTypes));
-                }
+                // to make sure no field is null (so setting empty objects)
+                subUpdates.add(Updates.setOnInsert(ApiInfo.ALL_AUTH_TYPES_FOUND, new HashSet<>()));
+            } else {
+                subUpdates.add(Updates.addEachToSet(ApiInfo.ALL_AUTH_TYPES_FOUND, Arrays.asList(allAuthTypesFound.toArray())));
             }
 
             // apiAccessType
             Set<ApiInfo.ApiAccessType> apiAccessTypes = apiInfo.getApiAccessTypes();
             if (apiAccessTypes.isEmpty()) {
-                subUpdates.add(Updates.set(ApiInfo.API_ACCESS_TYPES, new HashSet<>()));
-            }
-            for (ApiInfo.ApiAccessType apiAccessType: apiAccessTypes) {
-                if (!(originalApiInfo.getApiAccessTypes().contains(apiAccessType))) {
-                    subUpdates.add(Updates.addToSet(ApiInfo.API_ACCESS_TYPES, apiAccessType));
-                }
+                // to make sure no field is null (so setting empty objects)
+                subUpdates.add(Updates.setOnInsert(ApiInfo.API_ACCESS_TYPES, new HashSet<>()));
+            } else {
+                subUpdates.add(Updates.addEachToSet(ApiInfo.API_ACCESS_TYPES, Arrays.asList(apiAccessTypes.toArray())));
             }
 
             // violations
             Map<String,Integer> violationsMap = apiInfo.getViolations();
             if (violationsMap.isEmpty()) {
-                subUpdates.add(Updates.set(ApiInfo.VIOLATIONS, new HashMap<>()));
-            }
-            for (String customKey: violationsMap.keySet()) {
-                subUpdates.add(Updates.set(ApiInfo.VIOLATIONS + "." + customKey, violationsMap.get(customKey)));
+                // to make sure no field is null (so setting empty objects)
+                subUpdates.add(Updates.setOnInsert(ApiInfo.VIOLATIONS, new HashMap<>()));
+            } else {
+                for (String customKey: violationsMap.keySet()) {
+                    subUpdates.add(Updates.set(ApiInfo.VIOLATIONS + "." + customKey, violationsMap.get(customKey)));
+                }
             }
 
             // last seen
@@ -318,18 +305,19 @@ public class AktoPolicy {
 
             updates.add(
                     new UpdateOneModel<>(
-                            ApiInfoDao.getFilter(apiInfo.getId().url, apiInfo.getId().method+"", apiInfo.getId().getApiCollectionId()),
+                            ApiInfoDao.getFilter(apiInfo.getId()),
                             Updates.combine(subUpdates),
                             new UpdateOptions().upsert(true)
                     )
             );
+
         }
 
 
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoRemoveList) {
             updates.add(
                     new DeleteOneModel<>(
-                            ApiInfoDao.getFilter(apiInfoKey.getUrl(), apiInfoKey.getMethod() +"", apiInfoKey.getApiCollectionId())
+                            ApiInfoDao.getFilter(apiInfoKey)
                     )
             );
         }

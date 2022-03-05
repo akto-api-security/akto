@@ -93,13 +93,21 @@ public class TestAktoPolicy extends MongoBasedTest {
         allAuthTypesFound2.add(b1);
         apiInfo2.setAllAuthTypesFound(allAuthTypesFound2);
 
+        ApiInfo apiInfo3 = new ApiInfo(1,"/api/books", URLMethods.Method.POST);
+        apiInfo3.getApiAccessTypes().add(ApiInfo.ApiAccessType.PUBLIC);
+        Set<Set<ApiInfo.AuthType>> allAuthTypesFound3 = new HashSet<>();
+        Set<ApiInfo.AuthType> b2 = new HashSet<>();
+        b2.add(ApiInfo.AuthType.UNAUTHENTICATED);
+        allAuthTypesFound3.add(b2);
+        apiInfo3.setAllAuthTypesFound(allAuthTypesFound3);
+
         ApiInfo deleteApiInfo1 = new ApiInfo(0, "/api/delete/1", URLMethods.Method.GET);
         ApiInfo deleteApiInfo2 = new ApiInfo(0, "/api/delete/2", URLMethods.Method.GET);
 
-        ApiInfoDao.instance.insertMany(Arrays.asList(apiInfo1,apiInfo2, deleteApiInfo1, deleteApiInfo2));
+        ApiInfoDao.instance.insertMany(Arrays.asList(apiInfo1,apiInfo2,apiInfo3, deleteApiInfo1, deleteApiInfo2));
 
         List<ApiInfo> apiInfoListFromDb = ApiInfoDao.instance.findAll(new BasicDBObject());
-        Assertions.assertEquals(apiInfoListFromDb.size(), 4);
+        Assertions.assertEquals(apiInfoListFromDb.size(), 5);
 
         ApiInfo newApiInfo = new ApiInfo(0, "/api/new", URLMethods.Method.GET);
         newApiInfo.getApiAccessTypes().add(ApiInfo.ApiAccessType.PUBLIC);
@@ -125,10 +133,12 @@ public class TestAktoPolicy extends MongoBasedTest {
         apiInfoMap.put(apiInfo1.getId(),apiInfo1);
         apiInfoMap.put(apiInfo2.getId(),apiInfo2);
         apiInfoMap.put(newApiInfo.getId(), newApiInfo);
+        apiInfoMap.put(apiInfo3.getId(), null);
 
         List<ApiInfo.ApiInfoKey> apiInfoRemoveList = Arrays.asList(deleteApiInfo1.getId(), deleteApiInfo2.getId());
 
         AktoPolicy aktoPolicy = new AktoPolicy();
+        // did this to replace removeList and apiInfoMap set from initialising
         aktoPolicy.setApiInfoMap(apiInfoMap);
         aktoPolicy.setApiInfoRemoveList(apiInfoRemoveList);
 
@@ -139,7 +149,7 @@ public class TestAktoPolicy extends MongoBasedTest {
         for (ApiInfo apiInfo: apiInfoListFromDb) {
             latestApiInfoMap.put(apiInfo.getId(), apiInfo);
         }
-        Assertions.assertEquals(latestApiInfoMap.keySet().size(), 3);
+        Assertions.assertEquals(latestApiInfoMap.keySet().size(), 4);
         Assertions.assertFalse(latestApiInfoMap.containsKey(deleteApiInfo1.getId()));
         Assertions.assertFalse(latestApiInfoMap.containsKey(deleteApiInfo2.getId()));
 
@@ -157,6 +167,48 @@ public class TestAktoPolicy extends MongoBasedTest {
         Assertions.assertEquals(latestApiInfo3.getApiAccessTypes().size(),1);
         Assertions.assertEquals(latestApiInfo3.getAllAuthTypesFound().size(), 1);
         Assertions.assertEquals(latestApiInfo3.getViolations().size(), 0);
+
+    }
+
+    @Test
+    public void testAddingEmptySets() {
+        ApiInfo apiInfo1 = new ApiInfo(0,"/api/books", URLMethods.Method.GET);
+        apiInfo1.getApiAccessTypes().add(ApiInfo.ApiAccessType.PRIVATE);
+        Map<String, Integer> violations1 = new HashMap<>();
+        violations1.put("first", Context.now() - 1000);
+        apiInfo1.setViolations(violations1);
+        Set<Set<ApiInfo.AuthType>> allAuthTypesFound1 = new HashSet<>();
+        Set<ApiInfo.AuthType> a1 = new HashSet<>();
+        a1.add(ApiInfo.AuthType.BEARER);
+        allAuthTypesFound1.add(a1);
+        apiInfo1.setAllAuthTypesFound(allAuthTypesFound1);
+
+        ApiInfo apiInfo2 = new ApiInfo(0,"/api/cars", URLMethods.Method.GET);
+
+        ApiInfoDao.instance.insertOne(apiInfo1);
+
+        Map<ApiInfo.ApiInfoKey, ApiInfo> apiInfoMap = new HashMap<>();
+        apiInfoMap.put(apiInfo1.getId(), new ApiInfo(apiInfo1.getId()));
+        apiInfoMap.put(apiInfo2.getId(), apiInfo2);
+
+        AktoPolicy aktoPolicy = new AktoPolicy();
+        // did this to replace removeList and apiInfoMap set from initialising
+        aktoPolicy.setApiInfoMap(apiInfoMap);
+        aktoPolicy.setApiInfoRemoveList(new ArrayList<>());
+        aktoPolicy.syncWithDb(false);
+
+        ApiInfo dbApiInfo1 = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(apiInfo1.getId()));
+        Assertions.assertNotNull(dbApiInfo1);
+        Assertions.assertEquals(dbApiInfo1.getViolations().keySet(),apiInfo1.getViolations().keySet());
+        Assertions.assertEquals(dbApiInfo1.getAllAuthTypesFound().size(),apiInfo1.getAllAuthTypesFound().size());
+        Assertions.assertEquals(dbApiInfo1.getApiAccessTypes().size(),apiInfo1.getApiAccessTypes().size());
+
+        ApiInfo dbApiInfo2 = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(apiInfo2.getId()));
+        Assertions.assertNotNull(dbApiInfo2);
+        Assertions.assertEquals(dbApiInfo2.getViolations().keySet(),apiInfo2.getViolations().keySet());
+        Assertions.assertEquals(dbApiInfo2.getAllAuthTypesFound().size(),apiInfo2.getAllAuthTypesFound().size());
+        Assertions.assertEquals(dbApiInfo2.getApiAccessTypes().size(),apiInfo2.getApiAccessTypes().size());
+        Assertions.assertTrue(dbApiInfo2.getLastSeen()>0);
 
     }
 

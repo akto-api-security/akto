@@ -13,6 +13,7 @@ import com.akto.MongoBasedTest;
 import com.akto.dao.RuntimeFilterDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.UsersDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.User;
 import com.akto.dto.messaging.Message.Mode;
 import com.akto.dto.runtime_filters.RuntimeFilter;
@@ -194,7 +195,8 @@ public class TestDBSync extends MongoBasedTest {
     }
 
     @Test
-    public void testInitialiseFilters() {
+    public void testInitialiseFilters() throws InterruptedException {
+        Context.accountId.set(10000);
         int totalFilters = 2;
         RuntimeFilterDao.instance.initialiseFilters();
         List<RuntimeFilter> runtimeFilters = RuntimeFilterDao.instance.findAll(new BasicDBObject());
@@ -205,6 +207,7 @@ public class TestDBSync extends MongoBasedTest {
         runtimeFilters = RuntimeFilterDao.instance.findAll(filter);
         assertEquals(runtimeFilters.size(), 0);
 
+        Thread.sleep(1000);
         RuntimeFilterDao.instance.initialiseFilters();
         runtimeFilters = RuntimeFilterDao.instance.findAll(filter);
         assertEquals(runtimeFilters.size(), 1);
