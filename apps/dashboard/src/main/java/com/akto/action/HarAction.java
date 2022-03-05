@@ -1,6 +1,9 @@
 package com.akto.action;
 
+import com.akto.DaoInit;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.RuntimeFilterDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.har.HAR;
 import com.akto.kafka.Kafka;
@@ -10,7 +13,9 @@ import com.akto.runtime.policies.AktoPolicy;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.opensymphony.xwork2.Action;
 import com.sun.jna.*;
 
@@ -30,31 +35,11 @@ public class HarAction extends UserAction {
     private boolean skipKafka;
     private byte[] tcpContent;
 
-    public static void main(String[] args) throws InterruptedException, JsonProcessingException {
-        String brokerIP = "172.18.0.5:9092";
-        Kafka kafka = new Kafka(brokerIP);
-
-        // Map<String, Object> m = new HashMap<>();
-        // m.put("group_name", "adsf");
-        // m.put("vxlanId", 1234);
-        // m.put("vpc_cidr", Arrays.asList("192.1.1.1/16"));
-        // ObjectMapper mapper = new ObjectMapper();
-        // String message_initial = mapper.writeValueAsString(m);
-        // kafka.send(message_initial, "akto.api.logs");
-
-
-
-        String message = "{\"method\":\"GET\",\"requestPayload\":\"{\\\"steatus\\\":\\\"pending\\\"}\",\"responsePayload\":\"[{\\\"id\\\":2799412,\\\"category\\\":{\\\"id\\\":19475553,\\\"name\\\":\\\"nostrud cupidatat labore\\\"},\\\"name\\\":\\\"doggie\\\",\\\"photoUrls\\\":[\\\"culpa occaecat\\\",\\\"ad incididunt\\\"],\\\"tags\\\":[{\\\"id\\\":47291519,\\\"name\\\":\\\"consequat aute pariatur\\\"},{\\\"id\\\":-53726990,\\\"name\\\":\\\"Lorem enim consectetur\\\"}],\\\"status\\\":\\\"pending\\\"},{\\\"id\\\":1641165953,\\\"category\\\":{\\\"id\\\":1,\\\"name\\\":\\\"categoryNameUpdated\\\"},\\\"name\\\":\\\"Lauren\\\",\\\"photoUrls\\\":[\\\"photoUrl1Updated\\\",\\\"photoUrl2Updated\\\"],\\\"tags\\\":[{\\\"id\\\":34932781,\\\"name\\\":\\\"Ut dolore\\\"},{\\\"id\\\":93600857,\\\"name\\\":\\\"sint\\\"}],\\\"status\\\":\\\"pending\\\"},{\\\"id\\\":1641165973,\\\"category\\\":{\\\"id\\\":1,\\\"name\\\":\\\"categoryNameUpdated\\\"},\\\"name\\\":\\\"Alanis\\\",\\\"photoUrls\\\":[\\\"photoUrl1Updated\\\",\\\"photoUrl2Updated\\\"],\\\"tags\\\":[{\\\"id\\\":34932781,\\\"name\\\":\\\"Ut dolore\\\"},{\\\"id\\\":93600857,\\\"name\\\":\\\"sint\\\"}],\\\"status\\\":\\\"pending\\\"},{\\\"id\\\":81723614,\\\"category\\\":{\\\"id\\\":-35894100,\\\"name\\\":\\\"sit reprehenderit fugiat amet aliqua\\\"},\\\"name\\\":\\\"doggie\\\",\\\"photoUrls\\\":[\\\"occaecat nostrud dolore fugiat tempor\\\",\\\"id est\\\"],\\\"tags\\\":[{\\\"id\\\":-85885711,\\\"name\\\":\\\"pariatur labore Lorem\\\"},{\\\"id\\\":-37987020,\\\"name\\\":\\\"v\\\"}],\\\"status\\\":\\\"pending\\\"},{\\\"id\\\":39185211,\\\"cateagory\\\":{\\\"id\\\":12899832,\\\"name\\\":\\\"anim enim elit incididunt\\\"},\\\"name\\\":\\\"doggie\\\",\\\"photoUrls\\\":[\\\"adipisicing in\\\",\\\"pariatur veniam do\\\"],\\\"tags\\\":[{\\\"id\\\":-97403520,\\\"namee\\\":\\\"dolore minim\\\"},{\\\"id\\\":53200598,\\\"name\\\":\\\"in dolore\\\"}],\\\"status\\\":\\\"pending\\\"}]\",\"ip\":\"null\",\"source\":\"MIRRORING\",\"type\":\"HTTP/2\",\"akto_vxlan_id\":\"0\",\"path\":\"https://petstore.swagger.io/v1/books\",\"requestHeaders\":\"{\\\"TE\\\":\\\"trailers\\\",\\\"Accept\\\":\\\"application/json\\\",\\\"User-Agent\\\":\\\"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:95.0) Gecko/20100101 Firefox/95.0\\\",\\\"Referer\\\":\\\"https://petstore.swagger.io/\\\",\\\"Connection\\\":\\\"keep-alive\\\",\\\"Sec-Fetch-Dest\\\":\\\"empty\\\",\\\"Sec-Fetch-Site\\\":\\\"same-origin\\\",\\\"Host\\\":\\\"petstore.swagger.io\\\",\\\"Accept-Language\\\":\\\"en-US,en;q=0.5\\\",\\\"Accept-Encoding\\\":\\\"gzip, deflate, br\\\",\\\"Sec-Fetch-Mode\\\":\\\"cors\\\"}\",\"responseHeaders\":\"{\\\"date\\\":\\\"Mon, 03 Jan 2022 07:16:32 GMT\\\",\\\"access-control-allow-origin\\\":\\\"*\\\",\\\"server\\\":\\\"Jetty(9.2.9.v20150224)\\\",\\\"access-control-allow-headers\\\":\\\"Content-Type, api_key, Authorization\\\",\\\"X-Firefox-Spdy\\\":\\\"h2\\\",\\\"content-type\\\":\\\"application/json\\\",\\\"access-control-allow-methods\\\":\\\"GET, POST, DELETE, PUT\\\"}\",\"time\":\"1641194192\",\"contentType\":\"application/json\",\"akto_account_id\":\"1000000\",\"statusCode\":\"201\",\"status\":\"OK\"}";
-        String message1 = "{\"method\":\"GET\",\"requestPayload\":\"{\\\"stebtus\\\":\\\"pending\\\"}\",\"responsePayload\":\"[{\\\"id\\\":2799412,\\\"category\\\":{\\\"id\\\":19475553,\\\"name\\\":\\\"nostrud cupidatat labore\\\"},\\\"name\\\":\\\"doggie\\\",\\\"photoUrls\\\":[\\\"culpa occaecat\\\",\\\"ad incididunt\\\"],\\\"tags\\\":[{\\\"id\\\":47291519,\\\"name\\\":\\\"consequat aute pariatur\\\"},{\\\"id\\\":-53726990,\\\"name\\\":\\\"Lorem enim consectetur\\\"}],\\\"status\\\":\\\"pending\\\"},{\\\"id\\\":1641165953,\\\"category\\\":{\\\"id\\\":1,\\\"name\\\":\\\"categoryNameUpdated\\\"},\\\"name\\\":\\\"Lauren\\\",\\\"photoUrls\\\":[\\\"photoUrl1Updated\\\",\\\"photoUrl2Updated\\\"],\\\"tags\\\":[{\\\"id\\\":34932781,\\\"name\\\":\\\"Ut dolore\\\"},{\\\"id\\\":93600857,\\\"name\\\":\\\"sint\\\"}],\\\"status\\\":\\\"pending\\\"},{\\\"id\\\":1641165973,\\\"category\\\":{\\\"id\\\":1,\\\"name\\\":\\\"categoryNameUpdated\\\"},\\\"name\\\":\\\"Alanis\\\",\\\"photoUrls\\\":[\\\"photoUrl1Updated\\\",\\\"photoUrl2Updated\\\"],\\\"tags\\\":[{\\\"id\\\":34932781,\\\"name\\\":\\\"Ut dolore\\\"},{\\\"id\\\":93600857,\\\"name\\\":\\\"sint\\\"}],\\\"status\\\":\\\"pending\\\"},{\\\"id\\\":81723614,\\\"category\\\":{\\\"id\\\":-35894100,\\\"name\\\":\\\"sit reprehenderit fugiat amet aliqua\\\"},\\\"name\\\":\\\"doggie\\\",\\\"photoUrls\\\":[\\\"occaecat nostrud dolore fugiat tempor\\\",\\\"id est\\\"],\\\"tags\\\":[{\\\"id\\\":-85885711,\\\"name\\\":\\\"pariatur labore Lorem\\\"},{\\\"id\\\":-37987020,\\\"name\\\":\\\"v\\\"}],\\\"status\\\":\\\"pending\\\"},{\\\"id\\\":39185211,\\\"cateagory\\\":{\\\"id\\\":12899832,\\\"name\\\":\\\"anim enim elit incididunt\\\"},\\\"name\\\":\\\"doggie\\\",\\\"photoUrls\\\":[\\\"adipisicing in\\\",\\\"pariatur veniam do\\\"],\\\"tags\\\":[{\\\"id\\\":-97403520,\\\"namee\\\":\\\"dolore minim\\\"},{\\\"id\\\":53200598,\\\"name\\\":\\\"in dolore\\\"}],\\\"status\\\":\\\"pending\\\"}]\",\"ip\":\"null\",\"source\":\"MIRRORING\",\"type\":\"HTTP/2\",\"akto_vxlan_id\":\"0\",\"path\":\"https://petstore.swagger.io/v1/car/findByStatus\",\"requestHeaders\":\"{\\\"TE\\\":\\\"trailers\\\",\\\"Accept\\\":\\\"application/json\\\",\\\"User-Agent\\\":\\\"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:95.0) Gecko/20100101 Firefox/95.0\\\",\\\"Referer\\\":\\\"https://petstore.swagger.io/\\\",\\\"Connection\\\":\\\"keep-alive\\\",\\\"Sec-Fetch-Dest\\\":\\\"empty\\\",\\\"Sec-Fetch-Site\\\":\\\"same-origin\\\",\\\"Host\\\":\\\"petstore.swagger.io\\\",\\\"Accept-Language\\\":\\\"en-US,en;q=0.5\\\",\\\"Accept-Encoding\\\":\\\"gzip, deflate, br\\\",\\\"Sec-Fetch-Mode\\\":\\\"cors\\\"}\",\"responseHeaders\":\"{\\\"date\\\":\\\"Mon, 03 Jan 2022 07:16:32 GMT\\\",\\\"access-control-allow-origin\\\":\\\"*\\\",\\\"server\\\":\\\"Jetty(9.2.9.v20150224)\\\",\\\"access-control-allow-headers\\\":\\\"Content-Type, api_key, Authorization\\\",\\\"X-Firefox-Spdy\\\":\\\"h2\\\",\\\"content-type\\\":\\\"application/json\\\",\\\"access-control-allow-methods\\\":\\\"GET, POST, DELETE, PUT\\\"}\",\"time\":\"1641194192\",\"contentType\":\"application/json\",\"akto_account_id\":\"1000000\",\"statusCode\":\"201\",\"status\":\"OK\"}";
-        for (int i=0;i < 10; i++) {
-            if (i == 15 || i == 29) {
-                System.out.println("sss");
-                kafka.send(message1,"akto.api.logs");
-            }
-            kafka.send(message,"akto.api.logs");
-            Thread.sleep(5000);
-        }
-        Thread.sleep(5000);
+    public static void main(String[] args) {
+        DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
+        Context.accountId.set(1_000_000);
+        RuntimeFilterDao.instance.initialiseFilters();
+        System.out.println(RuntimeFilterDao.instance.findAll(new BasicDBObject()));
     }
 
     @Override

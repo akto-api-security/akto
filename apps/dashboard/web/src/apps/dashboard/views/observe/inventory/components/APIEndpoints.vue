@@ -333,7 +333,8 @@ export default {
         },
         refreshPage(shouldLoad) {
             // if (!this.apiCollection || this.apiCollection.length === 0 || this.$store.state.inventory.apiCollectionId !== this.apiCollectionId) {
-            if (!shouldLoad || ((new Date() / 1000) - this.lastFetched > 60*5)) {
+            let collectionIdChanged = this.$store.state.inventory.apiCollectionId !== this.apiCollectionId
+            if (collectionIdChanged || !shouldLoad || ((new Date() / 1000) - this.lastFetched > 60*5)) {
                 this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId, shouldLoad: shouldLoad})
 
                 api.getAllUrlsAndMethods(this.apiCollectionId).then(resp => {
