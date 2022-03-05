@@ -289,6 +289,7 @@
         </action>
 
 
+        <!--  DO NOT CHANGE THE PATH NAME BEING USED BY EXTERNAL API -->
         <action name="api/getAPICollection" class="com.akto.action.observe.InventoryAction" method="getAPICollection">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -301,6 +302,7 @@
         </action>
 
 
+        <!--  DO NOT CHANGE THE PATH NAME BEING USED BY EXTERNAL API -->
         <action name="api/loadRecentParameters" class="com.akto.action.observe.InventoryAction" method="loadRecentParameters">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -313,6 +315,7 @@
         </action>
 
 
+        <!--  DO NOT CHANGE THE PATH NAME BEING USED BY EXTERNAL API -->
         <action name="api/loadSensitiveParameters" class="com.akto.action.observe.InventoryAction" method="loadSensitiveParameters">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -529,6 +532,16 @@
             </result>
         </action>
 
+        <action name="api/addExternalApiToken" class="com.akto.action.ApiTokenAction" method="addExternalApiToken">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
         <action name="api/deleteApiToken" class="com.akto.action.ApiTokenAction" method="deleteApiToken">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -539,7 +552,7 @@
             </result>
         </action>
 
-        <action name="api/fetchBurpTokens" class="com.akto.action.ApiTokenAction" method="fetchBurpTokens">
+        <action name="api/fetchApiTokens" class="com.akto.action.ApiTokenAction" method="fetchApiTokens">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json">
@@ -549,6 +562,7 @@
             </result>
         </action>
 
+        <!--  DO NOT CHANGE THE PATH NAME BEING USED BY EXTERNAL API -->
         <action name="api/fetchEndpointTrafficData" class="com.akto.action.TrafficAction" method="fetchEndpointTrafficData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
