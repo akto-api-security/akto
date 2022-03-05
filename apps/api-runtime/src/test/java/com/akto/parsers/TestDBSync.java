@@ -207,8 +207,6 @@ public class TestDBSync extends MongoBasedTest {
         runtimeFilters = RuntimeFilterDao.instance.findAll(filter);
         assertEquals(runtimeFilters.size(), 0);
 
-        Thread.sleep(1000);
-        RuntimeFilterDao.instance.initialiseFilters();
         runtimeFilters = RuntimeFilterDao.instance.findAll(filter);
         assertEquals(runtimeFilters.size(), 1);
 
