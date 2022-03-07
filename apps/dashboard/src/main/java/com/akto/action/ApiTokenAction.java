@@ -28,6 +28,23 @@ public class ApiTokenAction extends UserAction{
         return SUCCESS.toUpperCase();
     }
 
+    public static final String FULL_STRING_ALLOWED_API = "*";
+    public String addExternalApiToken() {
+        String username = getSUser().getLogin();
+        String apiKey = randomString.nextString();
+        if (apiKey == null || apiKey.length() != keyLength) return ERROR.toUpperCase();
+
+        List<String> allowedApis = new ArrayList<>();
+        allowedApis.add(FULL_STRING_ALLOWED_API);
+
+        ApiToken apiToken = new ApiToken(Context.now(),Context.accountId.get(),"external_key",apiKey, Context.now(),
+                username, ApiToken.Utility.EXTERNAL_API, allowedApis);
+        ApiTokensDao.instance.insertOne(apiToken);
+        apiTokenList = new ArrayList<>();
+        apiTokenList.add(apiToken);
+        return SUCCESS.toUpperCase();
+    }
+
     private int apiTokenId;
     private boolean apiTokenDeleted;
     public String deleteApiToken() {
@@ -46,12 +63,11 @@ public class ApiTokenAction extends UserAction{
     }
 
     List<ApiToken> apiTokenList;
-    public String fetchBurpTokens() {
+    public String fetchApiTokens() {
         String username = getSUser().getLogin();
         apiTokenList = ApiTokensDao.instance.findAll(
                 Filters.and(
-                        Filters.eq(ApiToken.USER_NAME, username),
-                        Filters.eq(ApiToken.UTILITY, ApiToken.Utility.BURP)
+                        Filters.eq(ApiToken.USER_NAME, username)
                 )
         );
         return SUCCESS.toUpperCase();

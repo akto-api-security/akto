@@ -29,14 +29,6 @@ public class InviteUserAction extends UserAction{
     public String execute() {
         int user_id = getSUser().getId();
 
-        // only admins are allowed to invite others
-        RBAC rbac = RBACDao.instance.findOne(Filters.and(
-                Filters.eq(RBAC.USER_ID, user_id), Filters.eq(RBAC.ROLE,RBAC.Role.ADMIN))
-        );
-        if (rbac == null) {
-            return ERROR.toUpperCase();
-        }
-
         Map<String,Object> claims = new HashMap<>();
         claims.put("email", inviteeEmail);
 

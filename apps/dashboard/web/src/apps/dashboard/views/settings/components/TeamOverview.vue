@@ -185,9 +185,7 @@
         computed: {
             ...mapState('team', ['users']),
             isAdmin() {
-                return this.users && 
-                    Object.entries(this.users).length > 0 &&
-                    this.users.find(x => x.login === window.USER_NAME).role === "ADMIN"
+                return true
             }            
         }
     }

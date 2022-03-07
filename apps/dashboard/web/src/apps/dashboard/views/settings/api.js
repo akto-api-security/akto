@@ -78,6 +78,15 @@ export default {
             return resp
         })
     },
+    addExternalApiToken() {
+        return request({
+            url: '/api/addExternalApiToken',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
+    },
     deleteApiToken(apiTokenId) {
         return request({
             url: '/api/deleteApiToken',
@@ -87,9 +96,9 @@ export default {
             return resp
         })
     },
-    fetchBurpTokens() {
+    fetchApiTokens() {
         return request({
-            url: '/api/fetchBurpTokens',
+            url: '/api/fetchApiTokens',
             method: 'post',
             data: {}
         }).then((resp) => {

@@ -17,12 +17,7 @@ public class ApiTokensDao extends CommonContextDao<ApiToken>{
         return ApiToken.class;
     }
 
-    public ApiToken findByKeyForPath(String key, String path) {
-        return instance.findOne(
-                Filters.and(
-                        Filters.eq(ApiToken.KEY, key),
-                        Filters.in(ApiToken.ACCESS_LIST, path)
-                )
-        );
+    public ApiToken findByKey(String key) {
+        return instance.findOne(Filters.eq(ApiToken.KEY, key));
     }
 }

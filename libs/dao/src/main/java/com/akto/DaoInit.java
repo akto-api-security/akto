@@ -2,6 +2,10 @@ package com.akto;
 
 import com.akto.dto.*;
 import com.akto.dto.notifications.content.Content;
+import com.akto.dto.runtime_filters.FieldExistsFilter;
+import com.akto.dto.FilterSampleData;
+import com.akto.dto.runtime_filters.ResponseCodeRuntimeFilter;
+import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
 import com.akto.dto.type.SingleTypeInfo;
@@ -40,11 +44,22 @@ public class DaoInit {
         ClassModel<ThirdPartyAccess>  thirdPartyAccessClassModel = ClassModel.builder(ThirdPartyAccess.class).enableDiscriminator(true).build();
         ClassModel<Credential>   credentialClassModel = ClassModel.builder(Credential.class).enableDiscriminator(true).build();
         ClassModel<ApiToken> apiTokenClassModel = ClassModel.builder(ApiToken.class).enableDiscriminator(true).build();
+        ClassModel<ApiInfo> apiInfoClassModel = ClassModel.builder(ApiInfo.class).enableDiscriminator(true).build();
+        ClassModel<ApiInfo.ApiInfoKey> apiInfoKeyClassModel = ClassModel.builder(ApiInfo.ApiInfoKey.class).enableDiscriminator(true).build();
+        ClassModel<CustomFilter> customFilterClassModel = ClassModel.builder(CustomFilter.class).enableDiscriminator(true).build();
+        ClassModel<FieldExistsFilter> fieldExistsFilterClassModel = ClassModel.builder(FieldExistsFilter.class).enableDiscriminator(true).build();
+        ClassModel<ResponseCodeRuntimeFilter> responseCodeRuntimeFilterClassModel = ClassModel.builder(ResponseCodeRuntimeFilter.class).enableDiscriminator(true).build();;
+        ClassModel<RuntimeFilter> runtimeFilterClassModel = ClassModel.builder(RuntimeFilter.class).enableDiscriminator(true).build();
+        ClassModel<FilterSampleData> filterSampleDataClassModel = ClassModel.builder(FilterSampleData.class).enableDiscriminator(true).build();
+        ClassModel<AccountSettings> accountSettingsClassModel = ClassModel.builder(AccountSettings.class).enableDiscriminator(true).build();
+
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(queueEntryClassModel, configClassModel, 
             signupInfoClassModel, contentClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel,singleTypeInfoClassModel,
-                thirdPartyAccessClassModel, credentialClassModel, apiTokenClassModel).automatic(true).build());
+                thirdPartyAccessClassModel, credentialClassModel, apiTokenClassModel, apiInfoClassModel,
+                apiInfoKeyClassModel, customFilterClassModel, runtimeFilterClassModel, filterSampleDataClassModel,
+                fieldExistsFilterClassModel, accountSettingsClassModel, responseCodeRuntimeFilterClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
             new EnumCodec<>(SingleTypeInfo.SubType.class),
@@ -52,7 +67,10 @@ public class DaoInit {
             new EnumCodec<>(Method.class),
             new EnumCodec<>(RBAC.Role.class),
             new EnumCodec<>(Credential.Type.class),
-            new EnumCodec<>(ApiToken.Utility.class)
+            new EnumCodec<>(ApiToken.Utility.class),
+            new EnumCodec<>(ApiInfo.AuthType.class),
+            new EnumCodec<>(ApiInfo.ApiAccessType.class)
+
         );
 
         CodecRegistry codecRegistry = fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry, customEnumCodecs);

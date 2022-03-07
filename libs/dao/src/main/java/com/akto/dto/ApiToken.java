@@ -18,7 +18,7 @@ public class ApiToken {
 
 
     public enum Utility{
-        BURP
+        BURP, EXTERNAL_API
     }
 
     public ApiToken() {}
