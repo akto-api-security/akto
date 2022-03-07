@@ -188,16 +188,6 @@ export default {
                   sortKey: 'last_seen'
                 },
                 {
-                    text: constants.DISCOVERED,
-                    value: 'added',
-                    sortKey: 'detectedTs'
-                },
-                {
-                    text: 'Changes',
-                    value: 'changes',
-                    sortKey: 'changesCount'
-                },
-                {
                   text: 'Access Type',
                   value: 'access_type',
                   sortKey: 'access_type'
@@ -206,6 +196,16 @@ export default {
                   text: 'Auth Type',
                   value: 'auth_type',
                   sortKey: 'auth_type'
+                },
+                {
+                    text: constants.DISCOVERED,
+                    value: 'added',
+                    sortKey: 'detectedTs'
+                },
+                {
+                    text: 'Changes',
+                    value: 'changes',
+                    sortKey: 'changesCount'
                 }
             ],
             unusedHeaders: [

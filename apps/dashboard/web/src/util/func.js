@@ -327,9 +327,9 @@ export default {
                     if (!access_types || access_types.length == 0) {
                         access_type = null
                     } else if (access_types.indexOf("PUBLIC") !== -1) {
-                        access_type = "PUBLIC"
+                        access_type = "Public"
                     } else {
-                        access_type = "PRIVATE"
+                        access_type = "Private"
                     }
                 }
 
@@ -351,7 +351,7 @@ export default {
                     changesCount: 0,
                     changes: '',
                     apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
-                    auth_type: authType
+                    auth_type: (authType || "").toLowerCase()
                 }
 
             }

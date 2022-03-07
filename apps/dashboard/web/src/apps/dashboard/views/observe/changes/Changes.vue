@@ -179,13 +179,12 @@ export default {
                     value: 'apiCollectionName'
                 },
                 {
-                  text: 'Last Seen',
-                  value: 'last_seen',
-                  sortKey: 'last_seen'
-                },
-                {
                     text: 'Method',
                     value: 'method'
+                },
+                {
+                    text: 'Sensitive Params',
+                    value: 'sensitive'
                 },
                 {
                   text: 'Access Type',
@@ -193,20 +192,20 @@ export default {
                   sortKey: 'access_type'
                 },
                 {
-                    text: 'Sensitive Params',
-                    value: 'sensitive'
+                  text: 'Auth Type',
+                  value: 'auth_type',
+                  sortKey: 'auth_type'
+                },
+                {
+                  text: 'Last Seen',
+                  value: 'last_seen',
+                  sortKey: 'last_seen'
                 },
                 {
                     text: constants.DISCOVERED,
                     value: 'added',
                     sortKey: 'detectedTs'
-                },
-                {
-                  text: 'Auth Type',
-                  value: 'auth_type',
-                  sortKey: 'auth_type'
                 }
-
             ],
             parameterHeaders: [
                 {
