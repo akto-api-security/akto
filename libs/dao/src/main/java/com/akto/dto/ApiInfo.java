@@ -93,6 +93,14 @@ public class ApiInfo {
             return apiCollectionId + " " + url + " " + method;
         }
 
+        public static ApiInfoKey generateFromHttpResponseParams(HttpResponseParams httpResponseParams) {
+            return new ApiInfo.ApiInfoKey(
+                    httpResponseParams.getRequestParams().getApiCollectionId(),
+                    httpResponseParams.getRequestParams().getURL(),
+                    URLMethods.Method.valueOf(httpResponseParams.getRequestParams().getMethod())
+            );
+        }
+
     }
 
 

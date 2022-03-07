@@ -19,15 +19,20 @@ import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.management.openmbean.InvalidKeyException;
+import java.security.KeyException;
 import java.util.*;
 
 public class AktoPolicy {
-    private List<RuntimeFilter> filters;
-    private Map<ApiInfo.ApiInfoKey, ApiInfo> apiInfoMap;
-    private List<ApiInfo.ApiInfoKey> apiInfoRemoveList ;
-    private List<ApiInfo.ApiInfoKey> sampleDataRemoveList ;
+    public static final String TEMPLATE = "template";
+    public static final String STRICT = "strict";
+
+    private List<RuntimeFilter> filters = new ArrayList<>();
+    private Map<String, Map<ApiInfo.ApiInfoKey, ApiInfo>> apiInfoMap = new HashMap<>();
+    private List<ApiInfo.ApiInfoKey> apiInfoRemoveList = new ArrayList<>();
+    private List<ApiInfo.ApiInfoKey> sampleDataRemoveList = new ArrayList<>();
     Map<ApiInfo.ApiInfoKey,Map<Integer, CappedList<String>>> sampleMessages = new HashMap<>();
-    private boolean processCalledAtLeastOnce = false;
+    boolean processCalledAtLeastOnce = false;
     ApiAccessTypePolicy apiAccessTypePolicy = new ApiAccessTypePolicy(null);
 
     private final int batchTimeThreshold = 60;
@@ -41,8 +46,10 @@ public class AktoPolicy {
         this.filters = RuntimeFilterDao.instance.findAll(new BasicDBObject());
     }
 
-    public AktoPolicy() {
-        syncWithDb(true);
+    public AktoPolicy(boolean shouldSyncWithDb) {
+        if (shouldSyncWithDb) {
+            syncWithDb(true);
+        }
     }
 
     public void syncWithDb(boolean initialising) {
@@ -71,6 +78,8 @@ public class AktoPolicy {
         }
 
         apiInfoMap = new HashMap<>();
+        apiInfoMap.put(TEMPLATE, new HashMap<>());
+        apiInfoMap.put(STRICT, new HashMap<>());
 
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         apiInfoRemoveList = new ArrayList<>();
@@ -80,30 +89,34 @@ public class AktoPolicy {
             for (String u: apiCollection.getUrls()) {
                 String[] v = u.split(" ");
                 ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollection.getId(), v[0], URLMethods.Method.valueOf(v[1]));
-                apiInfoMap.put(apiInfoKey, null);
+                if (isTemplateUrl(apiInfoKey.getUrl())) {
+                    apiInfoMap.get(TEMPLATE).put(apiInfoKey, null);
+                } else {
+                    apiInfoMap.get(STRICT).put(apiInfoKey, null);
+                }
             }
         }
         logger.info("Total apiInfoMap keys " + apiInfoMap.keySet());
-        logger.info("Fetching apiinfoList");
-        int i = 0;
+        logger.info("Fetching apiInfoList");
         List<ApiInfo> apiInfoList =  ApiInfoDao.instance.findAll(new BasicDBObject());
         for (ApiInfo apiInfo: apiInfoList) {
             ApiInfo.ApiInfoKey apiInfoKey = apiInfo.getId();
-            if (apiInfoMap.containsKey(apiInfoKey)) {
-                i += 1;
+            if (apiInfoMap.get(STRICT).containsKey(apiInfoKey)) {
                 logger.info("ADDING: " + apiInfo.key());
-                apiInfoMap.put(apiInfoKey, apiInfo);
+                apiInfoMap.get(STRICT).put(apiInfoKey, apiInfo);
+            } else if (apiInfoMap.get(TEMPLATE).containsKey(apiInfoKey)) {
+                logger.info("ADDING: " + apiInfo.key());
+                apiInfoMap.get(TEMPLATE).put(apiInfoKey, apiInfo);
             } else {
                 logger.info("DELETING: " + apiInfo.key());
                 apiInfoRemoveList.add(apiInfoKey);
             }
         }
-        logger.info("ApiInfoMap keys not null " + i);
 
         sampleDataRemoveList = new ArrayList<>();
         List<ApiInfo.ApiInfoKey> filterSampleDataIdList = FilterSampleDataDao.instance.getApiInfoKeys();
         for (ApiInfo.ApiInfoKey apiInfoKey: filterSampleDataIdList) {
-            if (apiInfoMap.containsKey(apiInfoKey)) {
+            if (apiInfoMap.get(STRICT).containsKey(apiInfoKey) || apiInfoMap.get(TEMPLATE).containsKey(apiInfoKey)) {
                 sampleMessages.put(apiInfoKey, new HashMap<>());
             } else {
                 sampleDataRemoveList.add(apiInfoKey);
@@ -156,13 +169,8 @@ public class AktoPolicy {
             this.processCalledAtLeastOnce = true;
         }
 
-        ApiInfo.ApiInfoKey key = getApiInfoMapKey(httpResponseParams);
-        if (key == null) return;
-        ApiInfo apiInfo = apiInfoMap.get(key);
-        if (apiInfo == null) {
-            apiInfo = new ApiInfo(httpResponseParams);
-            apiInfo.setId(key);
-        }
+        ApiInfo apiInfo = getApiInfoFromMap(httpResponseParams);
+        if (apiInfo == null) return;
 
         for (RuntimeFilter filter: filters) {
             boolean filterResult = filter.process(httpResponseParams);
@@ -186,45 +194,54 @@ public class AktoPolicy {
 
             // add sample data
             if (saveSample) {
-                Map<Integer, CappedList<String>> sampleData = sampleMessages.get(key);
+                Map<Integer, CappedList<String>> sampleData = sampleMessages.get(apiInfo.getId());
                 if (sampleData == null) {
                     sampleData = new HashMap<>();
                 }
                 CappedList<String> d = sampleData.getOrDefault(filter.getId(),new CappedList<String>(FilterSampleData.cap, true));
                 d.add(httpResponseParams.getOrig());
                 sampleData.put(filter.getId(), d);
-                sampleMessages.put(key, sampleData);
+                sampleMessages.put(apiInfo.getId(), sampleData);
             }
         }
 
         apiInfo.setLastSeen(Context.now());
-        apiInfoMap.put(key, apiInfo);
+        if (apiInfoMap.get(STRICT).containsKey(apiInfo.getId())) {
+            apiInfoMap.get(STRICT).put(apiInfo.getId(), apiInfo);
+        } else {
+            apiInfoMap.get(TEMPLATE).put(apiInfo.getId(), apiInfo);
+        }
         logger.info("Done with process");
     }
 
-    public static ApiInfo.ApiInfoKey getApiInfoMapKey(ApiInfo.ApiInfoKey apiInfoKey, Set<ApiInfo.ApiInfoKey> apiInfoKeySet)  {
+    public ApiInfo getApiInfoFromMap(ApiInfo.ApiInfoKey apiInfoKey) throws NoSuchElementException{
         // strict check
         String apiInfoKeyUrl = apiInfoKey.getUrl();
-        if (apiInfoKeySet.contains(apiInfoKey)) {
-            return apiInfoKey;
+        ApiInfo apiInfo = null;
+        if (apiInfoMap.get(STRICT).containsKey(apiInfoKey)) {
+            apiInfo = apiInfoMap.get(STRICT).get(apiInfoKey);
+            if (apiInfo == null) {
+                apiInfo = new ApiInfo(apiInfoKey);
+            }
+            return apiInfo;
+        }
+
+        // only adding leading slashes if not present
+        if (!apiInfoKeyUrl.startsWith("/")) {
+            apiInfoKeyUrl = "/" + apiInfoKeyUrl;
         }
 
         // template check
-        for (ApiInfo.ApiInfoKey key: apiInfoKeySet) {
+        for (ApiInfo.ApiInfoKey key: apiInfoMap.get(TEMPLATE).keySet()) {
             // 1. match collection id
             if (key.getApiCollectionId() != apiInfoKey.getApiCollectionId()) continue;
             // 2. match method
             if (!key.getMethod().equals(apiInfoKey.getMethod())) continue;
             // 3. match url
             String keyUrl = key.getUrl();
-            // a. check if template url
-            if (! (keyUrl.contains("STRING") || keyUrl.contains("INTEGER"))) continue;
             // b. check if template url matches
             if (!keyUrl.startsWith("/")) {
                 keyUrl = "/" + keyUrl;
-            }
-            if (!apiInfoKeyUrl.startsWith("/")) {
-                apiInfoKeyUrl = "/" + apiInfoKeyUrl;
             }
             String[] a = keyUrl.split("/");
             String[] b = apiInfoKeyUrl.split("/");
@@ -239,7 +256,11 @@ public class AktoPolicy {
             }
 
             if (flag) {
-                return key;
+                apiInfo = apiInfoMap.get(TEMPLATE).get(key);
+                if (apiInfo == null) {
+                    apiInfo = new ApiInfo(key);
+                }
+                return apiInfo;
             }
 
         }
@@ -250,18 +271,22 @@ public class AktoPolicy {
 
     }
 
-    public ApiInfo.ApiInfoKey getApiInfoMapKey(HttpResponseParams httpResponseParams)  {
-        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(
-                httpResponseParams.getRequestParams().getApiCollectionId(),
-                httpResponseParams.getRequestParams().getURL(),
-                URLMethods.Method.valueOf(httpResponseParams.getRequestParams().getMethod())
-        );
+    public ApiInfo getApiInfoFromMap(HttpResponseParams httpResponseParams)  {
+        ApiInfo.ApiInfoKey apiInfoKey = ApiInfo.ApiInfoKey.generateFromHttpResponseParams(httpResponseParams);
 
-        return getApiInfoMapKey(apiInfoKey, this.apiInfoMap.keySet());
+        return getApiInfoFromMap(apiInfoKey);
+
     }
 
-    public static List<WriteModel<ApiInfo>> getUpdates(Map<ApiInfo.ApiInfoKey, ApiInfo> apiInfoMap , List<ApiInfo.ApiInfoKey> apiInfoRemoveList) {
+    public static List<WriteModel<ApiInfo>> getUpdates(Map<String, Map<ApiInfo.ApiInfoKey, ApiInfo>> apiInfoMapNested , List<ApiInfo.ApiInfoKey> apiInfoRemoveList) {
         List<WriteModel<ApiInfo>> updates = new ArrayList<>();
+        Map<ApiInfo.ApiInfoKey, ApiInfo> apiInfoMap = new HashMap<>();
+        for (String k: apiInfoMapNested.keySet()) {
+            Map<ApiInfo.ApiInfoKey, ApiInfo> m = apiInfoMapNested.get(k);
+            for (ApiInfo.ApiInfoKey kk: m.keySet()) {
+                apiInfoMap.put(kk, m.get(kk));
+            }
+        }
 
         for (ApiInfo.ApiInfoKey key: apiInfoMap.keySet()) {
             ApiInfo apiInfo = apiInfoMap.get(key);
@@ -355,6 +380,10 @@ public class AktoPolicy {
         return bulkUpdates;
     }
 
+    public boolean isTemplateUrl(String url) {
+        return url.contains("STRING") || url.contains("INTEGER") ;
+    }
+
     public List<RuntimeFilter> getFilters() {
         return filters;
     }
@@ -363,11 +392,11 @@ public class AktoPolicy {
         this.filters = filters;
     }
 
-    public Map<ApiInfo.ApiInfoKey, ApiInfo> getApiInfoMap() {
+    public Map<String,Map<ApiInfo.ApiInfoKey, ApiInfo>> getApiInfoMap() {
         return apiInfoMap;
     }
 
-    public void setApiInfoMap(Map<ApiInfo.ApiInfoKey, ApiInfo> apiInfoMap) {
+    public void setApiInfoMap(Map<String,Map<ApiInfo.ApiInfoKey, ApiInfo>> apiInfoMap) {
         this.apiInfoMap = apiInfoMap;
     }
 

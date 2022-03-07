@@ -86,7 +86,7 @@ public class HarAction extends UserAction {
             
             if(skipKafka) {
                 parser.syncFunction(responses);
-                AktoPolicy aktoPolicy = new AktoPolicy(); // keep inside if condition statement because db call when initialised
+                AktoPolicy aktoPolicy = new AktoPolicy(true); // keep inside if condition statement because db call when initialised
                 aktoPolicy.main(responses);
             }
         } catch (Exception e) {

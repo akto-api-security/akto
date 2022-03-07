@@ -6,12 +6,13 @@ import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.FilterSampleDataDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.ApiCollection;
-import com.akto.dto.ApiInfo;
-import com.akto.dto.FilterSampleData;
+import com.akto.dto.*;
 import com.akto.dto.type.URLMethods;
 import com.akto.types.CappedList;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
@@ -29,13 +30,15 @@ public class TestAktoPolicy extends MongoBasedTest {
 
 
     @Test
-    public void syncWithDbInitialising() {
+    public void syncWithDbInitialising() throws Exception {
         Set<String> urls = new HashSet<>();
         urls.add("/api/books GET");
         urls.add("/api/books POST");
         urls.add("/api/cars GET");
         urls.add("/api/toys PUT");
-        urls.add("/api/toys/INTEGER PUT");
+        urls.add("api/toys/INTEGER PUT");
+        urls.add("api/new/INTEGER GET");
+        urls.add("/api/new/books GET");
         ApiCollection apiCollection = new ApiCollection(0,"", 0, urls);
         ApiCollectionsDao.instance.insertOne(apiCollection);
 
@@ -55,11 +58,13 @@ public class TestAktoPolicy extends MongoBasedTest {
         filterSampleDataList.add(new FilterSampleData(new ApiInfo.ApiInfoKey(0,"/api/toys/3", URLMethods.Method.PUT), 0));
         FilterSampleDataDao.instance.insertMany(filterSampleDataList);
 
-        AktoPolicy aktoPolicy = new AktoPolicy();
+        AktoPolicy aktoPolicy = new AktoPolicy(true);
 
-        Assertions.assertEquals(aktoPolicy.getApiInfoMap().keySet().size(), 5);
-        Assertions.assertTrue(aktoPolicy.getApiInfoMap().containsKey(new ApiInfo.ApiInfoKey(0, "/api/books", URLMethods.Method.GET)));
-        Assertions.assertTrue(aktoPolicy.getApiInfoMap().containsKey(new ApiInfo.ApiInfoKey(0, "/api/books", URLMethods.Method.POST)));
+        Assertions.assertEquals(aktoPolicy.getApiInfoMap().get(AktoPolicy.STRICT).keySet().size(), 5);
+        Assertions.assertEquals(aktoPolicy.getApiInfoMap().get(AktoPolicy.TEMPLATE).keySet().size(), 2);
+        Assertions.assertTrue(aktoPolicy.getApiInfoMap().get(AktoPolicy.STRICT).containsKey(new ApiInfo.ApiInfoKey(0, "/api/books", URLMethods.Method.GET)));
+        Assertions.assertTrue(aktoPolicy.getApiInfoMap().get(AktoPolicy.STRICT).containsKey(new ApiInfo.ApiInfoKey(0, "/api/books", URLMethods.Method.POST)));
+        Assertions.assertTrue(aktoPolicy.getApiInfoMap().get(AktoPolicy.TEMPLATE).containsKey(new ApiInfo.ApiInfoKey(0, "api/toys/INTEGER", URLMethods.Method.PUT)));
 
         Assertions.assertEquals(aktoPolicy.getApiInfoRemoveList().size(), 3);
         Assertions.assertTrue(aktoPolicy.getApiInfoRemoveList().contains(new ApiInfo.ApiInfoKey(0, "/api/asdf", URLMethods.Method.POST)));
@@ -70,6 +75,125 @@ public class TestAktoPolicy extends MongoBasedTest {
         Assertions.assertTrue(aktoPolicy.getSampleDataRemoveList().contains(new ApiInfo.ApiInfoKey(0, "/api/asdf", URLMethods.Method.POST)));
         Assertions.assertTrue(aktoPolicy.getSampleDataRemoveList().contains(new ApiInfo.ApiInfoKey(1, "/api/toys", URLMethods.Method.PUT)));
         Assertions.assertTrue(aktoPolicy.getSampleDataRemoveList().contains(new ApiInfo.ApiInfoKey(0, "/api/toys/3", URLMethods.Method.PUT)));
+
+        HttpResponseParams hrp1 = new HttpResponseParams();
+        hrp1.requestParams = new HttpRequestParams();
+        hrp1.requestParams.setApiCollectionId(0);
+        hrp1.requestParams.url = "/api/books";
+        hrp1.requestParams.method = "GET";
+
+        HttpResponseParams hrp2 = new HttpResponseParams();
+        hrp2.requestParams = new HttpRequestParams();
+        hrp2.requestParams.setApiCollectionId(0);
+        hrp2.requestParams.url = "/api/toys/3";
+        hrp2.requestParams.method = "PUT";
+
+        HttpResponseParams hrp3 = new HttpResponseParams();
+        hrp3.requestParams = new HttpRequestParams();
+        hrp3.requestParams.setApiCollectionId(0);
+        hrp3.requestParams.url = "/api/new/3";
+        hrp3.requestParams.method = "GET";
+
+        HttpResponseParams hrp4 = new HttpResponseParams();
+        hrp4.requestParams = new HttpRequestParams();
+        hrp4.requestParams.setApiCollectionId(0);
+        hrp4.requestParams.url = "/api/new/books";
+        hrp4.requestParams.method = "GET";
+
+        HttpResponseParams hrp5 = new HttpResponseParams();
+        hrp5.requestParams = new HttpRequestParams();
+        hrp5.requestParams.setApiCollectionId(0);
+        hrp5.requestParams.url = "/api/tom/1";
+        hrp5.requestParams.method = "GET";
+
+        Assertions.assertNull(aktoPolicy.getApiInfoMap().get(AktoPolicy.TEMPLATE).get(ApiInfo.ApiInfoKey.generateFromHttpResponseParams(hrp3)));
+        Assertions.assertNull(aktoPolicy.getApiInfoMap().get(AktoPolicy.STRICT).get(ApiInfo.ApiInfoKey.generateFromHttpResponseParams(hrp4)));
+
+        // before starting ... changing lastSeen of all api info to test lastSeen
+        for (String k: aktoPolicy.getApiInfoMap().keySet()) {
+            for (ApiInfo.ApiInfoKey aik: aktoPolicy.getApiInfoMap().get(k).keySet()) {
+                ApiInfo a = aktoPolicy.getApiInfoMap().get(k).get(aik);
+                if (a != null) a.setLastSeen(0);
+            }
+        }
+
+        // this is called to prevent initial sync
+        aktoPolicy.processCalledAtLeastOnce = true;
+
+        aktoPolicy.process(hrp1);
+        aktoPolicy.process(hrp2);
+        aktoPolicy.process(hrp3);
+        aktoPolicy.process(hrp4);
+        aktoPolicy.process(hrp1);
+        aktoPolicy.process(hrp4);
+        aktoPolicy.process(hrp5);
+        aktoPolicy.process(hrp2);
+        aktoPolicy.process(hrp3);
+
+        HttpResponseParams hrp6 = new HttpResponseParams();
+        hrp6.requestParams = new HttpRequestParams();
+        hrp6.requestParams.setApiCollectionId(0);
+        hrp6.requestParams.url = "/api/books";
+        hrp6.requestParams.method = "POST";
+
+
+        // checking if maps are updated with the latest data
+        Assertions.assertNotNull(aktoPolicy.getApiInfoMap().get(AktoPolicy.STRICT).get(ApiInfo.ApiInfoKey.generateFromHttpResponseParams(hrp1)));
+        Assertions.assertNotNull(aktoPolicy.getApiInfoMap().get(AktoPolicy.TEMPLATE).get(new ApiInfo.ApiInfoKey(0,"api/toys/INTEGER", URLMethods.Method.PUT)));
+        Assertions.assertNotNull(aktoPolicy.getApiInfoMap().get(AktoPolicy.TEMPLATE).get(new ApiInfo.ApiInfoKey(0,"api/new/INTEGER", URLMethods.Method.GET)));
+        Assertions.assertNotNull(aktoPolicy.getApiInfoMap().get(AktoPolicy.STRICT).get(ApiInfo.ApiInfoKey.generateFromHttpResponseParams(hrp4)));
+        Assertions.assertNull(aktoPolicy.getApiInfoMap().get(AktoPolicy.STRICT).get(ApiInfo.ApiInfoKey.generateFromHttpResponseParams(hrp5)));
+        Assertions.assertNull(aktoPolicy.getApiInfoMap().get(AktoPolicy.TEMPLATE).get(ApiInfo.ApiInfoKey.generateFromHttpResponseParams(hrp5)));
+
+        // checking lastSeen updated
+        Assertions.assertTrue(aktoPolicy.getApiInfoMap().get(AktoPolicy.STRICT).get(ApiInfo.ApiInfoKey.generateFromHttpResponseParams(hrp1)).getLastSeen() > 0);
+        Assertions.assertTrue(aktoPolicy.getApiInfoMap().get(AktoPolicy.TEMPLATE).get(new ApiInfo.ApiInfoKey(0,"api/toys/INTEGER", URLMethods.Method.PUT)).getLastSeen() > 0);
+        Assertions.assertTrue(aktoPolicy.getApiInfoMap().get(AktoPolicy.TEMPLATE).get(new ApiInfo.ApiInfoKey(0,"api/new/INTEGER", URLMethods.Method.GET)).getLastSeen() > 0);
+        Assertions.assertTrue(aktoPolicy.getApiInfoMap().get(AktoPolicy.STRICT).get(ApiInfo.ApiInfoKey.generateFromHttpResponseParams(hrp4)).getLastSeen() > 0);
+        Assertions.assertEquals(0, aktoPolicy.getApiInfoMap().get(AktoPolicy.STRICT).get(ApiInfo.ApiInfoKey.generateFromHttpResponseParams(hrp6)).getLastSeen());
+
+        ApiCollectionsDao.instance.updateOne(
+                Filters.eq("_id", apiCollection.getId()),
+                Updates.pushEach("urls", Arrays.asList("/api/tom/1 GET", "/api/jerry/3 GET"))
+        );
+
+        aktoPolicy.syncWithDb(false);
+
+        Assertions.assertEquals(aktoPolicy.getApiInfoMap().get(AktoPolicy.STRICT).keySet().size(), 7);
+        Assertions.assertEquals(aktoPolicy.getApiInfoMap().get(AktoPolicy.TEMPLATE).keySet().size(), 2);
+
+        aktoPolicy.process(hrp1);
+        aktoPolicy.process(hrp5);
+
+        Assertions.assertNotNull(aktoPolicy.getApiInfoMap().get(AktoPolicy.STRICT).get(ApiInfo.ApiInfoKey.generateFromHttpResponseParams(hrp5)));
+
+        ApiCollectionsDao.instance.updateOne(
+                Filters.eq("_id", apiCollection.getId()),
+                Updates.pull("urls", "/api/tom/1 GET")
+        );
+
+        ApiCollectionsDao.instance.updateOne(
+                Filters.eq("_id", apiCollection.getId()),
+                Updates.push("urls", "api/tom/INTEGER GET")
+        );
+
+        aktoPolicy.syncWithDb(false);
+        Assertions.assertEquals(aktoPolicy.getApiInfoMap().get(AktoPolicy.STRICT).keySet().size(), 6);
+        Assertions.assertEquals(aktoPolicy.getApiInfoMap().get(AktoPolicy.TEMPLATE).keySet().size(), 3);
+
+        aktoPolicy.process(hrp1);
+        aktoPolicy.process(hrp5);
+
+        Assertions.assertNull(aktoPolicy.getApiInfoMap().get(AktoPolicy.STRICT).get(ApiInfo.ApiInfoKey.generateFromHttpResponseParams(hrp5)));
+        Assertions.assertTrue(aktoPolicy.getApiInfoMap().get(AktoPolicy.TEMPLATE).containsKey(new ApiInfo.ApiInfoKey(0, "api/tom/INTEGER", URLMethods.Method.GET)));
+
+        aktoPolicy.syncWithDb(false);
+        Assertions.assertEquals(aktoPolicy.getApiInfoMap().get(AktoPolicy.STRICT).keySet().size(), 6);
+        Assertions.assertEquals(aktoPolicy.getApiInfoMap().get(AktoPolicy.TEMPLATE).keySet().size(), 3);
+
+        ApiInfo tomIntegerDeleted = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(ApiInfo.ApiInfoKey.generateFromHttpResponseParams(hrp5)));
+        Assertions.assertNull(tomIntegerDeleted);
+
     }
 
     @Test
@@ -115,7 +239,9 @@ public class TestAktoPolicy extends MongoBasedTest {
         s.add(ApiInfo.AuthType.JWT);
         newApiInfo.getAllAuthTypesFound().add(s);
 
-        Map<ApiInfo.ApiInfoKey, ApiInfo> apiInfoMap = new HashMap<>();
+        Map<String, Map<ApiInfo.ApiInfoKey, ApiInfo>> apiInfoMap = new HashMap<>();
+        apiInfoMap.put(AktoPolicy.STRICT, new HashMap<>());
+        apiInfoMap.put(AktoPolicy.TEMPLATE, new HashMap<>());
 
         apiInfo1.getApiAccessTypes().add(ApiInfo.ApiAccessType.PUBLIC);
         apiInfo1.getViolations().put("first", Context.now());
@@ -130,14 +256,14 @@ public class TestAktoPolicy extends MongoBasedTest {
         bb2.add(ApiInfo.AuthType.JWT);
         apiInfo2.getAllAuthTypesFound().add(bb2);
 
-        apiInfoMap.put(apiInfo1.getId(),apiInfo1);
-        apiInfoMap.put(apiInfo2.getId(),apiInfo2);
-        apiInfoMap.put(newApiInfo.getId(), newApiInfo);
-        apiInfoMap.put(apiInfo3.getId(), null);
+        apiInfoMap.get(AktoPolicy.STRICT).put(apiInfo1.getId(),apiInfo1);
+        apiInfoMap.get(AktoPolicy.STRICT).put(apiInfo2.getId(),apiInfo2);
+        apiInfoMap.get(AktoPolicy.STRICT).put(newApiInfo.getId(), newApiInfo);
+        apiInfoMap.get(AktoPolicy.STRICT).put(apiInfo3.getId(), null);
 
         List<ApiInfo.ApiInfoKey> apiInfoRemoveList = Arrays.asList(deleteApiInfo1.getId(), deleteApiInfo2.getId());
 
-        AktoPolicy aktoPolicy = new AktoPolicy();
+        AktoPolicy aktoPolicy = new AktoPolicy(true);
         // did this to replace removeList and apiInfoMap set from initialising
         aktoPolicy.setApiInfoMap(apiInfoMap);
         aktoPolicy.setApiInfoRemoveList(apiInfoRemoveList);
@@ -187,11 +313,13 @@ public class TestAktoPolicy extends MongoBasedTest {
 
         ApiInfoDao.instance.insertOne(apiInfo1);
 
-        Map<ApiInfo.ApiInfoKey, ApiInfo> apiInfoMap = new HashMap<>();
-        apiInfoMap.put(apiInfo1.getId(), new ApiInfo(apiInfo1.getId()));
-        apiInfoMap.put(apiInfo2.getId(), apiInfo2);
+        Map<String,Map<ApiInfo.ApiInfoKey, ApiInfo>> apiInfoMap = new HashMap<>();
+        apiInfoMap.put(AktoPolicy.STRICT, new HashMap<>());
+        apiInfoMap.put(AktoPolicy.TEMPLATE, new HashMap<>());
+        apiInfoMap.get(AktoPolicy.STRICT).put(apiInfo1.getId(), new ApiInfo(apiInfo1.getId()));
+        apiInfoMap.get(AktoPolicy.STRICT).put(apiInfo2.getId(), apiInfo2);
 
-        AktoPolicy aktoPolicy = new AktoPolicy();
+        AktoPolicy aktoPolicy = new AktoPolicy(true);
         // did this to replace removeList and apiInfoMap set from initialising
         aktoPolicy.setApiInfoMap(apiInfoMap);
         aktoPolicy.setApiInfoRemoveList(new ArrayList<>());
@@ -234,14 +362,16 @@ public class TestAktoPolicy extends MongoBasedTest {
 
         FilterSampleData filterSampleDataNew = new FilterSampleData(new ApiInfo.ApiInfoKey(0,"/api/new", URLMethods.Method.GET), 0);
 
-        Map<ApiInfo.ApiInfoKey, ApiInfo> apiInfoMap = new HashMap<>();
-        apiInfoMap.put(filterSampleData1.getId().getApiInfoKey(),null);
-        apiInfoMap.put(filterSampleData2.getId().getApiInfoKey(),null);
-        apiInfoMap.put(filterSampleData3.getId().getApiInfoKey(),null);
-        apiInfoMap.put(filterSampleData4.getId().getApiInfoKey(),null);
-        apiInfoMap.put(filterSampleDataNew.getId().getApiInfoKey(),null);
+        Map<String,Map<ApiInfo.ApiInfoKey, ApiInfo>> apiInfoMap = new HashMap<>();
+        apiInfoMap.put(AktoPolicy.STRICT, new HashMap<>());
+        apiInfoMap.put(AktoPolicy.TEMPLATE, new HashMap<>());
+        apiInfoMap.get(AktoPolicy.STRICT).put(filterSampleData1.getId().getApiInfoKey(),null);
+        apiInfoMap.get(AktoPolicy.STRICT).put(filterSampleData2.getId().getApiInfoKey(),null);
+        apiInfoMap.get(AktoPolicy.STRICT).put(filterSampleData3.getId().getApiInfoKey(),null);
+        apiInfoMap.get(AktoPolicy.STRICT).put(filterSampleData4.getId().getApiInfoKey(),null);
+        apiInfoMap.get(AktoPolicy.STRICT).put(filterSampleDataNew.getId().getApiInfoKey(),null);
 
-        AktoPolicy aktoPolicy = new AktoPolicy();
+        AktoPolicy aktoPolicy = new AktoPolicy(true);
         aktoPolicy.setApiInfoMap(apiInfoMap);
 
         Map<ApiInfo.ApiInfoKey, Map<Integer, CappedList<String>> > m = new HashMap<>();

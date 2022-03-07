@@ -223,7 +223,7 @@ public class Main {
                     }
 
                     if (!aktoPolicyMap.containsKey(accountId)) {
-                        AktoPolicy aktoPolicy = new AktoPolicy();
+                        AktoPolicy aktoPolicy = new AktoPolicy(true);
                         aktoPolicyMap.put(accountId, aktoPolicy);
                     }
 
