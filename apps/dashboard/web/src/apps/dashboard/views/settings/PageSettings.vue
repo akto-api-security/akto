@@ -37,14 +37,6 @@ export default {
     methods: {
         getActiveAccount() {
             return this.$store.state.auth.activeAccount
-        },
-        sendInvitationEmail(){
-            let spec={
-                inviteeName: "Ankush",
-                inviteeEmail: "ankush@akto.io",
-                websiteHostName: window.location.origin
-            }
-            api.inviteUsers(spec)
         }
     }
 }

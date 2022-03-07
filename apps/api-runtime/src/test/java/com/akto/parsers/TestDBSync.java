@@ -4,16 +4,16 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import com.akto.MongoBasedTest;
+import com.akto.dao.RuntimeFilterDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.UsersDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.User;
 import com.akto.dto.messaging.Message.Mode;
+import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.URLTemplate;
@@ -24,7 +24,9 @@ import com.akto.runtime.URLAggregator;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
+import org.bson.conversions.Bson;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 
 public class TestDBSync extends MongoBasedTest {
 
@@ -188,6 +190,50 @@ public class TestDBSync extends MongoBasedTest {
         assertEquals(1, sync.getDelta(0).getTemplateURLToMethods().size());
 
 
-    }    
+    }
+
+    @Test
+    public void testInitialiseFilters() throws InterruptedException {
+        Context.accountId.set(10000);
+        int totalFilters = 2;
+        RuntimeFilterDao.instance.initialiseFilters();
+        List<RuntimeFilter> runtimeFilters = RuntimeFilterDao.instance.findAll(new BasicDBObject());
+        assertEquals(runtimeFilters.size(), totalFilters);
+
+        Bson filter = Filters.eq(RuntimeFilter.NAME, RuntimeFilter.OPEN_ENDPOINTS_FILTER);
+        RuntimeFilterDao.instance.getMCollection().deleteOne(filter);
+        runtimeFilters = RuntimeFilterDao.instance.findAll(filter);
+        assertEquals(runtimeFilters.size(), 0);
+
+    }
+
+    @Test
+    public void testFilterHttpResponseParamsEmpty() {
+        List<HttpResponseParams> ss = HttpCallParser.filterHttpResponseParams(new ArrayList<>());
+        assertEquals(ss.size(),0);
+    }
+
+    @Test
+    public void testFilterHttpResponseParams() {
+        HttpResponseParams h1 = new HttpResponseParams();
+        h1.statusCode = 300;
+        HttpResponseParams h2 = new HttpResponseParams();
+        h2.statusCode = 499;
+        HttpResponseParams h3 = new HttpResponseParams();
+        h3.statusCode = 200;
+        HttpResponseParams h4 = new HttpResponseParams();
+        h4.statusCode = 199;
+        HttpResponseParams h5 = new HttpResponseParams();
+        h5.statusCode = 233;
+        HttpResponseParams h6 = new HttpResponseParams();
+        h6.statusCode = 299;
+
+        List<HttpResponseParams> httpResponseParamsList = Arrays.asList(h1,h2,h3,h4,h5,h6);
+
+        List<HttpResponseParams> filterHttpResponseParamsList = HttpCallParser.filterHttpResponseParams(httpResponseParamsList);
+
+        Assertions.assertEquals(filterHttpResponseParamsList.size(), 3);
+        Assertions.assertTrue(filterHttpResponseParamsList.containsAll(Arrays.asList(h3,h5,h6)));
+    }
 
 }

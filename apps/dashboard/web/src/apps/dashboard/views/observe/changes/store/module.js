@@ -14,7 +14,9 @@ var state = {
     loading: false,
     fetchTs: 0,
     apiCollection: [],
-    sensitiveParams: []
+    sensitiveParams: [],
+    apiInfoList: [],
+    lastFetched: 0
 }
 
 const changes = {
@@ -29,7 +31,6 @@ const changes = {
         },
         SAVE_API_COLLECTION (state, info) {
             state.apiCollection = info.data.endpoints.filter(x => x.subType !== "NULL")
-            state.apiCollection.forEach(e => e.url = func.parameterizeUrl(e.url));
         },
         SAVE_SENSITIVE (state, fields) {
             state.sensitiveParams = fields
@@ -53,6 +54,7 @@ const changes = {
         loadRecentParameters({commit}, options) {
             commit('EMPTY_STATE')
             state.loading = true
+            state.lastFetched = new Date() / 1000
             return api.loadRecentParameters().then((resp) => {
                 commit('SAVE_API_COLLECTION', {data: resp.data}, options)
                 api.listAllSensitiveFields().then(allSensitiveFields => {
@@ -61,6 +63,11 @@ const changes = {
                 state.loading = false
             }).catch(() => {
                 state.loading = false
+            })
+        },
+        fetchApiInfoListForRecentEndpoints({}) {
+            api.fetchApiInfoListForRecentEndpoints().then((resp) => {
+              state.apiInfoList = resp.apiInfoList
             })
         }
     },

@@ -30,7 +30,7 @@
                             <v-btn 
                                 icon 
                                 color="#47466A" 
-                                @click="refreshPage"
+                                @click="refreshPage(true)"
                                 v-on="on"
                                 v-bind="attrs"
                             >
@@ -172,7 +172,7 @@ export default {
                 },
                 {
                     text: 'Endpoint',
-                    value: 'endpoint'
+                    value: 'parameterisedEndpoint'
                 },
                 {
                     text: 'Collection',
@@ -185,6 +185,21 @@ export default {
                 {
                     text: 'Sensitive Params',
                     value: 'sensitive'
+                },
+                {
+                  text: 'Access Type',
+                  value: 'access_type',
+                  sortKey: 'access_type'
+                },
+                {
+                  text: 'Auth Type',
+                  value: 'auth_type',
+                  sortKey: 'auth_type'
+                },
+                {
+                  text: 'Last Seen',
+                  value: 'last_seen',
+                  sortKey: 'last_seen'
                 },
                 {
                     text: constants.DISCOVERED,
@@ -241,7 +256,7 @@ export default {
                     text: `${items.length}` + ` items ${sensitive ? '':'un'}marked sensitive`,
                     color: 'green'
                 })
-                this.refreshPage()
+                this.refreshPage(true)
             }).catch(() => {
                 window._AKTO.$emit('SHOW_SNACKBAR', {
                     show: true,
@@ -286,8 +301,11 @@ export default {
 
             this.$router.push(routeObj)
         },
-        refreshPage() {
-            this.$store.dispatch('changes/loadRecentParameters')
+        refreshPage(hardRefresh) {
+            if (hardRefresh || ((new Date() / 1000) - this.lastFetched > 60*5)) {
+                this.$store.dispatch('changes/loadRecentParameters')
+                this.$store.dispatch('changes/fetchApiInfoListForRecentEndpoints')
+            }
         },
         changesTrend (data) {
             let todayDate = func.todayDate()
@@ -308,7 +326,7 @@ export default {
         }
     },
     computed: {
-        ...mapState('changes', ['apiCollection']),
+        ...mapState('changes', ['apiCollection', 'apiInfoList', 'lastFetched']),
         mapCollectionIdToName() {
             return this.$store.state.collections.apiCollections.reduce((m, e) => {
                 m[e.id] = e.name
@@ -317,7 +335,7 @@ export default {
         },
         newEndpoints() {
             let now = func.timeNow()
-            return func.groupByEndpoint(this.apiCollection, this.mapCollectionIdToName).filter(x => x.detectedTs > now - func.recencyPeriod)
+            return func.groupByEndpoint(this.apiCollection,this.apiInfoList, this.mapCollectionIdToName).filter(x => x.detectedTs > now - func.recencyPeriod)
         },
         newEndpointsTrend() {
             return this.changesTrend(this.newEndpoints)
@@ -331,7 +349,7 @@ export default {
         },
         newSensitiveEndpoints() {
             let now = func.timeNow()
-            return func.groupByEndpoint(this.apiCollection, this.mapCollectionIdToName).filter(x => x.detectedTs > now - func.recencyPeriod && x.sensitive > 0)
+            return func.groupByEndpoint(this.apiCollection,this.apiInfoList, this.mapCollectionIdToName).filter(x => x.detectedTs > now - func.recencyPeriod && x.sensitive > 0)
         },
         newSensitiveParameters() {
             let now = func.timeNow()
@@ -339,7 +357,7 @@ export default {
         },
     },
     mounted() {
-        this.refreshPage()
+        this.refreshPage(false)
     }    
 
 }

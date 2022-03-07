@@ -136,5 +136,44 @@ export default {
         }).then((resp) => {
             return resp
         })
+    },
+
+    fetchApiInfoList(apiCollectionId) {
+        return request({
+            url: '/api/fetchApiInfoList',
+            method: 'post',
+            data: {
+                apiCollectionId
+            }
+        }).then((resp) => {
+            return resp
+        })
+    },
+    fetchFilters() {
+        return request({
+            url: '/api/fetchFilters',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    convertSampleDataToCurl(sampleData) {
+        return request({
+            url: '/api/convertSampleDataToCurl',
+            method: 'post',
+            data: {sampleData}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    fetchApiInfoListForRecentEndpoints() {
+        return request({
+            url: '/api/fetchApiInfoListForRecentEndpoints',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
     }
 }

@@ -1,10 +1,10 @@
 <template>
-  <div style="min-height:200px; padding-top:20px">
+  <div style="min-height:200px; padding-top:20px; margin-bottom:30px">
     <div class="d-flex" style="padding-bottom:10px">
       <v-avatar size="40px" style="margin-right: 15px">
-        <img src="@/assets/burpsuite.svg"/>
+        <img :src="require(`@/assets/${avatar_image}`)" />
       </v-avatar>
-      <h2 style="color: #47466A; font-size: 16px; font-weight: 500" class="fd-column jc-sa">Burp</h2>
+      <h2 style="color: #47466A; font-size: 16px; font-weight: 500" class="fd-column jc-sa">{{this.title}}</h2>
     </div>
     <div style="padding-top: 20px;">
       <div class="d-flex" v-for="item in burpTokensForTable" :key="item.id" style="padding-bottom: 30px">
@@ -43,18 +43,22 @@
 </template>
 
 <script>
-import api from "../../api.js"
 import ActionsTray from "@/apps/dashboard/shared/components/ActionsTray.vue"
 import func from "@/util/func";
+import obj from '@/util/obj'
 export default {
-  name: "Burp",
+  name: "ApiToken",
+  props: {
+    title: obj.strR,
+    burp_tokens: obj.arrR,
+    avatar_image: obj.str,
+  },
   components: {
     ActionsTray
   },
   data() {
     return {
       openPasswordMap: {},
-      burp_tokens: [],
       actions: [
         {
           isValid: item => true,
@@ -70,28 +74,17 @@ export default {
   },
   methods: {
     deleteBurpToken(item) {
-      return api.deleteApiToken(item.id).then((resp) => {
-        if (resp.apiTokenDeleted) {
-          this.burp_tokens = this.burp_tokens.filter(function(el) { return el.id != item.id; })
-        } else {
-        }
-        return resp
+      // did this because actionsTray needs async func
+      return new Promise((resolve, reject) => {
+        this.$emit("deleteToken", item.id)
       })
     },
-    addBurpToken(item){
-      return api.addBurpToken().then((resp) => {
-        this.burp_tokens.push(...resp.apiTokenList)
-      })
+    addBurpToken(){
+      this.$emit("generateToken")
     },
     eyeClicked(item) {
-      console.log(item.id)
       this.openPasswordMap[item.id] = !this.openPasswordMap[item.id]
     },
-  },
-  mounted() {
-    api.fetchBurpTokens().then((resp) => {
-      this.burp_tokens = resp.apiTokenList
-    })
   },
   computed: {
     burpTokensForTable() {

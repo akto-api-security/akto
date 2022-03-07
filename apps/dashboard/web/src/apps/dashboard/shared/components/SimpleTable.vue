@@ -20,7 +20,10 @@
             hide-default-header
         >
             <template v-slot:top="{ pagination, options, updateOptions }" v-if="items && items.length > 0">
-                <div class="d-flex jc-sb"> 
+                <div class="d-flex jc-sb">
+                    <div v-if="showName" class="table-name">
+                      {{name}}
+                    </div>
                     <div>
                         <slot name="massActions"/>
                     </div>
@@ -40,12 +43,12 @@
                                 </v-tooltip>
                                 <v-tooltip bottom>
                                     <template v-slot:activator="{on, attrs}">
-                                        <v-btn 
+                                        <v-btn
                                             v-on="on"
                                             v-bind="attrs"
-                                            icon 
-                                            color="#47466A" 
-                                            @click="itemsPerPage = [-1]" 
+                                            icon
+                                            color="#47466A"
+                                            @click="itemsPerPage = [-1]"
                                             v-if="enablePagination && itemsPerPage[0] != -1"
                                         >
                                             <v-icon>$fas_angle-double-down</v-icon>
@@ -53,15 +56,15 @@
                                     </template>
                                     Show all
                                 </v-tooltip>
-                                        <v-btn 
-                                            icon 
-                                            color="#47466A" 
-                                            @click="itemsPerPage = [rowsPerPage]" 
+                                        <v-btn
+                                            icon
+                                            color="#47466A"
+                                            @click="itemsPerPage = [rowsPerPage]"
                                             v-if="enablePagination && itemsPerPage[0] == -1"
                                         >
                                             <v-icon>$fas_angle-double-up</v-icon>
                                         </v-btn>
-                            </div>            
+                            </div>
                             <slot name="add-new-row-btn"/>
                         </div>
                     </div>
@@ -172,7 +175,8 @@ export default {
         sortDescDefault: obj.boolN,
         actions: obj.arrN,
         allowNewRow: obj.boolN,
-        hideDownloadCSVIcon: obj.boolN
+        hideDownloadCSVIcon: obj.boolN,
+        showName: obj.boolN
     },
     data () {
         let rowsPerPage = 50
@@ -340,7 +344,16 @@ export default {
         color: var(--v-themeColor-base)
         display: flex
 
-    .table-row-actions    
+    .table-name
+        justify-content: end
+        font-size: 18px
+        margin-top: 16px
+        align-items: center
+        color: var(--v-themeColor-base)
+        font-weight: bold
+        display: flex
+
+    .table-row-actions
         position: absolute
         right: 30px
         padding: 8px 16px !important

@@ -67,7 +67,11 @@ public class PostmanAction extends UserAction {
     private int apiCollectionId;
     public String createPostmanApi() throws Exception { // TODO: remove exception
         PostmanCredential postmanCredential = fetchPostmanCredential();
-        if (postmanCredential == null) return ERROR.toUpperCase();
+        if (postmanCredential == null) {
+            addActionError("Please add postman credentials in settings");
+            return ERROR.toUpperCase();
+        }
+
 
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq("_id", apiCollectionId));
         String apiName = "AKTO " + apiCollection.getName();
@@ -100,7 +104,11 @@ public class PostmanAction extends UserAction {
     public String savePostmanCollection() {
         int userId = getSUser().getId();
         PostmanCredential postmanCredential = fetchPostmanCredential();
-        if (postmanCredential == null) return ERROR.toUpperCase();
+        if (postmanCredential == null) {
+            addActionError("Please add postman credentials in settings");
+            return ERROR.toUpperCase();
+        }
+
 
         Main main = new Main(postmanCredential.getApiKey());
         JsonNode postmanCollection = main.fetchPostmanCollectionString(postmanCollectionId);
@@ -176,7 +184,10 @@ public class PostmanAction extends UserAction {
     List<BasicDBObject> collections = new ArrayList<>();
     public String fetchCollections() {
         PostmanCredential postmanCredential = fetchPostmanCredential();
-        if (postmanCredential == null) return ERROR.toUpperCase();
+        if (postmanCredential == null) {
+            addActionError("Please add postman credentials in settings");
+            return ERROR.toUpperCase();
+        }
 
         Main main = new Main(postmanCredential.getApiKey());
         JsonNode postmanCollectionsNode = main.fetchApiCollections();

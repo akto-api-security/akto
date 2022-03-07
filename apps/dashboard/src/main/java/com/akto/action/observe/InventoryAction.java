@@ -43,9 +43,12 @@ public class InventoryAction extends UserAction {
         return list;
     }
 
+    public final static int deltaPeriodValue = 62 * 24 * 60 * 60;
+
+    // if this function is changed then make sure to update fetchApiInfoListForRecentEndpoints method too
     public String loadRecentParameters() {
         response = new BasicDBObject();
-        List<SingleTypeInfo> list = fetchRecentParams(62 * 24 * 60 * 60);
+        List<SingleTypeInfo> list = fetchRecentParams(deltaPeriodValue);
         response.put("data", new BasicDBObject("endpoints", list));
         return Action.SUCCESS.toUpperCase();
     }

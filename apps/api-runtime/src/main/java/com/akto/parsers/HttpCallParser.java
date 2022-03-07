@@ -130,20 +130,33 @@ public class HttpCallParser {
     }
 
     public void syncFunction(List<HttpResponseParams> responseParams)  {
-
-        boolean isHarOrPcap = aggregate(responseParams);
+        // USE ONLY filteredResponseParams and not responseParams
+        List<HttpResponseParams> filteredResponseParams = filterHttpResponseParams(responseParams);
+        boolean isHarOrPcap = aggregate(filteredResponseParams);
 
         for (int apiCollectionId: aggregatorMap.keySet()) {
             URLAggregator aggregator = aggregatorMap.get(apiCollectionId);
             apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
         }
 
-        this.sync_count += responseParams.size();
+        this.sync_count += filteredResponseParams.size();
         if (this.sync_count >= sync_threshold_count || (Context.now() - this.last_synced) > this.sync_threshold_time || isHarOrPcap) {
             apiCatalogSync.syncWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
         }
+    }
+
+    public static List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList) {
+        List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
+        for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
+            boolean cond = httpResponseParam.statusCode >= 200 && httpResponseParam.statusCode < 300;
+            if (cond) {
+                filteredResponseParams.add(httpResponseParam);
+            }
+        }
+
+        return filteredResponseParams;
     }
 
     Map<Integer, URLAggregator> aggregatorMap = new HashMap<>();

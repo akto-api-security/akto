@@ -1,13 +1,21 @@
 package com.akto.action;
 
+import com.akto.DaoInit;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.RuntimeFilterDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.har.HAR;
 import com.akto.kafka.Kafka;
 import com.akto.listener.KafkaListener;
 import com.akto.parsers.HttpCallParser;
+import com.akto.runtime.policies.AktoPolicy;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.opensymphony.xwork2.Action;
 import com.sun.jna.*;
 
@@ -26,6 +34,14 @@ public class HarAction extends UserAction {
 
     private boolean skipKafka;
     private byte[] tcpContent;
+
+    public static void main1(String[] args) {
+        DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
+        Context.accountId.set(1_000_000);
+        RuntimeFilterDao.instance.initialiseFilters();
+        System.out.println(RuntimeFilterDao.instance.findAll(new BasicDBObject()));
+        ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), new HashSet<>()));
+    }
 
     @Override
     public String execute() throws IOException {
@@ -60,7 +76,7 @@ public class HarAction extends UserAction {
                         KafkaListener.kafka.send(message,topic);
                     } else {
                         HttpResponseParams responseParams =  HttpCallParser.parseKafkaMessage(message);
-                        responseParams.getRequestParams().setApiCollectionId(1234);
+                        responseParams.getRequestParams().setApiCollectionId(apiCollectionId);
                         responses.add(responseParams);
                     }
                 } else {
@@ -68,8 +84,11 @@ public class HarAction extends UserAction {
                 }
             }
             
-            if(skipKafka)
+            if(skipKafka) {
                 parser.syncFunction(responses);
+                AktoPolicy aktoPolicy = new AktoPolicy(true); // keep inside if condition statement because db call when initialised
+                aktoPolicy.main(responses);
+            }
         } catch (Exception e) {
             e.printStackTrace();
             return SUCCESS.toUpperCase();

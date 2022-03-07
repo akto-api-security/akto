@@ -8,17 +8,21 @@ import java.util.concurrent.TimeUnit;
 
 import com.akto.DaoInit;
 import com.akto.dao.APIConfigsDao;
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.RuntimeFilterDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.APIConfig;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.KafkaHealthMetric;
 import com.akto.parsers.HttpCallParser;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.HttpRequestParams;
+import com.akto.runtime.policies.AktoPolicy;
 import com.google.gson.Gson;
+import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
@@ -34,8 +38,9 @@ import org.slf4j.LoggerFactory;
 
 public class Main {
     private Consumer<String, String> consumer;
-    private static final String GROUP_NAME = "group_name";
-    private static final String VXLAN_ID = "vxlanId";
+    public static final String GROUP_NAME = "group_name";
+    public static final String VXLAN_ID = "vxlanId";
+    public static final String VPC_CIDR = "vpc_cidr";
     private static final Logger logger = LoggerFactory.getLogger(HttpCallParser.class);
 
     private static int debugPrintCounter = 500;
@@ -46,13 +51,17 @@ public class Main {
         }
     }   
 
-    private static boolean tryForCollectionName(String message) {
+    public static boolean tryForCollectionName(String message) {
         boolean ret = false;
         try {
             Gson gson = new Gson();
 
             Map<String, Object> json = gson.fromJson(message, Map.class);
-            if (json.size() == 2 && json.containsKey(GROUP_NAME) && json.containsKey(VXLAN_ID)) {
+
+            logger.info("Json size: " + json.size());
+            boolean withoutCidrCond = json.size() == 2 && json.containsKey(GROUP_NAME) && json.containsKey(VXLAN_ID);
+            boolean withCidrCond = json.size() == 3 && json.containsKey(GROUP_NAME) && json.containsKey(VXLAN_ID) && json.containsKey(VPC_CIDR);
+            if (withCidrCond || withoutCidrCond) {
                 ret = true;
                 String groupName = (String) (json.get(GROUP_NAME));
                 String vxlanIdStr = ((Double) json.get(VXLAN_ID)).intValue() + "";
@@ -65,6 +74,15 @@ public class Main {
                 } else if (currCollection.getName() == null || currCollection.getName().length() == 0) {
                     ApiCollectionsDao.instance.getMCollection().updateOne(findQ, Updates.set("name", groupName));
                 }
+
+                if (json.size() == 3) {
+                    Bson accFBson = Filters.eq("_id", Context.accountId.get());
+                    List<String> cidrList = (List<String>) json.get(VPC_CIDR);
+                    logger.info("cidrList: " + cidrList);
+                    AccountSettingsDao.instance.getMCollection().updateOne(
+                        accFBson, Updates.addEachToSet("privateCidrList", cidrList), new UpdateOptions().upsert(true)
+                    );
+                }
             }
         } catch (Exception e) {
             logger.error("error in try collection", e);
@@ -76,6 +94,10 @@ public class Main {
 
     public static void createIndices() {
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
+    }
+
+    public static void insertRuntimeFilters() {
+        RuntimeFilterDao.instance.initialiseFilters();
     }
 
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
@@ -95,6 +117,7 @@ public class Main {
         SingleTypeInfoDao.instance.getMCollection().updateMany(Filters.exists("apiCollectionId", false), Updates.set("apiCollectionId", 0));
 
         createIndices();
+        insertRuntimeFilters();
 
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("_id", 0);
         if (apiCollection == null) {
@@ -130,6 +153,7 @@ public class Main {
 
         Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
         Map<String, Flow> flowMap = new HashMap<>();
+        Map<String, AktoPolicy> aktoPolicyMap = new HashMap<>();
 
         // sync infra metrics thread
         ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
@@ -198,15 +222,22 @@ public class Main {
                         flowMap.put(accountId, flow);
                     }
 
+                    if (!aktoPolicyMap.containsKey(accountId)) {
+                        AktoPolicy aktoPolicy = new AktoPolicy(true);
+                        aktoPolicyMap.put(accountId, aktoPolicy);
+                    }
+
                     HttpCallParser parser = httpCallParserMap.get(accountId);
                     Flow flow = flowMap.get(accountId);
+                    AktoPolicy aktoPolicy = aktoPolicyMap.get(accountId);
 
                     try {
                         List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
                         parser.syncFunction(accWiseResponse);
                         flow.init(accWiseResponse);
+                        aktoPolicy.main(accWiseResponse);
                     } catch (Exception e) {
-                        // TODO:
+                        logger.error(e.toString());
                     }
                 }
 
