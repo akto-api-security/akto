@@ -35,11 +35,12 @@ public class HarAction extends UserAction {
     private boolean skipKafka;
     private byte[] tcpContent;
 
-    public static void main(String[] args) {
+    public static void main1(String[] args) {
         DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
         Context.accountId.set(1_000_000);
         RuntimeFilterDao.instance.initialiseFilters();
         System.out.println(RuntimeFilterDao.instance.findAll(new BasicDBObject()));
+        ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), new HashSet<>()));
     }
 
     @Override

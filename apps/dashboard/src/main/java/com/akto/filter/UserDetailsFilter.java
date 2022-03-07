@@ -26,6 +26,8 @@ import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
+import java.util.ArrayList;
+import java.util.List;
 
 import static com.akto.action.LoginAction.REFRESH_TOKEN_COOKIE_NAME;
 
@@ -70,6 +72,10 @@ public class UserDetailsFilter implements Filter {
         // if api key present then check if valid api key or not and generate access token
         // else find access token from request header
         if (apiKey != null) {
+            if (endPointBlockedForApiToken(requestURI)) {
+                httpServletResponse.sendError(403);
+                return;
+            }
             // check if valid key for path
             ApiToken apiToken = ApiTokensDao.instance.findByKey(apiKey);
             if (apiToken == null) {
@@ -199,5 +205,22 @@ public class UserDetailsFilter implements Filter {
             }
         }
         filterChain.doFilter(servletRequest, servletResponse);
+    }
+
+    public boolean endPointBlockedForApiToken(String endpoint) {
+        if (endpoint.startsWith("/dashboard") || endpoint.startsWith("/setup")) {
+            return true;
+        }
+
+        List<String> blockedList = new ArrayList<>();
+        blockedList.add("/api/inviteUsers");
+        blockedList.add("/api/logout");
+        blockedList.add("/api/getPostmanCredential");
+        blockedList.add("/api/addBurpToken");
+        blockedList.add("/api/addExternalApiToken");
+        blockedList.add("/api/deleteApiToken");
+        blockedList.add("/api/fetchApiTokens");
+
+        return blockedList.contains(endpoint);
     }
 }
