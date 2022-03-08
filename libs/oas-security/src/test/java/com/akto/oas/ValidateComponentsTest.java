@@ -14,7 +14,7 @@ import com.akto.oas.PathComponent;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class ValidateComponentsTest {
+public class ValidateComponentsTest {
     @Test
     public void validateNullComponents() {
         List<Issue> issues = OpenAPIValidator.validateComponents(null,null,new ArrayList<>());

@@ -14,7 +14,7 @@ import com.akto.oas.SchemaValidator;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class SchemaValidatorTest {
+public class SchemaValidatorTest {
 
     @Test
     public void testNullSchema() {

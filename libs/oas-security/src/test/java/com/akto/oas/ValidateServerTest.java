@@ -15,7 +15,7 @@ import com.akto.oas.PathComponent;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class ValidateServerTest {
+public class ValidateServerTest {
     @Test
     public void testNullGlobalServers() {
         List<String> path = new ArrayList<>();

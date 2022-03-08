@@ -53,7 +53,8 @@ public class ValidateSecurityTest {
         Assertions.assertEquals(issues.get(0).getPath(), Arrays.asList(PathComponent.SECURITY, "0", "first"));
     }
 
-    @Test void validOauthSecurity() {
+    @Test 
+    public void validOauthSecurity() {
         List<String> path = new ArrayList<>();
         SecurityRequirement securityRequirement = new SecurityRequirement();
         securityRequirement.put("first", Collections.singletonList("scope1"));
