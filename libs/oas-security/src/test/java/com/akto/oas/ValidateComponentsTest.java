@@ -4,7 +4,7 @@ import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 import java.util.*;
 
@@ -14,7 +14,7 @@ import com.akto.oas.PathComponent;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class ValidateComponentsTest {
+public class ValidateComponentsTest {
     @Test
     public void validateNullComponents() {
         List<Issue> issues = OpenAPIValidator.validateComponents(null,null,new ArrayList<>());

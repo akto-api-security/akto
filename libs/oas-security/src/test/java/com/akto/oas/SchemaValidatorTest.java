@@ -2,7 +2,7 @@ package com.akto.oas;
 
 import io.swagger.v3.oas.models.media.*;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -14,7 +14,7 @@ import com.akto.oas.SchemaValidator;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class SchemaValidatorTest {
+public class SchemaValidatorTest {
 
     @Test
     public void testNullSchema() {

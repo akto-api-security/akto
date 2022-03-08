@@ -1,7 +1,7 @@
 package com.akto.runtime;
 
 import com.akto.dto.HttpRequestParams;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 import java.util.*;
 

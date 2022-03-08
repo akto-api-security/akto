@@ -5,7 +5,7 @@ import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.type.URLMethods.Method;
 
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 public class SetFieldPolicyTest {
 
