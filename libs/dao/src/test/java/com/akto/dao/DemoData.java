@@ -150,7 +150,6 @@ public class DemoData extends DaoConnect {
     }
 
 
-    @Test
     public void fixData() throws IOException {
 
         ApiCollection defaultCollection = ApiCollectionsDao.instance.findOne(defaultCollKey);
