@@ -2,7 +2,7 @@ package com.akto.oas;
 
 import io.swagger.v3.oas.models.media.*;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 import java.math.BigDecimal;
 import java.util.*;

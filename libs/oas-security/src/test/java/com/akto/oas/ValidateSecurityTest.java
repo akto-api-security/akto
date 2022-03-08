@@ -1,7 +1,7 @@
 package com.akto.oas;
 
 import io.swagger.v3.oas.models.security.*;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 
 import java.util.*;

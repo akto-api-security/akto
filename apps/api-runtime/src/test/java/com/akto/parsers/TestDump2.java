@@ -26,7 +26,7 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 public class TestDump2 {
 
