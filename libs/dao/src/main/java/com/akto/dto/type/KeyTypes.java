@@ -215,7 +215,7 @@ public class KeyTypes {
     }
 
     public static boolean isCreditCard(String s) {
-        if (s.length() < 12 || s.length() > 18) return false;
+        if (s.length() < 12 || s.length() > 23) return false;
         if (s.toLowerCase() != s.toUpperCase()) return false; // only numbers
         return creditCardValidator.isValid(s);
     }
