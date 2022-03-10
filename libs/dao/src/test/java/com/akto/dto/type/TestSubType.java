@@ -55,6 +55,8 @@ public class TestSubType {
         assertFalse(negativeIp4);
         boolean edgeCase = isIP("172.01.1.2");
         assertFalse(edgeCase);
+        boolean ipv4_mapped_ipv6= isIP("0000:0000:0000:0000:0000:ffff:192.168.100.228");
+        assertTrue(ipv4_mapped_ipv6);
     }
 
 }

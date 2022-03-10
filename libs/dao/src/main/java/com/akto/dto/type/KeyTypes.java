@@ -170,7 +170,22 @@ public class KeyTypes {
     }
 
     public static boolean isPhoneNumber(String mobileNumber) {
+        boolean lengthCondition = mobileNumber.length() < 8 || mobileNumber.length() > 16;
+        boolean alphabetsCondition = mobileNumber.toLowerCase() != mobileNumber.toUpperCase(); // contains alphabets
+
+        if (lengthCondition || alphabetsCondition) {
+            return false;
+        }
+
         PhoneNumberUtil phoneNumberUtil = PhoneNumberUtil.getInstance();
+
+        // isPossibleNumber computes faster than parse but less accuracy
+        boolean check = phoneNumberUtil.isPossibleNumber(mobileNumber,
+                    Phonenumber.PhoneNumber.CountryCodeSource.UNSPECIFIED.name());
+        if (!check) {
+            return false;
+        }
+
         try {
             Phonenumber.PhoneNumber phone = phoneNumberUtil.parse(mobileNumber,
                     Phonenumber.PhoneNumber.CountryCodeSource.UNSPECIFIED.name());
@@ -200,10 +215,16 @@ public class KeyTypes {
     }
 
     public static boolean isCreditCard(String s) {
+        if (s.length() < 12 || s.length() > 23) return false;
+        if (s.toLowerCase() != s.toUpperCase()) return false; // only numbers
         return creditCardValidator.isValid(s);
     }
 
     public static boolean isIP(String s) {
+        // for edge cases look at test cases of this function
+        boolean canBeIpv4 = (s.length() > 6) || (s.length() <= 15) && (s.split(".").length == 4);
+        boolean canBeIpv6 = (s.length() < 45 && s.split(":").length > 6);
+        if (!(canBeIpv4 || canBeIpv6)) return false;
         return ipAddressValidator.isValid(s);
     }
 
