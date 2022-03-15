@@ -2,7 +2,7 @@ package com.akto.oas;
 import io.swagger.v3.oas.models.servers.Server;
 import io.swagger.v3.oas.models.servers.ServerVariable;
 import io.swagger.v3.oas.models.servers.ServerVariables;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -15,7 +15,7 @@ import com.akto.oas.PathComponent;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class ValidateServerTest {
+public class ValidateServerTest {
     @Test
     public void testNullGlobalServers() {
         List<String> path = new ArrayList<>();
