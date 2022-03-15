@@ -342,7 +342,16 @@ export default {
         },
         newParameters() {
             let now = func.timeNow()
-            return this.apiCollection.filter(x => x.timestamp > now - func.recencyPeriod).map(this.prepareItemForTable)
+            let listParams = this.apiCollection.filter(x => x.timestamp > now - func.recencyPeriod).map(this.prepareItemForTable)
+            listParams.sort((a, b) => {
+                if (a.detectedTs > b.detectedTs + 3600) {
+                    return -1
+                } else if (a.detectedTs < b.detectedTs - 3600) {
+                    return 1
+                } else {
+                    return func.isSubTypeSensitive(a) > func.isSubTypeSensitive(b) ? -1 : 1
+                }
+            })
         },
         newParamsTrend() {
             return this.changesTrend(this.newParameters)

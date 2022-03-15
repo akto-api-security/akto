@@ -23,7 +23,7 @@
           />
         </div>
       </template>
-      Upload traffic (.har, .pcap)
+      Upload traffic (.har)
   </v-tooltip>
 </template>
 
