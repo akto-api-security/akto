@@ -29,7 +29,7 @@
             <count-box title="All Endpoints" :count="allEndpoints.length" colorTitle="Total"/>
         </div>    
 
-        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Open', 'Undocumented', 'Deprecated', 'Documented']">
+        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Unauthenticated', 'Undocumented', 'Deprecated', 'Documented']">
             <template slot="actions-tray">
             </template>
             <template slot="All">
@@ -94,12 +94,12 @@
                     :errors="{}"
                 />
             </template>
-            <template slot="Open">
+            <template slot="Unauthenticated">
                 <simple-table 
                     :headers=tableHeaders 
                     :items=openEndpoints
                     @rowClicked=rowClicked 
-                    name="Open" 
+                    name="Unauthenticated" 
                     sortKeyDefault="sensitive" 
                     :sortDescDefault="true"
                 >

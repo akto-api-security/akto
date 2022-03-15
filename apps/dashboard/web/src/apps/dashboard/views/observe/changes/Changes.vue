@@ -343,13 +343,13 @@ export default {
         newParameters() {
             let now = func.timeNow()
             let listParams = this.apiCollection.filter(x => x.timestamp > now - func.recencyPeriod).map(this.prepareItemForTable)
-            listParams.sort((a, b) => {
+            return listParams.sort((a, b) => {
                 if (a.detectedTs > b.detectedTs + 3600) {
                     return -1
                 } else if (a.detectedTs < b.detectedTs - 3600) {
                     return 1
                 } else {
-                    return func.isSubTypeSensitive(a) > func.isSubTypeSensitive(b) ? -1 : 1
+                    return func.isSubTypeSensitive(a.x) > func.isSubTypeSensitive(b.x) ? -1 : 1
                 }
             })
         },
