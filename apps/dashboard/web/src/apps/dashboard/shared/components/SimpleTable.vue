@@ -65,7 +65,7 @@
                                             <v-icon>$fas_angle-double-up</v-icon>
                                         </v-btn>
                             </div>
-                            <slot name="add-new-row-btn"/>
+                            <slot name="add-new-row-btn" :filteredItems=filteredItems />
                         </div>
                     </div>
                 </div>
