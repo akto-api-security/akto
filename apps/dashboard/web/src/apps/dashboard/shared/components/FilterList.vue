@@ -25,7 +25,23 @@
                     </template>
                 </v-text-field>
             </v-list-item>
-            <v-list-item v-for="(item, index) in filteredItems.slice(0, 1000)" :key="index">
+            <v-list-item v-if="filteredItems.length > pageSize">
+                <div style="display: flex;margin-left: auto;">
+                    <span class="item-label" style="padding-top: 10px !important">{{startItemIndex + 1}} - {{endItemIndex}} of {{filteredItems.length}}</span>
+                    <span class="item-label">
+                        <v-btn icon :disabled="startItemIndex == 0" @click="pageNumber--">
+                            <v-icon>$fas_angle-left</v-icon>
+                        </v-btn>
+                    </span>
+                    <span class="item-label">
+                        <v-btn icon :disabled="endItemIndex == filteredItems.length" @click="pageNumber++">
+                            <v-icon>$fas_angle-right</v-icon>
+                        </v-btn>
+                    </span>
+                </div>
+            </v-list-item>
+
+            <v-list-item v-for="(item, index) in filteredItems.slice(startItemIndex, endItemIndex)" :key="index">
                 <span>
                     <v-btn icon primary plain :ripple="false" @click="checkboxClicked(item)" class="checkbox-btn">
                         <v-icon>
@@ -36,11 +52,6 @@
                 <v-list-item-content>
                     <span class="item-label">{{item.title}}</span>
                     <span class="item-subtitle">{{item.subtitle}}</span>
-                </v-list-item-content>
-            </v-list-item>
-            <v-list-item v-if="filteredItems.length > 1000">
-                <v-list-item-content>
-                    <span class="item-label">Showing 1000 results only</span>
                 </v-list-item-content>
             </v-list-item>
         </v-list>
@@ -65,7 +76,9 @@ export default {
                 return m
             }, {}),
             searchText: "",
-            globalCheckbox: false
+            globalCheckbox: false,
+            pageNumber: 1,
+            pageSize: 1000
         }
     },
     methods: {
@@ -90,12 +103,19 @@ export default {
     },
     computed: {
         filteredItems () {
+            this.pageNumber = 1
             if (this.searchText && this.searchText.length > 0) {
                 return this.items.filter(x => x.title.toLowerCase().indexOf(this.searchText) != -1)
             } else {
                 return this.items
             }
             
+        },
+        startItemIndex() {
+            return (this.pageNumber - 1) * this.pageSize
+        },
+        endItemIndex() {
+            return Math.min(this.startItemIndex + this.pageSize, this.filteredItems.length)
         }
     }
 }
