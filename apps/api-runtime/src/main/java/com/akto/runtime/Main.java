@@ -175,6 +175,11 @@ public class Main {
                     try {
                          
                         printL(r.value());
+                        lastSyncOffset++;
+
+                        if (lastSyncOffset % 100 == 0) {
+                            System.out.println("Committing offset at position: " + lastSyncOffset);
+                        }
 
                         if (tryForCollectionName(r.value())) {
                             continue;
@@ -243,22 +248,22 @@ public class Main {
                     }
                 }
 
-                for (TopicPartition tp: main.consumer.assignment()) {
-                    String tpName = tp.topic();
-                    long position = main.consumer.position(tp);
-                    long endOffset = main.consumer.endOffsets(Collections.singleton(tp)).get(tp);
-                    int partition = tp.partition();
+                // for (TopicPartition tp: main.consumer.assignment()) {
+                //     String tpName = tp.topic();
+                //     long position = main.consumer.position(tp);
+                //     long endOffset = main.consumer.endOffsets(Collections.singleton(tp)).get(tp);
+                //     int partition = tp.partition();
 
-                    if ((position-lastSyncOffset) > 100) {
-                        System.out.println("Committing offset at position: " + position + " for partition " + partition);
-                        lastSyncOffset = position;
-                    }
+                //     if ((position-lastSyncOffset) > 100) {
+                //         System.out.println("Committing offset at position: " + position + " for partition " + partition);
+                //         lastSyncOffset = position;
+                //     }
 
 
-                    KafkaHealthMetric kafkaHealthMetric = new KafkaHealthMetric(tpName, partition,
-                            position,endOffset,Context.now());
-                    task.kafkaHealthMetricsMap.put(kafkaHealthMetric.hashCode()+"", kafkaHealthMetric);
-                }
+                //     KafkaHealthMetric kafkaHealthMetric = new KafkaHealthMetric(tpName, partition,
+                //             position,endOffset,Context.now());
+                //     task.kafkaHealthMetricsMap.put(kafkaHealthMetric.hashCode()+"", kafkaHealthMetric);
+                // }
             }
 
         } catch (WakeupException ignored) {
