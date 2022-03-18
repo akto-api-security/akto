@@ -131,7 +131,7 @@ public class Main {
         APIConfig apiConfig;
         apiConfig = APIConfigsDao.instance.findOne(Filters.eq("name", configName));
         if (apiConfig == null) {
-            apiConfig = new APIConfig(configName,"access-token", 1, 10000, 120);
+            apiConfig = new APIConfig(configName,"access-token", 1, 10_000_000, 120);
         }
 
         final Main main = new Main();
@@ -160,12 +160,14 @@ public class Main {
         KafkaHealthMetricSyncTask task = new KafkaHealthMetricSyncTask();
         executor.scheduleAtFixedRate(task, 2, 60, TimeUnit.SECONDS);
 
+        long lastSyncOffset = 0;
+
         try {
             main.consumer.subscribe(Collections.singleton(topicName));
             while (true) {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 main.consumer.commitSync();
-
+                
                 // TODO: what happens if exception
                 Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
                 for (ConsumerRecord<String,String> r: records) {
@@ -247,9 +249,11 @@ public class Main {
                     long endOffset = main.consumer.endOffsets(Collections.singleton(tp)).get(tp);
                     int partition = tp.partition();
 
-                    if (position < 100 || position % 100 == 0) {
+                    if ((position-lastSyncOffset) > 100) {
                         System.out.println("Committing offset at position: " + position + " for partition " + partition);
+                        lastSyncOffset = position;
                     }
+
 
                     KafkaHealthMetric kafkaHealthMetric = new KafkaHealthMetric(tpName, partition,
                             position,endOffset,Context.now());
