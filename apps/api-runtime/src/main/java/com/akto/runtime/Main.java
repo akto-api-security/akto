@@ -241,8 +241,8 @@ public class Main {
                     try {
                         List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
                         parser.syncFunction(accWiseResponse);
-                        flow.init(accWiseResponse);
-                        aktoPolicy.main(accWiseResponse);
+                        // flow.init(accWiseResponse);
+                        // aktoPolicy.main(accWiseResponse);
                     } catch (Exception e) {
                         logger.error(e.toString());
                     }
