@@ -156,9 +156,9 @@ public class Main {
         Map<String, AktoPolicy> aktoPolicyMap = new HashMap<>();
 
         // sync infra metrics thread
-        ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
-        KafkaHealthMetricSyncTask task = new KafkaHealthMetricSyncTask(main.consumer);
-        executor.scheduleAtFixedRate(task, 2, 60, TimeUnit.SECONDS);
+        // ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
+        // KafkaHealthMetricSyncTask task = new KafkaHealthMetricSyncTask(main.consumer);
+        // executor.scheduleAtFixedRate(task, 2, 60, TimeUnit.SECONDS);
 
         long lastSyncOffset = 0;
 
