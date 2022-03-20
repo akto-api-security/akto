@@ -85,7 +85,7 @@ public class APICatalogSync {
         String userId = extractUserId(responseParams, userIdentifier);
 
         if (!responseParams.getIsPending()) {
-            //requestTemplate.processTraffic(responseParams.getTime());
+            requestTemplate.processTraffic(responseParams.getTime());
         }
         if (statusCode >= 200 && statusCode < 300) {
             String reqPayload = requestParams.getPayload();
@@ -98,7 +98,7 @@ public class APICatalogSync {
                 payload.putAll(queryParams.toMap());
                 deletedInfo.addAll(requestTemplate.process2(payload, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId()));
             }
-            //requestTemplate.recordMessage(responseParams.getOrig());
+            requestTemplate.recordMessage(responseParams.getOrig());
         }
 
         Map<Integer, RequestTemplate> responseTemplates = requestTemplate.getResponseTemplates();
@@ -120,7 +120,7 @@ public class APICatalogSync {
             deletedInfo.addAll(responseTemplate.process2(payload, baseURL.getUrl(), methodStr, statusCode, userId, requestParams.getApiCollectionId()));
             responseTemplate.processHeaders(responseParams.getHeaders(), baseURL.getUrl(), method.name(), statusCode, userId, requestParams.getApiCollectionId());
             if (!responseParams.getIsPending()) {
-                //responseTemplate.processTraffic(responseParams.getTime());
+                responseTemplate.processTraffic(responseParams.getTime());
             }
         } catch (JsonParseException e) {
 
