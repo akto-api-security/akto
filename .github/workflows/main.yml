@@ -47,7 +47,7 @@ jobs:
       - name: Prepare Dashboard UI
         working-directory: ./apps/dashboard/
         run: npm install && npm run build
-      - run: mvn package -DskipTests=true
+      - run: mvn package
       - name: Configure AWS credentials
         if: ${{ github.event.inputs.Environment == 'staging' }}
         uses: aws-actions/configure-aws-credentials@v1
