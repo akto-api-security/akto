@@ -18,7 +18,6 @@ import java.util.Map;
 
 public class KafkaHealthMetricSyncTask implements Runnable{
     Consumer<String, String>  consumer;
-    long lastSyncOffset = 0;
     public Map<String,KafkaHealthMetric> kafkaHealthMetricsMap = new HashMap<>();
     private static final Logger logger = LoggerFactory.getLogger(KafkaHealthMetricSyncTask.class);
 
@@ -37,12 +36,6 @@ public class KafkaHealthMetricSyncTask implements Runnable{
                 long position = consumer.position(tp);
                 long endOffset = consumer.endOffsets(Collections.singleton(tp)).get(tp);
                 int partition = tp.partition();
-
-                if ((position-lastSyncOffset) > 100) {
-                    System.out.println("Committing offset at position: " + position + " for partition " + partition);
-                    lastSyncOffset = position;
-                }
-
 
                 KafkaHealthMetric kafkaHealthMetric = new KafkaHealthMetric(tpName, partition,
                         position,endOffset,Context.now());
