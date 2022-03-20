@@ -157,7 +157,7 @@ public class Main {
 
         // sync infra metrics thread
         ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
-        KafkaHealthMetricSyncTask task = new KafkaHealthMetricSyncTask();
+        KafkaHealthMetricSyncTask task = new KafkaHealthMetricSyncTask(main.consumer);
         executor.scheduleAtFixedRate(task, 2, 60, TimeUnit.SECONDS);
 
         long lastSyncOffset = 0;
@@ -241,29 +241,12 @@ public class Main {
                     try {
                         List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
                         parser.syncFunction(accWiseResponse);
-                        // flow.init(accWiseResponse);
-                        // aktoPolicy.main(accWiseResponse);
+                        flow.init(accWiseResponse);
+                        aktoPolicy.main(accWiseResponse);
                     } catch (Exception e) {
                         logger.error(e.toString());
                     }
                 }
-
-                // for (TopicPartition tp: main.consumer.assignment()) {
-                //     String tpName = tp.topic();
-                //     long position = main.consumer.position(tp);
-                //     long endOffset = main.consumer.endOffsets(Collections.singleton(tp)).get(tp);
-                //     int partition = tp.partition();
-
-                //     if ((position-lastSyncOffset) > 100) {
-                //         System.out.println("Committing offset at position: " + position + " for partition " + partition);
-                //         lastSyncOffset = position;
-                //     }
-
-
-                //     KafkaHealthMetric kafkaHealthMetric = new KafkaHealthMetric(tpName, partition,
-                //             position,endOffset,Context.now());
-                //     task.kafkaHealthMetricsMap.put(kafkaHealthMetric.hashCode()+"", kafkaHealthMetric);
-                // }
             }
 
         } catch (WakeupException ignored) {
