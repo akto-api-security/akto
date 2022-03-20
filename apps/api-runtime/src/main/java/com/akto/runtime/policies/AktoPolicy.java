@@ -19,8 +19,6 @@ import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.management.openmbean.InvalidKeyException;
-import java.security.KeyException;
 import java.util.*;
 
 public class AktoPolicy {
@@ -35,9 +33,9 @@ public class AktoPolicy {
     boolean processCalledAtLeastOnce = false;
     ApiAccessTypePolicy apiAccessTypePolicy = new ApiAccessTypePolicy(null);
 
-    private final int batchTimeThreshold = 60;
+    private final int batchTimeThreshold = 120;
     private int timeSinceLastSync;
-    private final int batchSizeThreshold = 1000;
+    private final int batchSizeThreshold = 10_000_000;
     private int currentBatchSize = 0;
 
     private static final Logger logger = LoggerFactory.getLogger(AktoPolicy.class);
@@ -53,7 +51,7 @@ public class AktoPolicy {
     }
 
     public void syncWithDb(boolean initialising) {
-        logger.info("Syncing with db");
+        // logger.info("Syncing with db");
         if (!initialising) {
             List<WriteModel<ApiInfo>> writesForApiInfo = AktoPolicy.getUpdates(apiInfoMap, apiInfoRemoveList);
             List<WriteModel<FilterSampleData>> writesForSampleData = getUpdatesForSampleData();
@@ -72,7 +70,7 @@ public class AktoPolicy {
         if (accountSettings != null) {
             List<String> cidrList = accountSettings.getPrivateCidrList();
             if ( cidrList != null && !cidrList.isEmpty()) {
-                logger.info("Found cidr from db");
+                // logger.info("Found cidr from db");
                 apiAccessTypePolicy.setPrivateCidrList(cidrList);
             }
         }
@@ -84,8 +82,8 @@ public class AktoPolicy {
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         apiInfoRemoveList = new ArrayList<>();
         for (ApiCollection apiCollection: apiCollections) {
-            logger.info("ApiCollection: " + apiCollection.getName());
-            logger.info("URLs : " + apiCollection.getUrls());
+            // logger.info("ApiCollection: " + apiCollection.getName());
+            // logger.info("URLs : " + apiCollection.getUrls());
             for (String u: apiCollection.getUrls()) {
                 String[] v = u.split(" ");
                 ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollection.getId(), v[0], URLMethods.Method.valueOf(v[1]));
@@ -96,19 +94,19 @@ public class AktoPolicy {
                 }
             }
         }
-        logger.info("Total apiInfoMap keys " + apiInfoMap.keySet());
-        logger.info("Fetching apiInfoList");
+        // logger.info("Total apiInfoMap keys " + apiInfoMap.keySet());
+        // logger.info("Fetching apiInfoList");
         List<ApiInfo> apiInfoList =  ApiInfoDao.instance.findAll(new BasicDBObject());
         for (ApiInfo apiInfo: apiInfoList) {
             ApiInfo.ApiInfoKey apiInfoKey = apiInfo.getId();
             if (apiInfoMap.get(STRICT).containsKey(apiInfoKey)) {
-                logger.info("ADDING: " + apiInfo.key());
+                // logger.info("ADDING: " + apiInfo.key());
                 apiInfoMap.get(STRICT).put(apiInfoKey, apiInfo);
             } else if (apiInfoMap.get(TEMPLATE).containsKey(apiInfoKey)) {
-                logger.info("ADDING: " + apiInfo.key());
+                // logger.info("ADDING: " + apiInfo.key());
                 apiInfoMap.get(TEMPLATE).put(apiInfoKey, apiInfo);
             } else {
-                logger.info("DELETING: " + apiInfo.key());
+                // logger.info("DELETING: " + apiInfo.key());
                 apiInfoRemoveList.add(apiInfoKey);
             }
         }
@@ -122,9 +120,6 @@ public class AktoPolicy {
                 sampleDataRemoveList.add(apiInfoKey);
             }
         }
-
-        this.currentBatchSize = 0;
-        this.timeSinceLastSync = Context.now();
     }
 
     public void main(List<HttpResponseParams> httpResponseParamsList) throws Exception {
@@ -145,6 +140,8 @@ public class AktoPolicy {
 
         if (syncImmediately || currentBatchSize >= batchSizeThreshold || (Context.now() -  timeSinceLastSync) >= batchTimeThreshold) {
             logger.info("Let's sync becoz threshold achieved: " + currentBatchSize + " " + (Context.now() -  timeSinceLastSync));
+            this.currentBatchSize = 0;
+            this.timeSinceLastSync = Context.now();
             syncWithDb(false);
         }
     }
@@ -162,7 +159,7 @@ public class AktoPolicy {
     }
 
     public void process(HttpResponseParams httpResponseParams) throws Exception {
-        logger.info("processing....");
+        // logger.info("processing....");
         if (!this.processCalledAtLeastOnce) {
             logger.info("Calling first");
             syncWithDb(true);
@@ -211,7 +208,7 @@ public class AktoPolicy {
         } else {
             apiInfoMap.get(TEMPLATE).put(apiInfo.getId(), apiInfo);
         }
-        logger.info("Done with process");
+        // logger.info("Done with process");
     }
 
     public ApiInfo getApiInfoFromMap(ApiInfo.ApiInfoKey apiInfoKey) throws NoSuchElementException{

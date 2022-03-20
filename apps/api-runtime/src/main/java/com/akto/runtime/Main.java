@@ -58,7 +58,7 @@ public class Main {
 
             Map<String, Object> json = gson.fromJson(message, Map.class);
 
-            logger.info("Json size: " + json.size());
+            // logger.info("Json size: " + json.size());
             boolean withoutCidrCond = json.size() == 2 && json.containsKey(GROUP_NAME) && json.containsKey(VXLAN_ID);
             boolean withCidrCond = json.size() == 3 && json.containsKey(GROUP_NAME) && json.containsKey(VXLAN_ID) && json.containsKey(VPC_CIDR);
             if (withCidrCond || withoutCidrCond) {
@@ -235,13 +235,13 @@ public class Main {
                     }
 
                     HttpCallParser parser = httpCallParserMap.get(accountId);
-                    Flow flow = flowMap.get(accountId);
+                    // Flow flow = flowMap.get(accountId);
                     AktoPolicy aktoPolicy = aktoPolicyMap.get(accountId);
 
                     try {
                         List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
                         parser.syncFunction(accWiseResponse);
-                        flow.init(accWiseResponse);
+                        // flow.init(accWiseResponse);
                         aktoPolicy.main(accWiseResponse);
                     } catch (Exception e) {
                         logger.error(e.toString());
