@@ -10,20 +10,20 @@
                 <sample-single-side
                     class="flex-equal"
                     title="Request" 
-                    :firstLine='json.method + " " + json.path + " " + json.type'
-                    :headers="JSON.parse(json.requestHeaders)" 
-                    :data="json.requestPayload"
-                    :complete-data="json"
+                    :firstLine='json["message"].method + " " + json["message"].path + " " + json["message"].type'
+                    :headers="{}" 
+                    :data="requestJson"
+                    :complete-data="json['message']"
                     :simpleCopy="false"
                 />
                 <sample-single-side 
                     class="flex-equal"                
                     title="Response" 
-                    :firstLine='json.statusCode + " " + json.status' 
-                    :headers="JSON.parse(json.responseHeaders)" 
-                    :data="json.responsePayload"
+                    :firstLine='json["message"].statusCode + " " + json["message"].status' 
+                    :headers="{}" 
+                    :data="responseJson"
                     :simpleCopy="true"
-                    :complete-data="json"
+                    :complete-data="json['message']"
                 />
             </div>
         </div>
@@ -52,8 +52,43 @@ export default {
         }
     },
     computed: {
+        requestJson: function() {
+            let result = {}
+            result["json"] = {"requestHeaders":JSON.parse(this.json["message"]["requestHeaders"]), "requestPayload": JSON.parse(this.json["message"]["requestPayload"])}
+            result["highlightPaths"] = {}
+            for (const x in this.json["highlightPaths"]) {
+                if (x["responseCode"] === -1) {
+                    if (x["isHeader"]) {
+                        result["highlightPaths"]["root#"+"requestHeaders#"+x["param"]] = x["subType"]
+                    } else {
+                        result["highlightPaths"]["root#"+"requestPayload#"+x["param"]] = x["subType"]
+                    }
+                }
+            }
+            return result
+        },
+        responseJson: function() {
+            let result = {}
+            result["json"] = {"responseHeaders":JSON.parse(this.json["message"]["responseHeaders"]), "responsePayload": JSON.parse(this.json["message"]["responsePayload"])}
+            result["highlightPaths"] = {}
+            for (const x of this.json["highlightPaths"]) {
+                if (x["responseCode"] !== -1) {
+                    console.log(x);
+                    if (x["isHeader"]) {
+                        result["highlightPaths"]["root#"+"responseHeaders#"+x["param"]] = x["subType"]
+                    } else {
+                        result["highlightPaths"]["root#"+"responsePayload#"+x["param"]] = x["subType"]
+                    }
+                }
+            }
+            return result
+        },
+
         json: function() {
-            return this.messages.length > 0 ? JSON.parse(this.messages[this.currentIndex]) : {}
+            return {
+                "message": JSON.parse(this.messages[this.currentIndex]["message"]),
+                "highlightPaths": this.messages[this.currentIndex]["highlightPaths"]
+                }
         }
     }
 }

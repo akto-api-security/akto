@@ -6,11 +6,13 @@ import java.util.List;
 import java.util.Map;
 
 import com.akto.dao.SampleDataDao;
+import com.akto.dao.SensitiveSampleDataDao;
 import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
-import com.itextpdf.text.pdf.PdfStructTreeController.returnType;
+import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 
@@ -63,6 +65,27 @@ public class TrafficAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    Map<String, List<SingleTypeInfo.ParamId>> sensitiveSampleData = new HashMap<>();
+    public String fetchSensitiveSampleData() {
+        List<SensitiveSampleData> sensitiveSampleDataList = SensitiveSampleDataDao.instance.findAll(
+                Filters.and(
+                        Filters.eq("_id.url", url),
+                        Filters.eq("_id.apiCollectionId", apiCollectionId),
+                        Filters.eq("_id.method", method)
+                )
+        );
+
+        for (SensitiveSampleData sensitiveSampleData: sensitiveSampleDataList) {
+            for (String data: sensitiveSampleData.getSampleData()) {
+                List<SingleTypeInfo.ParamId> s = this.sensitiveSampleData.getOrDefault(data, new ArrayList<>());
+                s.add(sensitiveSampleData.getId());
+                this.sensitiveSampleData.put(data, s);
+            }
+        }
+
+
+        return Action.SUCCESS.toUpperCase();
+    }
 
     public void setApiCollectionId(int apiCollectionId) {
         this.apiCollectionId = apiCollectionId;
@@ -99,4 +122,9 @@ public class TrafficAction {
     public List<SampleData> getSampleDataList() {
         return this.sampleDataList;
     }
+
+    public Map<String,List<SingleTypeInfo.ParamId>> getSensitiveSampleData() {
+        return this.sensitiveSampleData;
+    }
+
 }

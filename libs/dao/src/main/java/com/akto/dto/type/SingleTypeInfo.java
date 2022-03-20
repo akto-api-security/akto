@@ -78,6 +78,62 @@ public class SingleTypeInfo {
 
         public ParamId() {
         }
+
+        public String getUrl() {
+            return url;
+        }
+
+        public void setUrl(String url) {
+            this.url = url;
+        }
+
+        public String getMethod() {
+            return method;
+        }
+
+        public void setMethod(String method) {
+            this.method = method;
+        }
+
+        public int getResponseCode() {
+            return responseCode;
+        }
+
+        public void setResponseCode(int responseCode) {
+            this.responseCode = responseCode;
+        }
+
+        public boolean isHeader() {
+            return isHeader;
+        }
+
+        public void setHeader(boolean header) {
+            isHeader = header;
+        }
+
+        public String getParam() {
+            return param;
+        }
+
+        public void setParam(String param) {
+            this.param = param;
+        }
+
+        public SubType getSubType() {
+            return subType;
+        }
+
+        public void setSubType(SubType subType) {
+            this.subType = subType;
+        }
+
+        public int getApiCollectionId() {
+            return apiCollectionId;
+        }
+
+        public void setApiCollectionId(int apiCollectionId) {
+            this.apiCollectionId = apiCollectionId;
+        }
     }
 
     String url;
