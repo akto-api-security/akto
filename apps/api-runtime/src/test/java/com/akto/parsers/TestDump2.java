@@ -25,7 +25,6 @@ import com.akto.runtime.URLAggregator;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.Test;
 
 public class TestDump2 {
@@ -112,8 +111,8 @@ public class TestDump2 {
 
         aggr.addURL(httpResponseParams);
         sync.computeDelta(aggr, false, 0);
-        
-        assertEquals(15, sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0)).size());        
+        APICatalogSync.DbUpdateReturn dbUpdateReturn = sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0));
+        assertEquals(15, dbUpdateReturn.bulkUpdatesForSingleTypeInfo.size());
         assertEquals(2, sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size());        
         assertEquals(1, sync.getDBUpdatesForSampleData(0, sync.getDelta(0)).size());        
     }
@@ -141,8 +140,8 @@ public class TestDump2 {
             RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
             assertEquals(1, respTemplate.getUserIds().size());
             assertEquals(3, respTemplate.getParameters().size());
-
-            assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(collectionId), sync.getDbState(collectionId)).size());
+            APICatalogSync.DbUpdateReturn dbUpdateReturn = sync.getDBUpdatesForParams(sync.getDelta(collectionId), sync.getDbState(collectionId));
+            assertEquals(24, dbUpdateReturn.bulkUpdatesForSingleTypeInfo.size());
             assertEquals(2, sync.getDBUpdatesForTraffic(collectionId, sync.getDelta(collectionId)).size());        
         }        
     }
@@ -153,9 +152,9 @@ public class TestDump2 {
         simpleTestForSingleCollection(0, sync);
         simpleTestForSingleCollection(1, sync);
         simpleTestForSingleCollection(2, sync);
-        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0)).size());
-        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(1), sync.getDbState(1)).size());
-        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(2), sync.getDbState(2)).size());
+        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0)).bulkUpdatesForSingleTypeInfo.size());
+        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(1), sync.getDbState(1)).bulkUpdatesForSingleTypeInfo.size());
+        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(2), sync.getDbState(2)).bulkUpdatesForSingleTypeInfo.size());
     }
 
     @Test
@@ -297,7 +296,7 @@ public class TestDump2 {
         // TODO: investigate and fix this
         // assertEquals(1, respTemplate.getParameters().size());
 
-        List updates = sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0));
+        List updates = sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0)).bulkUpdatesForSingleTypeInfo;
         // TODO: investigate and fix this
         // assertEquals(22, updates.size());
     }

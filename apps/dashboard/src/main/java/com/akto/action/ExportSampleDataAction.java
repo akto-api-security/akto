@@ -89,10 +89,10 @@ public class ExportSampleDataAction extends UserAction {
                             JsonNode fieldValue = node.get(fieldName);
                             if (fieldValue.isValueNode()) {
                                 if (flag) {
-                                    url.append("?").append(fieldName).append("=").append(fieldValue.textValue());
+                                    url.append("?").append(fieldName).append("=").append(fieldValue.asText());
                                     flag = false;
                                 } else {
-                                    url.append("&").append(fieldName).append("=").append(fieldValue.textValue());
+                                    url.append("&").append(fieldName).append("=").append(fieldValue.asText());
                                 }
                             }
                         }

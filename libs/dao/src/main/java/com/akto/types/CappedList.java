@@ -27,7 +27,7 @@ public class CappedList<T> {
             this.elements.add(t);
             isInserted = true;
         } else if (forceLatestEntry) {
-            this.elements.add(nextPos, t);
+            this.elements.set(nextPos, t);
             isInserted = true;
         }
 

@@ -1,23 +1,47 @@
 package com.akto.runtime;
 
 import com.akto.dao.KafkaHealthMetricsDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.KafkaHealthMetric;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.ReplaceOptions;
+
+import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.common.TopicPartition;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
 public class KafkaHealthMetricSyncTask implements Runnable{
+    Consumer<String, String>  consumer;
     public Map<String,KafkaHealthMetric> kafkaHealthMetricsMap = new HashMap<>();
     private static final Logger logger = LoggerFactory.getLogger(KafkaHealthMetricSyncTask.class);
+
+
+    public KafkaHealthMetricSyncTask(Consumer<String, String>  consumer) {
+        this.consumer = consumer;
+    }
+
+
     @Override
     public void run() {
         try {
             logger.info("SYNCING");
+            for (TopicPartition tp: consumer.assignment()) {
+                String tpName = tp.topic();
+                long position = consumer.position(tp);
+                long endOffset = consumer.endOffsets(Collections.singleton(tp)).get(tp);
+                int partition = tp.partition();
+
+                KafkaHealthMetric kafkaHealthMetric = new KafkaHealthMetric(tpName, partition,
+                        position,endOffset,Context.now());
+                kafkaHealthMetricsMap.put(kafkaHealthMetric.hashCode()+"", kafkaHealthMetric);
+            }
+
             for (String key: kafkaHealthMetricsMap.keySet()) {
                 KafkaHealthMetric kafkaHealthMetric = kafkaHealthMetricsMap.get(key);
                 Bson filter = Filters.and(

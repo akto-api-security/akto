@@ -7,11 +7,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import com.akto.DaoInit;
-import com.akto.dao.APIConfigsDao;
-import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.RuntimeFilterDao;
-import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.APIConfig;
 import com.akto.dto.AccountSettings;
@@ -58,7 +54,7 @@ public class Main {
 
             Map<String, Object> json = gson.fromJson(message, Map.class);
 
-            logger.info("Json size: " + json.size());
+            // logger.info("Json size: " + json.size());
             boolean withoutCidrCond = json.size() == 2 && json.containsKey(GROUP_NAME) && json.containsKey(VXLAN_ID);
             boolean withCidrCond = json.size() == 3 && json.containsKey(GROUP_NAME) && json.containsKey(VXLAN_ID) && json.containsKey(VPC_CIDR);
             if (withCidrCond || withoutCidrCond) {
@@ -94,6 +90,7 @@ public class Main {
 
     public static void createIndices() {
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
+        SensitiveSampleDataDao.instance.createIndicesIfAbsent();
     }
 
     public static void insertRuntimeFilters() {
@@ -131,7 +128,7 @@ public class Main {
         APIConfig apiConfig;
         apiConfig = APIConfigsDao.instance.findOne(Filters.eq("name", configName));
         if (apiConfig == null) {
-            apiConfig = new APIConfig(configName,"access-token", 1, 10000, 120);
+            apiConfig = new APIConfig(configName,"access-token", 1, 10_000_000, 120);
         }
 
         final Main main = new Main();
@@ -156,16 +153,18 @@ public class Main {
         Map<String, AktoPolicy> aktoPolicyMap = new HashMap<>();
 
         // sync infra metrics thread
-        ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
-        KafkaHealthMetricSyncTask task = new KafkaHealthMetricSyncTask();
-        executor.scheduleAtFixedRate(task, 2, 60, TimeUnit.SECONDS);
+        // ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
+        // KafkaHealthMetricSyncTask task = new KafkaHealthMetricSyncTask(main.consumer);
+        // executor.scheduleAtFixedRate(task, 2, 60, TimeUnit.SECONDS);
+
+        long lastSyncOffset = 0;
 
         try {
             main.consumer.subscribe(Collections.singleton(topicName));
             while (true) {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 main.consumer.commitSync();
-
+                
                 // TODO: what happens if exception
                 Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
                 for (ConsumerRecord<String,String> r: records) {
@@ -173,6 +172,11 @@ public class Main {
                     try {
                          
                         printL(r.value());
+                        lastSyncOffset++;
+
+                        if (lastSyncOffset % 100 == 0) {
+                            System.out.println("Committing offset at position: " + lastSyncOffset);
+                        }
 
                         if (tryForCollectionName(r.value())) {
                             continue;
@@ -228,32 +232,17 @@ public class Main {
                     }
 
                     HttpCallParser parser = httpCallParserMap.get(accountId);
-                    Flow flow = flowMap.get(accountId);
+                    // Flow flow = flowMap.get(accountId);
                     AktoPolicy aktoPolicy = aktoPolicyMap.get(accountId);
 
                     try {
                         List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
                         parser.syncFunction(accWiseResponse);
-                        flow.init(accWiseResponse);
+                        // flow.init(accWiseResponse);
                         aktoPolicy.main(accWiseResponse);
                     } catch (Exception e) {
                         logger.error(e.toString());
                     }
-                }
-
-                for (TopicPartition tp: main.consumer.assignment()) {
-                    String tpName = tp.topic();
-                    long position = main.consumer.position(tp);
-                    long endOffset = main.consumer.endOffsets(Collections.singleton(tp)).get(tp);
-                    int partition = tp.partition();
-
-                    if (position < 100 || position % 100 == 0) {
-                        System.out.println("Committing offset at position: " + position + " for partition " + partition);
-                    }
-
-                    KafkaHealthMetric kafkaHealthMetric = new KafkaHealthMetric(tpName, partition,
-                            position,endOffset,Context.now());
-                    task.kafkaHealthMetricsMap.put(kafkaHealthMetric.hashCode()+"", kafkaHealthMetric);
                 }
             }
 

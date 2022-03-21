@@ -6,6 +6,7 @@
     v-on:selected="itemSelected"
     :canSelect="hasSelectedListener"
     :highlightItem="highlightItem"
+    :highlightItemMap="highlightItemMap"
   />
 </template>
 
@@ -39,6 +40,10 @@ export default Vue.extend({
       required: false
     },
     highlightItem: {
+      type: Object,
+      required: false
+    },
+    highlightItemMap: {
       type: Object,
       required: false
     }
@@ -94,7 +99,7 @@ export default Vue.extend({
               i.toString(),
               val[i],
               depth + 1,
-              includeKey ? `${path}${key}.${i}.` : `${path}`,
+              includeKey ? `${path}${key}.?${i}.` : `${path}`,
               false
             )
           errorMap = {...errorMap, ...child.errorMap}
