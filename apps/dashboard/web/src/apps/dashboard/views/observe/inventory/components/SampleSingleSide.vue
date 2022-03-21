@@ -19,14 +19,21 @@
         </v-btn>
       </div>
       <div class="sample-data-line">{{firstLine}}</div>
-      <div
+      <!-- <div
           v-for="value, header, index in headers" :key="index"
             class="sample-data-headers" 
         >
             <span class="sample-data-headers-key">{{header}}</span>
             <span class="sample-data-headers-val">: {{value}}</span>
-        </div>
-        <div class="sample-data-message">{{data}}</div>
+        </div> -->
+        <!-- <div class="sample-data-message">{{data}}</div> -->
+          <div class="wrapper">
+            <json-viewer
+              :contentJSON="data['json']"
+              :errors="{}" 
+              :highlightItemMap="data['highlightPaths']" 
+              />
+          </div>
     </div>
 </template>
 
@@ -34,14 +41,18 @@
 
 import obj from "@/util/obj"
 import api from "@/apps/dashboard/views/observe/inventory/api";
+import JsonViewer from "@/apps/dashboard/shared/components/JSONViewer"
 
 export default {
     name: "SampleSingleSide",
+    components: {
+        JsonViewer
+    },
     props: {
         title: obj.strR,
         firstLine: obj.strR,
         headers: obj.objR,
-        data: obj.strR,
+        data: obj.objR,
         completeData: obj.objR,
         simpleCopy: obj.boolR
     },
@@ -76,8 +87,8 @@ export default {
         let snackBarMessage = ""
         if (this.simpleCopy) {
           let b = {}
-          b["responsePayload"] = this.data ? JSON.parse(this.data): {}
-          b["responseHeaders"] = this.headers
+          b["responsePayload"] = this.completeData ? this.completeData["responsePayload"]: {}
+          b["responseHeaders"] = this.completeData ? this.completeData["responseHeaders"]: {}
           b["statusCode"] = this.completeData.statusCode
           d = JSON.stringify(b)
           snackBarMessage = "Response data copied to clipboard"
@@ -104,6 +115,10 @@ export default {
         tooltipValue: function() {
           return this.simpleCopy ? "Copy response values": "Copy as curl"
            
+        },
+        dd : function() {
+          // let b = JSON.parse(this.data)
+          return b
         }
     }
 }
@@ -135,4 +150,25 @@ export default {
         color: #47466A99 
         overflow-wrap: anywhere
 
+</style>
+
+
+<style lang="scss">
+.wrapper .value-key {
+  color: #47466A99;
+  padding: 1px 5px 2px 10px;
+}
+
+.wrapper .data-key {
+  color: #47466A;
+  padding: 1px 5px 2px 7px;
+}
+
+.wrapper .chevron-arrow {
+  border-right: 2px solid lightgrey;
+  border-bottom: 2px solid lightgrey;
+}
+.wrapper .json-view-item:not(.root-item) {
+  border-left: 1px dashed lightgrey;
+}
 </style>

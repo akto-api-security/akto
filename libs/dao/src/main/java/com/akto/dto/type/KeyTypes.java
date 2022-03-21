@@ -44,14 +44,17 @@ public class KeyTypes {
         return ret;
     }
 
-    public void process(String url, String method, int responseCode, boolean isHeader, String param, Object object, String userId, int apiCollectionId) {
+    public void process(String url, String method, int responseCode, boolean isHeader, String param, Object object,
+                        String userId, int apiCollectionId, String rawMessage) {
 
         SubType subType = findSubType(object);
 
         SingleTypeInfo singleTypeInfo = occurrences.get(subType);
         if (singleTypeInfo == null) {
             Set<Object> examples = new HashSet<>();
-            examples.add(object);
+            if (subType.isSensitive) {
+                examples.add(rawMessage);
+            }
 
             Set<String> userIds = new HashSet<>();
             userIds.add(userId);

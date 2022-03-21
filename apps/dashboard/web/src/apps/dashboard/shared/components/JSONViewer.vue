@@ -5,6 +5,7 @@
             :errors="errors"  
             :maxDepth="1"
             :highlightItem="highlightItem"
+            :highlightItemMap="highlightItemMap"
             class="customStyle"
             @selected="selectedElem"
         />
@@ -26,7 +27,8 @@ export default {
     props: {
         contentJSON: obj.objR,
         errors: obj.objR,
-        highlightItem: obj.objN
+        highlightItem: obj.objN,
+        highlightItemMap: obj.objN
     },
     methods: {
         selectedElem (e) {

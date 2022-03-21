@@ -129,6 +129,8 @@ public class HttpCallParser {
         return null;
     }
 
+    int numberOfSyncs = 0;
+
     public void syncFunction(List<HttpResponseParams> responseParams)  {
         // USE ONLY filteredResponseParams and not responseParams
         List<HttpResponseParams> filteredResponseParams = filterHttpResponseParams(responseParams);
@@ -140,7 +142,9 @@ public class HttpCallParser {
         }
 
         this.sync_count += filteredResponseParams.size();
-        if (this.sync_count >= sync_threshold_count || (Context.now() - this.last_synced) > this.sync_threshold_time || isHarOrPcap) {
+        int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
+        if (this.sync_count >= syncThresh || (Context.now() - this.last_synced) > this.sync_threshold_time || isHarOrPcap) {
+            numberOfSyncs++;
             apiCatalogSync.syncWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;

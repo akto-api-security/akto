@@ -10,20 +10,20 @@
                 <sample-single-side
                     class="flex-equal"
                     title="Request" 
-                    :firstLine='json.method + " " + json.path + " " + json.type'
-                    :headers="JSON.parse(json.requestHeaders)" 
-                    :data="json.requestPayload"
-                    :complete-data="json"
+                    :firstLine='json["message"].method + " " + json["message"].path + " " + json["message"].type'
+                    :headers="{}" 
+                    :data="requestJson"
+                    :complete-data="json['message']"
                     :simpleCopy="false"
                 />
                 <sample-single-side 
                     class="flex-equal"                
                     title="Response" 
-                    :firstLine='json.statusCode + " " + json.status' 
-                    :headers="JSON.parse(json.responseHeaders)" 
-                    :data="json.responsePayload"
+                    :firstLine='json["message"].statusCode + " " + json["message"].status' 
+                    :headers="{}" 
+                    :data="responseJson"
                     :simpleCopy="true"
-                    :complete-data="json"
+                    :complete-data="json['message']"
                 />
             </div>
         </div>
@@ -52,8 +52,73 @@ export default {
         }
     },
     computed: {
+        requestJson: function() {
+            let result = {}
+            let requestHeaders = {}
+            try {
+              requestHeaders = JSON.parse(this.json["message"]["requestHeaders"] || "{}")
+            } catch (e) {
+              // eat it
+            }
+            let requestPayload = {}
+          try {
+            requestPayload = JSON.parse(this.json["message"]["requestPayload"] || "{}")
+          } catch (e) {
+            // eat it
+          }
+          result["json"] = {"requestHeaders": requestHeaders, "requestPayload": requestPayload}
+            result["highlightPaths"] = {}
+            for (const x of this.json["highlightPaths"]) {
+              if (x["responseCode"] === -1) {
+                    let key = ""
+                    if (x["header"]) {
+                        key = "root#"+"requestheaders#"+x["param"]
+                    } else {
+                        key = "root#"+"requestpayload#"+x["param"]
+                    }
+
+                    key = key.toLowerCase()
+                    result["highlightPaths"][key] = x["subType"]
+              }
+            }
+            return result
+        },
+        responseJson: function() {
+            let result = {}
+            let responseHeaders = {};
+            try {
+              responseHeaders = JSON.parse(this.json["message"]["responseHeaders"] || "{}")
+            } catch (e) {
+              // eat it
+            }
+            let responsePayload = {}
+            try {
+              responsePayload = JSON.parse(this.json["message"]["responsePayload"] || "{}")
+            } catch (e) {
+              // eat it
+            }
+            result["json"] = {"responseHeaders": responseHeaders, "responsePayload": responsePayload}
+            result["highlightPaths"] = {}
+            for (const x of this.json["highlightPaths"]) {
+                if (x["responseCode"] !== -1) {
+                    let key = ""
+                    if (x["header"]) {
+                        key = "root#"+"responseheaders#"+x["param"]
+                    } else {
+                        key = "root#"+"responsepayload#"+x["param"];
+                    }
+                    key = key.toLowerCase();
+                    result["highlightPaths"][key] = x["subType"]
+                }
+            }
+            return result
+        },
+
         json: function() {
-            return this.messages.length > 0 ? JSON.parse(this.messages[this.currentIndex]) : {}
+            return {
+                "message": JSON.parse(this.messages[this.currentIndex]["message"]),
+                "highlightPaths": this.messages[this.currentIndex]["highlightPaths"]
+                }
         }
     }
 }
