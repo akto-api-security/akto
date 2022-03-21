@@ -54,7 +54,7 @@ export default {
     computed: {
         requestJson: function() {
             let result = {}
-            result["json"] = {"requestHeaders":JSON.parse(this.json["message"]["requestHeaders"] || "{}"), "requestPayload": JSON.parse(this.json["message"]["requestPayload"]) || "{}"}
+            result["json"] = {"requestHeaders":JSON.parse(this.json["message"]["requestHeaders"] || "{}"), "requestPayload": JSON.parse(this.json["message"]["requestPayload"] || "{}")}
             result["highlightPaths"] = {}
             for (const x in this.json["highlightPaths"]) {
                 if (x["responseCode"] === -1) {
