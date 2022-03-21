@@ -54,7 +54,19 @@ export default {
     computed: {
         requestJson: function() {
             let result = {}
-            result["json"] = {"requestHeaders":JSON.parse(this.json["message"]["requestHeaders"]), "requestPayload": JSON.parse(this.json["message"]["requestPayload"])}
+            let requestHeaders = {}
+            try {
+              requestHeaders = JSON.parse(this.json["message"]["requestHeaders"] || {})
+            } catch (e) {
+              // eat it
+            }
+            let requestPayload = {}
+          try {
+            requestPayload = JSON.parse(this.json["message"]["requestPayload"] || {})
+          } catch (e) {
+            // eat it
+          }
+          result["json"] = {"requestHeaders": requestHeaders, "requestPayload": requestPayload}
             result["highlightPaths"] = {}
             for (const x of this.json["highlightPaths"]) {
               if (x["responseCode"] === -1) {
@@ -73,7 +85,19 @@ export default {
         },
         responseJson: function() {
             let result = {}
-            result["json"] = {"responseHeaders":JSON.parse(this.json["message"]["responseHeaders"]), "responsePayload": JSON.parse(this.json["message"]["responsePayload"])}
+            let responseHeaders = {};
+            try {
+              responseHeaders = JSON.parse(this.json["message"]["responseHeaders"] || {})
+            } catch (e) {
+              // eat it
+            }
+            let responsePayload = {}
+            try {
+              responsePayload = JSON.parse(this.json["message"]["responsePayload"] || {})
+            } catch (e) {
+              // eat it
+            }
+            result["json"] = {"responseHeaders": responseHeaders, "responsePayload": responsePayload}
             result["highlightPaths"] = {}
             for (const x of this.json["highlightPaths"]) {
                 if (x["responseCode"] !== -1) {
