@@ -56,14 +56,18 @@ export default {
             let result = {}
             result["json"] = {"requestHeaders":JSON.parse(this.json["message"]["requestHeaders"]), "requestPayload": JSON.parse(this.json["message"]["requestPayload"])}
             result["highlightPaths"] = {}
-            for (const x in this.json["highlightPaths"]) {
-                if (x["responseCode"] === -1) {
-                    if (x["isHeader"]) {
-                        result["highlightPaths"]["root#"+"requestHeaders#"+x["param"]] = x["subType"]
+            for (const x of this.json["highlightPaths"]) {
+              if (x["responseCode"] === -1) {
+                    let key = ""
+                    if (x["header"]) {
+                        key = "root#"+"requestheaders#"+x["param"]
                     } else {
-                        result["highlightPaths"]["root#"+"requestPayload#"+x["param"]] = x["subType"]
+                        key = "root#"+"requestpayload#"+x["param"]
                     }
-                }
+
+                    key = key.toLowerCase()
+                    result["highlightPaths"][key] = x["subType"]
+              }
             }
             return result
         },
@@ -73,12 +77,14 @@ export default {
             result["highlightPaths"] = {}
             for (const x of this.json["highlightPaths"]) {
                 if (x["responseCode"] !== -1) {
-                    console.log(x);
-                    if (x["isHeader"]) {
-                        result["highlightPaths"]["root#"+"responseHeaders#"+x["param"]] = x["subType"]
+                    let key = ""
+                    if (x["header"]) {
+                        key = "root#"+"responseheaders#"+x["param"]
                     } else {
-                        result["highlightPaths"]["root#"+"responsePayload#"+x["param"]] = x["subType"]
+                        key = "root#"+"responsepayload#"+x["param"];
                     }
+                    key = key.toLowerCase();
+                    result["highlightPaths"][key] = x["subType"]
                 }
             }
             return result

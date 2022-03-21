@@ -140,7 +140,7 @@ export default Vue.extend({
         if (v.length > 0 && v[0] === "?") {
           return "$"
         } else {
-          return v
+          return v.toLowerCase()
         }
       })
 

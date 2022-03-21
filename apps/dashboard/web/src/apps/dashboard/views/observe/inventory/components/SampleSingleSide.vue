@@ -48,14 +48,11 @@ export default {
     components: {
         JsonViewer
     },
-    mounted() {
-      console.log(this.data['highlightPaths']);
-    },
     props: {
         title: obj.strR,
         firstLine: obj.strR,
         headers: obj.objR,
-        data: obj.strR,
+        data: obj.objR,
         completeData: obj.objR,
         simpleCopy: obj.boolR
     },

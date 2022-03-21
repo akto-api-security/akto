@@ -107,7 +107,7 @@ public class SingleTypeInfo {
             return isHeader;
         }
 
-        public void setHeader(boolean header) {
+        public void setIsHeader(boolean header) {
             isHeader = header;
         }
 
