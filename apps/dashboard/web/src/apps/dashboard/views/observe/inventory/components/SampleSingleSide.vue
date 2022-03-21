@@ -87,8 +87,8 @@ export default {
         let snackBarMessage = ""
         if (this.simpleCopy) {
           let b = {}
-          b["responsePayload"] = this.data ? JSON.parse(this.data): {}
-          b["responseHeaders"] = this.headers
+          b["responsePayload"] = this.completeData ? this.completeData["responsePayload"]: {}
+          b["responseHeaders"] = this.completeData ? this.completeData["responseHeaders"]: {}
           b["statusCode"] = this.completeData.statusCode
           d = JSON.stringify(b)
           snackBarMessage = "Response data copied to clipboard"
