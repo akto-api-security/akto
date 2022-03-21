@@ -54,7 +54,7 @@ export default {
     computed: {
         requestJson: function() {
             let result = {}
-            result["json"] = {"requestHeaders":JSON.parse(this.json["message"]["requestHeaders"]), "requestPayload": JSON.parse(this.json["message"]["requestPayload"])}
+            result["json"] = {"requestHeaders":JSON.parse(this.json["message"]["requestHeaders"] || "{}"), "requestPayload": JSON.parse(this.json["message"]["requestPayload"]) || "{}"}
             result["highlightPaths"] = {}
             for (const x in this.json["highlightPaths"]) {
                 if (x["responseCode"] === -1) {
@@ -69,11 +69,10 @@ export default {
         },
         responseJson: function() {
             let result = {}
-            result["json"] = {"responseHeaders":JSON.parse(this.json["message"]["responseHeaders"]), "responsePayload": JSON.parse(this.json["message"]["responsePayload"])}
+            result["json"] = {"responseHeaders":JSON.parse(this.json["message"]["responseHeaders"] || "{}"), "responsePayload": JSON.parse(this.json["message"]["responsePayload"] || "{}")}
             result["highlightPaths"] = {}
             for (const x of this.json["highlightPaths"]) {
                 if (x["responseCode"] !== -1) {
-                    console.log(x);
                     if (x["isHeader"]) {
                         result["highlightPaths"]["root#"+"responseHeaders#"+x["param"]] = x["subType"]
                     } else {
