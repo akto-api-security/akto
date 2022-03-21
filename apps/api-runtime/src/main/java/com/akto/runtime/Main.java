@@ -7,11 +7,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import com.akto.DaoInit;
-import com.akto.dao.APIConfigsDao;
-import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.RuntimeFilterDao;
-import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.APIConfig;
 import com.akto.dto.AccountSettings;
@@ -94,6 +90,7 @@ public class Main {
 
     public static void createIndices() {
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
+        SensitiveSampleDataDao.instance.createIndicesIfAbsent();
     }
 
     public static void insertRuntimeFilters() {
