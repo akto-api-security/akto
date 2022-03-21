@@ -58,7 +58,7 @@ public class RequestTemplate {
         if (set.size() < 10) set.add(userId);
     }
 
-    private void insert(Object obj, String userId, Trie.Node<String, Pair<KeyTypes, Set<String>>> root, String url, String method, int responseCode, String prefix, int apiCollectionId) {        
+    private void insert(Object obj, String userId, Trie.Node<String, Pair<KeyTypes, Set<String>>> root, String url, String method, int responseCode, String prefix, int apiCollectionId, String rawMessage) {
 
         prefix += ("#"+root.getPathElem());
         if (prefix.startsWith("#")) {
@@ -77,22 +77,22 @@ public class RequestTemplate {
                 }
 
                 add(curr.getValue().getSecond(), userId);
-                insert(value, userId, curr, url, method, responseCode, prefix, apiCollectionId);
+                insert(value, userId, curr, url, method, responseCode, prefix, apiCollectionId, rawMessage);
             }
         } else if (obj instanceof BasicDBList) {
             for(Object elem: (BasicDBList) obj) {
                 Trie.Node<String, Pair<KeyTypes, Set<String>>> listNode = root.getOrCreate("$", new Pair<>(new KeyTypes(new HashMap<>(), false), new HashSet<String>()));
                 add(listNode.getValue().getSecond(), userId);
-                insert(elem, userId, listNode, url, method, responseCode, prefix, apiCollectionId);
+                insert(elem, userId, listNode, url, method, responseCode, prefix, apiCollectionId, rawMessage);
             }
         } else {
             //url, method, responseCode, true, header, value, userId
-            root.getValue().getFirst().process(url, method, responseCode, false, prefix, obj, userId, apiCollectionId);
+            root.getValue().getFirst().process(url, method, responseCode, false, prefix, obj, userId, apiCollectionId, rawMessage);
             add(root.getValue().getSecond(), userId);   
         }
     }
 
-    public void processHeaders(Map<String, List<String>> headerPayload, String url, String method, int responseCode, String userId, int apiCollectionId) {
+    public void processHeaders(Map<String, List<String>> headerPayload, String url, String method, int responseCode, String userId, int apiCollectionId, String rawMessage) {
         for (String header: headerPayload.keySet()) {
             KeyTypes keyTypes = this.headers.get(header);
             if (keyTypes == null) {
@@ -101,7 +101,7 @@ public class RequestTemplate {
             }
 
             for(String value: headerPayload.get(header)) {
-                keyTypes.process(url, method, responseCode, true, header, value, userId, apiCollectionId);
+                keyTypes.process(url, method, responseCode, true, header, value, userId, apiCollectionId, rawMessage);
             }
         }
     }
@@ -118,7 +118,7 @@ public class RequestTemplate {
 
     public static long insertTime = 0, processTime = 0, deleteTime = 0;
 
-    public List<SingleTypeInfo> process2(BasicDBObject payload, String url, String method, int responseCode, String userId, int apiCollectionId) {
+    public List<SingleTypeInfo> process2(BasicDBObject payload, String url, String method, int responseCode, String userId, int apiCollectionId, String rawMessage) {
             List<SingleTypeInfo> deleted = new ArrayList<>();
         
             if(userIds.size() < 10) userIds.add(userId);
@@ -156,7 +156,7 @@ public class RequestTemplate {
                     }
                 }
 
-                keyTypes.process(url, method, responseCode, false, param, flattened.get(param), userId, apiCollectionId);
+                keyTypes.process(url, method, responseCode, false, param, flattened.get(param), userId, apiCollectionId, rawMessage);
             }
 
             processTime += (System.currentTimeMillis() - s);
