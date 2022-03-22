@@ -15,7 +15,7 @@
           </span>
         </span>
 
-        <span v-else class="properties">{{ lengthString }}</span>
+        <!-- <span v-else class="properties">{{ lengthString }}</span> -->
       </button>
 
       <json-view-item
@@ -27,6 +27,7 @@
         :maxDepth="maxDepth"
         :canSelect="canSelect"
         :highlightItem="highlightItem"
+        :highlightItemMap="highlightItemMap"
       />
     </div>
     <!-- Handle Leaf Values -->
@@ -38,6 +39,7 @@
       :role="canSelect ? 'button' : undefined"
       :tabindex="canSelect ? '0' : undefined"
       v-if="data.type === 'value'"
+      @mouseover="upHere = true" @mouseleave="upHere = false"
     >
       <span class="value-key">{{ data.key }}:</span>
       <span :style="getValueStyle(data.value)">
@@ -54,11 +56,11 @@ export default Vue.extend({
   name: 'json-view-item',
   data: function() {
     return {
-      open: this.shouldShow()
+      open: true,
     };
   },
   mounted () {
-    this.$refs['container'].scrollIntoView({behavior: 'smooth', block: 'center'})
+    // this.$refs['container'].scrollIntoView({behavior: 'smooth', block: 'center'})
   },
   props: {
     data: {
@@ -76,6 +78,10 @@ export default Vue.extend({
       default: false
     },
     highlightItem: {
+      type: Object,
+      required: false
+    },
+    highlightItemMap: {
       type: Object,
       required: false
     }
@@ -127,6 +133,19 @@ export default Vue.extend({
         default:
           return { color: 'var(--vjc-valueKey-color)' };
       }
+    },
+    convertAbsoluteToRelative: function(value) {
+      let arr = value.split(".")
+      arr = arr.map((v) => {
+        if (v.length > 0 && v[0] === "?") {
+          return "$"
+        } else {
+          return v.toLowerCase()
+        }
+      })
+
+      return arr.join("#")
+
     }
   },
   computed: {
@@ -136,10 +155,14 @@ export default Vue.extend({
         opened: this.open
       };
     },
+    sensitiveHighlightValue() {
+      return this.highlightItemMap ? this.highlightItemMap[this.convertAbsoluteToRelative(this.data.path)] : null
+    },
     valueClasses: function() {
       return {
         'value-key': true,
-        'can-select': this.canSelect
+        'can-select': this.canSelect,
+        'sensitive-hightlight-class': this.sensitiveHighlightValue
       };
     },
     keyClass: function () {
@@ -171,7 +194,7 @@ export default Vue.extend({
 });
 </script>
 
-<style lang="scss" scoped>
+<style lang="scss">
 .json-view-item:not(.root-item) {
   margin-left: 15px;
 }
@@ -181,7 +204,9 @@ export default Vue.extend({
   font-weight: 600;
   margin-left: 10px;
   border-radius: 2px;
+  overflow: hidden;
   white-space: nowrap;
+  text-overflow: clip;
   padding: 5px 5px 5px 10px;
 
   &.can-select {
@@ -241,6 +266,10 @@ export default Vue.extend({
     text-decoration-color: #f44336;
 }
 
+.sensitive-hightlight-class {
+  background-color: #FF000033;
+}
+
 .chevron-arrow {
   flex-shrink: 0;
   border-right: 4px solid var(--vjc-arrow-color);
@@ -255,5 +284,10 @@ export default Vue.extend({
     margin-top: -3px;
     transform: rotate(45deg);
   }
+}
+
+.highlight-property { 
+  font-weight: 200;
+  color: var(--vjc-key-color);
 }
 </style>

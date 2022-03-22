@@ -67,7 +67,8 @@
                     <template #item.type="{item}">
                         <sensitive-chip-group :sensitiveTags="[item.type]" />
                     </template>
-                    <template #add-new-row-btn>
+                    
+                    <template #add-new-row-btn="{filteredItems}">
                         <div class="ma-1 d-flex">
                             <v-dialog
                                 :model="showDialog1"
@@ -92,7 +93,7 @@
                             </template>
                                 <batch-operation 
                                     title="Parameters" 
-                                    :items="newParameters.filter(x => !isSubTypeSensitive(x.x)).map(toFilterListObj)" 
+                                    :items="filteredItems.filter(x => !isSubTypeSensitive(x.x)).map(toFilterListObj)" 
                                     operation-name="Mark sensitive"
                                     @btnClicked="markAllSensitive(true, $event)"
                                 />
@@ -342,7 +343,16 @@ export default {
         },
         newParameters() {
             let now = func.timeNow()
-            return this.apiCollection.filter(x => x.timestamp > now - func.recencyPeriod).map(this.prepareItemForTable)
+            let listParams = this.apiCollection.filter(x => x.timestamp > now - func.recencyPeriod).map(this.prepareItemForTable)
+            return listParams.sort((a, b) => {
+                if (a.detectedTs > b.detectedTs + 3600) {
+                    return -1
+                } else if (a.detectedTs < b.detectedTs - 3600) {
+                    return 1
+                } else {
+                    return func.isSubTypeSensitive(a.x) > func.isSubTypeSensitive(b.x) ? -1 : 1
+                }
+            })
         },
         newParamsTrend() {
             return this.changesTrend(this.newParameters)

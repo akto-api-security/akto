@@ -138,6 +138,18 @@ export default {
         })
     },
 
+    fetchSensitiveSampleData(url, apiCollectionId, method) {
+        return request({
+            url: '/api/fetchSensitiveSampleData',
+            method: 'post',
+            data: {
+                url, apiCollectionId, method
+            }
+        }).then((resp) => {
+            return resp
+        })
+    },
+
     fetchApiInfoList(apiCollectionId) {
         return request({
             url: '/api/fetchApiInfoList',

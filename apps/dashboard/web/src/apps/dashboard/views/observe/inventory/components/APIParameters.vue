@@ -25,7 +25,7 @@
                 </a-card>
             </v-col>
         </v-row>
-        <layout-with-tabs :tabs="['Request', 'Response', 'Values']">
+        <layout-with-tabs :tabs="['Request', 'Response', 'Values', 'Sensitive Values']">
             <template slot="Request">
                 <simple-table 
                     :headers="headers" 
@@ -48,6 +48,10 @@
             </template>
             <template slot="Values">
                 <sample-data :messages="sampleData" v-if="sampleData"/>
+                <spinner v-else/>
+            </template>
+            <template slot="Sensitive Values">
+                <sample-data :messages="sensitiveSampleData" v-if="sensitiveSampleData"/>
                 <spinner v-else/>
             </template>
         </layout-with-tabs>
@@ -126,7 +130,8 @@ export default {
             ],
             loadingTrafficData: false,
             trafficInfo: {},
-            sampleData: null
+            sampleData: null,
+            sensitiveSampleData: null
         }  
     },
     methods: {
@@ -234,8 +239,19 @@ export default {
         let resp = await api.fetchEndpointTrafficData(this.url, this.apiCollectionId, this.method, now - 60 * 24 * 60 * 60, now)
         this.loadingTrafficData = false
         this.trafficInfo = resp.traffic
+
         let sampleDataResp = await api.fetchSampleData(this.url, this.apiCollectionId, this.method)
-        this.sampleData = sampleDataResp.sampleDataList.length > 0 ? sampleDataResp.sampleDataList[0].samples : []
+        let data = sampleDataResp.sampleDataList.length > 0 ? sampleDataResp.sampleDataList[0].samples : []
+        this.sampleData = []
+        data.forEach((x) => {
+            this.sampleData.push({"message": x, "highlightPaths": []})
+        })
+
+        let sensitiveDataResp = await api.fetchSensitiveSampleData(this.url, this.apiCollectionId, this.method)
+        this.sensitiveSampleData = []
+        for (const c in sensitiveDataResp.sensitiveSampleData) {
+            this.sensitiveSampleData.push({"message": c, "highlightPaths": sensitiveDataResp.sensitiveSampleData[c]})
+        }
     }
 }
 </script>

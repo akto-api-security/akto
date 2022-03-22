@@ -18,18 +18,18 @@
                         Refresh
                     </v-tooltip>
 
-                <upload-file fileFormat=".har,.pcap" @fileChanged="handleFileChange" label=""/>
+                <upload-file fileFormat=".har" @fileChanged="handleFileChange" label=""/>
                 <icon-menu icon="$fas_download" :items="downloadFileItems"/>
             </div>
         </div>
         <div class="d-flex">
             <count-box title="Sensitive Endpoints" :count="sensitiveEndpoints.length" colorTitle="Overdue"/>
-            <count-box title="Shadow Endpoints" :count="shadowEndpoints.length" colorTitle="Pending"/>
-            <count-box title="Unused Endpoints" :count="unusedEndpoints.length" colorTitle="This week"/>
+            <count-box title="Undocumented Endpoints" :count="shadowEndpoints.length" colorTitle="Pending"/>
+            <count-box title="Deprecated Endpoints" :count="unusedEndpoints.length" colorTitle="This week"/>
             <count-box title="All Endpoints" :count="allEndpoints.length" colorTitle="Total"/>
         </div>    
 
-        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Open', 'Shadow', 'Unused', 'Documented']">
+        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Unauthenticated', 'Undocumented', 'Deprecated', 'Documented']">
             <template slot="actions-tray">
             </template>
             <template slot="All">
@@ -57,12 +57,12 @@
                     </template>
                 </simple-table>
             </template>
-            <template slot="Shadow">
+            <template slot="Undocumented">
                 <simple-table 
                     :headers=tableHeaders 
                     :items=shadowEndpoints 
                     @rowClicked=rowClicked 
-                    name="Shadow"  
+                    name="Undocumented"  
                     sortKeyDefault="sensitive" 
                     :sortDescDefault="true"
                 >
@@ -71,11 +71,11 @@
                     </template>
                 </simple-table>
             </template>
-            <template slot="Unused">
+            <template slot="Deprecated">
                 <simple-table 
                     :headers=unusedHeaders 
                     :items=unusedEndpoints 
-                    name="Unused"
+                    name="Deprecated"
                 />
             </template>
             <template slot="Documented">
@@ -94,12 +94,12 @@
                     :errors="{}"
                 />
             </template>
-            <template slot="Open">
+            <template slot="Unauthenticated">
                 <simple-table 
                     :headers=tableHeaders 
                     :items=openEndpoints
                     @rowClicked=rowClicked 
-                    name="Open" 
+                    name="Unauthenticated" 
                     sortKeyDefault="sensitive" 
                     :sortDescDefault="true"
                 >
