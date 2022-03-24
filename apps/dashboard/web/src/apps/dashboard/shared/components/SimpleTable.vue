@@ -261,7 +261,22 @@ export default {
         columnValueList: {
             get () {
                 return this.headers.reduce((m, h) => {
-                    m[h.value] = [...new Set(this.items.map(i => i[h.value]).sort())].map(x => {return {title: x, subtitle: '', value: x}})
+                    let allItemValues = []
+                    
+                    this.items.forEach(i => {
+                            let value = i[h.value]
+                            if (value instanceof Set) {
+                                allItemValues = allItemValues.concat(...value)
+                            } else if (value instanceof Array) {
+                                allItemValues = allItemValues.concat(...value)
+                            } else if (typeof value !== 'undefined') {
+                                return allItemValues.push(i[h.value])
+                            }
+                        }
+                    )
+
+                    let distinctItems = [...new Set(allItemValues.sort())]
+                    m[h.value] = distinctItems.map(x => {return {title: x, subtitle: '', value: x}})
                     return m
                 }, {})
             }
@@ -269,7 +284,7 @@ export default {
         filteredItems() {
             return this.items.filter((d) => {
                 return Object.keys(this.filters).every((f) => {
-                return this.filters[f].size < 1 || this.filters[f].has(d[f]);
+                return this.filters[f].size < 1 || this.filters[f].has(d[f]) || (d[f] instanceof Set && [...this.filters[f]].filter( ff => d[f].has(ff)).length > 0 );
                 });
             });
         },
