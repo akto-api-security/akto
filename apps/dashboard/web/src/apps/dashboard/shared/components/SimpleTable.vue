@@ -105,6 +105,7 @@
                                                     :title="header.text" 
                                                     :items="columnValueList[header.value]" 
                                                     @clickedItem="appliedFilter(header.value, $event)" 
+                                                    @operatorChanged="operatorChanged(header.value, $event)"
                                                     @selectedAll="selectedAll(header.value, $event)"
                                                 />
                                             </v-menu>
@@ -187,7 +188,8 @@ export default {
             sortKey: this.sortKeyDefault || null,
             sortDesc: this.sortDescDefault || false,
             filters: this.headers.reduce((map, e) => {map[e.value] = new Set(); return map}, {}),
-            showFilterMenu: this.headers.reduce((map, e) => {map[e.value] = false; return map}, {})
+            showFilterMenu: this.headers.reduce((map, e) => {map[e.value] = false; return map}, {}),
+            filterOperators: this.headers.reduce((map, e) => {map[e.value] = 'OR'; return map}, {})
         }
     },
     methods: {
@@ -201,13 +203,17 @@ export default {
             }
             this.filters = {...this.filters}
         },
-        appliedFilter (hValue, {item, checked}) { 
+        appliedFilter (hValue, {item, checked, operator}) { 
+            this.filterOperators[hValue] = operator || 'OR'
             if (checked) {
                 this.filters[hValue].add(item.value)
             } else {
                 this.filters[hValue].delete(item.value)
             }
             this.filters = {...this.filters}
+        },
+        operatorChanged(hValue, {operator}) {
+            this.filterOperators[hValue] = operator || 'OR'
         },
         downloadData() {
             let headerTextToValueMap = Object.fromEntries(this.headers.map(x => [x.text, x.value]).filter(x => x[0].length > 0));
@@ -255,6 +261,33 @@ export default {
                 this.sortKey = headerSortKey
             }
             // return this.sortFunc(this.items, this.sortKey, this.sortDesc)
+        },
+        filterFunc(item, header) {
+            let itemValue = item[header]
+            let selectedValues = this.filters[header]
+            if (this.filters[header].size < 1) {
+                return true
+            } 
+            
+            if(itemValue instanceof Set) {
+                switch(this.filterOperators[header]) {
+                    case "OR":
+                        return [...selectedValues].filter( v => itemValue.has(v)).length > 0 
+                    case "AND":
+                        return [...selectedValues].filter( v => !itemValue.has(v)).length == 0 
+                    case "NOT":
+                        return [...selectedValues].filter( v => itemValue.has(v)).length == 0 
+
+                }
+            } else {
+                switch (this.filterOperators[header]) {
+                    case "OR": 
+                    case "AND":
+                        return selectedValues.has(itemValue)
+                    case "NOT":
+                        return !selectedValues.has(itemValue)
+                }
+            }
         }
     },
     computed: {
@@ -284,7 +317,7 @@ export default {
         filteredItems() {
             return this.items.filter((d) => {
                 return Object.keys(this.filters).every((f) => {
-                return this.filters[f].size < 1 || this.filters[f].has(d[f]) || (d[f] instanceof Set && [...this.filters[f]].filter( ff => d[f].has(ff)).length > 0 );
+                return this.filterFunc(d, f)
                 });
             });
         },
