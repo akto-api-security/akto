@@ -215,12 +215,19 @@ export default {
         operatorChanged(hValue, {operator}) {
             this.filterOperators[hValue] = operator || 'OR'
         },
+        valToString(val) {
+            if (val instanceof Set) {
+                return [...val].join(" & ")
+            } else {
+                return val || "-"
+            }
+        },
         downloadData() {
             let headerTextToValueMap = Object.fromEntries(this.headers.map(x => [x.text, x.value]).filter(x => x[0].length > 0));
 
             let csv = Object.keys(headerTextToValueMap).join(",")+"\r\n"
-            this.items.forEach(i => {
-                csv += Object.values(headerTextToValueMap).map(h => (i[h] || "-")).join(",") + "\r\n"
+            this.filteredItems.forEach(i => {
+                csv += Object.values(headerTextToValueMap).map(h => this.valToString(i[h])).join(",") + "\r\n"
             })
             let blob = new Blob([csv], {
                 type: "application/csvcharset=UTF-8"
