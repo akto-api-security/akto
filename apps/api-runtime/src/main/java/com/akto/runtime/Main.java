@@ -227,7 +227,8 @@ public class Main {
                     }
 
                     if (!aktoPolicyMap.containsKey(accountId)) {
-                        AktoPolicy aktoPolicy = new AktoPolicy(true);
+                        APICatalogSync apiCatalogSync = httpCallParserMap.get(accountId).apiCatalogSync;
+                        AktoPolicy aktoPolicy = new AktoPolicy(apiCatalogSync);
                         aktoPolicyMap.put(accountId, aktoPolicy);
                     }
 
@@ -237,9 +238,9 @@ public class Main {
 
                     try {
                         List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
-                        parser.syncFunction(accWiseResponse);
+                        APICatalogSync apiCatalogSync = parser.syncFunction(accWiseResponse);
                         // flow.init(accWiseResponse);
-                        aktoPolicy.main(accWiseResponse);
+                        aktoPolicy.main(accWiseResponse, apiCatalogSync);
                     } catch (Exception e) {
                         logger.error(e.toString());
                     }

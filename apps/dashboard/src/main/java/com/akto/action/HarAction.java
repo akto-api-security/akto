@@ -9,6 +9,7 @@ import com.akto.har.HAR;
 import com.akto.kafka.Kafka;
 import com.akto.listener.KafkaListener;
 import com.akto.parsers.HttpCallParser;
+import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.policies.AktoPolicy;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -86,9 +87,9 @@ public class HarAction extends UserAction {
             }
             
             if(skipKafka) {
-                parser.syncFunction(responses);
-                AktoPolicy aktoPolicy = new AktoPolicy(true); // keep inside if condition statement because db call when initialised
-                aktoPolicy.main(responses);
+                APICatalogSync apiCatalogSync = parser.syncFunction(responses);
+                AktoPolicy aktoPolicy = new AktoPolicy(parser.apiCatalogSync); // keep inside if condition statement because db call when initialised
+                aktoPolicy.main(responses, apiCatalogSync);
             }
         } catch (Exception e) {
             e.printStackTrace();

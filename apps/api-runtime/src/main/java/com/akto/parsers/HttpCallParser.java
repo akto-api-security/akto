@@ -1,10 +1,8 @@
 package com.akto.parsers;
 
-import java.io.*;
 import java.net.URLDecoder;
 import java.util.*;
 
-import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
@@ -13,7 +11,6 @@ import com.akto.runtime.URLAggregator;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
-import com.mongodb.ConnectionString;
 
 import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
@@ -32,7 +29,7 @@ public class HttpCallParser {
     private int last_synced;
     private static final Logger logger = LoggerFactory.getLogger(HttpCallParser.class);
 
-    APICatalogSync apiCatalogSync;
+    public APICatalogSync apiCatalogSync;
     public HttpCallParser(String userIdentifier, int thresh, int sync_threshold_count, int sync_threshold_time) {
         last_synced = 0;
         this.sync_threshold_count = sync_threshold_count;
@@ -131,7 +128,7 @@ public class HttpCallParser {
 
     int numberOfSyncs = 0;
 
-    public void syncFunction(List<HttpResponseParams> responseParams)  {
+    public APICatalogSync syncFunction(List<HttpResponseParams> responseParams)  {
         // USE ONLY filteredResponseParams and not responseParams
         List<HttpResponseParams> filteredResponseParams = filterHttpResponseParams(responseParams);
         boolean isHarOrPcap = aggregate(filteredResponseParams);
@@ -148,7 +145,10 @@ public class HttpCallParser {
             apiCatalogSync.syncWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
+            return apiCatalogSync;
         }
+
+        return null;
     }
 
     public static List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList) {

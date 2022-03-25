@@ -32,7 +32,7 @@ public class ApiAccessTypePolicy {
            boolean result = ipInCidr(ip);
            if (!result) {
                apiInfo.getApiAccessTypes().add(ApiInfo.ApiAccessType.PUBLIC);
-               return true;
+               return false;
            }
         }
 

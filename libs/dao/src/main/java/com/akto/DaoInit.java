@@ -11,6 +11,7 @@ import com.akto.dto.third_party_access.ThirdPartyAccess;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.type.URLTemplate;
+import com.akto.types.CappedList;
 import com.akto.util.EnumCodec;
 import com.akto.dto.Attempt.AttemptResult;
 import com.akto.dto.auth.APIAuth;
@@ -52,6 +53,7 @@ public class DaoInit {
         ClassModel<RuntimeFilter> runtimeFilterClassModel = ClassModel.builder(RuntimeFilter.class).enableDiscriminator(true).build();
         ClassModel<FilterSampleData> filterSampleDataClassModel = ClassModel.builder(FilterSampleData.class).enableDiscriminator(true).build();
         ClassModel<AccountSettings> accountSettingsClassModel = ClassModel.builder(AccountSettings.class).enableDiscriminator(true).build();
+        ClassModel<CappedList>  cappedListClassModel = ClassModel.builder(CappedList.class).enableDiscriminator(true).build();
 
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(queueEntryClassModel, configClassModel, 
@@ -59,7 +61,7 @@ public class DaoInit {
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel,singleTypeInfoClassModel,
                 thirdPartyAccessClassModel, credentialClassModel, apiTokenClassModel, apiInfoClassModel,
                 apiInfoKeyClassModel, customFilterClassModel, runtimeFilterClassModel, filterSampleDataClassModel,
-                fieldExistsFilterClassModel, accountSettingsClassModel, responseCodeRuntimeFilterClassModel).automatic(true).build());
+                fieldExistsFilterClassModel, accountSettingsClassModel, responseCodeRuntimeFilterClassModel, cappedListClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
             new EnumCodec<>(SingleTypeInfo.SubType.class),
