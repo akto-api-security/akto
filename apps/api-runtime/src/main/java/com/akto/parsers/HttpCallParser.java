@@ -5,6 +5,7 @@ import java.net.URLDecoder;
 import java.util.*;
 
 import com.akto.DaoInit;
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
@@ -15,6 +16,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.ConnectionString;
 
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.Updates;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +35,8 @@ public class HttpCallParser {
     private int sync_count = 0;
     private int last_synced;
     private static final Logger logger = LoggerFactory.getLogger(HttpCallParser.class);
+
+    private Map<String, Integer> hostNameToIdMap = new HashMap<>();
 
     APICatalogSync apiCatalogSync;
     public HttpCallParser(String userIdentifier, int thresh, int sync_threshold_count, int sync_threshold_time) {
@@ -111,6 +117,53 @@ public class HttpCallParser {
         return headers;
     }
 
+    public static String getHostName(Map<String,List<String>> headers) {
+        if (headers == null) return null;
+        for (String k: headers.keySet()) {
+            if (k.equalsIgnoreCase("host")) {
+                List<String> hosts = headers.get(k);
+                if (hosts.size() > 0) return hosts.get(0);
+                return null;
+            }
+        }
+        return null;
+    }
+
+
+    public int createCollectionBasedOnHostName(int id, String host)  throws Exception {
+        UpdateOptions updateOptions = new UpdateOptions();
+        updateOptions.upsert(true);
+        // 3 cases
+        // 1. If 2 threads are trying to insert same host simultaneously then both will succeed with upsert true
+        // 2. If we are trying to insert different host but same id (hashCode collision) then it will fail,
+        //    so we loop 20 times till we succeed
+        boolean flag = false;
+        for (int i=0;i < 20; i++) {
+            id += i;
+            try {
+                ApiCollectionsDao.instance.getMCollection().updateOne(
+                        Filters.eq("name", host),
+                        Updates.combine(
+                                Updates.setOnInsert("_id", id),
+                                Updates.setOnInsert("startTs", Context.now()),
+                                Updates.setOnInsert("urls", new HashSet<>()),
+                                Updates.setOnInsert("hostWise", true)
+                        ),
+                        updateOptions
+                );
+                flag = true;
+                break;
+            } catch (Exception e) {
+                logger.error("Error while inserting apiCollection, trying again " + i + " " + e.getMessage());
+            }
+        }
+        if (flag) { // flag tells if we were successfully able to insert collection
+            return id;
+        } else {
+            throw new Exception("Not able to insert");
+        }
+    }
+
     public static String getAcceptableContentType(Map<String,List<String>> headers) {
         List<String> acceptableContentTypes = Arrays.asList(JSON_CONTENT_TYPE, FORM_URL_ENCODED_CONTENT_TYPE);
         List<String> contentTypeValues = new ArrayList<>();
@@ -151,11 +204,33 @@ public class HttpCallParser {
         }
     }
 
-    public static List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList) {
+    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
         for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
             boolean cond = httpResponseParam.statusCode >= 200 && httpResponseParam.statusCode < 300;
             if (cond) {
+                String hostName = getHostName(httpResponseParam.getRequestParams().getHeaders());
+                if (hostName != null) {
+                    hostName = hostName.toLowerCase();
+                    hostName = hostName.trim();
+
+                    int apiCollectionId ;
+                    if (hostNameToIdMap.containsKey(hostName)) {
+                        apiCollectionId = hostNameToIdMap.get(hostName);
+                    } else {
+                        int hostHashCode = hostName.hashCode();
+                        try {
+                            apiCollectionId = createCollectionBasedOnHostName(hostHashCode, hostName);
+                            hostNameToIdMap.put(hostName, apiCollectionId);
+                        } catch (Exception e) {
+                            logger.error("Failed to create collection for host : " + hostName);
+                            apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
+                        }
+                    }
+
+                    httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
+                }
+
                 filteredResponseParams.add(httpResponseParam);
             }
         }
@@ -196,5 +271,13 @@ public class HttpCallParser {
 
     public int getSyncCount() {
         return this.sync_count;
+    }
+
+    public Map<String, Integer> getHostNameToIdMap() {
+        return hostNameToIdMap;
+    }
+
+    public void setHostNameToIdMap(Map<String, Integer> hostNameToIdMap) {
+        this.hostNameToIdMap = hostNameToIdMap;
     }
 }

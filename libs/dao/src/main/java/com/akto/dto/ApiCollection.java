@@ -11,6 +11,7 @@ public class ApiCollection {
     String name;
     int startTs;
     Set<String> urls;
+    boolean hostWise;
 
     public ApiCollection() {
     }
@@ -63,5 +64,12 @@ public class ApiCollection {
             ", urls='" + getUrls() + "'" +
             "}";
     }
-    
+
+    public boolean isHostWise() {
+        return hostWise;
+    }
+
+    public void setHostWise(boolean hostWise) {
+        this.hostWise = hostWise;
+    }
 }

@@ -7,10 +7,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import java.util.*;
 
 import com.akto.MongoBasedTest;
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.RuntimeFilterDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollection;
+import com.akto.dto.HttpRequestParams;
 import com.akto.dto.User;
 import com.akto.dto.messaging.Message.Mode;
 import com.akto.dto.runtime_filters.RuntimeFilter;
@@ -209,31 +212,106 @@ public class TestDBSync extends MongoBasedTest {
 
     @Test
     public void testFilterHttpResponseParamsEmpty() {
-        List<HttpResponseParams> ss = HttpCallParser.filterHttpResponseParams(new ArrayList<>());
+        HttpCallParser httpCallParser = new HttpCallParser("",0,0,0);
+        List<HttpResponseParams> ss = httpCallParser.filterHttpResponseParams(new ArrayList<>());
         assertEquals(ss.size(),0);
     }
 
     @Test
     public void testFilterHttpResponseParams() {
+        String domain = "domain.com";
+        String domain1 = "domain1.com";
+        String domain2 = "domain2.com";
+        String domain3 = "domain3.com";
+        ApiCollectionsDao.instance.insertOne(new ApiCollection(0, domain, 0, new HashSet<>()));
+        // id as domain2 hashcode to see if collision case works or not
+        ApiCollectionsDao.instance.insertOne(new ApiCollection(domain2.hashCode(), domain1, 0, new HashSet<>()));
+
         HttpResponseParams h1 = new HttpResponseParams();
+        h1.requestParams = new HttpRequestParams();
+        h1.requestParams.setHeaders(new HashMap<>());
+        h1.requestParams.getHeaders().put("host", Collections.singletonList(domain2));
         h1.statusCode = 300;
         HttpResponseParams h2 = new HttpResponseParams();
+        h2.requestParams = new HttpRequestParams();
+        h2.requestParams.setHeaders(new HashMap<>());
+        h2.requestParams.getHeaders().put("host", Collections.singletonList(domain2));
         h2.statusCode = 499;
         HttpResponseParams h3 = new HttpResponseParams();
+        h3.requestParams = new HttpRequestParams();
+        h3.requestParams.setHeaders(new HashMap<>());
+        h3.requestParams.getHeaders().put("host", Collections.singletonList(domain2));
         h3.statusCode = 200;
         HttpResponseParams h4 = new HttpResponseParams();
+        h4.requestParams = new HttpRequestParams();
+        h4.requestParams.setHeaders(new HashMap<>());
+        h4.requestParams.getHeaders().put("host", Collections.singletonList(domain2));
         h4.statusCode = 199;
         HttpResponseParams h5 = new HttpResponseParams();
+        h5.requestParams = new HttpRequestParams();
+        h5.requestParams.setHeaders(new HashMap<>());
+        h5.requestParams.getHeaders().put("host", Collections.singletonList(domain2));
         h5.statusCode = 233;
         HttpResponseParams h6 = new HttpResponseParams();
+        h6.requestParams = new HttpRequestParams();
+        h6.requestParams.setHeaders(new HashMap<>());
+        h6.requestParams.getHeaders().put("host", Collections.singletonList(domain3));
         h6.statusCode = 299;
 
         List<HttpResponseParams> httpResponseParamsList = Arrays.asList(h1,h2,h3,h4,h5,h6);
 
-        List<HttpResponseParams> filterHttpResponseParamsList = HttpCallParser.filterHttpResponseParams(httpResponseParamsList);
+        HttpCallParser httpCallParser = new HttpCallParser("",0,0,0);
+        List<HttpResponseParams> filterHttpResponseParamsList = httpCallParser.filterHttpResponseParams(httpResponseParamsList);
 
         Assertions.assertEquals(filterHttpResponseParamsList.size(), 3);
         Assertions.assertTrue(filterHttpResponseParamsList.containsAll(Arrays.asList(h3,h5,h6)));
+
+        Map<String, Integer> hostNameToIdMap = httpCallParser.getHostNameToIdMap();
+        Assertions.assertEquals(h3.requestParams.getApiCollectionId(), hostNameToIdMap.get(domain2));
+        Assertions.assertEquals(h5.requestParams.getApiCollectionId(), hostNameToIdMap.get(domain2));
+        Assertions.assertEquals(h6.requestParams.getApiCollectionId(),  hostNameToIdMap.get(domain3));
+
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        Assertions.assertEquals(apiCollections.size(), 4);
+        Map<String, ApiCollection> apiCollectionMap = new HashMap<>();
+        for (ApiCollection apiCollection: apiCollections) {
+            apiCollectionMap.put(apiCollection.getName(), apiCollection);
+        }
+
+        Assertions.assertEquals(apiCollectionMap.get(domain2).getId(), domain2.hashCode() + 1);
+        Assertions.assertTrue(apiCollectionMap.get(domain2).isHostWise());
+        Assertions.assertEquals(apiCollectionMap.get(domain3).getId(), domain3.hashCode());
+        Assertions.assertEquals(apiCollectionMap.get(domain1).getId(), domain2.hashCode());
+        Assertions.assertEquals(apiCollectionMap.get(domain).getId(), 0);
+        Assertions.assertFalse(apiCollectionMap.get(domain).isHostWise());
+
+        // if another instance of httpCallParser starts then it start from empty map but it shouldn't create duplicate collections
+        HttpCallParser httpCallParser1 = new HttpCallParser("",0,0,0);
+        HttpResponseParams h7 = new HttpResponseParams();
+        h7.requestParams = new HttpRequestParams();
+        h7.requestParams.setHeaders(new HashMap<>());
+        h7.requestParams.getHeaders().put("host", Collections.singletonList(domain2));
+        h7.statusCode = 200;
+        httpCallParser1.filterHttpResponseParams(httpResponseParamsList);
+        List<ApiCollection> apiCollections1 = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        Assertions.assertEquals(apiCollections1.size(), 4);
+    }
+
+    @Test
+    public void testCollisionHostNameCollection() {
+        ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "domain", 0, new HashSet<>()));
+        HttpResponseParams h1 = new HttpResponseParams();
+        h1.requestParams = new HttpRequestParams();
+        h1.requestParams.setHeaders(new HashMap<>());
+        h1.requestParams.getHeaders().put("host", Collections.singletonList("domain"));
+        h1.statusCode = 200;
+
+        HttpCallParser httpCallParser = new HttpCallParser("",0,0,0);
+        httpCallParser.filterHttpResponseParams(Collections.singletonList(h1));
+
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        Assertions.assertEquals(apiCollections.size(), 1);
+        Assertions.assertEquals(apiCollections.get(0).getId(), 0);
     }
 
 }
