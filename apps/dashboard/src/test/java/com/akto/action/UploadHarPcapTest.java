@@ -33,7 +33,7 @@ import io.swagger.v3.oas.models.Operation;
 
 public class UploadHarPcapTest extends MongoBasedTest {
 
-    private static final int apiCollectionId = 1234;
+    private static final int apiCollectionId = -86958465;
     private static final String apiKey = "PMAK-61fcbd62e58bb3004edcaf49-2ea57c2f8e5b8fef10965a3f169525fafa";
     private static String workspaceId = null;
 
