@@ -62,7 +62,7 @@ public class TestDBSync extends MongoBasedTest {
         sync.computeDelta(aggr, true, 0);
         sync.syncWithDB(); 
 
-        assertEquals(1, sync.getDelta(0).getStrictURLToMethods().size());
+        assertEquals(0, sync.getDelta(0).getStrictURLToMethods().size());
         assertEquals(1, sync.getDelta(0).getTemplateURLToMethods().size());
 
         Map.Entry<URLTemplate, RequestTemplate> entry = sync.getDelta(0).getTemplateURLToMethods().entrySet().iterator().next();
@@ -70,11 +70,11 @@ public class TestDBSync extends MongoBasedTest {
         assertEquals(url+"INTEGER", entry.getKey().getTemplateString());
         RequestTemplate reqTemplate = entry.getValue();
 
-        assertEquals(29, reqTemplate.getUserIds().size());
+        assertEquals(30, reqTemplate.getUserIds().size());
         assertEquals(2, reqTemplate.getParameters().size());
         
         RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.getStatusCode());
-        assertEquals(29, respTemplate.getUserIds().size());
+        assertEquals(30, respTemplate.getUserIds().size());
         assertEquals(3, respTemplate.getParameters().size());
     }    
 
