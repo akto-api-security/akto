@@ -28,10 +28,19 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
 import org.bson.conversions.Bson;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 
 public class TestDBSync extends MongoBasedTest {
+
+    private static int currAccountId = 0;
+
+    @Before
+    public void changeAccountId() {
+        Context.accountId.set(currAccountId);
+        currAccountId += 1;
+    }
 
     @Test
     public void testMongo() {
