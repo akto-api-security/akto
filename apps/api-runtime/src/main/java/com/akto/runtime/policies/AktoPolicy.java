@@ -197,7 +197,6 @@ public class AktoPolicy {
         }
 
         if (apiCatalogSync != null) {
-            logger.info("Let's sync becoz threshold achieved: " + currentBatchSize + " " + (Context.now() -  timeSinceLastSync));
             this.currentBatchSize = 0;
             this.timeSinceLastSync = Context.now();
             syncWithDb(false, apiCatalogSync.delta);

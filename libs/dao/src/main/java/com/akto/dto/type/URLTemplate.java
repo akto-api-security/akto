@@ -39,9 +39,9 @@ public class URLTemplate {
 
         String a = url + " " + urlMethod.name();
         String b = this.getTemplateString() + " " + urlMethod;
-//        if (a.equals(b)) {
-//            return true;
-//        }
+        if (a.equals(b)) {
+            return true;
+        }
 
         String[] thatTokens = url.split("/");
 

@@ -139,7 +139,7 @@ public class TestAktoPolicy extends MongoBasedTest {
         apiInfoList = ApiInfoDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(apiInfoList.size(), hrpList.size());
         filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
-        Assertions.assertEquals(filterSampleDataList.size(), 0);
+        Assertions.assertEquals(filterSampleDataList.size(), 0); // because no policy violation
 
 
         URLStatic urlStatic7 = new URLStatic("/api/toys/2", URLMethods.Method.PUT);
@@ -164,11 +164,8 @@ public class TestAktoPolicy extends MongoBasedTest {
         Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().get(0).getDeletedInfo().get(0), new ApiInfo.ApiInfoKey(0, urlStatic6.getUrl(), urlStatic6.getMethod()));
         Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().get(0).getStrictURLToMethods().size(), 6 ); // because one hrp is of different collection
         Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().get(0).getTemplateURLToMethods().size(), 1 );
-
-        System.out.println("***");
-        System.out.println(aktoPolicy.getApiInfoCatalogMap().get(0).getTemplateURLToMethods().get(APICatalogSync.createUrlTemplate("api/toys/INTEGER", urlStatic6.getMethod())).getApiInfo());
-        System.out.println(aktoPolicy.getApiInfoCatalogMap().get(0).getTemplateURLToMethods().get(APICatalogSync.createUrlTemplate("api/toys/INTEGER", urlStatic6.getMethod())).getFilterSampleDataMap());
-        System.out.println("***");
+        Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().get(0).getTemplateURLToMethods()
+                .get(APICatalogSync.createUrlTemplate("api/toys/INTEGER", urlStatic6.getMethod())).getFilterSampleDataMap().size(), 1 );
 
         // delete will happen in next cycle
         apiInfoList = ApiInfoDao.instance.findAll(new BasicDBObject());
