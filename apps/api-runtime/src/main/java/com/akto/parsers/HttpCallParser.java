@@ -234,8 +234,9 @@ public class HttpCallParser {
             String hostName = getHostName(httpResponseParam.getRequestParams().getHeaders());
             int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
             int apiCollectionId ;
+            List<HttpResponseParams.Source> whiteListSource = Arrays.asList(HttpResponseParams.Source.MIRRORING);
 
-            if (hostName != null && ApiCollection.useHost) {
+            if (whiteListSource.contains(httpResponseParam.getSource()) && hostName != null && ApiCollection.useHost) {
                 hostName = hostName.toLowerCase();
                 hostName = hostName.trim();
 
