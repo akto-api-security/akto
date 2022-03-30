@@ -5,10 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import com.akto.MongoBasedTest;
 import com.akto.dao.AccountSettingsDao;
@@ -38,6 +35,11 @@ public class TestMainSubFunctions extends MongoBasedTest{
     public void testTryForCollectionNameWithoutCidr() throws JsonProcessingException {
         int vxlan_id = 10000;
         String group_name = "bb";
+
+        ApiCollectionsDao.instance.insertOne(new ApiCollection(
+                vxlan_id, null, 0, new HashSet<>(), null, vxlan_id
+        ));
+
         Map<String, Object> m = new HashMap<>();
         m.put(Main.GROUP_NAME, group_name);
         m.put(Main.VXLAN_ID, vxlan_id);
@@ -45,19 +47,26 @@ public class TestMainSubFunctions extends MongoBasedTest{
         String message = mapper.writeValueAsString(m);
         Main.tryForCollectionName(message);
 
-        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq("_id",vxlan_id ));
-        assertNotNull(apiCollection);
+        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.VXLAN_ID,vxlan_id ));
+        assertEquals(apiCollection.getVxlanId(), vxlan_id);
+        assertEquals(apiCollection.getName(), group_name);
+        assertNull(apiCollection.getHostName());
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(Filters.eq("_id", Context.accountId.get()));
         assertNull(accountSettings);
     }
-    
+
 
     @Test
     public void testTryForCollectionNameWithCidr() throws JsonProcessingException {
         int vxlan_id = 10000;
         String group_name = "bb";
         List<String> vpc_cidr = Arrays.asList("192.1.1.1/16", "193.1.1.1/16");
+
+        ApiCollectionsDao.instance.insertOne(new ApiCollection(
+                vxlan_id, null, 0, new HashSet<>(), null, vxlan_id
+        ));
+
         Map<String, Object> m = new HashMap<>();
         m.put(Main.GROUP_NAME, group_name);
         m.put(Main.VXLAN_ID, vxlan_id);
@@ -66,8 +75,10 @@ public class TestMainSubFunctions extends MongoBasedTest{
         String message = mapper.writeValueAsString(m);
         Main.tryForCollectionName(message);
 
-        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq("_id",vxlan_id ));
-        assertNotNull(apiCollection);
+        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.VXLAN_ID,vxlan_id ));
+        assertEquals(apiCollection.getVxlanId(), vxlan_id);
+        assertEquals(apiCollection.getName(), group_name);
+        assertNull(apiCollection.getHostName());
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(Filters.eq("_id", Context.accountId.get()));
         assertNotNull(accountSettings);

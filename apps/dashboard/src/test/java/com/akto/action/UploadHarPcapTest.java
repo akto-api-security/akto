@@ -111,7 +111,7 @@ public class UploadHarPcapTest extends MongoBasedTest {
     public void testDuplicateCollectionNames() {
         ApiCollectionsAction action = new ApiCollectionsAction();
         String testName = "test1";
-        ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", 0, new HashSet<>()));
+        ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", 0, new HashSet<>(),null,0));
         action.setCollectionName(testName);
 
         action.createCollection();

@@ -615,16 +615,8 @@ public class APICatalogSync {
                 }
 
                 Bson findQ = Filters.eq("_id", collectionId);
-                ApiCollection currCollection = ApiCollectionsDao.instance.findOne(findQ);
-                
 
-                if (currCollection == null) {
-                    ApiCollectionsDao.instance.insertOne(new ApiCollection(collectionId, "", Context.now(), newURLs));
-
-                } else {
-                    currCollection.setUrls(newURLs);
-                    ApiCollectionsDao.instance.getMCollection().updateOne(findQ, Updates.set("urls", newURLs));
-                }
+                ApiCollectionsDao.instance.getMCollection().updateOne(findQ, Updates.set("urls", newURLs));
             }
         }
     }
