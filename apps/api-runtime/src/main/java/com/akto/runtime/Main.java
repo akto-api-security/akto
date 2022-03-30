@@ -63,7 +63,7 @@ public class Main {
                 String groupName = (String) (json.get(GROUP_NAME));
                 String vxlanIdStr = ((Double) json.get(VXLAN_ID)).intValue() + "";
                 int vxlanId = Integer.parseInt(vxlanIdStr);
-                ApiCollectionsDao.instance.getMCollection().updateOne(
+                ApiCollectionsDao.instance.getMCollection().updateMany(
                         Filters.eq(ApiCollection.VXLAN_ID, vxlanId),
                         Updates.set(ApiCollection.NAME, groupName)
                 );
