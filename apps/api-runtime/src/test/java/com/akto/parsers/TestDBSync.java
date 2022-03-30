@@ -304,6 +304,7 @@ public class TestDBSync extends MongoBasedTest {
         h1.requestParams.getHeaders().put("host", Collections.singletonList(domain1));
         h1.requestParams.setApiCollectionId(vxlanId1);
         h1.statusCode = 200;
+        h1.setSource(Source.MIRRORING);
 
         httpCallParser.filterHttpResponseParams(Collections.singletonList(h1));
 
@@ -329,6 +330,7 @@ public class TestDBSync extends MongoBasedTest {
         h2.requestParams.getHeaders().put("host", Collections.singletonList(domain2));
         h2.requestParams.setApiCollectionId(vxlanId2);
         h2.statusCode = 200;
+        h2.setSource(Source.MIRRORING);
 
         httpCallParser.filterHttpResponseParams(Collections.singletonList(h2));
 
@@ -352,6 +354,7 @@ public class TestDBSync extends MongoBasedTest {
         h3.requestParams.getHeaders().put("host", Collections.singletonList(domain3));
         h3.requestParams.setApiCollectionId(vxlanId2); // same vxlan but different host
         h3.statusCode = 200;
+        h3.setSource(Source.MIRRORING);
 
         httpCallParser.filterHttpResponseParams(Collections.singletonList(h3));
 
@@ -377,6 +380,7 @@ public class TestDBSync extends MongoBasedTest {
         h4.requestParams.getHeaders().put("host", Collections.singletonList(domain4));
         h4.requestParams.setApiCollectionId(vxlanId4);
         h4.statusCode = 200;
+        h4.setSource(Source.MIRRORING);
 
         // before processing inserting apiCollection with same id but different vxlanId and host
         int dupId = domain4.hashCode() + vxlanId4;
@@ -408,6 +412,7 @@ public class TestDBSync extends MongoBasedTest {
         h1.requestParams.setHeaders(new HashMap<>());
         h1.requestParams.getHeaders().put("host", Collections.singletonList("domain"));
         h1.statusCode = 200;
+        h1.setSource(Source.MIRRORING);
 
         HttpCallParser httpCallParser = new HttpCallParser("",0,0,0);
         httpCallParser.filterHttpResponseParams(Collections.singletonList(h1));
