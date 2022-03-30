@@ -39,7 +39,7 @@ public class TestAktoPolicy extends MongoBasedTest {
         urls.add("api/toys/INTEGER PUT");
         urls.add("api/new/INTEGER GET");
         urls.add("/api/new/books GET");
-        ApiCollection apiCollection = new ApiCollection(0,"", 0, urls);
+        ApiCollection apiCollection = new ApiCollection(0,"", 0, urls, null, 0);
         ApiCollectionsDao.instance.insertOne(apiCollection);
 
         List<ApiInfo> apiInfoList = new ArrayList<>();

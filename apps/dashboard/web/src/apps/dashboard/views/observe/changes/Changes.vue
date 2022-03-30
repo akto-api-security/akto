@@ -330,7 +330,7 @@ export default {
         ...mapState('changes', ['apiCollection', 'apiInfoList', 'lastFetched']),
         mapCollectionIdToName() {
             return this.$store.state.collections.apiCollections.reduce((m, e) => {
-                m[e.id] = e.name
+                m[e.id] = e.displayName
                 return m
             }, {})
         },

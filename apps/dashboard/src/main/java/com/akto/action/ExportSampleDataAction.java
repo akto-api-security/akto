@@ -35,7 +35,7 @@ public class ExportSampleDataAction extends UserAction {
             for(SingleTypeInfo singleTypeInfo: SingleTypeInfoDao.instance.fetchAll()) {
                 urls.add(singleTypeInfo.getUrl());
             }
-            ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), urls));
+            ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), urls, null,0));
         }
     }
 

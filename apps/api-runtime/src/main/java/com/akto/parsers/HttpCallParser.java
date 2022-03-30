@@ -7,6 +7,7 @@ import java.util.*;
 import com.akto.DaoInit;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.runtime.APICatalogSync;
@@ -129,8 +130,25 @@ public class HttpCallParser {
         return null;
     }
 
+    public int createCollectionSimple(int vxlanId) {
+        UpdateOptions updateOptions = new UpdateOptions();
+        updateOptions.upsert(true);
 
-    public int createCollectionBasedOnHostName(int id, String host)  throws Exception {
+        ApiCollectionsDao.instance.getMCollection().updateOne(
+                Filters.eq("_id", vxlanId),
+                Updates.combine(
+                        Updates.set(ApiCollection.VXLAN_ID, vxlanId),
+                        Updates.setOnInsert("startTs", Context.now()),
+                        Updates.setOnInsert("urls", new HashSet<>())
+                ),
+                updateOptions
+        );
+
+        return vxlanId;
+    }
+
+
+    public int createCollectionBasedOnHostName(int id, String host, int vxlanId)  throws Exception {
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
         // 3 cases
@@ -138,16 +156,18 @@ public class HttpCallParser {
         // 2. If we are trying to insert different host but same id (hashCode collision) then it will fail,
         //    so we loop 20 times till we succeed
         boolean flag = false;
-        for (int i=0;i < 20; i++) {
+        for (int i=0;i < 100; i++) {
             id += i;
             try {
                 ApiCollectionsDao.instance.getMCollection().updateOne(
-                        Filters.eq("name", host),
+                        Filters.and(
+                                Filters.eq(ApiCollection.HOST_NAME, host),
+                                Filters.eq(ApiCollection.VXLAN_ID, vxlanId)
+                        ),
                         Updates.combine(
                                 Updates.setOnInsert("_id", id),
                                 Updates.setOnInsert("startTs", Context.now()),
-                                Updates.setOnInsert("urls", new HashSet<>()),
-                                Updates.setOnInsert("hostWise", true)
+                                Updates.setOnInsert("urls", new HashSet<>())
                         ),
                         updateOptions
                 );
@@ -208,31 +228,46 @@ public class HttpCallParser {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
         for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
             boolean cond = httpResponseParam.statusCode >= 200 && httpResponseParam.statusCode < 300;
-            if (cond) {
-                String hostName = getHostName(httpResponseParam.getRequestParams().getHeaders());
-                if (hostName != null) {
-                    hostName = hostName.toLowerCase();
-                    hostName = hostName.trim();
+            if (!cond) continue;
 
-                    int apiCollectionId ;
-                    if (hostNameToIdMap.containsKey(hostName)) {
-                        apiCollectionId = hostNameToIdMap.get(hostName);
-                    } else {
-                        int hostHashCode = hostName.hashCode();
-                        try {
-                            apiCollectionId = createCollectionBasedOnHostName(hostHashCode, hostName);
-                            hostNameToIdMap.put(hostName, apiCollectionId);
-                        } catch (Exception e) {
-                            logger.error("Failed to create collection for host : " + hostName);
-                            apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
-                        }
+            String hostName = getHostName(httpResponseParam.getRequestParams().getHeaders());
+            int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
+            int apiCollectionId ;
+
+            if (hostName != null && ApiCollection.useHost) {
+                hostName = hostName.toLowerCase();
+                hostName = hostName.trim();
+
+                String key = hostName + " " + vxlanId;
+
+                if (hostNameToIdMap.containsKey(key)) {
+                    apiCollectionId = hostNameToIdMap.get(key);
+                } else {
+                    int id = hostName.hashCode() + vxlanId;
+                    try {
+                        apiCollectionId = createCollectionBasedOnHostName(id, hostName, vxlanId);
+                        hostNameToIdMap.put(key, apiCollectionId);
+                    } catch (Exception e) {
+                        logger.error("Failed to create collection for host : " + hostName);
+                        createCollectionSimple(vxlanId);
+                        hostNameToIdMap.put("null " + vxlanId, vxlanId);
+                        apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
                     }
-
-                    httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
                 }
 
-                filteredResponseParams.add(httpResponseParam);
+            } else {
+                String key = "null" + " " + vxlanId;
+
+                if (!hostNameToIdMap.containsKey(key)) {
+                    createCollectionSimple(vxlanId);
+                    hostNameToIdMap.put(key, vxlanId);
+                }
+
+                apiCollectionId = vxlanId;
             }
+
+            httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
+            filteredResponseParams.add(httpResponseParam);
         }
 
         return filteredResponseParams;

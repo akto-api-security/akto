@@ -41,7 +41,7 @@ public class HarAction extends UserAction {
         Context.accountId.set(1_000_000);
         RuntimeFilterDao.instance.initialiseFilters();
         System.out.println(RuntimeFilterDao.instance.findAll(new BasicDBObject()));
-        ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), new HashSet<>()));
+        ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), new HashSet<>(), null,0));
     }
 
     @Override
