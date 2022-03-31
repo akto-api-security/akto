@@ -1,6 +1,7 @@
 package com.akto.dto;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 import org.bson.codecs.pojo.annotations.BsonId;
@@ -31,7 +32,7 @@ public class ApiCollection {
         this.vxlanId = vxlanId;
     }
 
-    public static boolean useHost = System.getenv("USE_HOSTNAME") != null;
+    public static boolean useHost = Objects.equals(System.getenv("USE_HOSTNAME"), "true");
 
     public int getId() {
         return this.id;
