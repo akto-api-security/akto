@@ -1,7 +1,6 @@
 package com.akto.parsers;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.util.*;
@@ -224,6 +223,32 @@ public class TestDBSync extends MongoBasedTest {
         HttpCallParser httpCallParser = new HttpCallParser("",0,0,0);
         List<HttpResponseParams> ss = httpCallParser.filterHttpResponseParams(new ArrayList<>());
         assertEquals(ss.size(),0);
+    }
+
+    @Test
+    public void testFilterHttpResponseParamsIpHost() {
+        ApiCollection.useHost = true;
+        HttpCallParser httpCallParser = new HttpCallParser("",0,0,0);
+        HttpResponseParams h1 = new HttpResponseParams();
+        h1.requestParams = new HttpRequestParams();
+        h1.requestParams.setHeaders(new HashMap<>());
+        h1.requestParams.getHeaders().put("host", Collections.singletonList("127.1.2.3"));
+        h1.statusCode = 200;
+        h1.requestParams.setApiCollectionId(1000);
+        h1.setSource(Source.MIRRORING);
+
+        HttpResponseParams h2 = new HttpResponseParams();
+        h2.requestParams = new HttpRequestParams();
+        h2.requestParams.setHeaders(new HashMap<>());
+        h2.requestParams.getHeaders().put("host", Collections.singletonList("avneesh32.com"));
+        h2.statusCode = 200;
+        h2.requestParams.setApiCollectionId(1000);
+        h2.setSource(Source.MIRRORING);
+
+        List<HttpResponseParams> ss = httpCallParser.filterHttpResponseParams(Arrays.asList(h1, h2));
+        assertEquals(ss.size(),2);
+        assertEquals(h1.requestParams.getApiCollectionId(), 1000);
+        assertTrue(h2.requestParams.getApiCollectionId() != 1000);
     }
 
     @Test
