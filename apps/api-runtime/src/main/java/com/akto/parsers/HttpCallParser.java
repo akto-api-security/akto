@@ -235,8 +235,14 @@ public class HttpCallParser {
             int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
             int apiCollectionId ;
             List<HttpResponseParams.Source> whiteListSource = Arrays.asList(HttpResponseParams.Source.MIRRORING);
+            boolean hostNameCondition;
+            if (hostName == null) {
+                hostNameCondition = false;
+            } else {
+                hostNameCondition = ! ( hostName.toLowerCase().equals(hostName.toUpperCase()) );
+            }
 
-            if (whiteListSource.contains(httpResponseParam.getSource()) && hostName != null && ApiCollection.useHost) {
+            if (whiteListSource.contains(httpResponseParam.getSource()) &&  hostNameCondition && ApiCollection.useHost) {
                 hostName = hostName.toLowerCase();
                 hostName = hostName.trim();
 
