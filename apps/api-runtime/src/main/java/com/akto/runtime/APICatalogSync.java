@@ -41,7 +41,7 @@ public class APICatalogSync {
     public String userIdentifier;
     private static final Logger logger = LoggerFactory.getLogger(APICatalogSync.class);
     Map<Integer, APICatalog> dbState;
-    Map<Integer, APICatalog> delta;
+    public Map<Integer, APICatalog> delta;
 
     public APICatalogSync(String userIdentifier,int thresh) {
         this.thresh = thresh;
@@ -576,7 +576,7 @@ public class APICatalogSync {
         );
     }
 
-    private static URLTemplate createUrlTemplate(String url, Method method) {
+    public static URLTemplate createUrlTemplate(String url, Method method) {
         String[] tokens = trim(url).split("/");
         SuperType[] types = new SuperType[tokens.length];
         for(int i = 0; i < tokens.length; i ++ ) {
@@ -615,16 +615,8 @@ public class APICatalogSync {
                 }
 
                 Bson findQ = Filters.eq("_id", collectionId);
-                ApiCollection currCollection = ApiCollectionsDao.instance.findOne(findQ);
-                
 
-                if (currCollection == null) {
-                    ApiCollectionsDao.instance.insertOne(new ApiCollection(collectionId, "", Context.now(), newURLs));
-
-                } else {
-                    currCollection.setUrls(newURLs);
-                    ApiCollectionsDao.instance.getMCollection().updateOne(findQ, Updates.set("urls", newURLs));
-                }
+                ApiCollectionsDao.instance.getMCollection().updateOne(findQ, Updates.set("urls", newURLs));
             }
         }
     }

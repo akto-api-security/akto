@@ -18,6 +18,7 @@ import com.akto.parsers.HttpCallParser;
 import com.akto.dto.HttpResponseParams;
 import com.akto.runtime.policies.AktoPolicy;
 import com.google.gson.Gson;
+import com.google.protobuf.Api;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -62,14 +63,10 @@ public class Main {
                 String groupName = (String) (json.get(GROUP_NAME));
                 String vxlanIdStr = ((Double) json.get(VXLAN_ID)).intValue() + "";
                 int vxlanId = Integer.parseInt(vxlanIdStr);
-                Bson findQ = Filters.eq("_id", vxlanId);
-                ApiCollection currCollection = ApiCollectionsDao.instance.findOne(findQ);
-                if (currCollection == null) {
-                    ApiCollection newCollection = new ApiCollection(vxlanId, groupName, Context.now(), new HashSet<>());
-                    ApiCollectionsDao.instance.getMCollection().insertOne(newCollection);
-                } else if (currCollection.getName() == null || currCollection.getName().length() == 0) {
-                    ApiCollectionsDao.instance.getMCollection().updateOne(findQ, Updates.set("name", groupName));
-                }
+                ApiCollectionsDao.instance.getMCollection().updateMany(
+                        Filters.eq(ApiCollection.VXLAN_ID, vxlanId),
+                        Updates.set(ApiCollection.NAME, groupName)
+                );
 
                 if (json.size() == 3) {
                     Bson accFBson = Filters.eq("_id", Context.accountId.get());
@@ -122,7 +119,7 @@ public class Main {
             for(SingleTypeInfo singleTypeInfo: SingleTypeInfoDao.instance.fetchAll()) {
                 urls.add(singleTypeInfo.getUrl());
             }
-            ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), urls));
+            ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), urls, null, 0));
         }
 
         APIConfig apiConfig;
@@ -227,7 +224,8 @@ public class Main {
                     }
 
                     if (!aktoPolicyMap.containsKey(accountId)) {
-                        AktoPolicy aktoPolicy = new AktoPolicy(true);
+                        APICatalogSync apiCatalogSync = httpCallParserMap.get(accountId).apiCatalogSync;
+                        AktoPolicy aktoPolicy = new AktoPolicy(apiCatalogSync);
                         aktoPolicyMap.put(accountId, aktoPolicy);
                     }
 
@@ -237,9 +235,9 @@ public class Main {
 
                     try {
                         List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
-                        parser.syncFunction(accWiseResponse);
+                        APICatalogSync apiCatalogSync = parser.syncFunction(accWiseResponse);
                         // flow.init(accWiseResponse);
-                        aktoPolicy.main(accWiseResponse);
+                        aktoPolicy.main(accWiseResponse, apiCatalogSync);
                     } catch (Exception e) {
                         logger.error(e.toString());
                     }

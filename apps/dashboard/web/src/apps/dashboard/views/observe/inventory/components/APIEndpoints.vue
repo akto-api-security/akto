@@ -340,8 +340,6 @@ export default {
                 api.getAllUrlsAndMethods(this.apiCollectionId).then(resp => {
                     this.documentedURLs = resp.data || {}
                 })
-                this.$store.dispatch('inventory/fetchApiInfoList', {apiCollectionId: this.apiCollectionId})
-                this.$store.dispatch('inventory/fetchFilters')
             }
 
             this.$emit('mountedView', {type: 1, apiCollectionId: this.apiCollectionId})

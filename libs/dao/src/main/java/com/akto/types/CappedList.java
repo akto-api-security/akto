@@ -9,6 +9,9 @@ public class CappedList<T> {
     boolean forceLatestEntry;
     int nextPos;
 
+    public CappedList() {
+    }
+
     public CappedList(int limit, boolean forceLatestEntry) {
         this.limit = limit;
         this.forceLatestEntry = forceLatestEntry;
@@ -40,5 +43,37 @@ public class CappedList<T> {
 
     public ArrayList<T> get() {
         return this.elements;
+    }
+
+    public int getLimit() {
+        return limit;
+    }
+
+    public void setLimit(int limit) {
+        this.limit = limit;
+    }
+
+    public ArrayList<T> getElements() {
+        return elements;
+    }
+
+    public void setElements(ArrayList<T> elements) {
+        this.elements = elements;
+    }
+
+    public boolean isForceLatestEntry() {
+        return forceLatestEntry;
+    }
+
+    public void setForceLatestEntry(boolean forceLatestEntry) {
+        this.forceLatestEntry = forceLatestEntry;
+    }
+
+    public int getNextPos() {
+        return nextPos;
+    }
+
+    public void setNextPos(int nextPos) {
+        this.nextPos = nextPos;
     }
 }

@@ -1,11 +1,12 @@
 package com.akto.parsers;
 
-import java.io.*;
 import java.net.URLDecoder;
 import java.util.*;
 
 import com.akto.DaoInit;
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.runtime.APICatalogSync;
@@ -13,8 +14,10 @@ import com.akto.runtime.URLAggregator;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
-import com.mongodb.ConnectionString;
 
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.Updates;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,7 +35,9 @@ public class HttpCallParser {
     private int last_synced;
     private static final Logger logger = LoggerFactory.getLogger(HttpCallParser.class);
 
-    APICatalogSync apiCatalogSync;
+    public APICatalogSync apiCatalogSync;
+    private Map<String, Integer> hostNameToIdMap = new HashMap<>();
+
     public HttpCallParser(String userIdentifier, int thresh, int sync_threshold_count, int sync_threshold_time) {
         last_synced = 0;
         this.sync_threshold_count = sync_threshold_count;
@@ -111,6 +116,72 @@ public class HttpCallParser {
         return headers;
     }
 
+    public static String getHostName(Map<String,List<String>> headers) {
+        if (headers == null) return null;
+        for (String k: headers.keySet()) {
+            if (k.equalsIgnoreCase("host")) {
+                List<String> hosts = headers.get(k);
+                if (hosts.size() > 0) return hosts.get(0);
+                return null;
+            }
+        }
+        return null;
+    }
+
+    public int createCollectionSimple(int vxlanId) {
+        UpdateOptions updateOptions = new UpdateOptions();
+        updateOptions.upsert(true);
+
+        ApiCollectionsDao.instance.getMCollection().updateOne(
+                Filters.eq("_id", vxlanId),
+                Updates.combine(
+                        Updates.set(ApiCollection.VXLAN_ID, vxlanId),
+                        Updates.setOnInsert("startTs", Context.now()),
+                        Updates.setOnInsert("urls", new HashSet<>())
+                ),
+                updateOptions
+        );
+
+        return vxlanId;
+    }
+
+
+    public int createCollectionBasedOnHostName(int id, String host, int vxlanId)  throws Exception {
+        UpdateOptions updateOptions = new UpdateOptions();
+        updateOptions.upsert(true);
+        // 3 cases
+        // 1. If 2 threads are trying to insert same host simultaneously then both will succeed with upsert true
+        // 2. If we are trying to insert different host but same id (hashCode collision) then it will fail,
+        //    so we loop 20 times till we succeed
+        boolean flag = false;
+        for (int i=0;i < 100; i++) {
+            id += i;
+            try {
+                ApiCollectionsDao.instance.getMCollection().updateOne(
+                        Filters.and(
+                                Filters.eq(ApiCollection.HOST_NAME, host),
+                                Filters.eq(ApiCollection.VXLAN_ID, vxlanId)
+                        ),
+                        Updates.combine(
+                                Updates.setOnInsert("_id", id),
+                                Updates.setOnInsert("startTs", Context.now()),
+                                Updates.setOnInsert("urls", new HashSet<>())
+                        ),
+                        updateOptions
+                );
+                flag = true;
+                break;
+            } catch (Exception e) {
+                logger.error("Error while inserting apiCollection, trying again " + i + " " + e.getMessage());
+            }
+        }
+        if (flag) { // flag tells if we were successfully able to insert collection
+            return id;
+        } else {
+            throw new Exception("Not able to insert");
+        }
+    }
+
     public static String getAcceptableContentType(Map<String,List<String>> headers) {
         List<String> acceptableContentTypes = Arrays.asList(JSON_CONTENT_TYPE, FORM_URL_ENCODED_CONTENT_TYPE);
         List<String> contentTypeValues = new ArrayList<>();
@@ -131,7 +202,7 @@ public class HttpCallParser {
 
     int numberOfSyncs = 0;
 
-    public void syncFunction(List<HttpResponseParams> responseParams)  {
+    public APICatalogSync syncFunction(List<HttpResponseParams> responseParams)  {
         // USE ONLY filteredResponseParams and not responseParams
         List<HttpResponseParams> filteredResponseParams = filterHttpResponseParams(responseParams);
         boolean isHarOrPcap = aggregate(filteredResponseParams);
@@ -148,16 +219,63 @@ public class HttpCallParser {
             apiCatalogSync.syncWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
+            return apiCatalogSync;
         }
+
+        return null;
     }
 
-    public static List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList) {
+    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
         for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
             boolean cond = httpResponseParam.statusCode >= 200 && httpResponseParam.statusCode < 300;
-            if (cond) {
-                filteredResponseParams.add(httpResponseParam);
+            if (!cond) continue;
+
+            String hostName = getHostName(httpResponseParam.getRequestParams().getHeaders());
+            int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
+            int apiCollectionId ;
+            List<HttpResponseParams.Source> whiteListSource = Arrays.asList(HttpResponseParams.Source.MIRRORING);
+            boolean hostNameCondition;
+            if (hostName == null) {
+                hostNameCondition = false;
+            } else {
+                hostNameCondition = ! ( hostName.toLowerCase().equals(hostName.toUpperCase()) );
             }
+
+            if (whiteListSource.contains(httpResponseParam.getSource()) &&  hostNameCondition && ApiCollection.useHost) {
+                hostName = hostName.toLowerCase();
+                hostName = hostName.trim();
+
+                String key = hostName + " " + vxlanId;
+
+                if (hostNameToIdMap.containsKey(key)) {
+                    apiCollectionId = hostNameToIdMap.get(key);
+                } else {
+                    int id = hostName.hashCode() + vxlanId;
+                    try {
+                        apiCollectionId = createCollectionBasedOnHostName(id, hostName, vxlanId);
+                        hostNameToIdMap.put(key, apiCollectionId);
+                    } catch (Exception e) {
+                        logger.error("Failed to create collection for host : " + hostName);
+                        createCollectionSimple(vxlanId);
+                        hostNameToIdMap.put("null " + vxlanId, vxlanId);
+                        apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
+                    }
+                }
+
+            } else {
+                String key = "null" + " " + vxlanId;
+
+                if (!hostNameToIdMap.containsKey(key)) {
+                    createCollectionSimple(vxlanId);
+                    hostNameToIdMap.put(key, vxlanId);
+                }
+
+                apiCollectionId = vxlanId;
+            }
+
+            httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
+            filteredResponseParams.add(httpResponseParam);
         }
 
         return filteredResponseParams;
@@ -196,5 +314,13 @@ public class HttpCallParser {
 
     public int getSyncCount() {
         return this.sync_count;
+    }
+
+    public Map<String, Integer> getHostNameToIdMap() {
+        return hostNameToIdMap;
+    }
+
+    public void setHostNameToIdMap(Map<String, Integer> hostNameToIdMap) {
+        this.hostNameToIdMap = hostNameToIdMap;
     }
 }

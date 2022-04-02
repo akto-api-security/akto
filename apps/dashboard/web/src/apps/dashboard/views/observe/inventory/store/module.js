@@ -95,6 +95,15 @@ const inventory = {
                     if(resp && resp.data && resp.data.content)
                         state.swaggerContent = JSON.parse(resp.data.content)
                 })
+                api.fetchApiInfoList(apiCollectionId).then(resp => {
+                    state.apiInfoList = resp.apiInfoList
+                })
+                api.fetchFilters().then(resp => {
+                    let a = resp.runtimeFilters
+                    a.forEach(x => {
+                        state.filters[x.customFieldName] = x
+                    })
+                })
                 state.loading = false
             }).catch(() => {
                 state.loading = false

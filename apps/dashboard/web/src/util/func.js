@@ -314,12 +314,12 @@ export default {
 
         if (apiInfoList) {
             apiInfoList.forEach(x => {
-                apiInfoMap[x["id"]["url"] + "-" + x["id"]["method"]] = x
+                apiInfoMap[x["id"]["apiCollectionId"] + "-" + x["id"]["url"] + "-" + x["id"]["method"]] = x
             })
         }
 
         listParams.forEach(x => {
-            let key = x.url + "-" + x.method
+            let key = x.apiCollectionId + "-" + x.url + "-" + x.method
             if (!ret[key]) {
                 let access_type = null
                 if (apiInfoMap[key]) {

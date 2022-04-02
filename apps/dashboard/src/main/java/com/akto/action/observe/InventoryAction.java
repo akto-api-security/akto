@@ -68,15 +68,18 @@ public class InventoryAction extends UserAction {
     public String getAllUrlsAndMethods() {
         response = new BasicDBObject();
         BasicDBObject ret = new BasicDBObject();
-        response.put("data", ret);
 
         APISpec apiSpec = APISpecDao.instance.findById(apiCollectionId);
-        SwaggerParseResult result = new OpenAPIParser().readContents(apiSpec.getContent(), null, null);
-        OpenAPI openAPI = result.getOpenAPI();
-        Paths paths = openAPI.getPaths();
-        for(String path: paths.keySet()) {
-            ret.append(path, paths.get(path).readOperationsMap().keySet());
+        if (apiSpec != null) {
+            SwaggerParseResult result = new OpenAPIParser().readContents(apiSpec.getContent(), null, null);
+            OpenAPI openAPI = result.getOpenAPI();
+            Paths paths = openAPI.getPaths();
+            for(String path: paths.keySet()) {
+                ret.append(path, paths.get(path).readOperationsMap().keySet());
+            }
         }
+
+        response.put("data", ret);
 
         return Action.SUCCESS.toUpperCase();
     }
