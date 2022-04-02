@@ -195,7 +195,7 @@ public class APICatalogSync {
             boolean matchedInDeltaTemplate = false;
             for(URLTemplate urlTemplate: deltaCatalog.getTemplateURLToMethods().keySet()){
                 RequestTemplate deltaTemplate = deltaCatalog.getTemplateURLToMethods().get(urlTemplate);
-                if (urlTemplate.match(newUrl) && deltaTemplate.compare(newTemplate)) {
+                if (urlTemplate.match(newUrl) && deltaTemplate.compare(newTemplate, urlTemplate)) {
                     matchedInDeltaTemplate = true;
                     deltaTemplate.mergeFrom(newTemplate);
                     break;
@@ -217,7 +217,7 @@ public class APICatalogSync {
                         continue;
                     }
 
-                    if (dbTemplate.compare(newTemplate)) {
+                    if (dbTemplate.compare(newTemplate, mergedTemplate)) {
                         deltaCatalog.getDeletedInfo().addAll(dbTemplate.getAllTypeInfo());
                         RequestTemplate alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(mergedTemplate);
 
@@ -249,7 +249,7 @@ public class APICatalogSync {
                     continue;
                 }
 
-                if (deltaTemplate.compare(newTemplate)) {
+                if (deltaTemplate.compare(newTemplate, mergedTemplate)) {
                     newUrlMatchedInDelta = true;
                     deltaCatalog.getDeletedInfo().addAll(deltaTemplate.getAllTypeInfo());
                     RequestTemplate alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(mergedTemplate);
@@ -290,7 +290,8 @@ public class APICatalogSync {
         }
 
         SuperType[] newTypes = new SuperType[newTokens.length];
-        int templatizedTokens = 0;
+        int templatizedNumTokens = 0;
+        int templatizedStrTokens = 0;
         for(int i = 0; i < newTokens.length; i ++) {
             String tempToken = newTokens[i];
             String dbToken = dbTokens[i];
@@ -302,15 +303,15 @@ public class APICatalogSync {
             if (NumberUtils.isParsable(tempToken) && NumberUtils.isParsable(dbToken)) {
                 newTypes[i] = SuperType.INTEGER;
                 newTokens[i] = null;
-                templatizedTokens++;
+                templatizedNumTokens++;
             } else {
                 newTypes[i] = SuperType.STRING;
                 newTokens[i] = null;
-                templatizedTokens++;
+                templatizedStrTokens++;
             }
         }
 
-        if (templatizedTokens == 1) {
+        if (templatizedStrTokens <= 1) {
             return new URLTemplate(newTokens, newTypes, newUrl.getMethod());
         }
 
@@ -335,7 +336,7 @@ public class APICatalogSync {
                     if (urlTemplate.match(newUrl)) {
                         RequestTemplate dbTemplate = dbCatalog.getTemplateURLToMethods().get(urlTemplate);
 
-                        if (newRequestTemplate.compare(dbTemplate)) {
+                        if (newRequestTemplate.compare(dbTemplate, urlTemplate)) {
                             RequestTemplate alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(urlTemplate);
 
                             if (alreadyInDelta != null) {

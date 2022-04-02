@@ -14,6 +14,7 @@ import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.SingleTypeInfo.ParamId;
 import com.akto.dto.type.SingleTypeInfo.SubType;
+import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.types.CappedList;
 import com.akto.util.JSONUtils;
@@ -463,7 +464,17 @@ public class RequestTemplate {
         return ret;
     }
 
-    private static boolean compareKeys(RequestTemplate a, RequestTemplate b) {
+    private static boolean isMergedOnStr(URLTemplate urlTemplate) {
+        for(SuperType superType: urlTemplate.getTypes()) {
+            if (superType == SuperType.STRING) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static boolean compareKeys(RequestTemplate a, RequestTemplate b, URLTemplate mergedUrl) {
         int aReqParamsCount = a.headers.size() + a.parameters.size();
         int bReqParamsCount = b.headers.size() + b.parameters.size();
 
@@ -485,6 +496,10 @@ public class RequestTemplate {
                     return false;
                 }
             }
+        }
+
+        if (!isMergedOnStr(mergedUrl)) {
+            return true;
         }
 
         boolean has2XXStatus = false;
@@ -520,7 +535,7 @@ public class RequestTemplate {
         return has2XXStatus;
     }
 
-    public boolean compare(RequestTemplate that) {
-        return compareKeys(this, that);
+    public boolean compare(RequestTemplate that, URLTemplate mergedUrl) {
+        return compareKeys(this, that, mergedUrl);
     }
 }
