@@ -94,11 +94,19 @@ public class ApiCollection {
 
     // to be used in front end
     public String getDisplayName() {
+        String result;
         if (this.hostName != null) {
-            return this.hostName + " - " + this.name;
+            result = this.hostName + " - " + this.name;
         } else {
-            return this.name;
+            result = this.name + "";
         }
+
+        if (this.hostName == null || this.name == null) {
+            result = result.replace(" - ", " ");
+        }
+
+        result = result.replace("null", "");
+        return result;
     }
 
 
