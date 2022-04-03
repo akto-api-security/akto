@@ -7,7 +7,10 @@ import org.bson.codecs.pojo.annotations.BsonIgnore;
 import java.util.*;
 
 public class ApiInfo {
-    // whenever new field is added make sure to update getUpdates method of AktoPolicy.java
+    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    // WHENEVER NEW FIELD IS ADDED MAKE SURE TO UPDATE getUpdates METHOD OF AktoPolicy.java AND MERGE METHOD OF
+    // ApiInfo.java
+    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     private ApiInfoKey id;
     public static final String ALL_AUTH_TYPES_FOUND = "allAuthTypesFound";
     private Set<Set<AuthType>> allAuthTypesFound;
@@ -136,6 +139,24 @@ public class ApiInfo {
         }
     }
 
+    public void merge(ApiInfo that) {
+        // never merge id
+        if (that.lastSeen > this.lastSeen) {
+            this.lastSeen = that.lastSeen;
+        }
+
+        for (String k: that.violations.keySet()) {
+            if (this.violations.get(k) == null || that.violations.get(k) > this.violations.get(k)) {
+                this.violations.put(k,that.violations.get(k));
+            }
+        }
+
+        this.allAuthTypesFound.addAll(that.allAuthTypesFound);
+
+        this.apiAccessTypes.addAll(that.getApiAccessTypes());
+
+    }
+
     public void setViolations(Map<String, Integer> violations) {
         this.violations = violations;
     }
@@ -170,6 +191,17 @@ public class ApiInfo {
 
         this.actualAuthType = result;
 
+    }
+
+    @Override
+    public String toString() {
+        return "{" +
+                " id='" + getId() + "'" +
+                ", allAuthTypesFound='" + getAllAuthTypesFound() + "'" +
+                ", lastSeen='" + getLastSeen() + "'" +
+                ", violations='" + getViolations() + "'" +
+                ", accessTypes='" + getApiAccessTypes() + "'" +
+                "}";
     }
 
 

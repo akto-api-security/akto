@@ -36,6 +36,13 @@ public class URLTemplate {
     public boolean match(String url, Method urlMethod) {
         if (url.startsWith("/")) url = url.substring(1, url.length());
         if (url.endsWith("/")) url = url.substring(0, url.length()-1);
+
+        String a = url + " " + urlMethod.name();
+        String b = this.getTemplateString() + " " + urlMethod;
+        if (a.equals(b)) {
+            return true;
+        }
+
         String[] thatTokens = url.split("/");
 
         return match(thatTokens, urlMethod);

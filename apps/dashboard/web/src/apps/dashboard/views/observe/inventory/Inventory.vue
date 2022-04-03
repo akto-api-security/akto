@@ -70,7 +70,7 @@ export default {
             if (event.type >= 1) {
                 let coll = this.apiCollections.find(x => x.id === event.apiCollectionId)                    
                 if (coll) {
-                    let newRouteObject = this.getRouteObject({collectionName: coll.name, apiCollectionId: coll.id, type: 1})
+                    let newRouteObject = this.getRouteObject({collectionName: coll.displayName, apiCollectionId: coll.id, type: 1})
                     this.breadcrumbs.push(newRouteObject)
                 } else {
                     return

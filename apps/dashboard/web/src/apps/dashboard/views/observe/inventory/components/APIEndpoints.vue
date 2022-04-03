@@ -38,10 +38,10 @@
                     :items=allEndpoints 
                     @rowClicked=rowClicked 
                     name="All" 
-                    sortKeyDefault="sensitive" 
+                    sortKeyDefault="sensitiveTags" 
                     :sortDescDefault="true"
                 >
-                    <template #item.sensitive="{item}">
+                    <template #item.sensitiveTags="{item}">
                         <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
                     </template>
                 </simple-table>
@@ -52,7 +52,7 @@
                     :items=sensitiveEndpoints 
                     @rowClicked=rowClicked name="Sensitive"
                 >
-                    <template #item.sensitive="{item}">
+                    <template #item.sensitiveTags="{item}">
                         <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
                     </template>
                 </simple-table>
@@ -63,10 +63,10 @@
                     :items=shadowEndpoints 
                     @rowClicked=rowClicked 
                     name="Undocumented"  
-                    sortKeyDefault="sensitive" 
+                    sortKeyDefault="sensitiveTags" 
                     :sortDescDefault="true"
                 >
-                    <template #item.sensitive="{item}">
+                    <template #item.sensitiveTags="{item}">
                         <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
                     </template>
                 </simple-table>
@@ -100,10 +100,10 @@
                     :items=openEndpoints
                     @rowClicked=rowClicked 
                     name="Unauthenticated" 
-                    sortKeyDefault="sensitive" 
+                    sortKeyDefault="sensitiveTags" 
                     :sortDescDefault="true"
                 >
-                    <template #item.sensitive="{item}">
+                    <template #item.sensitiveTags="{item}">
                         <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
                     </template>
                 </simple-table>
@@ -180,7 +180,7 @@ export default {
                 },
                 {
                     text: 'Sensitive Params',
-                    value: 'sensitive'
+                    value: 'sensitiveTags'
                 },
                 {
                   text: 'Last Seen',
@@ -340,8 +340,6 @@ export default {
                 api.getAllUrlsAndMethods(this.apiCollectionId).then(resp => {
                     this.documentedURLs = resp.data || {}
                 })
-                this.$store.dispatch('inventory/fetchApiInfoList', {apiCollectionId: this.apiCollectionId})
-                this.$store.dispatch('inventory/fetchFilters')
             }
 
             this.$emit('mountedView', {type: 1, apiCollectionId: this.apiCollectionId})

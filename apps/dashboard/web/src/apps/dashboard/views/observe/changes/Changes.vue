@@ -50,7 +50,7 @@
                     :sortDescDefault="true" 
                     @rowClicked="goToEndpoint"
                 >
-                    <template #item.sensitive="{item}">
+                    <template #item.sensitiveTags="{item}">
                         <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
                     </template>
                 </simple-table>
@@ -185,7 +185,7 @@ export default {
                 },
                 {
                     text: 'Sensitive Params',
-                    value: 'sensitive'
+                    value: 'sensitiveTags'
                 },
                 {
                   text: 'Access Type',
@@ -330,7 +330,7 @@ export default {
         ...mapState('changes', ['apiCollection', 'apiInfoList', 'lastFetched']),
         mapCollectionIdToName() {
             return this.$store.state.collections.apiCollections.reduce((m, e) => {
-                m[e.id] = e.name
+                m[e.id] = e.displayName
                 return m
             }, {})
         },
