@@ -475,6 +475,10 @@ public class RequestTemplate {
     }
 
     private static boolean compareKeys(RequestTemplate a, RequestTemplate b, URLTemplate mergedUrl) {
+        if (!isMergedOnStr(mergedUrl)) {
+            return true;
+        }
+
         int aReqParamsCount = a.headers.size() + a.parameters.size();
         int bReqParamsCount = b.headers.size() + b.parameters.size();
 
@@ -496,10 +500,6 @@ public class RequestTemplate {
                     return false;
                 }
             }
-        }
-
-        if (!isMergedOnStr(mergedUrl)) {
-            return true;
         }
 
         boolean has2XXStatus = false;
