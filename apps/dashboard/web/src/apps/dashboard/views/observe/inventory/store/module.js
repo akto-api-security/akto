@@ -37,7 +37,7 @@ const inventory = {
         },
         SAVE_API_COLLECTION (state, info) {
             state.apiCollectionId = info.apiCollectionId
-            state.apiCollection = info.data.endpoints.filter(x => x.subType !== "NULL")
+            state.apiCollection = info.data.endpoints.filter(x => x.subType.name !== "NULL")
             state.apiCollectionName = info.data.name
         },
         TOGGLE_SENSITIVE (state, p) {

@@ -284,7 +284,7 @@ export default {
                 method: x.method,
                 added: func.prettifyEpoch(x.timestamp),
                 location: (x.responseCode == -1 ? 'Request' : 'Response') + ' ' + (x.isHeader ? 'headers' : 'payload'),
-                type: x.subType,
+                type: x.subType.name,
                 detectedTs: x.timestamp,
                 apiCollectionId: x.apiCollectionId,
                 apiCollectionName: idToNameMap[x.apiCollectionId] || '-',

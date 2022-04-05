@@ -4,6 +4,7 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.CustomDataType;
 import com.akto.dto.type.SingleTypeInfo.ParamId;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 
@@ -20,10 +21,10 @@ public class KeyTypes {
     public static InetAddressValidator ipAddressValidator = InetAddressValidator.getInstance();
     public static final Map<SubType, Pattern> patternToSubType = new HashMap<>();
     static {
-        patternToSubType.put(SubType.EMAIL, Pattern.compile("^[a-zA-Z0-9_+&*-]+(?:\\.[a-zA-Z0-9_+&*-]+)*@(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,7}$"));
-        patternToSubType.put(SubType.URL, Pattern.compile("^((((https?|ftps?|gopher|telnet|nntp)://)|(mailto:|news:))([-%()_.!~*';/?:@&=+$,A-Za-z0-9])+)$"));
-        patternToSubType.put(SubType.SSN, Pattern.compile("^\\d{3}-\\d{2}-\\d{4}$"));
-        patternToSubType.put(SubType.UUID, Pattern.compile("^[A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{12}$"));
+        patternToSubType.put(SingleTypeInfo.EMAIL, Pattern.compile("^[a-zA-Z0-9_+&*-]+(?:\\.[a-zA-Z0-9_+&*-]+)*@(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,7}$"));
+        patternToSubType.put(SingleTypeInfo.URL, Pattern.compile("^((((https?|ftps?|gopher|telnet|nntp)://)|(mailto:|news:))([-%()_.!~*';/?:@&=+$,A-Za-z0-9])+)$"));
+        patternToSubType.put(SingleTypeInfo.SSN, Pattern.compile("^\\d{3}-\\d{2}-\\d{4}$"));
+        patternToSubType.put(SingleTypeInfo.UUID, Pattern.compile("^[A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{12}$"));
 
     }
 
@@ -47,12 +48,14 @@ public class KeyTypes {
     public void process(String url, String method, int responseCode, boolean isHeader, String param, Object object,
                         String userId, int apiCollectionId, String rawMessage) {
 
-        SubType subType = findSubType(object);
+        String key = param.replaceAll("#", ".").replaceAll("\\.\\$", "");
+        SubType subType = findSubType(object,key);
 
         SingleTypeInfo singleTypeInfo = occurrences.get(subType);
         if (singleTypeInfo == null) {
             Set<Object> examples = new HashSet<>();
-            if (subType.isSensitive) {
+            SingleTypeInfo.Position position = SingleTypeInfo.findPosition(responseCode, isHeader);
+            if (subType.isSensitive(position)) {
                 examples.add(rawMessage);
             }
 
@@ -68,10 +71,16 @@ public class KeyTypes {
         singleTypeInfo.incr(object);
     }
 
-    private SubType findSubType(Object o) {
+    private SubType findSubType(Object o,String key) {
         if (o == null) {
-            return SubType.NULL;
-        } 
+            return SingleTypeInfo.NULL;
+        }
+
+        for (CustomDataType customDataType: SingleTypeInfo.customDataTypeMap.values()) {
+            if (!customDataType.isActive()) continue;
+            boolean result = customDataType.validate(o,key);
+            if (result) return customDataType.toSubType();
+        }
 
         if (NumberUtils.isDigits(o.toString())) {
             if (o.toString().length() < 19) {
@@ -83,14 +92,14 @@ public class KeyTypes {
             Long l = (Long) o;
 
             if ( l <= Integer.MAX_VALUE && l >= Integer.MIN_VALUE) {
-                return SubType.INTEGER_32;
+                return SingleTypeInfo.INTEGER_32;
             } else {
-                return SubType.INTEGER_64;
+                return SingleTypeInfo.INTEGER_64;
             }
         }
 
         if (o instanceof Integer) {
-            return SubType.INTEGER_32;
+            return SingleTypeInfo.INTEGER_32;
         }
 
         if (NumberUtils.isParsable(o.toString())) {
@@ -98,12 +107,12 @@ public class KeyTypes {
         }
 
         if (o instanceof Float || o instanceof Double) {
-            return SubType.FLOAT;
+            return SingleTypeInfo.FLOAT;
         }
 
         if (o instanceof Boolean) {
             Boolean bool = (Boolean) o;
-            return bool ? SubType.TRUE : SubType.FALSE;
+            return bool ? SingleTypeInfo.TRUE : SingleTypeInfo.FALSE;
         }
 
         if (o instanceof String) {
@@ -115,24 +124,24 @@ public class KeyTypes {
                 }
             }
             if (isJWT(str)) {
-                return SubType.JWT;
+                return SingleTypeInfo.JWT;
             }
 
             if (isPhoneNumber(str)) {
-                return SubType.PHONE_NUMBER;
+                return SingleTypeInfo.PHONE_NUMBER;
             }
 
             if (isCreditCard(str)) {
-                return SubType.CREDIT_CARD;
+                return SingleTypeInfo.CREDIT_CARD;
             }
             if (isIP(str)) {
-                return SubType.IP_ADDRESS;
+                return SingleTypeInfo.IP_ADDRESS;
             }
 
-            return SubType.GENERIC;
+            return SingleTypeInfo.GENERIC;
         }
 
-        return SubType.OTHER;
+        return SingleTypeInfo.OTHER;
     }
 
     public Map<SubType,SingleTypeInfo> getOccurrences() {

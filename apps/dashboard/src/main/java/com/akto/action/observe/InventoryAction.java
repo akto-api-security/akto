@@ -1,14 +1,15 @@
 package com.akto.action.observe;
 
-import java.util.List;
+import java.util.*;
 
-import com.akto.action.SensitiveFieldAction;
 import com.akto.action.UserAction;
 import com.akto.dao.APISpecDao;
+import com.akto.dao.CustomDataTypeDao;
 import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.APISpec;
+import com.akto.dto.CustomDataType;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.SingleTypeInfo.SubType;
@@ -20,6 +21,7 @@ import io.swagger.parser.OpenAPIParser;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Paths;
 import io.swagger.v3.parser.core.models.SwaggerParseResult;
+import org.bson.conversions.Bson;
 
 public class InventoryAction extends UserAction {
 
@@ -54,7 +56,10 @@ public class InventoryAction extends UserAction {
     }
 
     public String loadSensitiveParameters() {
-        List list = SingleTypeInfoDao.instance.findAll(Filters.in("subType", SubType.getSensitiveTypes()));
+
+        Bson filter = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(null);
+
+        List list = SingleTypeInfoDao.instance.findAll(filter);
 
         List<SensitiveParamInfo> customSensitiveList = SensitiveParamInfoDao.instance.findAll(Filters.eq("sensitive", true));
 

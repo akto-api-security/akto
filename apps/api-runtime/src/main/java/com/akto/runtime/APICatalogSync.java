@@ -541,13 +541,13 @@ public class APICatalogSync {
                 }
             }
 
-            Bson updateKey = createFilters(deltaInfo);
+            Bson updateKey = SingleTypeInfoDao.createFilters(deltaInfo);
 
             bulkUpdates.add(new UpdateOneModel<>(updateKey, update, new UpdateOptions().upsert(true)));
         }
 
         for(SingleTypeInfo deleted: currentDelta.getDeletedInfo()) {
-            bulkUpdates.add(new DeleteOneModel<>(createFilters(deleted), new DeleteOptions()));
+            bulkUpdates.add(new DeleteOneModel<>(SingleTypeInfoDao.createFilters(deleted), new DeleteOptions()));
             bulkUpdatesForSampleData.add(new DeleteOneModel<>(SensitiveSampleDataDao.getFilters(deleted), new DeleteOptions()));
         }
 
@@ -564,17 +564,6 @@ public class APICatalogSync {
         }
     }
 
-    public static Bson createFilters(SingleTypeInfo info) {
-        return Filters.and(
-            Filters.eq("url", info.getUrl()),
-            Filters.eq("method", info.getMethod()),
-            Filters.eq("responseCode", info.getResponseCode()),
-            Filters.eq("isHeader", info.getIsHeader()),
-            Filters.eq("param", info.getParam()),
-            Filters.eq("subType", info.getSubType()),
-            Filters.eq("apiCollectionId", info.getApiCollectionId())
-        );
-    }
 
     private static URLTemplate createUrlTemplate(String url, Method method) {
         String[] tokens = trim(url).split("/");

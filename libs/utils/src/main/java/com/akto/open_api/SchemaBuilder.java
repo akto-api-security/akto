@@ -116,7 +116,7 @@ public class SchemaBuilder {
     }
 
     public static CustomSchema customSchemaFromSubType(SingleTypeInfo.SubType subType, String name) {
-        Class<? extends Schema> type = subType.swaggerSchemaClass;
+        Class<? extends Schema> type = subType.getSwaggerSchemaClass();
 
         return new CustomSchema(type,name);
     }

@@ -30,7 +30,7 @@ const changes = {
             state.sensitiveParams = []
         },
         SAVE_API_COLLECTION (state, info) {
-            state.apiCollection = info.data.endpoints.filter(x => x.subType !== "NULL")
+            state.apiCollection = info.data.endpoints.filter(x => x.subType.name !== "NULL")
         },
         SAVE_SENSITIVE (state, fields) {
             state.sensitiveParams = fields

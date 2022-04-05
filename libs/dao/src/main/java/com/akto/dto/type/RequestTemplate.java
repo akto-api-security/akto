@@ -140,7 +140,7 @@ public class RequestTemplate {
                     int curr = param.indexOf("#");
                     while (curr < param.length() && curr > 0) {
                         KeyTypes occ = parameters.get(param.substring(0, curr));
-                        if (occ != null && occ.occurrences.containsKey(SubType.DICT)) {
+                        if (occ != null && occ.occurrences.containsKey(SingleTypeInfo.DICT)) {
                             isParentPresent = true;
                             break;
                         }
@@ -316,8 +316,8 @@ public class RequestTemplate {
 
         Map<SubType, SingleTypeInfo> occ = new HashMap<>();
 
-        ParamId paramId = new ParamId(url, method, responseCode, false, prefix + "#" + node.getPathElem(), SubType.DICT, apiCollectionId);
-        occ.put(SubType.DICT, new SingleTypeInfo(paramId, new HashSet<>(), node.getValue().getSecond(), 1, Context.now(), 0));
+        ParamId paramId = new ParamId(url, method, responseCode, false, prefix + "#" + node.getPathElem(),SingleTypeInfo.DICT, apiCollectionId);
+        occ.put(SingleTypeInfo.DICT, new SingleTypeInfo(paramId, new HashSet<>(), node.getValue().getSecond(), 1, Context.now(), 0));
         node.getValue().setFirst(new KeyTypes(occ, false));
 
         node.getChildren().clear();

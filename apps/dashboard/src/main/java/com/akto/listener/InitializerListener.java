@@ -114,7 +114,8 @@ public class InitializerListener implements ServletContextListener {
 
                     newEndpointsToCountLast7Days.compute(param.getUrl(), (k, v) -> 1 + (v == null ? 0 : v));
 
-                    if (param.getSubType().isSensitive ) {
+                    SingleTypeInfo.Position position = param.findPosition();
+                    if (param.getSubType().isSensitive(position)) {
                         newSensitiveParams.add(param.getParam() + " in " + param.getMethod() + ": " + param.getUrl());
                     }
                 }
@@ -153,6 +154,8 @@ public class InitializerListener implements ServletContextListener {
 
 
         DaoInit.init(new ConnectionString(mongoURI));
+
+        SingleTypeInfo.init();
 
         setUpWeeklyScheduler();
     }

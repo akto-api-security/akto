@@ -66,7 +66,7 @@ public class PayloadAnalyzer {
                                 SingleTypeInfo info = occurrences.get(subType);
                                 Bson update = Updates.inc("count", info.getCount());
 
-                                Bson updateKey = APICatalogSync.createFilters(info);
+                                Bson updateKey = SingleTypeInfoDao.createFilters(info);
 
                                 bulkUpdates.add(new UpdateOneModel<>(updateKey, update, new UpdateOptions().upsert(true)));
 

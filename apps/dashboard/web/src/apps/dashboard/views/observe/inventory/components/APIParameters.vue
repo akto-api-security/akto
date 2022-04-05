@@ -147,7 +147,7 @@ export default {
                 color: x.savedAsSensitive || func.isSubTypeSensitive(x) ? this.$vuetify.theme.themes.dark.redMetric: this.$vuetify.theme.themes.dark.greenMetric,
                 name: x.param.replaceAll("#", ".").replaceAll(".$", ""),
                 sensitive: func.isSubTypeSensitive(x) ? 'Yes' : '',
-                type: x.subType,
+                type: x.subType.name,
                 container: x.isHeader ? 'Headers' : 'Payload ',
                 date: this.prettifyDate(x.timestamp),
                 detectedTs: x.timestamp,
@@ -210,7 +210,7 @@ export default {
         },
         sensitiveParamsForChart() {
             return Object.entries(this.sensitiveParams.reduce((z, e) => {
-                let key = func.isSubTypeSensitive(e) ? e.subType : 'General'
+                let key = func.isSubTypeSensitive(e) ? e.subType.name : 'General'
                 z[key] = (z[key] || 0) + 1
                 return z
             }, {})).map((x, i) => {
