@@ -180,12 +180,12 @@ public class TestDBSync extends MongoBasedTest {
         for (int i = 1; i <= 30; i ++ ) {
             aggr.addURL(TestDump2.createSampleParams("user"+i, "payment/id"+i));
         }
-        sync.computeDelta(aggr, true, 0);
+        sync.computeDelta(aggr, true, 123);
         sync.syncWithDB(); 
 
 
-        assertEquals(0, sync.getDelta(0).getStrictURLToMethods().size());
-        assertEquals(1, sync.getDelta(0).getTemplateURLToMethods().size());
+        assertEquals(30, sync.getDelta(123).getStrictURLToMethods().size());
+        assertEquals(0, sync.getDelta(123).getTemplateURLToMethods().size());
 
         HttpResponseParams resp2 = TestDump2.createSampleParams("user1", "payment/history");
         ArrayList<String> newHeader = new ArrayList<>();
@@ -194,11 +194,11 @@ public class TestDBSync extends MongoBasedTest {
         URLAggregator aggr2 = new URLAggregator();
         aggr2.addURL(resp2);
         
-        sync.computeDelta(aggr2, true, 0);
+        sync.computeDelta(aggr2, true, 123);
         sync.syncWithDB(); 
 
-        assertEquals(1, sync.getDelta(0).getStrictURLToMethods().size());
-        assertEquals(1, sync.getDelta(0).getTemplateURLToMethods().size());
+        assertEquals(30, sync.getDelta(123).getStrictURLToMethods().size());
+        assertEquals(1, sync.getDelta(123).getTemplateURLToMethods().size());
 
 
     }
