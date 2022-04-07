@@ -211,6 +211,7 @@ public class APICatalogSync {
             if (dbTemplates != null && dbTemplates.size() > 0) {
                 boolean newUrlMatchedInDb = false;
                 int countSimilarURLs = 0;
+                Map<URLTemplate, Set<RequestTemplate>> potentialMerges = new HashMap<>();
                 for(URLStatic dbUrl: dbTemplates.keySet()) {
                     RequestTemplate dbTemplate = dbTemplates.get(dbUrl);
                     URLTemplate mergedTemplate = tryMergeUrls(dbUrl, newUrl);
@@ -221,9 +222,14 @@ public class APICatalogSync {
                     if (dbTemplate.compare(newTemplate, mergedTemplate)) {
 
                         if (countSimilarURLs <= 20) {
+                            Set<RequestTemplate> similarTemplates = potentialMerges.get(mergedTemplate);
+                            if (similarTemplates == null) {
+                                similarTemplates = new HashSet<>();
+                                potentialMerges.put(mergedTemplate, similarTemplates);
+                            } 
+                            similarTemplates.add(dbTemplate);
                             countSimilarURLs++;
                         } else {
-                            deltaCatalog.getDeletedInfo().addAll(dbTemplate.getAllTypeInfo());
                             RequestTemplate alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(mergedTemplate);
 
                             if (alreadyInDelta != null) {
@@ -233,6 +239,12 @@ public class APICatalogSync {
                                 dbCopy.mergeFrom(newTemplate);    
                                 deltaCatalog.getTemplateURLToMethods().put(mergedTemplate, dbCopy);
                             }
+
+                            for (RequestTemplate rt: potentialMerges.getOrDefault(mergedTemplate, new HashSet<>())) {
+                                deltaCatalog.getDeletedInfo().addAll(rt.getAllTypeInfo());
+                            }
+                            deltaCatalog.getDeletedInfo().addAll(dbTemplate.getAllTypeInfo());
+                            
                             newUrlMatchedInDb = true;
                             break;    
                         }
