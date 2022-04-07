@@ -195,7 +195,7 @@ public class APICatalogSync {
             boolean matchedInDeltaTemplate = false;
             for(URLTemplate urlTemplate: deltaCatalog.getTemplateURLToMethods().keySet()){
                 RequestTemplate deltaTemplate = deltaCatalog.getTemplateURLToMethods().get(urlTemplate);
-                if (urlTemplate.match(newUrl) && deltaTemplate.compare(newTemplate, urlTemplate)) {
+                if (urlTemplate.match(newUrl)) {
                     matchedInDeltaTemplate = true;
                     deltaTemplate.mergeFrom(newTemplate);
                     break;
@@ -210,6 +210,8 @@ public class APICatalogSync {
             Map<URLStatic, RequestTemplate> dbTemplates = dbSizeToUrlToTemplate.get(tokens.length);
             if (dbTemplates != null && dbTemplates.size() > 0) {
                 boolean newUrlMatchedInDb = false;
+                int countSimilarURLs = 0;
+                Map<URLTemplate, Set<RequestTemplate>> potentialMerges = new HashMap<>();
                 for(URLStatic dbUrl: dbTemplates.keySet()) {
                     RequestTemplate dbTemplate = dbTemplates.get(dbUrl);
                     URLTemplate mergedTemplate = tryMergeUrls(dbUrl, newUrl);
@@ -218,19 +220,34 @@ public class APICatalogSync {
                     }
 
                     if (dbTemplate.compare(newTemplate, mergedTemplate)) {
-                        deltaCatalog.getDeletedInfo().addAll(dbTemplate.getAllTypeInfo());
-                        RequestTemplate alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(mergedTemplate);
 
-                        if (alreadyInDelta != null) {
-                            alreadyInDelta.mergeFrom(newTemplate);
+                        if (countSimilarURLs <= 20) {
+                            Set<RequestTemplate> similarTemplates = potentialMerges.get(mergedTemplate);
+                            if (similarTemplates == null) {
+                                similarTemplates = new HashSet<>();
+                                potentialMerges.put(mergedTemplate, similarTemplates);
+                            } 
+                            similarTemplates.add(dbTemplate);
+                            countSimilarURLs++;
                         } else {
-                            RequestTemplate dbCopy = dbTemplate.copy();
-                            dbCopy.mergeFrom(newTemplate);    
-                            deltaCatalog.getTemplateURLToMethods().put(mergedTemplate, dbCopy);
+                            RequestTemplate alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(mergedTemplate);
+
+                            if (alreadyInDelta != null) {
+                                alreadyInDelta.mergeFrom(newTemplate);
+                            } else {
+                                RequestTemplate dbCopy = dbTemplate.copy();
+                                dbCopy.mergeFrom(newTemplate);    
+                                deltaCatalog.getTemplateURLToMethods().put(mergedTemplate, dbCopy);
+                            }
+
+                            for (RequestTemplate rt: potentialMerges.getOrDefault(mergedTemplate, new HashSet<>())) {
+                                deltaCatalog.getDeletedInfo().addAll(rt.getAllTypeInfo());
+                            }
+                            deltaCatalog.getDeletedInfo().addAll(dbTemplate.getAllTypeInfo());
+                            
+                            newUrlMatchedInDb = true;
+                            break;    
                         }
-                        
-                        newUrlMatchedInDb = true;
-                        break;
                     }
                 }
 
@@ -245,26 +262,24 @@ public class APICatalogSync {
             for (URLStatic deltaUrl: deltaCatalog.getStrictURLToMethods().keySet()) {
                 RequestTemplate deltaTemplate = deltaTemplates.get(deltaUrl);
                 URLTemplate mergedTemplate = tryMergeUrls(deltaUrl, newUrl);
-                if (mergedTemplate == null) {
+                if (mergedTemplate == null || RequestTemplate.isMergedOnStr(mergedTemplate)) {
                     continue;
                 }
 
-                if (deltaTemplate.compare(newTemplate, mergedTemplate)) {
-                    newUrlMatchedInDelta = true;
-                    deltaCatalog.getDeletedInfo().addAll(deltaTemplate.getAllTypeInfo());
-                    RequestTemplate alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(mergedTemplate);
+                newUrlMatchedInDelta = true;
+                deltaCatalog.getDeletedInfo().addAll(deltaTemplate.getAllTypeInfo());
+                RequestTemplate alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(mergedTemplate);
 
-                    if (alreadyInDelta != null) {
-                        alreadyInDelta.mergeFrom(newTemplate);
-                    } else {
-                        RequestTemplate deltaCopy = deltaTemplate.copy();
-                        deltaCopy.mergeFrom(newTemplate);    
-                        deltaCatalog.getTemplateURLToMethods().put(mergedTemplate, deltaCopy);
-                    }
-                    
-                    deltaCatalog.getStrictURLToMethods().remove(deltaUrl);
-                    break;
-                }                
+                if (alreadyInDelta != null) {
+                    alreadyInDelta.mergeFrom(newTemplate);
+                } else {
+                    RequestTemplate deltaCopy = deltaTemplate.copy();
+                    deltaCopy.mergeFrom(newTemplate);    
+                    deltaCatalog.getTemplateURLToMethods().put(mergedTemplate, deltaCopy);
+                }
+                
+                deltaCatalog.getStrictURLToMethods().remove(deltaUrl);
+                break;
             }
             
             if (newUrlMatchedInDelta) {
@@ -290,7 +305,6 @@ public class APICatalogSync {
         }
 
         SuperType[] newTypes = new SuperType[newTokens.length];
-        int templatizedNumTokens = 0;
         int templatizedStrTokens = 0;
         for(int i = 0; i < newTokens.length; i ++) {
             String tempToken = newTokens[i];
@@ -303,7 +317,6 @@ public class APICatalogSync {
             if (NumberUtils.isParsable(tempToken) && NumberUtils.isParsable(dbToken)) {
                 newTypes[i] = SuperType.INTEGER;
                 newTokens[i] = null;
-                templatizedNumTokens++;
             } else {
                 newTypes[i] = SuperType.STRING;
                 newTokens[i] = null;
@@ -334,22 +347,18 @@ public class APICatalogSync {
 
                 for (URLTemplate  urlTemplate: dbCatalog.getTemplateURLToMethods().keySet()) {
                     if (urlTemplate.match(newUrl)) {
-                        RequestTemplate dbTemplate = dbCatalog.getTemplateURLToMethods().get(urlTemplate);
+                        RequestTemplate alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(urlTemplate);
 
-                        if (newRequestTemplate.compare(dbTemplate, urlTemplate)) {
-                            RequestTemplate alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(urlTemplate);
-
-                            if (alreadyInDelta != null) {
-                                alreadyInDelta.mergeFrom(newRequestTemplate);
-                            } else {
-                                RequestTemplate dbCopy = dbTemplate.copy();
-                                dbCopy.mergeFrom(newRequestTemplate);    
-                                deltaCatalog.getTemplateURLToMethods().put(urlTemplate, dbCopy);
-                            }
-                            iterator.remove();
-                            break;
+                        if (alreadyInDelta != null) {
+                            alreadyInDelta.mergeFrom(newRequestTemplate);
+                        } else {
+                            RequestTemplate dbTemplate = dbCatalog.getTemplateURLToMethods().get(urlTemplate);
+                            RequestTemplate dbCopy = dbTemplate.copy();
+                            dbCopy.mergeFrom(newRequestTemplate);    
+                            deltaCatalog.getTemplateURLToMethods().put(urlTemplate, dbCopy);
                         }
-                        
+                        iterator.remove();
+                        break;
                     }
                 }
             }

@@ -43,8 +43,8 @@ public class TestRequestTemplate {
 
         RequestTemplate a = createRequestTemplate(true);
         a.getHeaders().put("h4", new KeyTypes());
-        assertTrue(!a.compare(createRequestTemplate(true), urlTemplate));
-        assertTrue(!createRequestTemplate(true).compare(a, urlTemplate));
+        assertTrue(a.compare(createRequestTemplate(true), urlTemplate));
+        assertTrue(createRequestTemplate(true).compare(a, urlTemplate));
 
     }
 

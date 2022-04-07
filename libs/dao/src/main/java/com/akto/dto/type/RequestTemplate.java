@@ -16,7 +16,6 @@ import com.akto.dto.type.SingleTypeInfo.ParamId;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
-import com.akto.types.CappedList;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.akto.util.Trie;
@@ -24,14 +23,39 @@ import com.akto.util.Trie.Node;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class RequestTemplate {
 
+    private static class AllParams {
+        int lastKnownParamMapSize = 0;
+        Set<String> paramNames = new HashSet<>();
+
+        AllParams() {}
+
+        public void rebuild(Set<String> parameterKeys) {
+            lastKnownParamMapSize = -1;
+
+            for(String p: parameterKeys) {
+                paramNames.add(getParamName(p));
+            }
+            lastKnownParamMapSize = parameterKeys.size();
+        }
+
+        private static String getParamName(String param) {
+            String paramName = param.substring(param.lastIndexOf('#')+1);
+            int depth = StringUtils.countMatches(param, '#');
+            return depth+"-"+paramName;
+        }
+
+    }
+
     private static final Logger logger = LoggerFactory.getLogger(RequestTemplate.class);
 
     Map<String, KeyTypes> parameters;
+    AllParams allParams = new AllParams();
     Map<String, KeyTypes> headers;
     Map<Integer, RequestTemplate> responseTemplates;
     Set<String> userIds = new HashSet<>();
@@ -59,6 +83,14 @@ public class RequestTemplate {
         if (set.size() < 10) set.add(userId);
     }
 
+    public Set<String> getParamNames() {
+        Set<String> parameterKeys = parameters.keySet();
+        if (parameterKeys.size() != allParams.lastKnownParamMapSize) {
+            allParams.rebuild(parameterKeys);
+        }
+        return allParams.paramNames;
+    }
+    
     private void insert(Object obj, String userId, Trie.Node<String, Pair<KeyTypes, Set<String>>> root, String url, String method, int responseCode, String prefix, int apiCollectionId, String rawMessage) {
 
         prefix += ("#"+root.getPathElem());
@@ -134,6 +166,9 @@ public class RequestTemplate {
             BasicDBObject flattened = JSONUtils.flatten(payload);
             s = System.currentTimeMillis();
             for(String param: flattened.keySet()) {
+                if (parameters.size() > 1000) {
+                    continue;
+                }
                 KeyTypes keyTypes = parameters.get(param);
                 if (keyTypes == null) {
 
@@ -464,7 +499,7 @@ public class RequestTemplate {
         return ret;
     }
 
-    private static boolean isMergedOnStr(URLTemplate urlTemplate) {
+    public static boolean isMergedOnStr(URLTemplate urlTemplate) {
         for(SuperType superType: urlTemplate.getTypes()) {
             if (superType == SuperType.STRING) {
                 return true;
@@ -474,15 +509,43 @@ public class RequestTemplate {
         return false;
     }
 
+    private static boolean isWithin20Percent(Set<String> xSet, Set<String> ySet) {
+        int xs = xSet.size();
+        int ys = ySet.size();
+        if (xs == 0) return ys == 0;
+        if (ys == 0) return xs == 0;
+
+        int allowedDiffs = (int) (0.2 * Math.min(xs, ys));
+
+        if (Math.abs(xs - ys) > allowedDiffs) return false;
+
+        int absentInY = 0;
+        for(String x: xSet) {
+            if (!ySet.contains(x)) {
+                absentInY ++;
+                if (absentInY > allowedDiffs) return false;
+            }
+        }
+
+        allowedDiffs = allowedDiffs - absentInY;
+
+        int absentInX = 0;
+        for(String y: ySet) {
+            if (!xSet.contains(y)) {
+                absentInX ++;
+                if (absentInX > allowedDiffs) return false;
+            }
+        }
+
+        return absentInX <= allowedDiffs;
+    }
+
     private static boolean compareKeys(RequestTemplate a, RequestTemplate b, URLTemplate mergedUrl) {
         if (!isMergedOnStr(mergedUrl)) {
             return true;
         }
 
-        int aReqParamsCount = a.headers.size() + a.parameters.size();
-        int bReqParamsCount = b.headers.size() + b.parameters.size();
-
-        if (aReqParamsCount != bReqParamsCount) {
+        if (!isWithin20Percent(a.getParamNames(), b.getParamNames())) {
             return false;
         }
 
@@ -513,20 +576,7 @@ public class RequestTemplate {
                     return false;
                 }
 
-                int aRespParamsCount = aResp.parameters.size() + aResp.headers.size();
-                int bRespParamsCount = bResp.parameters.size() + bResp.headers.size();
-
-                if (aRespParamsCount != bRespParamsCount) {
-                    return false;
-                }
-
-                boolean areEqual = 
-                    a.headers.keySet().equals(b.headers.keySet()) && 
-                    a.parameters.keySet().equals(b.parameters.keySet()) &&
-                    aResp.headers.keySet().equals(bResp.headers.keySet()) && 
-                    aResp.parameters.keySet().equals(bResp.parameters.keySet());
-
-                if (!areEqual) {
+                if (!isWithin20Percent(aResp.getParamNames(), bResp.getParamNames())) {
                     return false;
                 }    
             }
