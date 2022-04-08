@@ -1,5 +1,8 @@
 <template>
-    <layout-with-tabs title="Settings" :tabs="['Integrations','Account', 'Users', 'Health']">
+    <layout-with-tabs title="Settings" :tabs="['Data types', 'Integrations', 'Account', 'Users', 'Health']">
+        <template slot="Data types">
+            <data-types/>
+        </template>
       <template slot="Integrations">
         <integrations/>
       </template>
@@ -26,13 +29,15 @@ import TeamOverview from './components/TeamOverview'
 import Health from './components/Health'
 import Integrations from './components/Integrations'
 import api from './api'
+import DataTypes from './components/data_types/DataTypes.vue'
 export default {
     name: "PageSettings",
     components: { 
         LayoutWithTabs,
         TeamOverview,
         Health,
-        Integrations
+        Integrations,
+        DataTypes
     },
     methods: {
         getActiveAccount() {

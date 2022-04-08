@@ -1,15 +1,15 @@
 package com.akto.dto.data_types;
 
 public class EndsWithPredicate extends Predicate{
-    String suffix;
+    String value;
 
     public EndsWithPredicate() {
-        super();
+        super(Type.ENDS_WITH);
     }
 
-    public EndsWithPredicate(String suffix) {
-        super();
-        this.suffix = suffix;
+    public EndsWithPredicate(String value) {
+        super(Type.ENDS_WITH);
+        this.value = value;
     }
 
     @Override
@@ -17,14 +17,14 @@ public class EndsWithPredicate extends Predicate{
         if (!(value instanceof String)) return false;
 
         String str = value.toString();
-        return str.endsWith(suffix);
+        return str.endsWith(this.value);
     }
 
-    public String getSuffix() {
-        return suffix;
+    public String getValue() {
+        return value;
     }
 
-    public void setSuffix(String suffix) {
-        this.suffix = suffix;
+    public void setValue(String value) {
+        this.value = value;
     }
 }

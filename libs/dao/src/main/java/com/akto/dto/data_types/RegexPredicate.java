@@ -3,30 +3,30 @@ package com.akto.dto.data_types;
 import java.util.regex.Pattern;
 
 public class RegexPredicate extends Predicate{
-    private String regex;
+    private String value;
 
     public RegexPredicate() {
-        super();
+        super(Type.REGEX);
     }
 
-    public RegexPredicate(String regex) {
-        super();
-        this.regex = regex;
+    public RegexPredicate(String value) {
+        super(Type.REGEX);
+        this.value = value;
     }
 
     @Override
     public boolean validate(Object value) {
         if (!(value instanceof String)) return false;
         String str = value.toString();
-        Pattern pattern = Pattern.compile(regex);
+        Pattern pattern = Pattern.compile(this.value);
         return pattern.matcher(str).matches();
     }
 
-    public String getRegex() {
-        return regex;
+    public String getValue() {
+        return value;
     }
 
-    public void setRegex(String regex) {
-        this.regex = regex;
+    public void setValue(String value) {
+        this.value = value;
     }
 }

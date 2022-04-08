@@ -17,6 +17,7 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
@@ -68,8 +69,23 @@ public class CustomDataTypeAction extends UserAction{
         REGEX, STARTS_WITH, ENDS_WITH
     }
 
-    private ObjectMapper mapper = new ObjectMapper();
-    private JsonFactory factory = mapper.getFactory();
+    private final ObjectMapper mapper = new ObjectMapper();
+    private final JsonFactory factory = mapper.getFactory();
+
+
+    private BasicDBObject dataTypes;
+    public String fetchDataTypes() {
+        List<CustomDataType> customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject());
+        dataTypes = new BasicDBObject();
+        dataTypes.put("customDataTypes", customDataTypes);
+        dataTypes.put("aktoDataTypes", SingleTypeInfo.subTypeMap.values());
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public BasicDBObject getDataTypes() {
+        return dataTypes;
+    }
 
     @Override
     public String execute() {
@@ -102,7 +118,7 @@ public class CustomDataTypeAction extends UserAction{
     private Map<String, List<SingleTypeInfo.ParamId>> customSubTypeMatch = new HashMap<>();
 
     private int pageNum;
-    public String getMatchesInSampleValues() {
+    public String findMatchesInSampleValues() {
         CustomDataType customDataType;
         try {
             customDataType = generateCustomDataType(getSUser().getId());

@@ -1,15 +1,15 @@
 package com.akto.dto.data_types;
 
 public class StartsWithPredicate extends Predicate{
-    String prefix;
+    String value;
 
     public StartsWithPredicate() {
-        super();
+        super(Type.STARTS_WITH);
     }
 
-    public StartsWithPredicate(String prefix) {
-        super();
-        this.prefix = prefix;
+    public StartsWithPredicate(String value) {
+        super(Type.STARTS_WITH);
+        this.value = value;
     }
 
     @Override
@@ -17,14 +17,14 @@ public class StartsWithPredicate extends Predicate{
         if (!(value instanceof String)) return false;
 
         String str = value.toString();
-        return str.startsWith(prefix);
+        return str.startsWith(this.value);
     }
 
-    public String getPrefix() {
-        return prefix;
+    public String getValue() {
+        return value;
     }
 
-    public void setPrefix(String prefix) {
-        this.prefix = prefix;
+    public void setValue(String value) {
+        this.value = value;
     }
 }

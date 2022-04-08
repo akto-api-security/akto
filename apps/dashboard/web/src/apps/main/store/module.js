@@ -7,6 +7,7 @@ import inventory from '@/apps/dashboard/views/observe/inventory/store/module'
 import changes from '@/apps/dashboard/views/observe/changes/store/module'
 import sensitive from '@/apps/dashboard/views/observe/sensitive/store/module'
 import collections from '@/apps/dashboard/views/observe/collections/store/module'
+import data_types from '@/apps/dashboard/views/settings/components/data_types/store/module'
 
 Vue.use(Vuex)
 
@@ -19,7 +20,8 @@ const store = new Vuex.Store({
         inventory,
         collections,
         changes,
-        sensitive
+        sensitive,
+        data_types
     }
 })
 
