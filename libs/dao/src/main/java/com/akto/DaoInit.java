@@ -69,6 +69,7 @@ public class DaoInit {
                 predicateClassModel, conditionsClassModel, regexPredicateClassModel, startsWithPredicateClassModel, endsWithPredicateClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
+            new EnumCodec<>(Conditions.Operator.class),
             new EnumCodec<>(SingleTypeInfo.SuperType.class),
             new EnumCodec<>(Method.class),
             new EnumCodec<>(RBAC.Role.class),

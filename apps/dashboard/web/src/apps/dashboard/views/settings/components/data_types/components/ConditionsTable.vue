@@ -16,39 +16,7 @@
                 <v-hover v-slot="{ hover }">
                     <v-row>
                         <v-col cols="1" v-if="index !== 0">
-                            <div class='operator-block' style="height: 40px; line-height: 47px">
-                                <div class="text-center">
-                                    <v-menu offset-y>
-                                        <template v-slot:activator="{ on, attrs }">
-                                            <span
-                                                v-if="conditions.operator"
-                                                v-bind="attrs"
-                                                v-on="on"
-                                                style="color: grey"
-                                                >
-                                                {{conditions.operator}}
-                                            </span>
-                                            <span
-                                                v-else
-                                                v-bind="attrs"
-                                                v-on="on"
-                                                style="text-decoration: italic; color: grey"
-                                                >
-                                                    click
-                                            </span>
-                                        </template>
-                                        <v-list>
-                                            <v-list-item 
-                                                v-for="(item, index) in operators" 
-                                                :key="index"
-                                                @click="conditions.operator = item"
-                                            >
-                                                <v-list-item-title>{{ item }}</v-list-item-title>
-                                            </v-list-item>
-                                        </v-list>
-                                    </v-menu>
-                                </div>
-                            </div>
+                            <operator-component :operator="conditions.operator" @operatorChanged="operatorChanged"/>
                         </v-col>
                         <v-col :cols="index === 0 ? 11 : 10">
                             <simple-condition-component :initial_string="initial_string" :condition="condition"/>
@@ -80,6 +48,7 @@
 <script>
 import obj from "@/util/obj"
 import SimpleConditionComponent from './SimpleConditionComponent.vue'
+import OperatorComponent from './OperatorComponent.vue'
 export default {
     name: "CondtionsTable",
     props: {
@@ -88,13 +57,11 @@ export default {
         table_header: obj.strR
     },
     components: {
-        SimpleConditionComponent
+        SimpleConditionComponent,
+        OperatorComponent
     },
     data() {
         return {
-            operators: [
-                "OR", "AND"
-            ],
             operation_types: [
                 {
                     "text": "starts with",
@@ -121,13 +88,12 @@ export default {
         deleteRow(index) {
             this.conditions.predicates.splice(index,1)
         },
+        operatorChanged(value) {
+            this.conditions.operator = value
+        },
         getValueStyle(value) {
             let width = !value  ? 6 : value.length + 4
             return { 'width': width+ 'ch' }
-        },
-        getValueStyleOperator(value) {
-            let width = !value  ? 6 : value.length + 4
-            return { 'width': width+ 'ch', "color": "grey" }
         },
         formatConditionType(value) {
             let finalValue = null
@@ -179,10 +145,6 @@ export default {
     background: #edecf0 
     width: fit-content
     padding: 0px 10px 10px 10px
-
-.operator-block
-    display: inline-block
-    color: grey
 
 </style>
 

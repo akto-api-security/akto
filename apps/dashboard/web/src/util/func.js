@@ -421,5 +421,66 @@ export default {
                 break;        
         }
         return icon
+    },
+
+    preparePredicatesForApi(predicates) {
+        let result = []
+        if (!predicates) return result
+        predicates.forEach((predicate) => {
+            let type = predicate["type"]
+            let obj = {"type": type}
+
+            let valueMap = {}
+            switch (type) {
+                case "STARTS_WITH":
+                case "ENDS_WITH":
+                case "REGEX":
+                    valueMap["value"] = predicate["value"]
+                    break;
+
+                case "IS_NUMBER":
+                    break;
+
+            }
+
+            obj["valueMap"] = valueMap
+
+            result.push(obj)
+        })
+
+        return result;
+    },
+
+    prepareDataTypes(data_types) {
+        if (data_types) {
+            data_types.forEach((x) => {
+                x["color"] = x["sensitiveAlways"] || x["sensitivePosition"].length > 0 ? "red": "transparent"
+                x["prefix"] = x["id"] ? "[custom]" : ""
+                if (x["id"]) {
+                    if (!x["keyConditions"]) {
+                        x["keyConditions"] = {"operator": "AND", "predicates": []}
+                    }
+                    if (!x["valueConditions"]) {
+                        x["valueConditions"] = {"operator": "AND", "predicates": []}
+                    }
+                }
+            })
+
+        }
+    },
+
+    prettifySensitivePosition(sensitivePosition) {
+        let andIndex = sensitivePosition.length - 2
+        let result = ""
+        for (let idx=0; idx < sensitivePosition.length; idx++) {
+            result += sensitivePosition[idx]
+            if (andIndex) {
+                result += "and"
+            } else {
+                result += ","
+            }
+        }
+
+        return result
     }
 }

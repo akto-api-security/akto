@@ -2,9 +2,16 @@
     <div>
         <v-row class="pa-4">
             <v-col md="3" class="data-types-container d-flex">
-                <a-card title="Data Types" color="rgba(33, 150, 243)" style="min-height: 600px">
-                    <div v-for="data_type in prettyDataTypes" :key="data_type.name">
-                        <data-type-card :item="data_type" @rowClicked="openDetails"/>
+                <a-card
+                    title="Data Types" 
+                    color="rgba(33, 150, 243)"
+                    style="min-height: 600px"
+                    icon_right="$fas_plus"
+                    icon_right_color="#6200EA"
+                    @icon_right_clicked="createNewDataType"
+                >
+                    <div v-for="data_type in data_types" :key="data_type.name">
+                        <data-type-card :item="data_type"/>
                     </div>
                 </a-card>
             </v-col>
@@ -31,34 +38,31 @@ export default {
     },
     data() {
         return {
-            data_type:null,
         }
     },
     mounted() {
         this.$store.dispatch("data_types/fetchDataTypes").then((resp) => {
             if (this.data_types.length > 0) {
-                console.log(this.data_types);
                 this.data_type = this.data_types[0]
             }
         })
     },
     methods: {
-        openDetails(item) {
-            this.data_type = item
+        createNewDataType() {
+            this.$store.state.data_types.data_type = {
+                "name": "",
+                "operator": "AND",
+                "keyConditions": {"operator": "AND", "predicates": []},
+                "sensitiveAlways": true,
+                "valueConditions": {"operator": "AND", "predicates": []},
+                "active": true,
+                "sensitivePosition": [],
+                "createNew": true
+            }
         }
     },
     computed: {
-        ...mapState('data_types', ['data_types']),
-        prettyDataTypes() {
-            if (this.data_types) {
-                console.log(this.data_types);
-                this.data_types.map((x) => {
-                    x["color"] = x["sensitiveAlways"] || x["sensitivePosition"].length > 0 ? "red": "rgba(71, 70, 106, 0.03)"
-                    x["prefix"] = x["id"] ? "[custom]" : ""
-                })
-                return this.data_types
-            }
-        }
+        ...mapState('data_types', ['data_types', 'data_type']),
     }
 }
 

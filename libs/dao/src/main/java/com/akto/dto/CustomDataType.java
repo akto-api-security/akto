@@ -16,12 +16,16 @@ public class CustomDataType {
     private boolean sensitiveAlways;
     private List<SingleTypeInfo.Position> sensitivePosition;
     private int creatorId;
+    public static final String TIMESTAMP = "timestamp";
     private int timestamp;
     public static final String ACTIVE = "active";
     private boolean active;
 
+    public static final String KEY_CONDITIONS = "keyConditions";
     Conditions keyConditions;
+    public static final String VALUE_CONDITIONS = "valueConditions";
     Conditions valueConditions;
+    public static final String OPERATOR = "operator";
     Conditions.Operator operator;
 
     public CustomDataType() { }

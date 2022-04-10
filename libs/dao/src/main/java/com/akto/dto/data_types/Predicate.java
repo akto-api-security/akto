@@ -3,7 +3,7 @@ package com.akto.dto.data_types;
 public abstract class Predicate {
     private Type type;
 
-    enum Type {
+    public enum Type {
         REGEX, STARTS_WITH, ENDS_WITH
     }
 

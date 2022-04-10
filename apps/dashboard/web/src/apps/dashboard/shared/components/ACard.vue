@@ -9,6 +9,13 @@
       </span>
       <slot name="title-bar"></slot>
       <v-card-subtitle>{{subtitle}}</v-card-subtitle>
+      <span>
+        <v-btn icon @click="$emit('icon_right_clicked')"  v-if="this.icon_right">
+          <v-icon :color="this.icon_right_color ? this.icon_right_color : 'rgba(71, 70, 106, 0.5)'">
+            {{icon_right}}
+          </v-icon>
+        </v-btn>
+      </span>
     </v-card-title>
     <div :style="{height: 'calc(100% - 56px)'}">
       <slot/>
@@ -25,7 +32,9 @@ export default {
     title: obj.strR,
     subtitle: obj.strN,
     icon: obj.strN,
-    color: obj.strN
+    color: obj.strN,
+    icon_right: obj.strN,
+    icon_right_color: obj.strN
   }
 }
 </script>

@@ -8,7 +8,7 @@
                 />
                 <td
                     class="table-column clickable"
-                    @click="$emit('rowClicked', item)"
+                    @click="dataTypeSelected(item)"
                     style="width: 100%"
                 >
                     <div class="table-entry">
@@ -41,7 +41,13 @@ export default {
         }
     },
     created() {
+    },
+    methods: {
+      dataTypeSelected(item) {
+        this.$store.state.data_types.data_type = item
+      }
     }
+
 }
 
 </script>
