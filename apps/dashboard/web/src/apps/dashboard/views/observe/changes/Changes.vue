@@ -56,19 +56,22 @@
                 </simple-table>
             </template>
             <template slot="New parameters">
-                <simple-table 
+                <server-table 
                     :headers="parameterHeaders" 
-                    :items="newParameters" 
                     name="New parameters" 
-                    sortKeyDefault="added" 
+                    sortKeyDefault="timestamp" 
                     :sortDescDefault="true"
                     @rowClicked="goToEndpoint"
+                    :fetchParams="fetchRecentParams"
+                    :processParams="prepareItemForTable"
+                    :getColumnValueList="getColumnValueList"
+                    :hideDownloadCSVIcon="true"
                 >
                     <template #item.type="{item}">
                         <sensitive-chip-group :sensitiveTags="[item.type]" />
                     </template>
                     
-                    <template #add-new-row-btn="{filteredItems}">
+                    <!-- <template #add-new-row-btn="{filteredItems}">
                         <div class="ma-1 d-flex">
                             <v-dialog
                                 :model="showDialog1"
@@ -128,8 +131,8 @@
                                 />
                             </v-dialog>
                         </div>
-                    </template>
-                </simple-table>
+                    </template> -->
+                </server-table>
             </template>
         </layout-with-tabs>
     </div>    
@@ -142,6 +145,7 @@ import ACard from '@/apps/dashboard/shared/components/ACard'
 import CountBox from '@/apps/dashboard/shared/components/CountBox'
 import LineChart from '@/apps/dashboard/shared/components/LineChart'
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
+import ServerTable from '@/apps/dashboard/shared/components/ServerTable'
 import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
 import func from '@/util/func'
 import constants from '@/util/constants'
@@ -158,6 +162,7 @@ export default {
         LineChart, 
         LayoutWithTabs,
         SimpleTable,
+        ServerTable,
         SensitiveChipGroup,
         LineChart,
         BatchOperation
@@ -215,32 +220,38 @@ export default {
                 },
                 {
                     text: 'Name',
-                    value: 'name'
+                    value: 'name',
+                    sortKey: 'param'
                 },
                 {
                     text: 'Type',
-                    value: 'type'
+                    value: 'type',
+                    sortKey: 'subType'
                 },
                 {
                     text: 'Endpoint',
-                    value: 'endpoint'
+                    value: 'endpoint',
+                    sortKey: 'url'
                 },
                 {
                     text: 'Collection',
-                    value: 'apiCollectionName'
+                    value: 'apiCollectionName',
+                    sortKey: 'apiCollectionId'
                 },
                 {
                     text: 'Method',
-                    value: 'method'
+                    value: 'method',
+                    sortKey: 'method'
                 },
                 {
                     text: 'Location',
-                    value: 'location'
+                    value: 'location',
+                    sortKey: 'isHeader'
                 },
                 {
                     text: constants.DISCOVERED,
                     value: 'added',
-                    sortKey: 'detectedTs'
+                    sortKey: 'timestamp'
                 }
             ]
         }
@@ -248,6 +259,75 @@ export default {
     methods: {
         isSubTypeSensitive(x) {
             return func.isSubTypeSensitive(x)
+        },
+        getColumnValueList(headerValue) {
+            switch (headerValue) {
+                case "method": 
+                    return {
+                        type: "STRING",
+                        values: ["GET", "POST", "PUT", "HEAD", "OPTIONS"].map(x => {return {
+                            title: x, 
+                            subtitle: '',
+                            value: x
+                        }})
+                    }
+
+                case "timestamp": 
+                    return {
+                        type: "INTEGER",
+                        values: {
+                            min: 0,
+                            max: 600
+                        }
+                    }
+
+                case "apiCollectionId": 
+                    return { 
+                        type: "STRING", 
+                        values: this.$store.state.collections.apiCollections.map(x=> {
+                            return {
+                                title: x.displayName,
+                                subtitle: '',
+                                value: x.id
+                            }
+                        })
+                    }
+
+                case "isHeader":
+                    return {
+                        type: "STRING",
+                        values: [
+                            {
+                                title: "Headers",
+                                subtitle: '',
+                                value: true
+                            },
+                            {
+                                title: "Payload",
+                                subtitle: '',
+                                value: false
+                            },
+                        ]
+                    }
+
+                case "subType": 
+                    return {
+                        type: "STRING",
+                        values: [
+                            "TRUE", "FALSE", "INTEGER_32", "INTEGER_64", "FLOAT", "NULL", "OTHER", "EMAIL", 
+                            "URL", "ADDRESS", "SSN", "CREDIT_CARD", "PHONE_NUMBER", "UUID", "GENERIC", "DICT", 
+                            "JWT", "IP_ADDRESS"].map(x => {
+                                return {
+                                    title: x, 
+                                    subtitle: '',
+                                    value: x
+                                }
+                            })
+                    }
+                 
+                default: 
+                    return  {type: "SEARCH", values: []}
+            }
         },
         markAllSensitive (sensitive, {items}) {
             let valueSet = new Set([...items.map(x => x.value)])
@@ -281,6 +361,7 @@ export default {
                 color: func.isSubTypeSensitive(x) ? this.$vuetify.theme.themes.dark.redMetric : this.$vuetify.theme.themes.dark.greenMetric,
                 name: x.param.replaceAll("#", ".").replaceAll(".$", ""),
                 endpoint: x.url,
+                url: x.url,
                 method: x.method,
                 added: func.prettifyEpoch(x.timestamp),
                 location: (x.responseCode == -1 ? 'Request' : 'Response') + ' ' + (x.isHeader ? 'headers' : 'payload'),
@@ -290,6 +371,9 @@ export default {
                 apiCollectionName: idToNameMap[x.apiCollectionId] || '-',
                 x: x
             }
+        },
+        async fetchRecentParams(sortKey, sortOrder, skip, limit, filters, filterOperators) {
+            return await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators)
         },
         goToEndpoint (row) {
             let routeObj = {

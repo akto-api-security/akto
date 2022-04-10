@@ -86,7 +86,7 @@ const inventory = {
             if (shouldLoad) {
                 state.loading = true
             }
-            return api.getAPICollection(apiCollectionId).then((resp) => {
+            return api.fetchAPICollection(apiCollectionId).then((resp) => {
                 commit('SAVE_API_COLLECTION', {data: resp.data, apiCollectionId: apiCollectionId}, options)
                 api.listAllSensitiveFields().then(allSensitiveFields => {
                     commit('SAVE_SENSITIVE', allSensitiveFields.data)

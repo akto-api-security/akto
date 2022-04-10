@@ -390,7 +390,7 @@ export default {
 
         return Object.values(ret)        
     },
-    recencyPeriod: 60 * 24 * 60 * 60,
+    recencyPeriod: 600 * 24 * 60 * 60,
     sensitiveTagDetails(tag) {
         let icon = "$fas_info-circle"
         switch(tag) {

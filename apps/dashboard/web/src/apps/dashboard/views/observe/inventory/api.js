@@ -57,9 +57,9 @@ export default {
             }
         })
     },
-    getAPICollection (apiCollectionId) {
+    fetchAPICollection (apiCollectionId) {
         return request({
-            url: '/api/getAPICollection',
+            url: '/api/fetchAPICollection',
             method: 'post',
             data: {
                 apiCollectionId: apiCollectionId
@@ -69,9 +69,9 @@ export default {
         })
     },
 
-    getAllUrlsAndMethods (apiCollectionId) {
+    fetchAllUrlsAndMethods (apiCollectionId) {
         return request({
-            url: '/api/getAllUrlsAndMethods',
+            url: '/api/fetchAllUrlsAndMethods',
             method: 'post',
             data: {
                 apiCollectionId: apiCollectionId

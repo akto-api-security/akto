@@ -290,7 +290,7 @@
 
 
         <!--  DO NOT CHANGE THE PATH NAME BEING USED BY EXTERNAL API -->
-        <action name="api/getAPICollection" class="com.akto.action.observe.InventoryAction" method="getAPICollection">
+        <action name="api/fetchAPICollection" class="com.akto.action.observe.InventoryAction" method="fetchAPICollection">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"   type="json">
@@ -328,7 +328,7 @@
         </action>
 
 
-        <action name="api/getAllUrlsAndMethods" class="com.akto.action.observe.InventoryAction" method="getAllUrlsAndMethods">
+        <action name="api/fetchAllUrlsAndMethods" class="com.akto.action.observe.InventoryAction" method="fetchAllUrlsAndMethods">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"   type="json">
@@ -634,6 +634,15 @@
         </action>
 
         <action name="api/fetchSensitiveSampleData" class="com.akto.action.TrafficAction" method="fetchSensitiveSampleData">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/fetchChanges" class="com.akto.action.observe.InventoryAction" method="fetchChanges">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json"/>

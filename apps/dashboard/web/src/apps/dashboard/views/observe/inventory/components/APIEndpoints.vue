@@ -337,7 +337,7 @@ export default {
             if (collectionIdChanged || !shouldLoad || ((new Date() / 1000) - this.lastFetched > 60*5)) {
                 this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId, shouldLoad: shouldLoad})
 
-                api.getAllUrlsAndMethods(this.apiCollectionId).then(resp => {
+                api.fetchAllUrlsAndMethods(this.apiCollectionId).then(resp => {
                     this.documentedURLs = resp.data || {}
                 })
             }

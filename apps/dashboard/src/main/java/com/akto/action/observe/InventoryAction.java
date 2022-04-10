@@ -1,6 +1,8 @@
 package com.akto.action.observe;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import com.akto.action.SensitiveFieldAction;
 import com.akto.action.UserAction;
@@ -14,7 +16,10 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Sorts;
 import com.opensymphony.xwork2.Action;
+
+import org.bson.conversions.Bson;
 
 import io.swagger.parser.OpenAPIParser;
 import io.swagger.v3.oas.models.OpenAPI;
@@ -27,7 +32,7 @@ public class InventoryAction extends UserAction {
 
     BasicDBObject response;
 
-    public String getAPICollection() {
+    public String fetchAPICollection() {
         List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.eq("apiCollectionId", apiCollectionId));
         response = new BasicDBObject();
         response.put("data", new BasicDBObject("name", "Main application").append("endpoints", list));
@@ -38,12 +43,12 @@ public class InventoryAction extends UserAction {
     public List<SingleTypeInfo> fetchRecentParams(int deltaPeriod) {
         int now = Context.now();
         int twoMonthsAgo = now - deltaPeriod;
-        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.gt("timestamp", twoMonthsAgo));
+        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.gt("timestamp", twoMonthsAgo), 0, 2, null);
 
         return list;
     }
 
-    public final static int deltaPeriodValue = 62 * 24 * 60 * 60;
+    public final static int deltaPeriodValue = 600 * 24 * 60 * 60;
 
     // if this function is changed then make sure to update fetchApiInfoListForRecentEndpoints method too
     public String loadRecentParameters() {
@@ -65,7 +70,7 @@ public class InventoryAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String getAllUrlsAndMethods() {
+    public String fetchAllUrlsAndMethods() {
         response = new BasicDBObject();
         BasicDBObject ret = new BasicDBObject();
 
@@ -84,6 +89,119 @@ public class InventoryAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    private String sortKey;
+    private int sortOrder;
+    private int limit;
+    private int skip;
+    private Map<String, List> filters;
+    private Map<String, String> filterOperators;
+
+    private Bson prepareFilters() {
+        int now = Context.now();
+        int twoMonthsAgo = now - deltaPeriodValue;
+
+        ArrayList<Bson> filterList = new ArrayList<>();
+        filterList.add(Filters.gt("timestamp", twoMonthsAgo));
+        for(Map.Entry<String, List> entry: filters.entrySet()) {
+            String key = entry.getKey();
+            List value = entry.getValue();
+
+            if (value.size() == 0) continue;
+            String operator = filterOperators.get(key);
+
+            switch (key) {
+                case "color": continue;
+                case "url":
+                case "param":
+                    switch (operator) {
+                        case "OR":
+                        case "AND":
+                            filterList.add(Filters.regex(key, ".*"+value.get(0)+".*", "i"));
+                            break;
+                        case "NOT":
+                            filterList.add(Filters.not(Filters.regex(key, ".*"+value.get(0)+".*", "i")));
+                            break;
+                    }
+
+                    break;
+                case "timestamp": 
+                    List<Long> ll = value;
+                    filterList.add(Filters.lte(key, (long) (Context.now()) - ll.get(0) * 86400L));
+                    filterList.add(Filters.gte(key, (long) (Context.now()) - ll.get(1) * 86400L));
+                    break;
+                default: 
+                    switch (operator) {
+                        case "OR":
+                        case "AND":
+                            filterList.add(Filters.in(key, value));
+                            break;
+
+                        case "NOT":
+                            filterList.add(Filters.nin(key, value));
+                            break;
+                    }
+                    
+            }
+        }
+
+        return Filters.and(filterList);
+
+    }
+
+    private List<SingleTypeInfo> getMongoResults() {
+
+        List<String> sortFields = new ArrayList<>();
+        sortFields.add(sortKey);
+
+        Bson sort = sortOrder == 1 ? Sorts.ascending(sortFields) : Sorts.descending(sortFields);
+
+        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.and(prepareFilters()), skip, limit, sort);
+        return list;        
+    }
+
+    private long getTotalParams() {
+        return SingleTypeInfoDao.instance.getMCollection().countDocuments(prepareFilters());
+    }
+
+    public String fetchChanges() {
+        response = new BasicDBObject();
+        response.put("data", new BasicDBObject("endpoints", getMongoResults()).append("total", getTotalParams()));
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String getSortKey() {
+        return this.sortKey;
+    }
+
+    public void setSortKey(String sortKey) {
+        this.sortKey = sortKey;
+    }
+
+    public int getSortOrder() {
+        return this.sortOrder;
+    }
+
+    public void setSortOrder(int sortOrder) {
+        this.sortOrder = sortOrder;
+    }
+
+    public int getLimit() {
+        return this.limit;
+    }
+
+    public void setLimit(int limit) {
+        this.limit = limit;
+    }
+
+    public int getSkip() {
+        return this.skip;
+    }
+
+    public void setSkip(int skip) {
+        this.skip = skip;
+    }
+
     public int getApiCollectionId() {
         return this.apiCollectionId;
     }
@@ -99,4 +217,21 @@ public class InventoryAction extends UserAction {
     public void setResponse(BasicDBObject response) {
         this.response = response;
     }
+
+    public Map<String,List> getFilters() {
+        return this.filters;
+    }
+
+    public void setFilters(Map<String,List> filters) {
+        this.filters = filters;
+    }
+
+    public Map<String,String> getFilterOperators() {
+        return this.filterOperators;
+    }
+
+    public void setFilterOperators(Map<String,String> filterOperators) {
+        this.filterOperators = filterOperators;
+    }
+
 }
