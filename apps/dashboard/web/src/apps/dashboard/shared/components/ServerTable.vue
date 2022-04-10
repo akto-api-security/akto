@@ -180,8 +180,6 @@ export default {
             this.filters = {...this.filters}
             this.showHideFilterIcon(hValue)
             this.options = {...this.options, page: 1}
-
-            // this.fetchRecentParams()
         },
         appliedFilter (hValue, {item, checked, operator, type, min, max, searchText}) { 
             if (type === "INTEGER") {
@@ -200,14 +198,11 @@ export default {
             this.filters = {...this.filters}
             this.showHideFilterIcon(hValue)
             this.options = {...this.options, page: 1}
-            // this.fetchRecentParams()
         },
         operatorChanged(hValue, {operator}) {
             this.filterOperators[hValue] = operator || 'OR'
             this.showHideFilterIcon(hValue)
             this.options = {...this.options, page: 1}
-
-            // this.fetchRecentParams()
         },
         valToString(val) {
             if (val instanceof Set) {
@@ -277,7 +272,6 @@ export default {
                 this.sortKey = headerSortKey
             }
             this.fetchRecentParams()
-            // return this.sortFunc(this.items, this.sortKey, this.sortDesc)
         },
         filterFunc(item, header) {
             let itemValue = item[header]
@@ -309,34 +303,6 @@ export default {
         getDataFromApi () {
             this.loading = true
             this.fetchRecentParams()
-        }
-    },
-    computed: {
-        columnValueList: {
-            get () {
-                return this.headers.reduce((m, h) => {
-                    let allItemValues = []
-                    
-                    // this.items.forEach(i => {
-                    //         let value = i[h.value]
-                    //         if (value instanceof Set) {
-                    //             allItemValues = allItemValues.concat(...value)
-                    //         } else if (value instanceof Array) {
-                    //             allItemValues = allItemValues.concat(...value)
-                    //         } else if (typeof value !== 'undefined') {
-                    //             return allItemValues.push(i[h.value])
-                    //         }
-                    //     }
-                    // )
-
-                    let distinctItems = [...new Set(allItemValues.sort())]
-                    m[h.value] = distinctItems.map(x => {return {title: x, subtitle: '', value: x}})
-                    return m
-                }, {})
-            }
-        },
-        enablePagination() {
-            return true
         }
     },
     watch: {

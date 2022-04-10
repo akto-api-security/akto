@@ -1,21 +1,31 @@
 package com.akto.action.observe;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.akto.action.SensitiveFieldAction;
 import com.akto.action.UserAction;
 import com.akto.dao.APISpecDao;
+import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.APISpec;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveParamInfo;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.SingleTypeInfo.SubType;
+import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import com.opensymphony.xwork2.Action;
 
@@ -50,11 +60,46 @@ public class InventoryAction extends UserAction {
 
     public final static int deltaPeriodValue = 600 * 24 * 60 * 60;
 
-    // if this function is changed then make sure to update fetchApiInfoListForRecentEndpoints method too
-    public String loadRecentParameters() {
+    public List<BasicDBObject> fetchRecentEndpoints() {
+        List<Bson> pipeline = new ArrayList<>();
+        BasicDBObject groupedId = 
+            new BasicDBObject("apiCollectionId", "$apiCollectionId")
+            .append("url", "$url")
+            .append("method", "$method");
+        pipeline.add(Aggregates.group(groupedId, Accumulators.min("startTs", "$timestamp")));
+        pipeline.add(Aggregates.match(Filters.gte("startTs", Context.now() - deltaPeriodValue)));
+        pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
+        MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+
+        List<BasicDBObject> endpoints = new ArrayList<>();
+        while(endpointsCursor.hasNext()) {
+            endpoints.add(endpointsCursor.next());
+        }
+
+        return endpoints;
+    }
+
+    public String loadRecentEndpoints() {
         response = new BasicDBObject();
-        List<SingleTypeInfo> list = fetchRecentParams(deltaPeriodValue);
-        response.put("data", new BasicDBObject("endpoints", list));
+        List<ApiInfo> apiInfoList = new ArrayList<>();
+        List<BasicDBObject> list = fetchRecentEndpoints();
+
+        Set<ApiInfoKey> apiInfoKeys = new HashSet<ApiInfoKey>();
+        for (BasicDBObject singleTypeInfo: list) {
+            singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
+            apiInfoKeys.add(new ApiInfoKey(singleTypeInfo.getInt("apiCollectionId"),singleTypeInfo.getString("url"), Method.valueOf(singleTypeInfo.getString("method"))));
+        }
+
+        List<ApiInfo> fromDb = ApiInfoDao.instance.findAll(new BasicDBObject());
+        for (ApiInfo a: fromDb) {
+            if (apiInfoKeys.contains(a.getId())) {
+                a.calculateActualAuth();
+                apiInfoList.add(a);
+            }
+        }
+
+
+        response.put("data", new BasicDBObject("endpoints", list).append("apiInfoList", apiInfoList));
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -69,6 +114,26 @@ public class InventoryAction extends UserAction {
 
         return Action.SUCCESS.toUpperCase();
     }
+
+    public String fetchNewParametersTrend() {
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(Filters.gte("timestamp", Context.now() - deltaPeriodValue)));
+        pipeline.add(Aggregates.project(Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$timestamp", 86400}))));
+        pipeline.add(Aggregates.project(Projections.computed("dayOfYear", new BasicDBObject("$trunc", new Object[]{"$dayOfYearFloat", 0}))));
+        pipeline.add(Aggregates.group("$dayOfYear", Accumulators.sum("count", 1)));
+        MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+
+        List<BasicDBObject> endpoints = new ArrayList<>();
+        while(endpointsCursor.hasNext()) {
+            endpoints.add(endpointsCursor.next());
+        }
+        response = new BasicDBObject();
+        response.put("data", new BasicDBObject("endpoints", endpoints));
+
+        return Action.SUCCESS.toUpperCase();
+
+    }
+
 
     public String fetchAllUrlsAndMethods() {
         response = new BasicDBObject();

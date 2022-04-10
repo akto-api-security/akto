@@ -29,5 +29,14 @@ export default {
         }).then(resp => {
             return resp.response.data
         })
+    },
+    fetchNewParametersTrend() {
+        return request({
+            url: '/api/fetchNewParametersTrend',
+            method: 'post',
+            data: {}
+        }).then(resp => {
+            return resp.data.endpoints
+        })
     }
 }

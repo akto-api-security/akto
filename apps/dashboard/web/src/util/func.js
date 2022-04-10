@@ -304,6 +304,60 @@ export default {
         });
         return newStr
     },
+    mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
+        let ret = {}
+        let apiInfoMap = {}
+
+        if (!listEndpoints) {
+            return []
+        }
+
+        if (apiInfoList) {
+            apiInfoList.forEach(x => {
+                apiInfoMap[x["id"]["apiCollectionId"] + "-" + x["id"]["url"] + "-" + x["id"]["method"]] = x
+            })
+        }
+
+        listEndpoints.forEach(x => {
+            let key = x.apiCollectionId + "-" + x.url + "-" + x.method
+            if (!ret[key]) {
+                let access_type = null
+                if (apiInfoMap[key]) {
+                    let access_types = apiInfoMap[key]["apiAccessTypes"]
+                    if (!access_types || access_types.length == 0) {
+                        access_type = null
+                    } else if (access_types.indexOf("PUBLIC") !== -1) {
+                        access_type = "Public"
+                    } else {
+                        access_type = "Private"
+                    }
+                }
+
+                let authType = apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].join(" or ") : ""
+
+                ret[key] = {
+                    sensitive: x.sensitive,
+                    endpoint: x.url,
+                    parameterisedEndpoint: this.parameterizeUrl(x.url),
+                    open: apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].indexOf("UNAUTHENTICATED") !== -1 : false,
+                    access_type: access_type,
+                    method: x.method,
+                    color: "#00bfa5",
+                    apiCollectionId: x.apiCollectionId,
+                    last_seen: apiInfoMap[key] ? this.prettifyEpoch(apiInfoMap[key]["lastSeen"]) : 0,
+                    detectedTs: x.startTs,
+                    added: this.prettifyEpoch(x.startTs),
+                    violations: apiInfoMap[key] ? apiInfoMap[key]["violations"] : {},
+                    apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
+                    auth_type: (authType || "").toLowerCase(),
+                    sensitiveTags: x.sensitive
+                }
+
+            }
+        })
+        
+        return Object.values(ret) 
+    },
     groupByEndpoint(listParams, apiInfoList,idToName) {
         let ret = {}
         let apiInfoMap = {}

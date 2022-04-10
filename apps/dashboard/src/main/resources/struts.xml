@@ -303,7 +303,18 @@
 
 
         <!--  DO NOT CHANGE THE PATH NAME BEING USED BY EXTERNAL API -->
-        <action name="api/loadRecentParameters" class="com.akto.action.observe.InventoryAction" method="loadRecentParameters">
+        <action name="api/loadRecentEndpoints" class="com.akto.action.observe.InventoryAction" method="loadRecentEndpoints">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/fetchNewParametersTrend" class="com.akto.action.observe.InventoryAction" method="fetchNewParametersTrend">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"   type="json">
@@ -592,16 +603,6 @@
        </action>
 
         <action name="api/fetchApiInfoList" class="com.akto.action.ApiInfoAction" method="fetchApiInfoList">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS"  type="json">
-            </result>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
-            </result>
-        </action>
-
-        <action name="api/fetchApiInfoListForRecentEndpoints" class="com.akto.action.ApiInfoAction" method="fetchApiInfoListForRecentEndpoints">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json">

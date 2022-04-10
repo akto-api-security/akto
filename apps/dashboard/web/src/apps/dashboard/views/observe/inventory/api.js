@@ -97,9 +97,9 @@ export default {
             data: {}
         })
     },
-    loadRecentParameters () {
+    loadRecentEndpoints () {
         return request({
-            url: '/api/loadRecentParameters',
+            url: '/api/loadRecentEndpoints',
             method: 'post',
             data: {}
         }).then((resp) => {
@@ -175,15 +175,6 @@ export default {
             url: '/api/convertSampleDataToCurl',
             method: 'post',
             data: {sampleData}
-        }).then((resp) => {
-            return resp
-        })
-    },
-    fetchApiInfoListForRecentEndpoints() {
-        return request({
-            url: '/api/fetchApiInfoListForRecentEndpoints',
-            method: 'post',
-            data: {}
         }).then((resp) => {
             return resp
         })
