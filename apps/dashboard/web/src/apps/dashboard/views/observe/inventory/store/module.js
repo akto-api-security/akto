@@ -141,7 +141,7 @@ const inventory = {
                         )
 
                         if (index > -1) {
-                            resp.data.params[index].sensitive = true
+                            resp.data.params[index].savedAsSensitive = true
                             resp.data.params[index].subType = 'Custom'
                         }
 
