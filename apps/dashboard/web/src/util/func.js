@@ -342,7 +342,7 @@ export default {
                     open: apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].indexOf("UNAUTHENTICATED") !== -1 : false,
                     access_type: access_type,
                     method: x.method,
-                    color: "#00bfa5",
+                    color: x.sensitive && x.sensitive.size > 0 ? "#f44336" : "#00bfa5",
                     apiCollectionId: x.apiCollectionId,
                     last_seen: apiInfoMap[key] ? this.prettifyEpoch(apiInfoMap[key]["lastSeen"]) : 0,
                     detectedTs: x.startTs,
@@ -357,92 +357,6 @@ export default {
         })
         
         return Object.values(ret) 
-    },
-    groupByEndpoint(listParams, apiInfoList,idToName) {
-        let ret = {}
-        let apiInfoMap = {}
-
-        if (!listParams) {
-            return []
-        }
-
-        if (apiInfoList) {
-            apiInfoList.forEach(x => {
-                apiInfoMap[x["id"]["apiCollectionId"] + "-" + x["id"]["url"] + "-" + x["id"]["method"]] = x
-            })
-        }
-
-        listParams.forEach(x => {
-            let key = x.apiCollectionId + "-" + x.url + "-" + x.method
-            if (!ret[key]) {
-                let access_type = null
-                if (apiInfoMap[key]) {
-                    let access_types = apiInfoMap[key]["apiAccessTypes"]
-                    if (!access_types || access_types.length == 0) {
-                        access_type = null
-                    } else if (access_types.indexOf("PUBLIC") !== -1) {
-                        access_type = "Public"
-                    } else {
-                        access_type = "Private"
-                    }
-                }
-
-                let authType = apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].join(" or ") : ""
-
-                ret[key] = {
-                    sensitive: 0,
-                    endpoint: x.url,
-                    parameterisedEndpoint: this.parameterizeUrl(x.url),
-                    open: apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].indexOf("UNAUTHENTICATED") !== -1 : false,
-                    access_type: access_type,
-                    method: x.method,
-                    color: "#00bfa5",
-                    apiCollectionId: x.apiCollectionId,
-                    last_seen: apiInfoMap[key] ? this.prettifyEpoch(apiInfoMap[key]["lastSeen"]) : 0,
-                    detectedTs: null,
-                    added: '-',
-                    violations: apiInfoMap[key] ? apiInfoMap[key]["violations"] : {},
-                    changesCount: 0,
-                    changes: '',
-                    apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
-                    auth_type: (authType || "").toLowerCase()
-                }
-
-            }
-            
-            let val = ret[key]
-
-            if(this.isSubTypeSensitive(x)) {
-                val.sensitive ++
-                if (!val.sensitiveTags) {
-                    val.sensitiveTags = new Set()
-                }
-    
-                val.sensitiveTags.add(x.subType)
-                val.color = "#f44336"
-            }
-
-            let now = this.timeNow()
-
-            if ((now - x.timestamp) < this.recencyPeriod) {
-                val.changesCount++
-            }
-
-            if (!val.detectedTs) {
-                val.detectedTs = x.timestamp
-            } else {
-                val.detectedTs = Math.min(val.detectedTs, x.timestamp)
-            }
-
-            if (val.detectedTs)
-                val.added = this.prettifyEpoch(val.detectedTs)
-
-            if (val.changesCount > 0)
-                val.changes = val.changesCount + " new parameter" + (val.changesCount > 1 ? "s" : "")
-            
-        })
-
-        return Object.values(ret)        
     },
     recencyPeriod: 600 * 24 * 60 * 60,
     sensitiveTagDetails(tag) {

@@ -21,6 +21,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ExplainVerbosity;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
@@ -38,17 +39,17 @@ import io.swagger.v3.parser.core.models.SwaggerParseResult;
 
 public class InventoryAction extends UserAction {
 
-    int apiCollectionId;
+    int apiCollectionId = -1;
 
     BasicDBObject response;
 
-    public String fetchAPICollection() {
-        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.eq("apiCollectionId", apiCollectionId));
-        response = new BasicDBObject();
-        response.put("data", new BasicDBObject("name", "Main application").append("endpoints", list));
+    // public String fetchAPICollection() {
+    //     List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.eq("apiCollectionId", apiCollectionId));
+    //     response = new BasicDBObject();
+    //     response.put("data", new BasicDBObject("name", "Main application").append("endpoints", list));
 
-        return Action.SUCCESS.toUpperCase();
-    }
+    //     return Action.SUCCESS.toUpperCase();
+    // }
 
     public List<SingleTypeInfo> fetchRecentParams(int deltaPeriod) {
         int now = Context.now();
@@ -79,10 +80,29 @@ public class InventoryAction extends UserAction {
         return endpoints;
     }
 
-    public String loadRecentEndpoints() {
+    public List<BasicDBObject> fetchEndpointsInCollection(int apiCollectionId) {
+        List<Bson> pipeline = new ArrayList<>();
+        BasicDBObject groupedId = 
+            new BasicDBObject("apiCollectionId", "$apiCollectionId")
+            .append("url", "$url")
+            .append("method", "$method");
+            pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
+            pipeline.add(Aggregates.group(groupedId, Accumulators.min("startTs", "$timestamp")));
+            pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
+
+        MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+
+        List<BasicDBObject> endpoints = new ArrayList<>();
+        while(endpointsCursor.hasNext()) {
+            endpoints.add(endpointsCursor.next());
+        }
+
+        return endpoints;
+    }
+
+    private void attachAPIInfoListInResponse(List<BasicDBObject> list) {
         response = new BasicDBObject();
         List<ApiInfo> apiInfoList = new ArrayList<>();
-        List<BasicDBObject> list = fetchRecentEndpoints();
 
         Set<ApiInfoKey> apiInfoKeys = new HashSet<ApiInfoKey>();
         for (BasicDBObject singleTypeInfo: list) {
@@ -100,13 +120,53 @@ public class InventoryAction extends UserAction {
 
 
         response.put("data", new BasicDBObject("endpoints", list).append("apiInfoList", apiInfoList));
+    }
+    
+    public String fetchAPICollection() {
+        List<BasicDBObject> list = fetchEndpointsInCollection(apiCollectionId);
+        attachAPIInfoListInResponse(list);
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String loadRecentEndpoints() {
+        List<BasicDBObject> list = fetchRecentEndpoints();
+        attachAPIInfoListInResponse(list);
         return Action.SUCCESS.toUpperCase();
     }
 
     public String loadSensitiveParameters() {
-        List list = SingleTypeInfoDao.instance.findAll(Filters.in("subType", SubType.getSensitiveTypes()));
 
-        List<SensitiveParamInfo> customSensitiveList = SensitiveParamInfoDao.instance.findAll(Filters.eq("sensitive", true));
+        List<Bson> filterStandardSensitiveParams = new ArrayList<>();
+        List<Bson> filterCustomSensitiveParams = new ArrayList<>();
+
+        filterStandardSensitiveParams.add(Filters.in("subType", SubType.getSensitiveTypes()));
+        filterCustomSensitiveParams.add(Filters.eq("sensitive", true));
+        
+        if (apiCollectionId >= 0) {
+            Bson apiCollectionIdFilter = Filters.eq("apiCollectionId", apiCollectionId);
+
+            filterStandardSensitiveParams.add(apiCollectionIdFilter);
+            filterCustomSensitiveParams.add(apiCollectionIdFilter);
+        }
+
+        if (url != null) {
+            Bson urlFilter = Filters.eq("url", url);
+
+            filterStandardSensitiveParams.add(urlFilter);
+            filterCustomSensitiveParams.add(urlFilter);
+        }
+
+        if (method != null) {
+            Bson methodFilter = Filters.eq("method", method);
+
+            filterStandardSensitiveParams.add(methodFilter);
+            filterCustomSensitiveParams.add(methodFilter);
+
+        }
+
+        List list = SingleTypeInfoDao.instance.findAll(Filters.and(filterStandardSensitiveParams));
+
+        List<SensitiveParamInfo> customSensitiveList = SensitiveParamInfoDao.instance.findAll(Filters.and(filterCustomSensitiveParams));
 
         list.addAll(customSensitiveList);
         response = new BasicDBObject();
@@ -120,13 +180,15 @@ public class InventoryAction extends UserAction {
         pipeline.add(Aggregates.match(Filters.gte("timestamp", Context.now() - deltaPeriodValue)));
         pipeline.add(Aggregates.project(Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$timestamp", 86400}))));
         pipeline.add(Aggregates.project(Projections.computed("dayOfYear", new BasicDBObject("$trunc", new Object[]{"$dayOfYearFloat", 0}))));
-        pipeline.add(Aggregates.group("$dayOfYear", Accumulators.sum("count", 1)));
+        pipeline.add(Aggregates.group("$dayOfYearFloat", Accumulators.sum("count", 1)));
+
         MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
 
         List<BasicDBObject> endpoints = new ArrayList<>();
         while(endpointsCursor.hasNext()) {
             endpoints.add(endpointsCursor.next());
         }
+
         response = new BasicDBObject();
         response.put("data", new BasicDBObject("endpoints", endpoints));
 
@@ -213,6 +275,23 @@ public class InventoryAction extends UserAction {
 
     }
 
+
+    public String url;
+    public String method;
+    public String loadParamsOfEndpoint() {
+        Bson filters = Filters.and(
+            Filters.eq("apiCollectionId", apiCollectionId),
+            Filters.eq("url", url),  
+            Filters.eq("method", method)
+        );
+
+        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(filters);
+
+        response = new BasicDBObject();
+        response.put("data", new BasicDBObject("params", list));
+        return Action.SUCCESS.toUpperCase();
+    }
+
     private List<SingleTypeInfo> getMongoResults() {
 
         List<String> sortFields = new ArrayList<>();
@@ -297,6 +376,22 @@ public class InventoryAction extends UserAction {
 
     public void setFilterOperators(Map<String,String> filterOperators) {
         this.filterOperators = filterOperators;
+    }
+
+    public String getUrl() {
+        return this.url;
+    }
+
+    public void setUrl(String url) {
+        this.url = url;
+    }
+
+    public String getMethod() {
+        return this.method;
+    }
+
+    public void setMethod(String method) {
+        this.method = method;
     }
 
 }

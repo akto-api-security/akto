@@ -243,9 +243,6 @@ export default {
         rowClicked(row) {
             this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.endpoint + " " + row.method, type: 2})
         },
-        groupByEndpoint(listParams, apiInfoList ) {
-            func.groupByEndpoint(listParams, apiInfoList)
-        },
         downloadData() {
             let headerTextToValueMap = Object.fromEntries(this.tableHeaders.map(x => [x.text, x.value]).filter(x => x[0].length > 0));
 
@@ -348,16 +345,16 @@ export default {
     computed: {
         ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'loading', 'swaggerContent', 'apiInfoList', 'filters', 'lastFetched']),
         openEndpoints() {
-          return func.groupByEndpoint(this.apiCollection, this.apiInfoList).filter(x => x.open)
+          return this.allEndpoints.filter(x => x.open)
         },
         allEndpoints () {
-            return func.groupByEndpoint(this.apiCollection, this.apiInfoList )
+            return func.mergeApiInfoAndApiCollection(this.apiCollection, this.apiInfoList)
         },
         sensitiveEndpoints() {
-            return func.groupByEndpoint(this.apiCollection, this.apiInfoList).filter(x => x.sensitive > 0)
+            return this.allEndpoints.filter(x => x.sensitive && x.sensitive.size > 0)
         },
         shadowEndpoints () {
-            return func.groupByEndpoint(this.apiCollection, this.apiInfoList).filter(x => this.isShadow(x))
+            return this.allEndpoints.filter(x => this.isShadow(x))
         },
         unusedEndpoints () {
             let ret = []

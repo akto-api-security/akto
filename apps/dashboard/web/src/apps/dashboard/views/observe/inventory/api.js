@@ -106,11 +106,28 @@ export default {
             return resp
         })
     },
-    loadSensitiveParameters () {
+    loadSensitiveParameters (apiCollectionId, url, method) {
         return request({
             url: '/api/loadSensitiveParameters',
             method: 'post',
-            data: {}
+            data: {
+                apiCollectionId,
+                url, 
+                method
+            }
+        }).then((resp) => {
+            return resp
+        })
+    },
+    loadParamsOfEndpoint (apiCollectionId, url, method) {
+        return request({
+            url: '/api/loadParamsOfEndpoint',
+            method: 'post',
+            data: {
+                apiCollectionId,
+                url,
+                method
+            }
         }).then((resp) => {
             return resp
         })

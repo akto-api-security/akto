@@ -181,7 +181,7 @@ export default {
         }
     },
     computed: {
-        ...mapState('inventory', ['apiCollection']),
+        ...mapState('inventory', ['parameters']),
         url () {
             return this.urlAndMethod.split(" ")[0]
         },
@@ -189,7 +189,7 @@ export default {
             return this.urlAndMethod.split(" ")[1]
         },
         sensitiveParams() {
-            return this.apiCollection.filter(x => x.url === this.url && x.method == this.method)
+            return this.parameters.filter(x => x.subType === "CUSTOM" || func.isSubTypeSensitive(x))
         },
         trafficTrend () {
             let dateToCount = this.trafficInfo
@@ -222,16 +222,21 @@ export default {
             })
         },
         requestItems() {
-            return this.sensitiveParams.filter(x => x.responseCode == -1).map(this.prepareItem)
+            return this.parameters.filter(x => x.responseCode == -1).map(this.prepareItem)
         },
         responseItems() {
-            return this.sensitiveParams.filter(x => x.responseCode > -1).map(this.prepareItem)
+            return this.parameters.filter(x => x.responseCode > -1).map(this.prepareItem)
         }
     },
     async mounted() {
         this.$emit('mountedView', {apiCollectionId: this.apiCollectionId, urlAndMethod: this.urlAndMethod, type: 2})
-        if (!this.apiCollection || this.apiCollection.length === 0 || this.$store.state.inventory.apiCollectionId !== this.apiCollectionId) {
-            this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId})
+        if (
+            this.$store.state.inventory.apiCollectionId !== this.apiCollectionId || 
+            this.$store.state.inventory.url !== this.url ||
+            this.$store.state.inventory.method !== this.method
+        ) {
+            let urlIdentifier = {apiCollectionId: this.apiCollectionId, url: this.url, method: this.method}
+            await this.$store.dispatch('inventory/loadParamsOfEndpoint', urlIdentifier)
         }
 
         let now = func.timeNow()
