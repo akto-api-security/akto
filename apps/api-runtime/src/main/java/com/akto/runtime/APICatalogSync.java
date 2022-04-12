@@ -42,12 +42,15 @@ public class APICatalogSync {
     private static final Logger logger = LoggerFactory.getLogger(APICatalogSync.class);
     Map<Integer, APICatalog> dbState;
     Map<Integer, APICatalog> delta;
+    public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
+
 
     public APICatalogSync(String userIdentifier,int thresh) {
         this.thresh = thresh;
         this.userIdentifier = userIdentifier;
         this.dbState = new HashMap<>();
         this.delta = new HashMap<>();
+        this.sensitiveParamInfoBooleanMap = new HashMap<>();
     }
 
 
@@ -77,14 +80,14 @@ public class APICatalogSync {
         }
         if (statusCode >= 200 && statusCode < 300) {
             String reqPayload = requestParams.getPayload();
-            requestTemplate.processHeaders(requestParams.getHeaders(), baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig());
+            requestTemplate.processHeaders(requestParams.getHeaders(), baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap);
             if(reqPayload.startsWith("[")) {
                 reqPayload = "{\"json\": "+reqPayload+"}";
             }
             if (reqPayload.startsWith("{")) {
                 BasicDBObject payload = BasicDBObject.parse(reqPayload);
                 payload.putAll(queryParams.toMap());
-                deletedInfo.addAll(requestTemplate.process2(payload, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig()));
+                deletedInfo.addAll(requestTemplate.process2(payload, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap));
             }
             requestTemplate.recordMessage(responseParams.getOrig());
         }
@@ -105,8 +108,8 @@ public class APICatalogSync {
             }
 
             BasicDBObject payload = BasicDBObject.parse(respPayload);
-            deletedInfo.addAll(responseTemplate.process2(payload, baseURL.getUrl(), methodStr, statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig()));
-            responseTemplate.processHeaders(responseParams.getHeaders(), baseURL.getUrl(), method.name(), statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig());
+            deletedInfo.addAll(responseTemplate.process2(payload, baseURL.getUrl(), methodStr, statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap));
+            responseTemplate.processHeaders(responseParams.getHeaders(), baseURL.getUrl(), method.name(), statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap);
             if (!responseParams.getIsPending()) {
                 responseTemplate.processTraffic(responseParams.getTime());
             }
@@ -529,16 +532,17 @@ public class APICatalogSync {
 
             if (oldTs == 0) {
                 update = Updates.combine(update, Updates.set("timestamp", now));
-                if (deltaInfo.getExamples() != null && !deltaInfo.getExamples().isEmpty()) {
-                    Bson bson = Updates.pushEach(SensitiveSampleData.SAMPLE_DATA, Arrays.asList(deltaInfo.getExamples().toArray()), new PushOptions().slice(-1 *SensitiveSampleData.cap));
-                    bulkUpdatesForSampleData.add(
-                            new UpdateOneModel<>(
-                                    SensitiveSampleDataDao.getFilters(deltaInfo),
-                                    bson,
-                                    new UpdateOptions().upsert(true)
-                            )
-                    );
-                }
+            }
+
+            if (deltaInfo.getExamples() != null && !deltaInfo.getExamples().isEmpty()) {
+                Bson bson = Updates.pushEach(SensitiveSampleData.SAMPLE_DATA, Arrays.asList(deltaInfo.getExamples().toArray()), new PushOptions().slice(-1 *SensitiveSampleData.cap));
+                bulkUpdatesForSampleData.add(
+                        new UpdateOneModel<>(
+                                SensitiveSampleDataDao.getFilters(deltaInfo),
+                                bson,
+                                new UpdateOptions().upsert(true)
+                        )
+                );
             }
 
             Bson updateKey = SingleTypeInfoDao.createFilters(deltaInfo);
@@ -551,16 +555,34 @@ public class APICatalogSync {
             bulkUpdatesForSampleData.add(new DeleteOneModel<>(SensitiveSampleDataDao.getFilters(deleted), new DeleteOptions()));
         }
 
-        return new DbUpdateReturn(bulkUpdates, bulkUpdatesForSampleData);
+
+        ArrayList<WriteModel<SensitiveParamInfo>> bulkUpdatesForSensitiveParamInfo = new ArrayList<>();
+        for (SensitiveParamInfo sensitiveParamInfo: sensitiveParamInfoBooleanMap.keySet()) {
+            if (!sensitiveParamInfoBooleanMap.get(sensitiveParamInfo)) continue;
+            bulkUpdatesForSensitiveParamInfo.add(
+                    new UpdateOneModel<SensitiveParamInfo>(
+                            SensitiveParamInfoDao.getFilters(sensitiveParamInfo),
+                            Updates.set(SensitiveParamInfo.SAMPLE_DATA_SAVED, true),
+                            new UpdateOptions().upsert(false)
+                    )
+            );
+        }
+
+        return new DbUpdateReturn(bulkUpdates, bulkUpdatesForSampleData, bulkUpdatesForSensitiveParamInfo);
     }
 
     public static class DbUpdateReturn {
         public ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSingleTypeInfo;
         public ArrayList<WriteModel<SensitiveSampleData>> bulkUpdatesForSampleData;
+        public ArrayList<WriteModel<SensitiveParamInfo>> bulkUpdatesForSensitiveParamInfo = new ArrayList<>();
 
-        public DbUpdateReturn(ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSingleTypeInfo, ArrayList<WriteModel<SensitiveSampleData>> bulkUpdatesForSampleData) {
+        public DbUpdateReturn(ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSingleTypeInfo,
+                              ArrayList<WriteModel<SensitiveSampleData>> bulkUpdatesForSampleData,
+                              ArrayList<WriteModel<SensitiveParamInfo>> bulkUpdatesForSensitiveParamInfo
+        ) {
             this.bulkUpdatesForSingleTypeInfo = bulkUpdatesForSingleTypeInfo;
             this.bulkUpdatesForSampleData = bulkUpdatesForSampleData;
+            this.bulkUpdatesForSensitiveParamInfo = bulkUpdatesForSensitiveParamInfo;
         }
     }
 
@@ -591,7 +613,12 @@ public class APICatalogSync {
     public void buildFromDB(boolean calcDiff) {
         List<SingleTypeInfo> allParams = SingleTypeInfoDao.instance.fetchAll();
         this.dbState = build(allParams);
-        
+        this.sensitiveParamInfoBooleanMap = new HashMap<>();
+        List<SensitiveParamInfo> sensitiveParamInfos = SensitiveParamInfoDao.instance.getUnsavedSensitiveParamInfos();
+        for (SensitiveParamInfo sensitiveParamInfo: sensitiveParamInfos) {
+            this.sensitiveParamInfoBooleanMap.put(sensitiveParamInfo, false);
+        }
+
         if(calcDiff) {
             for(int collectionId: this.dbState.keySet()) {
                 APICatalog newCatalog = this.dbState.get(collectionId);
@@ -700,6 +727,7 @@ public class APICatalogSync {
         List<WriteModel<SensitiveSampleData>> writesForSensitiveSampleData = new ArrayList<>();
         List<WriteModel<TrafficInfo>> writesForTraffic = new ArrayList<>();
         List<WriteModel<SampleData>> writesForSampleData = new ArrayList<>();
+        List<WriteModel<SensitiveParamInfo>> writesForSensitiveParamInfo = new ArrayList<>();
         counter++;
         for(int apiCollectionId: this.delta.keySet()) {
             APICatalog deltaCatalog = this.delta.get(apiCollectionId);
@@ -707,6 +735,7 @@ public class APICatalogSync {
             DbUpdateReturn dbUpdateReturn = getDBUpdatesForParams(deltaCatalog, dbCatalog);
             writesForParams.addAll(dbUpdateReturn.bulkUpdatesForSingleTypeInfo);
             writesForSensitiveSampleData.addAll(dbUpdateReturn.bulkUpdatesForSampleData);
+            writesForSensitiveParamInfo.addAll(dbUpdateReturn.bulkUpdatesForSensitiveParamInfo);
             writesForTraffic.addAll(getDBUpdatesForTraffic(apiCollectionId, deltaCatalog));
             deltaCatalog.setDeletedInfo(new ArrayList<>());
             if (counter < 10 || counter % 10 == 0) {
@@ -747,6 +776,10 @@ public class APICatalogSync {
 
         if (writesForSensitiveSampleData.size() > 0) {
             SensitiveSampleDataDao.instance.getMCollection().bulkWrite(writesForSensitiveSampleData);
+        }
+
+        if (writesForSensitiveParamInfo.size() > 0) {
+            SensitiveParamInfoDao.instance.getMCollection().bulkWrite(writesForSensitiveParamInfo);
         }
 
         buildFromDB(true);

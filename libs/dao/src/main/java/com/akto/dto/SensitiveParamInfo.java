@@ -1,5 +1,7 @@
 package com.akto.dto;
 
+import java.util.Objects;
+
 public class SensitiveParamInfo {
     private String url;
     private String method;
@@ -7,7 +9,10 @@ public class SensitiveParamInfo {
     private boolean isHeader;
     private String param;
     private int apiCollectionId;
+    public static final String SENSITIVE = "sensitive";
     private boolean sensitive;
+    public static final String SAMPLE_DATA_SAVED = "sampleDataSaved";
+    private boolean sampleDataSaved;
 
 
     public SensitiveParamInfo() {
@@ -21,6 +26,7 @@ public class SensitiveParamInfo {
         this.param = param;
         this.apiCollectionId = apiCollectionId;
         this.sensitive = sensitive;
+        this.sampleDataSaved = false;
     }
 
     public String getUrl() {
@@ -98,6 +104,27 @@ public class SensitiveParamInfo {
             ", apiCollectionId='" + getApiCollectionId() + "'" +
             ", sensitive='" + isSensitive() + "'" +
             "}";
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        SensitiveParamInfo that = (SensitiveParamInfo) o;
+        return responseCode == that.responseCode && isHeader == that.isHeader && apiCollectionId == that.apiCollectionId && url.equals(that.url) && method.equals(that.method) && param.equals(that.param);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(url, method, responseCode, isHeader, param, apiCollectionId);
+    }
+
+    public boolean isSampleDataSaved() {
+        return sampleDataSaved;
+    }
+
+    public void setSampleDataSaved(boolean sampleDataSaved) {
+        this.sampleDataSaved = sampleDataSaved;
     }
 
 }

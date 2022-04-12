@@ -5,6 +5,7 @@ import java.util.regex.Pattern;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.CustomDataType;
+import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.type.SingleTypeInfo.ParamId;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 
@@ -46,7 +47,7 @@ public class KeyTypes {
     }
 
     public void process(String url, String method, int responseCode, boolean isHeader, String param, Object object,
-                        String userId, int apiCollectionId, String rawMessage) {
+                        String userId, int apiCollectionId, String rawMessage, Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap) {
 
         String key = param.replaceAll("#", ".").replaceAll("\\.\\$", "");
         SubType subType = findSubType(object,key);
@@ -66,6 +67,20 @@ public class KeyTypes {
             singleTypeInfo = new SingleTypeInfo(paramId, examples, userIds, 1, Context.now(), 0);
 
             occurrences.put(subType, singleTypeInfo);
+        }
+
+        SensitiveParamInfo sensitiveParamInfo = new SensitiveParamInfo(
+                singleTypeInfo.getUrl(), singleTypeInfo.getMethod(), singleTypeInfo.getResponseCode(),
+                singleTypeInfo.getIsHeader(), singleTypeInfo.getParam(), singleTypeInfo.getApiCollectionId(), true
+        );
+
+        Boolean result = sensitiveParamInfoBooleanMap.get(sensitiveParamInfo);
+        if (result != null && !result) {
+            if (singleTypeInfo.getExamples() == null) {
+                singleTypeInfo.setExamples(new HashSet<>());
+            }
+            singleTypeInfo.getExamples().add(rawMessage);
+            sensitiveParamInfoBooleanMap.put(sensitiveParamInfo,true);
         }
 
         singleTypeInfo.incr(object);

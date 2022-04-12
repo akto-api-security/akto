@@ -10,6 +10,7 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.SingleTypeInfo.ParamId;
@@ -58,7 +59,7 @@ public class RequestTemplate {
         if (set.size() < 10) set.add(userId);
     }
 
-    private void insert(Object obj, String userId, Trie.Node<String, Pair<KeyTypes, Set<String>>> root, String url, String method, int responseCode, String prefix, int apiCollectionId, String rawMessage) {
+    private void insert(Object obj, String userId, Trie.Node<String, Pair<KeyTypes, Set<String>>> root, String url, String method, int responseCode, String prefix, int apiCollectionId, String rawMessage, Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap) {
 
         prefix += ("#"+root.getPathElem());
         if (prefix.startsWith("#")) {
@@ -77,22 +78,22 @@ public class RequestTemplate {
                 }
 
                 add(curr.getValue().getSecond(), userId);
-                insert(value, userId, curr, url, method, responseCode, prefix, apiCollectionId, rawMessage);
+                insert(value, userId, curr, url, method, responseCode, prefix, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap);
             }
         } else if (obj instanceof BasicDBList) {
             for(Object elem: (BasicDBList) obj) {
                 Trie.Node<String, Pair<KeyTypes, Set<String>>> listNode = root.getOrCreate("$", new Pair<>(new KeyTypes(new HashMap<>(), false), new HashSet<String>()));
                 add(listNode.getValue().getSecond(), userId);
-                insert(elem, userId, listNode, url, method, responseCode, prefix, apiCollectionId, rawMessage);
+                insert(elem, userId, listNode, url, method, responseCode, prefix, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap);
             }
         } else {
             //url, method, responseCode, true, header, value, userId
-            root.getValue().getFirst().process(url, method, responseCode, false, prefix, obj, userId, apiCollectionId, rawMessage);
+            root.getValue().getFirst().process(url, method, responseCode, false, prefix, obj, userId, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap);
             add(root.getValue().getSecond(), userId);   
         }
     }
 
-    public void processHeaders(Map<String, List<String>> headerPayload, String url, String method, int responseCode, String userId, int apiCollectionId, String rawMessage) {
+    public void processHeaders(Map<String, List<String>> headerPayload, String url, String method, int responseCode, String userId, int apiCollectionId, String rawMessage, Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap) {
         for (String header: headerPayload.keySet()) {
             KeyTypes keyTypes = this.headers.get(header);
             if (keyTypes == null) {
@@ -101,7 +102,7 @@ public class RequestTemplate {
             }
 
             for(String value: headerPayload.get(header)) {
-                keyTypes.process(url, method, responseCode, true, header, value, userId, apiCollectionId, rawMessage);
+                keyTypes.process(url, method, responseCode, true, header, value, userId, apiCollectionId, rawMessage,  sensitiveParamInfoBooleanMap);
             }
         }
     }
@@ -118,7 +119,7 @@ public class RequestTemplate {
 
     public static long insertTime = 0, processTime = 0, deleteTime = 0;
 
-    public List<SingleTypeInfo> process2(BasicDBObject payload, String url, String method, int responseCode, String userId, int apiCollectionId, String rawMessage) {
+    public List<SingleTypeInfo> process2(BasicDBObject payload, String url, String method, int responseCode, String userId, int apiCollectionId, String rawMessage, Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap) {
             List<SingleTypeInfo> deleted = new ArrayList<>();
         
             if(userIds.size() < 10) userIds.add(userId);
@@ -156,14 +157,14 @@ public class RequestTemplate {
                     }
                 }
 
-                keyTypes.process(url, method, responseCode, false, param, flattened.get(param), userId, apiCollectionId, rawMessage);
+                keyTypes.process(url, method, responseCode, false, param, flattened.get(param), userId, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap);
             }
 
             processTime += (System.currentTimeMillis() - s);
 
             s = System.currentTimeMillis();
             if (now - mergeTimestamp > 60 * 2) {
-                deleted = tryMergeNodesInTrie(url, method, responseCode, apiCollectionId);
+//                deleted = tryMergeNodesInTrie(url, method, responseCode, apiCollectionId);
                 mergeTimestamp = now;
             }
 

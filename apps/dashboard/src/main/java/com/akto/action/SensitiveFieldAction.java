@@ -39,7 +39,7 @@ public class SensitiveFieldAction extends UserAction{
     @Override
     public String execute() {
         ret = new BasicDBObject();
-        Bson filter = getFilters(url, method, responseCode, isHeader, param, apiCollectionId);
+        Bson filter = SensitiveParamInfoDao.getFilters(url, method, responseCode, isHeader, param, apiCollectionId);
         // null means user wants Akto to decide the sensitivity
         if (!sensitive)  {
             SensitiveParamInfoDao.instance.getMCollection().deleteOne(filter);
@@ -143,17 +143,6 @@ public class SensitiveFieldAction extends UserAction{
         return Action.SUCCESS.toUpperCase();
     }
 
-    public static Bson getFilters(String url, String method, int responseCode, boolean isHeader, String param, int apiCollectionId) {
-        List<Bson> defaultFilters = new ArrayList<>();
-        defaultFilters.add(Filters.eq("url", url));
-        defaultFilters.add(Filters.eq("method", method));
-        defaultFilters.add(Filters.eq("isHeader", isHeader));
-        defaultFilters.add(Filters.eq("param", param));
-        defaultFilters.add(Filters.eq("responseCode", responseCode));
-        defaultFilters.add(Filters.eq("apiCollectionId", apiCollectionId));
-
-        return Filters.and(defaultFilters);
-    }
 
     // private static Bson getFiltersForApiRelation(Relationship.ApiRelationInfo apiRelationInfo) {
     //     return getFilters(apiRelationInfo.getUrl(), apiRelationInfo.getMethod(), apiRelationInfo.getResponseCode(),
@@ -172,7 +161,7 @@ public class SensitiveFieldAction extends UserAction{
             boolean isHeader =  (Boolean) xObj.get("isHeader");
             String param = xObj.get("param").toString();
             long apiCollectionId = (Long) xObj.get("apiCollectionId");
-            Bson filter = getFilters(url, method, (int) responseCode, isHeader, param, (int) apiCollectionId);
+            Bson filter = SensitiveParamInfoDao.getFilters(url, method, (int) responseCode, isHeader, param, (int) apiCollectionId);
 
             Bson bson = Updates.set("sensitive", sensitive);
             
