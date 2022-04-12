@@ -154,7 +154,7 @@ export default {
         showName: obj.boolN
     },
     data () {
-        let rowsPerPage = 20
+        let rowsPerPage = 100
         return {
             options:{},
             rowsPerPage: rowsPerPage,
