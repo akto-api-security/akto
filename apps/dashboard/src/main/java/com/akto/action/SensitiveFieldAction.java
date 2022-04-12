@@ -164,14 +164,13 @@ public class SensitiveFieldAction extends UserAction{
     public String bulkMarkSensitive() {
         ArrayList<WriteModel<SensitiveParamInfo>> bulkUpdates = new ArrayList<>();
         for (Object item: items) {
-            HashMap<String, Object> itemObj = (HashMap) item;
-            HashMap <String, Object>xObj = (HashMap) (itemObj.get("x"));
+            HashMap<String, Object> xObj = (HashMap) item;
             String url = xObj.get("url").toString();
             String method = xObj.get("method").toString();
             long responseCode = (Long) xObj.get("responseCode");
             boolean isHeader =  (Boolean) xObj.get("isHeader");
             String param = xObj.get("param").toString();
-            long apiCollectionId = (Long) xObj.get("apiCollectionId");
+            long apiCollectionId = Long.parseLong(xObj.get("apiCollectionId").toString());
             Bson filter = getFilters(url, method, (int) responseCode, isHeader, param, (int) apiCollectionId);
 
             Bson bson = Updates.set("sensitive", sensitive);

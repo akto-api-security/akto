@@ -30,7 +30,13 @@
                     </div>
                     <div class="d-flex jc-end">
                         <div class="d-flex board-table-cards jc-end">
-                            <slot name="add-new-row-btn"/>
+                            <slot name="add-new-row-btn" 
+                                v-bind:filters="filters"  
+                                v-bind:filterOperators="filterOperators"
+                                v-bind:sortKey="sortKey"
+                                v-bind:sortDesc="sortDesc"
+                                v-bind:total="total"
+                            />
                         </div>
                     </div>
                 </div>
