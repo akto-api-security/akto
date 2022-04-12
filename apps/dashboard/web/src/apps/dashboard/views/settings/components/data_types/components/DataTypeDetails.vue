@@ -5,13 +5,14 @@
                 <v-col cols="2">
                     <span style="color:grey; font-size: 16px; font-weight: bold">Name</span>
                 </v-col>
-                <v-col cols="9" style="padding-top: 15px">
+                <v-col cols="9" style="padding-top: 0px">
                     <v-text-field
                         height="20px"
                         placeholder="Add data type name"
-                        flat solo class="ma-0 pa-0" hide-details
+                        flat solo class="ma-0 pa-0"
                         :readonly="data_type_copy['createNew'] ? false:true"
                         v-model="data_type_copy.name"
+                        :rules="name_rules"
                     />
                 </v-col>
             </v-row>
@@ -92,6 +93,17 @@
                         :loading="reviewLoading"
                     >
                       Review
+                        <span slot="loader">
+                            <v-progress-circular
+                                :rotate="360"
+                                :size="30"
+                                :width="5"
+                                :value="computeLoading"
+                                color="#6200EA"
+                            >
+                            </v-progress-circular>
+                            {{ computeLoading + "%"}}
+                        </span>
                     </v-btn>
                 </div>
             </v-row>
@@ -120,9 +132,16 @@ export default {
     data() {
         return {
             data_type_copy: null,
-            reviewData: null,
             saveLoading: false,
-            reviewLoading: false
+            reviewLoading: false,
+            name_rules: [
+                    value => {
+                        if (!value) return "Required"
+                        const regex = /^[a-z0-9_]+$/i;
+                        if (!value.match(regex)) return "Alphanumeric and underscore characters"
+                        return true
+                    },
+                ],
         }
     },
     methods: {
@@ -142,11 +161,10 @@ export default {
                 })
 
         },
-        async reviewCustomDataType() {
+        reviewCustomDataType() {
           this.reviewLoading = true
           this.$store.dispatch("data_types/createCustomDataType", {data_type: this.data_type_copy, save: false})
               .then((resp) => {
-                this.reviewData = resp
                 this.reviewLoading = false
               })
               .catch((err) => {
@@ -157,7 +175,7 @@ export default {
     mounted() {
     },
     computed: {
-      ...mapState('data_types', ['data_type', 'usersMap']),
+      ...mapState('data_types', ['data_type', 'usersMap', 'reviewData', 'current_sample_data_count', 'total_sample_data_count']),
       computeSensitiveValue() {
             if (this.data_type_copy) {
                 return this.data_type_copy.sensitiveAlways || this.data_type_copy.sensitivePosition.length > 0 ? "Yes" : "No"
@@ -180,13 +198,18 @@ export default {
           if (t) {
               return func.prettifyEpoch(t)
           }
+        },
+        computeLoading() {
+            if (this.total_sample_data_count === 0) return 0
+            let val = Math.round(100*this.current_sample_data_count / this.total_sample_data_count)
+            if (val > 100) return 100
+            return val
         }
     },
     watch: {
         data_type: function(newVal, oldVal) {
-          console.log("TRIGGERED")
             this.data_type_copy = JSON.parse(JSON.stringify(newVal))
-            this.reviewData = null
+            this.$store.state.data_types.reviewData = null
         },
     }
 }

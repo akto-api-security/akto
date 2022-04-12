@@ -27,10 +27,8 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
-import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
 
-import org.bson.types.ObjectId;
 
 import java.io.IOException;
 import java.util.*;
@@ -116,24 +114,27 @@ public class CustomDataTypeAction extends UserAction{
 
     @Override
     public String execute() {
-        // TODO: handle errors
-        if (name == null) return ERROR.toUpperCase();
         User user = getSUser();
-
+        customDataType = null;
         try {
             customDataType = generateCustomDataType(user.getId());
         } catch (AktoCustomException e) {
+            addActionError(e.getMessage());
             return ERROR.toUpperCase();
         }
 
         if (this.createNew) {
             CustomDataType customDataTypeFromDb = CustomDataTypeDao.instance.findOne(Filters.eq(CustomDataType.NAME, name));
-            if (customDataTypeFromDb != null) return ERROR.toUpperCase();
+            if (customDataTypeFromDb != null) {
+                addActionError("Data type with same name exists");
+                return ERROR.toUpperCase();
+            }
             // id is automatically set when inserting in pojo
             CustomDataTypeDao.instance.insertOne(customDataType);
         } else {
             FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
             options.returnDocument(ReturnDocument.AFTER);
+            options.upsert(false);
             customDataType = CustomDataTypeDao.instance.getMCollection().findOneAndUpdate(
                 Filters.eq("name", customDataType.getName()),
                 Updates.combine(
@@ -141,11 +142,19 @@ public class CustomDataTypeAction extends UserAction{
                     Updates.set(CustomDataType.KEY_CONDITIONS,customDataType.getKeyConditions()),
                     Updates.set(CustomDataType.VALUE_CONDITIONS,customDataType.getValueConditions()),
                     Updates.set(CustomDataType.OPERATOR,customDataType.getOperator()),
-                    Updates.set(CustomDataType.TIMESTAMP,Context.now())
+                    Updates.set(CustomDataType.TIMESTAMP,Context.now()),
+                    Updates.set(CustomDataType.ACTIVE,active)
                 ),
                 options
             );
+
+            if (customDataType == null) {
+                addActionError("Failed to update data type");
+                return ERROR.toUpperCase();
+            }
         }
+
+        SingleTypeInfo.fetchCustomDataTypes();
 
 
         return Action.SUCCESS.toUpperCase();
@@ -211,84 +220,53 @@ public class CustomDataTypeAction extends UserAction{
 
     private List<CustomSubTypeMatch> customSubTypeMatches;
 
-    public static void main(String[] args) {
-        DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
-        Context.accountId.set(1_000_000);
-
-        CustomDataTypeAction customDataTypeAction = new CustomDataTypeAction();
-        Map<String, Object> session = new HashMap<>();
-        session.put("user", new User());
-        customDataTypeAction.setSession(session);
-
-
-        customDataTypeAction.setCreateNew(true);
-        customDataTypeAction.setName("test_1");
-        customDataTypeAction.setSensitiveAlways(true);
-        customDataTypeAction.setOperator("AND");
-
-        customDataTypeAction.setKeyOperator("AND");
-        Map<String, Object> valueMap = new HashMap<>();
-        valueMap.put("value", "ship");
-        customDataTypeAction.setKeyConditionFromUsers(
-                Collections.singletonList(new ConditionFromUser(Predicate.Type.STARTS_WITH, valueMap))
-        );
-
-        customDataTypeAction.setValueOperator("AND");
-        customDataTypeAction.setValueConditionFromUsers(Collections.emptyList());
-
-        customDataTypeAction.reviewCustomDataType();
-
-        System.out.println(customDataTypeAction.getCustomSubTypeMatches().get(0).getKey());
-        System.out.println(customDataTypeAction.getCustomSubTypeMatches().get(0).getValue());
-        System.out.println(customDataTypeAction.getCustomSubTypeMatches().get(1).getKey());
-        System.out.println(customDataTypeAction.getCustomSubTypeMatches().get(1).getValue());
-    }
 
     private int pageNum;
+    private long totalSampleDataCount;
+    private long currentProcessed;
+    private static final int pageSize = 1000;
     public String reviewCustomDataType() {
         customSubTypeMatches = new ArrayList<>();
         CustomDataType customDataType;
         try {
             customDataType = generateCustomDataType(getSUser().getId());
         } catch (AktoCustomException e) {
+            addActionError(e.getMessage());
             return ERROR.toUpperCase();
         }
-        System.out.println("custom data type built");
 
-        int pageSize = 10;
-//        MongoCursor<SampleData> cursor = SampleDataDao.instance.getMCollection().find().skip(pageSize*(pageNum-1)).limit(pageSize).cursor();
-        List<SampleData> sampleDataList = SampleDataDao.instance.findAll(new BasicDBObject());
+        totalSampleDataCount = SampleDataDao.instance.getMCollection().estimatedDocumentCount();
 
-//        while(cursor.hasNext()) {
-//            SampleData elem = cursor.next();
-//            sampleDataList.add(elem);
-//        }
+        MongoCursor<SampleData> cursor = SampleDataDao.instance.getMCollection().find().skip(pageSize*(pageNum-1)).limit(pageSize).cursor();
+        currentProcessed = 0;
+        while(cursor.hasNext()) {
+            SampleData sampleData = cursor.next();
 
-        System.out.println(sampleDataList.size());
-
-        for (SampleData sampleData: sampleDataList) {
             List<String> samples = sampleData.getSamples();
             boolean skip = false;
             for (String sample: samples) {
                 Key apiKey = sampleData.getId();
                 try {
                     HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
-                    skip = forHeaders(httpResponseParams.getHeaders(), customDataType, sample, apiKey);
-                    skip = skip || forHeaders(httpResponseParams.requestParams.getHeaders(), customDataType, sample, apiKey);
-                    skip = skip || forPayload(httpResponseParams.getPayload(), customDataType, sample, apiKey);
-                    skip = skip || forPayload(httpResponseParams.requestParams.getPayload(), customDataType, sample, apiKey);
+                    boolean skip1 = forHeaders(httpResponseParams.getHeaders(), customDataType, apiKey);
+                    boolean skip2 = forHeaders(httpResponseParams.requestParams.getHeaders(), customDataType, apiKey);
+                    boolean skip3 = forPayload(httpResponseParams.getPayload(), customDataType, apiKey);
+                    boolean skip4 = forPayload(httpResponseParams.requestParams.getPayload(), customDataType, apiKey);
+                    skip = skip1 || skip2 || skip3 || skip4;
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
 
                 if (skip) break;
             }
+
+            currentProcessed += 1;
         }
 
         return SUCCESS.toUpperCase();
     }
 
-    public boolean forHeaders(Map<String, List<String>> headers, CustomDataType customDataType, String sample, Key apiKey) {
+    public boolean forHeaders(Map<String, List<String>> headers, CustomDataType customDataType, Key apiKey) {
         boolean matchFound = false;
         for (String headerName: headers.keySet()) {
             List<String> headerValues = headers.get(headerName);
@@ -306,7 +284,7 @@ public class CustomDataTypeAction extends UserAction{
         return matchFound;
     }
 
-    public boolean forPayload(String payload, CustomDataType customDataType, String sample, Key apiKey) throws IOException {
+    public boolean forPayload(String payload, CustomDataType customDataType, Key apiKey) throws IOException {
         boolean matchFound = false;
         JsonParser jp = factory.createParser(payload);
         JsonNode node = mapper.readTree(jp);
@@ -333,6 +311,18 @@ public class CustomDataTypeAction extends UserAction{
     }
 
     public CustomDataType generateCustomDataType(int userId) throws AktoCustomException {
+        // TODO: handle errors
+        if (name == null || name.length() == 0) throw new AktoCustomException("Name cannot be empty");
+        if (name.split(" ").length > 1) throw new AktoCustomException("Name has to be single word");
+        name = name.trim();
+        name = name.toUpperCase();
+        if (!(name.matches("[A-Z_0-9]+"))) throw new AktoCustomException("Name can only contain alphabets, numbers and underscores");
+
+        if (SingleTypeInfo.subTypeMap.containsKey(name)) {
+            throw new AktoCustomException("Data type name reserved");
+        }
+
+
         Conditions keyConditions = null;
         if (keyConditionFromUsers != null && keyOperator != null) {
 
@@ -382,6 +372,12 @@ public class CustomDataTypeAction extends UserAction{
             }
         }
 
+        if ((keyConditions == null || keyConditions.getPredicates() == null || keyConditions.getPredicates().size() == 0) &&
+              (valueConditions == null || valueConditions.getPredicates() ==null || valueConditions.getPredicates().size() == 0))  {
+
+            throw new AktoCustomException("Both key and value conditions can't be empty");
+        }
+
         Conditions.Operator mainOperator;
         try {
             mainOperator = Conditions.Operator.valueOf(operator);
@@ -393,23 +389,31 @@ public class CustomDataTypeAction extends UserAction{
                 true,keyConditions,valueConditions, mainOperator);
     }
 
-    private Predicate generatePredicate(Predicate.Type type, Map<String,Object> valueMap) {
+    static Predicate generatePredicate(Predicate.Type type, Map<String,Object> valueMap) {
+        if (valueMap == null || type == null) return null;
         Predicate predicate;
+        String value;
         switch (type) {
             case REGEX:
                 Object regex = valueMap.get("value");
-                if (regex == null) return null;
-                predicate = new RegexPredicate(regex.toString());
+                if (!(regex instanceof String)) return null;
+                value = regex.toString();
+                if (value.length() == 0) return null;
+                predicate = new RegexPredicate(value);
                 return predicate;
             case STARTS_WITH:
                 Object prefix = valueMap.get("value");
-                if (prefix == null) return null;
-                predicate = new StartsWithPredicate(prefix.toString());
+                if (!(prefix instanceof String)) return null;
+                value = prefix.toString();
+                if (value.length() == 0) return null;
+                predicate = new StartsWithPredicate(value);
                 return predicate;
             case ENDS_WITH:
                 Object suffix = valueMap.get("value");
-                if (suffix == null) return null;
-                predicate = new EndsWithPredicate(suffix.toString());
+                if (!(suffix instanceof String)) return null;
+                value = suffix.toString();
+                if (value.length() == 0) return null;
+                predicate = new EndsWithPredicate(value);
                 return predicate;
             default:
                 return null;
@@ -456,5 +460,41 @@ public class CustomDataTypeAction extends UserAction{
 
     public CustomDataType getCustomDataType() {
         return customDataType;
+    }
+
+    private boolean active;
+    public String toggleDataTypeActiveParam() {
+        FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
+        options.returnDocument(ReturnDocument.AFTER);
+        options.upsert(false);
+        customDataType = CustomDataTypeDao.instance.getMCollection().findOneAndUpdate(
+                Filters.eq(CustomDataType.NAME, this.name),
+                Updates.set(CustomDataType.ACTIVE, active),
+                options
+        );
+
+        if (customDataType == null) {
+            String v = active ? "activate" : "deactivate";
+            addActionError("Failed to "+ v +" data type");
+            return ERROR.toUpperCase();
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
+    }
+
+    public void setPageNum(int pageNum) {
+        this.pageNum = pageNum;
+    }
+
+    public long getTotalSampleDataCount() {
+        return totalSampleDataCount;
+    }
+
+    public long getCurrentProcessed() {
+        return currentProcessed;
     }
 }

@@ -14,6 +14,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.opensymphony.xwork2.Action;
@@ -86,6 +87,7 @@ public class HarAction extends UserAction {
             }
             
             if(skipKafka) {
+                SingleTypeInfo.fetchCustomDataTypes();
                 parser.syncFunction(responses);
                 AktoPolicy aktoPolicy = new AktoPolicy(true); // keep inside if condition statement because db call when initialised
                 aktoPolicy.main(responses);

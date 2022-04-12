@@ -142,16 +142,16 @@ export default {
 </style>
 
 <style >
-    .v-text-field .v-input__control .v-input__slot {
+    .inline-block-child .v-text-field .v-input__control .v-input__slot {
         min-height: auto !important;
         display: flex !important;
         align-items: center !important;
         background-color: transparent;
     }
-    .v-input__slot::before {
+    .inline-block-child .v-input__slot::before {
         border-style: none !important;
     }
-    .value_predicate .v-text-field__slot input {
+    .inline-block-child .value_predicate .v-text-field__slot input {
         color: #00f !important;
     }
 

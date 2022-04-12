@@ -24,20 +24,24 @@ public class SingleTypeInfo {
     public static void init() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                Context.accountId.set(1_000_000);
-                try {
-                    List<CustomDataType> customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject());
-                    Map<String, CustomDataType> newMap = new HashMap<>();
-                    for (CustomDataType customDataType: customDataTypes) {
-                        newMap.put(customDataType.getName(), customDataType);
-                    }
-                    customDataTypeMap = newMap;
-                } catch (Exception ex) {
-                    ex.printStackTrace(); // or logger would be better
-                }
+                fetchCustomDataTypes();
             }
         }, 0, 5, TimeUnit.MINUTES);
 
+    }
+
+    public static void fetchCustomDataTypes() {
+        Context.accountId.set(1_000_000);
+        try {
+            List<CustomDataType> customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject());
+            Map<String, CustomDataType> newMap = new HashMap<>();
+            for (CustomDataType customDataType: customDataTypes) {
+                newMap.put(customDataType.getName(), customDataType);
+            }
+            customDataTypeMap = newMap;
+        } catch (Exception ex) {
+            ex.printStackTrace(); // or logger would be better
+        }
     }
 
 
@@ -206,8 +210,11 @@ public class SingleTypeInfo {
         int responseCode;
         boolean isHeader;
         String param;
+        @BsonIgnore
         SubType subType;
         int apiCollectionId;
+        @BsonProperty("subType")
+        String subTypeString;
 
         public ParamId(String url, String method, int responseCode, boolean isHeader, String param, SubType subType, int apiCollectionId) {
             this.url = url;
@@ -266,8 +273,18 @@ public class SingleTypeInfo {
             return subType;
         }
 
-        public void setSubType(SubType subType) {
-            this.subType = subType;
+        public void setSubTypeString(String subTypeString) {
+            this.subTypeString = subTypeString;
+            this.subType = subTypeMap.get(subTypeString);
+            if (this.subType == null) {
+                CustomDataType customDataType = customDataTypeMap.get(subTypeString);
+                if (customDataType != null) {
+                    this.subType = customDataType.toSubType();
+                } else {
+                    // TODO:
+                    this.subType = GENERIC;
+                }
+            }
         }
 
         public int getApiCollectionId() {

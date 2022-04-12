@@ -11,7 +11,7 @@
                     @icon_right_clicked="createNewDataType"
                 >
                     <div v-for="data_type in data_types" :key="data_type.name">
-                        <data-type-card :item="data_type"/>
+                        <data-type-card :item="data_type" :actions="data_type_card_actions"/>
                     </div>
                 </a-card>
             </v-col>
@@ -38,10 +38,20 @@ export default {
     },
     data() {
         return {
+            data_type_card_actions: [
+                {
+                    isValid: item => item.id,
+                    icon: item => item.active? '$fas_trash' : '$fas_check',
+                    text: item => item.active? 'Deactivate' : 'Activate',
+                    func: item => this.toggleActivateFieldFunc(item),
+                    success: (resp, item) => this.toggleSuccessFunc(resp, item),
+                    failure: (err, item) => this.toggleFailureFunc(err, item)
+                }
+            ],
         }
     },
-    mounted() {
-        this.$store.dispatch("data_types/fetchDataTypes").then((resp) => {
+  mounted() {
+    this.$store.dispatch("data_types/fetchDataTypes").then((resp) => {
             if (this.data_types.length > 0) {
                 this.data_type = this.data_types[0]
             }
@@ -49,17 +59,26 @@ export default {
     },
     methods: {
         createNewDataType() {
-            this.$store.state.data_types.data_type = {
-                "name": "",
-                "operator": "AND",
-                "keyConditions": {"operator": "AND", "predicates": []},
-                "sensitiveAlways": true,
-                "valueConditions": {"operator": "AND", "predicates": []},
-                "active": true,
-                "sensitivePosition": [],
-                "createNew": true
-            }
-        }
+            this.$store.dispatch('data_types/setNewDataType')
+        },
+        toggleActivateFieldFunc (item) {
+            return this.$store.dispatch('data_types/toggleActiveParam', item)
+        },
+
+        toggleSuccessFunc (resp, item) {
+            window._AKTO.$emit('SHOW_SNACKBAR', {
+                show: true,
+                text: `${item.name} `+ (item.active? 'de' : '') +`activated successfully!`,
+                color: 'green'
+            })
+        },
+        toggleFailureFunc (err, item) {
+            window._AKTO.$emit('SHOW_SNACKBAR', {
+                show: true,
+                text: `An error occurred while `+ (item.active? 'de' : '')+`activating ${item.name}!`,
+                color: 'red'
+            })
+        },
     },
     computed: {
         ...mapState('data_types', ['data_types', 'data_type']),

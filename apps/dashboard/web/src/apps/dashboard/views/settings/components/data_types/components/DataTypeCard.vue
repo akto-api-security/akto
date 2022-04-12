@@ -17,9 +17,9 @@
                     </div>
                 </td>
 
-                <!-- <div v-if="actions && hover && actions.length > 0" class="table-row-actions">
+                <div v-if="actions && hover && actions.length > 0" class="table-row-actions">
                     <actions-tray :actions="actions || []" :subject=item></actions-tray>
-                </div> -->
+                </div>
             </tr>
         </v-hover>
         
@@ -28,12 +28,15 @@
         
 <script>
 import obj from "@/util/obj"
+import ActionsTray from "@/apps/dashboard/shared/components/ActionsTray";
 export default {
     name: "DataTypes",
     props: {
-        item: obj.ObjR
+        item: obj.ObjR,
+        actions: obj.arrN,
     },
     components: {
+        ActionsTray
     },
     data() {
         return {
@@ -73,5 +76,8 @@ export default {
 
     &:hover
         background-color: #edecf0 !important
+
+.table-row-actions
+  padding-top: 5px !important
 
 </style>

@@ -463,9 +463,20 @@ export default {
                     if (!x["valueConditions"]) {
                         x["valueConditions"] = {"operator": "AND", "predicates": []}
                     }
+                } else {
+                    x["active"] = true
                 }
             })
 
+            data_types.sort(function(a,b){
+                if (a["id"] && b["id"]) return b["id"]["timestamp"] - a["id"]["timestamp"]
+                return a["id"] ? -1 : 1
+            })
+
+            data_types.sort(function(a,b){
+                if (a["active"] && b["active"]) return 0
+                return a["active"] ? -1 : 1
+            })
         }
     },
 

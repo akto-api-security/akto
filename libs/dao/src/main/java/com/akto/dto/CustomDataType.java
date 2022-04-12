@@ -7,6 +7,7 @@ import io.swagger.v3.oas.models.media.StringSchema;
 import org.bson.types.ObjectId;
 
 import java.util.List;
+import java.util.Objects;
 
 public class CustomDataType {
     private ObjectId id;

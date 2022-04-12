@@ -18,7 +18,7 @@
                         <v-col cols="1" v-if="index !== 0">
                             <operator-component :operator="conditions.operator" @operatorChanged="operatorChanged"/>
                         </v-col>
-                        <v-col :cols="index === 0 ? 11 : 10">
+                        <v-col>
                             <simple-condition-component :initial_string="initial_string" :condition="condition"/>
                         </v-col>
                         <v-col cols="1">
