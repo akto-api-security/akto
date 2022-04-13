@@ -171,5 +171,8 @@
     border: unset! important    
 
 .float-right
-    float: right    
+    float: right
+
+.grey-text
+    color: #949597
 </style>

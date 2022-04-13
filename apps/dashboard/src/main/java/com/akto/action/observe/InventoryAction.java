@@ -59,7 +59,7 @@ public class InventoryAction extends UserAction {
         return list;
     }
 
-    public final static int deltaPeriodValue = 60 * 24 * 60 * 60;
+    public final static int deltaPeriodValue = 600 * 24 * 60 * 60;
 
     public List<BasicDBObject> fetchRecentEndpoints() {
         List<Bson> pipeline = new ArrayList<>();
@@ -180,7 +180,7 @@ public class InventoryAction extends UserAction {
         pipeline.add(Aggregates.match(Filters.gte("timestamp", Context.now() - deltaPeriodValue)));
         pipeline.add(Aggregates.project(Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$timestamp", 86400}))));
         pipeline.add(Aggregates.project(Projections.computed("dayOfYear", new BasicDBObject("$trunc", new Object[]{"$dayOfYearFloat", 0}))));
-        pipeline.add(Aggregates.group("$dayOfYearFloat", Accumulators.sum("count", 1)));
+        pipeline.add(Aggregates.group("$dayOfYear", Accumulators.sum("count", 1)));
 
         MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
 

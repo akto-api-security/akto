@@ -358,7 +358,11 @@ export default {
         
         return Object.values(ret) 
     },
-    recencyPeriod: 60 * 24 * 60 * 60,
+    recencyPeriod: 600 * 24 * 60 * 60,
+    toCommaSeparatedNumber(number) {
+        let nf = new Intl.NumberFormat('en-US');
+        return nf.format(number);      
+    },  
     sensitiveTagDetails(tag) {
         let icon = "$fas_info-circle"
         switch(tag) {

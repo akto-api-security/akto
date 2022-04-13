@@ -12,9 +12,9 @@
                     v-bind="{}"
                     v-on="{}"
                     >
-                        <span class="legend-text white--text">{{item.y}}</span>
+                        <span class="legend-text white--text"></span>
                     </v-avatar>
-                    <span class="legend-text ml-2">{{item.name}}</span>
+                    <span class="legend-text ml-2">{{item.name}} <span class="grey-text">({{prettify(item.y)}})</span></span>
                 </div>
             </div>
         </div>
@@ -27,6 +27,7 @@ import ACard from '@/apps/dashboard/shared/components/ACard'
 import DonutChart from '@/apps/dashboard/shared/components/DonutChart'
 
 import obj from '@/util/obj'
+import func from '@/util/func'
 
 export default {
     name: "SensitiveParamsCard",
@@ -37,6 +38,11 @@ export default {
     props: {
         title: obj.strR,
         sensitiveParams: obj.arrR
+    },
+    methods: {
+        prettify(number) {
+            return func.toCommaSeparatedNumber(number)
+        }
     }
 }
 </script>
