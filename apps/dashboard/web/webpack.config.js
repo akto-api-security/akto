@@ -142,7 +142,10 @@ if (process.env.NODE_ENV === 'production') {
                 compress: {
                   warnings: false
                 },
-                sourceMap: true
+                sourceMap: true,
+                output: {
+                  ascii_only: true
+                }
               }
         }
     ),
