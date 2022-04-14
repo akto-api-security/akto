@@ -14,6 +14,7 @@ var state = {
     apiCollection: [],
     sensitiveParams: [],
     swaggerContent : null,
+    documentedURLs: {},
     apiInfoList: [],
     filters: [],
     lastFetched: 0,
@@ -22,8 +23,12 @@ var state = {
     method: ''
 }
 
-let functionCompareParamObj = (x, p) => {
+let functionCompareEndpoint = (x, p) => {
     return x.url === p.url && x.method === p.method && x.apiCollectionId === p.apiCollectionId
+}
+
+let functionCompareParameter = (x, p) => {
+    return x.responseCode === p.responseCode && x.isHeader === p.isHeader && x.param === p.param
 }
 
 const inventory = {
@@ -40,6 +45,7 @@ const inventory = {
             state.parameters = []
             state.url = ''
             state.method = ''
+            state.documentedURLs = {}
         },
         EMPTY_PARAMS (state) {
             state.loading = false
@@ -50,37 +56,40 @@ const inventory = {
         SAVE_API_COLLECTION (state, info) {
             state.apiCollectionId = info.apiCollectionId
             state.apiCollectionName = info.data.name
-            state.apiCollection = info.data.endpoints.map(x => {return {...x._id, startTs: x.startTs}})
+            state.apiCollection = info.data.endpoints.map(x => {return {...x._id, startTs: x.startTs, changesCount: x.changesCount}})
             state.apiInfoList = info.data.apiInfoList
 
         },
         TOGGLE_SENSITIVE (state, p) {
             let sensitiveParamIndex = state.sensitiveParams.findIndex(x => {
-                return functionCompareParamObj(x, p)
-            })
-
-            let apiCollectionIndex = state.apiCollection.findIndex(x => {
-                return functionCompareParamObj(x, p)
+                return functionCompareParameter(x, p) && functionCompareEndpoint(x, p)
             })
 
             let savedAsSensitive = sensitiveParamIndex < 0
             if (savedAsSensitive) {
+                p.savedAsSensitive = p.sensitive
                 state.sensitiveParams.push(p)
             } else {
                 state.sensitiveParams.splice(sensitiveParamIndex, 1)
             }
+            
+            let paramIndex = state.parameters.findIndex(x => {
+                return functionCompareParameter(x, p)
+            })
 
-            if (apiCollectionIndex > -1) {
-                state.apiCollection[apiCollectionIndex].savedAsSensitive = savedAsSensitive
+            if (paramIndex > -1) {
+                state.parameters[paramIndex].sensitive = p.sensitive
+                state.parameters[paramIndex].savedAsSensitive = p.sensitive
             }
-            state.apiCollection = [...state.apiCollection]
+
+            state.parameters = [...state.parameters]
         },
         SAVE_SENSITIVE (state, fields) {
             state.sensitiveParams = fields
             
             fields.forEach(p => {
                 let apiCollectionIndex = state.apiCollection.findIndex(x => {
-                    return functionCompareParamObj(x, p)
+                    return functionCompareEndpoint(x, p)
                 })
                 
                 if (apiCollectionIndex > -1) {
@@ -117,6 +126,9 @@ const inventory = {
                     if(resp && resp.data && resp.data.content)
                         state.swaggerContent = JSON.parse(resp.data.content)
                 })
+                api.fetchAllUrlsAndMethods(apiCollectionId).then(resp => {
+                    state.documentedURLs = resp.data || {}
+                })
                 api.fetchFilters().then(resp => {
                     let a = resp.runtimeFilters
                     a.forEach(x => {
@@ -142,12 +154,12 @@ const inventory = {
 
                         if (index > -1) {
                             resp.data.params[index].savedAsSensitive = true
-                            resp.data.params[index].subType = 'Custom'
                         }
 
                     })
+                    commit('SAVE_PARAMS', {parameters: resp.data.params, apiCollectionId, url, method})
+                    state.loading = false
                 })
-                commit('SAVE_PARAMS', {parameters: resp.data.params, apiCollectionId, url, method})
             })
 
         },
@@ -204,7 +216,7 @@ const inventory = {
         getAPICollectionId: (state) => state.apiCollectionId,
         getAPICollectionName: (state) => state.apiCollectionName,
         isSensitive: (state) => p => state.sensitiveParams && state.sensitiveParams.findIndex(x => {
-            return functionCompareParamObj(x, p)
+            return functionCompareParameter(x, p)
         }) > 0,
         getApiInfoList: (state) => state.apiInfoList,
         getFilters: (state) => state.filters,

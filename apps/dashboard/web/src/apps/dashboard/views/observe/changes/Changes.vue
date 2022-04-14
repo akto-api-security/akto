@@ -1,5 +1,8 @@
 <template>
-    <div>
+    <div v-if="loading">
+        <spinner/>
+    </div>
+    <div v-else>
         <simple-layout title="API Changes"/>
         <div class="d-flex pa-4">
             <count-box title="New endpoints" :count="newEndpoints.length" colorTitle="Total" />
@@ -155,6 +158,7 @@ import {mapState} from 'vuex'
 import BatchOperation from './components/BatchOperation'
 import api from './api.js'
 import inventorApi from '../inventory/api.js'
+import Spinner from '@/apps/dashboard/shared/components/Spinner'
 
 export default {
     name: "ApiChanges",
@@ -168,7 +172,8 @@ export default {
         ServerTable,
         SensitiveChipGroup,
         LineChart,
-        BatchOperation
+        BatchOperation,
+        Spinner
     },
     data () {
         return {
@@ -444,7 +449,7 @@ export default {
         }
     },
     computed: {
-        ...mapState('changes', ['apiCollection', 'apiInfoList', 'lastFetched', 'sensitiveParams']),
+        ...mapState('changes', ['apiCollection', 'apiInfoList', 'lastFetched', 'sensitiveParams', 'loading']),
         mapCollectionIdToName() {
             return this.$store.state.collections.apiCollections.reduce((m, e) => {
                 m[e.id] = e.displayName

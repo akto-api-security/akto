@@ -1,5 +1,8 @@
 <template>
-    <div>
+    <div v-if="loading">
+        <spinner/>
+    </div>
+    <div v-else>
         <v-row>
             <v-col md="6">
                 <sensitive-params-card title="Sensitive parameters" :sensitiveParams="sensitiveParamsForChart"/>
@@ -83,7 +86,8 @@ export default {
         SensitiveParamsCard,
         LineChart,
         Spinner,
-        SampleData
+        SampleData,
+        Spinner
     },
     props: {
         urlAndMethod: obj.strR,
@@ -177,11 +181,12 @@ export default {
         isValid (item) {
             let obj = {...item.x}
             obj.savedAsSensitive = false
+            obj.sensitive = false
             return !func.isSubTypeSensitive(obj)
         }
     },
     computed: {
-        ...mapState('inventory', ['parameters']),
+        ...mapState('inventory', ['parameters', 'loading']),
         url () {
             return this.urlAndMethod.split(" ")[0]
         },
@@ -209,17 +214,30 @@ export default {
             return ret
         },
         sensitiveParamsForChart() {
-            return Object.entries(this.sensitiveParams.reduce((z, e) => {
-                let key = func.isSubTypeSensitive(e) ? e.subType : 'General'
+            if (this.parameters.length == 0) {
+                return []
+            }
+
+            let numGenericParams = this.parameters.length - this.sensitiveParams.length
+            let ret = Object.entries(this.sensitiveParams.reduce((z, e) => {
+                let key = func.isSubTypeSensitive(e) ? e.subType : 'Generic'
                 z[key] = (z[key] || 0) + 1
                 return z
             }, {})).map((x, i) => {
                 return {
                     name: x[0],
                     y: x[1],
-                    color: x[0] === 'General' ? "#7D787838" : (["#6200EAFF", "#6200EADF", "#6200EABF", "#6200EA9F", "#6200EA7F", "#6200EA5F", "#6200EA3F", "#6200EA1F"][i])
+                    color: ["#6200EAFF", "#6200EADF", "#6200EABF", "#6200EA9F", "#6200EA7F", "#6200EA5F", "#6200EA3F", "#6200EA1F"][i]
                 }
             })
+
+            ret.push({
+                name: "Generic",
+                y: numGenericParams,
+                color: "#7D787838"
+            })
+            
+            return ret
         },
         requestItems() {
             return this.parameters.filter(x => x.responseCode == -1).map(this.prepareItem)

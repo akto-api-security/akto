@@ -346,6 +346,8 @@ export default {
                     apiCollectionId: x.apiCollectionId,
                     last_seen: apiInfoMap[key] ? this.prettifyEpoch(apiInfoMap[key]["lastSeen"]) : 0,
                     detectedTs: x.startTs,
+                    changesCount: x.changesCount,
+                    changes: x.changesCount && x.changesCount > 0 ? (x.changesCount +" new parameter"+(x.changesCount > 1? "s": "")) : '-',
                     added: this.prettifyEpoch(x.startTs),
                     violations: apiInfoMap[key] ? apiInfoMap[key]["violations"] : {},
                     apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',

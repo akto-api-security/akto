@@ -87,7 +87,18 @@ public class InventoryAction extends UserAction {
             .append("url", "$url")
             .append("method", "$method");
             pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
-            pipeline.add(Aggregates.group(groupedId, Accumulators.min("startTs", "$timestamp")));
+
+            int recentEpoch = Context.now() - deltaPeriodValue;
+
+
+            Bson projections = Projections.fields(
+                Projections.include("timestamp", "apiCollectionId", "url", "method"),
+                Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$timestamp", recentEpoch})),
+                Projections.computed("dayOfYear", new BasicDBObject("$trunc", new Object[]{"$dayOfYearFloat", 0}))
+            );
+
+            pipeline.add(Aggregates.project(projections));
+            pipeline.add(Aggregates.group(groupedId, Accumulators.min("startTs", "$timestamp"), Accumulators.sum("changesCount", 1)));
             pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
 
         MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();

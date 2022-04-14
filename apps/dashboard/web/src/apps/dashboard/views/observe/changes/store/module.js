@@ -36,16 +36,20 @@ const changes = {
         SAVE_SENSITIVE (state, fields) {
             state.sensitiveParams = fields
             
-            fields.forEach(p => {
-                let apiCollectionIndex = state.apiCollection.findIndex(x => {
-                    return functionCompareParamObj(x, p)
+            fields = fields.reduce((z,e) => {
+                let key = [e.apiCollectionId + "-" + e.url + "-" + e.method]
+                z[key] = z[key] || new Set()
+                z[key].add(e.subType || "Custom")
+                return z
+            },{})
+
+            Object.entries(fields).forEach(p => {
+                let apiCollectionIndex = state.apiCollection.findIndex(e => {
+                    return (e.apiCollectionId + "-" + e.url + "-" + e.method) === p[0]
                 })
                 
                 if (apiCollectionIndex > -1) {
-                    if (!state.apiCollection[apiCollectionIndex].sensitive) {
-                        state.apiCollection[apiCollectionIndex].sensitive = new Set()
-                    }
-                    state.apiCollection[apiCollectionIndex].sensitive.add(p.subType || "Custom")
+                    state.apiCollection[apiCollectionIndex].sensitive = p[1]
                 }
             })
             state.apiCollection = [...state.apiCollection]
