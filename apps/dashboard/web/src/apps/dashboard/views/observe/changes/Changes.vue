@@ -74,7 +74,7 @@
                         <sensitive-chip-group :sensitiveTags="[item.type]" />
                     </template>
                     
-                    <template #add-new-row-btn="{filters, filterOperators, sortKey, sortDesc, total}">
+                    <!-- <template #add-new-row-btn="{filters, filterOperators, sortKey, sortDesc, total}">
                         <div class="ma-1 d-flex">
                             <v-dialog
                                 :model="showDialog1"
@@ -136,7 +136,7 @@
                                 />
                             </v-dialog>
                         </div>
-                    </template>
+                    </template> -->
                 </server-table>
             </template>
         </layout-with-tabs>
