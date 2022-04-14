@@ -1,6 +1,13 @@
 <template>
     <div class="container">
-        <filter-list :title="title" :items="items" @clickedItem="appliedFilter" @selectedAll="selectedAll" width="600px"/>
+        <filter-list 
+            :title="title" 
+            :items="items" 
+            :hideOperators="true"
+            @clickedItem="appliedFilter" 
+            @selectedAll="selectedAll" 
+            width="600px"
+        />
 
         <div v-if="limitedItems.length < Object.values(allItems).filter(x => x.selected).length" class="info-text">
             <v-icon size="12">$fas_exclamation</v-icon>

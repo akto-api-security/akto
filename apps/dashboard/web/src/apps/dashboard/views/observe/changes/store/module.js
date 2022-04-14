@@ -7,7 +7,7 @@ import func from "@/util/func"
 Vue.use(Vuex)
 
 let functionCompareParamObj = (x, p) => {
-    return x.param === p.param && x.url === p.url && x.method === p.method && x.isHeader === p.isHeader && x.responseCode === p.responseCode && x.apiCollectionId === p.apiCollectionId
+    return x.url === p.url && x.method === p.method && x.apiCollectionId === p.apiCollectionId
 }
 
 var state = {
@@ -16,7 +16,9 @@ var state = {
     apiCollection: [],
     sensitiveParams: [],
     apiInfoList: [],
-    lastFetched: 0
+    lastFetched: 0,
+    data_type_names: []
+
 }
 
 const changes = {
@@ -30,7 +32,11 @@ const changes = {
             state.sensitiveParams = []
         },
         SAVE_API_COLLECTION (state, info) {
-            state.apiCollection = info.data.endpoints.filter(x => x.subType.name !== "NULL")
+            state.apiCollection = info.data.endpoints.map(x => {return {...x._id, startTs: x.startTs}})
+            state.apiInfoList = info.data.apiInfoList
+        },
+        SAVE_DATA_TYPE_NAMES(state, resp) {
+            state.data_type_names = [].concat(resp.allDataTypes)
         },
         SAVE_SENSITIVE (state, fields) {
             state.sensitiveParams = fields
@@ -41,7 +47,10 @@ const changes = {
                 })
                 
                 if (apiCollectionIndex > -1) {
-                    state.apiCollection[apiCollectionIndex].savedAsSensitive = true
+                    if (!state.apiCollection[apiCollectionIndex].sensitive) {
+                        state.apiCollection[apiCollectionIndex].sensitive = new Set()
+                    }
+                    state.apiCollection[apiCollectionIndex].sensitive.add(p.subType || {"name": "CUSTOM"})
                 }
             })
             state.apiCollection = [...state.apiCollection]
@@ -51,23 +60,23 @@ const changes = {
         emptyState({commit}, payload, options) {
             commit('EMPTY_STATE', payload, options)
         },
-        loadRecentParameters({commit}, options) {
+        loadRecentEndpoints({commit}, options) {
             commit('EMPTY_STATE')
             state.loading = true
             state.lastFetched = new Date() / 1000
-            return api.loadRecentParameters().then((resp) => {
+            return api.loadRecentEndpoints().then((resp) => {
                 commit('SAVE_API_COLLECTION', {data: resp.data}, options)
-                api.listAllSensitiveFields().then(allSensitiveFields => {
-                    commit('SAVE_SENSITIVE', allSensitiveFields.data)
+                api.loadSensitiveParameters().then(allSensitiveFields => {
+                    commit('SAVE_SENSITIVE', allSensitiveFields.data.endpoints)
                 })
                 state.loading = false
             }).catch(() => {
                 state.loading = false
             })
         },
-        fetchApiInfoListForRecentEndpoints({}) {
-            api.fetchApiInfoListForRecentEndpoints().then((resp) => {
-              state.apiInfoList = resp.apiInfoList
+        fetchDataTypeNames({commit}) {
+            return api.fetchDataTypeNames().then((resp) => {
+                commit('SAVE_DATA_TYPE_NAMES', resp)
             })
         }
     },

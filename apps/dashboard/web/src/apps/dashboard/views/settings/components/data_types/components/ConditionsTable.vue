@@ -62,20 +62,7 @@ export default {
     },
     data() {
         return {
-            operation_types: [
-                {
-                    "text": "starts with",
-                    "value": "STARTS_WITH"
-                },
-                {
-                    "text": "ends with",
-                    "value": "ENDS_WITH"
-                },
-                {
-                    "text": "matches regex",
-                    "value": "REGEX"
-                }
-            ]
+
         }
     },
     methods: {
@@ -83,7 +70,7 @@ export default {
             if (!this.conditions) {
                 this.conditions = {"operator": "AND", "predicates": []}
             }
-            this.conditions.predicates.push({"type": "STARTS_WITH", "value": null})
+            this.conditions.predicates.push({"type": "EQUALS_TO", "value": null})
         },
         deleteRow(index) {
             this.conditions.predicates.splice(index,1)
@@ -95,18 +82,6 @@ export default {
             let width = !value  ? 6 : value.length + 4
             return { 'width': width+ 'ch' }
         },
-        formatConditionType(value) {
-            let finalValue = null
-            for (let i=0; i < this.operation_types.length; i++) {
-                let operation = this.operation_types[i]
-                if (operation["value"] === value) {
-                    finalValue = operation["text"]
-                    break
-                }
-            }
-
-            return finalValue;
-        }
     },
     created() {
     },

@@ -234,13 +234,13 @@ public class TestDump2 {
 
         RequestTemplate reqTemplate = entry.getValue();
 
-        assertEquals(29, reqTemplate.getUserIds().size());
+        assertEquals(30, reqTemplate.getUserIds().size());
         assertEquals(2, reqTemplate.getParameters().size());
         
         RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
-        assertEquals(29, respTemplate.getUserIds().size());
+        assertEquals(30, respTemplate.getUserIds().size());
         assertEquals(3, respTemplate.getParameters().size());
-        assertEquals(4, sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size());        
+        assertEquals(2, sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size());        
     }
 
     private String createPayloadWithRepetitiveKeys(String i) {

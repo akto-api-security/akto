@@ -83,4 +83,50 @@ public class TestPredicates {
         result = regexPredicate.validate(value);
         assertFalse(result);
     }
+
+    @Test
+    public void testIsNumberPredicate() {
+        IsNumberPredicate isNumberPredicate = new IsNumberPredicate();
+        Object value = 32;
+        boolean result = isNumberPredicate.validate(value);
+        assertTrue(result);
+
+        value = 32.3;
+        result = isNumberPredicate.validate(value);
+        assertTrue(result);
+
+        result = isNumberPredicate.validate(null);
+        assertFalse(result);
+
+        value = "1234";
+        result = isNumberPredicate.validate(value);
+        assertFalse(result);
+
+        value = new HashMap<>();
+        result = isNumberPredicate.validate(value);
+        assertFalse(result);
+    }
+
+    @Test
+    public void testEqualsToPredicate() {
+        EqualsToPredicate equalsToPredicate = new EqualsToPredicate("something");
+        Object value = "something";
+        boolean result = equalsToPredicate.validate(value);
+        assertTrue(result);
+
+        value = " something ";
+        result = equalsToPredicate.validate(value);
+        assertTrue(result);
+
+        result = equalsToPredicate.validate(null);
+        assertFalse(result);
+
+        value = "Avneesh";
+        result = equalsToPredicate.validate(value);
+        assertFalse(result);
+
+        value = new HashMap<>();
+        result = equalsToPredicate.validate(value);
+        assertFalse(result);
+    }
 }

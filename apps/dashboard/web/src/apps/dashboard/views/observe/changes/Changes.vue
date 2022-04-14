@@ -4,7 +4,7 @@
         <div class="d-flex pa-4">
             <count-box title="New endpoints" :count="newEndpoints.length" colorTitle="Total" />
             <count-box title="New sensitive endpoints" :count="newSensitiveEndpoints.length" colorTitle="Overdue" />
-            <count-box title="New parameters" :count="newParameters.length" colorTitle="Total" />
+            <count-box title="New parameters" :count="newParametersCount" colorTitle="Total" />
             <count-box title="New sensitive parameters" :count="newSensitiveParameters.length" colorTitle="Overdue" />
         </div>
         <a-card title="Changes" icon="$fas_chart-line" class="ma-5">
@@ -50,25 +50,28 @@
                     :sortDescDefault="true" 
                     @rowClicked="goToEndpoint"
                 >
-                    <template #item.sensitive="{item}">
+                    <template #item.sensitiveTags="{item}">
                         <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
                     </template>
                 </simple-table>
             </template>
             <template slot="New parameters">
-                <simple-table 
+                <server-table 
                     :headers="parameterHeaders" 
-                    :items="newParameters" 
                     name="New parameters" 
-                    sortKeyDefault="added" 
+                    sortKeyDefault="timestamp" 
                     :sortDescDefault="true"
                     @rowClicked="goToEndpoint"
+                    :fetchParams="fetchRecentParams"
+                    :processParams="prepareItemForTable"
+                    :getColumnValueList="getColumnValueList"
+                    :hideDownloadCSVIcon="true"
                 >
                     <template #item.type="{item}">
                         <sensitive-chip-group :sensitiveTags="[item.type]" />
                     </template>
                     
-                    <template #add-new-row-btn="{filteredItems}">
+                    <!-- <template #add-new-row-btn="{filteredItems}">
                         <div class="ma-1 d-flex">
                             <v-dialog
                                 :model="showDialog1"
@@ -128,8 +131,8 @@
                                 />
                             </v-dialog>
                         </div>
-                    </template>
-                </simple-table>
+                    </template> -->
+                </server-table>
             </template>
         </layout-with-tabs>
     </div>    
@@ -142,6 +145,7 @@ import ACard from '@/apps/dashboard/shared/components/ACard'
 import CountBox from '@/apps/dashboard/shared/components/CountBox'
 import LineChart from '@/apps/dashboard/shared/components/LineChart'
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
+import ServerTable from '@/apps/dashboard/shared/components/ServerTable'
 import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
 import func from '@/util/func'
 import constants from '@/util/constants'
@@ -158,6 +162,7 @@ export default {
         LineChart, 
         LayoutWithTabs,
         SimpleTable,
+        ServerTable,
         SensitiveChipGroup,
         LineChart,
         BatchOperation
@@ -166,6 +171,8 @@ export default {
         return {
             showDialog1: false,
             showDialog2: false,
+            newParamsTrend: [],
+            newParametersCount: 0,
             endpointHeaders: [
                 {
                     text: '',
@@ -185,7 +192,7 @@ export default {
                 },
                 {
                     text: 'Sensitive Params',
-                    value: 'sensitive'
+                    value: 'sensitiveTags'
                 },
                 {
                   text: 'Access Type',
@@ -215,32 +222,38 @@ export default {
                 },
                 {
                     text: 'Name',
-                    value: 'name'
+                    value: 'name',
+                    sortKey: 'param'
                 },
                 {
                     text: 'Type',
-                    value: 'type'
+                    value: 'type',
+                    sortKey: 'subType'
                 },
                 {
                     text: 'Endpoint',
-                    value: 'endpoint'
+                    value: 'endpoint',
+                    sortKey: 'url'
                 },
                 {
                     text: 'Collection',
-                    value: 'apiCollectionName'
+                    value: 'apiCollectionName',
+                    sortKey: 'apiCollectionId'
                 },
                 {
                     text: 'Method',
-                    value: 'method'
+                    value: 'method',
+                    sortKey: 'method'
                 },
                 {
                     text: 'Location',
-                    value: 'location'
+                    value: 'location',
+                    sortKey: 'isHeader'
                 },
                 {
                     text: constants.DISCOVERED,
                     value: 'added',
-                    sortKey: 'detectedTs'
+                    sortKey: 'timestamp'
                 }
             ]
         }
@@ -248,6 +261,72 @@ export default {
     methods: {
         isSubTypeSensitive(x) {
             return func.isSubTypeSensitive(x)
+        },
+        getColumnValueList(headerValue) {
+            switch (headerValue) {
+                case "method": 
+                    return {
+                        type: "STRING",
+                        values: ["GET", "POST", "PUT", "HEAD", "OPTIONS"].map(x => {return {
+                            title: x, 
+                            subtitle: '',
+                            value: x
+                        }})
+                    }
+
+                case "timestamp": 
+                    return {
+                        type: "INTEGER",
+                        values: {
+                            min: 0,
+                            max: 600
+                        }
+                    }
+
+                case "apiCollectionId": 
+                    return { 
+                        type: "STRING", 
+                        values: this.$store.state.collections.apiCollections.map(x=> {
+                            return {
+                                title: x.displayName,
+                                subtitle: '',
+                                value: x.id
+                            }
+                        })
+                    }
+
+                case "isHeader":
+                    return {
+                        type: "STRING",
+                        values: [
+                            {
+                                title: "Headers",
+                                subtitle: '',
+                                value: true
+                            },
+                            {
+                                title: "Payload",
+                                subtitle: '',
+                                value: false
+                            },
+                        ]
+                    }
+
+                case "subType": 
+                    return {
+                        type: "STRING",
+                        values: this.data_type_names.map(x => {
+                                return {
+                                    title: x, 
+                                    subtitle: '',
+                                    value: x
+                                }
+                            })
+                    }
+                 
+                default: 
+                    return  {type: "SEARCH", values: []}
+            }
         },
         markAllSensitive (sensitive, {items}) {
             let valueSet = new Set([...items.map(x => x.value)])
@@ -281,6 +360,7 @@ export default {
                 color: func.isSubTypeSensitive(x) ? this.$vuetify.theme.themes.dark.redMetric : this.$vuetify.theme.themes.dark.greenMetric,
                 name: x.param.replaceAll("#", ".").replaceAll(".$", ""),
                 endpoint: x.url,
+                url: x.url,
                 method: x.method,
                 added: func.prettifyEpoch(x.timestamp),
                 location: (x.responseCode == -1 ? 'Request' : 'Response') + ' ' + (x.isHeader ? 'headers' : 'payload'),
@@ -290,6 +370,9 @@ export default {
                 apiCollectionName: idToNameMap[x.apiCollectionId] || '-',
                 x: x
             }
+        },
+        async fetchRecentParams(sortKey, sortOrder, skip, limit, filters, filterOperators) {
+            return await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators)
         },
         goToEndpoint (row) {
             let routeObj = {
@@ -304,13 +387,33 @@ export default {
         },
         refreshPage(hardRefresh) {
             if (hardRefresh || ((new Date() / 1000) - this.lastFetched > 60*5)) {
-                this.$store.dispatch('changes/loadRecentParameters')
-                this.$store.dispatch('changes/fetchApiInfoListForRecentEndpoints')
+                this.$store.dispatch('changes/loadRecentEndpoints')
+                api.fetchNewParametersTrend().then(resp => {
+                    let newParametersCount = 0
+                    let todayDate = func.todayDate()
+                    let twoMonthsAgo = func.incrDays(todayDate, -func.recencyPeriod/86400)
+                    
+                    let currDate = twoMonthsAgo
+                    let ret = []
+                    let dateToCount = resp.reduce((m, e) => { 
+                        let detectDate = func.toYMD(new Date(e._id*86400*1000))
+                        m[detectDate] = (m[detectDate] || 0 ) + e.count
+                        newParametersCount += e.count
+                        return m
+                    }, {})
+                    while (currDate <= todayDate) {
+                        ret.push([func.toDate(func.toYMD(currDate)), dateToCount[func.toYMD(currDate)] || 0])
+                        currDate = func.incrDays(currDate, 1)
+                    }
+                    this.newParametersCount = newParametersCount
+                    this.newParamsTrend = ret
+                })
+                this.$store.dispatch('changes/fetchDataTypeNames')
             }
         },
         changesTrend (data) {
             let todayDate = func.todayDate()
-            let twoMonthsAgo = func.incrDays(todayDate, -61)
+            let twoMonthsAgo = func.incrDays(todayDate, -func.recencyPeriod/86400)
             
             let currDate = twoMonthsAgo
             let ret = []
@@ -327,43 +430,25 @@ export default {
         }
     },
     computed: {
-        ...mapState('changes', ['apiCollection', 'apiInfoList', 'lastFetched']),
+        ...mapState('changes', ['apiCollection', 'apiInfoList', 'lastFetched', 'sensitiveParams', 'data_type_names']),
         mapCollectionIdToName() {
             return this.$store.state.collections.apiCollections.reduce((m, e) => {
-                m[e.id] = e.name
+                m[e.id] = e.displayName
                 return m
             }, {})
         },
         newEndpoints() {
-            let now = func.timeNow()
-            return func.groupByEndpoint(this.apiCollection,this.apiInfoList, this.mapCollectionIdToName).filter(x => x.detectedTs > now - func.recencyPeriod)
+            return func.mergeApiInfoAndApiCollection(this.apiCollection, this.apiInfoList, this.mapCollectionIdToName)
         },
         newEndpointsTrend() {
             return this.changesTrend(this.newEndpoints)
         },
-        newParameters() {
-            let now = func.timeNow()
-            let listParams = this.apiCollection.filter(x => x.timestamp > now - func.recencyPeriod).map(this.prepareItemForTable)
-            return listParams.sort((a, b) => {
-                if (a.detectedTs > b.detectedTs + 3600) {
-                    return -1
-                } else if (a.detectedTs < b.detectedTs - 3600) {
-                    return 1
-                } else {
-                    return func.isSubTypeSensitive(a.x) > func.isSubTypeSensitive(b.x) ? -1 : 1
-                }
-            })
-        },
-        newParamsTrend() {
-            return this.changesTrend(this.newParameters)
-        },
         newSensitiveEndpoints() {
-            let now = func.timeNow()
-            return func.groupByEndpoint(this.apiCollection,this.apiInfoList, this.mapCollectionIdToName).filter(x => x.detectedTs > now - func.recencyPeriod && x.sensitive > 0)
+            return this.newEndpoints.filter(x => x.sensitive && x.sensitive.size > 0)
         },
         newSensitiveParameters() {
             let now = func.timeNow()
-            return this.apiCollection.filter(x => x.timestamp > now - func.recencyPeriod && func.isSubTypeSensitive(x)).map(this.prepareItemForTable)
+            return this.sensitiveParams.filter(x => x.timestamp > now - func.recencyPeriod && func.isSubTypeSensitive(x))
         },
     },
     mounted() {

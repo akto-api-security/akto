@@ -38,10 +38,10 @@
                     :items=allEndpoints 
                     @rowClicked=rowClicked 
                     name="All" 
-                    sortKeyDefault="sensitive" 
+                    sortKeyDefault="sensitiveTags" 
                     :sortDescDefault="true"
                 >
-                    <template #item.sensitive="{item}">
+                    <template #item.sensitiveTags="{item}">
                         <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
                     </template>
                 </simple-table>
@@ -52,7 +52,7 @@
                     :items=sensitiveEndpoints 
                     @rowClicked=rowClicked name="Sensitive"
                 >
-                    <template #item.sensitive="{item}">
+                    <template #item.sensitiveTags="{item}">
                         <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
                     </template>
                 </simple-table>
@@ -63,10 +63,10 @@
                     :items=shadowEndpoints 
                     @rowClicked=rowClicked 
                     name="Undocumented"  
-                    sortKeyDefault="sensitive" 
+                    sortKeyDefault="sensitiveTags" 
                     :sortDescDefault="true"
                 >
-                    <template #item.sensitive="{item}">
+                    <template #item.sensitiveTags="{item}">
                         <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
                     </template>
                 </simple-table>
@@ -100,10 +100,10 @@
                     :items=openEndpoints
                     @rowClicked=rowClicked 
                     name="Unauthenticated" 
-                    sortKeyDefault="sensitive" 
+                    sortKeyDefault="sensitiveTags" 
                     :sortDescDefault="true"
                 >
-                    <template #item.sensitive="{item}">
+                    <template #item.sensitiveTags="{item}">
                         <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
                     </template>
                 </simple-table>
@@ -180,7 +180,7 @@ export default {
                 },
                 {
                     text: 'Sensitive Params',
-                    value: 'sensitive'
+                    value: 'sensitiveTags'
                 },
                 {
                   text: 'Last Seen',
@@ -242,9 +242,6 @@ export default {
     methods: {
         rowClicked(row) {
             this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.endpoint + " " + row.method, type: 2})
-        },
-        groupByEndpoint(listParams, apiInfoList ) {
-            func.groupByEndpoint(listParams, apiInfoList)
         },
         downloadData() {
             let headerTextToValueMap = Object.fromEntries(this.tableHeaders.map(x => [x.text, x.value]).filter(x => x[0].length > 0));
@@ -337,11 +334,9 @@ export default {
             if (collectionIdChanged || !shouldLoad || ((new Date() / 1000) - this.lastFetched > 60*5)) {
                 this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId, shouldLoad: shouldLoad})
 
-                api.getAllUrlsAndMethods(this.apiCollectionId).then(resp => {
+                api.fetchAllUrlsAndMethods(this.apiCollectionId).then(resp => {
                     this.documentedURLs = resp.data || {}
                 })
-                this.$store.dispatch('inventory/fetchApiInfoList', {apiCollectionId: this.apiCollectionId})
-                this.$store.dispatch('inventory/fetchFilters')
             }
 
             this.$emit('mountedView', {type: 1, apiCollectionId: this.apiCollectionId})
@@ -350,16 +345,16 @@ export default {
     computed: {
         ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'loading', 'swaggerContent', 'apiInfoList', 'filters', 'lastFetched']),
         openEndpoints() {
-          return func.groupByEndpoint(this.apiCollection, this.apiInfoList).filter(x => x.open)
+          return this.allEndpoints.filter(x => x.open)
         },
         allEndpoints () {
-            return func.groupByEndpoint(this.apiCollection, this.apiInfoList )
+            return func.mergeApiInfoAndApiCollection(this.apiCollection, this.apiInfoList)
         },
         sensitiveEndpoints() {
-            return func.groupByEndpoint(this.apiCollection, this.apiInfoList).filter(x => x.sensitive > 0)
+            return this.allEndpoints.filter(x => x.sensitive && x.sensitive.size > 0)
         },
         shadowEndpoints () {
-            return func.groupByEndpoint(this.apiCollection, this.apiInfoList).filter(x => this.isShadow(x))
+            return this.allEndpoints.filter(x => this.isShadow(x))
         },
         unusedEndpoints () {
             let ret = []

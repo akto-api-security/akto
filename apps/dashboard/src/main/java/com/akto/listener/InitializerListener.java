@@ -2,8 +2,12 @@ package com.akto.listener;
 
 import com.akto.DaoInit;
 import com.akto.action.observe.InventoryAction;
+import com.akto.dao.BackwardCompatibilityDao;
+import com.akto.dao.FilterSampleDataDao;
 import com.akto.dao.MarkovDao;
 import com.akto.dao.UsersDao;
+import com.akto.dto.BackwardCompatibility;
+import com.akto.dto.FilterSampleData;
 import com.akto.dto.Markov;
 import com.akto.dto.User;
 import com.akto.dto.messaging.Message;
@@ -11,9 +15,12 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.notifications.email.WeeklyEmail;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.InsertOneResult;
 import com.sendgrid.helpers.mail.Mail;
 
+import org.bson.BsonDocument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -143,6 +150,16 @@ public class InitializerListener implements ServletContextListener {
         return null;
     }
 
+    public void dropFilterSampleDataCollection(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getDropFilterSampleData() == 0) {
+            FilterSampleDataDao.instance.getMCollection().drop();
+        }
+        BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.DROP_FILTER_SAMPLE_DATA, Context.now())
+        );
+    }
+
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
 
@@ -158,5 +175,15 @@ public class InitializerListener implements ServletContextListener {
         SingleTypeInfo.init();
 
         setUpWeeklyScheduler();
+
+        Context.accountId.set(1_000_000);
+        BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
+        if (backwardCompatibility == null) {
+            backwardCompatibility = new BackwardCompatibility();
+            BackwardCompatibilityDao.instance.insertOne(backwardCompatibility);
+        }
+
+        // backward compatibility
+        dropFilterSampleDataCollection(backwardCompatibility);
     }
 }

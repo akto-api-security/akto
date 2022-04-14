@@ -2,15 +2,15 @@ package com.akto.dto.data_types;
 
 import java.util.regex.Pattern;
 
-public class RegexPredicate extends Predicate{
+public class EqualsToPredicate extends Predicate{
     private String value;
 
-    public RegexPredicate() {
-        super(Type.REGEX);
+    public EqualsToPredicate() {
+        super(Type.EQUALS_TO);
     }
 
-    public RegexPredicate(String value) {
-        super(Type.REGEX);
+    public EqualsToPredicate(String value) {
+        super(Type.EQUALS_TO);
         this.value = value;
     }
 
@@ -18,8 +18,8 @@ public class RegexPredicate extends Predicate{
     public boolean validate(Object obj) {
         if (!(obj instanceof String)) return false;
         String str = obj.toString();
-        Pattern pattern = Pattern.compile(this.value);
-        return pattern.matcher(str).matches();
+        str = str.trim();
+        return str.equals(this.value);
     }
 
     public String getValue() {

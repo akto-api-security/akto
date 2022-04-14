@@ -50,12 +50,8 @@ export default {
             ],
         }
     },
-  mounted() {
-    this.$store.dispatch("data_types/fetchDataTypes").then((resp) => {
-            if (this.data_types.length > 0) {
-                this.data_type = this.data_types[0]
-            }
-        })
+    mounted() {
+      this.$store.dispatch("data_types/fetchDataTypes")
     },
     methods: {
         createNewDataType() {

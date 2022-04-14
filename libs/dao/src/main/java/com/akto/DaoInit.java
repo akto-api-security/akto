@@ -12,6 +12,7 @@ import com.akto.dto.third_party_access.ThirdPartyAccess;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.type.URLTemplate;
+import com.akto.types.CappedList;
 import com.akto.util.EnumCodec;
 import com.akto.dto.Attempt.AttemptResult;
 import com.akto.dto.auth.APIAuth;
@@ -58,6 +59,7 @@ public class DaoInit {
         ClassModel<StartsWithPredicate> startsWithPredicateClassModel = ClassModel.builder(StartsWithPredicate.class).enableDiscriminator(true).build();
         ClassModel<EndsWithPredicate> endsWithPredicateClassModel = ClassModel.builder(EndsWithPredicate.class).enableDiscriminator(true).build();
         ClassModel<Conditions> conditionsClassModel = ClassModel.builder(Conditions.class).enableDiscriminator(true).build();
+        ClassModel<CappedList>  cappedListClassModel = ClassModel.builder(CappedList.class).enableDiscriminator(true).build();
 
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(queueEntryClassModel, configClassModel, 
@@ -65,8 +67,8 @@ public class DaoInit {
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel,singleTypeInfoClassModel,
                 thirdPartyAccessClassModel, credentialClassModel, apiTokenClassModel, apiInfoClassModel,
                 apiInfoKeyClassModel, customFilterClassModel, runtimeFilterClassModel, filterSampleDataClassModel,
-                fieldExistsFilterClassModel, accountSettingsClassModel, responseCodeRuntimeFilterClassModel,
-                predicateClassModel, conditionsClassModel, regexPredicateClassModel, startsWithPredicateClassModel, endsWithPredicateClassModel).automatic(true).build());
+                predicateClassModel, conditionsClassModel, regexPredicateClassModel, startsWithPredicateClassModel, endsWithPredicateClassModel,
+                fieldExistsFilterClassModel, accountSettingsClassModel, responseCodeRuntimeFilterClassModel, cappedListClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
             new EnumCodec<>(Conditions.Operator.class),

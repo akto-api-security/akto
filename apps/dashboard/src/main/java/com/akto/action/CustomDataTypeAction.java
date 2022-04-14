@@ -1,7 +1,6 @@
 package com.akto.action;
 
 
-import com.akto.DaoInit;
 import com.akto.dao.CustomDataTypeDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.UsersDao;
@@ -14,14 +13,13 @@ import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.parsers.HttpCallParser;
-import com.akto.runtime.RelationshipSync;
 import com.akto.utils.AktoCustomException;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
@@ -80,7 +78,7 @@ public class CustomDataTypeAction extends UserAction{
 
 
     private BasicDBObject dataTypes;
-    public String fetchDataTypes() {
+    public String fetchDataTypesForSettings() {
         List<CustomDataType> customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject());
         Collections.reverse(customDataTypes);
 
@@ -102,6 +100,20 @@ public class CustomDataTypeAction extends UserAction{
             }
         }
         dataTypes.put("aktoDataTypes", subTypes);
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    List<String> allDataTypes;
+    public String fetchDataTypeNames() {
+        this.allDataTypes = new ArrayList<>();
+        List<CustomDataType> customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject());
+        for (CustomDataType cdt: customDataTypes) {
+            allDataTypes.add(cdt.getName());
+        }
+        for (SingleTypeInfo.SubType subType: SingleTypeInfo.subTypeMap.values()) {
+            allDataTypes.add(subType.getName());
+        }
 
         return Action.SUCCESS.toUpperCase();
     }
@@ -284,30 +296,55 @@ public class CustomDataTypeAction extends UserAction{
         return matchFound;
     }
 
+    static class MatchResult {
+        String key;
+        Object value;
+
+        public MatchResult(String key, Object value) {
+            this.key = key;
+            this.value = value;
+        }
+    }
+
+    public static void extractAllValuesFromPayload(JsonNode node, String key, CustomDataType customDataType, List<MatchResult> matches) {
+        if (node == null) return;
+        if (node.isValueNode()) {
+            Object value = mapper.convertValue(node, Object.class);
+            boolean result = customDataType.validate(value, key);
+            if (result) matches.add(new MatchResult(key, value));
+        } else if (node.isArray()) {
+            ArrayNode arrayNode = (ArrayNode) node;
+            for(int i = 0; i < arrayNode.size(); i++) {
+                JsonNode arrayElement = arrayNode.get(i);
+                extractAllValuesFromPayload(arrayElement, null, customDataType, matches);
+            }
+        } else {
+            Iterator<String> fieldNames = node.fieldNames();
+            while(fieldNames.hasNext()) {
+                String fieldName = fieldNames.next();
+                JsonNode fieldValue = node.get(fieldName);
+                extractAllValuesFromPayload(fieldValue, fieldName, customDataType, matches);
+            }
+        }
+
+    }
+
     public boolean forPayload(String payload, CustomDataType customDataType, Key apiKey) throws IOException {
-        boolean matchFound = false;
         JsonParser jp = factory.createParser(payload);
         JsonNode node = mapper.readTree(jp);
 
-        Map<String,Set<String>> responseParamMap = new HashMap<>();
-        RelationshipSync.extractAllValuesFromPayload(node,new ArrayList<>(), responseParamMap);
+        List<MatchResult> matchResults = new ArrayList<>();
+        extractAllValuesFromPayload(node,null, customDataType, matchResults);
 
-        for (String param: responseParamMap.keySet()) {
-            Iterator<String> iterator = responseParamMap.get(param).iterator();
-            String key = param.replaceAll("#", ".").replaceAll("\\.\\$", "");
-            while (iterator.hasNext()) {
-                String value = iterator.next();
-                boolean result = customDataType.validate(value, key);
-                if (result) {
-                    matchFound = true;
-                    CustomSubTypeMatch customSubTypeMatch = new CustomSubTypeMatch(
-                            apiKey.getApiCollectionId(),apiKey.url,apiKey.method.name(),key, value
-                    );
-                    this.customSubTypeMatches.add(customSubTypeMatch);
-                }
-            }
+        for (MatchResult matchResult: matchResults) {
+            CustomSubTypeMatch customSubTypeMatch = new CustomSubTypeMatch(
+                    apiKey.getApiCollectionId(),apiKey.url,apiKey.method.name(), matchResult.key,  matchResult.value.toString()
+            );
+            this.customSubTypeMatches.add(customSubTypeMatch);
         }
-        return matchFound;
+
+        return matchResults.size() > 0;
+
     }
 
     public CustomDataType generateCustomDataType(int userId) throws AktoCustomException {
@@ -415,6 +452,16 @@ public class CustomDataTypeAction extends UserAction{
                 if (value.length() == 0) return null;
                 predicate = new EndsWithPredicate(value);
                 return predicate;
+            case EQUALS_TO:
+                Object v = valueMap.get("value");
+                if (!(v instanceof String)) return null;
+                value = v.toString();
+                if (value.length() == 0) return null;
+                predicate = new EqualsToPredicate(value);
+                return predicate;
+            case IS_NUMBER:
+                return new IsNumberPredicate();
+
             default:
                 return null;
         }
@@ -496,5 +543,9 @@ public class CustomDataTypeAction extends UserAction{
 
     public long getCurrentProcessed() {
         return currentProcessed;
+    }
+
+    public List<String> getAllDataTypes() {
+        return allDataTypes;
     }
 }

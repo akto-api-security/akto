@@ -13,6 +13,10 @@ import com.akto.dto.data_types.Predicate;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -20,7 +24,7 @@ import com.mongodb.client.model.InsertOneModel;
 import com.mongodb.client.model.WriteModel;
 import org.junit.Test;
 
-import java.lang.reflect.Array;
+import java.io.IOException;
 import java.util.*;
 
 import static org.junit.Assert.*;
@@ -204,7 +208,7 @@ public class TestCustomDataTypeAction extends MongoBasedTest {
         Map<String, Object> session = new HashMap<>();
         session.put("user", user4);
         customDataTypeAction.setSession(session);
-        customDataTypeAction.fetchDataTypes();
+        customDataTypeAction.fetchDataTypesForSettings();
 
         BasicDBObject dataTypes = customDataTypeAction.getDataTypes();
 
@@ -225,7 +229,7 @@ public class TestCustomDataTypeAction extends MongoBasedTest {
         customDataTypeAction.setSession(session);
         customDataTypeAction.setActive(false);
 
-        customDataTypeAction.fetchDataTypes();
+        customDataTypeAction.fetchDataTypesForSettings();
         assertFalse(customDataTypeAction.getCustomDataType().isActive());
 
         CustomDataType customDataTypeFromDb = CustomDataTypeDao.instance.findOne(CustomDataType.NAME, "NAME1");

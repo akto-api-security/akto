@@ -13,10 +13,10 @@ public class StartsWithPredicate extends Predicate{
     }
 
     @Override
-    public boolean validate(Object value) {
-        if (!(value instanceof String)) return false;
+    public boolean validate(Object obj) {
+        if (!(obj instanceof String)) return false;
 
-        String str = value.toString();
+        String str = obj.toString();
         return str.startsWith(this.value);
     }
 

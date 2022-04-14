@@ -16,11 +16,14 @@ var state = {
     swaggerContent : null,
     apiInfoList: [],
     filters: [],
-    lastFetched: 0
+    lastFetched: 0,
+    parameters: [],
+    url: '',
+    method: ''
 }
 
 let functionCompareParamObj = (x, p) => {
-    return x.param === p.param && x.url === p.url && x.method === p.method && x.isHeader === p.isHeader && x.responseCode === p.responseCode && x.apiCollectionId === p.apiCollectionId
+    return x.url === p.url && x.method === p.method && x.apiCollectionId === p.apiCollectionId
 }
 
 const inventory = {
@@ -34,11 +37,22 @@ const inventory = {
             state.apiCollection = []
             state.apiCollectionName = ''
             state.swaggerContent = null
+            state.parameters = []
+            state.url = ''
+            state.method = ''
+        },
+        EMPTY_PARAMS (state) {
+            state.loading = false
+            state.parameters = []
+            state.url = ''
+            state.method = ''
         },
         SAVE_API_COLLECTION (state, info) {
             state.apiCollectionId = info.apiCollectionId
-            state.apiCollection = info.data.endpoints.filter(x => x.subType.name !== "NULL")
             state.apiCollectionName = info.data.name
+            state.apiCollection = info.data.endpoints.map(x => {return {...x._id, startTs: x.startTs}})
+            state.apiInfoList = info.data.apiInfoList
+
         },
         TOGGLE_SENSITIVE (state, p) {
             let sensitiveParamIndex = state.sensitiveParams.findIndex(x => {
@@ -70,10 +84,21 @@ const inventory = {
                 })
                 
                 if (apiCollectionIndex > -1) {
-                    state.apiCollection[apiCollectionIndex].savedAsSensitive = true
+                    if (!state.apiCollection[apiCollectionIndex].sensitive) {
+                        state.apiCollection[apiCollectionIndex].sensitive = new Set()
+                    }
+                    if (!p.subType) {
+                        p.subType = {"name": "CUSTOM"}
+                    }
+                    state.apiCollection[apiCollectionIndex].sensitive.add(p.subType)
                 }
             })
             state.apiCollection = [...state.apiCollection]
+        },
+        SAVE_PARAMS(state, {method, url, parameters}) {
+            state.method = method
+            state.url = url
+            state.parameters = parameters
         }
     },
     actions: {
@@ -86,19 +111,52 @@ const inventory = {
             if (shouldLoad) {
                 state.loading = true
             }
-            return api.getAPICollection(apiCollectionId).then((resp) => {
+            return api.fetchAPICollection(apiCollectionId).then((resp) => {
                 commit('SAVE_API_COLLECTION', {data: resp.data, apiCollectionId: apiCollectionId}, options)
-                api.listAllSensitiveFields().then(allSensitiveFields => {
-                    commit('SAVE_SENSITIVE', allSensitiveFields.data)
+                api.loadSensitiveParameters(apiCollectionId).then(allSensitiveFields => {
+                    commit('SAVE_SENSITIVE', allSensitiveFields.data.endpoints)
                 })
                 api.loadContent(apiCollectionId).then(resp => {
                     if(resp && resp.data && resp.data.content)
                         state.swaggerContent = JSON.parse(resp.data.content)
                 })
+                api.fetchFilters().then(resp => {
+                    let a = resp.runtimeFilters
+                    a.forEach(x => {
+                        state.filters[x.customFieldName] = x
+                    })
+                })
                 state.loading = false
             }).catch(() => {
                 state.loading = false
             })
+        },
+        loadParamsOfEndpoint({commit}, {apiCollectionId, url, method}) {
+            commit('EMPTY_PARAMS')
+            state.loading = true    
+            return api.loadParamsOfEndpoint(apiCollectionId, url, method).then(resp => {
+                api.loadSensitiveParameters(apiCollectionId, url, method).then(allSensitiveFields => {
+                    allSensitiveFields.data.endpoints.filter(x => x.sensitive).forEach(sensitive => {
+                        let index = resp.data.params.findIndex(x => 
+                            x.param === sensitive.param && 
+                            x.isHeader === sensitive.isHeader && 
+                            x.responseCode === sensitive.responseCode    
+                        )
+
+                        if (index > -1 && !sensitive.subType) {
+                            resp.data.params[index].savedAsSensitive = true
+                            if (!resp.data.params[index].subType) {
+                                resp.data.params[index].subType = {"name": "CUSTOM"}
+                            } else {
+                                resp.data.params[index].subType = JSON.parse(JSON.stringify(resp.data.params[index].subType))
+                            }
+                        }
+
+                    })
+                })
+                commit('SAVE_PARAMS', {parameters: resp.data.params, apiCollectionId, url, method})
+            })
+
         },
         toggleSensitiveParam({commit}, paramInfo) {
             return api.addSensitiveField(paramInfo).then(resp => {

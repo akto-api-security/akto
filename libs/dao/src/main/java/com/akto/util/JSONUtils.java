@@ -7,7 +7,25 @@ public class JSONUtils {
     private static void flatten(Object obj, String prefix, BasicDBObject ret) {        
         if (obj instanceof BasicDBObject) {
             BasicDBObject basicDBObject = (BasicDBObject) obj;
+
+            boolean anyAlphabetExists = false;
+
+            for(String cs: basicDBObject.keySet()) {
+                if (cs == null) {
+                    continue;
+                }
+                final int sz = cs.length();
+                for (int i = 0; i < sz; i++) {
+                    final char nowChar = cs.charAt(i);
+                    if (Character.isLetter(nowChar)) {
+                        anyAlphabetExists = true;
+                        break;
+                    }
+                }
+            }
+
             for(String key: basicDBObject.keySet()) {
+                key = anyAlphabetExists ? key: "NUMBER";
                 Object value = basicDBObject.get(key);
                 flatten(value, prefix + (prefix.isEmpty() ? "" : "#") + key, ret);
             }

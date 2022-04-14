@@ -80,7 +80,7 @@ public class PostmanAction extends UserAction {
         OpenAPI openAPI = com.akto.open_api.Main.init(apiCollectionId, new ArrayList<>(allEndpoints));
         String openAPIStringAll = com.akto.open_api.Main.convertOpenApiToJSON(openAPI);
 
-        Set<String> sensitiveEndpoints = SingleTypeInfoDao.instance.getSensitiveEndpoints(apiCollectionId);
+        Set<String> sensitiveEndpoints = SingleTypeInfoDao.instance.getSensitiveEndpoints(apiCollectionId, null,null);
         Set<String> customSensitiveEndpoints = SensitiveParamInfoDao.instance.getUniqueEndpoints(apiCollectionId);
         sensitiveEndpoints.addAll(customSensitiveEndpoints);
         openAPI = com.akto.open_api.Main.init(apiCollectionId, new ArrayList<>(sensitiveEndpoints));

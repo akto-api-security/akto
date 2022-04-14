@@ -39,7 +39,7 @@
         <div 
             class="inline-block-child"
             style="padding-left: 20px"
-            v-if="['REGEX', 'STARTS_WITH', 'ENDS_WITH'].includes(condition.type)"
+            v-if="['EQUALS_TO','REGEX', 'STARTS_WITH', 'ENDS_WITH'].includes(condition.type)"
         >
             <v-text-field
                 height="15px"
@@ -72,8 +72,12 @@ export default {
             ],
             operation_types: [
                 {
-                    "text": "starts with",
-                    "value": "STARTS_WITH"
+                    "text": "equals to",
+                    "value": "EQUALS_TO"
+                },
+                {
+                  "text": "starts with",
+                  "value": "STARTS_WITH"
                 },
                 {
                     "text": "ends with",

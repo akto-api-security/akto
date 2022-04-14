@@ -110,20 +110,20 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         List<SingleTypeInfo> singleTypeInfoList = SingleTypeInfoDao.instance.findAll(new BasicDBObject());
         assertEquals(singleTypeInfoList.size(),9);
 
-        Bson filter = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(null);
+        Bson filter = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(null,null,null);
 
         List<SingleTypeInfo> sensitiveSingleTypeInfos = SingleTypeInfoDao.instance.findAll(filter);
         assertEquals(sensitiveSingleTypeInfos.size(), 6);
 
 
-        Set<String> sensitiveEndpoints = SingleTypeInfoDao.instance.getSensitiveEndpoints(0);
+        Set<String> sensitiveEndpoints = SingleTypeInfoDao.instance.getSensitiveEndpoints(0, null, null);
         assertEquals(sensitiveEndpoints.size(), 4);
 
         SensitiveParamInfoDao.instance.insertOne(
                 new SensitiveParamInfo("I", "GET", 200, false, "param", 0, true)
         );
 
-        sensitiveEndpoints = SingleTypeInfoDao.instance.getSensitiveEndpoints(0);
+        sensitiveEndpoints = SingleTypeInfoDao.instance.getSensitiveEndpoints(0, null, null);
         assertEquals(sensitiveEndpoints.size(), 5);
     }
 }

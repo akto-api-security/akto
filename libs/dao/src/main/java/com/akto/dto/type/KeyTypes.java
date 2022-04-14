@@ -50,7 +50,9 @@ public class KeyTypes {
                         String userId, int apiCollectionId, String rawMessage, Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap) {
 
         String key = param.replaceAll("#", ".").replaceAll("\\.\\$", "");
-        SubType subType = findSubType(object,key);
+        String[] keyArr = key.split("\\.");
+        String lastField = keyArr[keyArr.length - 1];
+        SubType subType = findSubType(object,lastField);
 
         SingleTypeInfo singleTypeInfo = occurrences.get(subType);
         if (singleTypeInfo == null) {

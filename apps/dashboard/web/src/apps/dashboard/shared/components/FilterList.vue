@@ -4,6 +4,18 @@
             <div>{{title}}</div>
             <div>{{Object.values(checkedMap).filter(x => x).length}}/{{Object.values(checkedMap).length}}</div>
         </div>
+        <div v-if="!hideOperators" class="d-flex jc-end pr-2" style="background-color: #FFFFFF">
+            <v-btn 
+                v-for="key, index in operators" 
+                plain 
+                :ripple="false" 
+                :key="index"
+                @click=operatorClicked(key)
+                :class="['operator', selectedOperator === key ? 'underline': '']"
+            >
+                {{key}}
+            </v-btn>
+        </div>
         <v-list dense class="filter-list" :style="{'width':  width || '250px'}">
             <v-list-item v-if="items && items.length > 8">
                 <span>
@@ -67,7 +79,8 @@ export default {
     props: {
         title: obj.strR,
         items: obj.arrN,
-        width: obj.strN
+        width: obj.strN,
+        hideOperators: obj.boolN
     },
     data () {
         return {
@@ -78,13 +91,19 @@ export default {
             searchText: "",
             globalCheckbox: false,
             pageNumber: 1,
-            pageSize: 1000
+            pageSize: 1000,
+            operators: ['OR', 'AND', 'NOT'],
+            selectedOperator: 'OR'
         }
     },
     methods: {
+        operatorClicked(operator) {
+            this.selectedOperator = operator
+            this.$emit('operatorChanged', {operator})
+        },
         checkboxClicked(item) {
             this.checkedMap[item.value] = !this.checkedMap[item.value]
-            this.$emit('clickedItem', {item: item, checked: this.checkedMap[item.value]})
+            this.$emit('clickedItem', {item: item, checked: this.checkedMap[item.value], operator: this.selectedOperator})
         },
         textChanged () {
             if (this.searchText && this.searchText.length > 0) {
@@ -145,6 +164,14 @@ export default {
     background: white
     opacity: 1
     font-size: 14px
+.underline
+    text-decoration: underline 
+    color: #6200EA !important
+.operator
+    color: #47466A99
+    min-width: unset !important
+    padding: 0px 8px !important
+
 </style>
 
 <style scoped>

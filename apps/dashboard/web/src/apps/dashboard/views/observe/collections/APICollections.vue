@@ -60,7 +60,7 @@ export default {
                 },
                 {
                     text: "API Name",
-                    value: "name"
+                    value: "displayName"
                 },
                 {
                     text: "Endpoints",

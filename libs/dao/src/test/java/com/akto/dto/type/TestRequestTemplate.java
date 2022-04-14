@@ -5,6 +5,8 @@ import static org.junit.Assert.assertTrue;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.akto.dto.type.SingleTypeInfo.SuperType;
+import com.akto.dto.type.URLMethods.Method;
 
 import org.junit.Test;
 
@@ -33,15 +35,16 @@ public class TestRequestTemplate {
 
     @Test
     public void testCompareKeys() {
-        assertTrue(createRequestTemplate(true).compare(createRequestTemplate(true)));
-        assertTrue(!createRequestTemplate(false).compare(createRequestTemplate(true)));
-        assertTrue(!createRequestTemplate(false).compare(createRequestTemplate(false)));
+        URLTemplate urlTemplate = new URLTemplate(new String[]{""}, new SuperType[]{SuperType.STRING}, Method.POST);
+        assertTrue(createRequestTemplate(true).compare(createRequestTemplate(true), urlTemplate));
+        assertTrue(!createRequestTemplate(false).compare(createRequestTemplate(true), urlTemplate));
+        assertTrue(!createRequestTemplate(false).compare(createRequestTemplate(false), urlTemplate));
 
 
         RequestTemplate a = createRequestTemplate(true);
         a.getHeaders().put("h4", new KeyTypes());
-        assertTrue(!a.compare(createRequestTemplate(true)));
-        assertTrue(!createRequestTemplate(true).compare(a));
+        assertTrue(a.compare(createRequestTemplate(true), urlTemplate));
+        assertTrue(createRequestTemplate(true).compare(a, urlTemplate));
 
     }
 

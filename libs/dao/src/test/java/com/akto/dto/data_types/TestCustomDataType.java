@@ -3,6 +3,7 @@ package com.akto.dto.data_types;
 import com.akto.dto.CustomDataType;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -11,6 +12,14 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class TestCustomDataType {
+
+
+    @Test
+    public void testEmptyPredicatesValidate() {
+        Conditions conditions1 = new Conditions(new ArrayList<>(), Conditions.Operator.AND);
+        boolean r = conditions1.validate("something");
+        assertFalse(r);
+    }
 
     @Test
     public void testValidate() {

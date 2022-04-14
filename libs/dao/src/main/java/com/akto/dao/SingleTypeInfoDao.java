@@ -78,9 +78,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return instance.findDistinctFields("url", String.class, filter);
     }
 
-    public Bson filterForSensitiveParamsExcludingUserMarkedSensitive(Integer apiCollectionId) {
-        // apiCollectionId null then no filter for apiCollectionId
-
+    public List<String> sensitiveSubTypeNames() {
         List<String> sensitiveSubTypes = new ArrayList<>();
         // AKTO sensitive
         for (SingleTypeInfo.SubType subType: SingleTypeInfo.subTypeMap.values()) {
@@ -96,6 +94,13 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             }
         }
 
+        return sensitiveSubTypes;
+    }
+
+    public Bson filterForSensitiveParamsExcludingUserMarkedSensitive(Integer apiCollectionId, String url, String method) {
+        // apiCollectionId null then no filter for apiCollectionId
+        List<String> sensitiveSubTypes = sensitiveSubTypeNames();
+
         Bson alwaysSensitiveFilter = Filters.in("subType", sensitiveSubTypes);
 
         Bson sensitivityBasedOnPosition = Filters.and(
@@ -103,17 +108,25 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
                 Filters.gt("responseCode", -1)
         );
 
-        if (apiCollectionId != null) {
-            return Filters.and(
-                    Filters.eq("apiCollectionId", apiCollectionId),
-                    Filters.or(alwaysSensitiveFilter, sensitivityBasedOnPosition)
-            );
+        List<Bson> filters = new ArrayList<>();
+        filters.add(Filters.or(alwaysSensitiveFilter, sensitivityBasedOnPosition));
+
+        if (apiCollectionId != null && apiCollectionId >= 0) {
+            filters.add(Filters.eq("apiCollectionId", apiCollectionId) );
         }
 
-        return Filters.or(alwaysSensitiveFilter, sensitivityBasedOnPosition);
+        if (url != null) {
+            filters.add(Filters.eq("url", url));
+        }
+
+        if (method != null) {
+            filters.add(Filters.eq("method",method));
+        }
+
+        return Filters.and(filters);
     }
 
-    public Set<String> getSensitiveEndpoints(int apiCollectionId) {
+    public Set<String> getSensitiveEndpoints(int apiCollectionId, String url, String method) {
         Set<String> urls = new HashSet<>();
 
         // User manually set sensitive
@@ -127,7 +140,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             urls.add(sensitiveParamInfo.getUrl());
         }
 
-        Bson filter = filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId);
+        Bson filter = filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId, url, method);
 
         urls.addAll(instance.findDistinctFields("url", String.class, filter));
 

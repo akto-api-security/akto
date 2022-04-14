@@ -36,7 +36,7 @@ public class ApiCollectionsAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        ApiCollection apiCollection = new ApiCollection(Context.now(), collectionName,Context.now(),new HashSet<>());
+        ApiCollection apiCollection = new ApiCollection(Context.now(), collectionName,Context.now(),new HashSet<>(), null, 0);
         ApiCollectionsDao.instance.insertOne(apiCollection);
         this.apiCollections = new ArrayList<>();
         this.apiCollections.add(apiCollection);

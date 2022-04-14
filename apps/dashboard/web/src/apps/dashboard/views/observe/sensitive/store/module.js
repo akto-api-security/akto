@@ -27,8 +27,8 @@ const sensitive = {
             state.sensitiveParams = []
         },
         SAVE_API_COLLECTION (state, info) {
-            state.apiCollection = info.data.endpoints.filter(x => x.subType !== "NULL")
-            state.apiCollection.forEach(x => x.subType = x.subType || {"subType": {"name": "CUSTOM"}})
+            state.apiCollection = info.data.endpoints.filter(x => x.subType.name !== "NULL")
+            state.apiCollection.forEach(x => x.subType = x.subType || {"name": "CUSTOM"})
         },
         SAVE_SENSITIVE (state, fields) {
             state.sensitiveParams = fields
@@ -54,7 +54,7 @@ const sensitive = {
             if (shouldLoad) {
                 state.loading = true
             }
-            return api.loadSensitiveParameters().then((resp) => {
+            return api.loadSensitiveParameters(-1).then((resp) => {
                 commit('SAVE_API_COLLECTION', {data: resp.data}, options)
                 listAllSensitiveFields().then(allSensitiveFields => {
                     commit('SAVE_SENSITIVE', allSensitiveFields.data)

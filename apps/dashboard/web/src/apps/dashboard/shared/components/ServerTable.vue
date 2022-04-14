@@ -4,22 +4,23 @@
             :headers="headers"
             :items="filteredItems"
             class="board-table-cards keep-scrolling"
-            :search="search"
+            :server-items-length="total"
+            :options.sync="options"
             :sort-by="sortKey"
             :sort-desc="sortDesc"
-            :custom-sort="sortFunc"
-            :items-per-page="rowsPerPage"
+            :items-per-page="rowsPerPage"            
+            :hide-default-footer="false"
             :footer-props="{
-                showFirstLastPage: true,
+                showFirstLastPage: false,
                 prevIcon: '$fas_angle-left',
                 nextIcon: '$fas_angle-right',
-                'items-per-page-options': itemsPerPage
-                
+                'items-per-page-options': itemsPerPage                
             }"
-            :hide-default-footer="!enablePagination"
+
             hide-default-header
+            :loading="loading"
         >
-            <template v-slot:top="{ pagination, options, updateOptions }" v-if="items && items.length > 0">
+            <template v-slot:top="{ pagination, options, updateOptions }">
                 <div class="d-flex jc-sb">
                     <div v-if="showName" class="table-name">
                       {{name}}
@@ -29,43 +30,7 @@
                     </div>
                     <div class="d-flex jc-end">
                         <div class="d-flex board-table-cards jc-end">
-                            <div class="clickable download-csv ma-1">
-                                <v-tooltip bottom>
-                                    <template v-slot:activator="{on, attrs}">
-                                        <v-btn 
-                                            v-on="on"
-                                            v-bind="attrs" 
-                                            icon color="#47466A" @click="downloadData" v-if="!hideDownloadCSVIcon">
-                                                <v-icon>$fas_file-csv</v-icon>
-                                        </v-btn>
-                                    </template>
-                                    Download as CSV
-                                </v-tooltip>
-                                <v-tooltip bottom>
-                                    <template v-slot:activator="{on, attrs}">
-                                        <v-btn
-                                            v-on="on"
-                                            v-bind="attrs"
-                                            icon
-                                            color="#47466A"
-                                            @click="itemsPerPage = [-1]"
-                                            v-if="enablePagination && itemsPerPage[0] != -1"
-                                        >
-                                            <v-icon>$fas_angle-double-down</v-icon>
-                                        </v-btn>
-                                    </template>
-                                    Show all
-                                </v-tooltip>
-                                        <v-btn
-                                            icon
-                                            color="#47466A"
-                                            @click="itemsPerPage = [rowsPerPage]"
-                                            v-if="enablePagination && itemsPerPage[0] == -1"
-                                        >
-                                            <v-icon>$fas_angle-double-up</v-icon>
-                                        </v-btn>
-                            </div>
-                            <slot name="add-new-row-btn" :filteredItems=filteredItems />
+                            <slot name="add-new-row-btn"/>
                         </div>
                     </div>
                 </div>
@@ -73,7 +38,7 @@
             <template v-slot:footer.prepend="{}">
                 <v-spacer/>
             </template>
-            <template v-slot:header="{}" v-if="items && items.length > 0">
+            <template v-slot:header="{}">
                 <template v-for="(header, index) in headers">
                     <v-hover v-slot="{ hover }" :key="index">
                         <th
@@ -87,7 +52,7 @@
                                             {{header.text}} 
                                         </span>
                                         <span>
-                                            <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.value]"> 
+                                            <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.sortKey || header.value]"> 
                                                 <template v-slot:activator="{ on, attrs }">                         
                                                     <v-btn 
                                                         :ripple="false" 
@@ -96,17 +61,17 @@
                                                         primary 
                                                         icon
                                                         class="filter-icon" 
-                                                        :style="{display: hover || showFilterMenu[header.value] || filters[header.value].size > 0 ? '' : 'none'}"
+                                                        :style="{display: hover || showFilterMenu[header.sortKey || header.value] || !showHideFilterIcon(header.sortKey || header.value) ? '' : 'none'}"
                                                     >
                                                         <v-icon :size="14">$fas_filter</v-icon>
                                                     </v-btn>
                                                 </template>
-                                                <filter-list 
-                                                    :title="header.text" 
-                                                    :items="columnValueList[header.value]" 
-                                                    @clickedItem="appliedFilter(header.value, $event)" 
-                                                    @operatorChanged="operatorChanged(header.value, $event)"
-                                                    @selectedAll="selectedAll(header.value, $event)"
+                                                <filter-column
+                                                    :title="header.text"
+                                                    :typeAndItems="getColumnValueList(header.sortKey || header.value)" 
+                                                    @clickedItem="appliedFilter(header.sortKey || header.value, $event)" 
+                                                    @operatorChanged="operatorChanged(header.sortKey || header.value, $event)"
+                                                    @selectedAll="selectedAll(header.sortKey || header.value, $event)"
                                                 />
                                             </v-menu>
                                         </span>
@@ -156,21 +121,24 @@
 <script>
 
 import obj from "@/util/obj"
+import func from "@/util/func"
 import { saveAs } from 'file-saver'
 import ActionsTray from './ActionsTray'
-import FilterList from './FilterList'
+import FilterColumn from './FilterColumn'
 import SimpleTextField from '@/apps/dashboard/shared/components/SimpleTextField.vue'
 
 export default {
-    name: "SimpleTable",
+    name: "ServerTable",
     components: {
         ActionsTray,
-        FilterList,
+        FilterColumn,
         SimpleTextField
     },
     props: {
         headers: obj.arrR,
-        items: obj.arrR,
+        fetchParams: Function,
+        processParams: Function,
+        getColumnValueList: Function,
         name: obj.strN,
         sortKeyDefault: obj.strN,
         sortDescDefault: obj.boolN,
@@ -180,19 +148,27 @@ export default {
         showName: obj.boolN
     },
     data () {
-        let rowsPerPage = 50
+        let rowsPerPage = 20
         return {
+            options:{},
             rowsPerPage: rowsPerPage,
             itemsPerPage: [rowsPerPage],
+            filteredItems: [],
+            total: 0,
+            loading: true,
+            currPage: 1,
             search: null,
             sortKey: this.sortKeyDefault || null,
             sortDesc: this.sortDescDefault || false,
-            filters: this.headers.reduce((map, e) => {map[e.value] = new Set(); return map}, {}),
-            showFilterMenu: this.headers.reduce((map, e) => {map[e.value] = false; return map}, {}),
-            filterOperators: this.headers.reduce((map, e) => {map[e.value] = 'OR'; return map}, {})
+            filters: this.headers.reduce((map, e) => {map[e.sortKey || e.value] = new Set(); return map}, {}),
+            showFilterMenu: this.headers.reduce((map, e) => {map[e.sortKey || e.value] = false; return map}, {}),
+            filterOperators: this.headers.reduce((map, e) => {map[e.sortKey || e.value] = 'OR'; return map}, {})
         }
     },
     methods: {
+        showHideFilterIcon(hValue) {
+            return (this.filterOperators[hValue] === "OR" && this.filters[hValue].size == 0)
+        },
         selectedAll (hValue, {items, checked}) {
             for(var index in items) {
                 if (checked) {
@@ -202,18 +178,31 @@ export default {
                 }
             }
             this.filters = {...this.filters}
+            this.showHideFilterIcon(hValue)
+            this.options = {...this.options, page: 1}
         },
-        appliedFilter (hValue, {item, checked, operator}) { 
-            this.filterOperators[hValue] = operator || 'OR'
-            if (checked) {
-                this.filters[hValue].add(item.value)
+        appliedFilter (hValue, {item, checked, operator, type, min, max, searchText}) { 
+            if (type === "INTEGER") {
+                this.filters[hValue] = [min, max]
+            } else if (type === "SEARCH") {
+                this.filters[hValue] = [searchText]
             } else {
-                this.filters[hValue].delete(item.value)
+
+                this.filterOperators[hValue] = operator || 'OR'
+                if (checked) {
+                    this.filters[hValue].add(item.value)
+                } else {
+                    this.filters[hValue].delete(item.value)
+                }
             }
             this.filters = {...this.filters}
+            this.showHideFilterIcon(hValue)
+            this.options = {...this.options, page: 1}
         },
         operatorChanged(hValue, {operator}) {
             this.filterOperators[hValue] = operator || 'OR'
+            this.showHideFilterIcon(hValue)
+            this.options = {...this.options, page: 1}
         },
         valToString(val) {
             if (val instanceof Set) {
@@ -234,31 +223,46 @@ export default {
             });
             saveAs(blob, (this.name || "file") + ".csv");
         },
-        sortFunc(items, columnToSort, isDesc) {
-
-            if (!items || items.length == 0) {
-                return items
+        pageUpdateFunction(pageNum) {
+            this.currPage = pageNum
+            this.fetchRecentParams()
+        },
+        emptyArr(size) {
+            let ret = Array(size)
+            for(var i = 0; i < size; i ++) {
+                ret[i] = this.headers.reduce((z, e) => {
+                    z[e.value] = ''
+                    return z
+                }, {})
             }
-
-            if (!columnToSort || columnToSort === '') {
-                return
-            }
-
-            let sortKey = this.headers.find(x => x.value === columnToSort)
-            if (sortKey) {
-                columnToSort = sortKey
-            }
-
-            let ret = items.sort((a, b) => {
-                
-                let ret = a[columnToSort] > b[columnToSort] ? 1 : -1
-                if (isDesc[0]) {
-                    ret = -ret
-                }
-                return ret
-            })
 
             return ret
+        },
+        fetchRecentParams() {
+            const { sortBy, sortDesc, page, itemsPerPage } = this.options
+            this.currPage = page
+            this.rowsPerPage = itemsPerPage
+            let skip = (this.currPage-1)*this.rowsPerPage
+            this.fetchParams(sortBy[0], sortDesc[0] ? -1: 1, skip, this.rowsPerPage, this.filters, this.filterOperators).then(resp => {
+                this.loading = false
+                let params = resp.endpoints
+                let total = resp.total
+                this.total = total
+                let now = func.timeNow()
+                let listParams = params.filter(x => x.timestamp > now - func.recencyPeriod).map(this.processParams)
+                let sortedParams = listParams.sort((a, b) => {
+                    if (a.detectedTs > b.detectedTs + 3600) {
+                        return -1
+                    } else if (a.detectedTs < b.detectedTs - 3600) {
+                        return 1
+                    } else {
+                        return func.isSubTypeSensitive(a.x) > func.isSubTypeSensitive(b.x) ? -1 : 1
+                    }
+                })
+                this.filteredItems = sortedParams
+            }).catch(e => {
+                this.loading = false
+            })
         },
         setSortOrInvertOrder (header) {
             let headerSortKey = header.sortKey || header.value
@@ -267,7 +271,7 @@ export default {
             } else {
                 this.sortKey = headerSortKey
             }
-            // return this.sortFunc(this.items, this.sortKey, this.sortDesc)
+            this.fetchRecentParams()
         },
         filterFunc(item, header) {
             let itemValue = item[header]
@@ -295,42 +299,22 @@ export default {
                         return !selectedValues.has(itemValue)
                 }
             }
+        },
+        getDataFromApi () {
+            this.loading = true
+            this.fetchRecentParams()
         }
     },
-    computed: {
-        columnValueList: {
-            get () {
-                return this.headers.reduce((m, h) => {
-                    let allItemValues = []
-                    
-                    this.items.forEach(i => {
-                            let value = i[h.value]
-                            if (value instanceof Set) {
-                                allItemValues = allItemValues.concat(...value)
-                            } else if (value instanceof Array) {
-                                allItemValues = allItemValues.concat(...value)
-                            } else if (typeof value !== 'undefined') {
-                                return allItemValues.push(i[h.value])
-                            }
-                        }
-                    )
-
-                    let distinctItems = [...new Set(allItemValues.sort())]
-                    m[h.value] = distinctItems.map(x => {return {title: x, subtitle: '', value: x}})
-                    return m
-                }, {})
-            }
+    watch: {
+      options: {
+        handler () {
+          this.getDataFromApi()
         },
-        filteredItems() {
-            return this.items.filter((d) => {
-                return Object.keys(this.filters).every((f) => {
-                return this.filterFunc(d, f)
-                });
-            });
-        },
-        enablePagination() {
-            return this.items && this.items.length > this.rowsPerPage
-        } 
+        deep: true,
+      },
+    },
+    mounted () {
+        this.fetchRecentParams()
     }
 
 }

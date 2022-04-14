@@ -24,7 +24,7 @@ public class ApiAccessTypePolicyTest {
         HttpResponseParams httpResponseParams = generateHttpResponseParams(ipList);
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = apiAccessTypePolicy.findApiAccessType(httpResponseParams,apiInfo, null);
-        Assertions.assertTrue(result);
+        Assertions.assertFalse(result);
         Assertions.assertEquals(apiInfo.getApiAccessTypes().size(),1);
         Assertions.assertTrue(apiInfo.getApiAccessTypes().contains(ApiInfo.ApiAccessType.PUBLIC));
     }
@@ -36,7 +36,7 @@ public class ApiAccessTypePolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         apiInfo.getApiAccessTypes().add(ApiInfo.ApiAccessType.PRIVATE);
         boolean result = apiAccessTypePolicy.findApiAccessType(httpResponseParams,apiInfo, null);
-        Assertions.assertTrue(result);
+        Assertions.assertFalse(result);
         Assertions.assertEquals(apiInfo.getApiAccessTypes().size(), 2);
     }
 
@@ -67,7 +67,7 @@ public class ApiAccessTypePolicyTest {
         HttpResponseParams httpResponseParams = generateHttpResponseParams(ipList);
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = apiAccessTypePolicy.findApiAccessType(httpResponseParams,apiInfo, null);
-        Assertions.assertTrue(result);
+        Assertions.assertFalse(result);
         Assertions.assertEquals(apiInfo.getApiAccessTypes().size(), 1);
         Assertions.assertTrue(apiInfo.getApiAccessTypes().contains(ApiInfo.ApiAccessType.PUBLIC));
     }

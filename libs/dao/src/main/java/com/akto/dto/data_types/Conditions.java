@@ -16,6 +16,7 @@ public class Conditions {
     }
 
     public boolean validate(Object value) {
+        if (predicates == null || predicates.size() == 0) return false;
         boolean result = predicates.get(0).validate(value);
         for (int i = 1 ; i < this.predicates.size(); i++) {
             Predicate predicate = predicates.get(i);
