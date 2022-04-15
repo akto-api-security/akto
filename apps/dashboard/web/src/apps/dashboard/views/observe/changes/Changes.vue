@@ -1,5 +1,8 @@
 <template>
-    <div>
+    <div v-if="loading">
+        <spinner/>
+    </div>
+    <div v-else>
         <simple-layout title="API Changes"/>
         <div class="d-flex pa-4">
             <count-box title="New endpoints" :count="newEndpoints.length" colorTitle="Total" />
@@ -71,7 +74,7 @@
                         <sensitive-chip-group :sensitiveTags="[item.type]" />
                     </template>
                     
-                    <!-- <template #add-new-row-btn="{filteredItems}">
+                    <!-- <template #add-new-row-btn="{filters, filterOperators, sortKey, sortDesc, total}">
                         <div class="ma-1 d-flex">
                             <v-dialog
                                 :model="showDialog1"
@@ -96,8 +99,9 @@
                             </template>
                                 <batch-operation 
                                     title="Parameters" 
-                                    :items="filteredItems.filter(x => !isSubTypeSensitive(x.x)).map(toFilterListObj)" 
+                                    :itemsSearch="{filters, filterOperators, sortKey, sortDesc, total, isSensitive: true}" 
                                     operation-name="Mark sensitive"
+                                    :fetchParams="fetchRecentParams"
                                     @btnClicked="markAllSensitive(true, $event)"
                                 />
                             </v-dialog>
@@ -125,8 +129,9 @@
                             </template>
                                 <batch-operation 
                                     title="Parameters" 
-                                    :items="newParameters.filter(x => isSubTypeSensitive(x.x)).map(toFilterListObj)" 
+                                    :itemsSearch="{filters, filterOperators, sortKey, sortDesc, total, isSensitive: false}" 
                                     operation-name="Unmark sensitive"
+                                    :fetchParams="fetchSensitiveParams"
                                     @btnClicked="markAllSensitive(false, $event)"
                                 />
                             </v-dialog>
@@ -152,6 +157,8 @@ import constants from '@/util/constants'
 import {mapState} from 'vuex'
 import BatchOperation from './components/BatchOperation'
 import api from './api.js'
+import inventorApi from '../inventory/api.js'
+import Spinner from '@/apps/dashboard/shared/components/Spinner'
 
 export default {
     name: "ApiChanges",
@@ -165,7 +172,8 @@ export default {
         ServerTable,
         SensitiveChipGroup,
         LineChart,
-        BatchOperation
+        BatchOperation,
+        Spinner
     },
     data () {
         return {
@@ -328,15 +336,26 @@ export default {
                     return  {type: "SEARCH", values: []}
             }
         },
+        convertToObj(x) {
+            // x.param + " " + location + " " + x.method + " " + x.url + " " + apiCollectionName,
+            let arr = x.split(' ')
+            return {
+                param: arr[0],
+                method: arr[3],
+                url: arr[4],
+                isHeader: arr[2].toLowerCase().startsWith("header"),
+                responseCode: arr[1].toLowerCase().startsWith("request") ? -1 : (+arr[1]),
+                apiCollectionId: Object.entries(this.mapCollectionIdToName).find(x => arr[5] === x[1])[0]
+            }
+        },
         markAllSensitive (sensitive, {items}) {
-            let valueSet = new Set([...items.map(x => x.value)])
-            api.bulkMarkSensitive(sensitive, this.newParameters.filter(n => valueSet.has(this.toFilterListObj(n).value))).then(resp => {
+            let valueSet = items.map(x => this.convertToObj(x.value))
+            api.bulkMarkSensitive(sensitive, valueSet).then(resp => {
                 window._AKTO.$emit('SHOW_SNACKBAR', {
                     show: true,
                     text: `${items.length}` + ` items ${sensitive ? '':'un'}marked sensitive`,
                     color: 'green'
                 })
-                this.refreshPage(true)
             }).catch(() => {
                 window._AKTO.$emit('SHOW_SNACKBAR', {
                     show: true,
@@ -346,13 +365,6 @@ export default {
             })
             this.showDialog1 = false
             this.showDialog2 = false
-        },
-        toFilterListObj(x) {
-            return {
-                value: x.name + " " + x.location + " " + x.method + " " + x.endpoint + " " + x.apiCollectionName,
-                title: x.name,
-                subtitle: x.location + " " + x.method + " " + x.endpoint + " (" + x.apiCollectionName + ")"
-            }
         },
         prepareItemForTable(x) {
             let idToNameMap = this.mapCollectionIdToName
@@ -373,6 +385,11 @@ export default {
         },
         async fetchRecentParams(sortKey, sortOrder, skip, limit, filters, filterOperators) {
             return await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators)
+        },
+        async fetchSensitiveParams() {
+            return await inventorApi.listAllSensitiveFields().then(resp => {
+                return {endpoints: resp.data}
+            })
         },
         goToEndpoint (row) {
             let routeObj = {
@@ -430,7 +447,7 @@ export default {
         }
     },
     computed: {
-        ...mapState('changes', ['apiCollection', 'apiInfoList', 'lastFetched', 'sensitiveParams', 'data_type_names']),
+        ...mapState('changes', ['apiCollection', 'apiInfoList', 'lastFetched', 'sensitiveParams', 'loading', , 'data_type_names']),
         mapCollectionIdToName() {
             return this.$store.state.collections.apiCollections.reduce((m, e) => {
                 m[e.id] = e.displayName

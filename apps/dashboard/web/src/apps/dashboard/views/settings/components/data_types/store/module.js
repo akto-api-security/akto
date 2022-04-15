@@ -95,7 +95,7 @@ const data_types = {
                 commit('SET_DATA_TYPES', resp)
             })
         },
-        async createCustomDataType({commit, dispatch}, { data_type, save}) {
+        async createCustomDataType({commit, dispatch, state}, { data_type, save}) {
             let id = data_type["id"]
             let name = data_type["name"]
             let sensitiveAlways = data_type["sensitiveAlways"]
@@ -115,6 +115,9 @@ const data_types = {
                 let idx = 0;
                 let batchSize = 1000
                 while (idx < 20 && batchSize >= 1000) {
+                    if (state.reviewData && state.reviewData.length > 1000) {
+                        break
+                    }
                     idx += 1
                     let resp = await api.reviewCustomDataType(id,name,sensitiveAlways,operator,keyOperator, keyConditionFromUsers,valueOperator ,valueConditionFromUsers,active,idx)
                     commit("SET_REVIEW_DATA", resp);

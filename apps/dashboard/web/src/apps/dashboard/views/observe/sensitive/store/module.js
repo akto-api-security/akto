@@ -27,8 +27,12 @@ const sensitive = {
             state.sensitiveParams = []
         },
         SAVE_API_COLLECTION (state, info) {
-            state.apiCollection = info.data.endpoints.filter(x => x.subType.name !== "NULL")
-            state.apiCollection.forEach(x => x.subType = x.subType || {"name": "CUSTOM"})
+            state.apiCollection = info.data.endpoints.filter(x => {
+                if (!x.subType) {
+                    x.subType = {"name": "CUSTOM"}
+                }
+                return (x.subType.name !== "NULL")
+            })
         },
         SAVE_SENSITIVE (state, fields) {
             state.sensitiveParams = fields

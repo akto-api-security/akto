@@ -346,6 +346,8 @@ export default {
                     apiCollectionId: x.apiCollectionId,
                     last_seen: apiInfoMap[key] ? this.prettifyEpoch(apiInfoMap[key]["lastSeen"]) : 0,
                     detectedTs: x.startTs,
+                    changesCount: x.changesCount,
+                    changes: x.changesCount && x.changesCount > 0 ? (x.changesCount +" new parameter"+(x.changesCount > 1? "s": "")) : '-',
                     added: this.prettifyEpoch(x.startTs),
                     violations: apiInfoMap[key] ? apiInfoMap[key]["violations"] : {},
                     apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
@@ -371,6 +373,10 @@ export default {
     },
 
     recencyPeriod: 600 * 24 * 60 * 60,
+    toCommaSeparatedNumber(number) {
+        let nf = new Intl.NumberFormat('en-US');
+        return nf.format(number);      
+    },  
     sensitiveTagDetails(tag) {
         let icon = "$fas_info-circle"
         switch(tag) {

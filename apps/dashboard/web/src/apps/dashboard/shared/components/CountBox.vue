@@ -1,6 +1,6 @@
 <template>
   <div class="count-box" :style="containerCSS()">
-    <div class="count-value">{{count}}</div>
+    <div class="count-value">{{toCommaSeparatedNumber(count)}}</div>
     <div class="count-title">{{title}}</div>
   </div>
 </template>
@@ -20,6 +20,9 @@ export default {
     }
   },
   methods: {
+    toCommaSeparatedNumber(number) {
+      return func.toCommaSeparatedNumber(number)
+    },
     titleToTextColor() {
       var colors = func.actionItemColors()
       return colors[this.colorTitle || this.title]

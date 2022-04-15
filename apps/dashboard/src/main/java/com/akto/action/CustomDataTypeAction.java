@@ -436,6 +436,9 @@ public class CustomDataTypeAction extends UserAction{
                 if (!(regex instanceof String)) return null;
                 value = regex.toString();
                 if (value.length() == 0) return null;
+                if (value.startsWith("/")) {
+                    value = value.substring(1, value.lastIndexOf("/"));
+                }
                 predicate = new RegexPredicate(value);
                 return predicate;
             case STARTS_WITH:

@@ -222,7 +222,6 @@ export default {
                     value: 'method'
                 }
             ],
-            documentedURLs: {},
             downloadFileItems: [
                 {
                     label: "Download OpenAPI Spec",
@@ -333,17 +332,13 @@ export default {
             let collectionIdChanged = this.$store.state.inventory.apiCollectionId !== this.apiCollectionId
             if (collectionIdChanged || !shouldLoad || ((new Date() / 1000) - this.lastFetched > 60*5)) {
                 this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId, shouldLoad: shouldLoad})
-
-                api.fetchAllUrlsAndMethods(this.apiCollectionId).then(resp => {
-                    this.documentedURLs = resp.data || {}
-                })
             }
 
             this.$emit('mountedView', {type: 1, apiCollectionId: this.apiCollectionId})
         }
     },
     computed: {
-        ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'loading', 'swaggerContent', 'apiInfoList', 'filters', 'lastFetched']),
+        ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'loading', 'swaggerContent', 'apiInfoList', 'filters', 'lastFetched', 'documentedURLs']),
         openEndpoints() {
           return this.allEndpoints.filter(x => x.open)
         },
