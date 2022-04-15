@@ -30,6 +30,7 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
 
     @Test
     public void testInsertAndFetchAktoDefined() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
         SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(
                 "url", "GET",200, false, "param#key", SingleTypeInfo.EMAIL, 0
         );
@@ -45,6 +46,8 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
 
     @Test
     public void testInsertAndFetchCustom() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        CustomDataTypeDao.instance.getMCollection().drop();
         Context.accountId.set(1_000_000);
         Conditions keyConditions = new Conditions(Arrays.asList(new StartsWithPredicate("we"), new RegexPredicate("reg")), Conditions.Operator.AND);
         Conditions valueConditions = new Conditions(Collections.singletonList(new EndsWithPredicate("something")), Conditions.Operator.OR);
@@ -74,6 +77,7 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
 
 
     private WriteModel<SingleTypeInfo> createSingleTypeInfoUpdate(String url, String method, SingleTypeInfo.SubType subType, int apiCollectionId, int responseCode) {
+        SingleTypeInfoDao.instance.getMCollection().drop();
         SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(
                 url, method,responseCode, false, "param", subType, apiCollectionId
         );
@@ -85,6 +89,8 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
 
     @Test
     public void testFilterForSensitiveParamsExcludingUserMarkedSensitive() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        CustomDataTypeDao.instance.getMCollection().drop();
         Context.accountId.set(1_000_000);
         List<WriteModel<SingleTypeInfo>> bulkWrites = new ArrayList<>();
         bulkWrites.add(createSingleTypeInfoUpdate("A", "GET", SingleTypeInfo.EMAIL, 0,200));

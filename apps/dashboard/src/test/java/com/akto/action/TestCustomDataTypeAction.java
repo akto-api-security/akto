@@ -31,7 +31,7 @@ import static org.junit.Assert.*;
 
 public class TestCustomDataTypeAction extends MongoBasedTest {
 
-    public static void main(String[] args) throws Exception {
+    public static void main1(String[] args) throws Exception {
         DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
         Context.accountId.set(1_000_000);
         ArrayList<WriteModel<SampleData>> bulkUpdates = new ArrayList<>();
@@ -74,6 +74,8 @@ public class TestCustomDataTypeAction extends MongoBasedTest {
 
     @Test
     public void testGenerateCustomDataTypeHappy() {
+        Context.accountId.set(1_000_000);
+        CustomDataTypeDao.instance.getMCollection().drop();
         Map<String, Object> valueMap = new HashMap<>();
         valueMap.put("value", "wencludeCustom");
         CustomDataTypeAction customDataTypeAction = generateCustomDataTypeAction(
@@ -219,8 +221,9 @@ public class TestCustomDataTypeAction extends MongoBasedTest {
 
     @Test
     public void testToggleDataTypeActiveParam() {
-        CustomDataType customDataType = new CustomDataType("NAME1", true, Collections.emptyList(), 1, true, null,null, Conditions.Operator.AND);
+        Context.accountId.set(1_000_000);
         CustomDataTypeDao.instance.getMCollection().drop();
+        CustomDataType customDataType = new CustomDataType("NAME1", true, Collections.emptyList(), 1, true, null,null, Conditions.Operator.AND);
         CustomDataTypeDao.instance.insertOne(customDataType);
 
         CustomDataTypeAction customDataTypeAction = new CustomDataTypeAction();
@@ -228,12 +231,13 @@ public class TestCustomDataTypeAction extends MongoBasedTest {
         session.put("user", new User());
         customDataTypeAction.setSession(session);
         customDataTypeAction.setActive(false);
+        customDataTypeAction.setName("NAME1");
 
-        customDataTypeAction.fetchDataTypesForSettings();
+        customDataTypeAction.toggleDataTypeActiveParam();
         assertFalse(customDataTypeAction.getCustomDataType().isActive());
 
         CustomDataType customDataTypeFromDb = CustomDataTypeDao.instance.findOne(CustomDataType.NAME, "NAME1");
-        assertTrue(customDataTypeFromDb.isActive());
+        assertFalse(customDataTypeFromDb.isActive());
     }
 
 }
