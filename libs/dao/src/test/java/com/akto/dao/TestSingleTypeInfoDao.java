@@ -112,7 +112,7 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         bulkWrites.add(createSingleTypeInfoUpdate("G", "GET", SingleTypeInfo.EMAIL, 0,-1));
         bulkWrites.add(createSingleTypeInfoUpdate("H", "GET", SingleTypeInfo.EMAIL, 1,-1));
 
-        SingleTypeInfo.init();
+        SingleTypeInfo.fetchCustomDataTypes();;
 
         SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkWrites);
 
