@@ -67,6 +67,7 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
                 SingleTypeInfoDao.createFilters(singleTypeInfo), Updates.inc("count",1)
         );
 
+
         SingleTypeInfo singleTypeInfoFromDb = SingleTypeInfoDao.instance.findOne(new BasicDBObject());
 
         assertEquals(singleTypeInfoFromDb.getSubType(), customDataType.toSubType());
