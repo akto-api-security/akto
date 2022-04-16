@@ -58,7 +58,9 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         );
 
         CustomDataTypeDao.instance.insertOne(customDataType);
-        SingleTypeInfo.init();
+        SingleTypeInfo.fetchCustomDataTypes();
+
+        assertEquals(SingleTypeInfo.customDataTypeMap.keySet().size(), 1);
 
         SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(
                 "url", "GET",200, false, "param#key", customDataType.toSubType(), 0
@@ -71,6 +73,7 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
 
         SingleTypeInfo singleTypeInfoFromDb = SingleTypeInfoDao.instance.findOne(SingleTypeInfoDao.createFilters(singleTypeInfo));
 
+        assertEquals(singleTypeInfoFromDb.getParam(), "param#key");
         assertEquals(singleTypeInfoFromDb.getSubType(), customDataType.toSubType());
 
     }
