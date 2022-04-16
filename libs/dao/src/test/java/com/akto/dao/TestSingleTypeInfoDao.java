@@ -11,6 +11,7 @@ import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.utils.MongoBasedTest;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
@@ -68,12 +69,10 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         );
 
 
-        SingleTypeInfo singleTypeInfoFromDb = SingleTypeInfoDao.instance.findOne(new BasicDBObject());
+        SingleTypeInfo singleTypeInfoFromDb = SingleTypeInfoDao.instance.findOne(SingleTypeInfoDao.createFilters(singleTypeInfo));
 
         assertEquals(singleTypeInfoFromDb.getSubType(), customDataType.toSubType());
 
-        SingleTypeInfoDao.instance.getMCollection().drop();
-        CustomDataTypeDao.instance.getMCollection().drop();
     }
 
 
