@@ -58,6 +58,8 @@ public class DaoInit {
         ClassModel<RegexPredicate> regexPredicateClassModel = ClassModel.builder(RegexPredicate.class).enableDiscriminator(true).build();
         ClassModel<StartsWithPredicate> startsWithPredicateClassModel = ClassModel.builder(StartsWithPredicate.class).enableDiscriminator(true).build();
         ClassModel<EndsWithPredicate> endsWithPredicateClassModel = ClassModel.builder(EndsWithPredicate.class).enableDiscriminator(true).build();
+        ClassModel<EqualsToPredicate> equalsToPredicateClassModel = ClassModel.builder(EqualsToPredicate.class).enableDiscriminator(true).build();
+        ClassModel<IsNumberPredicate> isNumberPredicateClassModel = ClassModel.builder(IsNumberPredicate.class).enableDiscriminator(true).build();
         ClassModel<Conditions> conditionsClassModel = ClassModel.builder(Conditions.class).enableDiscriminator(true).build();
         ClassModel<CappedList>  cappedListClassModel = ClassModel.builder(CappedList.class).enableDiscriminator(true).build();
 
@@ -68,7 +70,8 @@ public class DaoInit {
                 thirdPartyAccessClassModel, credentialClassModel, apiTokenClassModel, apiInfoClassModel,
                 apiInfoKeyClassModel, customFilterClassModel, runtimeFilterClassModel, filterSampleDataClassModel,
                 predicateClassModel, conditionsClassModel, regexPredicateClassModel, startsWithPredicateClassModel, endsWithPredicateClassModel,
-                fieldExistsFilterClassModel, accountSettingsClassModel, responseCodeRuntimeFilterClassModel, cappedListClassModel).automatic(true).build());
+                fieldExistsFilterClassModel, accountSettingsClassModel, responseCodeRuntimeFilterClassModel, cappedListClassModel,
+                equalsToPredicateClassModel, isNumberPredicateClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
             new EnumCodec<>(Conditions.Operator.class),

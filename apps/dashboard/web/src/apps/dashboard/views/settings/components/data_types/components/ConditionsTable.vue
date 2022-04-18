@@ -1,10 +1,10 @@
 <template>
     <div style="width: 100%;">
         <div style="padding-bottom: 10px; font-weight: bold; display: inline-block">
-            <span>
+            <span style="color: #47466a">
                 {{table_header}}
             </span>
-            <v-icon v-if="!conditions || !conditions.predicates || conditions.predicates.length == 0" @click="addNewRow" class="addRowIcon">
+            <v-icon @click="addNewRow" class="addRowIcon">
                 $fas_plus
             </v-icon>
         </div>
@@ -14,29 +14,20 @@
                 :class="index == 0 ? 'condition-row first' : 'condition-row'"
             >
                 <v-hover v-slot="{ hover }">
-                    <v-row>
-                        <v-col cols="1" v-if="index !== 0">
-                            <operator-component :operator="conditions.operator" @operatorChanged="operatorChanged"/>
-                        </v-col>
-                        <v-col>
+                    <div style="display: flex; justify-content: space-between">
+                        <div style="display: flex">
+                            <div style="padding-right: 20px" v-if="index !== 0">
+                                <operator-component :operator="conditions.operator" @operatorChanged="operatorChanged"/>
+                            </div>
                             <simple-condition-component :initial_string="initial_string" :condition="condition"/>
-                        </v-col>
-                        <v-col cols="1">
+                        </div>
+                        <div>
                             <v-icon 
-                                v-if="index === conditions.predicates.length-1"
-                                @click="addNewRow" class="addRowIcon">
-                                $fas_plus
-                            </v-icon>
-                            <v-icon v-else>
-                            </v-icon>
-                            <v-icon 
-                                v-if="hover"
                                 @click="deleteRow(index)" class="addRowIcon">
                                 $fas_trash
                             </v-icon>
-                        </v-col>
-
-                    </v-row>
+                        </div>
+                    </div>
                 </v-hover>
             </div>
         </div>
@@ -120,6 +111,11 @@ export default {
     background: #edecf0 
     width: fit-content
     padding: 0px 10px 10px 10px
+
+
+.v-icon.v-icon:after
+    background-color: transparent
+
 
 </style>
 

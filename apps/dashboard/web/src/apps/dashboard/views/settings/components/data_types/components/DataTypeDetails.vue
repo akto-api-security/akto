@@ -1,39 +1,50 @@
 <template>
     <div style="padding: 24px; height: 100%" v-if="data_type_copy">
         <v-container>
-            <v-row style="height: 40px">
-                <v-col cols="2">
-                    <span style="color:grey; font-size: 16px; font-weight: bold">Name</span>
-                </v-col>
-                <v-col cols="9" style="padding-top: 0px">
+            <div style=" display: flex">
+                <div class="form-text">
+                    Name
+                </div>
+                <div style="padding-top: 0px">
                     <v-text-field
-                        height="20px"
                         placeholder="Add data type name"
-                        flat solo class="ma-0 pa-0"
+                        flat solo
+                        class="form-value"
                         :readonly="data_type_copy['createNew'] ? false:true"
                         v-model="data_type_copy.name"
                         :rules="name_rules"
+                        hide-details
                     />
-                </v-col>
-            </v-row>
+                </div>
+            </div>
 
-            <v-row style="height: 40px" v-if="computeUsername">
-                <v-col cols="2">
-                    <span style="color:grey; font-size: 16px; font-weight: bold">Creator</span>
-                </v-col>
-                <v-col cols="9" style="padding-top: 12px; padding-left: 25px">
-                    <span style="color:black; font-size: 16px">{{computeUsername}}</span>
-                </v-col>
-            </v-row>
+            <div style=" display: flex" v-if="data_type_copy.creatorId">
+                <div class="form-text">
+                    Creator
+                </div>
+                <div style="padding-top: 0px">
+                    <v-text-field
+                        flat solo class="ma-0 pa-0"
+                        readonly
+                        hide-details
+                        :value= computeUsername
+                    />
+                </div>
+            </div>
 
-            <v-row style="height: 40px" v-if="data_type_copy.timestamp">
-              <v-col cols="2">
-                <span style="color:grey; font-size: 16px; font-weight: bold">Last Updated</span>
-              </v-col>
-              <v-col cols="9" style="padding-top: 12px; padding-left: 25px">
-                <span style="color:black; font-size: 16px">{{computeLastUpdated}}</span>
-              </v-col>
-            </v-row>
+            <div style="display: flex" v-if="data_type_copy.timestamp">
+                <div class="form-text">
+                    Last Updated
+                </div>
+                <div style="padding-top: 0px">
+                    <v-text-field
+                        flat solo class="ma-0 pa-0"
+                        readonly
+                        hide-details
+                        :value= computeLastUpdated
+                    />
+                </div>
+            </div>
 
           <div v-if="data_type_copy.id || data_type_copy.createNew">
             <v-row style="padding: 36px 12px 12px 12px"  >
@@ -58,18 +69,18 @@
                     />
                 </v-row>
             </div>
-            <v-row style="height: 50px">
-                <v-col cols="2">
-                    <span style="color:grey; font-size: 16px; font-weight: bold">Sensitive</span>
-                </v-col>
-                <v-col
-                    cols="9"
+            <div style="display: flex">
+                <div class="form-text">
+                    Sensitive
+                </div>
+                <div
                     :class="data_type_copy.sensitiveAlways || data_type_copy.sensitivePosition.length > 0? 'sensitive-text true' : 'sensitive-text'"
                     @click="toggleSensitive"
+                    style="width: 80px"
                 >
                     {{computeSensitiveValue}}
-                </v-col>
-            </v-row>
+                </div>
+            </div>
             <v-row v-if="data_type_copy.id || data_type_copy.createNew" style="padding-top: 30px">
                 <div style="padding: 12px">
                   <v-btn
@@ -146,7 +157,9 @@ export default {
     },
     methods: {
         toggleSensitive() {
-            this.data_type_copy.sensitiveAlways = !this.data_type_copy.sensitiveAlways
+            if (this.data_type_copy.id || this.data_type_copy.createNew) {
+                this.data_type_copy.sensitiveAlways = !this.data_type_copy.sensitiveAlways
+            }
         },
         operatorChanged(value) {
             this.data_type_copy.operator = value
@@ -178,7 +191,7 @@ export default {
       ...mapState('data_types', ['data_type', 'usersMap', 'reviewData', 'current_sample_data_count', 'total_sample_data_count']),
       computeSensitiveValue() {
             if (this.data_type_copy) {
-                return this.data_type_copy.sensitiveAlways || this.data_type_copy.sensitivePosition.length > 0 ? "Yes" : "No"
+                return this.data_type_copy.sensitiveAlways || this.data_type_copy.sensitivePosition.length > 0
             }
         },
         showMainOperator() {
@@ -218,7 +231,14 @@ export default {
 
 <style lang="sass" scoped>
     .sensitive-text
-        padding-left: 24px
+        color:grey
+        font-size: 16px
+        font-weight: bold
+        width: 210px
+        align-items: center
+        display: flex
+        padding: 0px
+        padding-left: 12px
         &.true
             color: red
         &:hover
@@ -230,10 +250,22 @@ export default {
         font-weight: bold
 
     .review-btn
-        color: black
+        color: #47466a
         font-size: 20px
 
 
+    .form-text
+        color: grey
+        font-size: 16px
+        font-weight: bold
+        width: 200px
+        align-items: center
+        display: flex
+    
+</style>
 
-
+<style>
+    .v-input, .v-input input, .v-input textarea {
+        color:  #47466a !important
+    }
 </style>
