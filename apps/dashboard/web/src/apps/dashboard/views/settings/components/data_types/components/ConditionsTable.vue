@@ -21,7 +21,7 @@
                             </div>
                             <simple-condition-component :initial_string="initial_string" :condition="condition"/>
                         </div>
-                        <div>
+                        <div v-if="hover">
                             <v-icon 
                                 @click="deleteRow(index)" class="addRowIcon">
                                 $fas_trash
@@ -93,14 +93,14 @@ export default {
     width: 100%
     border-style: solid
     padding: 16px
-    border-color: #D3D3D3
-    border-top-width: 1px
-    border-bottom-width: 2px
-    border-left-width: 2px
-    border-right-width: 2px
+    border-color: rgba(71,70,106,0.2)
+    border-top-width: 0.5px
+    border-bottom-width: 1px
+    border-left-width: 1px
+    border-right-width: 1px
 
     &.first
-        border-top-width: 2px
+        border-top-width: 1px
 
 .addRowIcon
     color: #6200EA

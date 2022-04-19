@@ -35,10 +35,19 @@ public class SingleTypeInfo {
         try {
             List<CustomDataType> customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject());
             Map<String, CustomDataType> newMap = new HashMap<>();
+            List<CustomDataType> sensitiveCustomDataType = new ArrayList<>();
+            List<CustomDataType> nonSensitiveCustomDataType = new ArrayList<>();
             for (CustomDataType customDataType: customDataTypes) {
                 newMap.put(customDataType.getName(), customDataType);
+                if (customDataType.isSensitiveAlways()) {
+                    sensitiveCustomDataType.add(customDataType);
+                } else {
+                    nonSensitiveCustomDataType.add(customDataType);
+                }
             }
             customDataTypeMap = newMap;
+            sensitiveCustomDataType.addAll(nonSensitiveCustomDataType);
+            customDataTypesSortedBySensitivity = new ArrayList<>(sensitiveCustomDataType);
         } catch (Exception ex) {
             ex.printStackTrace(); // or logger would be better
         }
@@ -316,6 +325,7 @@ public class SingleTypeInfo {
 
     public static final Map<String, SubType> subTypeMap = new HashMap<>();
     public static Map<String, CustomDataType> customDataTypeMap = new HashMap<>();
+    public static List<CustomDataType> customDataTypesSortedBySensitivity = new ArrayList<>();
     static {
         subTypeMap.put("TRUE", TRUE);
         subTypeMap.put("FALSE", FALSE);

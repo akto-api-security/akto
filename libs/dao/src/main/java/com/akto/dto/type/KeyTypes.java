@@ -93,7 +93,7 @@ public class KeyTypes {
             return SingleTypeInfo.NULL;
         }
 
-        for (CustomDataType customDataType: SingleTypeInfo.customDataTypeMap.values()) {
+        for (CustomDataType customDataType: SingleTypeInfo.customDataTypesSortedBySensitivity) {
             if (!customDataType.isActive()) continue;
             boolean result = customDataType.validate(o,key);
             if (result) return customDataType.toSubType();

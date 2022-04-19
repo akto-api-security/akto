@@ -4,7 +4,7 @@
             <tr class="table-row d-flex" >
                 <td
                     class="table-column"
-                    :style="{'background-color': item.color, 'padding' : '0px !important', 'width':'6px'}"
+                    :style="{'background-color': item.color, 'padding' : '0px !important', 'min-width':'6px'}"
                 />
                 <td
                     class="table-column clickable"
@@ -63,12 +63,9 @@ export default {
 
 .table-column
     padding: 4px 8px !important
-    border-top: 1px solid #FFFFFF !important
-    border-bottom: 1px solid #FFFFFF !important
     color: #47466A
 
 .table-row
-    border: 0px solid #FFFFFF !important
     position: relative
     background: rgba(71, 70, 106, 0.03)
     height: 50px

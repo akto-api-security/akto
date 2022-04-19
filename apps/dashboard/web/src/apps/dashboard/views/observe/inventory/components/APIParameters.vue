@@ -87,7 +87,6 @@ export default {
         LineChart,
         Spinner,
         SampleData,
-        Spinner
     },
     props: {
         urlAndMethod: obj.strR,
@@ -220,7 +219,7 @@ export default {
 
             let numGenericParams = this.parameters.length - this.sensitiveParams.length
             let ret = Object.entries(this.sensitiveParams.reduce((z, e) => {
-                let key = func.isSubTypeSensitive(e) ? e.subType : 'Generic'
+                let key = func.isSubTypeSensitive(e) ? e.subType.name : 'Generic'
                 z[key] = (z[key] || 0) + 1
                 return z
             }, {})).map((x, i) => {

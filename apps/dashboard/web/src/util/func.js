@@ -1,3 +1,4 @@
+import vuetify from "../plugins/vuetify"
 export default {
     trackingPeriodStr: (num) => {
         switch (num) {
@@ -441,7 +442,7 @@ export default {
     prepareDataTypes(data_types) {
         if (data_types) {
             data_types.forEach((x) => {
-                x["color"] = x["sensitiveAlways"] || x["sensitivePosition"].length > 0 ? "red": "transparent"
+                x["color"] = x["sensitiveAlways"] || x["sensitivePosition"].length > 0 ? vuetify.userPreset.theme.themes.dark.redMetric : "transparent"
                 x["prefix"] = x["id"] ? "[custom]" : ""
                 if (x["id"]) {
                     if (!x["keyConditions"]) {

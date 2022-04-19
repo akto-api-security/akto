@@ -239,25 +239,44 @@ export default {
         display: flex
         padding: 0px
         padding-left: 12px
+        color: #47466A
         &.true
-            color: red
+            color: var(--v-redMetric-base)
         &:hover
             cursor: pointer
 
     .save-btn
-        color: white
-        font-size: 20px
-        font-weight: bold
+        background-color: #6200EA !important
+        font-size: 16px
+        font-weight: 600
+        vertical-align: middle
+        border-radius: 4px
+        text-transform: none
+        letter-spacing: normal
+        width: 100%
+        height: 48px !important
+        margin-bottom: 24px
+        color: #FFFFFF
+
+        &.v-btn--disabled
+            opacity: 0.3
 
     .review-btn
-        color: #47466a
-        font-size: 20px
+        font-size: 16px
+        font-weight: 600
+        vertical-align: middle
+        border-radius: 4px
+        text-transform: none
+        letter-spacing: normal
+        width: 100%
+        height: 48px !important
+        margin-bottom: 24px
+        color: #47466A
 
 
     .form-text
         color: grey
         font-size: 16px
-        font-weight: bold
         width: 200px
         align-items: center
         display: flex
