@@ -34,6 +34,8 @@ public class TestKeyTypes {
 
         SingleTypeInfo.customDataTypeMap.put("SHIPPING", customDataType1);
         SingleTypeInfo.customDataTypeMap.put("CAPTAIN", customDataType2);
+        SingleTypeInfo.customDataTypesSortedBySensitivity.add(customDataType1);
+        SingleTypeInfo.customDataTypesSortedBySensitivity.add(customDataType2);
 
         // not sensitive
         keyTypes.process(url,method,responseCode ,false ,"param1" ,"value1" ,
