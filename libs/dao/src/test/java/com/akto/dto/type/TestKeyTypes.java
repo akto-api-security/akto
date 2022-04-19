@@ -5,6 +5,7 @@ import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.StartsWithPredicate;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -34,6 +35,7 @@ public class TestKeyTypes {
 
         SingleTypeInfo.customDataTypeMap.put("SHIPPING", customDataType1);
         SingleTypeInfo.customDataTypeMap.put("CAPTAIN", customDataType2);
+        SingleTypeInfo.customDataTypesSortedBySensitivity = new ArrayList<>();
         SingleTypeInfo.customDataTypesSortedBySensitivity.add(customDataType1);
         SingleTypeInfo.customDataTypesSortedBySensitivity.add(customDataType2);
 
