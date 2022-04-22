@@ -368,6 +368,16 @@ export default {
         border-bottom: 1px solid #FFFFFF !important
         background: rgba(71, 70, 106, 0.03)
         color: #47466A
+        max-width: 250px
+        text-overflow: ellipsis
+        overflow : hidden
+        white-space: nowrap
+
+        &:hover
+            text-overflow: clip
+            white-space: normal
+            word-break: break-all
+
 
     .table-row
         border: 0px solid #FFFFFF !important

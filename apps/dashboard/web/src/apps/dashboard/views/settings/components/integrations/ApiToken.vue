@@ -6,28 +6,18 @@
       </v-avatar>
       <h2 style="color: #47466A; font-size: 16px; font-weight: 500" class="fd-column jc-sa">{{this.title}}</h2>
     </div>
-    <div style="padding-top: 20px;">
+    <div style="padding-top: 20px;" v-if="burp_tokens.length > 0">
       <div class="d-flex" v-for="item in burpTokensForTable" :key="item.id" style="padding-bottom: 30px">
         <v-hover v-slot="{ hover }">
           <div class="d-flex" style="height: 34px;   line-height: 34px;">
-            <div style="width: 150px; padding-top: 20px;">
-              <h4 style="font-weight: normal; color: #47466A; font-size: 13px">{{item.computedTime}}</h4>
+            <div style="width: 150px">
+              <h4 class="text-detail">{{item.computedTime}}</h4>
             </div>
-            <div style="width: 500px">
-              <v-text-field
-                  :type="openPasswordMap[item.id] ? 'text' : 'password'"
-                  :value="item.key"
-                  clearable
-                  height="32px"
-                  readonly
-              >
-                <template v-slot:append>
-                  <v-icon @click="eyeClicked(item)" class="icon-nav-drawer">{{openPasswordMap[item.id] ? '$fas_eye' : '$fas_eye-slash'}}</v-icon>
-                </template>
-              
-              </v-text-field>
+            <div style="width: 350px">
+              <span v-if="openPasswordMap[item.id]" class="text-detail">{{item.key}}</span>
+              <span v-else class="text-detail">********************************************************</span>
             </div>
-            <div v-if="hover" class="pt-4">
+            <div v-if="hover">
               <actions-tray :actions="actions || []" :subject=item></actions-tray>
             </div>
           </div>
@@ -62,12 +52,19 @@ export default {
       actions: [
         {
           isValid: item => true,
+          icon: item => this.openPasswordMap[item.id] ? '$fas_eye' : '$fas_eye-slash',
+          text: item => this.openPasswordMap[item.id] ? 'Show' : 'Hide',
+          func: item => this.eyeClicked(item),
+          success: (resp, item) => () => {console.log(item)},
+          failure: (err, item) => () => {console.log(item)}
+        },
+        {
+          isValid: item => true,
           icon: item => '$fas_trash',
           text: item => 'Delete',
           func: item => this.deleteBurpToken(item),
           success: (resp, item) => () => {console.log(item)},
           failure: (err, item) => () => {console.log(item)},
-
         }
       ]
     }
@@ -83,17 +80,28 @@ export default {
       this.$emit("generateToken")
     },
     eyeClicked(item) {
-      this.openPasswordMap[item.id] = !this.openPasswordMap[item.id]
+      return new Promise((resolve, reject) => {
+        this.openPasswordMap[item.id] = !this.openPasswordMap[item.id]
+      })
     },
   },
   computed: {
     burpTokensForTable() {
       return this.burp_tokens.map(c => {
-        this.openPasswordMap[c.id] = false
         c.computedTime = func.prettifyEpoch(c.timestamp)
         c.openPassword = false
         return c
       })
+    }
+  },
+  watch: {
+    burp_tokens: {
+      handler() {
+        this.openPasswordMap = this.burp_tokens.reduce((m, c) => {
+                          m[c.id] = false
+                          return m
+                        }, {})        
+      }
     }
   }
 }
@@ -102,4 +110,8 @@ export default {
 <style scoped lang="sass">
 .icon-nav-drawer
   padding-top: 25px  
+.text-detail
+  font-weight: normal
+  color: #47466A
+  font-size: 13px  
 </style>

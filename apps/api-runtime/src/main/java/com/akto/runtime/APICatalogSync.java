@@ -77,6 +77,11 @@ public class APICatalogSync {
         }
         if (statusCode >= 200 && statusCode < 300) {
             String reqPayload = requestParams.getPayload();
+
+            if (reqPayload == null || reqPayload.isEmpty()) {
+                reqPayload = "{}";
+            }
+
             requestTemplate.processHeaders(requestParams.getHeaders(), baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig());
             if(reqPayload.startsWith("[")) {
                 reqPayload = "{\"json\": "+reqPayload+"}";
