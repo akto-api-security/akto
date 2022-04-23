@@ -109,7 +109,7 @@ public class TestDump2 {
         aggr.addURL(httpResponseParams);
         sync.computeDelta(aggr, false, 0);
         APICatalogSync.DbUpdateReturn dbUpdateReturn = sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0));
-        assertEquals(16, dbUpdateReturn.bulkUpdatesForSingleTypeInfo.size());
+        assertEquals(15, dbUpdateReturn.bulkUpdatesForSingleTypeInfo.size());
         assertEquals(2, sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size());        
         assertEquals(1, sync.getDBUpdatesForSampleData(0, sync.getDelta(0)).size());        
     }
