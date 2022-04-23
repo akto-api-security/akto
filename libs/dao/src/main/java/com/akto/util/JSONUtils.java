@@ -12,7 +12,7 @@ public class JSONUtils {
 
             Set<String> keySet = basicDBObject.keySet();
 
-            if (keySet == null || keySet.isEmpty()) {
+            if (prefix != null && !prefix.isEmpty() && (keySet == null || keySet.isEmpty())) {
                 ret.put(prefix, obj);
             }
 
