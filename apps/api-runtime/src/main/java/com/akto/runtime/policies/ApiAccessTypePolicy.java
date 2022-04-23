@@ -23,6 +23,12 @@ public class ApiAccessTypePolicy {
     public boolean findApiAccessType(HttpResponseParams httpResponseParams, ApiInfo apiInfo, RuntimeFilter filter) {
         if (privateCidrList == null || privateCidrList.isEmpty()) return false;
         List<String> ipList = httpResponseParams.getRequestParams().getHeaders().get(X_FORWARDED_FOR);
+        String sourceIP = httpResponseParams.getSourceIP();
+
+        if (sourceIP != null && !sourceIP.isEmpty()) {
+            ipList.add(sourceIP);
+        }
+
         if (ipList == null) {
             logger.info("Could not find " + X_FORWARDED_FOR + " header in API request");
             return false;

@@ -220,6 +220,10 @@ export default {
                 {
                     text: 'Method',
                     value: 'method'
+                },
+                {
+                    text: 'Last seen',
+                    value: 'lastSeen'
                 }
             ],
             downloadFileItems: [
@@ -338,7 +342,7 @@ export default {
         }
     },
     computed: {
-        ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'loading', 'swaggerContent', 'apiInfoList', 'filters', 'lastFetched', 'documentedURLs']),
+        ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'loading', 'swaggerContent', 'apiInfoList', 'filters', 'lastFetched', 'documentedURLs', 'apiInfoList']),
         openEndpoints() {
           return this.allEndpoints.filter(x => x.open)
         },
@@ -353,6 +357,7 @@ export default {
         },
         unusedEndpoints () {
             let ret = []
+            console.log("unusedEndpoints")
             Object.entries(this.documentedURLs).forEach(entry => {
                 let endpoint = entry[0]
                 entry[1].forEach(method => {
@@ -360,11 +365,23 @@ export default {
                         ret.push({
                             endpoint, 
                             method,
+                            lastSeen: 'in API spec file',
                             color: func.actionItemColors()["This week"]
                         })
                     }
                 })
             })
+            this.apiInfoList.forEach(apiInfo => {
+                if (apiInfo.lastSeen < (func.timeNow() - func.recencyPeriod)) {
+                    ret.push({
+                        endpoint: apiInfo.id.url, 
+                        method: apiInfo.id.method,
+                        lastSeen: func.prettifyEpoch(apiInfo.lastSeen),
+                        color: func.actionItemColors()["This week"]
+                    })
+                }
+            })
+
             return ret
         }
     },

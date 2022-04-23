@@ -79,6 +79,11 @@ public class APICatalogSync {
         }
         if (statusCode >= 200 && statusCode < 300) {
             String reqPayload = requestParams.getPayload();
+
+            if (reqPayload == null || reqPayload.isEmpty()) {
+                reqPayload = "{}";
+            }
+
             requestTemplate.processHeaders(requestParams.getHeaders(), baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap);
             if(reqPayload.startsWith("[")) {
                 reqPayload = "{\"json\": "+reqPayload+"}";
@@ -414,6 +419,13 @@ public class APICatalogSync {
                     processResponse(requestTemplate, responseParamsList, deletedInfo);
                     iterator.remove();
                 }
+
+                RequestTemplate strictMatchInDelta = deltaCatalog.getStrictURLToMethods().get(url);
+                if (strictMatchInDelta != null) {
+                    processResponse(strictMatchInDelta, responseParamsList, deletedInfo);
+                    iterator.remove();
+                }
+
             }
         } catch (Exception e) {
             logger.info(e.getMessage(), e);

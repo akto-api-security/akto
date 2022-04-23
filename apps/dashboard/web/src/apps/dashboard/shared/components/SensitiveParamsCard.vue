@@ -4,11 +4,11 @@
             <div class="pa-6">
                 <donut-chart name="Total" :size="220" :data=sensitiveParams />
             </div>
-            <div class="legend-container ml-4">
+            <div class="legend-container ml-8">
                 <div v-for="(item, index) in sensitiveParams" :key="index" class="pa-2">
                     <v-avatar
                     :color="item.color"
-                    :size="26"
+                    :size="13"
                     v-bind="{}"
                     v-on="{}"
                     >

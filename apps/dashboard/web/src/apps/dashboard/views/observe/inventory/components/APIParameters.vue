@@ -258,7 +258,7 @@ export default {
 
         let now = func.timeNow()
         this.loadingTrafficData = true
-        let resp = await api.fetchEndpointTrafficData(this.url, this.apiCollectionId, this.method, now - 600 * 24 * 60 * 60, now)
+        let resp = await api.fetchEndpointTrafficData(this.url, this.apiCollectionId, this.method, now - 60 * 24 * 60 * 60, now)
         this.loadingTrafficData = false
         this.trafficInfo = resp.traffic
 

@@ -9,13 +9,18 @@ function resolve (dir) {
       return path.join(__dirname, '..', dir)
 }
 
+function hashGenerator() {
+  return 1
+}
+
+process.env.HASH = hashGenerator()
 
 module.exports = {
   entry: {"babel-polyfill": "babel-polyfill", main: './web/src/apps/main/main.js', chrome_plugin: './web/src/apps/chrome_plugin/main.js'},
   output: {
     path: path.resolve(__dirname, './dist'),
     publicPath: '/dist/',
-    filename: '[name].js'
+    filename: '[name]'+process.env.HASH+'.js'
   },
   module: {
     rules: [
