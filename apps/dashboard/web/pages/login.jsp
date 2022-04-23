@@ -50,7 +50,10 @@ navigator.serviceWorker.register('/sw.js').then(function(reg) {
     window.SIGNUP_EMAIL_ID = '${signupEmailId}'
     // Enabling the debug mode flag is useful during implementation,
     // but it's recommended you remove it for production
-    mixpanel.init('c403d0b00353cc31d7e33d68dc778806', {debug: false, ignore_dnt:true}); 
+
+    if (!window.USER_NAME || window.USER_NAME.indexOf("@akto.io") == -1) {
+        mixpanel.init('c403d0b00353cc31d7e33d68dc778806', {debug: false, ignore_dnt:true}); 
+    }
    // mixpanel.track('Login');
     
 
