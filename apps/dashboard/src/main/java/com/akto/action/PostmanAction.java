@@ -165,9 +165,14 @@ public class PostmanAction extends UserAction {
 
     private List<BasicDBObject> workspaces;
     public String fetchWorkspaces() {
+        workspaces = new ArrayList<>();
+        if (api_key == null || api_key.isEmpty()) {
+            return SUCCESS.toUpperCase();
+        }
+
         Main main = new Main(api_key);
         JsonNode postmanCollection = main.fetchWorkspaces();
-        workspaces = new ArrayList<>();
+        
         if (postmanCollection == null) return SUCCESS.toUpperCase();
         Iterator<JsonNode> a = postmanCollection.elements();
         while (a.hasNext()) {
