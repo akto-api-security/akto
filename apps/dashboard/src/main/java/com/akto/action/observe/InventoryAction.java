@@ -59,7 +59,7 @@ public class InventoryAction extends UserAction {
         return list;
     }
 
-    public final static int deltaPeriodValue = 600 * 24 * 60 * 60;
+    public final static int deltaPeriodValue = 60 * 24 * 60 * 60;
 
     public List<BasicDBObject> fetchRecentEndpoints() {
         List<Bson> pipeline = new ArrayList<>();
