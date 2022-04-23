@@ -74,7 +74,7 @@
             <template slot="Deprecated">
                 <simple-table 
                     :headers=unusedHeaders 
-                    :items=unusedEndpoints 
+                    :items=deprecatedEndpoints
                     name="Deprecated"
                 />
             </template>
@@ -260,12 +260,6 @@ export default {
             else
                 return '-'
         },
-        isShadow(x) {
-            return !(this.documentedURLs[x.endpoint] && this.documentedURLs[x.endpoint].indexOf(x.method) != -1)
-        },
-        isUnused(url, method) {
-            return this.allEndpoints.filter(e => e.endpoint === url && e.method == method).length == 0
-        },
         handleFileChange({file}) {
             if (!file) {
                 this.content = null
@@ -338,7 +332,7 @@ export default {
         }
     },
     computed: {
-        ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'loading', 'swaggerContent', 'apiInfoList', 'filters', 'lastFetched', 'documentedURLs']),
+        ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'loading', 'swaggerContent', 'apiInfoList', 'filters', 'lastFetched', 'unusedEndpoints']),
         openEndpoints() {
           return this.allEndpoints.filter(x => x.open)
         },
@@ -349,22 +343,23 @@ export default {
             return this.allEndpoints.filter(x => x.sensitive && x.sensitive.size > 0)
         },
         shadowEndpoints () {
-            return this.allEndpoints.filter(x => this.isShadow(x))
+            return this.allEndpoints.filter(x => x.shadow)
         },
-        unusedEndpoints () {
+        deprecatedEndpoints() {
             let ret = []
-            Object.entries(this.documentedURLs).forEach(entry => {
-                let endpoint = entry[0]
-                entry[1].forEach(method => {
-                    if(this.isUnused(endpoint, method)) {
-                        ret.push({
-                            endpoint, 
-                            method,
-                            color: func.actionItemColors()["This week"]
-                        })
-                    }
+            try {
+                this.unusedEndpoints.forEach((x) => {
+                    if (!x) return;
+                    let arr = x.split(" ");
+                    if (arr.length < 2) return;
+                    ret.push({
+                      endpoint : arr[0],
+                      method : arr[1],
+                      color: func.actionItemColors()["This week"]
+                    })
                 })
-            })
+            } catch (e) {
+            }
             return ret
         }
     },

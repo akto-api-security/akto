@@ -1,29 +1,21 @@
 package com.akto.action.observe;
 
+import java.net.URI;
 import java.util.*;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import com.akto.action.UserAction;
 import com.akto.dao.APISpecDao;
-import com.akto.dao.CustomDataTypeDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.APISpec;
-import com.akto.dto.CustomDataType;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ExplainVerbosity;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
@@ -32,13 +24,15 @@ import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import com.opensymphony.xwork2.Action;
 
+import io.swagger.v3.oas.models.Operation;
+import io.swagger.v3.oas.models.PathItem;
+import io.swagger.v3.oas.models.servers.Server;
 import org.bson.conversions.Bson;
 
 import io.swagger.parser.OpenAPIParser;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Paths;
 import io.swagger.v3.parser.core.models.SwaggerParseResult;
-import org.bson.conversions.Bson;
 
 public class InventoryAction extends UserAction {
 
@@ -135,10 +129,136 @@ public class InventoryAction extends UserAction {
 
         response.put("data", new BasicDBObject("endpoints", list).append("apiInfoList", apiInfoList));
     }
-    
+
+    public static String retrievePath(String url) {
+        URI uri = URI.create(url);
+        String prependPath = uri.getPath();
+        if (!prependPath.startsWith("/")) prependPath = "/" + prependPath;
+        if (prependPath.endsWith("/")) prependPath = prependPath.substring(0, prependPath.length()-1);
+        return prependPath;
+    }
+
+    // todo: handle null
+    public static Set<String> fetchSwaggerData(List<BasicDBObject> endpoints, OpenAPI openAPI) {
+        List<Server> servers = openAPI.getServers();
+
+        List<String> prependPaths = new ArrayList<>();
+        if (servers == null) {
+            servers = new ArrayList<>();
+            servers.add(new Server().url("/"));
+        }
+
+        for (Server server: servers) {
+            String url = server.getUrl();
+            String prependPath = retrievePath(url);
+            prependPaths.add(prependPath);
+        }
+
+        Paths paths = openAPI.getPaths();
+
+        Set<String> strictPathsSet = new HashSet<>();
+        Map<String, PathItem> templatePathsMap = new HashMap<>();
+        Set<String> unused = new HashSet<>();
+
+        for(String path: paths.keySet()) {
+            PathItem pathItem = paths.get(path);
+            if (pathItem == null) continue;
+
+            if (path.contains("{")) {
+                for (String prependPath: prependPaths) {
+                    String finalUrl = prependPath + path;
+                    templatePathsMap.put(finalUrl, pathItem);
+                    for (PathItem.HttpMethod pathMethod: pathItem.readOperationsMap().keySet()) {
+                        unused.add(finalUrl + " " + pathMethod);
+                    }
+                }
+                continue;
+            }
+
+            for (PathItem.HttpMethod operationType: pathItem.readOperationsMap().keySet()) {
+                String method = operationType.toString().toUpperCase();
+                for (String prependPath: prependPaths) {
+                    String finalUrl = prependPath + path;
+                    strictPathsSet.add(finalUrl + " " + method);
+                    unused.add(finalUrl + " " + method);
+                }
+            }
+        }
+
+        for (BasicDBObject endpoint: endpoints) {
+            String endpointUrl = (String) ((BasicDBObject) endpoint.get("_id")).get("url");
+            // clean endpoint
+            String path = retrievePath(endpointUrl);
+            String method = (String) ((BasicDBObject) endpoint.get("_id")).get("method");
+            if (!path.startsWith("/")) path = "/" + path;
+            // match with strict
+            String endpointKey =  path + " " + method;
+            if (strictPathsSet.contains(endpointKey)) {
+                unused.remove(endpointKey);
+                continue;
+            }
+
+            boolean matched = false;
+            // if not then loop over templates
+            for (String p: templatePathsMap.keySet()) {
+                if (matched) break;
+                // check if method exists
+                Operation operation = templatePathsMap.get(p).readOperationsMap().get(PathItem.HttpMethod.valueOf(method));
+                if (operation == null) continue;
+
+                // check if same length
+                String[] q = p.split("/");
+                String[] r = endpointUrl.split("/");
+                if (q.length != r.length) continue;
+
+                // loop over
+                boolean flag = true;
+                for (int i =0; i < q.length; i ++) {
+                    if (Objects.equals(q[i], r[i]) ) continue;
+                    if ((Objects.equals(r[i], "STRING") || Objects.equals(r[i], "INTEGER")) && q[i].contains("{")) continue;
+
+                    flag = false;
+                    break;
+                }
+
+                if (flag) {
+                    unused.remove(p + " " + method);
+                    matched = true;
+                }
+
+            }
+
+            if (!matched) {
+                endpoint.append("shadow",true);
+            }
+        }
+
+
+        return unused;
+    }
+
     public String fetchAPICollection() {
         List<BasicDBObject> list = fetchEndpointsInCollection(apiCollectionId);
+
+        APISpec apiSpec = APISpecDao.instance.findById(apiCollectionId);
+        Set<String> unused = null;
+        try {
+            if (apiSpec != null) {
+                SwaggerParseResult result = new OpenAPIParser().readContents(apiSpec.getContent(), null, null);
+                OpenAPI openAPI = result.getOpenAPI();
+                unused = fetchSwaggerData(list, openAPI);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
         attachAPIInfoListInResponse(list);
+
+        if (unused == null) {
+            unused = new HashSet<>();
+        }
+        response.put("unusedEndpoints", unused);
+
         return Action.SUCCESS.toUpperCase();
     }
 

@@ -337,6 +337,7 @@ export default {
                 let authType = apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].join(" or ") : ""
 
                 ret[key] = {
+                    shadow: x.shadow ? x.shadow : false,
                     sensitive: x.sensitive,
                     endpoint: x.url,
                     parameterisedEndpoint: this.parameterizeUrl(x.url),
