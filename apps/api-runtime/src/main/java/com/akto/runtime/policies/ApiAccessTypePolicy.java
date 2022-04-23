@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.web.util.matcher.IpAddressMatcher;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class ApiAccessTypePolicy {
@@ -23,15 +24,15 @@ public class ApiAccessTypePolicy {
     public boolean findApiAccessType(HttpResponseParams httpResponseParams, ApiInfo apiInfo, RuntimeFilter filter) {
         if (privateCidrList == null || privateCidrList.isEmpty()) return false;
         List<String> ipList = httpResponseParams.getRequestParams().getHeaders().get(X_FORWARDED_FOR);
+
+        if (ipList == null) {
+            ipList = new ArrayList<>();
+        }
+
         String sourceIP = httpResponseParams.getSourceIP();
 
         if (sourceIP != null && !sourceIP.isEmpty()) {
             ipList.add(sourceIP);
-        }
-
-        if (ipList == null) {
-            logger.info("Could not find " + X_FORWARDED_FOR + " header in API request");
-            return false;
         }
 
         for (String ip: ipList) {
