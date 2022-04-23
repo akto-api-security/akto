@@ -357,7 +357,6 @@ export default {
         },
         unusedEndpoints () {
             let ret = []
-            console.log("unusedEndpoints")
             Object.entries(this.documentedURLs).forEach(entry => {
                 let endpoint = entry[0]
                 entry[1].forEach(method => {
