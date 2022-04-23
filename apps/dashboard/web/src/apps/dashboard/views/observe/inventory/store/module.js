@@ -14,13 +14,13 @@ var state = {
     apiCollection: [],
     sensitiveParams: [],
     swaggerContent : null,
-    documentedURLs: {},
     apiInfoList: [],
     filters: [],
     lastFetched: 0,
     parameters: [],
     url: '',
-    method: ''
+    method: '',
+    unusedEndpoints: []
 }
 
 let functionCompareEndpoint = (x, p) => {
@@ -45,7 +45,6 @@ const inventory = {
             state.parameters = []
             state.url = ''
             state.method = ''
-            state.documentedURLs = {}
         },
         EMPTY_PARAMS (state) {
             state.loading = false
@@ -56,8 +55,9 @@ const inventory = {
         SAVE_API_COLLECTION (state, info) {
             state.apiCollectionId = info.apiCollectionId
             state.apiCollectionName = info.data.name
-            state.apiCollection = info.data.endpoints.map(x => {return {...x._id, startTs: x.startTs, changesCount: x.changesCount}})
+            state.apiCollection = info.data.endpoints.map(x => {return {...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false}})
             state.apiInfoList = info.data.apiInfoList
+            state.unusedEndpoints = info.unusedEndpoints
 
         },
         TOGGLE_SENSITIVE (state, p) {
@@ -121,16 +121,13 @@ const inventory = {
                 state.loading = true
             }
             return api.fetchAPICollection(apiCollectionId).then((resp) => {
-                commit('SAVE_API_COLLECTION', {data: resp.data, apiCollectionId: apiCollectionId}, options)
+                commit('SAVE_API_COLLECTION', {data: resp.data, apiCollectionId: apiCollectionId, unusedEndpoints: resp.unusedEndpoints}, options)
                 api.loadSensitiveParameters(apiCollectionId).then(allSensitiveFields => {
                     commit('SAVE_SENSITIVE', allSensitiveFields.data.endpoints)
                 })
                 api.loadContent(apiCollectionId).then(resp => {
                     if(resp && resp.data && resp.data.content)
                         state.swaggerContent = JSON.parse(resp.data.content)
-                })
-                api.fetchAllUrlsAndMethods(apiCollectionId).then(resp => {
-                    state.documentedURLs = resp.data || {}
                 })
                 api.fetchFilters().then(resp => {
                     let a = resp.runtimeFilters
@@ -228,6 +225,7 @@ const inventory = {
         }) > 0,
         getApiInfoList: (state) => state.apiInfoList,
         getFilters: (state) => state.filters,
+        getUnusedEndpoints: (state) => state.unusedEndpoints,
     }
 }
 

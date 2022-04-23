@@ -69,6 +69,7 @@ public class APICatalogSync {
         String urlWithParams = requestParams.getURL();
         String methodStr = requestParams.getMethod();
         URLStatic baseURL = URLAggregator.getBaseURL(urlWithParams, methodStr);
+        responseParams.requestParams.url = baseURL.getUrl();
         BasicDBObject queryParams = URLAggregator.getQueryJSON(urlWithParams);
         int statusCode = responseParams.getStatusCode();
         Method method = Method.valueOf(methodStr);
