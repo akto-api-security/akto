@@ -4,7 +4,7 @@
         "-//Apache Software Foundation//DTD Struts Configuration 2.3//EN"
         "http://struts.apache.org/dtds/struts-2.3.dtd">
 <struts>
-    <constant name="struts.devMode" value="true"></constant>
+    <constant name="struts.devMode" value="false"></constant>
     <constant name="struts.enable.SlashesInActionNames" value="true"/>
     <constant name="struts.mapper.alwaysSelectFullNamespace" value="false"/>
 
@@ -290,7 +290,7 @@
 
 
         <!--  DO NOT CHANGE THE PATH NAME BEING USED BY EXTERNAL API -->
-        <action name="api/getAPICollection" class="com.akto.action.observe.InventoryAction" method="getAPICollection">
+        <action name="api/fetchAPICollection" class="com.akto.action.observe.InventoryAction" method="fetchAPICollection">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"   type="json">
@@ -303,7 +303,7 @@
 
 
         <!--  DO NOT CHANGE THE PATH NAME BEING USED BY EXTERNAL API -->
-        <action name="api/loadRecentParameters" class="com.akto.action.observe.InventoryAction" method="loadRecentParameters">
+        <action name="api/loadRecentEndpoints" class="com.akto.action.observe.InventoryAction" method="loadRecentEndpoints">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"   type="json">
@@ -314,6 +314,27 @@
             </result>
         </action>
 
+        <action name="api/fetchNewParametersTrend" class="com.akto.action.observe.InventoryAction" method="fetchNewParametersTrend">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/loadParamsOfEndpoint" class="com.akto.action.observe.InventoryAction" method="loadParamsOfEndpoint">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
 
         <!--  DO NOT CHANGE THE PATH NAME BEING USED BY EXTERNAL API -->
         <action name="api/loadSensitiveParameters" class="com.akto.action.observe.InventoryAction" method="loadSensitiveParameters">
@@ -328,7 +349,7 @@
         </action>
 
 
-        <action name="api/getAllUrlsAndMethods" class="com.akto.action.observe.InventoryAction" method="getAllUrlsAndMethods">
+        <action name="api/fetchAllUrlsAndMethods" class="com.akto.action.observe.InventoryAction" method="fetchAllUrlsAndMethods">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"   type="json">
@@ -601,16 +622,6 @@
             </result>
         </action>
 
-        <action name="api/fetchApiInfoListForRecentEndpoints" class="com.akto.action.ApiInfoAction" method="fetchApiInfoListForRecentEndpoints">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS"  type="json">
-            </result>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
-            </result>
-        </action>
-
         <action name="api/fetchFilters" class="com.akto.action.FilterAction">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -634,6 +645,66 @@
         </action>
 
         <action name="api/fetchSensitiveSampleData" class="com.akto.action.TrafficAction" method="fetchSensitiveSampleData">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/fetchDataTypes" class="com.akto.action.CustomDataTypeAction" method="fetchDataTypesForSettings">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/fetchChanges" class="com.akto.action.observe.InventoryAction" method="fetchChanges">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/saveCustomDataType" class="com.akto.action.CustomDataTypeAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/reviewCustomDataType" class="com.akto.action.CustomDataTypeAction" method="reviewCustomDataType">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/toggleDataTypeActiveParam" class="com.akto.action.CustomDataTypeAction" method="toggleDataTypeActiveParam">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchDataTypeNames" class="com.akto.action.CustomDataTypeAction" method="fetchDataTypeNames">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json"/>

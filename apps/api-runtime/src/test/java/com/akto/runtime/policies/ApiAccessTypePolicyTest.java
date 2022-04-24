@@ -15,7 +15,7 @@ public class ApiAccessTypePolicyTest {
         Map<String, List<String>> headers = new HashMap<>();
         headers.put(ApiAccessTypePolicy.X_FORWARDED_FOR, ipList);
         HttpRequestParams httpRequestParams = new HttpRequestParams("GET", "/a", "", headers, "", 0);
-        return new HttpResponseParams("",200,"",new HashMap<>(),"",httpRequestParams ,0,"0",false, HttpResponseParams.Source.OTHER, "");
+        return new HttpResponseParams("",200,"",new HashMap<>(),"",httpRequestParams ,0,"0",false, HttpResponseParams.Source.OTHER, "", "");
     }
 
     @Test

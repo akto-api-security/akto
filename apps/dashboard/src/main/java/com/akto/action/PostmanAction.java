@@ -80,7 +80,7 @@ public class PostmanAction extends UserAction {
         OpenAPI openAPI = com.akto.open_api.Main.init(apiCollectionId, new ArrayList<>(allEndpoints));
         String openAPIStringAll = com.akto.open_api.Main.convertOpenApiToJSON(openAPI);
 
-        Set<String> sensitiveEndpoints = SingleTypeInfoDao.instance.getSensitiveEndpoints(apiCollectionId);
+        Set<String> sensitiveEndpoints = SingleTypeInfoDao.instance.getSensitiveEndpoints(apiCollectionId, null,null);
         Set<String> customSensitiveEndpoints = SensitiveParamInfoDao.instance.getUniqueEndpoints(apiCollectionId);
         sensitiveEndpoints.addAll(customSensitiveEndpoints);
         openAPI = com.akto.open_api.Main.init(apiCollectionId, new ArrayList<>(sensitiveEndpoints));
@@ -165,9 +165,14 @@ public class PostmanAction extends UserAction {
 
     private List<BasicDBObject> workspaces;
     public String fetchWorkspaces() {
+        workspaces = new ArrayList<>();
+        if (api_key == null || api_key.isEmpty()) {
+            return SUCCESS.toUpperCase();
+        }
+
         Main main = new Main(api_key);
         JsonNode postmanCollection = main.fetchWorkspaces();
-        workspaces = new ArrayList<>();
+        
         if (postmanCollection == null) return SUCCESS.toUpperCase();
         Iterator<JsonNode> a = postmanCollection.elements();
         while (a.hasNext()) {

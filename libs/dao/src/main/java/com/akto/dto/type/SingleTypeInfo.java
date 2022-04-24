@@ -1,60 +1,216 @@
 package com.akto.dto.type;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
-
+import com.akto.DaoInit;
+import com.akto.dao.CustomDataTypeDao;
+import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.UsersDao;
+import com.akto.dao.context.Context;
+import com.akto.dto.CustomDataType;
+import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import io.swagger.v3.oas.models.media.*;
 import org.apache.commons.lang3.StringUtils;
+import org.bson.codecs.pojo.annotations.BsonIgnore;
+import org.bson.codecs.pojo.annotations.BsonProperty;
 
 public class SingleTypeInfo {
-    public enum SuperType {
-        BOOLEAN, INTEGER, FLOAT, STRING, NULL, OTHER
+
+    public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    public static void init() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                fetchCustomDataTypes();
+            }
+        }, 0, 5, TimeUnit.MINUTES);
+
     }
 
-    public enum SubType {
-        TRUE(SuperType.BOOLEAN, false, BooleanSchema.class),
-        FALSE(SuperType.BOOLEAN, false, BooleanSchema.class),
-        INTEGER_32(SuperType.INTEGER, false, IntegerSchema.class),
-        INTEGER_64(SuperType.INTEGER, false, IntegerSchema.class),
-        FLOAT(SuperType.FLOAT, false, NumberSchema.class),
-        NULL(SuperType.NULL, false, StringSchema.class),
-        OTHER(SuperType.OTHER, false, StringSchema.class),
-        EMAIL(SuperType.STRING, true, EmailSchema.class),
-        URL(SuperType.STRING, false, StringSchema.class),
-        ADDRESS(SuperType.STRING, true, StringSchema.class),
-        SSN(SuperType.STRING, true, StringSchema.class),
-        CREDIT_CARD(SuperType.STRING, true, StringSchema.class),
-        PHONE_NUMBER(SuperType.STRING, true, StringSchema.class),
-        UUID(SuperType.STRING, false, StringSchema.class),
-        GENERIC(SuperType.STRING, false, StringSchema.class),
-        DICT(SuperType.OTHER, false, MapSchema.class),
-        JWT(SuperType.STRING, false, StringSchema.class),
-        IP_ADDRESS(SuperType.STRING,false, StringSchema.class);
+    public static void fetchCustomDataTypes() {
+        Context.accountId.set(1_000_000);
+        try {
+            List<CustomDataType> customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject());
+            Map<String, CustomDataType> newMap = new HashMap<>();
+            List<CustomDataType> sensitiveCustomDataType = new ArrayList<>();
+            List<CustomDataType> nonSensitiveCustomDataType = new ArrayList<>();
+            for (CustomDataType customDataType: customDataTypes) {
+                newMap.put(customDataType.getName(), customDataType);
+                if (customDataType.isSensitiveAlways()) {
+                    sensitiveCustomDataType.add(customDataType);
+                } else {
+                    nonSensitiveCustomDataType.add(customDataType);
+                }
+            }
+            customDataTypeMap = newMap;
+            sensitiveCustomDataType.addAll(nonSensitiveCustomDataType);
+            customDataTypesSortedBySensitivity = new ArrayList<>(sensitiveCustomDataType);
+        } catch (Exception ex) {
+            ex.printStackTrace(); // or logger would be better
+        }
+    }
 
-        SuperType superType;
-        public boolean isSensitive;
-        public Class<? extends Schema> swaggerSchemaClass;
 
+    public enum SuperType {
+        BOOLEAN, INTEGER, FLOAT, STRING, NULL, OTHER, CUSTOM
+    }
 
-        SubType(SuperType superType, boolean isSensitive, Class<? extends Schema> swaggerSchemaClass) {
+    public enum Position {
+        REQUEST_HEADER, REQUEST_PAYLOAD, RESPONSE_HEADER, RESPONSE_PAYLOAD
+    }
+
+    public static final SubType TRUE = new SubType("TRUE", false, SuperType.BOOLEAN, BooleanSchema.class,
+            Collections.emptyList());
+    public static final SubType FALSE = new SubType("FALSE", false, SuperType.BOOLEAN, BooleanSchema.class,
+            Collections.emptyList());
+    public static final SubType INTEGER_32 = new SubType("INTEGER_32", false, SuperType.INTEGER, IntegerSchema.class,
+            Collections.emptyList());
+    public static final SubType INTEGER_64 = new SubType("INTEGER_64", false, SuperType.INTEGER, IntegerSchema.class,
+            Collections.emptyList());
+    public static final SubType FLOAT = new SubType("FLOAT", false, SuperType.FLOAT, NumberSchema.class,
+            Collections.emptyList());
+    public static final SubType NULL = new SubType("NULL", false, SuperType.STRING, StringSchema.class,
+            Collections.emptyList());
+    public static final SubType OTHER = new SubType("OTHER", false, SuperType.STRING, StringSchema.class,
+            Collections.emptyList());
+    public static final SubType EMAIL = new SubType("EMAIL", true, SuperType.STRING, EmailSchema.class,
+            Collections.emptyList());
+    public static final SubType URL = new SubType("URL", false, SuperType.STRING, StringSchema.class,
+            Arrays.asList(Position.RESPONSE_PAYLOAD, Position.RESPONSE_HEADER));
+    public static final SubType ADDRESS = new SubType("ADDRESS", true, SuperType.STRING, StringSchema.class,
+            Collections.emptyList());
+    public static final SubType SSN = new SubType("SSN", true, SuperType.STRING, StringSchema.class,
+            Collections.emptyList());
+    public static final SubType CREDIT_CARD = new SubType("CREDIT_CARD", true, SuperType.STRING, StringSchema.class,
+            Collections.emptyList());
+    public static final SubType PHONE_NUMBER = new SubType("PHONE_NUMBER", true, SuperType.STRING, StringSchema.class,
+            Collections.emptyList());
+    public static final SubType UUID = new SubType("UUID", true, SuperType.STRING, StringSchema.class,
+            Collections.emptyList());
+    public static final SubType GENERIC = new SubType("GENERIC", false, SuperType.STRING, StringSchema.class,
+            Collections.emptyList());
+    public static final SubType DICT = new SubType("DICT", false, SuperType.STRING, MapSchema.class,
+            Collections.emptyList());
+    public static final SubType JWT = new SubType("JWT", false, SuperType.STRING, StringSchema.class,
+            Arrays.asList(Position.RESPONSE_PAYLOAD, Position.RESPONSE_HEADER));
+    public static final SubType IP_ADDRESS = new SubType("IP_ADDRESS", false, SuperType.STRING, StringSchema.class,
+            Arrays.asList(Position.RESPONSE_PAYLOAD, Position.RESPONSE_HEADER));
+    // make sure to add AKTO subTypes to subTypeMap below
+
+    public static class SubType {
+        private String name;
+        private boolean sensitiveAlways;
+        private SuperType superType;
+        private Class<? extends Schema> swaggerSchemaClass;
+        private List<Position> sensitivePosition;
+
+        public SubType() {
+        }
+
+        public SubType(String name, boolean sensitiveAlways, SuperType superType,
+                Class<? extends Schema> swaggerSchemaClass, List<Position> sensitivePosition) {
+            this.name = name;
+            this.sensitiveAlways = sensitiveAlways;
             this.superType = superType;
-            this.isSensitive = isSensitive;
+            this.swaggerSchemaClass = swaggerSchemaClass;
+            this.sensitivePosition = sensitivePosition;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            SubType subType = (SubType) o;
+            return sensitiveAlways == subType.sensitiveAlways && name.equals(subType.name) && superType == subType.superType && swaggerSchemaClass.equals(subType.swaggerSchemaClass) && sensitivePosition.equals(subType.sensitivePosition);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(name, sensitiveAlways, superType, swaggerSchemaClass, sensitivePosition);
+        }
+
+        @Override
+        public String toString() {
+            return "SubType{" +
+                    "name='" + name + '\'' +
+                    ", sensitiveAlways=" + sensitiveAlways +
+                    ", superType=" + superType +
+                    ", swaggerSchemaClass=" + swaggerSchemaClass +
+                    ", sensitivePosition=" + sensitivePosition +
+                    '}';
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public boolean isSensitiveAlways() {
+            return sensitiveAlways;
+        }
+
+        public void setSensitiveAlways(boolean sensitiveAlways) {
+            this.sensitiveAlways = sensitiveAlways;
+        }
+
+        public SuperType getSuperType() {
+            return superType;
+        }
+
+        public void setSuperType(SuperType superType) {
+            this.superType = superType;
+        }
+
+        public Class<? extends Schema> getSwaggerSchemaClass() {
+            return swaggerSchemaClass;
+        }
+
+        public void setSwaggerSchemaClass(Class<? extends Schema> swaggerSchemaClass) {
             this.swaggerSchemaClass = swaggerSchemaClass;
         }
 
-        public static List<String> getSensitiveTypes() {
-            List<String> ret = new ArrayList<>();
-            for (SubType subType: SubType.values()) {
-                if (subType.isSensitive) {
-                    ret.add(subType.name());
-                }
-            }
-            return ret;
+        public List<Position> getSensitivePosition() {
+            return sensitivePosition;
         }
+
+        public void setSensitivePosition(List<Position> sensitivePosition) {
+            this.sensitivePosition = sensitivePosition;
+        }
+
+        // Calculates and tells if sensitive or not based on sensitiveAlways and sensitivePosition fields
+        public boolean isSensitive(Position position) {
+            if (this.sensitiveAlways) return true;
+            return this.sensitivePosition.contains(position);
+        }
+    }
+
+    public Position findPosition() {
+        return findPosition(responseCode, isHeader);
+    }
+
+    public static Position findPosition(int responseCode, boolean isHeader) {
+        SingleTypeInfo.Position position;
+        if (responseCode == -1) {
+            if (isHeader) {
+                position = SingleTypeInfo.Position.REQUEST_HEADER;
+            } else {
+                position = SingleTypeInfo.Position.REQUEST_PAYLOAD;
+            }
+        } else {
+            if (isHeader) {
+                position = SingleTypeInfo.Position.RESPONSE_HEADER;
+            } else {
+                position = SingleTypeInfo.Position.RESPONSE_PAYLOAD;
+            }
+        }
+
+        return position;
     }
 
     public static class ParamId {
@@ -63,8 +219,11 @@ public class SingleTypeInfo {
         int responseCode;
         boolean isHeader;
         String param;
+        @BsonIgnore
         SubType subType;
         int apiCollectionId;
+        @BsonProperty("subType")
+        String subTypeString;
 
         public ParamId(String url, String method, int responseCode, boolean isHeader, String param, SubType subType, int apiCollectionId) {
             this.url = url;
@@ -72,8 +231,8 @@ public class SingleTypeInfo {
             this.responseCode = responseCode;
             this.isHeader = isHeader;
             this.param = param;
-            this.subType = subType;  
-            this.apiCollectionId = apiCollectionId; 
+            this.subType = subType;
+            this.apiCollectionId = apiCollectionId;
         }
 
         public ParamId() {
@@ -123,8 +282,18 @@ public class SingleTypeInfo {
             return subType;
         }
 
-        public void setSubType(SubType subType) {
-            this.subType = subType;
+        public void setSubTypeString(String subTypeString) {
+            this.subTypeString = subTypeString;
+            this.subType = subTypeMap.get(subTypeString);
+            if (this.subType == null) {
+                CustomDataType customDataType = customDataTypeMap.get(subTypeString);
+                if (customDataType != null) {
+                    this.subType = customDataType.toSubType();
+                } else {
+                    // TODO:
+                    this.subType = GENERIC;
+                }
+            }
         }
 
         public int getApiCollectionId() {
@@ -141,13 +310,42 @@ public class SingleTypeInfo {
     int responseCode;
     boolean isHeader;
     String param;
+    @BsonIgnore
     SubType subType;
+    @BsonProperty("subType")
+    String subTypeString;
     Set<Object> examples = new HashSet<>();
     Set<String> userIds = new HashSet<>();
     int count;
     int timestamp;
     int duration;
     int apiCollectionId;
+    @BsonIgnore
+    boolean sensitive;
+
+    public static final Map<String, SubType> subTypeMap = new HashMap<>();
+    public static Map<String, CustomDataType> customDataTypeMap = new HashMap<>();
+    public static List<CustomDataType> customDataTypesSortedBySensitivity = new ArrayList<>();
+    static {
+        subTypeMap.put("TRUE", TRUE);
+        subTypeMap.put("FALSE", FALSE);
+        subTypeMap.put("INTEGER_32", INTEGER_32);
+        subTypeMap.put("INTEGER_64", INTEGER_64);
+        subTypeMap.put("FLOAT", FLOAT);
+        subTypeMap.put("NULL", NULL);
+        subTypeMap.put("OTHER", OTHER);
+        subTypeMap.put("EMAIL", EMAIL);
+        subTypeMap.put("URL", URL);
+        subTypeMap.put("ADDRESS", ADDRESS);
+        subTypeMap.put("SSN", SSN);
+        subTypeMap.put("CREDIT_CARD", CREDIT_CARD);
+        subTypeMap.put("PHONE_NUMBER", PHONE_NUMBER);
+        subTypeMap.put("UUID", UUID);
+        subTypeMap.put("GENERIC", GENERIC);
+        subTypeMap.put("DICT", DICT);
+        subTypeMap.put("JWT", JWT);
+        subTypeMap.put("IP_ADDRESS", IP_ADDRESS);
+    }
 
     public SingleTypeInfo() {
     }
@@ -158,7 +356,7 @@ public class SingleTypeInfo {
         this.responseCode = paramId.responseCode;
         this.isHeader = paramId.isHeader;
         this.param = paramId.param;
-        this.subType = paramId.subType;    
+        this.subType = paramId.subType;
         this.apiCollectionId = paramId.apiCollectionId;
         this.examples = examples;
         this.userIds = userIds;
@@ -189,7 +387,7 @@ public class SingleTypeInfo {
         paramId.responseCode = responseCode;
         paramId.isHeader = isHeader;
         paramId.param = param;
-        paramId.subType = subType;
+        paramId.subType = new SubType(subType.name, subType.sensitiveAlways, subType.superType, subType.swaggerSchemaClass, subType.sensitivePosition);
         paramId.apiCollectionId = apiCollectionId;
 
         return new SingleTypeInfo(paramId, copyExamples, copyUserIds, this.count, this.timestamp, this.duration);
@@ -303,14 +501,13 @@ public class SingleTypeInfo {
             return false;
         }
         SingleTypeInfo singleTypeInfo = (SingleTypeInfo) o;
-        return 
-            url.equals(singleTypeInfo.url) && 
-            method.equals(singleTypeInfo.method) && 
-            responseCode == singleTypeInfo.responseCode && 
-            isHeader == singleTypeInfo.isHeader && 
-            param.equals(singleTypeInfo.param) && 
-            subType == singleTypeInfo.subType && 
-            apiCollectionId == singleTypeInfo.apiCollectionId;
+        return url.equals(singleTypeInfo.url) &&
+                method.equals(singleTypeInfo.method) &&
+                responseCode == singleTypeInfo.responseCode &&
+                isHeader == singleTypeInfo.isHeader &&
+                param.equals(singleTypeInfo.param) &&
+                subType.equals(singleTypeInfo.subType) &&
+                apiCollectionId == singleTypeInfo.apiCollectionId;
     }
 
     @Override
@@ -326,7 +523,7 @@ public class SingleTypeInfo {
             ", responseCode='" + getResponseCode() + "'" +
             ", isHeader='" + isIsHeader() + "'" +
             ", param='" + getParam() + "'" +
-            ", subType='" + getSubType() + "'" +
+            ", subType='" + getSubType().name + "'" +
             ", apiCollectionId='" + getApiCollectionId() + "'" +
             ", examples='" + getExamples() + "'" +
             ", userIds='" + getUserIds() + "'" +
@@ -335,4 +532,24 @@ public class SingleTypeInfo {
             ", duration='" + getDuration() + "'" +
             "}";
     }
+
+    public void setSubTypeString(String subTypeString) {
+        this.subTypeString = subTypeString;
+        this.subType = subTypeMap.get(subTypeString);
+        if (this.subType == null) {
+            CustomDataType customDataType = customDataTypeMap.get(subTypeString);
+            if (customDataType != null) {
+                this.subType = customDataType.toSubType();
+            } else {
+                // TODO:
+                this.subType = GENERIC;
+            }
+        }
+    }
+
+    public boolean getSensitive() {
+        return this.subType.isSensitive(this.findPosition());
+    }
+
+
 }

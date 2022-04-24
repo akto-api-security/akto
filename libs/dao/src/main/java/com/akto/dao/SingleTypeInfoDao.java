@@ -1,15 +1,12 @@
 package com.akto.dao;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
-import com.akto.DaoInit;
 import com.akto.dao.context.Context;
+import com.akto.dto.CustomDataType;
+import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.DistinctIterable;
-import com.mongodb.client.ListIndexesIterable;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
@@ -64,25 +61,90 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return this.findAll(new BasicDBObject());
     }
 
+    public static Bson createFilters(SingleTypeInfo info) {
+        return Filters.and(
+                Filters.eq("url", info.getUrl()),
+                Filters.eq("method", info.getMethod()),
+                Filters.eq("responseCode", info.getResponseCode()),
+                Filters.eq("isHeader", info.getIsHeader()),
+                Filters.eq("param", info.getParam()),
+                Filters.eq("subType", info.getSubType().getName()),
+                Filters.eq("apiCollectionId", info.getApiCollectionId())
+        );
+    }
+
     public Set<String> getUniqueEndpoints(int apiCollectionId) {
         Bson filter = Filters.eq("apiCollectionId", apiCollectionId);
         return instance.findDistinctFields("url", String.class, filter);
     }
 
-    public Set<String> getSensitiveEndpoints(int apiCollectionId) {
-        List<String> v = new ArrayList<>();
-        for (SingleTypeInfo.SubType subType: SingleTypeInfo.SubType.values()) {
-            if (subType.isSensitive) {
-                v.add(subType.name());
+    public List<String> sensitiveSubTypeNames() {
+        List<String> sensitiveSubTypes = new ArrayList<>();
+        // AKTO sensitive
+        for (SingleTypeInfo.SubType subType: SingleTypeInfo.subTypeMap.values()) {
+            if (subType.isSensitiveAlways()) {
+                sensitiveSubTypes.add(subType.getName());
             }
         }
 
-        Bson filter = Filters.and(
-                Filters.eq("apiCollectionId",apiCollectionId),
-                Filters.in("subType", v)
+        // Custom data type sensitive
+        for (CustomDataType customDataType: SingleTypeInfo.customDataTypeMap.values()) {
+            if (customDataType.isSensitiveAlways()) {
+                sensitiveSubTypes.add(customDataType.getName());
+            }
+        }
+
+        return sensitiveSubTypes;
+    }
+
+    public Bson filterForSensitiveParamsExcludingUserMarkedSensitive(Integer apiCollectionId, String url, String method) {
+        // apiCollectionId null then no filter for apiCollectionId
+        List<String> sensitiveSubTypes = sensitiveSubTypeNames();
+
+        Bson alwaysSensitiveFilter = Filters.in("subType", sensitiveSubTypes);
+
+        Bson sensitivityBasedOnPosition = Filters.and(
+                Filters.in("subType", Arrays.asList(SingleTypeInfo.JWT.getName(), SingleTypeInfo.URL.getName(), SingleTypeInfo.IP_ADDRESS.getName())),
+                Filters.gt("responseCode", -1)
         );
 
-        return instance.findDistinctFields("url", String.class, filter);
+        List<Bson> filters = new ArrayList<>();
+        filters.add(Filters.or(alwaysSensitiveFilter, sensitivityBasedOnPosition));
+
+        if (apiCollectionId != null && apiCollectionId >= 0) {
+            filters.add(Filters.eq("apiCollectionId", apiCollectionId) );
+        }
+
+        if (url != null) {
+            filters.add(Filters.eq("url", url));
+        }
+
+        if (method != null) {
+            filters.add(Filters.eq("method",method));
+        }
+
+        return Filters.and(filters);
+    }
+
+    public Set<String> getSensitiveEndpoints(int apiCollectionId, String url, String method) {
+        Set<String> urls = new HashSet<>();
+
+        // User manually set sensitive
+        List<SensitiveParamInfo> customSensitiveList = SensitiveParamInfoDao.instance.findAll(
+                Filters.and(
+                        Filters.eq("sensitive", true),
+                        Filters.eq("apiCollectionId", apiCollectionId)
+                )
+        );
+        for (SensitiveParamInfo sensitiveParamInfo: customSensitiveList) {
+            urls.add(sensitiveParamInfo.getUrl());
+        }
+
+        Bson filter = filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId, url, method);
+
+        urls.addAll(instance.findDistinctFields("url", String.class, filter));
+
+        return urls;
     }
     
 }

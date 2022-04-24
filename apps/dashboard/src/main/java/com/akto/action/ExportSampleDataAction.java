@@ -58,8 +58,12 @@ public class ExportSampleDataAction extends UserAction {
         // Method
         builder.append("-X ").append(httpRequestParams.getMethod()).append(" \\\n  ");
 
+        String hostName = null;
         // Headers
         for (Map.Entry<String, List<String>> entry : httpRequestParams.getHeaders().entrySet()) {
+            if (entry.getKey().equalsIgnoreCase("host") && entry.getValue().size() > 0) {
+                hostName = entry.getValue().get(0);
+            }
             builder.append("-H '").append(entry.getKey()).append(":");
             for (String value : entry.getValue()) {
                 builder.append(" ").append(value.replaceAll("\"", "\\\\\""));
@@ -67,7 +71,15 @@ public class ExportSampleDataAction extends UserAction {
             builder.append("' \\\n  ");
         }
 
-        StringBuilder url = new StringBuilder(httpRequestParams.getURL());
+        String urlString;
+        String path = httpRequestParams.getURL();
+        if (hostName != null && !(path.toLowerCase().startsWith("http") || path.toLowerCase().startsWith("www."))) {
+            urlString = path.startsWith("/") ? hostName + path : hostName + "/" + path;
+        } else {
+            urlString = path;
+        }
+
+        StringBuilder url = new StringBuilder(urlString);
 
         // Body
         try {

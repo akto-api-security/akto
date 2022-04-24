@@ -131,7 +131,7 @@ public class DemoData extends DaoConnect {
                 SingleTypeInfo singleTypeInfo = SingleTypeInfoDao.instance.findOne("url", newUrl, "responseCode", 200);
                 String ssn = "card_owner_ssn";
                 singleTypeInfo.setParam(ssn);
-                singleTypeInfo.setSubType(SubType.SSN);
+                singleTypeInfo.setSubType(SingleTypeInfo.SSN);
                 singleTypeInfo.setExamples(null);
                 singleTypeInfo.setTimestamp(Context.now() - 60 * 60 * 24 * 7);
                 SingleTypeInfoDao.instance.getMCollection().deleteOne(Filters.eq("param", ssn));
@@ -139,7 +139,7 @@ public class DemoData extends DaoConnect {
 
                 String ccn = "credit_card_number";
                 singleTypeInfo.setParam(ccn);
-                singleTypeInfo.setSubType(SubType.CREDIT_CARD);
+                singleTypeInfo.setSubType(SingleTypeInfo.CREDIT_CARD);
                 singleTypeInfo.setExamples(null);
                 singleTypeInfo.setTimestamp(Context.now() - 60 * 60 * 24 * 7);
                 SingleTypeInfoDao.instance.getMCollection().deleteOne(Filters.eq("param", ccn));

@@ -74,7 +74,7 @@
             <template slot="Deprecated">
                 <simple-table 
                     :headers=unusedHeaders 
-                    :items=unusedEndpoints 
+                    :items=deprecatedEndpoints
                     name="Deprecated"
                 />
             </template>
@@ -220,9 +220,12 @@ export default {
                 {
                     text: 'Method',
                     value: 'method'
+                },
+                {
+                    text: 'Last seen',
+                    value: 'lastSeen'
                 }
             ],
-            documentedURLs: {},
             downloadFileItems: [
                 {
                     label: "Download OpenAPI Spec",
@@ -243,9 +246,6 @@ export default {
         rowClicked(row) {
             this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.endpoint + " " + row.method, type: 2})
         },
-        groupByEndpoint(listParams, apiInfoList ) {
-            func.groupByEndpoint(listParams, apiInfoList)
-        },
         downloadData() {
             let headerTextToValueMap = Object.fromEntries(this.tableHeaders.map(x => [x.text, x.value]).filter(x => x[0].length > 0));
 
@@ -263,12 +263,6 @@ export default {
                 return func.prettifyEpoch(ts)
             else
                 return '-'
-        },
-        isShadow(x) {
-            return !(this.documentedURLs[x.endpoint] && this.documentedURLs[x.endpoint].indexOf(x.method) != -1)
-        },
-        isUnused(url, method) {
-            return this.allEndpoints.filter(e => e.endpoint === url && e.method == method).length == 0
         },
         handleFileChange({file}) {
             if (!file) {
@@ -336,43 +330,52 @@ export default {
             let collectionIdChanged = this.$store.state.inventory.apiCollectionId !== this.apiCollectionId
             if (collectionIdChanged || !shouldLoad || ((new Date() / 1000) - this.lastFetched > 60*5)) {
                 this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId, shouldLoad: shouldLoad})
-
-                api.getAllUrlsAndMethods(this.apiCollectionId).then(resp => {
-                    this.documentedURLs = resp.data || {}
-                })
             }
 
             this.$emit('mountedView', {type: 1, apiCollectionId: this.apiCollectionId})
         }
     },
     computed: {
-        ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'loading', 'swaggerContent', 'apiInfoList', 'filters', 'lastFetched']),
+        ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'loading', 'swaggerContent', 'apiInfoList', 'filters', 'lastFetched', 'unusedEndpoints']),
         openEndpoints() {
-          return func.groupByEndpoint(this.apiCollection, this.apiInfoList).filter(x => x.open)
+          return this.allEndpoints.filter(x => x.open)
         },
         allEndpoints () {
-            return func.groupByEndpoint(this.apiCollection, this.apiInfoList )
+            return func.mergeApiInfoAndApiCollection(this.apiCollection, this.apiInfoList)
         },
         sensitiveEndpoints() {
-            return func.groupByEndpoint(this.apiCollection, this.apiInfoList).filter(x => x.sensitive > 0)
+            return this.allEndpoints.filter(x => x.sensitive && x.sensitive.size > 0)
         },
         shadowEndpoints () {
-            return func.groupByEndpoint(this.apiCollection, this.apiInfoList).filter(x => this.isShadow(x))
+            return this.allEndpoints.filter(x => x.shadow)
         },
-        unusedEndpoints () {
+        deprecatedEndpoints() {
             let ret = []
-            Object.entries(this.documentedURLs).forEach(entry => {
-                let endpoint = entry[0]
-                entry[1].forEach(method => {
-                    if(this.isUnused(endpoint, method)) {
-                        ret.push({
-                            endpoint, 
-                            method,
-                            color: func.actionItemColors()["This week"]
-                        })
-                    }
-                })
+            this.apiInfoList.forEach(apiInfo => {
+                if (apiInfo.lastSeen < (func.timeNow() - func.recencyPeriod)) {
+                    ret.push({
+                        endpoint: apiInfo.id.url, 
+                        method: apiInfo.id.method,
+                        lastSeen: func.prettifyEpoch(apiInfo.lastSeen),
+                        color: func.actionItemColors()["This week"]
+                    })
+                }
             })
+
+            try {
+                this.unusedEndpoints.forEach((x) => {
+                    if (!x) return;
+                    let arr = x.split(" ");
+                    if (arr.length < 2) return;
+                    ret.push({
+                      endpoint : arr[0],
+                      method : arr[1],
+                      color: func.actionItemColors()["This week"],
+                      lastSeen: 'in API spec file'
+                    })
+                })
+            } catch (e) {
+            }
             return ret
         }
     },

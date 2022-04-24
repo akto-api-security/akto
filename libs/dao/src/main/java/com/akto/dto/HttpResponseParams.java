@@ -22,11 +22,13 @@ public class HttpResponseParams {
     boolean isPending;
     Source source = Source.OTHER;
     String orig;
+    String sourceIP;
 
     public HttpResponseParams() {}
 
     public HttpResponseParams(String type, int statusCode, String status, Map<String, List<String>> headers, String payload,
-                              HttpRequestParams requestParams, int time, String accountId, boolean isPending, Source source, String orig) {
+                              HttpRequestParams requestParams, int time, String accountId, boolean isPending, Source source, 
+                              String orig, String sourceIP) {
         this.type = type;
         this.statusCode = statusCode;
         this.status = status;
@@ -38,6 +40,7 @@ public class HttpResponseParams {
         this.isPending = isPending;
         this.source = source;
         this.orig = orig;
+        this.sourceIP = sourceIP;
     }
 
     public String getPayload() {
@@ -90,5 +93,13 @@ public class HttpResponseParams {
 
     public void setOrig(String orig) {
         this.orig = orig;
+    }
+
+    public String getSourceIP() {
+        return this.sourceIP;
+    }
+
+    public void setSourceIP(String sourceIP) {
+        this.sourceIP = sourceIP;
     }
 }

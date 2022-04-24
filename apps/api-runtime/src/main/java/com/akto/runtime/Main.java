@@ -109,6 +109,7 @@ public class Main {
         DaoInit.init(new ConnectionString(mongoURI));
         Context.accountId.set(1_000_000);
         SingleTypeInfoDao.instance.getMCollection().updateMany(Filters.exists("apiCollectionId", false), Updates.set("apiCollectionId", 0));
+        SingleTypeInfo.init();
 
         createIndices();
         insertRuntimeFilters();
