@@ -421,12 +421,6 @@ public class APICatalogSync {
                     iterator.remove();
                 }
 
-                RequestTemplate strictMatchInDelta = deltaCatalog.getStrictURLToMethods().get(url);
-                if (strictMatchInDelta != null) {
-                    processResponse(strictMatchInDelta, responseParamsList, deletedInfo);
-                    iterator.remove();
-                }
-
             }
         } catch (Exception e) {
             logger.info(e.getMessage(), e);
