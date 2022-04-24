@@ -9,6 +9,11 @@ function resolve (dir) {
       return path.join(__dirname, '..', dir)
 }
 
+function hashGenerator() {
+  return 1
+}
+
+process.env.HASH = hashGenerator()
 
 module.exports = {
   entry: {"babel-polyfill": "babel-polyfill", main: './web/src/apps/main/main.js', chrome_plugin: './web/src/apps/chrome_plugin/main.js'},
@@ -142,7 +147,10 @@ if (process.env.NODE_ENV === 'production') {
                 compress: {
                   warnings: false
                 },
-                sourceMap: true
+                sourceMap: true,
+                output: {
+                  ascii_only: true
+                }
               }
         }
     ),

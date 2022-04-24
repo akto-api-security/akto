@@ -20,7 +20,7 @@ public class TestCustomSchemasFromSingleTypeInfo {
     public void testSimple() throws Exception {
         List<SchemaBuilder.CustomSchema> customSchemaList;
 
-        SingleTypeInfo s = generateSingleTypeInfo("id", SingleTypeInfo.SubType.GENERIC);
+        SingleTypeInfo s = generateSingleTypeInfo("id", SingleTypeInfo.GENERIC);
         customSchemaList = SchemaBuilder.getCustomSchemasFromSingleTypeInfo(s);
         assertEquals(1, customSchemaList.size());
         assertEquals("id", customSchemaList.get(0).name);
@@ -32,7 +32,7 @@ public class TestCustomSchemasFromSingleTypeInfo {
     public void testSimpleObject() throws Exception {
         List<SchemaBuilder.CustomSchema> customSchemaList;
 
-        SingleTypeInfo s = generateSingleTypeInfo("user#name#first", SingleTypeInfo.SubType.GENERIC);
+        SingleTypeInfo s = generateSingleTypeInfo("user#name#first", SingleTypeInfo.GENERIC);
         customSchemaList = SchemaBuilder.getCustomSchemasFromSingleTypeInfo(s);
         assertEquals(3, customSchemaList.size());
         assertEquals("user", customSchemaList.get(0).name);
@@ -47,7 +47,7 @@ public class TestCustomSchemasFromSingleTypeInfo {
     public void testObjectInArray() throws Exception {
         List<SchemaBuilder.CustomSchema> customSchemaList;
 
-        SingleTypeInfo s = generateSingleTypeInfo("cards#$#id", SingleTypeInfo.SubType.INTEGER_32);
+        SingleTypeInfo s = generateSingleTypeInfo("cards#$#id", SingleTypeInfo.INTEGER_32);
         customSchemaList = SchemaBuilder.getCustomSchemasFromSingleTypeInfo(s);
         assertEquals(3, customSchemaList.size());
         assertEquals("cards", customSchemaList.get(0).name);
@@ -62,7 +62,7 @@ public class TestCustomSchemasFromSingleTypeInfo {
     public void testNestedObjectInArray() throws Exception {
         List<SchemaBuilder.CustomSchema> customSchemaList;
 
-        SingleTypeInfo s = generateSingleTypeInfo("cards#$#user#name", SingleTypeInfo.SubType.GENERIC);
+        SingleTypeInfo s = generateSingleTypeInfo("cards#$#user#name", SingleTypeInfo.GENERIC);
         customSchemaList = SchemaBuilder.getCustomSchemasFromSingleTypeInfo(s);
         assertEquals(4, customSchemaList.size());
         assertEquals("cards", customSchemaList.get(0).name);
@@ -79,7 +79,7 @@ public class TestCustomSchemasFromSingleTypeInfo {
     public void testIntegerArray() throws Exception {
         List<SchemaBuilder.CustomSchema> customSchemaList;
 
-        SingleTypeInfo s = generateSingleTypeInfo("cards#$", SingleTypeInfo.SubType.INTEGER_32);
+        SingleTypeInfo s = generateSingleTypeInfo("cards#$", SingleTypeInfo.INTEGER_32);
         customSchemaList = SchemaBuilder.getCustomSchemasFromSingleTypeInfo(s);
         assertEquals(2, customSchemaList.size());
         assertEquals("cards", customSchemaList.get(0).name);
@@ -92,7 +92,7 @@ public class TestCustomSchemasFromSingleTypeInfo {
     public void testBareIntegerArray() throws Exception {
         List<SchemaBuilder.CustomSchema> customSchemaList;
 
-        SingleTypeInfo s = generateSingleTypeInfo("json#$#id", SingleTypeInfo.SubType.FLOAT);
+        SingleTypeInfo s = generateSingleTypeInfo("json#$#id", SingleTypeInfo.FLOAT);
         customSchemaList = SchemaBuilder.getCustomSchemasFromSingleTypeInfo(s);
         assertEquals(3, customSchemaList.size());
         assertEquals("json", customSchemaList.get(0).name);

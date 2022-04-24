@@ -93,6 +93,7 @@ public class HttpCallParser {
         String payload = (String) json.get("responsePayload");
         int time = Integer.parseInt(json.get("time").toString());
         String accountId = (String) json.get("akto_account_id");
+        String sourceIP = (String) json.get("ip");
 
         String isPendingStr = (String) json.getOrDefault("is_pending", "false");
         boolean isPending = !isPendingStr.toLowerCase().equals("false");
@@ -100,7 +101,7 @@ public class HttpCallParser {
         HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
         
         return new HttpResponseParams(
-                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message
+                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP
         );
 
     }

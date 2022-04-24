@@ -26,8 +26,8 @@ public class TrafficRecorder {
             this.sampleMessages.add(sampleMessage);
         }
         
-        for(String hourSinceEpoch: trafficMapSinceLastSync.keySet()) {
-            int count = trafficMapSinceLastSync.get(hourSinceEpoch);
+        for(String hourSinceEpoch: that.trafficMapSinceLastSync.keySet()) {
+            int count = that.trafficMapSinceLastSync.getOrDefault(hourSinceEpoch, 0);
             trafficMapSinceLastSync.compute(hourSinceEpoch, (k,v) -> {return (v == null ? 0 : v) + count;});
         }
     }

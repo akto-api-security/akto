@@ -1,6 +1,7 @@
 package com.akto;
 
 import com.akto.dto.*;
+import com.akto.dto.data_types.*;
 import com.akto.dto.notifications.content.Content;
 import com.akto.dto.runtime_filters.FieldExistsFilter;
 import com.akto.dto.FilterSampleData;
@@ -53,6 +54,13 @@ public class DaoInit {
         ClassModel<RuntimeFilter> runtimeFilterClassModel = ClassModel.builder(RuntimeFilter.class).enableDiscriminator(true).build();
         ClassModel<FilterSampleData> filterSampleDataClassModel = ClassModel.builder(FilterSampleData.class).enableDiscriminator(true).build();
         ClassModel<AccountSettings> accountSettingsClassModel = ClassModel.builder(AccountSettings.class).enableDiscriminator(true).build();
+        ClassModel<Predicate> predicateClassModel = ClassModel.builder(Predicate.class).enableDiscriminator(true).build();
+        ClassModel<RegexPredicate> regexPredicateClassModel = ClassModel.builder(RegexPredicate.class).enableDiscriminator(true).build();
+        ClassModel<StartsWithPredicate> startsWithPredicateClassModel = ClassModel.builder(StartsWithPredicate.class).enableDiscriminator(true).build();
+        ClassModel<EndsWithPredicate> endsWithPredicateClassModel = ClassModel.builder(EndsWithPredicate.class).enableDiscriminator(true).build();
+        ClassModel<EqualsToPredicate> equalsToPredicateClassModel = ClassModel.builder(EqualsToPredicate.class).enableDiscriminator(true).build();
+        ClassModel<IsNumberPredicate> isNumberPredicateClassModel = ClassModel.builder(IsNumberPredicate.class).enableDiscriminator(true).build();
+        ClassModel<Conditions> conditionsClassModel = ClassModel.builder(Conditions.class).enableDiscriminator(true).build();
         ClassModel<CappedList>  cappedListClassModel = ClassModel.builder(CappedList.class).enableDiscriminator(true).build();
 
 
@@ -61,10 +69,12 @@ public class DaoInit {
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel,singleTypeInfoClassModel,
                 thirdPartyAccessClassModel, credentialClassModel, apiTokenClassModel, apiInfoClassModel,
                 apiInfoKeyClassModel, customFilterClassModel, runtimeFilterClassModel, filterSampleDataClassModel,
-                fieldExistsFilterClassModel, accountSettingsClassModel, responseCodeRuntimeFilterClassModel, cappedListClassModel).automatic(true).build());
+                predicateClassModel, conditionsClassModel, regexPredicateClassModel, startsWithPredicateClassModel, endsWithPredicateClassModel,
+                fieldExistsFilterClassModel, accountSettingsClassModel, responseCodeRuntimeFilterClassModel, cappedListClassModel,
+                equalsToPredicateClassModel, isNumberPredicateClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
-            new EnumCodec<>(SingleTypeInfo.SubType.class),
+            new EnumCodec<>(Conditions.Operator.class),
             new EnumCodec<>(SingleTypeInfo.SuperType.class),
             new EnumCodec<>(Method.class),
             new EnumCodec<>(RBAC.Role.class),

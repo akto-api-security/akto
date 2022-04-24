@@ -42,11 +42,13 @@ export default {
       addBurpToken() {
         api.addBurpToken().then((resp) => {
           this.burp_tokens.push(...resp.apiTokenList)
+          this.burp_tokens = [...this.burp_tokens]
         })
       },
       addExternalApiToken() {
         api.addExternalApiToken().then((resp) => {
           this.external_api_tokens.push(...resp.apiTokenList)
+          this.external_api_tokens = [...this.external_api_tokens]
         })
       },
       deleteBurpToken(id) {
@@ -64,16 +66,19 @@ export default {
         })
       }
     },
-    mounted() {
-      api.fetchApiTokens().then((resp) => {
-        resp.apiTokenList.forEach(x => {
-          if (x.utility === "BURP") {
-            this.burp_tokens.push(x)
-          } else if (x.utility === "EXTERNAL_API") {
-            this.external_api_tokens.push(x)
-          }
-        })
+    async mounted() {
+      let resp = await api.fetchApiTokens()
+      resp.apiTokenList.forEach(x => {
+        if (x.utility === "BURP") {
+          this.burp_tokens.push(x)
+          
+        } else if (x.utility === "EXTERNAL_API") {
+          this.external_api_tokens.push(x)
+        }
       })
+      this.burp_tokens = [...this.burp_tokens]
+      
+      this.external_api_tokens = [...this.external_api_tokens]    
     },
 
 }

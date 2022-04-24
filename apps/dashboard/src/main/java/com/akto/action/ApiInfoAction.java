@@ -31,27 +31,6 @@ public class ApiInfoAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public String fetchApiInfoListForRecentEndpoints() {
-        apiInfoList = new ArrayList<>();
-        InventoryAction inventoryAction = new InventoryAction();
-        List<SingleTypeInfo> list = inventoryAction.fetchRecentParams(InventoryAction.deltaPeriodValue);
-        Set<ApiInfoKey> apiInfoKeys = new HashSet<ApiInfoKey>();
-        for (SingleTypeInfo singleTypeInfo: list) {
-            apiInfoKeys.add(new ApiInfoKey(singleTypeInfo.getApiCollectionId(),singleTypeInfo.getUrl(), Method.valueOf(singleTypeInfo.getMethod())));
-        }
-
-        List<ApiInfo> fromDb = ApiInfoDao.instance.findAll(new BasicDBObject());
-        for (ApiInfo a: fromDb) {
-            if (apiInfoKeys.contains(a.getId())) {
-                a.calculateActualAuth();
-                apiInfoList.add(a);
-            }
-        }
-
-
-        return SUCCESS.toUpperCase();
-    }
-
     public List<ApiInfo> getApiInfoList() {
         return apiInfoList;
     }

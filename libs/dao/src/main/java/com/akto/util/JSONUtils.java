@@ -1,5 +1,7 @@
 package com.akto.util;
 
+import java.util.Set;
+
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
@@ -8,23 +10,28 @@ public class JSONUtils {
         if (obj instanceof BasicDBObject) {
             BasicDBObject basicDBObject = (BasicDBObject) obj;
 
-            boolean anyAlphabetExists = false;
+            Set<String> keySet = basicDBObject.keySet();
 
-            for(String cs: basicDBObject.keySet()) {
-                if (cs == null) {
+            if (prefix != null && !prefix.isEmpty() && (keySet == null || keySet.isEmpty())) {
+                ret.put(prefix, obj);
+            }
+
+            for(String key: keySet) {
+
+                if (key == null) {
                     continue;
                 }
-                final int sz = cs.length();
+                boolean anyAlphabetExists = false;
+
+                final int sz = key.length();
                 for (int i = 0; i < sz; i++) {
-                    final char nowChar = cs.charAt(i);
+                    final char nowChar = key.charAt(i);
                     if (Character.isLetter(nowChar)) {
                         anyAlphabetExists = true;
                         break;
                     }
                 }
-            }
 
-            for(String key: basicDBObject.keySet()) {
                 key = anyAlphabetExists ? key: "NUMBER";
                 Object value = basicDBObject.get(key);
                 flatten(value, prefix + (prefix.isEmpty() ? "" : "#") + key, ret);

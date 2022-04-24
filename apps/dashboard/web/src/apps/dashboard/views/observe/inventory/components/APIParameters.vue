@@ -1,5 +1,8 @@
 <template>
-    <div>
+    <div v-if="loading">
+        <spinner/>
+    </div>
+    <div v-else>
         <v-row>
             <v-col md="6">
                 <sensitive-params-card title="Sensitive parameters" :sensitiveParams="sensitiveParamsForChart"/>
@@ -83,7 +86,7 @@ export default {
         SensitiveParamsCard,
         LineChart,
         Spinner,
-        SampleData
+        SampleData,
     },
     props: {
         urlAndMethod: obj.strR,
@@ -147,7 +150,7 @@ export default {
                 color: x.savedAsSensitive || func.isSubTypeSensitive(x) ? this.$vuetify.theme.themes.dark.redMetric: this.$vuetify.theme.themes.dark.greenMetric,
                 name: x.param.replaceAll("#", ".").replaceAll(".$", ""),
                 sensitive: func.isSubTypeSensitive(x) ? 'Yes' : '',
-                type: x.subType,
+                type: x.subType.name,
                 container: x.isHeader ? 'Headers' : 'Payload ',
                 date: this.prettifyDate(x.timestamp),
                 detectedTs: x.timestamp,
@@ -177,11 +180,12 @@ export default {
         isValid (item) {
             let obj = {...item.x}
             obj.savedAsSensitive = false
+            obj.sensitive = false
             return !func.isSubTypeSensitive(obj)
         }
     },
     computed: {
-        ...mapState('inventory', ['apiCollection']),
+        ...mapState('inventory', ['parameters', 'loading']),
         url () {
             return this.urlAndMethod.split(" ")[0]
         },
@@ -189,7 +193,7 @@ export default {
             return this.urlAndMethod.split(" ")[1]
         },
         sensitiveParams() {
-            return this.apiCollection.filter(x => x.url === this.url && x.method == this.method)
+            return this.parameters.filter(x => x.subType === "CUSTOM" || func.isSubTypeSensitive(x))
         },
         trafficTrend () {
             let dateToCount = this.trafficInfo
@@ -209,29 +213,47 @@ export default {
             return ret
         },
         sensitiveParamsForChart() {
-            return Object.entries(this.sensitiveParams.reduce((z, e) => {
-                let key = func.isSubTypeSensitive(e) ? e.subType : 'General'
+            if (this.parameters.length == 0) {
+                return []
+            }
+
+            let numGenericParams = this.parameters.length - this.sensitiveParams.length
+            let ret = Object.entries(this.sensitiveParams.reduce((z, e) => {
+                let key = func.isSubTypeSensitive(e) ? e.subType.name : 'Generic'
                 z[key] = (z[key] || 0) + 1
                 return z
             }, {})).map((x, i) => {
                 return {
                     name: x[0],
                     y: x[1],
-                    color: x[0] === 'General' ? "#7D787838" : (["#6200EAFF", "#6200EADF", "#6200EABF", "#6200EA9F", "#6200EA7F", "#6200EA5F", "#6200EA3F", "#6200EA1F"][i])
+                    color: ["#6200EAFF", "#6200EADF", "#6200EABF", "#6200EA9F", "#6200EA7F", "#6200EA5F", "#6200EA3F", "#6200EA1F"][i]
                 }
             })
+
+            ret.push({
+                name: "Generic",
+                y: numGenericParams,
+                color: "#7D787838"
+            })
+            
+            return ret
         },
         requestItems() {
-            return this.sensitiveParams.filter(x => x.responseCode == -1).map(this.prepareItem)
+            return this.parameters.filter(x => x.responseCode == -1).map(this.prepareItem)
         },
         responseItems() {
-            return this.sensitiveParams.filter(x => x.responseCode > -1).map(this.prepareItem)
+            return this.parameters.filter(x => x.responseCode > -1).map(this.prepareItem)
         }
     },
     async mounted() {
         this.$emit('mountedView', {apiCollectionId: this.apiCollectionId, urlAndMethod: this.urlAndMethod, type: 2})
-        if (!this.apiCollection || this.apiCollection.length === 0 || this.$store.state.inventory.apiCollectionId !== this.apiCollectionId) {
-            this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId})
+        if (
+            this.$store.state.inventory.apiCollectionId !== this.apiCollectionId || 
+            this.$store.state.inventory.url !== this.url ||
+            this.$store.state.inventory.method !== this.method
+        ) {
+            let urlIdentifier = {apiCollectionId: this.apiCollectionId, url: this.url, method: this.method}
+            await this.$store.dispatch('inventory/loadParamsOfEndpoint', urlIdentifier)
         }
 
         let now = func.timeNow()

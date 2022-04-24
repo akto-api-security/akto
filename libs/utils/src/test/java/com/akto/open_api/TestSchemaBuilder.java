@@ -16,8 +16,8 @@ public class TestSchemaBuilder {
 
     @Test
     public void testComplexParams() throws Exception{
-        SingleTypeInfo s1 = generateSingleTypeInfo("accessToken", SingleTypeInfo.SubType.JWT);
-        SingleTypeInfo s2 = generateSingleTypeInfo("ip", SingleTypeInfo.SubType.IP_ADDRESS);
+        SingleTypeInfo s1 = generateSingleTypeInfo("accessToken", SingleTypeInfo.JWT);
+        SingleTypeInfo s2 = generateSingleTypeInfo("ip", SingleTypeInfo.IP_ADDRESS);
         List<SingleTypeInfo> singleTypeInfoList = Arrays.asList(s1,s2);
 
         Schema<?> schema =  Main.buildSchema(singleTypeInfoList);
@@ -31,17 +31,17 @@ public class TestSchemaBuilder {
 
     @Test
     public void testSimpleObject() throws Exception {
-        SingleTypeInfo s1 = generateSingleTypeInfo("user#name#first", SingleTypeInfo.SubType.GENERIC);
-        SingleTypeInfo s2 = generateSingleTypeInfo("user#name#last", SingleTypeInfo.SubType.GENERIC);
-        SingleTypeInfo s3 = generateSingleTypeInfo("user#age", SingleTypeInfo.SubType.INTEGER_32);
-        SingleTypeInfo s4 = generateSingleTypeInfo("id", SingleTypeInfo.SubType.INTEGER_64);
-        SingleTypeInfo s5 = generateSingleTypeInfo("email", SingleTypeInfo.SubType.EMAIL);
-        SingleTypeInfo s6 = generateSingleTypeInfo("cards#$#id", SingleTypeInfo.SubType.GENERIC);
-        SingleTypeInfo s7 = generateSingleTypeInfo("cards#$#name", SingleTypeInfo.SubType.GENERIC);
-        SingleTypeInfo s8 = generateSingleTypeInfo("cards#$#dashboard#$#dashboard_id", SingleTypeInfo.SubType.UUID);
-        SingleTypeInfo s9 = generateSingleTypeInfo("cards#$#dashboard#$#name", SingleTypeInfo.SubType.GENERIC);
-        SingleTypeInfo s10 = generateSingleTypeInfo("cards#$#dashboard#$#time", SingleTypeInfo.SubType.INTEGER_64);
-        SingleTypeInfo s11 = generateSingleTypeInfo("prices#$", SingleTypeInfo.SubType.FLOAT);
+        SingleTypeInfo s1 = generateSingleTypeInfo("user#name#first", SingleTypeInfo.GENERIC);
+        SingleTypeInfo s2 = generateSingleTypeInfo("user#name#last", SingleTypeInfo.GENERIC);
+        SingleTypeInfo s3 = generateSingleTypeInfo("user#age", SingleTypeInfo.INTEGER_32);
+        SingleTypeInfo s4 = generateSingleTypeInfo("id", SingleTypeInfo.INTEGER_64);
+        SingleTypeInfo s5 = generateSingleTypeInfo("email", SingleTypeInfo.EMAIL);
+        SingleTypeInfo s6 = generateSingleTypeInfo("cards#$#id", SingleTypeInfo.GENERIC);
+        SingleTypeInfo s7 = generateSingleTypeInfo("cards#$#name", SingleTypeInfo.GENERIC);
+        SingleTypeInfo s8 = generateSingleTypeInfo("cards#$#dashboard#$#dashboard_id", SingleTypeInfo.UUID);
+        SingleTypeInfo s9 = generateSingleTypeInfo("cards#$#dashboard#$#name", SingleTypeInfo.GENERIC);
+        SingleTypeInfo s10 = generateSingleTypeInfo("cards#$#dashboard#$#time", SingleTypeInfo.INTEGER_64);
+        SingleTypeInfo s11 = generateSingleTypeInfo("prices#$", SingleTypeInfo.FLOAT);
         List<SingleTypeInfo> singleTypeInfoList = Arrays.asList(s1,s2,s3,s4,s5,s6,s7,s8,s9,s10,s11);
 
         Schema<?> schema =  Main.buildSchema(singleTypeInfoList);

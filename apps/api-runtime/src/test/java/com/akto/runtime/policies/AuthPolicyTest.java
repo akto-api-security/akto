@@ -13,7 +13,7 @@ public class AuthPolicyTest {
 
     public static HttpResponseParams generateHttpResponseParams(Map<String, List<String>> headers) {
         HttpRequestParams httpRequestParams = new HttpRequestParams("GET", "/a", "", headers, "", 0);
-        return new HttpResponseParams("",200,"",new HashMap<>(),"",httpRequestParams ,0,"0",false, HttpResponseParams.Source.OTHER, "");
+        return new HttpResponseParams("",200,"",new HashMap<>(),"",httpRequestParams ,0,"0",false, HttpResponseParams.Source.OTHER, "", "");
     }
 
     @Test

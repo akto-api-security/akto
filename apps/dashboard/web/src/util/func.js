@@ -1,3 +1,4 @@
+import vuetify from "../plugins/vuetify"
 export default {
     trackingPeriodStr: (num) => {
         switch (num) {
@@ -295,7 +296,7 @@ export default {
         return ret
     },
     isSubTypeSensitive(x) {
-        return x.savedAsSensitive || x.sensitive || x.subType === "EMAIL" || x.subType === "CREDIT_CARD" || x.subType.indexOf("PHONE_NUMBER") === 0 || x.subType === "SSN" || x.subType === "ADDRESS" || x.subType === "PAN_CARD"
+        return x.savedAsSensitive || x.sensitive
     },
     parameterizeUrl(x) {
         let re = /INTEGER|STRING/gi;
@@ -304,11 +305,11 @@ export default {
         });
         return newStr
     },
-    groupByEndpoint(listParams, apiInfoList,idToName) {
+    mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
         let ret = {}
         let apiInfoMap = {}
 
-        if (!listParams) {
+        if (!listEndpoints) {
             return []
         }
 
@@ -318,7 +319,7 @@ export default {
             })
         }
 
-        listParams.forEach(x => {
+        listEndpoints.forEach(x => {
             let key = x.apiCollectionId + "-" + x.url + "-" + x.method
             if (!ret[key]) {
                 let access_type = null
@@ -336,61 +337,48 @@ export default {
                 let authType = apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].join(" or ") : ""
 
                 ret[key] = {
-                    sensitive: 0,
+                    shadow: x.shadow ? x.shadow : false,
+                    sensitive: x.sensitive,
                     endpoint: x.url,
                     parameterisedEndpoint: this.parameterizeUrl(x.url),
                     open: apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].indexOf("UNAUTHENTICATED") !== -1 : false,
                     access_type: access_type,
                     method: x.method,
-                    color: "#00bfa5",
+                    color: x.sensitive && x.sensitive.size > 0 ? "#f44336" : "#00bfa5",
                     apiCollectionId: x.apiCollectionId,
                     last_seen: apiInfoMap[key] ? this.prettifyEpoch(apiInfoMap[key]["lastSeen"]) : 0,
-                    detectedTs: null,
-                    added: '-',
+                    detectedTs: x.startTs,
+                    changesCount: x.changesCount,
+                    changes: x.changesCount && x.changesCount > 0 ? (x.changesCount +" new parameter"+(x.changesCount > 1? "s": "")) : '-',
+                    added: this.prettifyEpoch(x.startTs),
                     violations: apiInfoMap[key] ? apiInfoMap[key]["violations"] : {},
-                    changesCount: 0,
-                    changes: '',
                     apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
-                    auth_type: (authType || "").toLowerCase()
+                    auth_type: (authType || "").toLowerCase(),
+                    sensitiveTags: this.convertSensitiveTags(x.sensitive)
                 }
 
             }
-            
-            let val = ret[key]
+        })
+        
+        return Object.values(ret) 
+    },
 
-            if(this.isSubTypeSensitive(x)) {
-                val.sensitive ++
-                if (!val.sensitiveTags) {
-                    val.sensitiveTags = new Set()
-                }
-    
-                val.sensitiveTags.add(x.subType)
-                val.color = "#f44336"
-            }
+    convertSensitiveTags(subTypeList) {
+        let result = new Set()
+        if (!subTypeList || subTypeList.size === 0) return result
 
-            let now = this.timeNow()
-
-            if ((now - x.timestamp) < this.recencyPeriod) {
-                val.changesCount++
-            }
-
-            if (!val.detectedTs) {
-                val.detectedTs = x.timestamp
-            } else {
-                val.detectedTs = Math.min(val.detectedTs, x.timestamp)
-            }
-
-            if (val.detectedTs)
-                val.added = this.prettifyEpoch(val.detectedTs)
-
-            if (val.changesCount > 0)
-                val.changes = val.changesCount + " new parameter" + (val.changesCount > 1 ? "s" : "")
-            
+        subTypeList.forEach((x) => {
+            result.add(x.name)
         })
 
-        return Object.values(ret)        
+        return result
     },
+
     recencyPeriod: 60 * 24 * 60 * 60,
+    toCommaSeparatedNumber(number) {
+        let nf = new Intl.NumberFormat('en-US');
+        return nf.format(number);      
+    },  
     sensitiveTagDetails(tag) {
         let icon = "$fas_info-circle"
         switch(tag) {
@@ -421,5 +409,78 @@ export default {
                 break;        
         }
         return icon
+    },
+
+    preparePredicatesForApi(predicates) {
+        let result = []
+        if (!predicates) return result
+        predicates.forEach((predicate) => {
+            let type = predicate["type"]
+            let obj = {"type": type}
+
+            let valueMap = {}
+            switch (type) {
+                case "STARTS_WITH":
+                case "ENDS_WITH":
+                case "REGEX":
+                case "EQUALS_TO":
+                    valueMap["value"] = predicate["value"]
+                    break;
+
+                case "IS_NUMBER":
+                    break;
+
+            }
+
+            obj["valueMap"] = valueMap
+
+            result.push(obj)
+        })
+
+        return result;
+    },
+
+    prepareDataTypes(data_types) {
+        if (data_types) {
+            data_types.forEach((x) => {
+                x["color"] = x["sensitiveAlways"] || x["sensitivePosition"].length > 0 ? vuetify.userPreset.theme.themes.dark.redMetric : "transparent"
+                x["prefix"] = x["id"] ? "[custom]" : ""
+                if (x["id"]) {
+                    if (!x["keyConditions"]) {
+                        x["keyConditions"] = {"operator": "AND", "predicates": []}
+                    }
+                    if (!x["valueConditions"]) {
+                        x["valueConditions"] = {"operator": "AND", "predicates": []}
+                    }
+                } else {
+                    x["active"] = true
+                }
+            })
+
+            data_types.sort(function(a,b){
+                if (a["id"] && b["id"]) return b["id"]["timestamp"] - a["id"]["timestamp"]
+                return a["id"] ? -1 : 1
+            })
+
+            data_types.sort(function(a,b){
+                if (a["active"] && b["active"]) return 0
+                return a["active"] ? -1 : 1
+            })
+        }
+    },
+
+    prettifySensitivePosition(sensitivePosition) {
+        let andIndex = sensitivePosition.length - 2
+        let result = ""
+        for (let idx=0; idx < sensitivePosition.length; idx++) {
+            result += sensitivePosition[idx]
+            if (andIndex) {
+                result += "and"
+            } else {
+                result += ","
+            }
+        }
+
+        return result
     }
 }

@@ -3,6 +3,7 @@ package com.akto.dao;
 import com.mongodb.client.*;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReplaceOptions;
+import com.mongodb.client.model.Sorts;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.InsertManyResult;
 import com.mongodb.client.result.InsertOneResult;
@@ -54,7 +55,18 @@ public abstract class MCollection<T> {
         return ret;
     }
     public List<T> findAll(Bson q) {
-        MongoCursor<T> cursor = this.getMCollection().find(q).cursor();
+        return findAll(q, 0, 1_000_000, null);
+    }
+
+    public List<T> findAll(Bson q, int skip, int limit, Bson sort) {
+        
+        FindIterable<T> commands = this.getMCollection().find(q).skip(skip).limit(limit);
+
+        if (sort != null) {
+            commands = commands.sort(sort);
+        }
+
+        MongoCursor<T> cursor = commands.cursor();
 
         ArrayList<T> ret = new ArrayList<T>();
 

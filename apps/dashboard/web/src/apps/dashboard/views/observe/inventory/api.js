@@ -57,9 +57,9 @@ export default {
             }
         })
     },
-    getAPICollection (apiCollectionId) {
+    fetchAPICollection (apiCollectionId) {
         return request({
-            url: '/api/getAPICollection',
+            url: '/api/fetchAPICollection',
             method: 'post',
             data: {
                 apiCollectionId: apiCollectionId
@@ -69,9 +69,9 @@ export default {
         })
     },
 
-    getAllUrlsAndMethods (apiCollectionId) {
+    fetchAllUrlsAndMethods (apiCollectionId) {
         return request({
-            url: '/api/getAllUrlsAndMethods',
+            url: '/api/fetchAllUrlsAndMethods',
             method: 'post',
             data: {
                 apiCollectionId: apiCollectionId
@@ -97,20 +97,37 @@ export default {
             data: {}
         })
     },
-    loadRecentParameters () {
+    loadRecentEndpoints () {
         return request({
-            url: '/api/loadRecentParameters',
+            url: '/api/loadRecentEndpoints',
             method: 'post',
             data: {}
         }).then((resp) => {
             return resp
         })
     },
-    loadSensitiveParameters () {
+    loadSensitiveParameters (apiCollectionId, url, method) {
         return request({
             url: '/api/loadSensitiveParameters',
             method: 'post',
-            data: {}
+            data: {
+                apiCollectionId,
+                url, 
+                method
+            }
+        }).then((resp) => {
+            return resp
+        })
+    },
+    loadParamsOfEndpoint (apiCollectionId, url, method) {
+        return request({
+            url: '/api/loadParamsOfEndpoint',
+            method: 'post',
+            data: {
+                apiCollectionId,
+                url,
+                method
+            }
         }).then((resp) => {
             return resp
         })
@@ -179,9 +196,10 @@ export default {
             return resp
         })
     },
-    fetchApiInfoListForRecentEndpoints() {
+
+    fetchDataTypeNames() {
         return request({
-            url: '/api/fetchApiInfoListForRecentEndpoints',
+            url: '/api/fetchDataTypeNames',
             method: 'post',
             data: {}
         }).then((resp) => {

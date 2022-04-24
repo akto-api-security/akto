@@ -127,7 +127,7 @@ export default {
                 method: x.method,
                 added: this.prettifyDate(x.timestamp),
                 location: x.isHeader ? 'Headers' : 'Payload',
-                type: x.subType || "OTHER",
+                type: x.subType.name || "OTHER",
                 apiCollectionId: x.apiCollectionId,
                 apiCollectionName: this.mapCollectionIdToName[x.apiCollectionId] || '-'
             }
@@ -141,7 +141,7 @@ export default {
         },
         sensitiveParamsForChart(allParams) {
             return Object.entries((allParams || []).reduce((z, e) => {
-                let key = func.isSubTypeSensitive(e) ? e.subType : 'General'
+                let key = func.isSubTypeSensitive(e) ? e.subType.name : 'General'
                 z[key] = (z[key] || 0) + 1
                 return z
             }, {})).map((x, i) => {
