@@ -129,7 +129,7 @@ router.beforeEach((to, from, next) => {
     if (to.name === 'signup' || to.name === 'login') {
         store.commit('auth/SET_ACCESS_TOKEN',null)
     }
-    if (window.mixpanel)
+    if (window.mixpanel && window.mixpanel.track)
         window.mixpanel.track(to.name)
     next()
 })
