@@ -58,6 +58,6 @@ navigator.serviceWorker.register('/sw.js').then(function(reg) {
     
 
 </script>
-<script src="/dist/main1.js"></script>
+<script src="/dist/main.js"></script>
 </body>
 </html>
