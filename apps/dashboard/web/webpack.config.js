@@ -20,7 +20,7 @@ module.exports = {
   output: {
     path: path.resolve(__dirname, './dist'),
     publicPath: '/dist/',
-    filename: '[name]'+process.env.HASH+'.js'
+    filename: '[name].js'
   },
   module: {
     rules: [
