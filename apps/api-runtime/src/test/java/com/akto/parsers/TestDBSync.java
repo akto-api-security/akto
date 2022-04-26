@@ -195,9 +195,9 @@ public class TestDBSync extends MongoBasedTest {
         aggr2.addURL(resp2);
         
         sync.computeDelta(aggr2, true, 123);
-        sync.syncWithDB(); 
+        sync.syncWithDB();
 
-        assertEquals(30, sync.getDelta(123).getStrictURLToMethods().size());
+        assertEquals(0, sync.getDelta(123).getStrictURLToMethods().size());
         assertEquals(1, sync.getDelta(123).getTemplateURLToMethods().size());
 
 
