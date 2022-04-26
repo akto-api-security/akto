@@ -38,19 +38,22 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.syncWithDB();
         parser.syncFunction(responseParams.subList(10,15));
         parser.apiCatalogSync.syncWithDB();
+        assertEquals(0, getStaticURLsSize(parser));
+
         parser.syncFunction(responseParams.subList(15,20));
         parser.apiCatalogSync.syncWithDB();
+        assertEquals(0, getStaticURLsSize(parser));
+
 
 
         Map<URLTemplate, RequestTemplate> urlTemplateMap = parser.apiCatalogSync.getDelta(123).getTemplateURLToMethods();
-        Map<URLStatic, RequestTemplate> urlStaticMap = parser.apiCatalogSync.getDelta(123).getStrictURLToMethods();
 
         for (URLTemplate urlTemplate: urlTemplateMap.keySet()) {
             System.out.println(urlTemplate.getTemplateString());
         }
 
         System.out.println();
-        System.out.println(urlStaticMap.keySet());
+        assertEquals(0, getStaticURLsSize(parser));
 
     }
 
