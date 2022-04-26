@@ -347,7 +347,6 @@ export default {
             return this.allEndpoints.filter(x => x.sensitive && x.sensitive.size > 0)
         },
         shadowEndpoints () {
-            console.log(this.allEndpoints);
             return this.allEndpoints.filter(x => x.shadow)
         },
         deprecatedEndpoints() {
