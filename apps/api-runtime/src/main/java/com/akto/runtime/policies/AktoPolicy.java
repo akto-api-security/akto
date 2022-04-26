@@ -42,7 +42,7 @@ public class AktoPolicy {
     }
 
     public AktoPolicy(APICatalogSync apiCatalogSync) {
-        buildFromDb(apiCatalogSync.delta);
+        buildFromDb(apiCatalogSync.dbState);
     }
 
     public void buildFromDb(Map<Integer, APICatalog> delta) {
@@ -199,7 +199,7 @@ public class AktoPolicy {
         if (apiCatalogSync != null) {
             this.currentBatchSize = 0;
             this.timeSinceLastSync = Context.now();
-            syncWithDb(false, apiCatalogSync.delta);
+            syncWithDb(false, apiCatalogSync.dbState);
         }
     }
 
