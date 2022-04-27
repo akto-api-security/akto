@@ -42,7 +42,7 @@ public class AktoPolicy {
     }
 
     public AktoPolicy(APICatalogSync apiCatalogSync) {
-        buildFromDb(apiCatalogSync.delta);
+        buildFromDb(apiCatalogSync.dbState);
     }
 
     public void buildFromDb(Map<Integer, APICatalog> delta) {
@@ -125,6 +125,16 @@ public class AktoPolicy {
             return;
         }
 
+        // there is a bug that /api/books was stored as api/books in db. So lastSeen has to be handled for this
+        String staticUrl = urlStatic.getUrl();
+        staticUrl = APICatalogSync.trim(staticUrl);
+        URLStatic newUrlStatic = new URLStatic(staticUrl, urlStatic.getMethod());
+        if (strictURLToMethods.containsKey(newUrlStatic)) {
+            filterSampleData.getId().getApiInfoKey().setUrl(staticUrl);
+            strictURLToMethods.get(urlStatic).getFilterSampleDataMap().put(filterSampleData.getId().getFilterId(), filterSampleData);
+            return;
+        }
+
         for (URLTemplate urlTemplate: templateURLToMethods.keySet()) {
             if (urlTemplate.match(urlStatic)) {
                 filterSampleData.getId().getApiInfoKey().setUrl(urlTemplate.getTemplateString());
@@ -152,6 +162,16 @@ public class AktoPolicy {
         URLStatic urlStatic = new URLStatic(apiInfoKey.getUrl(), apiInfoKey.getMethod());
         if (strictURLToMethods.containsKey(urlStatic)) {
             strictURLToMethods.get(urlStatic).setApiInfo(apiInfo);
+            return;
+        }
+
+        // there is a bug that /api/books was stored as api/books in db. So lastSeen has to be handled for this
+        String staticUrl = urlStatic.getUrl();
+        staticUrl = APICatalogSync.trim(staticUrl);
+        URLStatic newUrlStatic = new URLStatic(staticUrl, urlStatic.getMethod());
+        if (strictURLToMethods.containsKey(newUrlStatic)) {
+            apiInfo.getId().setUrl(staticUrl);
+            strictURLToMethods.get(newUrlStatic).setApiInfo(apiInfo);
             return;
         }
 
@@ -199,7 +219,7 @@ public class AktoPolicy {
         if (apiCatalogSync != null) {
             this.currentBatchSize = 0;
             this.timeSinceLastSync = Context.now();
-            syncWithDb(false, apiCatalogSync.delta);
+            syncWithDb(false, apiCatalogSync.dbState);
         }
     }
 

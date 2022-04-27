@@ -40,7 +40,7 @@ public class APICatalogSync {
     public int thresh;
     public String userIdentifier;
     private static final Logger logger = LoggerFactory.getLogger(APICatalogSync.class);
-    Map<Integer, APICatalog> dbState;
+    public Map<Integer, APICatalog> dbState;
     public Map<Integer, APICatalog> delta;
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
 
@@ -107,6 +107,10 @@ public class APICatalogSync {
 
         try {
             String respPayload = responseParams.getPayload();
+
+            if (respPayload == null || respPayload.isEmpty()) {
+                respPayload = "{}";
+            }
 
             if(respPayload.startsWith("[")) {
                 respPayload = "{\"json\": "+respPayload+"}";
@@ -301,7 +305,7 @@ public class APICatalogSync {
     }
 
 
-    private URLTemplate tryMergeUrls(URLStatic dbUrl, URLStatic newUrl) {
+    public static URLTemplate tryMergeUrls(URLStatic dbUrl, URLStatic newUrl) {
         if (dbUrl.getMethod() != newUrl.getMethod()) {
             return null;
         }
@@ -427,7 +431,7 @@ public class APICatalogSync {
         }
     }
 
-    private static String trim(String url) {
+    public static String trim(String url) {
         if (url.startsWith("/")) url = url.substring(1, url.length());
         if (url.endsWith("/")) url = url.substring(0, url.length()-1);
         return url;
