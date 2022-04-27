@@ -51,7 +51,7 @@ public class InventoryAction extends UserAction {
     public List<SingleTypeInfo> fetchRecentParams(int deltaPeriod) {
         int now = Context.now();
         int twoMonthsAgo = now - deltaPeriod;
-        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.gt("timestamp", twoMonthsAgo), 0, 2, null);
+        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.gt("timestamp", twoMonthsAgo), 0, 100000, null);
 
         return list;
     }
