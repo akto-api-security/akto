@@ -73,7 +73,11 @@ public class TestAktoPolicy extends MongoBasedTest {
         HttpResponseParams hrp1 = generateHttpResponseParams("url1", URLMethods.Method.GET, 0,new ArrayList<>(),false) ;
         HttpResponseParams hrp2 = generateHttpResponseParams("url2", URLMethods.Method.GET, 0,new ArrayList<>(),false) ;
         HttpResponseParams hrp3 = generateHttpResponseParams("url3", URLMethods.Method.GET, 0,new ArrayList<>(),false) ;
-        List<HttpResponseParams> responseParams = Arrays.asList(hrp1, hrp2, hrp3);
+
+        HttpResponseParams hrpMerge1 = generateHttpResponseParams("/api/books/1", URLMethods.Method.GET, 0,new ArrayList<>(),false) ;
+        HttpResponseParams hrpMerge2 = generateHttpResponseParams("/api/books/2", URLMethods.Method.GET, 0,new ArrayList<>(),false) ;
+
+        List<HttpResponseParams> responseParams = Arrays.asList(hrp1, hrp2, hrp3, hrpMerge1, hrpMerge2);
 
         HttpCallParser httpCallParser = new HttpCallParser("user", 1, 1,1);
         AktoPolicy aktoPolicy = new AktoPolicy(httpCallParser.apiCatalogSync);
@@ -84,21 +88,21 @@ public class TestAktoPolicy extends MongoBasedTest {
         aktoPolicy.main(Collections.singletonList(hrp1), httpCallParser.apiCatalogSync);
 
         List<ApiInfo> apiInfoList = ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId", 0));
-        Assertions.assertEquals(3,apiInfoList.size());
+        Assertions.assertEquals(4,apiInfoList.size());
 
         // restart server means new httpCallParser and aktoPolicy
         HttpCallParser httpCallParser1 = new HttpCallParser("user", 1, 1,1);
         AktoPolicy aktoPolicy1 = new AktoPolicy(httpCallParser1.apiCatalogSync);
 
         apiInfoList = ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId", 0));
-        Assertions.assertEquals(3,apiInfoList.size());
+        Assertions.assertEquals(4,apiInfoList.size());
 
         httpCallParser1.syncFunction(responseParams.subList(0,1));
         httpCallParser1.apiCatalogSync.syncWithDB();
         aktoPolicy1.main(responseParams.subList(0,1), httpCallParser1.apiCatalogSync);
 
         apiInfoList = ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId", 0));
-        Assertions.assertEquals(3,apiInfoList.size());
+        Assertions.assertEquals(4,apiInfoList.size());
 
         HttpResponseParams hrp4 = generateHttpResponseParams("url4", URLMethods.Method.GET, 0,new ArrayList<>(),false) ;
         httpCallParser1.syncFunction(Collections.singletonList(hrp4));
@@ -108,7 +112,7 @@ public class TestAktoPolicy extends MongoBasedTest {
         aktoPolicy1.main(Collections.singletonList(hrp1), httpCallParser1.apiCatalogSync);
 
         apiInfoList = ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId", 0));
-        Assertions.assertEquals(4,apiInfoList.size());
+        Assertions.assertEquals(5,apiInfoList.size());
 
     }
 
@@ -137,8 +141,9 @@ public class TestAktoPolicy extends MongoBasedTest {
         HttpResponseParams hrp9 = generateHttpResponseParams(urlStatic9.getUrl(), urlStatic9.getMethod(),0,Collections.singletonList(ApiInfo.AuthType.BEARER), false);
         URLStatic urlStatic10 = new URLStatic("/api/something/1", URLMethods.Method.GET);
         HttpResponseParams hrp10 = generateHttpResponseParams(urlStatic10.getUrl(), urlStatic10.getMethod(),0,Collections.singletonList(ApiInfo.AuthType.BASIC), false);
-        URLStatic urlStatic99 = new URLStatic("api/slash", URLMethods.Method.GET);
+        URLStatic urlStatic99 = new URLStatic("api/slash/1", URLMethods.Method.GET);
         HttpResponseParams hrp99 = generateHttpResponseParams("/"+urlStatic99.getUrl(), urlStatic99.getMethod(),99,Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED), false);
+        URLTemplate urlTemplate99 = APICatalogSync.tryMergeUrls(new URLStatic("api/slash/2", URLMethods.Method.GET), new URLStatic("api/slash/3", URLMethods.Method.GET));
 
         // sending a couple of requests to akto policy initially
         List<HttpResponseParams> hrpList = Arrays.asList(hrp1, hrp2, hrp3, hrp4, hrp5, hrp6,hrp99);
@@ -164,11 +169,13 @@ public class TestAktoPolicy extends MongoBasedTest {
 
         Map<URLStatic, RequestTemplate> strictUrlToMethods99 = new HashMap<>();
         strictUrlToMethods99.put(urlStatic99, null);
+        Map<URLTemplate, RequestTemplate> templateUrlToMethods99 = new HashMap<>();
+        templateUrlToMethods99.put(urlTemplate99, null);
 
 
         APICatalog apiCatalog = new APICatalog(0,strictUrlToMethods, new HashMap<>());
         APICatalog apiCatalog1 = new APICatalog(0,strictUrlToMethods1, new HashMap<>());
-        APICatalog apiCatalog99 = new APICatalog(0,strictUrlToMethods99, new HashMap<>());
+        APICatalog apiCatalog99 = new APICatalog(0,strictUrlToMethods99, templateUrlToMethods99);
         apiCatalogSync.dbState.put(0, apiCatalog);
         apiCatalogSync.dbState.put(1, apiCatalog1);
         apiCatalogSync.dbState.put(99, apiCatalog99);
@@ -195,6 +202,14 @@ public class TestAktoPolicy extends MongoBasedTest {
         filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(filterSampleDataList.size(), 1);
 
+        boolean flag = false;
+        for (ApiInfo apiInfo: apiInfoList) {
+            if (apiInfo.getId().getApiCollectionId() == 99 && apiInfo.getId().url.equals(urlStatic99.getUrl())) {
+                flag = true;
+                break;
+            }
+        }
+        Assertions.assertTrue(flag);
 
         URLStatic urlStatic7 = new URLStatic("/api/toys/2", URLMethods.Method.PUT);
         HttpResponseParams hrp7 = generateHttpResponseParams(urlStatic7.getUrl(), urlStatic7.getMethod(),0, Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED),true);

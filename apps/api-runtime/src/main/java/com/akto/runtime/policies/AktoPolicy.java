@@ -132,6 +132,7 @@ public class AktoPolicy {
         if (strictURLToMethods.containsKey(newUrlStatic)) {
             filterSampleData.getId().getApiInfoKey().setUrl(staticUrl);
             strictURLToMethods.get(urlStatic).getFilterSampleDataMap().put(filterSampleData.getId().getFilterId(), filterSampleData);
+            return;
         }
 
         for (URLTemplate urlTemplate: templateURLToMethods.keySet()) {
@@ -171,6 +172,7 @@ public class AktoPolicy {
         if (strictURLToMethods.containsKey(newUrlStatic)) {
             apiInfo.getId().setUrl(staticUrl);
             strictURLToMethods.get(newUrlStatic).setApiInfo(apiInfo);
+            return;
         }
 
         for (URLTemplate urlTemplate: templateURLToMethods.keySet()) {
