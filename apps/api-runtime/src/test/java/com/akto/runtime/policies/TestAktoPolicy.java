@@ -137,14 +137,16 @@ public class TestAktoPolicy extends MongoBasedTest {
         HttpResponseParams hrp9 = generateHttpResponseParams(urlStatic9.getUrl(), urlStatic9.getMethod(),0,Collections.singletonList(ApiInfo.AuthType.BEARER), false);
         URLStatic urlStatic10 = new URLStatic("/api/something/1", URLMethods.Method.GET);
         HttpResponseParams hrp10 = generateHttpResponseParams(urlStatic10.getUrl(), urlStatic10.getMethod(),0,Collections.singletonList(ApiInfo.AuthType.BASIC), false);
+        URLStatic urlStatic99 = new URLStatic("api/slash", URLMethods.Method.GET);
+        HttpResponseParams hrp99 = generateHttpResponseParams("/"+urlStatic99.getUrl(), urlStatic99.getMethod(),99,Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED), false);
 
         // sending a couple of requests to akto policy initially
-        List<HttpResponseParams> hrpList = Arrays.asList(hrp1, hrp2, hrp3, hrp4, hrp5, hrp6);
+        List<HttpResponseParams> hrpList = Arrays.asList(hrp1, hrp2, hrp3, hrp4, hrp5, hrp6,hrp99);
         aktoPolicy.main(hrpList, null);
 
         // since no data initially so will be stored in reserves
         Assertions.assertEquals(aktoPolicy.getReserveApiInfoMap().keySet().size(), hrpList.size());
-        Assertions.assertEquals(aktoPolicy.getReserveFilterSampleDataMap().keySet().size(), 0);
+        Assertions.assertEquals(aktoPolicy.getReserveFilterSampleDataMap().keySet().size(), 1);
 
 
         // After some threshold is reached httpCallParser will sync with db and send apiCatalogSync to aktoPolicy
@@ -160,16 +162,21 @@ public class TestAktoPolicy extends MongoBasedTest {
         Map<URLStatic, RequestTemplate> strictUrlToMethods1 = new HashMap<>();
         strictUrlToMethods1.put(urlStatic3, null);
 
+        Map<URLStatic, RequestTemplate> strictUrlToMethods99 = new HashMap<>();
+        strictUrlToMethods99.put(urlStatic99, null);
+
 
         APICatalog apiCatalog = new APICatalog(0,strictUrlToMethods, new HashMap<>());
         APICatalog apiCatalog1 = new APICatalog(0,strictUrlToMethods1, new HashMap<>());
+        APICatalog apiCatalog99 = new APICatalog(0,strictUrlToMethods99, new HashMap<>());
         apiCatalogSync.dbState.put(0, apiCatalog);
         apiCatalogSync.dbState.put(1, apiCatalog1);
+        apiCatalogSync.dbState.put(99, apiCatalog99);
 
         aktoPolicy.main(Collections.singletonList(hrp1), apiCatalogSync);
         Assertions.assertEquals(aktoPolicy.getReserveApiInfoMap().keySet().size(), 0);
-        Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().keySet().size(), 2);
-        Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().get(0).getStrictURLToMethods().size(), hrpList.size() -1 ); // because one hrp is of different collection
+        Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().keySet().size(), 3);
+        Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().get(0).getStrictURLToMethods().size(), hrpList.size() -2 ); // because two hrps is of different collection
         Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().get(0).getTemplateURLToMethods().size(), 0 );
         Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().get(1).getStrictURLToMethods().size(),1);
         Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().get(1).getTemplateURLToMethods().size(),0);
@@ -186,7 +193,7 @@ public class TestAktoPolicy extends MongoBasedTest {
         apiInfoList = ApiInfoDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(apiInfoList.size(), hrpList.size());
         filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
-        Assertions.assertEquals(filterSampleDataList.size(), 0); // because no policy violation
+        Assertions.assertEquals(filterSampleDataList.size(), 1);
 
 
         URLStatic urlStatic7 = new URLStatic("/api/toys/2", URLMethods.Method.PUT);
@@ -218,13 +225,13 @@ public class TestAktoPolicy extends MongoBasedTest {
         apiInfoList = ApiInfoDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(apiInfoList.size(), hrpList.size());
         filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
-        Assertions.assertEquals(filterSampleDataList.size(), 0);
+        Assertions.assertEquals(filterSampleDataList.size(), 1);
 
         aktoPolicy.main(Collections.singletonList(hrp1), apiCatalogSync);
         apiInfoList = ApiInfoDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(apiInfoList.size(), hrpList.size()+2);
         filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
-        Assertions.assertEquals(filterSampleDataList.size(), 1);
+        Assertions.assertEquals(filterSampleDataList.size(), 2);
 
         Map<ApiInfo.ApiInfoKey, ApiInfo> apiInfoMap = new HashMap<>();
         for (ApiInfo apiInfo: apiInfoList) {
@@ -279,7 +286,7 @@ public class TestAktoPolicy extends MongoBasedTest {
         Assertions.assertTrue(apiInfoMap.get(somethingIntegerApiInfoKey).getAllAuthTypesFound().contains(authTypes));
 
         filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
-        Assertions.assertEquals(filterSampleDataList.size(), 2);
+        Assertions.assertEquals(filterSampleDataList.size(), 3);
     }
 
     @Test

@@ -125,6 +125,15 @@ public class AktoPolicy {
             return;
         }
 
+        // there is a bug that /api/books was stored as api/books in db. So lastSeen has to be handled for this
+        String staticUrl = urlStatic.getUrl();
+        staticUrl = APICatalogSync.trim(staticUrl);
+        URLStatic newUrlStatic = new URLStatic(staticUrl, urlStatic.getMethod());
+        if (strictURLToMethods.containsKey(newUrlStatic)) {
+            filterSampleData.getId().getApiInfoKey().setUrl(staticUrl);
+            strictURLToMethods.get(urlStatic).getFilterSampleDataMap().put(filterSampleData.getId().getFilterId(), filterSampleData);
+        }
+
         for (URLTemplate urlTemplate: templateURLToMethods.keySet()) {
             if (urlTemplate.match(urlStatic)) {
                 filterSampleData.getId().getApiInfoKey().setUrl(urlTemplate.getTemplateString());
@@ -153,6 +162,15 @@ public class AktoPolicy {
         if (strictURLToMethods.containsKey(urlStatic)) {
             strictURLToMethods.get(urlStatic).setApiInfo(apiInfo);
             return;
+        }
+
+        // there is a bug that /api/books was stored as api/books in db. So lastSeen has to be handled for this
+        String staticUrl = urlStatic.getUrl();
+        staticUrl = APICatalogSync.trim(staticUrl);
+        URLStatic newUrlStatic = new URLStatic(staticUrl, urlStatic.getMethod());
+        if (strictURLToMethods.containsKey(newUrlStatic)) {
+            apiInfo.getId().setUrl(staticUrl);
+            strictURLToMethods.get(newUrlStatic).setApiInfo(apiInfo);
         }
 
         for (URLTemplate urlTemplate: templateURLToMethods.keySet()) {

@@ -431,7 +431,7 @@ public class APICatalogSync {
         }
     }
 
-    private static String trim(String url) {
+    public static String trim(String url) {
         if (url.startsWith("/")) url = url.substring(1, url.length());
         if (url.endsWith("/")) url = url.substring(0, url.length()-1);
         return url;
