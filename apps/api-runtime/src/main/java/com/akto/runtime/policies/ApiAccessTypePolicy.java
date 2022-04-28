@@ -36,6 +36,7 @@ public class ApiAccessTypePolicy {
         }
 
         for (String ip: ipList) {
+           ip = ip.replaceAll(" ", "");
            boolean result = ipInCidr(ip);
            if (!result) {
                apiInfo.getApiAccessTypes().add(ApiInfo.ApiAccessType.PUBLIC);

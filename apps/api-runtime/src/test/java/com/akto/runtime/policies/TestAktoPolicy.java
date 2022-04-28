@@ -1,6 +1,5 @@
 package com.akto.runtime.policies;
 
-import com.akto.DaoInit;
 import com.akto.MongoBasedTest;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
@@ -113,6 +112,38 @@ public class TestAktoPolicy extends MongoBasedTest {
 
         apiInfoList = ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId", 0));
         Assertions.assertEquals(5,apiInfoList.size());
+
+    }
+
+    @Test
+    public void testAddLastSeenToOldMissingSlashEndpoints() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        ApiInfoDao.instance.getMCollection().drop();
+        FilterSampleDataDao.instance.getMCollection().drop();
+        AccountSettings accountSettings = new AccountSettings(0, Collections.singletonList("172.31.0.0/16"));
+        AccountSettingsDao.instance.insertOne(accountSettings);
+        RuntimeFilterDao.instance.initialiseFilters();
+
+        HttpCallParser parser = new HttpCallParser("access-token", 1,40,10);
+
+        HttpResponseParams hrp1 = generateHttpResponseParams("api/toys/1", URLMethods.Method.GET,0, Collections.singletonList(ApiInfo.AuthType.JWT), true) ;
+        parser.syncFunction(Collections.singletonList(hrp1));
+        parser.apiCatalogSync.syncWithDB();
+
+        AktoPolicy aktoPolicy = new AktoPolicy(parser.apiCatalogSync);
+        URLStatic urlStatic = new URLStatic(hrp1.requestParams.url, URLMethods.Method.valueOf(hrp1.requestParams.method));
+        PolicyCatalog policyCatalog = aktoPolicy.getApiInfoCatalogMap().get(0).getStrictURLToMethods().get(urlStatic);
+        Assertions.assertNull(policyCatalog.getApiInfo());
+
+        HttpResponseParams hrp2 = generateHttpResponseParams("/api/toys/1", URLMethods.Method.GET,0, Collections.singletonList(ApiInfo.AuthType.JWT), true) ;
+        try {
+            aktoPolicy.main(Collections.singletonList(hrp2), null);
+        } catch (Exception e) {
+            Assertions.fail();
+        }
+
+        policyCatalog = aktoPolicy.getApiInfoCatalogMap().get(0).getStrictURLToMethods().get(urlStatic);
+        Assertions.assertNotNull(policyCatalog.getApiInfo());
 
     }
 

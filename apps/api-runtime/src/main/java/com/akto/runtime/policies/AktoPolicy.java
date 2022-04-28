@@ -323,6 +323,20 @@ public class AktoPolicy {
             return strictURLToMethods.get(urlStatic);
         }
 
+        // there is a bug that /api/books was stored as api/books in db. So lastSeen has to be handled for this
+        String staticUrl = urlStatic.getUrl();
+        staticUrl = APICatalogSync.trim(staticUrl);
+        URLStatic newUrlStatic = new URLStatic(staticUrl, urlStatic.getMethod());
+        if (strictURLToMethods.containsKey(newUrlStatic)) {
+            ApiInfo a = strictURLToMethods.get(newUrlStatic).getApiInfo();
+            if (a == null) {
+                apiInfoKey.setUrl(newUrlStatic.getUrl());
+                a = new ApiInfo(apiInfoKey);
+                strictURLToMethods.get(newUrlStatic).setApiInfo(a);
+            }
+            return strictURLToMethods.get(newUrlStatic);
+        }
+
         for (URLTemplate urlTemplate: templateURLToMethods.keySet()) {
             if (urlTemplate.match(urlStatic)) {
                 ApiInfo a = templateURLToMethods.get(urlTemplate).getApiInfo();
