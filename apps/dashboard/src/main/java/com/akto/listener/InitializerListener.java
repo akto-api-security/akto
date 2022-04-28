@@ -76,7 +76,7 @@ public class InitializerListener implements ServletContextListener {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 try {
-                    ChangesInfo changesInfo = getChangesInfo();
+                    ChangesInfo changesInfo = getChangesInfo(31, 7);
                     if (changesInfo == null || (changesInfo.newEndpointsLast7Days.size() + changesInfo.newSensitiveParams.size()) == 0) {
                         return;
                     }
@@ -101,23 +101,56 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
+    private void setUpDailyScheduler() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                try {
+                    ChangesInfo changesInfo = getChangesInfo(1, 1);
+                    User user = UsersDao.instance.findOne(new BasicDBObject("login", new BasicDBObject("$regex", ".*slack.com")));
+                    if (user == null) {
+                        return;
+                    }
+                    if (changesInfo == null || (changesInfo.newEndpointsLast7Days.size() + changesInfo.newSensitiveParams.size()) == 0) {
+                        return;
+                    }
+                    String sendTo = user.getLogin();
+                    logger.info("Sending daily email to " + sendTo);
+                    Mail mail = WeeklyEmail.buildWeeklyEmail(
+                        changesInfo.newSensitiveParams.size(), 
+                        changesInfo.newEndpointsLast7Days.size(), 
+                        changesInfo.newEndpointsLast31Days.size(), 
+                        sendTo, 
+                        changesInfo.newEndpointsLast7Days, 
+                        changesInfo.newSensitiveParams
+                    );
+
+                    WeeklyEmail.send(mail);
+
+                } catch (Exception ex) {
+                    ex.printStackTrace(); // or loggger would be better
+                }
+            }
+        }, 24, 24, TimeUnit.HOURS);
+
+    }
+
     static class ChangesInfo {
         public List<String> newSensitiveParams = new ArrayList<>();
         public List<String> newEndpointsLast7Days = new ArrayList<>();
         public List<String> newEndpointsLast31Days = new ArrayList<>();
     }
 
-    protected ChangesInfo getChangesInfo() {
+    protected ChangesInfo getChangesInfo(int newEndpointsDays, int newSensitiveParamsDays) {
         Context.accountId.set(1_000_000);
         InventoryAction inventoryAction = new InventoryAction();
         try {
-            List<SingleTypeInfo> params = inventoryAction.fetchRecentParams(31 * 24 * 60 * 60);
+            List<SingleTypeInfo> params = inventoryAction.fetchRecentParams(newEndpointsDays * 24 * 60 * 60);
             Map<String, Integer> newEndpointsToCountLast7Days = new HashMap<>();
             Map<String, Integer> newEndpointsToCountLast31Days = new HashMap<>();
             Set<String> newSensitiveParams = new HashSet<>();
             int now = Context.now();
             for(SingleTypeInfo param: params) {
-                if ((now-param.getTimestamp()) < 7 * 24 * 60 * 60 ) {
+                if ((now-param.getTimestamp()) < newSensitiveParamsDays * 24 * 60 * 60 ) {
 
                     newEndpointsToCountLast7Days.compute(param.getUrl(), (k, v) -> 1 + (v == null ? 0 : v));
 
@@ -175,7 +208,7 @@ public class InitializerListener implements ServletContextListener {
         SingleTypeInfo.init();
 
         setUpWeeklyScheduler();
-
+        setUpDailyScheduler();
         Context.accountId.set(1_000_000);
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
         if (backwardCompatibility == null) {
