@@ -109,6 +109,7 @@ public class HttpCallParser {
     public static Map<String,List<String>> getHeaders(Gson gson, Map json, String key) {
         Map headersFromRequest = gson.fromJson((String) json.get(key),Map.class);
         Map<String,List<String>> headers = new HashMap<>();
+        if (headersFromRequest == null) return headers;
         for (Object k: headersFromRequest.keySet()) {
             List<String> values = headers.getOrDefault(k,new ArrayList<>());
             values.add(headersFromRequest.get(k).toString());

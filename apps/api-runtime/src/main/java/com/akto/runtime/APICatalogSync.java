@@ -40,7 +40,7 @@ public class APICatalogSync {
     public int thresh;
     public String userIdentifier;
     private static final Logger logger = LoggerFactory.getLogger(APICatalogSync.class);
-    Map<Integer, APICatalog> dbState;
+    public Map<Integer, APICatalog> dbState;
     public Map<Integer, APICatalog> delta;
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
 
@@ -107,6 +107,10 @@ public class APICatalogSync {
 
         try {
             String respPayload = responseParams.getPayload();
+
+            if (respPayload == null || respPayload.isEmpty()) {
+                respPayload = "{}";
+            }
 
             if(respPayload.startsWith("[")) {
                 respPayload = "{\"json\": "+respPayload+"}";
@@ -228,35 +232,35 @@ public class APICatalogSync {
                     }
 
                     if (dbTemplate.compare(newTemplate, mergedTemplate)) {
+                        Set<RequestTemplate> similarTemplates = potentialMerges.get(mergedTemplate);
+                        if (similarTemplates == null) {
+                            similarTemplates = new HashSet<>();
+                            potentialMerges.put(mergedTemplate, similarTemplates);
+                        } 
+                        similarTemplates.add(dbTemplate);
+                        countSimilarURLs++;
+                     }
+                }
+                     
+                if (countSimilarURLs >= 20) {
+                    URLTemplate mergedTemplate = potentialMerges.keySet().iterator().next();
+                    RequestTemplate alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(mergedTemplate);
+                    RequestTemplate dbTemplate = potentialMerges.get(mergedTemplate).iterator().next();
 
-                        if (countSimilarURLs <= 20) {
-                            Set<RequestTemplate> similarTemplates = potentialMerges.get(mergedTemplate);
-                            if (similarTemplates == null) {
-                                similarTemplates = new HashSet<>();
-                                potentialMerges.put(mergedTemplate, similarTemplates);
-                            } 
-                            similarTemplates.add(dbTemplate);
-                            countSimilarURLs++;
-                        } else {
-                            RequestTemplate alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(mergedTemplate);
-
-                            if (alreadyInDelta != null) {
-                                alreadyInDelta.mergeFrom(newTemplate);
-                            } else {
-                                RequestTemplate dbCopy = dbTemplate.copy();
-                                dbCopy.mergeFrom(newTemplate);    
-                                deltaCatalog.getTemplateURLToMethods().put(mergedTemplate, dbCopy);
-                            }
-
-                            for (RequestTemplate rt: potentialMerges.getOrDefault(mergedTemplate, new HashSet<>())) {
-                                deltaCatalog.getDeletedInfo().addAll(rt.getAllTypeInfo());
-                            }
-                            deltaCatalog.getDeletedInfo().addAll(dbTemplate.getAllTypeInfo());
-                            
-                            newUrlMatchedInDb = true;
-                            break;    
-                        }
+                    if (alreadyInDelta != null) {
+                        alreadyInDelta.mergeFrom(newTemplate);
+                    } else {
+                        RequestTemplate dbCopy = dbTemplate.copy();
+                        dbCopy.mergeFrom(newTemplate);    
+                        deltaCatalog.getTemplateURLToMethods().put(mergedTemplate, dbCopy);
                     }
+
+                    for (RequestTemplate rt: potentialMerges.getOrDefault(mergedTemplate, new HashSet<>())) {
+                        deltaCatalog.getDeletedInfo().addAll(rt.getAllTypeInfo());
+                    }
+                    deltaCatalog.getDeletedInfo().addAll(dbTemplate.getAllTypeInfo());
+                    
+                    newUrlMatchedInDb = true;
                 }
 
                 if (newUrlMatchedInDb) {
@@ -301,7 +305,7 @@ public class APICatalogSync {
     }
 
 
-    private URLTemplate tryMergeUrls(URLStatic dbUrl, URLStatic newUrl) {
+    public static URLTemplate tryMergeUrls(URLStatic dbUrl, URLStatic newUrl) {
         if (dbUrl.getMethod() != newUrl.getMethod()) {
             return null;
         }
@@ -427,7 +431,7 @@ public class APICatalogSync {
         }
     }
 
-    private static String trim(String url) {
+    public static String trim(String url) {
         if (url.startsWith("/")) url = url.substring(1, url.length());
         if (url.endsWith("/")) url = url.substring(0, url.length()-1);
         return url;
@@ -567,6 +571,7 @@ public class APICatalogSync {
         }
 
         for(SingleTypeInfo deleted: currentDelta.getDeletedInfo()) {
+            currentDelta.getStrictURLToMethods().remove(new URLStatic(deleted.getUrl(), Method.valueOf(deleted.getMethod())));
             bulkUpdates.add(new DeleteOneModel<>(SingleTypeInfoDao.createFilters(deleted), new DeleteOptions()));
             bulkUpdatesForSampleData.add(new DeleteOneModel<>(SensitiveSampleDataDao.getFilters(deleted), new DeleteOptions()));
         }
