@@ -9,22 +9,29 @@ import com.akto.dao.UsersDao;
 import com.akto.dto.BackwardCompatibility;
 import com.akto.dto.FilterSampleData;
 import com.akto.dto.Markov;
+import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.User;
 import com.akto.dto.messaging.Message;
+import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.notifications.email.WeeklyEmail;
+import com.akto.notifications.slack.DailyUpdate;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.InsertOneResult;
 import com.sendgrid.helpers.mail.Mail;
+import com.slack.api.Slack;
+import com.slack.api.webhook.WebhookResponse;
 
+import org.apache.commons.lang3.StringUtils;
 import org.bson.BsonDocument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.akto.dao.context.Context;
+import com.akto.dao.notifications.SlackWebhooksDao;
 
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -83,7 +90,7 @@ public class InitializerListener implements ServletContextListener {
                     String sendTo = UsersDao.instance.findOne(new BasicDBObject()).getLogin();
                     logger.info("Sending weekly email");
                     Mail mail = WeeklyEmail.buildWeeklyEmail(
-                        changesInfo.newSensitiveParams.size(), 
+                        changesInfo.recentSentiiveParams, 
                         changesInfo.newEndpointsLast7Days.size(), 
                         changesInfo.newEndpointsLast31Days.size(), 
                         sendTo, 
@@ -105,32 +112,36 @@ public class InitializerListener implements ServletContextListener {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 try {
-                    ChangesInfo changesInfo = getChangesInfo(1, 1);
-                    User user = UsersDao.instance.findOne(new BasicDBObject("login", new BasicDBObject("$regex", ".*slack.com")));
-                    if (user == null) {
+                    Context.accountId.set(1_000_000);
+                    List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
+                    if (listWebhooks == null || listWebhooks.isEmpty()) {
                         return;
                     }
-                    if (changesInfo == null || (changesInfo.newEndpointsLast7Days.size() + changesInfo.newSensitiveParams.size()) == 0) {
-                        return;
-                    }
-                    String sendTo = user.getLogin();
-                    logger.info("Sending daily email to " + sendTo);
-                    Mail mail = WeeklyEmail.buildWeeklyEmail(
-                        changesInfo.newSensitiveParams.size(), 
-                        changesInfo.newEndpointsLast7Days.size(), 
-                        changesInfo.newEndpointsLast31Days.size(), 
-                        sendTo, 
-                        changesInfo.newEndpointsLast7Days, 
-                        changesInfo.newSensitiveParams
-                    );
 
-                    WeeklyEmail.send(mail);
+                    Slack slack = Slack.getInstance();
+
+                    for(SlackWebhook slackWebhook: listWebhooks) {
+                        System.out.println(slackWebhook); 
+
+                        ChangesInfo ci = getChangesInfo(slackWebhook.getLargerDuration(), slackWebhook.getSmallerDuration());
+                        if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams) == 0) {
+                            return;
+                        }
+    
+                        DailyUpdate dailyUpdate = new DailyUpdate(0, 0, ci.newSensitiveParams.size(), ci.newEndpointsLast7Days.size(), ci.recentSentiiveParams, ci.newSensitiveParams, "");
+    
+                        String webhookUrl = slackWebhook.getWebhook();
+                        String payload = dailyUpdate.toJSON();
+                        System.out.println(payload);
+                        WebhookResponse response = slack.send(webhookUrl, payload);
+                        System.out.println(response); 
+                    }
 
                 } catch (Exception ex) {
                     ex.printStackTrace(); // or loggger would be better
                 }
             }
-        }, 24, 24, TimeUnit.HOURS);
+        }, 0, 24, TimeUnit.HOURS);
 
     }
 
@@ -138,43 +149,51 @@ public class InitializerListener implements ServletContextListener {
         public List<String> newSensitiveParams = new ArrayList<>();
         public List<String> newEndpointsLast7Days = new ArrayList<>();
         public List<String> newEndpointsLast31Days = new ArrayList<>();
+        public int totalSensitiveParams = 0;
+        public int recentSentiiveParams = 0;
     }
 
     protected ChangesInfo getChangesInfo(int newEndpointsDays, int newSensitiveParamsDays) {
-        Context.accountId.set(1_000_000);
-        InventoryAction inventoryAction = new InventoryAction();
         try {
-            List<SingleTypeInfo> params = inventoryAction.fetchRecentParams(newEndpointsDays * 24 * 60 * 60);
-            Map<String, Integer> newEndpointsToCountLast7Days = new HashMap<>();
-            Map<String, Integer> newEndpointsToCountLast31Days = new HashMap<>();
-            Set<String> newSensitiveParams = new HashSet<>();
-            int now = Context.now();
-            for(SingleTypeInfo param: params) {
-                if ((now-param.getTimestamp()) < newSensitiveParamsDays * 24 * 60 * 60 ) {
-
-                    newEndpointsToCountLast7Days.compute(param.getUrl(), (k, v) -> 1 + (v == null ? 0 : v));
-
-                    SingleTypeInfo.Position position = param.findPosition();
-                    if (param.getSubType().isSensitive(position)) {
-                        newSensitiveParams.add(param.getParam() + " in " + param.getMethod() + ": " + param.getUrl());
-                    }
-                }
-
-                newEndpointsToCountLast31Days.compute(param.getUrl(), (k, v) -> 1 + (v == null ? 0 : v));
-            }
-
+            
             ChangesInfo ret = new ChangesInfo();
-            ret.newSensitiveParams.addAll(newSensitiveParams);
-            for(String newURL: newEndpointsToCountLast7Days.keySet()) {
-                if (newEndpointsToCountLast7Days.get(newURL) > 2) {
-                    ret.newEndpointsLast7Days.add(newURL);
+            List<BasicDBObject> newEndpointsSmallerDuration = new InventoryAction().fetchRecentEndpoints(newSensitiveParamsDays * 24 * 60 * 60);
+            List<BasicDBObject> newEndpointsBiggerDuration = new InventoryAction().fetchRecentEndpoints(newEndpointsDays * 24 * 60 * 60);
+
+            for (BasicDBObject singleTypeInfo: newEndpointsSmallerDuration) {
+                singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
+                ret.newEndpointsLast7Days.add(singleTypeInfo.getString("method") + singleTypeInfo.getString("url"));
+            }
+    
+            for (BasicDBObject singleTypeInfo: newEndpointsBiggerDuration) {
+                singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
+                ret.newEndpointsLast31Days.add(singleTypeInfo.getString("method") + singleTypeInfo.getString("url"));
+            }
+    
+            List<SingleTypeInfo> sensitiveParamsList = new InventoryAction().fetchSensitiveParams();
+            ret.totalSensitiveParams = sensitiveParamsList.size();
+            ret.recentSentiiveParams = 0;
+            int now = Context.now();
+            int delta = newSensitiveParamsDays * 24 * 60 * 60;
+            Map<String, Set<String>> endpointToSubTypes = new HashMap<>();
+            for(SingleTypeInfo sti: sensitiveParamsList) {
+                String key = sti.getMethod() + " " + sti.getUrl();
+                String value = sti.getSubType().getName();
+                if (sti.getTimestamp() >= now - delta) {
+                    ret.recentSentiiveParams ++;
+                    Set<String> subTypes = endpointToSubTypes.get(key);
+                    if (subTypes == null) {
+                        subTypes = new HashSet<>();
+                        endpointToSubTypes.put(key, subTypes);
+                    }
+                    subTypes.add(value);
                 }
             }
-            for(String newURL: newEndpointsToCountLast31Days.keySet()) {
-                if (newEndpointsToCountLast31Days.get(newURL) > 2) {
-                    ret.newEndpointsLast31Days.add(newURL);
-                }
+
+            for(String key: endpointToSubTypes.keySet()) {
+                ret.newSensitiveParams.add(key + ": " + StringUtils.join(endpointToSubTypes.get(key), ","));
             }
+
             return ret;
         } catch (Exception e) {
             logger.error("get new endpoints", e);
