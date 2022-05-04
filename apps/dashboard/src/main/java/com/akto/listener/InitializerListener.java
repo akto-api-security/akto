@@ -2,10 +2,7 @@ package com.akto.listener;
 
 import com.akto.DaoInit;
 import com.akto.action.observe.InventoryAction;
-import com.akto.dao.BackwardCompatibilityDao;
-import com.akto.dao.FilterSampleDataDao;
-import com.akto.dao.MarkovDao;
-import com.akto.dao.UsersDao;
+import com.akto.dao.*;
 import com.akto.dto.BackwardCompatibility;
 import com.akto.dto.FilterSampleData;
 import com.akto.dto.Markov;
@@ -193,6 +190,18 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
+    public void resetSingleTypeInfoCount(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getResetSingleTypeInfoCount() == 0) {
+            SingleTypeInfoDao.instance.resetCount();
+        }
+
+        BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.RESET_SINGLE_TYPE_INFO_COUNT, Context.now())
+        );
+
+    }
+
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
 
@@ -205,10 +214,6 @@ public class InitializerListener implements ServletContextListener {
 
         DaoInit.init(new ConnectionString(mongoURI));
 
-        SingleTypeInfo.init();
-
-        setUpWeeklyScheduler();
-        setUpDailyScheduler();
         Context.accountId.set(1_000_000);
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
         if (backwardCompatibility == null) {
@@ -218,5 +223,11 @@ public class InitializerListener implements ServletContextListener {
 
         // backward compatibility
         dropFilterSampleDataCollection(backwardCompatibility);
+        resetSingleTypeInfoCount(backwardCompatibility);
+
+        SingleTypeInfo.init();
+
+        setUpWeeklyScheduler();
+        setUpDailyScheduler();
     }
 }
