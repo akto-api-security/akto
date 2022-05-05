@@ -105,7 +105,18 @@ export default {
             return resp
         })
     },
-
-
-
+    addSlackWebhook(webhookUrl) {
+        return request({
+            url: '/api/addSlackWebhook',
+            method: 'post',
+            data: {webhookUrl}
+        })
+    },
+    deleteSlackWebhook(apiTokenId) {
+        return request({
+            url: '/api/deleteSlackWebhook',
+            method: 'post',
+            data: {apiTokenId}
+        })
+    }
 }

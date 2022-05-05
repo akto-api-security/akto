@@ -2,10 +2,17 @@ package com.akto.action;
 
 import com.akto.dao.ApiTokensDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dto.ApiToken;
+import com.akto.dto.ApiToken.Utility;
+import com.akto.dto.notifications.SlackWebhook;
+import com.akto.dto.type.KeyTypes;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.utils.RandomString;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.result.DeleteResult;
+import com.opensymphony.xwork2.Action;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -70,11 +77,67 @@ public class ApiTokenAction extends UserAction{
                         Filters.eq(ApiToken.USER_NAME, username)
                 )
         );
+
+        List<SlackWebhook> slackWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
+        for(SlackWebhook sw: slackWebhooks) {
+            ApiToken slackToken = 
+                new ApiToken(sw.getId(), Context.accountId.get(), sw.getWebhook(), sw.getWebhook(), 
+                sw.getId(), sw.getUserEmail(), Utility.SLACK, new ArrayList<>());
+                
+            apiTokenList.add(slackToken);
+        }
+
         return SUCCESS.toUpperCase();
+    }
+
+    private String error;
+    private String webhookUrl;
+    public String addSlackWebhook() {
+
+        boolean isUrl = KeyTypes.patternToSubType.get(SingleTypeInfo.URL).matcher(webhookUrl).matches();
+        boolean isSlackUrl = isUrl && webhookUrl.contains("hooks.slack.com");
+        boolean alreadyExists = SlackWebhooksDao.instance.findOne(new BasicDBObject("webhook", webhookUrl)) != null;
+
+        if (!isSlackUrl) {
+            this.error = "Please enter a valid Slack url";
+        } else if (alreadyExists) {
+            this.error = "This webhook url already exists";
+        } else {
+            int now = Context.now();
+            SlackWebhook newWebhook = new SlackWebhook(webhookUrl, 1, 1, now, getSUser().getLogin(), now);
+            this.apiTokenId = SlackWebhooksDao.instance.insertOne(newWebhook).getInsertedId().asInt32().getValue();
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String deleteSlackWebhook() {
+        SlackWebhooksDao.instance.deleteAll(new BasicDBObject("_id", apiTokenId));
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public void setError(String error) {
+        this.error = error;
+    }
+
+    public String getError() {
+        return this.error;
+    }
+
+    public String getWebhookUrl() {
+        return this.webhookUrl;
+    }
+
+    public void setWebhookUrl(String webhookUrl) {
+        this.webhookUrl = webhookUrl;
     }
 
     public List<ApiToken> getApiTokenList() {
         return apiTokenList;
+    }
+
+    public int getApiTokenId() {
+        return this.apiTokenId;
     }
 
     public void setApiTokenId(int apiTokenId) {
