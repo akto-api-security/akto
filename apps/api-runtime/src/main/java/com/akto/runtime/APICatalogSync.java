@@ -544,6 +544,8 @@ public class APICatalogSync {
 
             if (inc == 0) {
                 continue;
+            } else {
+                inc = 1;
             }
 
             int oldTs = dbInfo == null ? 0 : dbInfo.getTimestamp();
