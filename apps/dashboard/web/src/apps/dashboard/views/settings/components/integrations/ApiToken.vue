@@ -24,9 +24,11 @@
         </v-hover>
       </div>
     </div>
-    <div class="pt-2">
-      <v-btn color="#6200EA" style="color:white" @click="addBurpToken">Generate Token</v-btn>
-    </div>
+    <slot>
+      <div class="pt-2">
+        <v-btn color="#6200EA" style="color:white" @click="addBurpToken">{{addTokenTitle || "Generate Token"}}</v-btn>
+      </div>
+    </slot>
 
   </div>
 
@@ -42,6 +44,7 @@ export default {
     title: obj.strR,
     burp_tokens: obj.arrR,
     avatar_image: obj.str,
+    addTokenTitle: obj.strN
   },
   components: {
     ActionsTray
