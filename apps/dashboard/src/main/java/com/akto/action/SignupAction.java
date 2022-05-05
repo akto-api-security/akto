@@ -34,6 +34,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 
 import static com.mongodb.client.model.Filters.eq;
 import static com.mongodb.client.model.Updates.combine;
@@ -230,6 +231,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
     public String registerViaEmail() {
         code = "";
+        if (password == null || !validatePassword(password)) {
+            code = "Password must be alphanumeric and at least 8 characters long";
+            return ERROR.toUpperCase();
+        }
         long count = UsersDao.instance.getMCollection().countDocuments();
         // only 1st user is allowed to signup without invitationCode
         if (count != 0) {
@@ -277,6 +282,29 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         return SUCCESS.toUpperCase();
     }
 
+    public static boolean validatePassword(String password) {
+        boolean minimumFlag = password.length() > 8;
+        boolean maximumFlag = password.length() < 40;
+        boolean numbersFlag = false;
+        int lettersCount = 0;
+
+        for (int i = 0; i < password.length(); i++) {
+            char ch = password.charAt(i);
+            char upperCaseCh = Character.toUpperCase(ch);
+            if (ch >= '0' && ch <= '9') {
+                numbersFlag = true;
+            } else if (upperCaseCh >= 'A' && upperCaseCh <= 'Z') {
+                lettersCount ++;
+            } else if (ch != '_' && ch != '.') {
+                return false;
+            }
+        }
+
+        return numbersFlag && minimumFlag && maximumFlag && (lettersCount > 5);
+
+
+    }
+
     String companyName, teamName;
     List<String> allEmails;
     String shouldLogin="false";
@@ -322,8 +350,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             }
 
             SignupUserInfo signupUserInfo = SignupDao.instance.insertSignUp(userEmail, username, signupInfo);
-            new LoginAction().loginUser(signupUserInfo.getUser(), servletResponse, false);
-            servletResponse.sendRedirect("/setup");
+            LoginAction.loginUser(signupUserInfo.getUser(), servletResponse, false, servletRequest);
+            servletResponse.sendRedirect("/dashboard/setup");
         } else {
             String accountName = System.getenv("AKTO_ACCOUNT_NAME");
             if (accountName == null) accountName = "Helios";
@@ -355,7 +383,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             }
 
             servletRequest.getSession().setAttribute("user", user);
-            new LoginAction().loginUser(user, servletResponse, true);
+            new LoginAction().loginUser(user, servletResponse, true, servletRequest);
             servletResponse.sendRedirect("/dashboard/testing");
         }
     }

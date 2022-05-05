@@ -126,7 +126,7 @@ export default {
           if (!redirectLink.startsWith('/dashboard/')) {
             redirectLink = '/dashboard/testing'
           }
-          window.location.href = '/setup?redirect_uri=' + redirectLink
+          window.location.href = '/dashboard/setup?redirect_uri=' + redirectLink
         }
       })
     }

@@ -24,6 +24,15 @@
         <url-pattern>/*</url-pattern>
     </filter-mapping>
 
+    <filter>
+        <filter-name>SecurityHeadersFilter</filter-name>
+        <filter-class>com.akto.filter.SecurityHeadersFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>SecurityHeadersFilter</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+
 
     <filter>
         <filter-name>UserDetailsFilter</filter-name>
@@ -34,8 +43,6 @@
         <filter-name>UserDetailsFilter</filter-name>
         <url-pattern>/api/*</url-pattern>
         <url-pattern>/dashboard/*</url-pattern>
-        <url-pattern>/setup/*</url-pattern>
-        <url-pattern>/setup</url-pattern>
     </filter-mapping>
 
     <filter>

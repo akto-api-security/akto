@@ -28,6 +28,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import static com.akto.action.LoginAction.REFRESH_TOKEN_COOKIE_NAME;
 
@@ -52,6 +53,7 @@ public class UserDetailsFilter implements Filter {
         if (!httpServletRequest.getRequestURI().contains(LOGIN_URI) && !httpServletRequest.getRequestURI().contains("/auth/login") && !httpServletRequest.getRequestURI().contains("api/googleConfig")) {
             System.out.println("redirecting from " + httpServletRequest.getRequestURI() + " to login");
             httpServletResponse.sendRedirect(LOGIN_URI+"?redirect_uri="+httpServletRequest.getRequestURI());
+            return;
         }
         filterChain.doFilter(httpServletRequest, httpServletResponse);
     }
@@ -71,7 +73,8 @@ public class UserDetailsFilter implements Filter {
 
         // if api key present then check if valid api key or not and generate access token
         // else find access token from request header
-        if (apiKey != null) {
+        boolean apiKeyFlag = apiKey != null;
+        if (apiKeyFlag) {
             if (endPointBlockedForApiToken(requestURI)) {
                 httpServletResponse.sendError(403);
                 return;
@@ -140,16 +143,51 @@ public class UserDetailsFilter implements Filter {
             return ;
         }
 
-        HttpSession session = httpServletRequest.getSession();
+        HttpSession session = httpServletRequest.getSession(apiKeyFlag);
+        if (session == null ) {
+            redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
+            return ;
+        }
 
-        session.setAttribute("username", username);
+        // only for access-token based auth we check if session is valid or not
+        if (!apiKeyFlag) {
+            Object usernameObj = session.getAttribute("username");
+            if (!Objects.equals(usernameObj, username)) {
+                redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
+                return ;
+            }
+
+            try {
+                int loginTime = (int) session.getAttribute("login");
+                Object logoutObj =  session.getAttribute("logout");
+                if (logoutObj != null) {
+                    int logoutTime = (int) logoutObj;
+                    if (logoutTime > loginTime) {
+                        redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
+                        return ;
+                    }
+                }
+            } catch (Exception ignored) {
+                redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
+                return ;
+            }
+
+
+        }
+
         session.setAttribute(AccessTokenAction.ACCESS_TOKEN_HEADER_NAME, accessToken);
 
         User user = (User) session.getAttribute("user");
         boolean isSignedUp = "true".equalsIgnoreCase(signedUp);
 
-        if (httpServletRequest.getRequestURI().startsWith("/setup") && !isSignedUp) {
+        boolean setupPathCondition = requestURI.startsWith("/dashboard/setup");
+        boolean dashboardWithoutSetupCondition = requestURI.startsWith("/dashboard") && !setupPathCondition;
+        if (setupPathCondition && !isSignedUp) {
             SignupUserInfo signupUserInfo = SignupDao.instance.findOne("user.login", username);
+            if (signupUserInfo == null) {
+                redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
+                return ;
+            }
             user = signupUserInfo.getUser();
             session.setAttribute("user", user);
 
@@ -172,7 +210,7 @@ public class UserDetailsFilter implements Filter {
 
             servletRequest.setAttribute("signupInfo", infoObj);
 
-        } else if ((httpServletRequest.getRequestURI().startsWith("/dashboard") || httpServletRequest.getRequestURI().startsWith("/api")) && isSignedUp) {
+        } else if ((dashboardWithoutSetupCondition || httpServletRequest.getRequestURI().startsWith("/api")) && isSignedUp) {
 
             // if no user details in the session, ask from DB
             // TODO: if session info is too old, then also fetch from DB
@@ -203,12 +241,15 @@ public class UserDetailsFilter implements Filter {
             if (accessTokenFromRequest == null) {
                 ProfileAction.executeMeta1(user, httpServletRequest);
             }
+        } else {
+            redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
+            return ;
         }
         filterChain.doFilter(servletRequest, servletResponse);
     }
 
     public boolean endPointBlockedForApiToken(String endpoint) {
-        if (endpoint.startsWith("/dashboard") || endpoint.startsWith("/setup")) {
+        if (endpoint.startsWith("/dashboard")) {
             return true;
         }
 

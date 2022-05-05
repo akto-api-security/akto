@@ -200,7 +200,7 @@
             </result>
         </action>
 
-        <action name="setup/add-signup-info" class="com.akto.action.SignupAction" method="addSignupInfo">
+        <action name="dashboard/setup/add-signup-info" class="com.akto.action.SignupAction" method="addSignupInfo">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"   type="json">
