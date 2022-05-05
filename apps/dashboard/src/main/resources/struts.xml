@@ -553,6 +553,26 @@
             </result>
         </action>
 
+        <action name="api/addSlackWebhook" class="com.akto.action.ApiTokenAction" method="addSlackWebhook">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/deleteSlackWebhook" class="com.akto.action.ApiTokenAction" method="deleteSlackWebhook">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
         <action name="api/addExternalApiToken" class="com.akto.action.ApiTokenAction" method="addExternalApiToken">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
