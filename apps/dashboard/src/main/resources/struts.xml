@@ -29,6 +29,7 @@
             </result>
         </action>
 
+        <!--  DO NOT CHANGE PATH NAME FOR LOGIN. BEING USED IN A LOT OF PLACES -->
         <action name="auth/login" class="com.akto.action.LoginAction">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

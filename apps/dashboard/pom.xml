@@ -150,6 +150,12 @@
             <artifactId>micrometer-registry-prometheus</artifactId>
             <version>1.8.1</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/com.github.vladimir-bukhtoyarov/bucket4j-core -->
+        <dependency>
+            <groupId>com.github.vladimir-bukhtoyarov</groupId>
+            <artifactId>bucket4j-core</artifactId>
+            <version>7.5.0</version>
+        </dependency>
         <dependency>
             <groupId>com.akto.libs.utils</groupId>
             <artifactId>utils</artifactId>
