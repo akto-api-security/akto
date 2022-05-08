@@ -5,7 +5,7 @@
       v-model="formValid"
   >
     <v-text-field
-        autocomplete="off"
+        autocomplete="username"
         name="login"
         label="Email"
         placeholder=""
@@ -19,7 +19,7 @@
     />
     <v-text-field
         :append-icon="openPassword ? '$fas_eye' : '$fas_eye-slash'"
-        autocomplete="off"
+        autocomplete="new-password"
         name="password"
         label="Password"
         placeholder=""
@@ -36,8 +36,12 @@
 </template>
 
 <script>
+import obj from "@/util/obj"
 export default {
   name: "LoginFields",
+  props: {
+      isSignUp: obj.boolR
+  },
   data() {
     return {
       openPassword: false,
@@ -52,7 +56,7 @@ export default {
           (v) => this.isValidEmail(v) || 'Invalid e-mail id'
         ],
         password: [
-          (v) => !!v || ''
+          (v) => this.validPassword(v)
         ]
       }
     }
@@ -64,6 +68,34 @@ export default {
     },
     nonEmptyStr(v) {
       return !!v
+    },
+    validPassword(v) {
+        if (!this.isSignUp) {
+            return !!v  || 'Password cannot be blank'
+        }
+        if (!v) return false
+        let lenFlag = v.length > 8
+        if (!lenFlag) return "at least 8 characters"
+        let numFlag = false
+        let alphabetFlag = false
+        for (let i = 0; i < v.length; i++) {
+          let c = v.charAt(i);
+          c = c.toUpperCase();
+          let alpha = c >= "A" && c <= "Z"
+          if (alpha) {
+            alphabetFlag = true
+          }
+          let num = c >= "0" && c <= "9"
+          if (num) {
+            numFlag = true
+          }
+        }
+
+        if (!numFlag) return "must contain at least 1 digit"
+        if (!alphabetFlag) return "must contain at least 1 alphabet"
+
+        return true
+
     },
     disableButtons() {
       var valid = this.isValidEmail(this.formModel.username) && this.nonEmptyStr(this.formModel.password)

@@ -2,10 +2,13 @@ package com.akto.action;
 
 import com.akto.dao.PendingInviteCodesDao;
 import com.akto.dao.RBACDao;
+import com.akto.dao.UsersDao;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.RBAC;
+import com.akto.dto.User;
 import com.akto.notifications.email.SendgridEmail;
 import com.akto.utils.JWT;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 import com.sendgrid.helpers.mail.Mail;
@@ -28,6 +31,30 @@ public class InviteUserAction extends UserAction{
     @Override
     public String execute() {
         int user_id = getSUser().getId();
+
+        if (this.inviteeEmail == null) {
+            addActionError("Invalid email");
+            return ERROR.toUpperCase();
+        }
+
+        String[] inviteeEmailArr = this.inviteeEmail.split("@");
+        if (inviteeEmailArr.length != 2) {
+            addActionError("Invalid email");
+            return ERROR.toUpperCase();
+        }
+
+        // get first user
+        User user = UsersDao.instance.getFirstUser();
+        String login = user.getLogin();
+        String[] loginArr = login.split("@");
+        if (loginArr.length != 2) return ERROR.toUpperCase();
+        String domain = loginArr[1];
+        String inviteeEmailDomain = inviteeEmailArr[1];
+
+        if (!domain.equals(inviteeEmailDomain)) {
+            addActionError("Email must belong to same organisation");
+            return ERROR.toUpperCase();
+        }
 
         Map<String,Object> claims = new HashMap<>();
         claims.put("email", inviteeEmail);

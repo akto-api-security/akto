@@ -5,23 +5,27 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
-public class SecurityHeadersFilter implements Filter {
+public class HttpMethodFilter implements Filter {
     @Override
     public void init(FilterConfig filterConfig) throws ServletException {
     }
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+        HttpServletRequest httpServletRequest= (HttpServletRequest) request;
         HttpServletResponse httpServletResponse = (HttpServletResponse) response;
+        String method = httpServletRequest.getMethod();
+        if (method == null) {
+            httpServletResponse.sendError(404);
+            return ;
+        }
 
-        httpServletResponse.addHeader("X-Frame-Options", "deny");
-        httpServletResponse.addHeader("X-XSS-Protection", "1");
-        httpServletResponse.addHeader("X-Content-Type-Options", "nosniff");
-        httpServletResponse.addHeader("cache-control", "no-cache, no-store, must-revalidate, pre-check=0, post-check=0");
-        httpServletResponse.addHeader("server","AKTO server");
+        if (!method.equalsIgnoreCase("POST")) {
+            httpServletResponse.sendError(404);
+            return ;
+        }
 
-        chain.doFilter(request, response);
-
+        chain.doFilter(httpServletRequest, httpServletResponse);
     }
 
     @Override

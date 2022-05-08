@@ -25,6 +25,15 @@
     </filter-mapping>
 
     <filter>
+        <filter-name>HttpMethodFilter</filter-name>
+        <filter-class>com.akto.filter.HttpMethodFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>HttpMethodFilter</filter-name>
+        <url-pattern>/api/*</url-pattern>
+    </filter-mapping>
+
+    <filter>
         <filter-name>SecurityHeadersFilter</filter-name>
         <filter-class>com.akto.filter.SecurityHeadersFilter</filter-class>
     </filter>

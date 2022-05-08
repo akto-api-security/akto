@@ -351,6 +351,7 @@ public class CustomDataTypeAction extends UserAction{
         // TODO: handle errors
         if (name == null || name.length() == 0) throw new AktoCustomException("Name cannot be empty");
         if (name.split(" ").length > 1) throw new AktoCustomException("Name has to be single word");
+        if (name.length() > 15) throw new AktoCustomException("Maximum length allowed is 15 characters");
         name = name.trim();
         name = name.toUpperCase();
         if (!(name.matches("[A-Z_0-9]+"))) throw new AktoCustomException("Name can only contain alphabets, numbers and underscores");

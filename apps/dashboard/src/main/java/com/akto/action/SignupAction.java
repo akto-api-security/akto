@@ -231,8 +231,11 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
     public String registerViaEmail() {
         code = "";
-        if (password == null || !validatePassword(password)) {
-            code = "Password must be alphanumeric and at least 8 characters long";
+        if (password != null ) {
+            code = validatePassword(password);
+            if (code != null) return ERROR.toUpperCase();
+        } else {
+            code = "Password can't be empty";
             return ERROR.toUpperCase();
         }
         long count = UsersDao.instance.getMCollection().countDocuments();
@@ -282,11 +285,14 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         return SUCCESS.toUpperCase();
     }
 
-    public static boolean validatePassword(String password) {
+    public static String validatePassword(String password) {
         boolean minimumFlag = password.length() > 8;
+        if (!minimumFlag) return "Minimum of 8 characters required";
         boolean maximumFlag = password.length() < 40;
+        if (!maximumFlag) return "Maximum of 40 characters allowed";
+
         boolean numbersFlag = false;
-        int lettersCount = 0;
+        boolean lettersFlag = false;
 
         for (int i = 0; i < password.length(); i++) {
             char ch = password.charAt(i);
@@ -294,14 +300,17 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             if (ch >= '0' && ch <= '9') {
                 numbersFlag = true;
             } else if (upperCaseCh >= 'A' && upperCaseCh <= 'Z') {
-                lettersCount ++;
+                lettersFlag = true;
             } else if (ch != '_' && ch != '.') {
-                return false;
+                return "No special characters allowed other than underscore and full stop";
             }
         }
 
-        return numbersFlag && minimumFlag && maximumFlag && (lettersCount > 5);
+        if (numbersFlag && lettersFlag) {
+            return null;
+        }
 
+        return "Must contain letters and numbers";
 
     }
 
