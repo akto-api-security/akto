@@ -116,6 +116,12 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             Cookie cookie = new Cookie(REFRESH_TOKEN_COOKIE_NAME, refreshToken);
             cookie.setHttpOnly(true);
             cookie.setPath("/dashboard");
+
+            String https = System.getenv("AKTO_HTTPS_FLAG");
+            if (Objects.equals(https, "true")) {
+                cookie.setSecure(true);
+            }
+
             servletResponse.addCookie(cookie);
             HttpSession session = servletRequest.getSession(true);
             session.setAttribute("username", user.getLogin());
