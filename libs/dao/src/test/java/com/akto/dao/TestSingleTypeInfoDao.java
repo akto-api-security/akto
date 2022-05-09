@@ -24,8 +24,7 @@ import org.springframework.security.core.parameters.P;
 import java.security.PolicySpi;
 import java.util.*;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class TestSingleTypeInfoDao extends MongoBasedTest {
 
@@ -84,7 +83,7 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(
                 url, method,responseCode, false, "param", subType, apiCollectionId
         );
-        SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 0,0,0);
+        SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 100,0,0);
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
         return new UpdateOneModel<>(SingleTypeInfoDao.createFilters(singleTypeInfo), Updates.set("count",1),updateOptions);
@@ -134,5 +133,25 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
 
         sensitiveEndpoints = SingleTypeInfoDao.instance.getSensitiveEndpoints(0, null, null);
         assertEquals(sensitiveEndpoints.size(), 5);
+    }
+    @Test
+    public void testResetCount() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+
+        List<WriteModel<SingleTypeInfo>> bulkWrites = new ArrayList<>();
+        bulkWrites.add(createSingleTypeInfoUpdate("A", "GET", SingleTypeInfo.EMAIL, 0,200));
+        bulkWrites.add(createSingleTypeInfoUpdate("B", "GET", SingleTypeInfo.EMAIL, 0,200));
+        SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkWrites);
+
+        SingleTypeInfoDao.instance.resetCount();
+
+        List<SingleTypeInfo> singleTypeInfoList = SingleTypeInfoDao.instance.findAll(new BasicDBObject());
+
+        for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
+            if (singleTypeInfo.getCount() != 0) {
+                fail();
+            }
+        }
+
     }
 }

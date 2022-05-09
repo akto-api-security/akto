@@ -48,17 +48,18 @@ public class InventoryAction extends UserAction {
     //     return Action.SUCCESS.toUpperCase();
     // }
 
-    public List<SingleTypeInfo> fetchRecentParams(int deltaPeriod) {
-        int now = Context.now();
-        int twoMonthsAgo = now - deltaPeriod;
-        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.gt("timestamp", twoMonthsAgo), 0, 100000, null);
-
-        return list;
-    }
-
     public final static int deltaPeriodValue = 60 * 24 * 60 * 60;
 
-    public List<BasicDBObject> fetchRecentEndpoints() {
+    public List<SingleTypeInfo> fetchSensitiveParams() {
+        Bson filterStandardSensitiveParams = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId, url, method);
+
+        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(filterStandardSensitiveParams);
+
+        return list;        
+    }
+
+
+    public List<BasicDBObject> fetchRecentEndpoints(int deltaPeriodValue) {
         List<Bson> pipeline = new ArrayList<>();
         BasicDBObject groupedId = 
             new BasicDBObject("apiCollectionId", "$apiCollectionId")
@@ -263,14 +264,14 @@ public class InventoryAction extends UserAction {
     }
 
     public String loadRecentEndpoints() {
-        List<BasicDBObject> list = fetchRecentEndpoints();
+        List<BasicDBObject> list = fetchRecentEndpoints(deltaPeriodValue);
         attachAPIInfoListInResponse(list);
         return Action.SUCCESS.toUpperCase();
     }
 
     public String loadSensitiveParameters() {
 
-        Bson filterStandardSensitiveParams = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId, url, method);
+        List list = fetchSensitiveParams();
         List<Bson> filterCustomSensitiveParams = new ArrayList<>();
 
         filterCustomSensitiveParams.add(Filters.eq("sensitive", true));
@@ -294,11 +295,10 @@ public class InventoryAction extends UserAction {
 
         }
 
-        List list = SingleTypeInfoDao.instance.findAll(filterStandardSensitiveParams);
-
         List<SensitiveParamInfo> customSensitiveList = SensitiveParamInfoDao.instance.findAll(Filters.and(filterCustomSensitiveParams));
 
         list.addAll(customSensitiveList);
+
         response = new BasicDBObject();
         response.put("data", new BasicDBObject("endpoints", list));
 
