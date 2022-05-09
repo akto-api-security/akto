@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.util.Objects;
 
 public class SecurityHeadersFilter implements Filter {
+    private static final String https = System.getenv("AKTO_HTTPS_FLAG");
     @Override
     public void init(FilterConfig filterConfig) throws ServletException {
     }
@@ -21,9 +22,8 @@ public class SecurityHeadersFilter implements Filter {
         httpServletResponse.addHeader("cache-control", "no-cache, no-store, must-revalidate, pre-check=0, post-check=0");
         httpServletResponse.addHeader("server","AKTO server");
 
-        String https = System.getenv("AKTO_HTTPS_FLAG");
         if (Objects.equals(https, "true")) {
-            httpServletResponse.addHeader("strict-transport-security","max-age=63072000");
+            httpServletResponse.addHeader("strict-transport-security","max-age=31536000; includeSubDomains; preload");
         }
 
         chain.doFilter(request, response);

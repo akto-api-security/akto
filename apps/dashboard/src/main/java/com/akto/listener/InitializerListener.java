@@ -30,14 +30,7 @@ import org.slf4j.LoggerFactory;
 import com.akto.dao.context.Context;
 import com.akto.dao.notifications.SlackWebhooksDao;
 
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -223,6 +216,9 @@ public class InitializerListener implements ServletContextListener {
 
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
+        String https = System.getenv("AKTO_HTTPS_FLAG");
+        boolean httpsFlag = Objects.equals(https, "true");
+        sce.getServletContext().getSessionCookieConfig().setSecure(httpsFlag);
 
         System.out.println("context initialized");
 
