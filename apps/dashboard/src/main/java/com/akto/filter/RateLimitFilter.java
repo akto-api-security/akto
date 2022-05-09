@@ -61,9 +61,8 @@ public class RateLimitFilter implements Filter {
 
         String requestURI = httpServletRequest.getRequestURI();
         String ip = httpServletRequest.getRemoteAddr();
-        System.out.println("ip: " + ip);
 
-        if (ip == null){
+        if (ip == null) {
             httpServletResponse.sendError(401);
             return ;
         }

@@ -41,7 +41,7 @@ public class ApiCollectionsAction extends UserAction {
         }
 
         for (char c: this.collectionName.toCharArray()) {
-            boolean alphabets = c >= 'A' && c <= 'Z';
+            boolean alphabets = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
             boolean numbers = c >= '0' && c <= '9';
             boolean specialChars = c == '-' || c == '.' || c == '_';
 

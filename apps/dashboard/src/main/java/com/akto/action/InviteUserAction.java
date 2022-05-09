@@ -28,31 +28,40 @@ public class InviteUserAction extends UserAction{
     private String inviteeName;
     private String inviteeEmail;
     private String websiteHostName;
-    @Override
-    public String execute() {
-        int user_id = getSUser().getId();
 
-        if (this.inviteeEmail == null) {
-            addActionError("Invalid email");
-            return ERROR.toUpperCase();
-        }
+    public static final String INVALID_EMAIL_ERROR = "Invalid email";
+    public static final String DIFFERENT_ORG_EMAIL_ERROR = "Email must belong to same organisation";
 
-        String[] inviteeEmailArr = this.inviteeEmail.split("@");
+    public static String validateEmail(String email, String adminLogin) {
+        if (email == null) return INVALID_EMAIL_ERROR;
+
+        String[] inviteeEmailArr = email.split("@");
         if (inviteeEmailArr.length != 2) {
-            addActionError("Invalid email");
-            return ERROR.toUpperCase();
+            return INVALID_EMAIL_ERROR;
         }
 
-        // get first user
-        User user = UsersDao.instance.getFirstUser();
-        String login = user.getLogin();
-        String[] loginArr = login.split("@");
-        if (loginArr.length != 2) return ERROR.toUpperCase();
+        // validating if same organisation or not
+        String[] loginArr = adminLogin.split("@");
+        if (loginArr.length != 2) return "Invalid admin login";
         String domain = loginArr[1];
         String inviteeEmailDomain = inviteeEmailArr[1];
 
         if (!domain.equals(inviteeEmailDomain)) {
-            addActionError("Email must belong to same organisation");
+            return DIFFERENT_ORG_EMAIL_ERROR;
+        }
+
+        return null;
+    }
+
+    @Override
+    public String execute() {
+        int user_id = getSUser().getId();
+
+        User admin = UsersDao.instance.getFirstUser();
+        String code = validateEmail(this.inviteeEmail, admin.getLogin());
+
+        if (code != null) {
+            addActionError(code);
             return ERROR.toUpperCase();
         }
 

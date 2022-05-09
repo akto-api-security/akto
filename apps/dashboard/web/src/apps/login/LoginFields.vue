@@ -19,7 +19,7 @@
     />
     <v-text-field
         :append-icon="openPassword ? '$fas_eye' : '$fas_eye-slash'"
-        autocomplete="new-password"
+        autocomplete="shut-up-google"
         name="password"
         label="Password"
         placeholder=""

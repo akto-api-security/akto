@@ -285,11 +285,15 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         return SUCCESS.toUpperCase();
     }
 
+    public static final String MINIMUM_PASSWORD_ERROR = "Minimum of 8 characters required";
+    public static final String MAXIMUM_PASSWORD_ERROR = "Maximum of 40 characters allowed";
+    public static final String NO_SPECIAL_CHARS_ALLOWED_ERROR = "No special characters allowed other than underscore and full stop";
+    public static final String MUST_BE_ALPHANUMERIC_ERROR = "Must contain letters and numbers";
     public static String validatePassword(String password) {
         boolean minimumFlag = password.length() > 8;
-        if (!minimumFlag) return "Minimum of 8 characters required";
+        if (!minimumFlag) return MINIMUM_PASSWORD_ERROR;
         boolean maximumFlag = password.length() < 40;
-        if (!maximumFlag) return "Maximum of 40 characters allowed";
+        if (!maximumFlag) return MAXIMUM_PASSWORD_ERROR;
 
         boolean numbersFlag = false;
         boolean lettersFlag = false;
@@ -302,7 +306,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             } else if (upperCaseCh >= 'A' && upperCaseCh <= 'Z') {
                 lettersFlag = true;
             } else if (ch != '_' && ch != '.') {
-                return "No special characters allowed other than underscore and full stop";
+                return NO_SPECIAL_CHARS_ALLOWED_ERROR;
             }
         }
 
@@ -310,7 +314,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             return null;
         }
 
-        return "Must contain letters and numbers";
+        return MUST_BE_ALPHANUMERIC_ERROR;
 
     }
 

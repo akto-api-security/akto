@@ -121,7 +121,6 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             session.setAttribute("username", user.getLogin());
             session.setAttribute("user", user);
             session.setAttribute("login", Context.now());
-            System.out.println("id: " + session.getId());
             if (signedUp) {
                 UsersDao.instance.getMCollection().findOneAndUpdate(
                         Filters.eq("_id", user.getId()),
