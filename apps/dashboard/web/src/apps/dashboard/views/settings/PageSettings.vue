@@ -7,13 +7,8 @@
         <integrations/>
       </template>
       <template slot="Account">
-            <div class="pa-8">
-                <div class="d-flex">
-                    <div class="entry-text">Account ID</div>
-                    <div class="entry-value">{{getActiveAccount()}}</div>
-                </div>
-            </div>
-        </template>
+          <account/>
+      </template>
         <template slot="Users">
             <team-overview/>
         </template>
@@ -30,6 +25,7 @@ import Health from './components/Health'
 import Integrations from './components/Integrations'
 import api from './api'
 import DataTypes from './components/data_types/DataTypes.vue'
+import Account from './components/Account'
 export default {
     name: "PageSettings",
     components: { 
@@ -37,7 +33,8 @@ export default {
         TeamOverview,
         Health,
         Integrations,
-        DataTypes
+        DataTypes,
+        Account
     },
     methods: {
         getActiveAccount() {

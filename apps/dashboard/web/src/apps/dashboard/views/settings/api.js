@@ -105,7 +105,27 @@ export default {
             return resp
         })
     },
+    toggleRedactFeature(redactPayload) {
+        return request({
+            url: '/api/toggleRedactFeature',
+            method: 'post',
+            data: {
+                redactPayload
+            }
+        }).then((resp) => {
+            return resp
+        })
+    },
 
+    fetchAdminSettings() {
+        return request({
+            url: '/api/fetchAdminSettings',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
+    }
 
 
 }

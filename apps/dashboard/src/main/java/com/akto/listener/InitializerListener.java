@@ -1,11 +1,14 @@
 package com.akto.listener;
 
 import com.akto.DaoInit;
+import com.akto.action.AdminSettingsAction;
 import com.akto.action.observe.InventoryAction;
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.BackwardCompatibilityDao;
 import com.akto.dao.FilterSampleDataDao;
 import com.akto.dao.MarkovDao;
 import com.akto.dao.UsersDao;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.BackwardCompatibility;
 import com.akto.dto.FilterSampleData;
 import com.akto.dto.Markov;
@@ -193,6 +196,14 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
+    public void dropSampleDataIfEarlierNotDroped(AccountSettings accountSettings) { 
+        if (accountSettings == null) return;
+        if (accountSettings.isRedactPayload() && !accountSettings.isSampleDataCollectionDropped()) {
+            AdminSettingsAction.dropCollections(Context.accountId.get());
+        }
+
+    }
+
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
 
@@ -218,5 +229,8 @@ public class InitializerListener implements ServletContextListener {
 
         // backward compatibility
         dropFilterSampleDataCollection(backwardCompatibility);
+
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        dropSampleDataIfEarlierNotDroped(accountSettings);
     }
 }

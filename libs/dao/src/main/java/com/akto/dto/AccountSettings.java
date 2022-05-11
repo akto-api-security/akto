@@ -1,18 +1,23 @@
 package com.akto.dto;
 
 import java.util.List;
-import org.springframework.security.web.util.matcher.IpAddressMatcher;
 
 public class AccountSettings {
     private int id;
+    public static final String PRIVATE_CIDR_LIST = "privateCidrList";
     private List<String> privateCidrList;
+    public static final String REDACT_PAYLOAD = "redactPayload";
+    private Boolean redactPayload;
+    public static final String SAMPLE_DATA_COLLECTION_DROPPED = "sampleDataCollectionDropped";
+    private boolean sampleDataCollectionDropped;
 
     public AccountSettings() {
     }
 
-    public AccountSettings(int id, List<String> privateCidrList) {
+    public AccountSettings(int id, List<String> privateCidrList, Boolean redactPayload) {
         this.id = id;
         this.privateCidrList = privateCidrList;
+        this.redactPayload = redactPayload;
     }
 
 
@@ -30,5 +35,25 @@ public class AccountSettings {
 
     public void setPrivateCidrList(List<String> privateCidrList) {
         this.privateCidrList = privateCidrList;
+    }
+
+    public Boolean isRedactPayload() {
+        return redactPayload;
+    }
+
+    public Boolean getRedactPayload() {
+        return redactPayload;
+    }
+
+    public void setRedactPayload(Boolean redactPayload) {
+        this.redactPayload = redactPayload;
+    }
+
+    public boolean isSampleDataCollectionDropped() {
+        return sampleDataCollectionDropped;
+    }
+
+    public void setSampleDataCollectionDropped(boolean sampleDataCollectionDropped) {
+        this.sampleDataCollectionDropped = sampleDataCollectionDropped;
     }
 }
