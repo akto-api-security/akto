@@ -11,6 +11,7 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
 
+import com.mongodb.client.model.Updates;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
@@ -147,4 +148,10 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return urls;
     }
     
+    public void resetCount() {
+        instance.getMCollection().updateMany(
+                Filters.gt("count", 0),
+                Updates.set("count", 0)
+        );
+    }
 }
