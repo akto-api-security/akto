@@ -29,6 +29,7 @@ public class AktoPolicy {
 
     boolean processCalledAtLeastOnce = false;
     ApiAccessTypePolicy apiAccessTypePolicy = new ApiAccessTypePolicy(null);
+    boolean redact = false;
 
     private final int batchTimeThreshold = 120;
     private int timeSinceLastSync;
@@ -54,6 +55,10 @@ public class AktoPolicy {
             if ( cidrList != null && !cidrList.isEmpty()) {
                 // logger.info("Found cidr from db");
                 apiAccessTypePolicy.setPrivateCidrList(cidrList);
+            }
+
+            if (accountSettings.isRedactPayload() != null) {
+                redact = accountSettings.isRedactPayload();
             }
         }
 
@@ -101,7 +106,7 @@ public class AktoPolicy {
             logger.info("Writing to db: " + "writesForApiInfoSize="+writesForApiInfo.size() + " writesForSampleData="+ writesForSampleData.size());
             try {
                 if (writesForApiInfo.size() > 0) ApiInfoDao.instance.getMCollection().bulkWrite(writesForApiInfo);
-                if (writesForSampleData.size() > 0) FilterSampleDataDao.instance.getMCollection().bulkWrite(writesForSampleData);
+                if (!redact && writesForSampleData.size() > 0) FilterSampleDataDao.instance.getMCollection().bulkWrite(writesForSampleData);
             } catch (Exception e) {
                 logger.error(e.toString());
             }
