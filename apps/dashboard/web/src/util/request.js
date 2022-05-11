@@ -61,6 +61,14 @@ const err = async (error) => {
       })
       break
 
+    case 429:
+      window._AKTO.$emit('SHOW_SNACKBAR', {
+        show: true,
+        text: "Too many requests!! Please try after 1 hour",
+        color: 'red'
+      })
+      break
+
     case 403:
       const originalRequest = error.config;
       if (originalRequest._retry) {
