@@ -1,7 +1,34 @@
 <template>
-    <layout-with-tabs title="Settings" :tabs="['Data types', 'Integrations', 'Account', 'Users', 'Health']">
+    <layout-with-tabs title="Settings" :tabs="['Data types', 'Tags', 'Integrations', 'Account', 'Users', 'Health']">
         <template slot="Data types">
-            <data-types/>
+            <data-types 
+                title="Data types"
+                :data_types="data_types"
+                :toggleActivateFieldFunc='toggleActivateDataTypes'
+                :createNewDataType="createNewDataType"
+                @selectedEntry="selectedDataType"
+            >
+                <template #details-container="{}">
+                    <a-card title="Details" color="rgba(33, 150, 243)" style="min-height: 600px">
+                        <data-type-details :data_type="data_type"/>
+                    </a-card>                    
+                </template>
+            </data-types>
+        </template>
+        <template slot="Tags">
+            <data-types 
+                title="Tags"
+                :data_types="tag_configs"
+                :toggleActivateFieldFunc='toggleActivateTagConfig'
+                :createNewDataType="createNewTagConfig"
+                @selectedEntry="selectedTagConfig"
+            >
+                <template #details-container="{}">
+                    <a-card title="Details" color="rgba(33, 150, 243)" style="min-height: 600px">
+                        <tag-config-details :tag_config_copy="tag_config"/>
+                    </a-card>                    
+                </template>
+            </data-types>
         </template>
       <template slot="Integrations">
         <integrations/>
@@ -30,6 +57,12 @@ import Health from './components/Health'
 import Integrations from './components/Integrations'
 import api from './api'
 import DataTypes from './components/data_types/DataTypes.vue'
+import DataTypeDetails from './components/data_types/components/DataTypeDetails.vue'
+import TagSettings from './components/tag_configs/TagSettings.vue'
+import TagConfigDetails from './components/tag_configs/TagConfigDetails.vue'
+import ACard from '@/apps/dashboard/shared/components/ACard'
+
+import {mapState} from 'vuex'
 export default {
     name: "PageSettings",
     components: { 
@@ -37,12 +70,42 @@ export default {
         TeamOverview,
         Health,
         Integrations,
-        DataTypes
+        DataTypes,
+        TagSettings,
+        TagConfigDetails,
+        DataTypeDetails,
+        ACard
+    },
+    mounted() {
+        this.$store.dispatch("data_types/fetchDataTypes")
+        this.$store.dispatch("tag_configs/fetchTagConfigs")
     },
     methods: {
+        createNewDataType() {
+            return this.$store.dispatch('data_types/setNewDataType')
+        },
+        toggleActivateDataTypes(item) {
+            return this.$store.dispatch('data_types/toggleActiveParam', item)
+        },
+        selectedDataType(item) {
+            this.$store.state.data_types.data_type = item
+        },
+        createNewTagConfig() {
+            return this.$store.dispatch('tag_configs/setNewTagConfig')
+        },
+        toggleActivateTagConfig(item) {
+            return this.$store.dispatch('tag_configs/toggleActiveTagConfig', item)
+        },
+        selectedTagConfig(item) {
+            this.$store.state.tag_configs.tag_config = item
+        },
         getActiveAccount() {
             return this.$store.state.auth.activeAccount
         }
+    },
+    computed: {
+        ...mapState('data_types', ['data_types', 'data_type']),
+        ...mapState('tag_configs', ['tag_configs', 'tag_config'])
     }
 }
 </script>

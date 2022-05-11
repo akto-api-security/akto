@@ -47,7 +47,7 @@ export default {
     },
     methods: {
       dataTypeSelected(item) {
-        this.$store.state.data_types.data_type = item
+        this.$emit("selectedEntry", item)
       }
     }
 
@@ -60,6 +60,15 @@ export default {
 .table-entry
     font-size: 14px !important
     height: 100%
+    text-overflow: ellipsis
+    overflow : hidden
+    white-space: nowrap
+
+    &:hover
+        text-overflow: clip
+        white-space: normal
+        word-break: break-all
+
 
 .table-column
     padding: 4px 8px !important
@@ -68,7 +77,6 @@ export default {
 .table-row
     position: relative
     background: rgba(71, 70, 106, 0.03)
-    height: 50px
     line-height: 40px
 
     &:hover
@@ -76,5 +84,7 @@ export default {
 
 .table-row-actions
   padding-top: 5px !important
+  position: absolute
+  right: 0px
 
 </style>

@@ -276,6 +276,10 @@ export default {
                 return true
             } 
             
+            if (itemValue instanceof Array) {
+                itemValue = new Set(itemValue);
+            }
+
             if(itemValue instanceof Set) {
                 switch(this.filterOperators[header]) {
                     case "OR":
