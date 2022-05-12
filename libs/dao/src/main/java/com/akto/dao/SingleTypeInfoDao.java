@@ -105,7 +105,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         Bson alwaysSensitiveFilter = Filters.in("subType", sensitiveSubTypes);
 
         Bson sensitivityBasedOnPosition = Filters.and(
-                Filters.in("subType", Arrays.asList(SingleTypeInfo.JWT.getName(), SingleTypeInfo.URL.getName(), SingleTypeInfo.IP_ADDRESS.getName())),
+                Filters.in("subType", Arrays.asList(SingleTypeInfo.JWT.getName(), SingleTypeInfo.IP_ADDRESS.getName())),
                 Filters.gt("responseCode", -1)
         );
 
