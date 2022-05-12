@@ -1,6 +1,6 @@
 import Vue from 'vue'
 import Vuex from 'vuex'
-import func from '../../../../../../../util/func'
+import func from '@/util/func'
 import api from '../api'
 
 

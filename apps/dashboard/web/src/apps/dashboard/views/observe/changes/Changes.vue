@@ -56,6 +56,9 @@
                     <template #item.sensitiveTags="{item}">
                         <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
                     </template>
+                    <template #item.tags="{item}">
+                        <tag-chip-group :tags="Array.from(item.tags || [])" />
+                    </template>
                 </simple-table>
             </template>
             <template slot="New parameters">
@@ -152,6 +155,7 @@ import LineChart from '@/apps/dashboard/shared/components/LineChart'
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import ServerTable from '@/apps/dashboard/shared/components/ServerTable'
 import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
+import TagChipGroup from '@/apps/dashboard/shared/components/TagChipGroup'
 import func from '@/util/func'
 import constants from '@/util/constants'
 import {mapState} from 'vuex'
@@ -171,6 +175,7 @@ export default {
         SimpleTable,
         ServerTable,
         SensitiveChipGroup,
+        TagChipGroup,
         LineChart,
         BatchOperation,
         Spinner
@@ -197,6 +202,10 @@ export default {
                 {
                     text: 'Method',
                     value: 'method'
+                },
+                {
+                    text: 'Tags',
+                    value: 'tags'
                 },
                 {
                     text: 'Sensitive Params',
