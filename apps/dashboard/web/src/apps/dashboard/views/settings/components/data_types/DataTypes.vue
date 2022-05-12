@@ -1,40 +1,40 @@
 <template>
-    <div>
-        <v-row class="pa-4">
-            <v-col md="3" class="data-types-container d-flex">
+    <div class="data-types-container d-flex">
                 <a-card
-                    title="Data Types" 
+                    :title="title" 
                     color="rgba(33, 150, 243)"
-                    style="min-height: 600px"
+                    style="min-height: 600px; flex: 1 1 20%"
                     icon_right="$fas_plus"
                     icon_right_color="#6200EA"
                     @icon_right_clicked="createNewDataType"
                 >
                     <div v-for="data_type in data_types" :key="data_type.name">
-                        <data-type-card :item="data_type" :actions="data_type_card_actions"/>
+                        <data-type-card :item="data_type" :actions="data_type_card_actions" @selectedEntry="entryUpdated"/>
                     </div>
                 </a-card>
-            </v-col>
-            <v-col md="9" class="details-container d-flex" >
-                <a-card title="Details" color="rgba(33, 150, 243)" style="min-height: 600px">
-                    <data-type-details :data_type="data_type"/>
-                </a-card>
-            </v-col>
-        </v-row>
+            <div class="details-container" >
+                <slot name="details-container"/>
+            </div>
     </div>
 </template>
 
 <script>
 import ACard from "@/apps/dashboard/shared/components/ACard"
 import DataTypeCard from "./components/DataTypeCard.vue"
-import DataTypeDetails from './components/DataTypeDetails.vue'
+import obj from '@/util/obj'
 import {mapState} from 'vuex'
 export default {
     name: "DataTypes",
     components: {
         ACard,
-        DataTypeCard,
-        DataTypeDetails
+        DataTypeCard
+    },
+    props: {
+        title: obj.strR,
+        data_types: obj.arrN,
+        toggleActivateFieldFunc: obj.funcR,
+        createNewDataType: obj.funcR,
+        selectedEntry: obj.funcR
     },
     data() {
         return {
@@ -50,17 +50,10 @@ export default {
             ],
         }
     },
-    mounted() {
-      this.$store.dispatch("data_types/fetchDataTypes")
-    },
     methods: {
-        createNewDataType() {
-            this.$store.dispatch('data_types/setNewDataType')
+        entryUpdated(item) {
+            this.$emit("selectedEntry", item)
         },
-        toggleActivateFieldFunc (item) {
-            return this.$store.dispatch('data_types/toggleActiveParam', item)
-        },
-
         toggleSuccessFunc (resp, item) {
             window._AKTO.$emit('SHOW_SNACKBAR', {
                 show: true,
@@ -75,9 +68,6 @@ export default {
                 color: 'red'
             })
         },
-    },
-    computed: {
-        ...mapState('data_types', ['data_types', 'data_type']),
     }
 }
 
@@ -86,8 +76,9 @@ export default {
 <style lang="sass" scoped>
 .main
     background-color: #47466A
-.data-types-container .v-card
-    margin-right: 0px
-.details-container .v-card
-    margin-left: 0px
+.data-types-container
+    
+.details-container
+    flex: 1 1 80%
+
 </style>

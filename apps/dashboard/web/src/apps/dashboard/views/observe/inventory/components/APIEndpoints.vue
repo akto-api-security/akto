@@ -44,6 +44,9 @@
                     <template #item.sensitiveTags="{item}">
                         <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
                     </template>
+                    <template #item.tags="{item}">
+                        <tag-chip-group :tags="Array.from(item.tags || [])" />
+                    </template>
                 </simple-table>
             </template>
             <template slot="Sensitive">
@@ -54,6 +57,9 @@
                 >
                     <template #item.sensitiveTags="{item}">
                         <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
+                    </template>
+                    <template #item.tags="{item}">
+                        <tag-chip-group :tags="Array.from(item.tags || [])" />
                     </template>
                 </simple-table>
             </template>
@@ -68,6 +74,9 @@
                 >
                     <template #item.sensitiveTags="{item}">
                         <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
+                    </template>
+                    <template #item.tags="{item}">
+                        <tag-chip-group :tags="Array.from(item.tags || [])" />
                     </template>
                 </simple-table>
             </template>
@@ -106,6 +115,9 @@
                     <template #item.sensitiveTags="{item}">
                         <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
                     </template>
+                    <template #item.tags="{item}">
+                        <tag-chip-group :tags="Array.from(item.tags || [])" />
+                    </template>
                 </simple-table>
             </template>
             <!-- <template slot="Policies">
@@ -132,6 +144,7 @@ import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import api from '../api'
 import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
+import TagChipGroup from '@/apps/dashboard/shared/components/TagChipGroup'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
 import { saveAs } from 'file-saver'
 import UploadFile from '@/apps/dashboard/shared/components/UploadFile'
@@ -146,6 +159,7 @@ export default {
         LayoutWithTabs,
         SimpleTable,
         SensitiveChipGroup,
+        TagChipGroup,
         Spinner,
         UploadFile,
         JsonViewer,
@@ -177,6 +191,10 @@ export default {
                 {
                     text: 'Method',
                     value: 'method'
+                },
+                {
+                    text: 'Tags',
+                    value: 'tags'
                 },
                 {
                     text: 'Sensitive Params',

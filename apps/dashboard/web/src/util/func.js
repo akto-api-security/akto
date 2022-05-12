@@ -339,6 +339,7 @@ export default {
                 ret[key] = {
                     shadow: x.shadow ? x.shadow : false,
                     sensitive: x.sensitive,
+                    tags: x.tags,
                     endpoint: x.url,
                     parameterisedEndpoint: this.parameterizeUrl(x.url),
                     open: apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].indexOf("UNAUTHENTICATED") !== -1 : false,
@@ -439,11 +440,11 @@ export default {
 
         return result;
     },
-
     prepareDataTypes(data_types) {
         if (data_types) {
             data_types.forEach((x) => {
-                x["color"] = x["sensitiveAlways"] || x["sensitivePosition"].length > 0 ? vuetify.userPreset.theme.themes.dark.redMetric : "transparent"
+                let isSensitive = x["sensitiveAlways"] || (x["sensitivePosition"] && x["sensitivePosition"].length > 0)
+                x["color"] = isSensitive ? vuetify.userPreset.theme.themes.dark.redMetric : "transparent"
                 x["prefix"] = x["id"] ? "[custom]" : ""
                 if (x["id"]) {
                     if (!x["keyConditions"]) {
