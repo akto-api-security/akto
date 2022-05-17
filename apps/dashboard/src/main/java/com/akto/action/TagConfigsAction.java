@@ -63,7 +63,7 @@ public class TagConfigsAction extends UserAction {
         if (!(name.matches("[A-Z_0-9]+"))) throw new AktoCustomException("Name can only contain alphabets, numbers and underscores");
 
         if (keyOperator == null) {
-            throw new AktoCustomException("Operator can't be null");
+            keyOperator = "AND";
         }
 
         Conditions keyConditions = null;
