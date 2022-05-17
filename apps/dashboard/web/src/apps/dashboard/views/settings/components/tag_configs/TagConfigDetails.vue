@@ -68,29 +68,6 @@
                     Save
                   </v-btn>
                 </div>
-                <div style="padding: 12px">
-                  <v-btn
-                        @click="reviewCustomDataType"
-                        color="#white"
-                        class="review-btn"
-                        height="40px"
-                        width="100px"
-                        :loading="reviewLoading"
-                    >
-                      Review
-                        <span slot="loader">
-                            <v-progress-circular
-                                :rotate="360"
-                                :size="30"
-                                :width="5"
-                                :value="computeLoading"
-                                color="#6200EA"
-                            >
-                            </v-progress-circular>
-                            {{ computeLoading + "%"}}
-                        </span>
-                    </v-btn>
-                </div>
             </v-row>
             <review-table v-if="reviewData" :review-data="reviewData"/>
         </v-container>

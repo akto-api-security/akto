@@ -9,6 +9,7 @@ import com.akto.MongoBasedTest;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.RuntimeFilterDao;
 import com.akto.dao.SampleDataDao;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
@@ -18,7 +19,9 @@ import com.akto.dto.messaging.Message.Mode;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.RequestTemplate;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLTemplate;
+import com.akto.dto.type.SingleTypeInfo.ParamId;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.HttpResponseParams.Source;
 import com.akto.runtime.APICatalogSync;
@@ -447,4 +450,22 @@ public class TestDBSync extends MongoBasedTest {
         Assertions.assertEquals(apiCollections.get(0).getId(), 0);
     }
 
+    // @Test
+    // public void testRemovingStaleStaticURLs() {
+    //     ParamId staticParam = new ParamId("api/payment1", "GET", -1, false, "payment_id", SingleTypeInfo.GENERIC, 0);
+    //     staticParam.setSubTypeString("GENERIC");
+    //     SingleTypeInfo staticInfo = new SingleTypeInfo(staticParam, null, new HashSet<>(), 1, 1, 1);
+    //     staticInfo.setSubTypeString("GENERIC");
+    //     ParamId templateParam = new ParamId("api/STRING", "GET", -1, false, "payment_id", SingleTypeInfo.GENERIC, 0);
+    //     templateParam.setSubTypeString("GENERIC");
+    //     SingleTypeInfo templateInfo = new SingleTypeInfo(templateParam, null, new HashSet<>(), 1, 1, 1);
+    //     templateInfo.setSubTypeString("GENERIC");
+    //     SingleTypeInfoDao.instance.insertOne(staticInfo);
+    //     SingleTypeInfoDao.instance.insertOne(templateInfo);
+    //     HttpCallParser parser1 = new HttpCallParser("access-token", 1,40,10);
+    //     assertEquals(parser1.apiCatalogSync.dbState.get(0).getStrictURLToMethods().size(), 0);
+    //     parser1.syncFunction(new ArrayList<>());
+    //     assertEquals(SingleTypeInfoDao.instance.findAll(new BasicDBObject()).size(), 1);
+
+    // }
 }
