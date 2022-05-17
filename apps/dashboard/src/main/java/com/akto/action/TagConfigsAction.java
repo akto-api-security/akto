@@ -62,8 +62,12 @@ public class TagConfigsAction extends UserAction {
         name = name.toUpperCase();
         if (!(name.matches("[A-Z_0-9]+"))) throw new AktoCustomException("Name can only contain alphabets, numbers and underscores");
 
+        if (keyOperator == null) {
+            throw new AktoCustomException("Operator can't be null");
+        }
+
         Conditions keyConditions = null;
-        Conditions.Operator kOperator = Conditions.Operator.AND;
+        Conditions.Operator kOperator = Conditions.Operator.valueOf(keyOperator);
         if (keyConditionFromUsers != null) {
             List<Predicate> predicates = new ArrayList<>();
             for (ConditionFromUser conditionFromUser: keyConditionFromUsers) {

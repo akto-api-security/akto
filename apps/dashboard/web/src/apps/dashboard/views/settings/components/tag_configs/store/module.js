@@ -92,11 +92,12 @@ const tag_configs = {
         async createTagConfig({commit, dispatch, state}, { tag_config, save}) {
             let id = tag_config["id"]
             let name = tag_config["name"]
+            let keyOperator = tag_config["keyConditions"]["operator"]
             let keyConditionFromUsers =  func.preparePredicatesForApi(tag_config["keyConditions"]["predicates"])
             let createNew = tag_config["createNew"] ? tag_config["createNew"] : false
             let active = tag_config["active"]
             if (save) {
-                return api.saveTagConfig(id,name, keyConditionFromUsers, createNew, active).then((resp) => {
+                return api.saveTagConfig(id,name, keyOperator, keyConditionFromUsers, createNew, active).then((resp) => {
                     commit("UPDATE_TAG_CONFIGS", resp["tagConfig"]);
                 })
             } else {
@@ -108,7 +109,7 @@ const tag_configs = {
                         break
                     }
                     idx += 1
-                    let resp = await api.reviewTagConfig(id,name, keyConditionFromUsers,active,idx)
+                    let resp = await api.reviewTagConfig(id,name, keyOperator, keyConditionFromUsers,active,idx)
                     commit("SET_REVIEW_DATA", resp);
                     batchSize = resp["currentProcessed"]
                 }

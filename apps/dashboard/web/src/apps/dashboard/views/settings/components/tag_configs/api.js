@@ -10,13 +10,14 @@ export default {
         })
     },
 
-    reviewTagConfig(id, name, keyConditionFromUsers, active, pageNum) {
+    reviewTagConfig(id, name, keyOperator, keyConditionFromUsers, active, pageNum) {
         return request({
             url: '/api/reviewTagConfig',
             method: 'post',
             data: {
                 id,
                 name,
+                keyOperator,
                 keyConditionFromUsers,
                 active,
                 pageNum
@@ -25,12 +26,12 @@ export default {
         })
     },
 
-    saveTagConfig(id,name, keyConditionFromUsers, createNew,active) {
+    saveTagConfig(id,name, keyOperator, keyConditionFromUsers, createNew,active) {
         return request({
             url: '/api/saveTagConfig',
             method: 'post',
             data: {
-                id,name,keyConditionFromUsers, createNew, active
+                id,name,keyOperator,keyConditionFromUsers, createNew, active
              }
 
         })
