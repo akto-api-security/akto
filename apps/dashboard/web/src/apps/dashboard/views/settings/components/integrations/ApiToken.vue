@@ -1,10 +1,8 @@
 <template>
   <div style="min-height:200px; padding-top:20px; margin-bottom:30px">
     <div class="d-flex" style="padding-bottom:10px">
-      <v-avatar size="40px" style="margin-right: 15px">
-        <img :src="require(`@/assets/${avatar_image}`)" />
-      </v-avatar>
-      <h2 style="color: #47466A; font-size: 16px; font-weight: 500" class="fd-column jc-sa">{{this.title}}</h2>
+      <v-icon :size="50" style="width: 50px !important">{{avatar_image}}</v-icon>
+      <div class="title-text fd-column jc-sa">{{this.title}}</div>
     </div>
     <div style="padding-top: 20px;" v-if="burp_tokens.length > 0">
       <div class="d-flex" v-for="item in burpTokensForTable" :key="item.id" style="padding-bottom: 30px">
@@ -117,4 +115,10 @@ export default {
   font-weight: normal
   color: #47466A
   font-size: 13px  
+.title-text
+  color: #47466A
+  font-size: 16px
+  font-weight: 500  
+  margin-left: 16px
+  
 </style>
