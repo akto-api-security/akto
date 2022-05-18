@@ -9,7 +9,7 @@
   >
     <div class="integration-details">
       <div class="integration-logo">
-        <v-icon :size="50" :color="color">{{icon}}</v-icon>
+        <v-icon :size="50" :color="color" style="width: 50px !important">{{icon}}</v-icon>
       </div>
       <div class="integration-name">
         {{name}}
@@ -28,7 +28,7 @@ export default {
     name: obj.strR
   },
   data () {
-    let iconDetails = func.icon(func.sourceNum(this.name))
+    let iconDetails = func.icon(this.name.replaceAll(' ','').toUpperCase())
     return {
       icon: iconDetails.name,
       color: iconDetails.color

@@ -483,5 +483,21 @@ export default {
         }
 
         return result
+    },
+
+    icon(name) {
+        switch (name) {
+            case "BURPSUITE":
+                return {name: '$burpsuite', color: '#fe7b5b'}
+
+            case "POSTMAN":
+                return {name: '$postman', color: '#ffffff'}
+
+            case "AKTOAPI":
+                return {name: '$restapi', color: '#fe7b5b'}
+
+            case "SLACK":
+                return {name: '$slack', color: '#fe7b5b'}
+        }
     }
 }

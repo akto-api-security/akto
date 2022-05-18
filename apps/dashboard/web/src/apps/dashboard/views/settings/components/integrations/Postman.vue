@@ -2,7 +2,7 @@
   <div style="min-height:200px;margin-bottom:30px">
     <div class="d-flex" style="padding-bottom:10px">
       <v-avatar size="40px" style="margin-right: 15px">
-        <img src="@/assets/getpostman-icon.svg"/>
+        <v-icon :size="50" style="width: 50px !important">$postman</v-icon>
       </v-avatar>
       <h2 style="color: #47466A; font-size: 16px; font-weight: 500" class="fd-column jc-sa">Postman</h2>
     </div>

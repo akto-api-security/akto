@@ -4,6 +4,10 @@ import 'vuetify/dist/vuetify.min.css'
 import { library } from '@fortawesome/fontawesome-svg-core' // Core SVG
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome' // Integration
 import CurlyBraces from "../apps/dashboard/shared/icons/CurlyBraces"
+import Burpsuite from "../apps/dashboard/shared/icons/Burpsuite"
+import Slack from "../apps/dashboard/shared/icons/Slack"
+import Postman from "../apps/dashboard/shared/icons/Postman"
+import Restapi from "../apps/dashboard/shared/icons/Restapi"
 
 Vue.component('font-awesome-icon', FontAwesomeIcon)
 
@@ -139,6 +143,22 @@ const faIconsOpts = {}
 
 faIconsOpts.curlyBraces = {
   component: CurlyBraces
+}
+
+faIconsOpts.burpsuite = {
+  component: Burpsuite
+}
+
+faIconsOpts.postman = {
+  component: Postman
+}
+
+faIconsOpts.slack = {
+  component: Slack
+}
+
+faIconsOpts.restapi = {
+  component: Restapi
 }
 
 faIcons.forEach(x => faIconsOpts[x.prefix+"_"+x.iconName] = {

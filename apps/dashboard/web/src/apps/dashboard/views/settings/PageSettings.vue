@@ -31,7 +31,7 @@
             </data-types>
         </template>
       <template slot="Integrations">
-        <integrations/>
+        <integration-center/>
       </template>
       <template slot="Account">
             <div class="pa-8">
@@ -54,13 +54,13 @@
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import TeamOverview from './components/TeamOverview'
 import Health from './components/Health'
-import Integrations from './components/Integrations'
 import api from './api'
 import DataTypes from './components/data_types/DataTypes.vue'
 import DataTypeDetails from './components/data_types/components/DataTypeDetails.vue'
 import TagSettings from './components/tag_configs/TagSettings.vue'
 import TagConfigDetails from './components/tag_configs/TagConfigDetails.vue'
 import ACard from '@/apps/dashboard/shared/components/ACard'
+import IntegrationCenter from './components/integrations/IntegrationCenter'
 
 import {mapState} from 'vuex'
 export default {
@@ -69,7 +69,7 @@ export default {
         LayoutWithTabs,
         TeamOverview,
         Health,
-        Integrations,
+        IntegrationCenter,
         DataTypes,
         TagSettings,
         TagConfigDetails,
