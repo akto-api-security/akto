@@ -5,6 +5,7 @@
         icon
         @click="resetAndEmit"
         style="margin-right: auto"
+        :ripple="false"
         v-if="stepNumber ==2"
         width=100
       >
