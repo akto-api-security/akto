@@ -12,16 +12,26 @@ public class SlackWebhook {
     int largerDuration;
     int timestamp;
     String userEmail;
+    String dashboardUrl;
 
     public SlackWebhook() {
     }
 
-    public SlackWebhook(String webhook, int smallerDuration, int largerDuration, int timestamp, String userEmail, int id) {
+    public SlackWebhook(int id, String webhook, int smallerDuration, int largerDuration, int timestamp, String userEmail, String dashboardUrl) {
+        this.id = id;
         this.webhook = webhook;
         this.smallerDuration = smallerDuration;
         this.largerDuration = largerDuration;
         this.timestamp = timestamp;
         this.userEmail = userEmail;
+        this.dashboardUrl = dashboardUrl;
+    }
+
+    public int getId() {
+        return this.id;
+    }
+
+    public void setId(int id) {
         this.id = id;
     }
 
@@ -65,24 +75,24 @@ public class SlackWebhook {
         this.userEmail = userEmail;
     }
 
-    public int getId() {
-        return this.id;
+    public String getDashboardUrl() {
+        return this.dashboardUrl;
     }
 
-    public void setId(int id) {
-        this.id = id;
+    public void setDashboardUrl(String dashboardUrl) {
+        this.dashboardUrl = dashboardUrl;
     }
 
     @Override
     public String toString() {
         return "{" +
-            " webhook='" + getWebhook() + "'" +
+            " id='" + getId() + "'" +
+            ", webhook='" + getWebhook() + "'" +
             ", smallerDuration='" + getSmallerDuration() + "'" +
             ", largerDuration='" + getLargerDuration() + "'" +
             ", timestamp='" + getTimestamp() + "'" +
             ", userEmail='" + getUserEmail() + "'" +
-            ", id='" + getId() + "'" +
+            ", dashboardUrl='" + getDashboardUrl() + "'" +
             "}";
     }
-
 }
