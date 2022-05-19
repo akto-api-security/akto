@@ -14,11 +14,16 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.result.DeleteResult;
 import com.opensymphony.xwork2.Action;
 
+import org.apache.struts2.interceptor.ServletRequestAware;
+
+import javax.servlet.http.HttpServletRequest;
+
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class ApiTokenAction extends UserAction{
+public class ApiTokenAction extends UserAction implements ServletRequestAware {
     private static final int keyLength = 40;
     private static final RandomString randomString = new RandomString(keyLength);
 
@@ -92,6 +97,7 @@ public class ApiTokenAction extends UserAction{
 
     private String error;
     private String webhookUrl;
+    private String dashboardUrl;
     public String addSlackWebhook() {
 
         boolean isUrl = KeyTypes.patternToSubType.get(SingleTypeInfo.URL).matcher(webhookUrl).matches();
@@ -104,7 +110,7 @@ public class ApiTokenAction extends UserAction{
             this.error = "This webhook url already exists";
         } else {
             int now = Context.now();
-            SlackWebhook newWebhook = new SlackWebhook(webhookUrl, 1, 1, now, getSUser().getLogin(), now);
+            SlackWebhook newWebhook = new SlackWebhook(now, webhookUrl, 1, 1, now, getSUser().getLogin(), dashboardUrl);
             this.apiTokenId = SlackWebhooksDao.instance.insertOne(newWebhook).getInsertedId().asInt32().getValue();
         }
 
@@ -146,5 +152,10 @@ public class ApiTokenAction extends UserAction{
 
     public boolean isApiTokenDeleted() {
         return apiTokenDeleted;
+    }
+
+    @Override
+    public void setServletRequest(HttpServletRequest request) {
+        this.dashboardUrl = request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort();
     }
 }

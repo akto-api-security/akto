@@ -1,6 +1,6 @@
 package com.akto.notifications.slack;
 
-import java.util.List;
+import java.util.Map;
 
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -33,11 +33,18 @@ public class DailyUpdate {
         return ret;
     }
 
-    private static BasicDBList createApiListSection(List<String> mapEndpointToSubtypes, String dashboardLink) {
+    private static BasicDBList createApiListSection(Map<String, String> mapEndpointToSubtypes, String dashboardLink) {
         BasicDBList ret = new BasicDBList();
 
-        for(String endpointData: mapEndpointToSubtypes.subList(0, Math.min(4, mapEndpointToSubtypes.size()))) {
-            ret.add(new BasicDBObject("type", "section").append("text", new BasicDBObject("type", "mrkdwn").append("text", ">" + endpointData)));
+        int counter = 0;
+        for(String endpointData: mapEndpointToSubtypes.keySet()) {
+            counter ++ ;
+            if (counter == 5) {
+                break;
+            }
+            String link = dashboardLink + mapEndpointToSubtypes.get(endpointData);
+            String text = "<"+link+"|"+endpointData+">";
+            ret.add(new BasicDBObject("type", "section").append("text", new BasicDBObject("type", "mrkdwn").append("text", ">" + text)));
         }
 
         if (mapEndpointToSubtypes.size() > 4) {
@@ -56,14 +63,14 @@ public class DailyUpdate {
     private int newSensitiveEndpoints;
     private int newEndpoints;
     private int newSensitiveParams;
-    private List<String> mapEndpointToSubtypes;
+    private Map<String, String> mapEndpointToSubtypes;
     private String dashboardLink;
     
 
 
     public DailyUpdate(
         int totalSensitiveEndpoints, int totalEndpoints, int newSensitiveEndpoints, 
-        int newEndpoints, int newSensitiveParams, List<String> mapEndpointToSubtypes, String dashboardLink
+        int newEndpoints, int newSensitiveParams, Map<String, String> mapEndpointToSubtypes, String dashboardLink
     ) {
         this.totalSensitiveEndpoints = totalSensitiveEndpoints;
         this.totalEndpoints = totalEndpoints;

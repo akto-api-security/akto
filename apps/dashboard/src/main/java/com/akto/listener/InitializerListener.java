@@ -13,6 +13,7 @@ import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.notifications.email.WeeklyEmail;
 import com.akto.notifications.slack.DailyUpdate;
+import com.akto.util.Pair;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -31,6 +32,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.notifications.SlackWebhooksDao;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
@@ -92,7 +94,7 @@ public class InitializerListener implements ServletContextListener {
                         changesInfo.newEndpointsLast31Days.size(), 
                         sendTo, 
                         changesInfo.newEndpointsLast7Days, 
-                        changesInfo.newSensitiveParams
+                        changesInfo.newSensitiveParams.keySet()
                     );
 
                     WeeklyEmail.send(mail);
@@ -125,7 +127,7 @@ public class InitializerListener implements ServletContextListener {
                             return;
                         }
     
-                        DailyUpdate dailyUpdate = new DailyUpdate(0, 0, ci.newSensitiveParams.size(), ci.newEndpointsLast7Days.size(), ci.recentSentiiveParams, ci.newSensitiveParams, "");
+                        DailyUpdate dailyUpdate = new DailyUpdate(0, 0, ci.newSensitiveParams.size(), ci.newEndpointsLast7Days.size(), ci.recentSentiiveParams, ci.newSensitiveParams, slackWebhook.getDashboardUrl());
     
                         String webhookUrl = slackWebhook.getWebhook();
                         String payload = dailyUpdate.toJSON();
@@ -143,7 +145,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     static class ChangesInfo {
-        public List<String> newSensitiveParams = new ArrayList<>();
+        public Map<String, String> newSensitiveParams = new HashMap<>();
         public List<String> newEndpointsLast7Days = new ArrayList<>();
         public List<String> newEndpointsLast31Days = new ArrayList<>();
         public int totalSensitiveParams = 0;
@@ -172,9 +174,11 @@ public class InitializerListener implements ServletContextListener {
             ret.recentSentiiveParams = 0;
             int now = Context.now();
             int delta = newSensitiveParamsDays * 24 * 60 * 60;
-            Map<String, Set<String>> endpointToSubTypes = new HashMap<>();
+            Map<Pair<String, String>, Set<String>> endpointToSubTypes = new HashMap<>();
             for(SingleTypeInfo sti: sensitiveParamsList) {
-                String key = sti.getMethod() + " " + sti.getUrl();
+                String encoded = Base64.getEncoder().encodeToString((sti.getUrl() + " " + sti.getMethod()).getBytes());
+                String link = "/dashboard/observe/inventory/"+sti.getApiCollectionId()+"/"+encoded;
+                Pair<String, String> key = new Pair<>(sti.getMethod() + " " + sti.getUrl(), link);
                 String value = sti.getSubType().getName();
                 if (sti.getTimestamp() >= now - delta) {
                     ret.recentSentiiveParams ++;
@@ -187,8 +191,8 @@ public class InitializerListener implements ServletContextListener {
                 }
             }
 
-            for(String key: endpointToSubTypes.keySet()) {
-                ret.newSensitiveParams.add(key + ": " + StringUtils.join(endpointToSubTypes.get(key), ","));
+            for(Pair<String, String> key: endpointToSubTypes.keySet()) {
+                ret.newSensitiveParams.put(key.getFirst() + ": " + StringUtils.join(endpointToSubTypes.get(key), ","), key.getSecond());
             }
 
             return ret;
