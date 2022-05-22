@@ -37,7 +37,41 @@
             <div class="pa-8">
                 <div class="d-flex">
                     <div class="entry-text">Account ID</div>
-                    <div class="entry-value">{{getActiveAccount()}}</div>
+                    <div class="entry-text">{{getActiveAccount()}}</div>
+                </div>
+                <div>
+                    <v-dialog
+                        v-model="showDialog"
+                        width="500"
+                    >
+                        <template v-slot:activator="{ on, attrs }">
+                            <v-btn 
+                                primary 
+                                dark 
+                                color="#6200EA" 
+                                @click="showDialog = true"
+                                v-bind="attrs"
+                                v-on="on"
+                            >
+                                Update
+                            </v-btn>
+                        </template>
+                        <div class="dialog-box">
+                            <v-select
+                                required
+                                :items="awsRegions"
+                                v-model="region"
+                                label="Select the region in which Akto is deployed"
+                            />
+                                
+                                <div class="entry-text"> Please note that this will incur a downtime of 10 mins to update the system. </div>
+                                <div class="d-flex jc-end">
+                                    <v-btn primary dark color="#6200EA" @click="takeUpdate" :disabled="region == ''">
+                                        Proceed
+                                    </v-btn>
+                                </div>
+                        </div>
+                    </v-dialog>
                 </div>
             </div>
         </template>
@@ -80,6 +114,13 @@ export default {
         this.$store.dispatch("data_types/fetchDataTypes")
         this.$store.dispatch("tag_configs/fetchTagConfigs")
     },
+    data() {
+        return {
+            showDialog: false,
+            region: '',
+            awsRegions: ["us-east-2","us-east-1","us-west-1","us-west-2","af-south-1","ap-east-1","ap-southeast-3","ap-south-1","ap-northeast-3","ap-northeast-2","ap-southeast-1","ap-southeast-2","ap-northeast-1","ca-central-1","eu-central-1","eu-west-1","eu-west-2","eu-south-1","eu-west-3","eu-north-1","me-south-1","sa-east-1"]
+        }
+    },
     methods: {
         createNewDataType() {
             return this.$store.dispatch('data_types/setNewDataType')
@@ -101,6 +142,9 @@ export default {
         },
         getActiveAccount() {
             return this.$store.state.auth.activeAccount
+        },
+        takeUpdate() {
+            api.takeUpdate(this.region)
         }
     },
     computed: {
@@ -118,4 +162,9 @@ export default {
 .entry-text
     font-weight: 500
     margin-right: 16px
+    color: #47466A
+
+.dialog-box
+    padding: 16px
+    background: #ffffff    
 </style>
