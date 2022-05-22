@@ -31,16 +31,16 @@ public class AccountAction extends UserAction {
     }
 
     private String region;
-    public String takeUpdate() {
 
+    private void invokeLambda(String functionName) {
         InvokeRequest invokeRequest = new InvokeRequest()
-                .withFunctionName("TrafficMirroringInstanceRefreshHandler")
+                .withFunctionName(functionName)
                 .withPayload("{}");
         InvokeResult invokeResult = null;
 
         try {
             AWSLambda awsLambda = AWSLambdaClientBuilder.standard()
-                    .withRegion(Regions.US_EAST_1).build();
+                    .withRegion(Regions.fromName(region)).build();
 
             invokeResult = awsLambda.invoke(invokeRequest);
 
@@ -54,7 +54,11 @@ public class AccountAction extends UserAction {
         }
 
         System.out.println(invokeResult.getStatusCode());
+    }
 
+    public String takeUpdate() {
+        invokeLambda("TrafficMirroringInstanceRefreshHandler");
+        invokeLambda("DashboardInstanceRefreshHandler");
         return Action.SUCCESS.toUpperCase();
     }
 
