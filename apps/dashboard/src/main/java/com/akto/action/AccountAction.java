@@ -30,8 +30,6 @@ public class AccountAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    private String region;
-
     private void invokeLambda(String functionName) {
         InvokeRequest invokeRequest = new InvokeRequest()
                 .withFunctionName(functionName)
@@ -101,13 +99,5 @@ public class AccountAction extends UserAction {
 
     public void setNewAccountId(int newAccountId) {
         this.newAccountId = newAccountId;
-    }
-
-    public String getRegion() {
-        return this.region;
-    }
-
-    public void setRegion(String region) {
-        this.region = region;
     }
 }

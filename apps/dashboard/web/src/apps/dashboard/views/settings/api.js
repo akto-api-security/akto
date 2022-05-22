@@ -119,11 +119,11 @@ export default {
             data: {apiTokenId}
         })
     },
-    takeUpdate(region) {
+    takeUpdate() {
         return request({
             url: '/api/takeUpdate',
             method: 'post',
-            data: {region}
+            data: {}
         })
     }
 }
