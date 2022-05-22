@@ -773,7 +773,18 @@
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
-        </action>        
+        </action>   
+
+        <action name="api/takeUpdate" class="com.akto.action.AccountAction" method="takeUpdate">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+
     </package>
 
 </struts>

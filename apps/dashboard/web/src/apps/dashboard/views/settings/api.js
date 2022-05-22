@@ -118,5 +118,12 @@ export default {
             method: 'post',
             data: {apiTokenId}
         })
+    },
+    takeUpdate() {
+        return request({
+            url: '/api/takeUpdate',
+            method: 'post',
+            data: {}
+        })
     }
 }

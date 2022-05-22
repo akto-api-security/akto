@@ -37,7 +37,34 @@
             <div class="pa-8">
                 <div class="d-flex">
                     <div class="entry-text">Account ID</div>
-                    <div class="entry-value">{{getActiveAccount()}}</div>
+                    <div class="entry-text">{{getActiveAccount()}}</div>
+                </div>
+                <div class="py-4">
+                    <v-dialog
+                        v-model="showDialog"
+                        width="500"
+                    >
+                        <template v-slot:activator="{ on, attrs }">
+                            <v-btn 
+                                primary 
+                                dark 
+                                color="#6200EA" 
+                                @click="showDialog = true"
+                                v-bind="attrs"
+                                v-on="on"
+                            >
+                                Update Akto
+                            </v-btn>
+                        </template>
+                        <div class="dialog-box">
+                            <div class="entry-text"> Please note that this will incur a downtime of 10 mins to update the system. </div>
+                            <div class="d-flex jc-end">
+                                <v-btn primary dark color="#6200EA" @click="takeUpdate">
+                                    Proceed
+                                </v-btn>
+                            </div>
+                        </div>
+                    </v-dialog>
                 </div>
             </div>
         </template>
@@ -80,6 +107,11 @@ export default {
         this.$store.dispatch("data_types/fetchDataTypes")
         this.$store.dispatch("tag_configs/fetchTagConfigs")
     },
+    data() {
+        return {
+            showDialog: false
+        }
+    },
     methods: {
         createNewDataType() {
             return this.$store.dispatch('data_types/setNewDataType')
@@ -101,6 +133,11 @@ export default {
         },
         getActiveAccount() {
             return this.$store.state.auth.activeAccount
+        },
+        takeUpdate() {
+            this.showDialog = false
+            api.takeUpdate()
+
         }
     },
     computed: {
@@ -118,4 +155,9 @@ export default {
 .entry-text
     font-weight: 500
     margin-right: 16px
+    color: #47466A
+
+.dialog-box
+    padding: 16px
+    background: #ffffff    
 </style>

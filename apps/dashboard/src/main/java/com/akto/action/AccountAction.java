@@ -7,6 +7,15 @@ import com.akto.dto.Account;
 import com.akto.dto.UserAccountEntry;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
+import com.amazonaws.auth.profile.ProfileCredentialsProvider;
+import com.amazonaws.regions.Regions;
+import com.amazonaws.services.lambda.AWSLambda;
+import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
+import com.amazonaws.services.lambda.model.InvokeRequest;
+import com.amazonaws.services.lambda.model.InvokeResult;
+import com.amazonaws.services.lambda.model.ServiceException;
+
+import java.nio.charset.StandardCharsets;
 
 import static com.mongodb.client.model.Filters.eq;
 
@@ -18,6 +27,35 @@ public class AccountAction extends UserAction {
     @Override
     public String execute() {
 
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    private void invokeLambda(String functionName) {
+        InvokeRequest invokeRequest = new InvokeRequest()
+                .withFunctionName(functionName)
+                .withPayload("{}");
+        InvokeResult invokeResult = null;
+
+        try {
+            AWSLambda awsLambda = AWSLambdaClientBuilder.standard().build();
+
+            invokeResult = awsLambda.invoke(invokeRequest);
+
+            String ans = new String(invokeResult.getPayload().array(), StandardCharsets.UTF_8);
+
+            //write out the return value
+            System.out.println(ans);
+
+        } catch (ServiceException e) {
+            System.out.println(e);
+        }
+
+        System.out.println(invokeResult.getStatusCode());
+    }
+
+    public String takeUpdate() {
+        invokeLambda("TrafficMirroringInstanceRefreshHandler");
+        invokeLambda("DashboardInstanceRefreshHandler");
         return Action.SUCCESS.toUpperCase();
     }
 
