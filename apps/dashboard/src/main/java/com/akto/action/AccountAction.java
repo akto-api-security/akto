@@ -39,8 +39,7 @@ public class AccountAction extends UserAction {
         InvokeResult invokeResult = null;
 
         try {
-            AWSLambda awsLambda = AWSLambdaClientBuilder.standard()
-                    .withRegion(Regions.fromName(region)).build();
+            AWSLambda awsLambda = AWSLambdaClientBuilder.standard().build();
 
             invokeResult = awsLambda.invoke(invokeRequest);
 
