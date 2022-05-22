@@ -39,7 +39,7 @@
                     <div class="entry-text">Account ID</div>
                     <div class="entry-text">{{getActiveAccount()}}</div>
                 </div>
-                <div>
+                <div class="py-4">
                     <v-dialog
                         v-model="showDialog"
                         width="500"
@@ -53,7 +53,7 @@
                                 v-bind="attrs"
                                 v-on="on"
                             >
-                                Update
+                                Update Akto
                             </v-btn>
                         </template>
                         <div class="dialog-box">
