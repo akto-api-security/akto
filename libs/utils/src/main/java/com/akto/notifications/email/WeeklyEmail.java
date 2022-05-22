@@ -9,6 +9,7 @@ import com.sendgrid.helpers.mail.objects.*;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 /*
@@ -23,7 +24,7 @@ public class WeeklyEmail{
     int newLastMonth,
     String sendTo,
     List <String> newEpList,
-    List <String> sEpList
+    Collection <String> sEpList
   ) {
     Mail mail = new Mail();
 
