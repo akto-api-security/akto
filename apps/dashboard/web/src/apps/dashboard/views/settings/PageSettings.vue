@@ -144,7 +144,9 @@ export default {
             return this.$store.state.auth.activeAccount
         },
         takeUpdate() {
+            this.showDialog = false
             api.takeUpdate(this.region)
+
         }
     },
     computed: {
