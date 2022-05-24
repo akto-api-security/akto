@@ -671,6 +671,32 @@ public class APICatalogSync {
 
                 ApiCollectionsDao.instance.getMCollection().updateOne(findQ, Updates.set("urls", newURLs));
             }
+        } else {
+
+            for(Map.Entry<Integer, APICatalog> entry: this.dbState.entrySet()) {
+                int apiCollectionId = entry.getKey();
+                APICatalog apiCatalog = entry.getValue();
+                for(URLTemplate urlTemplate: apiCatalog.getTemplateURLToMethods().keySet()) {
+                    Iterator<Map.Entry<URLStatic, RequestTemplate>> staticURLIterator = apiCatalog.getStrictURLToMethods().entrySet().iterator();
+                    while(staticURLIterator.hasNext()){
+                        Map.Entry<URLStatic, RequestTemplate> urlXTemplate = staticURLIterator.next();
+                        URLStatic urlStatic = urlXTemplate.getKey();
+                        RequestTemplate requestTemplate = urlXTemplate.getValue();
+                        if (urlTemplate.match(urlStatic)) {
+                            if (this.delta == null) {
+                                this.delta = new HashMap<>();
+                            }
+
+                            if (this.getDelta(apiCollectionId) == null) {
+                                this.delta.put(apiCollectionId, new APICatalog(apiCollectionId, new HashMap<>(), new HashMap<>()));
+                            }
+
+                            this.getDelta(apiCollectionId).getDeletedInfo().addAll(requestTemplate.getAllTypeInfo());
+                            staticURLIterator.remove();
+                        }
+                    }
+                }
+            }
         }
     }
 

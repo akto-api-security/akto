@@ -1,5 +1,5 @@
 <template>
-    <div style="padding: 24px; height: 100%" v-if="data_type_copy">
+    <div style="padding: 24px; height: 100%" v-if="tag_config_copy">
         <v-container>
             <div style=" display: flex">
                 <div class="form-text">
@@ -7,18 +7,18 @@
                 </div>
                 <div style="padding-top: 0px">
                     <v-text-field
-                        placeholder="Add data type name"
+                        placeholder="Add tag name"
                         flat solo
                         class="form-value"
-                        :readonly="data_type_copy['createNew'] ? false:true"
-                        v-model="data_type_copy.name"
+                        :readonly="tag_config_copy['createNew'] ? false:true"
+                        v-model="tag_config_copy.name"
                         :rules="name_rules"
                         hide-details
                     />
                 </div>
             </div>
 
-            <div style=" display: flex" v-if="data_type_copy.creatorId">
+            <div style=" display: flex" v-if="tag_config_copy.creatorId">
                 <div class="form-text">
                     Creator
                 </div>
@@ -32,7 +32,7 @@
                 </div>
             </div>
 
-            <div style="display: flex" v-if="data_type_copy.timestamp">
+            <div style="display: flex" v-if="tag_config_copy.timestamp">
                 <div class="form-text">
                     Last Updated
                 </div>
@@ -46,42 +46,16 @@
                 </div>
             </div>
 
-          <div v-if="data_type_copy.id || data_type_copy.createNew">
+          <div v-if="tag_config_copy.id || tag_config_copy.createNew">
             <v-row style="padding: 36px 12px 12px 12px"  >
                     <conditions-table
-                    :conditions="data_type_copy.keyConditions"
+                    :conditions="tag_config_copy.keyConditions"
                     initial_string="param_name"
-                    table_header="Key conditions"
-                    />
-                </v-row>
-                <v-row
-                    style="padding: 12px 12px 12px 12px"
-                    v-if="showMainOperator" 
-                >
-                    <operator-component :operator="data_type_copy.operator" @operatorChanged="operatorChanged"/>
-                </v-row>
-
-                <v-row style="padding: 12px; padding-bottom: 50px"  >
-                    <conditions-table
-                    :conditions="data_type_copy.valueConditions"
-                    initial_string="param_value"
-                    table_header="Value conditions"
+                    table_header="URL conditions"
                     />
                 </v-row>
             </div>
-            <div style="display: flex">
-                <div class="form-text">
-                    Sensitive
-                </div>
-                <div
-                    :class="data_type_copy.sensitiveAlways || (data_type_copy.sensitivePosition && data_type_copy.sensitivePosition.length > 0)? 'sensitive-text true' : 'sensitive-text'"
-                    @click="toggleSensitive"
-                    style="width: 80px"
-                >
-                    {{computeSensitiveValue}}
-                </div>
-            </div>
-            <v-row v-if="data_type_copy.id || data_type_copy.createNew" style="padding-top: 30px">
+            <v-row v-if="tag_config_copy.id || tag_config_copy.createNew" style="padding-top: 30px">
                 <div style="padding: 12px">
                   <v-btn
                         @click="save"
@@ -94,29 +68,6 @@
                     Save
                   </v-btn>
                 </div>
-                <div style="padding: 12px">
-                  <v-btn
-                        @click="reviewCustomDataType"
-                        color="#white"
-                        class="review-btn"
-                        height="40px"
-                        width="100px"
-                        :loading="reviewLoading"
-                    >
-                      Review
-                        <span slot="loader">
-                            <v-progress-circular
-                                :rotate="360"
-                                :size="30"
-                                :width="5"
-                                :value="computeLoading"
-                                color="#6200EA"
-                            >
-                            </v-progress-circular>
-                            {{ computeLoading + "%"}}
-                        </span>
-                    </v-btn>
-                </div>
             </v-row>
             <review-table v-if="reviewData" :review-data="reviewData"/>
         </v-container>
@@ -126,23 +77,21 @@
 
 <script>
 import obj from "@/util/obj"
-import ConditionsTable from './ConditionsTable.vue'
-import OperatorComponent from './OperatorComponent.vue'
+import ConditionsTable from '../data_types/components/ConditionsTable.vue'
 import ReviewTable from "@/apps/dashboard/views/settings/components/data_types/components/ReviewTable";
 import {mapState} from "vuex";
 import func from "@/util/func";
 export default {
-    name: "DataTypeDetails",
+    name: "TagConfigDetails",
     props: {
     },
     components: {
         ConditionsTable,
-        OperatorComponent,
         ReviewTable
     },
     data() {
         return {
-            data_type_copy: null,
+            tag_config_copy: null,
             saveLoading: false,
             reviewLoading: false,
             name_rules: [
@@ -156,17 +105,9 @@ export default {
         }
     },
     methods: {
-        toggleSensitive() {
-            if (this.data_type_copy.id || this.data_type_copy.createNew) {
-                this.data_type_copy.sensitiveAlways = !this.data_type_copy.sensitiveAlways
-            }
-        },
-        operatorChanged(value) {
-            this.data_type_copy.operator = value
-        },
         save() {
             this.saveLoading = true
-            this.$store.dispatch("data_types/createCustomDataType", {data_type: this.data_type_copy, save: true})
+            this.$store.dispatch("tag_configs/createTagConfig", {tag_config: this.tag_config_copy, save: true})
                 .then((resp) => {
                   this.saveLoading = false
                 }).catch((err) => {
@@ -176,7 +117,7 @@ export default {
         },
         reviewCustomDataType() {
           this.reviewLoading = true
-          this.$store.dispatch("data_types/createCustomDataType", {data_type: this.data_type_copy, save: false})
+          this.$store.dispatch("tag_configs/createTagConfig", {tag_config: this.tag_config_copy, save: false})
               .then((resp) => {
                 this.reviewLoading = false
               })
@@ -186,28 +127,18 @@ export default {
         }
     },
     mounted() {
+        this.tag_config_copy = this.$store.state.tag_configs.tag_config
     },
     computed: {
-      ...mapState('data_types', ['data_type', 'usersMap', 'reviewData', 'current_sample_data_count', 'total_sample_data_count']),
-      computeSensitiveValue() {
-            if (this.data_type_copy) {
-                return this.data_type_copy.sensitiveAlways || this.data_type_copy.sensitivePosition.length > 0
-            }
-        },
-        showMainOperator() {
-            return this.data_type_copy.keyConditions && this.data_type_copy.keyConditions.predicates &&
-            this.data_type_copy.keyConditions.predicates.length > 0 &&
-            this.data_type_copy.valueConditions && this.data_type_copy.valueConditions.predicates &&
-            this.data_type_copy.valueConditions.predicates.length > 0
-        },
+      ...mapState('tag_configs', ['tag_config', 'usersMap', 'reviewData', 'current_sample_data_count', 'total_sample_data_count']),
         computeUsername() {
-          if (this.data_type_copy.creatorId) {
-              return this.usersMap[this.data_type_copy.creatorId]
+          if (this.tag_config_copy.creatorId) {
+              return this.usersMap[this.tag_config_copy.creatorId]
           }
           return null
         },
         computeLastUpdated() {
-          let t = this.data_type_copy.timestamp
+          let t = this.tag_config_copy.timestamp
           if (t) {
               return func.prettifyEpoch(t)
           }
@@ -220,9 +151,9 @@ export default {
         }
     },
     watch: {
-        data_type: function(newVal, oldVal) {
-            this.data_type_copy = JSON.parse(JSON.stringify(newVal))
-            this.$store.state.data_types.reviewData = null
+        tag_config: function(newVal, oldVal) {
+            this.tag_config_copy = JSON.parse(JSON.stringify(newVal))
+            this.$store.state.tag_configs.reviewData = null
         },
     }
 }

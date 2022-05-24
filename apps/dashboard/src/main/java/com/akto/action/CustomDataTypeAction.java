@@ -427,7 +427,7 @@ public class CustomDataTypeAction extends UserAction{
                 true,keyConditions,valueConditions, mainOperator);
     }
 
-    static Predicate generatePredicate(Predicate.Type type, Map<String,Object> valueMap) {
+    public static Predicate generatePredicate(Predicate.Type type, Map<String,Object> valueMap) {
         if (valueMap == null || type == null) return null;
         Predicate predicate;
         String value;

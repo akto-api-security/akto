@@ -8,10 +8,12 @@ import com.akto.dao.APISpecDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.TagConfigsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.APISpec;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveParamInfo;
+import com.akto.dto.TagConfig;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
@@ -107,6 +109,21 @@ public class InventoryAction extends UserAction {
         }
 
         return endpoints;
+    }
+
+    private void attachTagsInAPIList(List<BasicDBObject> list) {
+        List<TagConfig> tagConfigs = TagConfigsDao.instance.findAll(new BasicDBObject("active", true));
+        for (BasicDBObject singleTypeInfo: list) {
+            singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
+            String url = singleTypeInfo.getString("url");
+            List<String> tags = new ArrayList<>();
+            for(TagConfig tagConfig: tagConfigs) {
+                if (tagConfig.getKeyConditions().validate(url)) {
+                    tags.add(tagConfig.getName());
+                }
+            }
+            singleTypeInfo.put("tags", tags);
+        }
     }
 
     private void attachAPIInfoListInResponse(List<BasicDBObject> list) {
@@ -253,6 +270,7 @@ public class InventoryAction extends UserAction {
             e.printStackTrace();
         }
 
+        attachTagsInAPIList(list);
         attachAPIInfoListInResponse(list);
 
         if (unused == null) {
@@ -265,6 +283,7 @@ public class InventoryAction extends UserAction {
 
     public String loadRecentEndpoints() {
         List<BasicDBObject> list = fetchRecentEndpoints(deltaPeriodValue);
+        attachTagsInAPIList(list);
         attachAPIInfoListInResponse(list);
         return Action.SUCCESS.toUpperCase();
     }

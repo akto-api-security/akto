@@ -79,7 +79,7 @@ public class SingleTypeInfo {
     public static final SubType EMAIL = new SubType("EMAIL", true, SuperType.STRING, EmailSchema.class,
             Collections.emptyList());
     public static final SubType URL = new SubType("URL", false, SuperType.STRING, StringSchema.class,
-            Arrays.asList(Position.RESPONSE_PAYLOAD, Position.RESPONSE_HEADER));
+            Collections.emptyList());
     public static final SubType ADDRESS = new SubType("ADDRESS", true, SuperType.STRING, StringSchema.class,
             Collections.emptyList());
     public static final SubType SSN = new SubType("SSN", true, SuperType.STRING, StringSchema.class,

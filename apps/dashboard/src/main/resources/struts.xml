@@ -685,6 +685,15 @@
             </result>
         </action>
 
+        <action name="api/fetchTagConfigs" class="com.akto.action.TagConfigsAction" method="fetchTagConfigs">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
         <action name="api/fetchChanges" class="com.akto.action.observe.InventoryAction" method="fetchChanges">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -749,7 +758,46 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json"/>
-            <result name="ERROR" type="httpheader">
+
+          <action name="api/saveTagConfig" class="com.akto.action.TagConfigsAction" method="saveTagConfig">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/reviewTagConfig" class="com.akto.action.TagConfigsAction" method="reviewTagConfig">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/toggleActiveTagConfig" class="com.akto.action.TagConfigsAction" method="toggleActiveTagConfig">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>   
+
+        <action name="api/takeUpdate" class="com.akto.action.AccountAction" method="takeUpdate">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+
+          <result name="ERROR" type="httpheader">
                 <param name="status">401</param>
             </result>
         </action>

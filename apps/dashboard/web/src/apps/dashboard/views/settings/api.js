@@ -139,7 +139,12 @@ export default {
         }).then((resp) => {
             return resp
         })
+    },
+    takeUpdate() {
+        return request({
+            url: '/api/takeUpdate',
+            method: 'post',
+            data: {}
+        })
     }
-
-
 }
