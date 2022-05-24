@@ -76,7 +76,6 @@ export default {
 <style lang="sass" scoped>
 .main
     background-color: #47466A
-.data-types-container
     
 .details-container
     flex: 1 1 80%

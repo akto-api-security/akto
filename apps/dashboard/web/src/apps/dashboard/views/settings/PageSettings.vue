@@ -36,11 +36,7 @@
       <template slot="Account">
         <div>
           <account/>
-            <div class="pa-8">
-                <div class="d-flex">
-                    <div class="entry-text">Account ID</div>
-                    <div class="entry-text">{{getActiveAccount()}}</div>
-                </div>
+            <div class="px-8">
                 <div class="py-4">
                     <v-dialog
                         v-model="showDialog"
@@ -100,9 +96,8 @@ export default {
         LayoutWithTabs,
         TeamOverview,
         Health,
-        Integrations,
         DataTypes,
-        Account
+        Account,
         IntegrationCenter,
         DataTypes,
         TagSettings,

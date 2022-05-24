@@ -162,7 +162,6 @@ export default {
 
 <style lang="sass" scoped>
     .sensitive-text
-        color:grey
         font-size: 16px
         font-weight: bold
         width: 210px
