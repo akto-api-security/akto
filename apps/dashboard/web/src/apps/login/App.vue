@@ -42,6 +42,7 @@
                 <login-fields
                   @fieldsChanged="fieldsChanged"
                   @enterPressed="login"
+                  :isSignUp ="false"
                 />
               </div>
               <v-card-actions>

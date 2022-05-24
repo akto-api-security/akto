@@ -2,10 +2,13 @@ package com.akto.action;
 
 import com.akto.dao.PendingInviteCodesDao;
 import com.akto.dao.RBACDao;
+import com.akto.dao.UsersDao;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.RBAC;
+import com.akto.dto.User;
 import com.akto.notifications.email.SendgridEmail;
 import com.akto.utils.JWT;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 import com.sendgrid.helpers.mail.Mail;
@@ -25,9 +28,42 @@ public class InviteUserAction extends UserAction{
     private String inviteeName;
     private String inviteeEmail;
     private String websiteHostName;
+
+    public static final String INVALID_EMAIL_ERROR = "Invalid email";
+    public static final String DIFFERENT_ORG_EMAIL_ERROR = "Email must belong to same organisation";
+
+    public static String validateEmail(String email, String adminLogin) {
+        if (email == null) return INVALID_EMAIL_ERROR;
+
+        String[] inviteeEmailArr = email.split("@");
+        if (inviteeEmailArr.length != 2) {
+            return INVALID_EMAIL_ERROR;
+        }
+
+        // validating if same organisation or not
+        String[] loginArr = adminLogin.split("@");
+        if (loginArr.length != 2) return "Invalid admin login";
+        String domain = loginArr[1];
+        String inviteeEmailDomain = inviteeEmailArr[1];
+
+        if (!domain.equals(inviteeEmailDomain)) {
+            return DIFFERENT_ORG_EMAIL_ERROR;
+        }
+
+        return null;
+    }
+
     @Override
     public String execute() {
         int user_id = getSUser().getId();
+
+        User admin = UsersDao.instance.getFirstUser();
+        String code = validateEmail(this.inviteeEmail, admin.getLogin());
+
+        if (code != null) {
+            addActionError(code);
+            return ERROR.toUpperCase();
+        }
 
         Map<String,Object> claims = new HashMap<>();
         claims.put("email", inviteeEmail);

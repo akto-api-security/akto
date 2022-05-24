@@ -29,6 +29,7 @@
             </result>
         </action>
 
+        <!--  DO NOT CHANGE PATH NAME FOR LOGIN. BEING USED IN A LOT OF PLACES -->
         <action name="auth/login" class="com.akto.action.LoginAction">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -200,7 +201,7 @@
             </result>
         </action>
 
-        <action name="setup/add-signup-info" class="com.akto.action.SignupAction" method="addSignupInfo">
+        <action name="dashboard/setup/add-signup-info" class="com.akto.action.SignupAction" method="addSignupInfo">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"   type="json">
@@ -411,8 +412,10 @@
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json">
             </result>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
 
@@ -742,7 +745,21 @@
             </result>
         </action>
 
-        <action name="api/saveTagConfig" class="com.akto.action.TagConfigsAction" method="saveTagConfig">
+        <action name="api/toggleRedactFeature" class="com.akto.action.AdminSettingsAction" method="toggleRedactFeature">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/fetchAdminSettings" class="com.akto.action.AdminSettingsAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json"/>
+
+          <action name="api/saveTagConfig" class="com.akto.action.TagConfigsAction" method="saveTagConfig">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json"/>
@@ -779,12 +796,11 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="httpheader">
+
+          <result name="ERROR" type="httpheader">
                 <param name="status">401</param>
             </result>
         </action>
-
-
     </package>
 
 </struts>

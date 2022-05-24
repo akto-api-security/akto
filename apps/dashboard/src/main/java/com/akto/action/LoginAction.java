@@ -2,6 +2,7 @@ package com.akto.action;
 
 import com.akto.dao.SignupDao;
 import com.akto.dao.UsersDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.Config;
 import com.akto.dto.SignupInfo;
 import com.akto.dto.SignupUserInfo;
@@ -18,6 +19,7 @@ import org.apache.struts2.interceptor.ServletResponseAware;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
@@ -71,8 +73,8 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                 String passHash = Integer.toString((passInfo.getSalt() + password).hashCode());
 
                 if (passHash.equals(passInfo.getPasshash())) {
-                    loginUser(signupUserInfo.getUser(), servletResponse, false);
-                    loginResult.put("redirect", "/setup");
+                    loginUser(signupUserInfo.getUser(), servletResponse, false, servletRequest);
+                    loginResult.put("redirect", "/dashboard/setup");
                     return "SUCCESS";
                 }
             }
@@ -81,11 +83,11 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             return "ERROR";
         }
 
-        String result = loginUser(user, servletResponse, true);
+        String result = loginUser(user, servletResponse, true, servletRequest);
         return result;
     }
 
-    public String loginUser(User user, HttpServletResponse servletResponse, boolean signedUp) {
+    public static String loginUser(User user, HttpServletResponse servletResponse, boolean signedUp, HttpServletRequest servletRequest) {
         String refreshToken;
         Map<String,Object> claims = new HashMap<>();
         claims.put("username",user.getLogin());
@@ -113,8 +115,18 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             servletResponse.addHeader(AccessTokenAction.ACCESS_TOKEN_HEADER_NAME,token.getAccessToken());
             Cookie cookie = new Cookie(REFRESH_TOKEN_COOKIE_NAME, refreshToken);
             cookie.setHttpOnly(true);
-            cookie.setPath("/");
+            cookie.setPath("/dashboard");
+
+            String https = System.getenv("AKTO_HTTPS_FLAG");
+            if (Objects.equals(https, "true")) {
+                cookie.setSecure(true);
+            }
+
             servletResponse.addCookie(cookie);
+            HttpSession session = servletRequest.getSession(true);
+            session.setAttribute("username", user.getLogin());
+            session.setAttribute("user", user);
+            session.setAttribute("login", Context.now());
             if (signedUp) {
                 UsersDao.instance.getMCollection().findOneAndUpdate(
                         Filters.eq("_id", user.getId()),

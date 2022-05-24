@@ -38,7 +38,7 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
         Cookie cookie = new Cookie(REFRESH_TOKEN_COOKIE_NAME, null);
         cookie.setMaxAge(0);
         cookie.setHttpOnly(true);
-        cookie.setPath("/");
+        cookie.setPath("/dashboard");
         return cookie;
     }
 

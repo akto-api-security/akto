@@ -36,11 +36,16 @@ public class ApiAccessTypePolicy {
         }
 
         for (String ip: ipList) {
+           if (ip == null) continue;
            ip = ip.replaceAll(" ", "");
-           boolean result = ipInCidr(ip);
-           if (!result) {
-               apiInfo.getApiAccessTypes().add(ApiInfo.ApiAccessType.PUBLIC);
-               return false;
+           try {
+                boolean result = ipInCidr(ip);
+                if (!result) {
+                    apiInfo.getApiAccessTypes().add(ApiInfo.ApiAccessType.PUBLIC);
+                    return false;
+                }
+           } catch (Exception e) {
+                return false;
            }
         }
 

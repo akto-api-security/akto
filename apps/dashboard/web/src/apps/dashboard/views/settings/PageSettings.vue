@@ -34,6 +34,8 @@
         <integration-center/>
       </template>
       <template slot="Account">
+        <div>
+          <account/>
             <div class="pa-8">
                 <div class="d-flex">
                     <div class="entry-text">Account ID</div>
@@ -67,6 +69,7 @@
                     </v-dialog>
                 </div>
             </div>
+          </div>
         </template>
         <template slot="Users">
             <team-overview/>
@@ -83,6 +86,7 @@ import TeamOverview from './components/TeamOverview'
 import Health from './components/Health'
 import api from './api'
 import DataTypes from './components/data_types/DataTypes.vue'
+import Account from './components/Account'
 import DataTypeDetails from './components/data_types/components/DataTypeDetails.vue'
 import TagSettings from './components/tag_configs/TagSettings.vue'
 import TagConfigDetails from './components/tag_configs/TagConfigDetails.vue'
@@ -96,6 +100,9 @@ export default {
         LayoutWithTabs,
         TeamOverview,
         Health,
+        Integrations,
+        DataTypes,
+        Account
         IntegrationCenter,
         DataTypes,
         TagSettings,

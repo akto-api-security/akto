@@ -12,13 +12,15 @@ const team = {
         users: {},
         name: '',
         fetchTs: 0,
-        team: {}
+        team: {},
+        redactPayload: null
     },
     getters: {
         getId: (state) => state.id,
         getUsers: (state) => state.users,
         getName: (state) => state.name,
-        getTeam: (state) => state.team
+        getTeam: (state) => state.team,
+        getRedactPayload: (state) => state.redactPayload
     },
     mutations: {
         SET_TEAM_DETAILS(state, details) {
@@ -34,13 +36,31 @@ const team = {
             state.name = ''
             state.fetchTs = 0
             state.team = {}
-        }
+        },
+        SET_ADMIN_SETTINGS(state, resp) {
+            console.log(resp)
+            if (!resp.accountSettings) {
+                state.redactPayload = false
+            } else {
+                state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
+            }
+        },
     },
     actions: {
         getTeamData({commit, dispatch}, id) {
             return api.getTeamData().then((resp) => {
                 commit('SET_TEAM_DETAILS', resp)
             })
+        },
+        fetchAdminSettings({commit, dispatch}) {
+            api.fetchAdminSettings().then((resp => {
+                commit('SET_ADMIN_SETTINGS', resp)
+            }))
+        },
+        toggleRedactFeature({commit, dispatch, state}, v) {
+            api.toggleRedactFeature(v).then((resp => {
+                state.redactPayload = v
+            }))
         },
         removeUser({commit, dispatch}, user) {
             return api.removeUser(user.login).then(resp => {

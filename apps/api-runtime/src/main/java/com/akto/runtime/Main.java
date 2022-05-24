@@ -40,6 +40,9 @@ public class Main {
     public static final String VPC_CIDR = "vpc_cidr";
     private static final Logger logger = LoggerFactory.getLogger(HttpCallParser.class);
 
+    // this sync threshold time is used for deleting sample data
+    public static final int sync_threshold_time = 120;
+
     private static int debugPrintCounter = 500;
     private static void printL(Object o) {
         if (debugPrintCounter > 0) {
@@ -69,11 +72,10 @@ public class Main {
                 );
 
                 if (json.size() == 3) {
-                    Bson accFBson = Filters.eq("_id", Context.accountId.get());
                     List<String> cidrList = (List<String>) json.get(VPC_CIDR);
                     logger.info("cidrList: " + cidrList);
                     AccountSettingsDao.instance.getMCollection().updateOne(
-                        accFBson, Updates.addEachToSet("privateCidrList", cidrList), new UpdateOptions().upsert(true)
+                        AccountSettingsDao.generateFilter(), Updates.addEachToSet("privateCidrList", cidrList), new UpdateOptions().upsert(true)
                     );
                 }
             }
@@ -126,7 +128,7 @@ public class Main {
         APIConfig apiConfig;
         apiConfig = APIConfigsDao.instance.findOne(Filters.eq("name", configName));
         if (apiConfig == null) {
-            apiConfig = new APIConfig(configName,"access-token", 1, 10_000_000, 120);
+            apiConfig = new APIConfig(configName,"access-token", 1, 10_000_000, sync_threshold_time); // this sync threshold time is used for deleting sample data
         }
 
         final Main main = new Main();
