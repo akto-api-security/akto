@@ -120,7 +120,7 @@ public class TestAktoPolicy extends MongoBasedTest {
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiInfoDao.instance.getMCollection().drop();
         FilterSampleDataDao.instance.getMCollection().drop();
-        AccountSettings accountSettings = new AccountSettings(0, Collections.singletonList("172.31.0.0/16"));
+        AccountSettings accountSettings = new AccountSettings(0, Collections.singletonList("172.31.0.0/16"), false);
         AccountSettingsDao.instance.insertOne(accountSettings);
         RuntimeFilterDao.instance.initialiseFilters();
 
@@ -149,7 +149,7 @@ public class TestAktoPolicy extends MongoBasedTest {
 
     @Test
     public void test1() throws Exception {
-        AccountSettings accountSettings = new AccountSettings(0, Collections.singletonList("172.31.0.0/16"));
+        AccountSettings accountSettings = new AccountSettings(0, Collections.singletonList("172.31.0.0/16"), false);
         AccountSettingsDao.instance.insertOne(accountSettings);
         RuntimeFilterDao.instance.initialiseFilters();
 

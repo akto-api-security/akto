@@ -42,7 +42,7 @@ const router =  new Router({
             component: PageSignup
         },
         {
-            path: '/setup',
+            path: '/dashboard/setup',
             name: 'setup',
             component: PageOnboard
         },

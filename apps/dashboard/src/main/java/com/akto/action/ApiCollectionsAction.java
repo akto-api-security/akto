@@ -27,8 +27,30 @@ public class ApiCollectionsAction extends UserAction {
 
     }
 
+    static int maxCollectionNameLength = 25;
     private String collectionName;
     public String createCollection() {
+        if (this.collectionName == null) {
+            addActionError("Invalid collection name");
+            return ERROR.toUpperCase();
+        }
+
+        if (this.collectionName.length() > maxCollectionNameLength) {
+            addActionError("Custom collections max length: " + maxCollectionNameLength);
+            return ERROR.toUpperCase();
+        }
+
+        for (char c: this.collectionName.toCharArray()) {
+            boolean alphabets = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+            boolean numbers = c >= '0' && c <= '9';
+            boolean specialChars = c == '-' || c == '.' || c == '_';
+
+            if (!(alphabets || numbers || specialChars)) {
+                addActionError("Collection names can only be alphanumeric and contain '-','.' and '_'");
+                return ERROR.toUpperCase();
+            }
+        }
+
         // unique names
         ApiCollection sameNameCollection = ApiCollectionsDao.instance.findByName(collectionName);
         if (sameNameCollection != null){

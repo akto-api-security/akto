@@ -24,6 +24,34 @@
         <url-pattern>/*</url-pattern>
     </filter-mapping>
 
+    <filter>
+        <filter-name>HttpMethodFilter</filter-name>
+        <filter-class>com.akto.filter.HttpMethodFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>HttpMethodFilter</filter-name>
+        <url-pattern>/api/*</url-pattern>
+    </filter-mapping>
+
+    <filter>
+        <filter-name>SecurityHeadersFilter</filter-name>
+        <filter-class>com.akto.filter.SecurityHeadersFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>SecurityHeadersFilter</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+
+    <filter>
+        <filter-name>RateLimitFilter</filter-name>
+        <filter-class>com.akto.filter.RateLimitFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>RateLimitFilter</filter-name>
+        <url-pattern>/auth/login</url-pattern>
+        <url-pattern>/api/inviteUsers</url-pattern>
+    </filter-mapping>
+
 
     <filter>
         <filter-name>UserDetailsFilter</filter-name>
@@ -34,8 +62,6 @@
         <filter-name>UserDetailsFilter</filter-name>
         <url-pattern>/api/*</url-pattern>
         <url-pattern>/dashboard/*</url-pattern>
-        <url-pattern>/setup/*</url-pattern>
-        <url-pattern>/setup</url-pattern>
     </filter-mapping>
 
     <filter>

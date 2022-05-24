@@ -148,7 +148,7 @@ export default {
   methods: {
     goToToday () {
       request({
-        url: '/setup/add-signup-info',
+        url: '/dashboard/setup/add-signup-info',
         method: 'post',
         data: {
           companyName: this.companyName,

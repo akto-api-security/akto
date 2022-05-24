@@ -1,14 +1,15 @@
 package com.akto.listener;
 
 import com.akto.DaoInit;
+import com.akto.action.AdminSettingsAction;
 import com.akto.action.observe.InventoryAction;
 import com.akto.dao.*;
+import com.akto.dao.AccountSettingsDao;
+import com.akto.dao.BackwardCompatibilityDao;
+import com.akto.dao.FilterSampleDataDao;
+import com.akto.dao.UsersDao;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.BackwardCompatibility;
-import com.akto.dto.FilterSampleData;
-import com.akto.dto.Markov;
-import com.akto.dto.SensitiveParamInfo;
-import com.akto.dto.User;
-import com.akto.dto.messaging.Message;
 import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.notifications.email.WeeklyEmail;
@@ -18,28 +19,18 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
-import com.mongodb.client.result.InsertOneResult;
 import com.sendgrid.helpers.mail.Mail;
 import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;
 
 import org.apache.commons.lang3.StringUtils;
-import org.bson.BsonDocument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.akto.dao.context.Context;
 import com.akto.dao.notifications.SlackWebhooksDao;
 
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -222,11 +213,21 @@ public class InitializerListener implements ServletContextListener {
                 Filters.eq("_id", backwardCompatibility.getId()),
                 Updates.set(BackwardCompatibility.RESET_SINGLE_TYPE_INFO_COUNT, Context.now())
         );
+    }
+
+    public void dropSampleDataIfEarlierNotDroped(AccountSettings accountSettings) {
+        if (accountSettings == null) return;
+        if (accountSettings.isRedactPayload() == true && !accountSettings.isSampleDataCollectionDropped()) {
+            AdminSettingsAction.dropCollections(Context.accountId.get());
+        }
 
     }
 
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
+        String https = System.getenv("AKTO_HTTPS_FLAG");
+        boolean httpsFlag = Objects.equals(https, "true");
+        sce.getServletContext().getSessionCookieConfig().setSecure(httpsFlag);
 
         System.out.println("context initialized");
 
@@ -252,5 +253,8 @@ public class InitializerListener implements ServletContextListener {
 
         setUpWeeklyScheduler();
         setUpDailyScheduler();
+
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        dropSampleDataIfEarlierNotDroped(accountSettings);
     }
 }

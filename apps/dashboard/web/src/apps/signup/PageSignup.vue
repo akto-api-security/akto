@@ -39,7 +39,7 @@
 <!--        </v-btn>-->
         <!-- <div class="or">or</div> -->
 
-        <login-fields @fieldsChanged="fieldsChanged" @enterPressed="signupUser"/>
+        <login-fields @fieldsChanged="fieldsChanged" @enterPressed="signupUser" :isSignUp ="true"/>
         <v-btn class="signup-btn" :disabled="disableButtons" :loading="signupLoading" @click="signupUser" style="background-color:  #6200EA !important; color: #FFFFFF !important">
           Sign up
         </v-btn>
@@ -126,7 +126,7 @@ export default {
           if (!redirectLink.startsWith('/dashboard/')) {
             redirectLink = '/dashboard/testing'
           }
-          window.location.href = '/setup?redirect_uri=' + redirectLink
+          window.location.href = '/dashboard/setup?redirect_uri=' + redirectLink
         }
       })
     }

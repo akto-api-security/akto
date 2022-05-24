@@ -1,5 +1,6 @@
 package com.akto.dao;
 
+import com.akto.dto.RBAC;
 import com.akto.dto.SignupInfo;
 import com.akto.dto.UserAccountEntry;
 import com.akto.dto.User;
@@ -7,6 +8,7 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Sorts;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -82,6 +84,15 @@ public class UsersDao extends CommonContextDao<User> {
     }
 
     final public static UsersDao instance = new UsersDao();
+
+    public User getFirstUser() {
+        MongoCursor<User> cursor = instance.getMCollection().find().sort(Sorts.ascending("_id")).limit(1).cursor();
+        if (cursor.hasNext()) {
+            return cursor.next();
+        }
+
+        return null;
+    }
 
     public Map<Integer, String> getUsernames(Collection<Integer> userIds) {
         MongoCursor<User> cursor = instance.getMCollection().find(in("_id", userIds)).projection(new BasicDBObject("name", 1)).cursor();
