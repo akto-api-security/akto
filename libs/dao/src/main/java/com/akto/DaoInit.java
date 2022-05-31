@@ -7,6 +7,7 @@ import com.akto.dto.runtime_filters.FieldExistsFilter;
 import com.akto.dto.FilterSampleData;
 import com.akto.dto.runtime_filters.ResponseCodeRuntimeFilter;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.testing.*;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
 import com.akto.dto.type.SingleTypeInfo;
@@ -62,6 +63,12 @@ public class DaoInit {
         ClassModel<IsNumberPredicate> isNumberPredicateClassModel = ClassModel.builder(IsNumberPredicate.class).enableDiscriminator(true).build();
         ClassModel<Conditions> conditionsClassModel = ClassModel.builder(Conditions.class).enableDiscriminator(true).build();
         ClassModel<CappedList>  cappedListClassModel = ClassModel.builder(CappedList.class).enableDiscriminator(true).build();
+        ClassModel<TestingRun> testingRunClassModel = ClassModel.builder(TestingRun.class).enableDiscriminator(true).build();
+        ClassModel<TestingRunResult> testingRunResultClassModel = ClassModel.builder(TestingRunResult.class).enableDiscriminator(true).build();
+        ClassModel<TestResult> testResultClassModel = ClassModel.builder(TestResult.class).enableDiscriminator(true).build();
+        ClassModel<AuthMechanism> authMechanismClassModel = ClassModel.builder(AuthMechanism.class).enableDiscriminator(true).build();
+        ClassModel<AuthParam> authParamClassModel = ClassModel.builder(AuthParam.class).enableDiscriminator(true).build();
+        ClassModel<HardcodedAuthParam> hardcodedAuthParamClassModel = ClassModel.builder(HardcodedAuthParam.class).enableDiscriminator(true).build();
 
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(queueEntryClassModel, configClassModel, 
@@ -71,7 +78,8 @@ public class DaoInit {
                 apiInfoKeyClassModel, customFilterClassModel, runtimeFilterClassModel, filterSampleDataClassModel,
                 predicateClassModel, conditionsClassModel, regexPredicateClassModel, startsWithPredicateClassModel, endsWithPredicateClassModel,
                 fieldExistsFilterClassModel, accountSettingsClassModel, responseCodeRuntimeFilterClassModel, cappedListClassModel,
-                equalsToPredicateClassModel, isNumberPredicateClassModel).automatic(true).build());
+                equalsToPredicateClassModel, isNumberPredicateClassModel, testingRunClassModel, testingRunResultClassModel, testResultClassModel,
+                authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
             new EnumCodec<>(Conditions.Operator.class),
@@ -81,8 +89,9 @@ public class DaoInit {
             new EnumCodec<>(Credential.Type.class),
             new EnumCodec<>(ApiToken.Utility.class),
             new EnumCodec<>(ApiInfo.AuthType.class),
-            new EnumCodec<>(ApiInfo.ApiAccessType.class)
-
+            new EnumCodec<>(ApiInfo.ApiAccessType.class),
+            new EnumCodec<>(TestResult.TestError.class),
+            new EnumCodec<>(AuthParam.Location.class)
         );
 
         CodecRegistry codecRegistry = fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry, customEnumCodecs);
