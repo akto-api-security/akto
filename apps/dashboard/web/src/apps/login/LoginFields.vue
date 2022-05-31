@@ -74,7 +74,7 @@ export default {
             return !!v  || 'Password cannot be blank'
         }
         if (!v) return false
-        let lenFlag = v.length > 8
+        let lenFlag = v.length >= 8
         if (!lenFlag) return "at least 8 characters"
         let numFlag = false
         let alphabetFlag = false

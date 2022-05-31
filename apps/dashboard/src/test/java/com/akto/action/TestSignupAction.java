@@ -15,8 +15,8 @@ public class TestSignupAction {
         code = SignupAction.validatePassword("avneesh_avneesh_avneesh_avneesh_avneesh_avneesh_avneesh_avneesh_avneesh");
         assertEquals(code, SignupAction.MAXIMUM_PASSWORD_ERROR);
 
-        code = SignupAction.validatePassword("avneesh$123");
-        assertEquals(code, SignupAction.NO_SPECIAL_CHARS_ALLOWED_ERROR);
+        code = SignupAction.validatePassword("avneesh\uD83D\uDE03123");
+        assertEquals(code, SignupAction.INVALID_CHAR);
 
         code = SignupAction.validatePassword("avneesh_avneesh");
         assertEquals(code, SignupAction.MUST_BE_ALPHANUMERIC_ERROR);
