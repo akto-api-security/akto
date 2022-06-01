@@ -69,6 +69,9 @@ public class DaoInit {
         ClassModel<AuthMechanism> authMechanismClassModel = ClassModel.builder(AuthMechanism.class).enableDiscriminator(true).build();
         ClassModel<AuthParam> authParamClassModel = ClassModel.builder(AuthParam.class).enableDiscriminator(true).build();
         ClassModel<HardcodedAuthParam> hardcodedAuthParamClassModel = ClassModel.builder(HardcodedAuthParam.class).enableDiscriminator(true).build();
+        ClassModel<TestingEndpoints> testingEndpointsClassModel = ClassModel.builder(TestingEndpoints.class).enableDiscriminator(true).build();
+        ClassModel<CustomTestingEndpoints> customTestingEndpointsClassModel = ClassModel.builder(CustomTestingEndpoints.class).enableDiscriminator(true).build();
+        ClassModel<CollectionWiseTestingEndpoints> collectionWiseTestingEndpointsClassModel = ClassModel.builder(CollectionWiseTestingEndpoints.class).enableDiscriminator(true).build();
 
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(queueEntryClassModel, configClassModel, 
@@ -79,7 +82,9 @@ public class DaoInit {
                 predicateClassModel, conditionsClassModel, regexPredicateClassModel, startsWithPredicateClassModel, endsWithPredicateClassModel,
                 fieldExistsFilterClassModel, accountSettingsClassModel, responseCodeRuntimeFilterClassModel, cappedListClassModel,
                 equalsToPredicateClassModel, isNumberPredicateClassModel, testingRunClassModel, testingRunResultClassModel, testResultClassModel,
-                authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel).automatic(true).build());
+                authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel,
+                testingEndpointsClassModel, customTestingEndpointsClassModel, collectionWiseTestingEndpointsClassModel
+        ).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
             new EnumCodec<>(Conditions.Operator.class),
@@ -91,7 +96,9 @@ public class DaoInit {
             new EnumCodec<>(ApiInfo.AuthType.class),
             new EnumCodec<>(ApiInfo.ApiAccessType.class),
             new EnumCodec<>(TestResult.TestError.class),
-            new EnumCodec<>(AuthParam.Location.class)
+            new EnumCodec<>(AuthParam.Location.class),
+            new EnumCodec<>(TestingEndpoints.Type.class),
+            new EnumCodec<>(TestingRun.State.class)
         );
 
         CodecRegistry codecRegistry = fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry, customEnumCodecs);

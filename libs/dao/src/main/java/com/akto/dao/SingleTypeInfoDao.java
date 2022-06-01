@@ -3,15 +3,15 @@ package com.akto.dao;
 import java.util.*;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomDataType;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.*;
 
-import com.mongodb.client.model.Updates;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
@@ -153,5 +153,44 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
                 Filters.gt("count", 0),
                 Updates.set("count", 0)
         );
+    }
+
+
+    public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(int apiCollectionId) {
+        List<Bson> pipeline = new ArrayList<>();
+        BasicDBObject groupedId =
+                new BasicDBObject("apiCollectionId", "$apiCollectionId")
+                        .append("url", "$url")
+                        .append("method", "$method");
+        pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
+
+        Bson projections = Projections.fields(
+                Projections.include("timestamp", "apiCollectionId", "url", "method")
+        );
+
+        pipeline.add(Aggregates.project(projections));
+        pipeline.add(Aggregates.group(groupedId));
+        pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
+
+        MongoCursor<BasicDBObject> endpointsCursor = instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+
+        List<ApiInfo.ApiInfoKey> endpoints = new ArrayList<>();
+        while(endpointsCursor.hasNext()) {
+            BasicDBObject v = endpointsCursor.next();
+            try {
+                BasicDBObject vv = (BasicDBObject) v.get("_id");
+                ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(
+                        (int) vv.get("apiCollectionId"),
+                        (String) vv.get("url"),
+                        URLMethods.Method.valueOf((String) vv.get("method"))
+                );
+                endpoints.add(apiInfoKey);
+            } catch (Exception e) {
+                e.printStackTrace();
+
+            }
+        }
+
+        return endpoints;
     }
 }

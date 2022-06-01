@@ -13,20 +13,25 @@ public class TestingRun {
     private int pickedUpTimestamp;
     public static final String END_TIMESTAMP = "endTimestamp";
     private int endTimestamp;
+    private State state;
     private String userEmail;
-    // TODO: discuss a better way to represent apisList and testConfig so that if new APIs come then they get tested too
-    private List<ApiInfo.ApiInfoKey> apisList;
+    private TestingEndpoints testingEndpoints;
     private int testIdConfig;
 
     public TestingRun() { }
 
-    public TestingRun(int scheduleTimestamp, String userEmail, List<ApiInfo.ApiInfoKey> apisList, int testIdConfig) {
+    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state) {
         this.scheduleTimestamp = scheduleTimestamp;
         this.endTimestamp = -1;
         this.pickedUpTimestamp = -1;
         this.userEmail = userEmail;
-        this.apisList = apisList;
+        this.testingEndpoints = testingEndpoints;
         this.testIdConfig = testIdConfig;
+        this.state = state;
+    }
+
+    public enum State {
+        SCHEDULED, RUNNING, STOPPED, COMPLETED
     }
 
     public ObjectId getId() {
@@ -61,12 +66,12 @@ public class TestingRun {
         this.userEmail = userEmail;
     }
 
-    public List<ApiInfo.ApiInfoKey> getApisList() {
-        return apisList;
+    public TestingEndpoints getTestingEndpoints() {
+        return testingEndpoints;
     }
 
-    public void setApisList(List<ApiInfo.ApiInfoKey> apisList) {
-        this.apisList = apisList;
+    public void setTestingEndpoints(TestingEndpoints testingEndpoints) {
+        this.testingEndpoints = testingEndpoints;
     }
 
     public int getTestIdConfig() {
@@ -84,4 +89,14 @@ public class TestingRun {
     public void setPickedUpTimestamp(int pickedUpTimestamp) {
         this.pickedUpTimestamp = pickedUpTimestamp;
     }
+
+
+    public State getState() {
+        return this.state;
+    }
+
+    public void setState(State state) {
+        this.state = state;
+    }
+
 }
