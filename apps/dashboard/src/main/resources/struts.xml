@@ -43,7 +43,7 @@
             </result>
         </action>
 
-        <action name="auth/accessToken" class="com.akto.action.AccessTokenAction">
+        <action name="dashboard/accessToken" class="com.akto.action.AccessTokenAction">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
