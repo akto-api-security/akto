@@ -23,8 +23,8 @@ public class Main {
 
     public static void main(String[] args) throws InterruptedException {
         logger.info("Starting testing module....");
-
-        DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
+        String mongoURI = System.getenv("AKTO_MONGO_CONN");;
+        DaoInit.init(new ConnectionString(mongoURI));
         Context.accountId.set(1_000_000);
 
         scheduler.scheduleAtFixedRate(new Runnable() {

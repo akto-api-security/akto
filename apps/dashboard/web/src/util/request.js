@@ -81,7 +81,7 @@ const err = async (error) => {
       }
       originalRequest._retry = true
       await service({
-        url: '/auth/accessToken',
+        url: '/dashboard/accessToken',
         method: 'get',
       })
       return service(originalRequest)

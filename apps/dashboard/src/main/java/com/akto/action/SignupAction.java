@@ -33,9 +33,9 @@ import org.bson.conversions.Bson;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 
+import static com.mongodb.client.model.Filters.all;
 import static com.mongodb.client.model.Filters.eq;
 import static com.mongodb.client.model.Updates.combine;
 import static com.mongodb.client.model.Updates.set;
@@ -287,16 +287,18 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
     public static final String MINIMUM_PASSWORD_ERROR = "Minimum of 8 characters required";
     public static final String MAXIMUM_PASSWORD_ERROR = "Maximum of 40 characters allowed";
-    public static final String NO_SPECIAL_CHARS_ALLOWED_ERROR = "No special characters allowed other than underscore and full stop";
+    public static final String INVALID_CHAR = "Invalid character";
     public static final String MUST_BE_ALPHANUMERIC_ERROR = "Must contain letters and numbers";
     public static String validatePassword(String password) {
-        boolean minimumFlag = password.length() > 8;
+        boolean minimumFlag = password.length() >= 8;
         if (!minimumFlag) return MINIMUM_PASSWORD_ERROR;
         boolean maximumFlag = password.length() < 40;
         if (!maximumFlag) return MAXIMUM_PASSWORD_ERROR;
 
         boolean numbersFlag = false;
         boolean lettersFlag = false;
+
+        Set<String> allowedSpecialChars = new HashSet<>(Arrays.asList("+", "@", "*", "#", "$", "%", "&", "/", "(", ")", "=", "?", "^", "!", "[","]", "{", "}", "-", "_", ":", ";", ">", "<", "|", ",", "."));
 
         for (int i = 0; i < password.length(); i++) {
             char ch = password.charAt(i);
@@ -305,8 +307,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 numbersFlag = true;
             } else if (upperCaseCh >= 'A' && upperCaseCh <= 'Z') {
                 lettersFlag = true;
-            } else if (ch != '_' && ch != '.') {
-                return NO_SPECIAL_CHARS_ALLOWED_ERROR;
+            } else if (!allowedSpecialChars.contains(ch+"")) {
+                return INVALID_CHAR;
             }
         }
 
