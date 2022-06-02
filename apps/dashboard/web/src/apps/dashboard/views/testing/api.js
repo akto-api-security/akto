@@ -49,5 +49,15 @@ export default {
         }).then((resp) => {
             return resp
         })        
+    },
+
+    fetchRequestAndResponseForTest(x) {
+        return request({
+            url: '/api/fetchRequestAndResponseForTest',
+            method: 'post',
+            data: {testingRunResults:[x]}
+        }).then((resp) => {
+            return resp
+        })        
     }
 }

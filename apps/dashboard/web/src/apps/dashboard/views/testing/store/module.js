@@ -45,9 +45,6 @@ const testing = {
             state.loading = true
             return api.fetchTestingDetails().then((resp) => {
                 commit('SAVE_DETAILS', resp)
-                api.fetchTestingRunResults().then(resp => {
-                    commit('SAVE_TESTING_RUN_RESULTS', resp)
-                })
                 state.loading = false
             }).catch(() => {
                 state.loading = false
@@ -66,6 +63,11 @@ const testing = {
         addAuthMechanism({commit}, {key, value, location}) {
             return api.addAuthMechanism(key, value, location).then(resp => {
                 commit('SAVE_AUTH_MECHANISM', resp)
+            })
+        },
+        loadTestingRunResults({commit}) {
+            api.fetchTestingRunResults().then(resp => {
+                commit('SAVE_TESTING_RUN_RESULTS', resp)
             })
         }
     },

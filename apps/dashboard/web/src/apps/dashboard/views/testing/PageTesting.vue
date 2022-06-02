@@ -19,14 +19,14 @@
                         label="Auth header value"
                         style="width: 500px"
                     />                    
-                </div>                
+                </div>
             </div>
 
             <v-btn primary dark color="#6200EA" @click="saveAuthMechanism" v-if="someAuthChanged">
                 Save changes
             </v-btn>
 
-            <div>
+            <div class="pt-12">
                 <span class="heading">API Testing Results</span>
             </div>
 
@@ -34,12 +34,40 @@
                 :headers="endpointHeaders" 
                 :items="flattenedTestingRunResults" 
                 name="API Testing Results" 
-                @rowClicked="goToEndpoint"
+                @rowClicked="openDetails"
             >
                 <template #item.tests="{item}">
                     <sensitive-chip-group :sensitiveTags="Array.from(item.tests || new Set())" />
                 </template>
             </simple-table>
+
+            <v-dialog
+                v-model="openDetailsDialog"
+            >
+                <div class="details-dialog">
+                    <a-card
+                        title="Test details"
+                        color="rgba(33, 150, 243)"
+                        subtitle=""
+                        icon="$fas_stethoscope"
+                    >
+                        <template #title-bar>
+                            <v-btn
+                                plain
+                                icon
+                                @click="openDetailsDialog = false"
+                                style="margin-left: auto"
+                            >
+                                <v-icon>$fas_times</v-icon>
+                            </v-btn>
+                        </template>
+                        <div>
+                            <sample-data :messages='requestAndResponse'/>
+                        </div>
+                    </a-card>
+                </div>
+
+            </v-dialog>
 
         </div>
     </simple-layout>
@@ -50,7 +78,10 @@
 import SimpleLayout from '@/apps/dashboard/layouts/SimpleLayout'
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
+import ACard from '@/apps/dashboard/shared/components/ACard'
+import SampleData from '@/apps/dashboard/shared/components/SampleData'
 
+import api from './api'
 import func from '@/util/func'
 import { mapState } from 'vuex'
 
@@ -59,7 +90,9 @@ export default {
     components: {
         SimpleLayout,
         SimpleTable,
-        SensitiveChipGroup
+        SensitiveChipGroup,
+        ACard,
+        SampleData
     },
     props: {
 
@@ -68,6 +101,8 @@ export default {
         return  {
             newKey: this.nonNullAuth ? this.nonNullAuth.key : null,
             newVal: this.nonNullAuth ? this.nonNullAuth.value: null,
+            openDetailsDialog: false,
+            requestAndResponse: null,
             endpointHeaders: [
                 {
                     text: "color",
@@ -108,6 +143,11 @@ export default {
         },
         saveAuthMechanism() {
             this.$store.dispatch('testing/addAuthMechanism', {key: this.newKey, value: this.newVal, location: "HEADER"})
+        },
+        async openDetails(row) {
+            let r = await api.fetchRequestAndResponseForTest(row.x)
+            this.requestAndResponse = r.testingRunResults && r.testingRunResults[0] ? Object.entries(r.testingRunResults[0].resultMap).filter(x => x[1].vulnerable).map(x => {return {message: x[1].message, title: x[0], highlightPaths:[]}}) : []
+            this.openDetailsDialog = true
         },
         goToEndpoint(row) {
             let routeObj = {
@@ -158,6 +198,8 @@ export default {
     },
     mounted() {
         this.$store.dispatch('testing/loadTestingDetails')        
+        this.$store.dispatch('testing/loadTestingRunResults')        
+        
     },
     watch: {
         authMechanism: {
@@ -179,6 +221,9 @@ export default {
 .input-value
     padding-right: 8px
     color: #47466A
+
+.details-dialog
+    background-color: #FFFFFF
 </style>
 
 <style scoped>
@@ -191,5 +236,9 @@ export default {
 .page-testing >>> input {
   font-size: 12px;
   font-weight: 400;
+}
+
+.details-dialog >>> .v-card {
+    margin: 0px !important;
 }
 </style>

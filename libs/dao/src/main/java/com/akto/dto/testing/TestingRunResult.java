@@ -52,4 +52,16 @@ public class TestingRunResult {
     public void setResultMap(Map<String, TestResult> resultMap) {
         this.resultMap = resultMap;
     }
+
+
+    @Override
+    public String toString() {
+        return "{" +
+            " id='" + getId() + "'" +
+            ", testRunId='" + getTestRunId() + "'" +
+            ", apiInfoKey='" + getApiInfoKey() + "'" +
+            ", resultMap='" + getResultMap() + "'" +
+            "}";
+    }
+
 }

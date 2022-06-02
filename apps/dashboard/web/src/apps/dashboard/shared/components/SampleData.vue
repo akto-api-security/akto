@@ -1,7 +1,9 @@
 <template>
     <div v-if="messages && messages.length > 0">
         <div>
-            <div v-if="messages.length > 1" class="d-flex jc-end mr-3">
+            <div v-if="messages.length > 1" class="d-flex jc-sb mr-3">
+                <div v-if="json.title" style="margin: auto 8px; color: #47466A">{{json.title}}</div>
+                
                 <v-btn icon @click="currentIndex = (++currentIndex)%messages.length">
                     <v-icon>$fas_angle-double-right</v-icon>
                 </v-btn>
@@ -97,7 +99,7 @@ export default {
             } catch (e) {
               // eat it
             }
-            result["json"] = {"responseHeaders": responseHeaders, "responsePayload": responsePayload}
+            result["json"] = {"responseHeaders": responseHeaders, "responsePayload": responsePayload, "title": this.json.title || ""}
             result["highlightPaths"] = {}
             for (const x of this.json["highlightPaths"]) {
                 if (x["responseCode"] !== -1) {
@@ -117,6 +119,7 @@ export default {
         json: function() {
             return {
                 "message": JSON.parse(this.messages[this.currentIndex]["message"]),
+                title: this.messages[this.currentIndex]["title"],
                 "highlightPaths": this.messages[this.currentIndex]["highlightPaths"]
                 }
         }
