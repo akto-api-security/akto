@@ -20,8 +20,13 @@ public class TestExecutor {
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
+        System.out.println("APIs: " + apiInfoKeyList.size());
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
-            start(apiInfoKey, testingRun.getTestIdConfig(), testingRun.getId());
+            try {
+                start(apiInfoKey, testingRun.getTestIdConfig(), testingRun.getId());
+            } catch (Exception e) {
+                // TODO:
+            }
         }
     }
 

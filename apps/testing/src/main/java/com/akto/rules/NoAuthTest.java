@@ -1,24 +1,32 @@
 package com.akto.rules;
 
 
+import com.akto.DaoInit;
+import com.akto.dao.AuthMechanismsDao;
+import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestingRunResult;
 import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.testing.ApiExecutor;
+import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import org.bson.types.ObjectId;
+
+import java.util.List;
 
 public class NoAuthTest extends TestPlugin {
 
     @Override
     public void start(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId) {
-        System.out.println("NO AUTH TEST STARTING");
-        HttpRequestParams httpRequestParams = SampleMessageStore.fetchHappyPath(apiInfoKey);
+        HttpRequestParams httpRequestParams = SampleMessageStore.fetchPath(apiInfoKey);
         if (httpRequestParams == null) {
-            addWithoutRequestError(apiInfoKey, testRunId, TestResult.TestError.NO_HAPPY_PATH);
+            addWithoutRequestError(apiInfoKey, testRunId, TestResult.TestError.NO_PATH);
             return;
         }
 
@@ -32,10 +40,11 @@ public class NoAuthTest extends TestPlugin {
 
         HttpResponseParams httpResponseParams = null;
         try {
-            httpResponseParams = ApiExecutor.makeRequest(httpRequestParams);
-            if (httpResponseParams == null) throw new Exception();
+            httpResponseParams = ApiExecutor.sendRequest(httpRequestParams);
         } catch (Exception e) {
             e.printStackTrace();
+            HttpResponseParams newHttpResponseParams = generateEmptyResponsePayload(httpRequestParams);
+            addWithRequestError(apiInfoKey, testRunId, TestResult.TestError.API_REQUEST_FAILED, newHttpResponseParams);
             // TODO:
             return ;
         }

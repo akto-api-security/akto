@@ -9,7 +9,7 @@ public class TestResult {
     private List<TestError> errors;
 
     public enum TestError {
-        NO_HAPPY_PATH, NO_AUTH_MECHANISM
+        NO_PATH, NO_HAPPY_PATH, NO_AUTH_MECHANISM, API_REQUEST_FAILED
     }
 
     public TestResult(String message, boolean vulnerable, List<TestError> errors) {

@@ -1,14 +1,17 @@
 package com.akto.action.testing;
 
 import com.akto.action.UserAction;
+import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
-import com.akto.dto.testing.CollectionWiseTestingEndpoints;
-import com.akto.dto.testing.CustomTestingEndpoints;
-import com.akto.dto.testing.TestingEndpoints;
-import com.akto.dto.testing.TestingRun;
+import com.akto.dto.testing.*;
+import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 
 import java.util.List;
 
@@ -22,6 +25,12 @@ public class StartTestAction extends UserAction {
     public String execute() {
         User user = getSUser();
         int testIdConfig = 0;
+
+        AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
+        if (authMechanism == null) {
+            addActionError("Please set authentication mechanism before you test any APIs");
+            return ERROR.toUpperCase();
+        }
 
         TestingEndpoints testingEndpoints;
         switch (type) {
@@ -49,6 +58,56 @@ public class StartTestAction extends UserAction {
         return SUCCESS;
     }
 
+    private List<TestingRun> testingRuns;
+    public String retrieveAllTests() {
+        testingRuns = TestingRunDao.instance.findAll(new BasicDBObject());
+        testingRuns.sort((o1, o2) -> o2.getScheduleTimestamp() - o1.getScheduleTimestamp());
+        return SUCCESS.toUpperCase();
+    }
+
+
+    private String testRunId;
+    public String stopTest() {
+        ObjectId testRunObjectId;
+        try {
+            testRunObjectId = new ObjectId(testRunId);
+        } catch (Exception e) {
+            addActionError("Test doesn't exist");
+            return ERROR.toUpperCase();
+        }
+
+        Bson filter = Filters.eq("_id", testRunObjectId);
+        Bson update = Updates.set(TestingRun.STATE, TestingRun.State.STOPPED);
+        TestingRunDao.instance.updateOne(filter, update);
+        return SUCCESS.toUpperCase();
+    }
+
+    public String replayTest() {
+        User user = getSUser();
+        ObjectId testRunObjectId;
+        try {
+            testRunObjectId = new ObjectId(testRunId);
+        } catch (Exception e) {
+            addActionError("Test doesn't exist");
+            return ERROR.toUpperCase();
+        }
+
+        Bson filter = Filters.eq("_id", testRunObjectId);
+        TestingRun testingRun = TestingRunDao.instance.findOne(filter);
+        if (testingRun == null) {
+            addActionError("Test doesn't exist");
+            return ERROR.toUpperCase();
+        }
+
+        TestingRun newTestingRun = new TestingRun(
+                Context.now(), user.getLogin(), testingRun.getTestingEndpoints(), testingRun.getTestIdConfig(), TestingRun.State.SCHEDULED
+        );
+
+        TestingRunDao.instance.insertOne(newTestingRun);
+
+        return SUCCESS.toUpperCase();
+    }
+
     public void setType(TestingEndpoints.Type type) {
         this.type = type;
     }
@@ -59,5 +118,13 @@ public class StartTestAction extends UserAction {
 
     public void setApiInfoKeyList(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
         this.apiInfoKeyList = apiInfoKeyList;
+    }
+
+    public void setTestRunId(String testRunId) {
+        this.testRunId = testRunId;
+    }
+
+    public List<TestingRun> getTestingRuns() {
+        return testingRuns;
     }
 }

@@ -13,6 +13,7 @@ public class TestingRun {
     private int pickedUpTimestamp;
     public static final String END_TIMESTAMP = "endTimestamp";
     private int endTimestamp;
+    public static final String STATE = "state";
     private State state;
     private String userEmail;
     private TestingEndpoints testingEndpoints;

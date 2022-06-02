@@ -8,9 +8,9 @@ import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.parsers.HttpCallParser;
 import com.akto.testing.ApiExecutor;
+import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBObject;
 
-import java.awt.print.Book;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ListIterator;
@@ -37,6 +37,19 @@ public class SampleMessageStore {
         sampleDataMap = new HashMap<>(tempSampleDataMap);
     }
 
+
+    public static HttpRequestParams fetchPath(ApiInfo.ApiInfoKey apiInfoKey) {
+        List<String> samples = sampleDataMap.get(apiInfoKey);
+        if (samples == null || samples.isEmpty()) return null;
+        String message = samples.get(0);
+        try {
+                HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(message);
+                return httpResponseParams.getRequestParams();
+        } catch(Exception e) {
+            return null;
+        }
+    }
+
     public static HttpRequestParams fetchHappyPath(ApiInfo.ApiInfoKey apiInfoKey) {
         List<String> samples = sampleDataMap.get(apiInfoKey);
         if (samples == null || samples.isEmpty()) return null;
@@ -45,17 +58,14 @@ public class SampleMessageStore {
         while(iter.hasNext()){
             String message = iter.next();
 
-            // make request
             int statusCode = 0;
             HttpRequestParams httpRequestParams;
             try {
                 HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(message);
                 httpRequestParams = httpResponseParams.getRequestParams();
-                HttpResponseParams result = ApiExecutor.makeRequest(httpRequestParams);
-                if (result == null) throw new Exception();
+                HttpResponseParams result = ApiExecutor.sendRequest(httpRequestParams);
                 statusCode = result.getStatusCode();
             } catch (Exception e) {
-                System.out.println("2");
                 e.printStackTrace();
                 iter.remove();
                 continue;
@@ -63,7 +73,6 @@ public class SampleMessageStore {
 
             // not happy path remove from list
             if (statusCode < 200 || statusCode >= 300) {
-                System.out.println(statusCode);
                 iter.remove();
             } else {
                 return httpRequestParams;

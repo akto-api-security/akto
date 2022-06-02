@@ -1,6 +1,5 @@
 package com.akto.rules;
 
-import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
@@ -15,10 +14,9 @@ public class BOLATest extends TestPlugin {
 
     @Override
     public void start(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId) {
-        System.out.println("BOLA TEST STARTING");
-        HttpRequestParams httpRequestParams = SampleMessageStore.fetchHappyPath(apiInfoKey);
+        HttpRequestParams httpRequestParams = SampleMessageStore.fetchPath(apiInfoKey);
         if (httpRequestParams == null) {
-            addWithoutRequestError(apiInfoKey, testRunId, TestResult.TestError.NO_HAPPY_PATH);
+            addWithoutRequestError(apiInfoKey, testRunId, TestResult.TestError.NO_PATH);
             return;
         }
 
@@ -32,11 +30,11 @@ public class BOLATest extends TestPlugin {
 
         HttpResponseParams httpResponseParams = null;
         try {
-            httpResponseParams = ApiExecutor.makeRequest(httpRequestParams);
-            if (httpResponseParams == null) throw new Exception();
+            httpResponseParams = ApiExecutor.sendRequest(httpRequestParams);
         } catch (Exception e) {
             e.printStackTrace();
-            // TODO:
+            HttpResponseParams newHttpResponseParams = generateEmptyResponsePayload(httpRequestParams);
+            addWithRequestError(apiInfoKey, testRunId, TestResult.TestError.API_REQUEST_FAILED, newHttpResponseParams);
             return ;
         }
 

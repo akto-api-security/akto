@@ -1,11 +1,18 @@
 package com.akto.testing;
 
+import com.akto.DaoInit;
+import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.traffic.SampleData;
+import com.akto.dto.type.URLMethods;
+import com.akto.parsers.HttpCallParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import kotlin.Pair;
 import okhttp3.*;
 
@@ -25,7 +32,7 @@ public class ApiExecutor {
             .readTimeout(30, TimeUnit.SECONDS)
             .build();
 
-    public static HttpResponseParams common(Request request) {
+    public static HttpResponseParams common(Request request) throws Exception {
         Call call = client.newCall(request);
         Response response = null;
         String body;
@@ -33,7 +40,7 @@ public class ApiExecutor {
             response = call.execute();
             ResponseBody responseBody = response.body();
             if (responseBody == null) {
-                return null;
+                throw new Exception("Couldn't read response body");
             }
             try {
                 body = responseBody.string();
@@ -43,7 +50,7 @@ public class ApiExecutor {
             }
         } catch (IOException e) {
             e.printStackTrace();
-            return null;
+            throw new Exception("Api Call failed");
         } finally {
             if (response != null) {
                 response.close();
@@ -69,96 +76,119 @@ public class ApiExecutor {
         return new HttpResponseParams("", statusCode, status, responseHeaders, body, null, Context.now(), 1_000_000+"", false, HttpResponseParams.Source.OTHER, "", "");
     }
 
-    public static HttpResponseParams makeRequest(HttpRequestParams httpRequestParams) throws URISyntaxException, UnsupportedEncodingException, JsonProcessingException {
-        // initiate builder
+    public static String makeUrlAbsolute(String url, Map<String, List<String>> reqHeaders) throws Exception {
+        // get host from header
+        List<String> hostHeaderValue = reqHeaders.get("host");
+        if (hostHeaderValue == null || hostHeaderValue.size() == 0) throw new Exception("Host not found");
+        String host = hostHeaderValue.get(0);
+        if (host == null) throw new Exception("Host not found");
+        if (!url.startsWith("/")) url = "/" + url;
+        if (host.endsWith("/")) host = host.substring(0, host.length()-1);
+
+        host = host.toLowerCase();
+        if (!host.startsWith("http")) {
+            List<String> protocolValues = reqHeaders.get("x-forwarded-proto");
+            if (protocolValues != null && protocolValues.size() > 0) {
+                String protocol = protocolValues.get(0);
+                host = protocol + "://" + host;
+            } else {
+                String firstChar = host.split("")[0];
+                try {
+                    Integer.parseInt(firstChar);
+                    host = "http://" + host;
+                } catch (Exception e) {
+                    host = "https://" + host;
+                }
+            }
+        }
+
+        url = host + url;
+
+        return url;
+    }
+
+    public static HttpResponseParams sendRequest(HttpRequestParams httpRequestParams) throws Exception {
+        String url = httpRequestParams.url.toLowerCase();
+        url = url.trim();
+        if (!url.startsWith("http")) {
+            url = makeUrlAbsolute(url, httpRequestParams.getHeaders());
+        }
+        httpRequestParams.url = url;
+
         Request.Builder builder = new Request.Builder();
 
         // add headers
         Map<String, List<String>> headersMap = httpRequestParams.getHeaders();
         for (String headerName: headersMap.keySet()) {
-            for (String headerValue: headersMap.get(headerName)) {
+            List<String> headerValueList = headersMap.get(headerName);
+            if (headerValueList == null || headerValueList.isEmpty()) continue;
+            for (String headerValue: headerValueList) {
                 if (headerValue == null) continue;
                 builder.addHeader(headerName, headerValue);
             }
         }
 
-        String method = httpRequestParams.getMethod();
-        if (!method.equals("GET")) { // GET url is added later in pipeline
-            String url = httpRequestParams.getURL();
+        URLMethods.Method method = URLMethods.Method.valueOf(httpRequestParams.getMethod());
+
+        if (!method.equals(URLMethods.Method.GET)) { // GET url is added later in pipeline
             builder = builder.url(url);
         }
 
         HttpResponseParams httpResponseParams = null;
         switch (method) {
-            case "GET":
+            case GET:
                 httpResponseParams = getRequest(httpRequestParams, builder);
                 break;
-            case "POST":
-                httpResponseParams = postRequest(httpRequestParams, builder);
+            case POST:
+            case PUT:
+            case DELETE:
+            case HEAD:
+            case OPTIONS:
+            case TRACE:
+                httpResponseParams = sendWithRequestBody(httpRequestParams, builder);
                 break;
-            case "PUT":
-                httpResponseParams = putRequest(httpRequestParams, builder);
-                break;
-            case "DELETE":
-                httpResponseParams = deleteRequest(httpRequestParams, builder);
-                break;
-            default:
-                return null;
+            case OTHER:
+                throw new Exception("Invalid method name");
         }
 
         httpResponseParams.requestParams = httpRequestParams;
         return httpResponseParams;
     }
 
-    public static HttpResponseParams getRequest(HttpRequestParams httpRequestParams, Request.Builder builder) throws URISyntaxException, JsonProcessingException, UnsupportedEncodingException {
+    public static HttpResponseParams getRequest(HttpRequestParams httpRequestParams, Request.Builder builder)  throws Exception{
         String url = httpRequestParams.getURL();
-        URI u = new URI(url);
+//        URI u = new URI(url);
+//
+//        StringBuilder sb = new StringBuilder(u.getQuery() == null ? "" : u.getQuery());
+//
+//        // add query params
+//        String payload = httpRequestParams.getPayload();
+//        JsonNode node = mapper.readTree(payload);
+//        if (node.isObject()) {
+//            Iterator<String> fieldNames = node.fieldNames();
+//            while(fieldNames.hasNext()) {
+//                String fieldName = fieldNames.next();
+//                JsonNode fieldValue = node.get(fieldName);
+//                if (fieldValue.isValueNode()) {
+//                    if (sb.length() > 0) sb.append('&');
+//                    sb.append(URLEncoder.encode(fieldName, "UTF-8"));
+//                    sb.append('=');
+//                    sb.append(URLEncoder.encode(fieldValue.asText(), "UTF-8")); //TODO: asText is not always the best option
+//                }
+//            }
+//            u = new URI(u.getScheme(), u.getAuthority(), u.getPath(),
+//                    sb.toString(), u.getFragment());
+//        }
 
-        StringBuilder sb = new StringBuilder(u.getQuery() == null ? "" : u.getQuery());
-
-        // add query params
-        String payload = httpRequestParams.getPayload();
-        JsonNode node = mapper.readTree(payload);
-        if (node.isObject()) {
-            Iterator<String> fieldNames = node.fieldNames();
-            while(fieldNames.hasNext()) {
-                String fieldName = fieldNames.next();
-                JsonNode fieldValue = node.get(fieldName);
-                if (fieldValue.isValueNode()) {
-                    if (sb.length() > 0) sb.append('&');
-                    sb.append(URLEncoder.encode(fieldName, "UTF-8"));
-                    sb.append('=');
-                    sb.append(URLEncoder.encode(fieldValue.asText(), "UTF-8")); //TODO: asText is not always the best option
-                }
-            }
-            u = new URI(u.getScheme(), u.getAuthority(), u.getPath(),
-                    sb.toString(), u.getFragment());
-        }
-
-
-        System.out.println(u.toString());
-        builder = builder.url(u.toString());
+        builder = builder.url(url);
         Request request = builder.build();
         return common(request);
     }
 
-    public static HttpResponseParams postRequest(HttpRequestParams httpRequestParams, Request.Builder builder) {
+
+    public static HttpResponseParams sendWithRequestBody(HttpRequestParams httpRequestParams, Request.Builder builder) throws Exception {
         RequestBody body = RequestBody.create(httpRequestParams.getPayload(), MediaType.parse("application/json; charset=utf-8"));
-        builder = builder.post(body);
-        Request request = builder.build();
-
-        return common(request);
-    }
-
-    public static HttpResponseParams putRequest(HttpRequestParams httpRequestParams, Request.Builder builder) {
-        RequestBody body = RequestBody.create( httpRequestParams.getPayload(), MediaType.parse("application/json; charset=utf-8"));
-        builder = builder.put(body);
-        Request request = builder.build();
-        return common(request);
-    }
-
-    public static HttpResponseParams deleteRequest(HttpRequestParams httpRequestParams, Request.Builder builder) {
-        builder = builder.delete();
+        builder = builder.method(httpRequestParams.getMethod(), body);
         Request request = builder.build();
         return common(request);
     }
