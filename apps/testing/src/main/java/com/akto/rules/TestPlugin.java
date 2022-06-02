@@ -50,7 +50,7 @@ public abstract class TestPlugin {
     }
 
 
-    public void addTestSuccessResult(HttpResponseParams httpResponseParams, ObjectId testRunId, boolean vulnerable) {
+    public void addTestSuccessResult(ApiInfo.ApiInfoKey apiInfoKey, HttpResponseParams httpResponseParams, ObjectId testRunId, boolean vulnerable) {
         HttpRequestParams httpRequestParams = httpResponseParams.getRequestParams();
 
         String message = null;
@@ -62,7 +62,7 @@ public abstract class TestPlugin {
             return;
         }
 
-        Bson filter = TestingRunResultDao.generateFilter(testRunId, httpRequestParams);
+        Bson filter = TestingRunResultDao.generateFilter(testRunId, apiInfoKey);
         Bson update = Updates.set("resultMap." + testName(), new TestResult(message, vulnerable, new ArrayList<>()));
         TestingRunResultDao.instance.updateOne(filter, update);
     }

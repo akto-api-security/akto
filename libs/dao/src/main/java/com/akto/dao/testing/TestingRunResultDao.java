@@ -22,8 +22,8 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
         return TestingRunResult.class;
     }
 
-    public static Bson generateFilter(ObjectId testRunId, HttpRequestParams httpRequestParams) {
-        return generateFilter(testRunId, httpRequestParams.getApiCollectionId(), httpRequestParams.getURL(), httpRequestParams.getMethod());
+    public static Bson generateFilter(ObjectId testRunId, ApiInfo.ApiInfoKey apiInfoKey) {
+        return generateFilter(testRunId, apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
     }
 
     public static Bson generateFilter(ObjectId testRunId, int apiCollectionId ,String url, String method) {

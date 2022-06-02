@@ -51,7 +51,7 @@ public class NoAuthTest extends TestPlugin {
 
         boolean vulnerable = isStatusGood(httpResponseParams);
 
-        addTestSuccessResult(httpResponseParams, testRunId, vulnerable);
+        addTestSuccessResult(apiInfoKey, httpResponseParams,testRunId, vulnerable);
 
     }
 
