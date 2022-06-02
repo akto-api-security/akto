@@ -3,6 +3,7 @@ import Router from 'vue-router'
 const PageLogin  = () => import( '@/apps/login/App')
 const PageDashboard  = () => import( '@/apps/dashboard/App')
 const PageToday  = () => import( "@/apps/dashboard/views/today/Today")
+const PageTesting  = () => import( "@/apps/dashboard/views/testing/PageTesting")
 import store from '@/apps/main/store/module'
 const PageSignup = () => import("@/apps/signup/PageSignup")
 const PageOnboard = () => import("@/apps/signup/PageOnboard")
@@ -51,12 +52,15 @@ const router =  new Router({
             name: 'dashboard',
             component: PageDashboard,
             redirect: '/dashboard/testing',
+            beforeEnter (to, from, next) {
+                store.dispatch('collections/loadAllApiCollections').then(() => next()).catch(() => next())
+            },
             children: [
                 {
                     path: 'testing',
                     name: 'testing',
                     components: {
-                        default: PageToday
+                        default: PageTesting
                     }
                 },
                 {
@@ -70,9 +74,6 @@ const router =  new Router({
                     path: 'observe',
                     name: 'observe',
                     component: Observe,
-                    beforeEnter (to, from, next) {
-                        store.dispatch('collections/loadAllApiCollections').then(() => next()).catch(() => next())
-                    },
                     children:[
                         {
                             path: 'inventory',

@@ -12,6 +12,7 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import com.mongodb.client.model.Sorts;
 
 import java.util.List;
 
@@ -21,8 +22,7 @@ public class StartTestAction extends UserAction {
     private int apiCollectionId;
     private List<ApiInfo.ApiInfoKey> apiInfoKeyList;
 
-    @Override
-    public String execute() {
+    public String startTest() {
         User user = getSUser();
         int testIdConfig = 0;
 
@@ -54,34 +54,43 @@ public class StartTestAction extends UserAction {
         );
 
         TestingRunDao.instance.insertOne(testingRun);
-
-        return SUCCESS;
+        this.retrieveAllCollectionTests();
+        return SUCCESS.toUpperCase();
     }
 
     private List<TestingRun> testingRuns;
-    public String retrieveAllTests() {
-        testingRuns = TestingRunDao.instance.findAll(new BasicDBObject());
+    private AuthMechanism authMechanism;
+
+    public String retrieveAllCollectionTests() {
+        this.authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
+        BasicDBObject query = new BasicDBObject("testingEndpoints.type", "COLLECTION_WISE");
+        testingRuns = TestingRunDao.instance.findAll(query);
         testingRuns.sort((o1, o2) -> o2.getScheduleTimestamp() - o1.getScheduleTimestamp());
         return SUCCESS.toUpperCase();
     }
 
-
-    private String testRunId;
     public String stopTest() {
-        ObjectId testRunObjectId;
-        try {
-            testRunObjectId = new ObjectId(testRunId);
-        } catch (Exception e) {
-            addActionError("Test doesn't exist");
-            return ERROR.toUpperCase();
-        }
+        BasicDBObject query = 
+            new BasicDBObject("testingEndpoints.type", "COLLECTION_WISE")
+            .append("testingEndpoints.apiCollectionId", apiCollectionId);
 
-        Bson filter = Filters.eq("_id", testRunObjectId);
-        Bson update = Updates.set(TestingRun.STATE, TestingRun.State.STOPPED);
-        TestingRunDao.instance.updateOne(filter, update);
-        return SUCCESS.toUpperCase();
+        List<TestingRun> testingRunsForCollection = TestingRunDao.instance.findAll(query, 0, 1, Sorts.descending("scheduleTimestamp"));
+
+        if (!testingRunsForCollection.isEmpty()) {
+            TestingRun testingRun = testingRunsForCollection.get(0);
+            if(testingRun.getState() == TestingRun.State.RUNNING || testingRun.getState() == TestingRun.State.SCHEDULED) {
+                ObjectId testRunObjectId = testingRun.getId();        
+                Bson filter = Filters.eq("_id", testRunObjectId);
+                Bson update = Updates.set(TestingRun.STATE, TestingRun.State.STOPPED);
+                TestingRunDao.instance.updateOne(filter, update);
+                this.retrieveAllCollectionTests();
+                return SUCCESS.toUpperCase();        
+            }
+        }
+        return ERROR.toUpperCase();
     }
 
+    private String testRunId;
     public String replayTest() {
         User user = getSUser();
         ObjectId testRunObjectId;
@@ -126,5 +135,13 @@ public class StartTestAction extends UserAction {
 
     public List<TestingRun> getTestingRuns() {
         return testingRuns;
+    }
+
+    public AuthMechanism getAuthMechanism() {
+        return this.authMechanism;
+    }
+
+    public void setAuthMechanism(AuthMechanism authMechanism) {
+        this.authMechanism = authMechanism;
     }
 }

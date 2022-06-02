@@ -73,12 +73,20 @@ export default {
             ],
             actions: [ 
                 {
-                    isValid: item => this.isValid(item),
+                    isValid: item => this.isValidForDelete(item),
                     icon: item => '$fas_trash',
                     text: item => 'Delete Collection',
                     func: item => this.deleteCollection(item),
                     success: (resp, item) => this.successfullyDeleted(resp, item),
                     failure: (err, item) => this.unsuccessfullyDeleted(err, item)
+                },
+                {
+                    isValid: item => this.isValidForTest(item),
+                    icon: item => this.getIconForTest(item),
+                    text: item => this.getTextForTest(item),
+                    func: item => this.executeOperationForTest(item),
+                    success: (resp, item) => {},
+                    failure: (err, item) => {}
                 }
             ],
             showNewRow: false,
@@ -117,15 +125,44 @@ export default {
             })
             this.deletedCollection = null
         },
-        isValid(item) {
+        isValidForDelete(item) {
             if(item.id != 0)
                 return true;
             else
                 return false;
-        }  
+        },
+        isValidForTest(item) {
+            return true
+        },
+        isRunning(item) {
+            let latestRun = this.testingRuns.find(x => x.testingEndpoints.apiCollectionId === item.id)
+            return (latestRun != null && (latestRun.state == "RUNNING" || latestRun.state == "SCHEDULED"))
+        },
+        getIconForTest(item) {
+            return this.isRunning(item) ? "$fas_stop" : "$fas_play"
+        },
+        getTextForTest(item) {
+            let latestRun = this.testingRuns.find(x => x.testingEndpoints.apiCollectionId === item.id)
+
+            if (latestRun == null) {
+                return "Run first test"
+            } else if (latestRun.state === "RUNNING" || latestRun.state === "SCHEDULED") {
+                return "Stop test"
+            } else {
+                return "Run new test. Last started " + func.prettifyEpoch(latestRun.scheduleTimestamp)
+            }
+        },
+        async executeOperationForTest (item) {
+            if (this.isRunning(item)){
+                await this.$store.dispatch('testing/stopTestForCollection', item.id)
+            } else {
+                await this.$store.dispatch('testing/startTestForCollection', item.id)
+            }
+        }
     },
     computed: {
-        ...mapState('collections', ['apiCollections', 'loading']),
+        ...mapState('collections', ['apiCollections', 'loading', 'testingRuns']),
+        ...mapState('testing', ['testingRuns', 'authMechanism']),
         apiCollectionsForTable() {
             return this.apiCollections.map(c => {
                 return {
@@ -138,6 +175,7 @@ export default {
         }
     },
     mounted () {
+        this.$store.dispatch('testing/loadTestingDetails')
         this.$emit('mountedView', {type: 0})
     }
 }

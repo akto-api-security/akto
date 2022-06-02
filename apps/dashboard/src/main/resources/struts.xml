@@ -803,7 +803,7 @@
             </result>
         </action>
 
-        <action name="api/startTest" class="com.akto.action.testing.StartTestAction">
+        <action name="api/startTest" class="com.akto.action.testing.StartTestAction" method="startTest">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
@@ -814,7 +814,18 @@
             </result>
         </action>
 
-        <action name="api/retrieveAllTests" class="com.akto.action.testing.StartTestAction" method="retrieveAllTests">
+        <action name="api/retrieveAllCollectionTests" class="com.akto.action.testing.StartTestAction" method="retrieveAllCollectionTests">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/toggleTestingRunForCollection" class="com.akto.action.testing.StartTestAction" method="toggleTestingRunForCollection">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
@@ -847,7 +858,18 @@
             </result>
         </action>
 
-        <action name="api/addAuthMechanism" class="com.akto.action.testing.AuthMechanismAction">
+        <action name="api/addAuthMechanism" class="com.akto.action.testing.AuthMechanismAction" method="addAuthMechanism">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchTestingRunResults" class="com.akto.action.testing.AuthMechanismAction" method="fetchTestingRunResults">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>

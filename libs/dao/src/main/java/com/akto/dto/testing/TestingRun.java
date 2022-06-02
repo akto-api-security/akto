@@ -100,4 +100,18 @@ public class TestingRun {
         this.state = state;
     }
 
+    @Override
+    public String toString() {
+        return "{" +
+            " id='" + getId() + "'" +
+            ", scheduleTimestamp='" + getScheduleTimestamp() + "'" +
+            ", pickedUpTimestamp='" + getPickedUpTimestamp() + "'" +
+            ", endTimestamp='" + getEndTimestamp() + "'" +
+            ", state='" + getState() + "'" +
+            ", userEmail='" + getUserEmail() + "'" +
+            ", testingEndpoints='" + getTestingEndpoints() + "'" +
+            ", testIdConfig='" + getTestIdConfig() + "'" +
+            "}";
+    }
+
 }
