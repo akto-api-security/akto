@@ -61,7 +61,7 @@
                                 <v-icon>$fas_times</v-icon>
                             </v-btn>
                         </template>
-                        <div>
+                        <div class="pa-4">
                             <sample-data :messages='requestAndResponse'/>
                         </div>
                     </a-card>
