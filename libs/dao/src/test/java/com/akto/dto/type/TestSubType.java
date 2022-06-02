@@ -39,6 +39,23 @@ public class TestSubType {
     public void testCreditCard() {
         boolean happy = isCreditCard("378282246310005");
         assertTrue(happy);
+        happy = isCreditCard("5267 318 1879 75449");
+        assertTrue(happy);
+        happy = isCreditCard("5267     318 1879 75 4 49");
+        assertTrue(happy);
+        happy = isCreditCard("4111 1111 1111 1111");
+        assertTrue(happy);
+        happy = isCreditCard("5105 1051 0510 5100");
+        assertTrue(happy);
+        happy = isCreditCard("5104 0600 0000 0008");
+        assertTrue(happy);
+        happy = isCreditCard("4718 6091 0820 4366");
+        assertTrue(happy);
+        happy = isCreditCard("5104 0155 5555 5558");
+        assertTrue(happy);
+        happy = isCreditCard("5241 8100 0000 0000");
+        assertTrue(happy);
+
         boolean sad = isCreditCard("3782822463100075");
         assertFalse(sad);
     }
