@@ -22,15 +22,19 @@ public class HardcodedAuthParam extends AuthParam {
     }
 
     @Override
-    public void addAuthTokens(HttpRequestParams httpRequestParams) {
+    public boolean addAuthTokens(HttpRequestParams httpRequestParams) {
         Map<String, List<String>> headers = httpRequestParams.getHeaders();
+        if (!headers.containsKey(this.key)) return false;
         headers.put(this.key, Collections.singletonList(this.value));
+        return true;
     }
 
     @Override
-    public void removeAuthTokens(HttpRequestParams httpRequestParams) {
+    public boolean removeAuthTokens(HttpRequestParams httpRequestParams) {
         Map<String, List<String>> headers = httpRequestParams.getHeaders();
+        if (!headers.containsKey(this.key)) return false;
         headers.put(this.key, Collections.singletonList(null));
+        return true;
     }
 
     public Location getWhere() {

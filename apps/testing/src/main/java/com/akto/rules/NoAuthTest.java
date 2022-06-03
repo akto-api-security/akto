@@ -36,8 +36,9 @@ public class NoAuthTest extends TestPlugin {
             return;
         }
 
-        authMechanism.removeAuthFromRequest(httpRequestParams);
-
+        boolean result = authMechanism.removeAuthFromRequest(httpRequestParams);
+        if (!result) return ;
+        
         HttpResponseParams httpResponseParams = null;
         try {
             httpResponseParams = ApiExecutor.sendRequest(httpRequestParams);

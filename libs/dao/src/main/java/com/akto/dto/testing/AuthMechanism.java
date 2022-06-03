@@ -16,16 +16,20 @@ public class AuthMechanism {
         this.authParams = authParams;
     }
 
-    public void addAuthToRequest(HttpRequestParams httpRequestParams) {
+    public boolean addAuthToRequest(HttpRequestParams httpRequestParams) {
         for (AuthParam authParamPair : authParams) {
-            authParamPair.addAuthTokens(httpRequestParams);
+            boolean result = authParamPair.addAuthTokens(httpRequestParams);
+            if (!result) return false;
         }
+        return true;
     }
 
-    public void removeAuthFromRequest(HttpRequestParams httpRequestParams) {
+    public boolean removeAuthFromRequest(HttpRequestParams httpRequestParams) {
         for (AuthParam authParamPair : authParams) {
-            authParamPair.removeAuthTokens(httpRequestParams);
+            boolean result = authParamPair.removeAuthTokens(httpRequestParams);
+            if (!result) return false;
         }
+        return true;
     }
 
     public ObjectId getId() {

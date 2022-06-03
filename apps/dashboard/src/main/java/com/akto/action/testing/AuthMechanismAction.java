@@ -60,7 +60,7 @@ public class AuthMechanismAction extends UserAction {
                 if (testingRunForCollection == null) {
                     tests.put(key, test);
                     testRunIdSet.add(test.getId());
-                } else if (testingRunForCollection.getScheduleTimestamp() > test.getScheduleTimestamp()) {
+                } else if (testingRunForCollection.getScheduleTimestamp() < test.getScheduleTimestamp()) {
                     tests.put(key, test);
                     testRunIdSet.add(test.getId());
                     testRunIdSet.remove(testingRunForCollection.getId());

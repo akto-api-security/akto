@@ -26,7 +26,8 @@ public class BOLATest extends TestPlugin {
             return;
         }
 
-        authMechanism.addAuthToRequest(httpRequestParams);
+        boolean result = authMechanism.addAuthToRequest(httpRequestParams);
+        if (!result) return ;
 
         HttpResponseParams httpResponseParams = null;
         try {
