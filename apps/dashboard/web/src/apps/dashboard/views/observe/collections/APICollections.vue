@@ -132,7 +132,7 @@ export default {
                 return false;
         },
         isValidForTest(item) {
-            return true
+            return !this.isRunning(item)
         },
         isRunning(item) {
             let latestRun = this.testingRuns.find(x => x.testingEndpoints.apiCollectionId === item.id)
