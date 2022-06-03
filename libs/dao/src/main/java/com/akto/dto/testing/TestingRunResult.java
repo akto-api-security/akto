@@ -1,12 +1,16 @@
 package com.akto.dto.testing;
 
 import com.akto.dto.ApiInfo;
+
+import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
 import java.util.Map;
 
 public class TestingRunResult {
     private ObjectId id;
+    @BsonIgnore
+    private String hexId;
     public static final String TEST_RUN_ID = "testRunId";
     private ObjectId testRunId;
     public static final String API_INFO_KEY = "apiInfoKey";
@@ -51,6 +55,15 @@ public class TestingRunResult {
 
     public void setResultMap(Map<String, TestResult> resultMap) {
         this.resultMap = resultMap;
+    }
+
+
+    public String getHexId() {
+        return this.hexId;
+    }
+
+    public void setHexId(String hexId) {
+        this.hexId = hexId;
     }
 
 

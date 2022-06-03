@@ -99,7 +99,7 @@ export default {
             } catch (e) {
               // eat it
             }
-            result["json"] = {"responseHeaders": responseHeaders, "responsePayload": responsePayload, "title": this.json.title || ""}
+            result["json"] = {"responseHeaders": responseHeaders, "responsePayload": responsePayload}
             result["highlightPaths"] = {}
             for (const x of this.json["highlightPaths"]) {
                 if (x["responseCode"] !== -1) {
