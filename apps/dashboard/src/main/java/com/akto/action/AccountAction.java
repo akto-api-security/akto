@@ -53,8 +53,6 @@ public class AccountAction extends UserAction {
         } catch (AWSLambdaException e) {
             System.out.println(e);
         }
-
-        System.out.println(invokeResult.getStatusCode());
     }
 
     private void listMatchingLambda(String functionName) {
