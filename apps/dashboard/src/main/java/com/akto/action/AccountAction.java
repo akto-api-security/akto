@@ -11,6 +11,7 @@ import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.lambda.AWSLambda;
 import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
+import com.amazonaws.services.lambda.model.AWSLambdaException;
 import com.amazonaws.services.lambda.model.FunctionConfiguration;
 import com.amazonaws.services.lambda.model.InvokeRequest;
 import com.amazonaws.services.lambda.model.InvokeResult;
@@ -70,7 +71,7 @@ public class AccountAction extends UserAction {
                     invokeExactLambda(config.getFunctionName(), awsLambda);
                 }
             }
-        } catch (ServiceException e) {
+        } catch (AWSLambdaException e) {
             System.out.println(e);
             invokeExactLambda(functionName, awsLambda);
         }
