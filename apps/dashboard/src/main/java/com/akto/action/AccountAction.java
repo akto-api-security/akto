@@ -11,11 +11,15 @@ import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.lambda.AWSLambda;
 import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
+import com.amazonaws.services.lambda.model.FunctionConfiguration;
 import com.amazonaws.services.lambda.model.InvokeRequest;
 import com.amazonaws.services.lambda.model.InvokeResult;
+import com.amazonaws.services.lambda.model.ListFunctionsResult;
 import com.amazonaws.services.lambda.model.ServiceException;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Iterator;
+import java.util.List;
 
 import static com.mongodb.client.model.Filters.eq;
 
@@ -38,14 +42,28 @@ public class AccountAction extends UserAction {
 
         try {
             AWSLambda awsLambda = AWSLambdaClientBuilder.standard().build();
+            ListFunctionsResult functionResult = awsLambda.listFunctions();
 
-            invokeResult = awsLambda.invoke(invokeRequest);
+            List<FunctionConfiguration> list = functionResult.getFunctions();
 
-            String ans = new String(invokeResult.getPayload().array(), StandardCharsets.UTF_8);
+            for (FunctionConfiguration config: list) {
+                System.out.println("The function name is "+config.getFunctionName());
 
-            //write out the return value
-            System.out.println(ans);
+                if(config.getFunctionName().contains(functionName)) {
+                    try {
 
+                        System.out.println("Invoke lambda "+config.getFunctionName());
+                        invokeResult = awsLambda.invoke(invokeRequest);
+
+                        String ans = new String(invokeResult.getPayload().array(), StandardCharsets.UTF_8);
+            
+                        //write out the return value
+                        System.out.println(ans);        
+                    } catch (ServiceException e) {
+                        System.out.println(e);
+                    }
+                }
+            }
         } catch (ServiceException e) {
             System.out.println(e);
         }
