@@ -35,10 +35,6 @@ public class AccountAction extends UserAction {
     }
 
     private void invokeLambda(String functionName) {
-        InvokeRequest invokeRequest = new InvokeRequest()
-                .withFunctionName(functionName)
-                .withPayload("{}");
-        InvokeResult invokeResult = null;
 
         try {
             AWSLambda awsLambda = AWSLambdaClientBuilder.standard().build();
@@ -50,8 +46,12 @@ public class AccountAction extends UserAction {
                 System.out.println("The function name is "+config.getFunctionName());
 
                 if(config.getFunctionName().contains(functionName)) {
+                    InvokeRequest invokeRequest = new InvokeRequest()
+                        .withFunctionName(config.getFunctionName())
+                        .withPayload("{}");
+                    InvokeResult invokeResult = null;
                     try {
-
+        
                         System.out.println("Invoke lambda "+config.getFunctionName());
                         invokeResult = awsLambda.invoke(invokeRequest);
 
@@ -62,13 +62,13 @@ public class AccountAction extends UserAction {
                     } catch (ServiceException e) {
                         System.out.println(e);
                     }
+
+                    System.out.println(invokeResult.getStatusCode());
                 }
             }
         } catch (ServiceException e) {
             System.out.println(e);
         }
-
-        System.out.println(invokeResult.getStatusCode());
     }
 
     public String takeUpdate() {
