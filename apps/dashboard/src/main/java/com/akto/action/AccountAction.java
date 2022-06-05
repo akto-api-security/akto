@@ -50,7 +50,7 @@ public class AccountAction extends UserAction {
 
             //write out the return value
             System.out.println(ans);        
-        } catch (ServiceException e) {
+        } catch (AWSLambdaException e) {
             System.out.println(e);
         }
 
