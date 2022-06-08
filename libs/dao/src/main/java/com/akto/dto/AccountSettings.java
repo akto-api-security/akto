@@ -7,7 +7,7 @@ public class AccountSettings {
     public static final String PRIVATE_CIDR_LIST = "privateCidrList";
     private List<String> privateCidrList;
     public static final String REDACT_PAYLOAD = "redactPayload";
-    private Boolean redactPayload;
+    private boolean redactPayload;
     public static final String SAMPLE_DATA_COLLECTION_DROPPED = "sampleDataCollectionDropped";
     private boolean sampleDataCollectionDropped;
 
@@ -37,15 +37,15 @@ public class AccountSettings {
         this.privateCidrList = privateCidrList;
     }
 
-    public Boolean isRedactPayload() {
+    public boolean isRedactPayload() {
         return redactPayload;
     }
 
-    public Boolean getRedactPayload() {
+    public boolean getRedactPayload() {
         return redactPayload;
     }
 
-    public void setRedactPayload(Boolean redactPayload) {
+    public void setRedactPayload(boolean redactPayload) {
         this.redactPayload = redactPayload;
     }
 
