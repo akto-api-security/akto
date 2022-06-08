@@ -57,9 +57,7 @@ public class AktoPolicy {
                 apiAccessTypePolicy.setPrivateCidrList(cidrList);
             }
 
-            if (accountSettings.isRedactPayload() != null) {
-                redact = accountSettings.isRedactPayload();
-            }
+            redact = accountSettings.isRedactPayload();
         }
 
         apiInfoCatalogMap = new HashMap<>();
