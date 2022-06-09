@@ -244,9 +244,10 @@ public class KeyTypes {
     }
 
     public static boolean isCreditCard(String s) {
-        if (s.length() < 12 || s.length() > 23) return false;
-        if (s.toLowerCase() != s.toUpperCase()) return false; // only numbers
-        return creditCardValidator.isValid(s);
+        String cc = s.replaceAll(" ", "");
+        if (cc.length() < 12 || cc.length() > 23) return false;
+        if (!cc.toLowerCase().equals(cc.toUpperCase())) return false; // only numbers
+        return creditCardValidator.isValid(cc);
     }
 
     public static boolean isIP(String s) {
