@@ -51,6 +51,7 @@ public class CustomDataType {
     }
 
     public boolean validate(Object value, Object key) {
+        if (this.keyConditions == null && this.valueConditions==null) return false;
         boolean keyResult = true;
         if (this.keyConditions != null) {
             keyResult = this.keyConditions.validate(key);
