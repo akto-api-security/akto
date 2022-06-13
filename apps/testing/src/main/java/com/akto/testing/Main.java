@@ -60,6 +60,8 @@ public class Main {
 
         logger.info("Starting.......");
 
+//        StatusCodeAnalyser.run();
+
         while (true) {
             int start = Context.now();
 
@@ -82,7 +84,7 @@ public class Main {
             try {
                 TestExecutor.init(testingRun);
             } catch (Exception e) {
-                // TODO:
+                e.printStackTrace();
             }
 
             Bson completedUpdate = Updates.combine(
