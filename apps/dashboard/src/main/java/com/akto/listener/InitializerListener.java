@@ -217,8 +217,7 @@ public class InitializerListener implements ServletContextListener {
 
     public void dropSampleDataIfEarlierNotDroped(AccountSettings accountSettings) {
         if (accountSettings == null) return;
-        boolean redactCondition = accountSettings.isRedactPayload()!=null && accountSettings.isRedactPayload() == true;
-        if (redactCondition && !accountSettings.isSampleDataCollectionDropped()) {
+        if (accountSettings.isRedactPayload() && !accountSettings.isSampleDataCollectionDropped()) {
             AdminSettingsAction.dropCollections(Context.accountId.get());
         }
 

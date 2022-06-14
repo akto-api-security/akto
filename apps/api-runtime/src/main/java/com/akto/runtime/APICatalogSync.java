@@ -787,7 +787,7 @@ public class APICatalogSync {
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
 
         boolean redact = false;
-        if (accountSettings != null && accountSettings.isRedactPayload() != null) {
+        if (accountSettings != null) {
             redact =  accountSettings.isRedactPayload();
         }
 
