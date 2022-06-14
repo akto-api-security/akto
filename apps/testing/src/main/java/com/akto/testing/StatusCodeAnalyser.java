@@ -1,5 +1,7 @@
 package com.akto.testing;
 
+import com.akto.DaoInit;
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
@@ -10,6 +12,9 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mongodb.ConnectionString;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
@@ -42,24 +47,38 @@ public class StatusCodeAnalyser {
         }
     }
 
+    private static final Logger logger = LoggerFactory.getLogger(StatusCodeAnalyser.class);
 
     public static int MAX_COUNT = 30;
     public static void run() {
+        logger.info("Running status analyser");
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = SampleMessageStore.sampleDataMap;
-        if (sampleDataMap == null) return;
+        if (sampleDataMap == null) {
+            logger.error("No sample data");
+            return;
+        }
         AuthMechanism authMechanism = AuthMechanismStore.getAuthMechanism();
-        if (authMechanism == null) return;
+        if (authMechanism == null) {
+            logger.error("No auth mechanism");
+            return;
+        }
         Map<Set<String>, Map<String,Integer>> frequencyMap = new HashMap<>();
 
         int count = 0;
+        int inc = 0;
         for (ApiInfo.ApiInfoKey apiInfoKey: sampleDataMap.keySet()) {
             if (count > MAX_COUNT) break;
             try {
                 boolean success = fillFrequencyMap(apiInfoKey, authMechanism, frequencyMap);
-                if (success)  count += 1;
+                if (success)  {
+                    count += 1;
+                    logger.info("count: " + count);
+                }
             } catch (Exception e) {
                 e.printStackTrace();
             }
+            if (inc % 10 == 0) System.out.println(inc);
+            inc += 1;
         }
 
         calculateResult(frequencyMap, 5);

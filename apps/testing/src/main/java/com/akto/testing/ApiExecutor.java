@@ -1,26 +1,15 @@
 package com.akto.testing;
 
-import com.akto.DaoInit;
-import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.parsers.HttpCallParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import kotlin.Pair;
 import okhttp3.*;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URLEncoder;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -108,7 +97,8 @@ public class ApiExecutor {
     }
 
     public static HttpResponseParams sendRequest(HttpRequestParams httpRequestParams) throws Exception {
-        String url = httpRequestParams.url.toLowerCase();
+        // don't lowercase url because query params will change and will result in incorrect request
+        String url = httpRequestParams.url;
         url = url.trim();
         if (!url.startsWith("http")) {
             url = makeUrlAbsolute(url, httpRequestParams.getHeaders());
@@ -121,6 +111,7 @@ public class ApiExecutor {
         Map<String, List<String>> headersMap = httpRequestParams.getHeaders();
         if (headersMap == null) headersMap = new HashMap<>();
         for (String headerName: headersMap.keySet()) {
+            if (headerName.equals("content-length")) continue;
             List<String> headerValueList = headersMap.get(headerName);
             if (headerValueList == null || headerValueList.isEmpty()) continue;
             for (String headerValue: headerValueList) {
