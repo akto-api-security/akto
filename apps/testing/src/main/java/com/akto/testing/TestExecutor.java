@@ -3,9 +3,12 @@ package com.akto.testing;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.TestingRun;
+import com.akto.dto.type.RequestTemplate;
 import com.akto.rules.BOLATest;
 import com.akto.rules.NoAuthTest;
 import org.bson.types.ObjectId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashSet;
 import java.util.List;
@@ -19,21 +22,23 @@ public class TestExecutor {
         return url;
     }
 
+    private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
     public static void init(TestingRun testingRun) {
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         System.out.println("APIs: " + apiInfoKeyList.size());
+
         Set<ApiInfo.ApiInfoKey> store = new HashSet<>();
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
-            String url = slashHandling(apiInfoKey.url);
-            ApiInfo.ApiInfoKey modifiedKey = new ApiInfo.ApiInfoKey(apiInfoKey.getApiCollectionId(), url, apiInfoKey.method);
-            if (store.contains(modifiedKey)) continue;
-            store.add(modifiedKey);
             try {
+                String url = slashHandling(apiInfoKey.url+"");
+                ApiInfo.ApiInfoKey modifiedKey = new ApiInfo.ApiInfoKey(apiInfoKey.getApiCollectionId(), url, apiInfoKey.method);
+                if (store.contains(modifiedKey)) continue;
+                store.add(modifiedKey);
                 start(apiInfoKey, testingRun.getTestIdConfig(), testingRun.getId());
             } catch (Exception e) {
-                // TODO:
+                logger.error(e.getMessage());
             }
         }
     }

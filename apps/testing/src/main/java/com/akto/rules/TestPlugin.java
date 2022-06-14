@@ -94,8 +94,6 @@ public abstract class TestPlugin {
 
 
     public void addTestSuccessResult(ApiInfo.ApiInfoKey apiInfoKey, HttpResponseParams httpResponseParams, ObjectId testRunId, boolean vulnerable) {
-        HttpRequestParams httpRequestParams = httpResponseParams.getRequestParams();
-
         String message = null;
         try {
             message = RedactSampleData.convertHttpRespToOriginalString(httpResponseParams);
@@ -104,6 +102,7 @@ public abstract class TestPlugin {
             e.printStackTrace();
             return;
         }
+        if (message == null) return;
 
         Bson filter = TestingRunResultDao.generateFilter(testRunId, apiInfoKey);
         Bson update = Updates.set("resultMap." + testName(), new TestResult(message, vulnerable, new ArrayList<>()));

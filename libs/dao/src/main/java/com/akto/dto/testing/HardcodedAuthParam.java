@@ -23,6 +23,7 @@ public class HardcodedAuthParam extends AuthParam {
 
     @Override
     public boolean addAuthTokens(HttpRequestParams httpRequestParams) {
+        if (this.key == null) return false;
         Map<String, List<String>> headers = httpRequestParams.getHeaders();
         String k = this.key.toLowerCase().trim();
         if (!headers.containsKey(k)) return false;
@@ -32,6 +33,7 @@ public class HardcodedAuthParam extends AuthParam {
 
     @Override
     public boolean removeAuthTokens(HttpRequestParams httpRequestParams) {
+        if (this.key == null) return false;
         Map<String, List<String>> headers = httpRequestParams.getHeaders();
         String k = this.key.toLowerCase().trim();
         if (!headers.containsKey(k)) return false;

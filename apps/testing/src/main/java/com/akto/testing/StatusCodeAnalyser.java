@@ -22,10 +22,10 @@ public class StatusCodeAnalyser {
 
     static List<StatusCodeIdentifier> result = new ArrayList<>();
 
-    static {
-        // TODO: remove this
-        result.add(new StatusCodeIdentifier(new HashSet<>(Arrays.asList("status#code", "status#reason", "status#message", "status#type", "status#title")), "status#code"));
-    }
+//    static {
+//        // TODO: remove this
+//        result.add(new StatusCodeIdentifier(new HashSet<>(Arrays.asList("status#code", "status#reason", "status#message", "status#type", "status#title")), "status#code"));
+//    }
 
     public static class StatusCodeIdentifier {
         public Set<String> keySet;
@@ -43,102 +43,36 @@ public class StatusCodeAnalyser {
     }
 
 
+    public static int MAX_COUNT = 30;
     public static void run() {
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = SampleMessageStore.sampleDataMap;
-        int count = 0;
+        if (sampleDataMap == null) return;
         AuthMechanism authMechanism = AuthMechanismStore.getAuthMechanism();
         if (authMechanism == null) return;
         Map<Set<String>, Map<String,Integer>> frequencyMap = new HashMap<>();
 
+        int count = 0;
         for (ApiInfo.ApiInfoKey apiInfoKey: sampleDataMap.keySet()) {
-            if (count > 30) break;
-
-            // fetch sample message
-            HttpResponseParams originalHttpResponseParams = SampleMessageStore.fetchOriginalMessage(apiInfoKey);
-            if (originalHttpResponseParams == null) continue;
-            // discard if payload is null or empty
-            if (originalHttpResponseParams.getPayload() == null || originalHttpResponseParams.getPayload().equals("{}")) {
-                continue;
-            }
-
-            // if auth token is not passed originally -> skip
-            HttpRequestParams httpRequestParams = originalHttpResponseParams.getRequestParams();
-            boolean result = authMechanism.removeAuthFromRequest(httpRequestParams);
-            if (!result) continue;
-
-            // execute API
-            HttpResponseParams httpResponseParams;
+            if (count > MAX_COUNT) break;
             try {
-                 httpResponseParams = ApiExecutor.sendRequest(httpRequestParams);
+                boolean success = fillFrequencyMap(apiInfoKey, authMechanism, frequencyMap);
+                if (success)  count += 1;
             } catch (Exception e) {
-                continue;
+                e.printStackTrace();
             }
-
-            // if non 2xx then skip this api
-            if (httpResponseParams.statusCode < 200 || httpResponseParams.statusCode >= 300) continue;
-
-            // store response keys and values in map
-            String payload = httpResponseParams.getPayload();
-            String originalPayload = originalHttpResponseParams.getPayload();
-            Map<String, Set<String>> responseParamMap = new HashMap<>();
-            Map<String, Set<String>> originalResponseParamMap = new HashMap<>();
-            try {
-                JsonParser jp = factory.createParser(payload);
-                JsonNode node = mapper.readTree(jp);
-                extractAllValuesFromPayload(node,new ArrayList<>(), responseParamMap);
-
-                jp = factory.createParser(originalPayload);
-                node = mapper.readTree(jp);
-                extractAllValuesFromPayload(node,new ArrayList<>(), originalResponseParamMap);
-            } catch (Exception e) {
-                continue;
-            }
-
-            if (responseParamMap.size() > 10) continue;
-
-            List<String> potentialStatusCodeKeys = new ArrayList<>();
-            for (String key: responseParamMap.keySet()) {
-                Set<String> val = responseParamMap.get(key);
-                if (val.size() != 1) continue;
-                List<String> valList = new ArrayList<>(val);
-                String statusCodeString = valList.get(0);
-                try {
-                    int statusCode = Integer.parseInt(statusCodeString);
-                    if (statusCode < 0 || statusCode > 999 ) continue;
-                } catch (Exception e) {
-                    continue;
-                }
-                potentialStatusCodeKeys.add(key);
-                break;
-            }
-
-            if (potentialStatusCodeKeys.isEmpty()) continue;
-
-            Set<String> params = responseParamMap.keySet();
-            Map<String, Integer> newCountObj = frequencyMap.get(params);
-            if (newCountObj != null) {
-                for (String statusCodeKey: potentialStatusCodeKeys) {
-                    Integer val = newCountObj.getOrDefault(statusCodeKey, 0);
-                    newCountObj.put(statusCodeKey, val + 1);
-                }
-            } else {
-                // Add only if original and current payloads are different
-                if (originalResponseParamMap.keySet().equals(responseParamMap.keySet())) {
-                    continue;
-                }
-                frequencyMap.put(params, new HashMap<>());
-                for (String statusCodeKey: potentialStatusCodeKeys) {
-                    frequencyMap.get(params).put(statusCodeKey, 1);
-                }
-            }
-
-
-            count += 1;
         }
 
-        int threshold = 5;
+        calculateResult(frequencyMap, 5);
+
+        System.out.println("*********************");
+        System.out.println(result);
+        System.out.println("*********************");
+    }
+
+    public static void calculateResult(Map<Set<String>, Map<String,Integer>> frequencyMap, int threshold) {
+        if (frequencyMap == null) return;
         for (Set<String> params: frequencyMap.keySet()) {
-            Map<String, Integer> countObj = frequencyMap.get(params);
+            Map<String, Integer> countObj = frequencyMap.getOrDefault(params, new HashMap<>());
             for (String key: countObj.keySet()) {
                 if (countObj.get(key) > threshold) {
                     result.add(new StatusCodeIdentifier(params, key));
@@ -146,12 +80,98 @@ public class StatusCodeAnalyser {
                 }
             }
         }
-
-        System.out.println("*********************");
-        System.out.println(result);
-        System.out.println("*********************");
     }
 
+    public static boolean fillFrequencyMap(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<Set<String>, Map<String,Integer>> frequencyMap) {
+
+        // fetch sample message
+        HttpResponseParams originalHttpResponseParams = SampleMessageStore.fetchOriginalMessage(apiInfoKey);
+        if (originalHttpResponseParams == null) return false;
+
+        // discard if payload is null or empty
+        String originalPayload = originalHttpResponseParams.getPayload();
+        if (originalPayload == null || originalPayload.equals("{}") || originalPayload.isEmpty()) {
+            return false;
+        }
+
+        // if auth token is not passed originally -> skip
+        HttpRequestParams httpRequestParams = originalHttpResponseParams.getRequestParams();
+        boolean result = authMechanism.removeAuthFromRequest(httpRequestParams);
+        if (!result) return false;
+
+        // execute API
+        HttpResponseParams httpResponseParams;
+        try {
+            httpResponseParams = ApiExecutor.sendRequest(httpRequestParams);
+        } catch (Exception e) {
+            return false;
+        }
+
+        // if non 2xx then skip this api
+        if (httpResponseParams.statusCode < 200 || httpResponseParams.statusCode >= 300) return false;
+
+        // store response keys and values in map
+        String payload = httpResponseParams.getPayload();
+        Map<String, Set<String>> responseParamMap = new HashMap<>();
+        Map<String, Set<String>> originalResponseParamMap = new HashMap<>();
+        try {
+            JsonParser jp = factory.createParser(payload);
+            JsonNode node = mapper.readTree(jp);
+            extractAllValuesFromPayload(node,new ArrayList<>(), responseParamMap);
+
+            jp = factory.createParser(originalPayload);
+            node = mapper.readTree(jp);
+            extractAllValuesFromPayload(node,new ArrayList<>(), originalResponseParamMap);
+        } catch (Exception e) {
+            return false;
+        }
+
+        if (responseParamMap.size() > 10) return false;
+
+        List<String> potentialStatusCodeKeys = getPotentialStatusCodeKeys(responseParamMap);
+        if (potentialStatusCodeKeys.isEmpty()) return false;
+
+        Set<String> params = responseParamMap.keySet();
+        Map<String, Integer> newCountObj = frequencyMap.get(params);
+        if (newCountObj != null) {
+            for (String statusCodeKey: potentialStatusCodeKeys) {
+                Integer val = newCountObj.getOrDefault(statusCodeKey, 0);
+                newCountObj.put(statusCodeKey, val + 1);
+            }
+        } else {
+            // Add only if original and current payloads are different
+            if (originalResponseParamMap.keySet().equals(responseParamMap.keySet())) {
+                return false;
+            }
+            frequencyMap.put(params, new HashMap<>());
+            for (String statusCodeKey: potentialStatusCodeKeys) {
+                frequencyMap.get(params).put(statusCodeKey, 1);
+            }
+        }
+
+
+        return true;
+    }
+
+    public static List<String> getPotentialStatusCodeKeys(Map<String,Set<String>> responseParamMap) {
+        List<String> potentialStatusCodeKeys = new ArrayList<>();
+        for (String key: responseParamMap.keySet()) {
+            Set<String> val = responseParamMap.get(key);
+            if (val== null || val.size() != 1) continue;
+            List<String> valList = new ArrayList<>(val);
+            String statusCodeString = valList.get(0);
+            try {
+                int statusCode = Integer.parseInt(statusCodeString);
+                if (statusCode < 0 || statusCode > 999 ) continue;
+            } catch (Exception e) {
+                continue;
+            }
+            potentialStatusCodeKeys.add(key);
+            break;
+        }
+
+        return potentialStatusCodeKeys;
+    }
 
     public static int getStatusCode(HttpResponseParams httpResponseParams) {
         int statusCode = httpResponseParams.getStatusCode();

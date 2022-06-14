@@ -42,7 +42,7 @@ public class Main {
         }, 5, 5, TimeUnit.MINUTES);
 
 
-        int delta = Context.now() - 60*60;
+        int delta = Context.now() - 20*60;
 
         Bson filter1 = Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED);
         Bson filter2 = Filters.and(
@@ -60,7 +60,7 @@ public class Main {
 
         logger.info("Starting.......");
 
-//        StatusCodeAnalyser.run();
+        StatusCodeAnalyser.run();
 
         while (true) {
             int start = Context.now();

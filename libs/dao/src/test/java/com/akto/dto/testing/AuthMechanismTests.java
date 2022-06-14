@@ -1,7 +1,6 @@
 package com.akto.dto.testing;
 
 import com.akto.dto.HttpRequestParams;
-import org.apache.commons.collections.map.HashedMap;
 import org.junit.Test;
 
 import java.util.*;
@@ -10,7 +9,7 @@ import static org.junit.Assert.*;
 
 public class AuthMechanismTests {
 
-    private void asdf(HttpRequestParams httpRequestParams, String key, List<String> modifiedValue) {
+    private void validate(HttpRequestParams httpRequestParams, String key, List<String> modifiedValue) {
         String value = "Value";
         String finalKey = key.toLowerCase().trim();
         AuthMechanism authMechanism = new AuthMechanism();
@@ -37,9 +36,9 @@ public class AuthMechanismTests {
         headers.put("header4", Collections.singletonList("1"));
         HttpRequestParams httpRequestParams = new HttpRequestParams("", "", "",headers ,"", 0);
 
-        asdf(httpRequestParams, "Header1", Collections.singletonList("Value"));
-        asdf(httpRequestParams, " Header2  ", Collections.singletonList("Value"));
-        asdf(httpRequestParams, "InvalidHeader", null);
+        validate(httpRequestParams, "Header1", Collections.singletonList("Value"));
+        validate(httpRequestParams, " Header2  ", Collections.singletonList("Value"));
+        validate(httpRequestParams, "InvalidHeader", null);
 
 
     }

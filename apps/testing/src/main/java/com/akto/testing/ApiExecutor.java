@@ -119,6 +119,7 @@ public class ApiExecutor {
 
         // add headers
         Map<String, List<String>> headersMap = httpRequestParams.getHeaders();
+        if (headersMap == null) headersMap = new HashMap<>();
         for (String headerName: headersMap.keySet()) {
             List<String> headerValueList = headersMap.get(headerName);
             if (headerValueList == null || headerValueList.isEmpty()) continue;
@@ -130,9 +131,7 @@ public class ApiExecutor {
 
         URLMethods.Method method = URLMethods.Method.valueOf(httpRequestParams.getMethod());
 
-        if (!method.equals(URLMethods.Method.GET)) { // GET url is added later in pipeline
-            builder = builder.url(url);
-        }
+        builder = builder.url(url);
 
         HttpResponseParams httpResponseParams = null;
         switch (method) {
@@ -156,31 +155,6 @@ public class ApiExecutor {
     }
 
     public static HttpResponseParams getRequest(HttpRequestParams httpRequestParams, Request.Builder builder)  throws Exception{
-        String url = httpRequestParams.getURL();
-//        URI u = new URI(url);
-//
-//        StringBuilder sb = new StringBuilder(u.getQuery() == null ? "" : u.getQuery());
-//
-//        // add query params
-//        String payload = httpRequestParams.getPayload();
-//        JsonNode node = mapper.readTree(payload);
-//        if (node.isObject()) {
-//            Iterator<String> fieldNames = node.fieldNames();
-//            while(fieldNames.hasNext()) {
-//                String fieldName = fieldNames.next();
-//                JsonNode fieldValue = node.get(fieldName);
-//                if (fieldValue.isValueNode()) {
-//                    if (sb.length() > 0) sb.append('&');
-//                    sb.append(URLEncoder.encode(fieldName, "UTF-8"));
-//                    sb.append('=');
-//                    sb.append(URLEncoder.encode(fieldValue.asText(), "UTF-8")); //TODO: asText is not always the best option
-//                }
-//            }
-//            u = new URI(u.getScheme(), u.getAuthority(), u.getPath(),
-//                    sb.toString(), u.getFragment());
-//        }
-
-        builder = builder.url(url);
         Request request = builder.build();
         return common(request);
     }
