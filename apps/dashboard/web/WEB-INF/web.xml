@@ -6,6 +6,7 @@
     <display-name>dashboard</display-name>
 
     <session-config>
+        <session-timeout>-1</session-timeout>
         <cookie-config>
             <http-only>true</http-only>
         </cookie-config>
