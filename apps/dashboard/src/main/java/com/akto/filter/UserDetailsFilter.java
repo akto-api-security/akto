@@ -50,6 +50,11 @@ public class UserDetailsFilter implements Filter {
 
     private void redirectIfNotLoginURI(FilterChain filterChain, HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse) throws IOException, ServletException {
 
+        if (httpServletRequest.getRequestURI().contains(API_URI)) {
+            httpServletResponse.sendError(403);
+            return ;
+        }
+
         if (!httpServletRequest.getRequestURI().contains(LOGIN_URI) && !httpServletRequest.getRequestURI().contains("/auth/login") && !httpServletRequest.getRequestURI().contains("api/googleConfig")) {
             System.out.println("redirecting from " + httpServletRequest.getRequestURI() + " to login");
             httpServletResponse.sendRedirect(LOGIN_URI+"?redirect_uri="+httpServletRequest.getRequestURI());
