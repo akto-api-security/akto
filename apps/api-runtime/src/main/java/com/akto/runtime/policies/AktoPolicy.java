@@ -6,6 +6,7 @@ import com.akto.dto.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.type.APICatalog;
+import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.URLStatic;
 import com.akto.dto.type.URLTemplate;
 import com.akto.runtime.APICatalogSync;
@@ -61,34 +62,70 @@ public class AktoPolicy {
         }
 
         apiInfoCatalogMap = new HashMap<>();
+        if (delta == null) return;
         for (Integer collectionId: delta.keySet()) {
             ApiInfoCatalog apiInfoCatalog = new ApiInfoCatalog(new HashMap<>(), new HashMap<>(), new ArrayList<>());
             apiInfoCatalogMap.put(collectionId, apiInfoCatalog);
+
             APICatalog apiCatalog = delta.get(collectionId);
-            for (URLStatic urlStatic: apiCatalog.getStrictURLToMethods().keySet()) {
-                apiInfoCatalog.getStrictURLToMethods().put(urlStatic, new PolicyCatalog(null, new HashMap<>()));
+            if (apiCatalog == null) continue;
+
+            Map<URLStatic, RequestTemplate> apiStrictURLToMethods = apiCatalog.getStrictURLToMethods();
+            Map<URLStatic, PolicyCatalog> apiInfoStrictURLToMethods = apiInfoCatalog.getStrictURLToMethods();
+            if (apiInfoStrictURLToMethods == null) {
+                apiInfoStrictURLToMethods = new HashMap<>();
             }
-            for (URLTemplate urlTemplate: apiCatalog.getTemplateURLToMethods().keySet()) {
-                apiInfoCatalog.getTemplateURLToMethods().put(urlTemplate,new PolicyCatalog(null, new HashMap<>()));
+
+            if (apiStrictURLToMethods != null) {
+                for (URLStatic urlStatic: apiStrictURLToMethods.keySet()) {
+                    apiInfoStrictURLToMethods.put(urlStatic, new PolicyCatalog(null, new HashMap<>()));
+                }
+            }
+
+            Map<URLTemplate, RequestTemplate> apiTemplateURLToMethods = apiCatalog.getTemplateURLToMethods();
+            Map<URLTemplate, PolicyCatalog> apiInfoTemplateURLToMethods = apiInfoCatalog.getTemplateURLToMethods();
+            if (apiInfoTemplateURLToMethods == null) {
+                apiInfoTemplateURLToMethods = new HashMap<>();
+            }
+            if (apiTemplateURLToMethods != null) {
+                for (URLTemplate urlTemplate: apiTemplateURLToMethods.keySet()) {
+                    apiInfoTemplateURLToMethods.put(urlTemplate,new PolicyCatalog(null, new HashMap<>()));
+                }
             }
         }
 
         List<ApiInfo> apiInfoList =  ApiInfoDao.instance.findAll(new BasicDBObject());
         for (ApiInfo apiInfo: apiInfoList) {
-            fillApiInfoInCatalog(apiInfo, true);
+            try {
+                fillApiInfoInCatalog(apiInfo, true);
+            } catch (Exception e) {
+                logger.error(e.getMessage() + " " + e.getCause());
+            }
         }
 
         for (ApiInfo apiInfo: reserveApiInfoMap.values()) {
-            fillApiInfoInCatalog(apiInfo, false);
+            try {
+                fillApiInfoInCatalog(apiInfo, false);
+            } catch (Exception e) {
+                logger.error(e.getMessage() + " " + e.getCause());
+            }
         }
 
         List<FilterSampleData> filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
         for (FilterSampleData filterSampleData: filterSampleDataList) {
-            fillFilterSampleDataInCatalog(filterSampleData);
+            try{
+                fillFilterSampleDataInCatalog(filterSampleData);
+            } catch (Exception e) {
+                logger.error(e.getMessage() + " " + e.getCause());
+            }
         }
 
         for (FilterSampleData filterSampleData: reserveFilterSampleDataMap.values()) {
-            fillFilterSampleDataInCatalog(filterSampleData);
+            try {
+                fillFilterSampleDataInCatalog(filterSampleData);
+            } catch (Exception e) {
+                logger.error(e.getMessage() + " " + e.getCause());
+            }
         }
 
         reserveApiInfoMap = new HashMap<>();
@@ -114,6 +151,8 @@ public class AktoPolicy {
     }
 
     public void fillFilterSampleDataInCatalog(FilterSampleData filterSampleData) {
+        if (filterSampleData == null || filterSampleData.getId() == null) return;
+
         ApiInfo.ApiInfoKey apiInfoKey = filterSampleData.getId().getApiInfoKey();
         ApiInfoCatalog apiInfoCatalog = apiInfoCatalogMap.get(apiInfoKey.getApiCollectionId());
         if (apiInfoCatalog == null) {
@@ -121,10 +160,19 @@ public class AktoPolicy {
             return;
         }
         Map<URLStatic, PolicyCatalog> strictURLToMethods = apiInfoCatalog.getStrictURLToMethods();
-        Map<URLTemplate, PolicyCatalog> templateURLToMethods = apiInfoCatalog.getTemplateURLToMethods();
+        if (strictURLToMethods == null) {
+            strictURLToMethods = new HashMap<>();
+            apiInfoCatalog.setStrictURLToMethods(strictURLToMethods);
+        }
         URLStatic urlStatic = new URLStatic(apiInfoKey.getUrl(), apiInfoKey.getMethod());
-        if (strictURLToMethods.containsKey(urlStatic)) {
-            strictURLToMethods.get(urlStatic).getFilterSampleDataMap().put(filterSampleData.getId().getFilterId(), filterSampleData);
+        PolicyCatalog policyCatalog = strictURLToMethods.get(urlStatic);
+        if (policyCatalog != null) {
+            Map<Integer, FilterSampleData> filterSampleDataMap = policyCatalog.getFilterSampleDataMap();
+            if (filterSampleDataMap == null) {
+                filterSampleDataMap = new HashMap<>();
+                policyCatalog.setFilterSampleDataMap(filterSampleDataMap);
+            }
+            filterSampleDataMap.put(filterSampleData.getId().getFilterId(), filterSampleData);
             return;
         }
 
@@ -132,21 +180,40 @@ public class AktoPolicy {
         String staticUrl = urlStatic.getUrl();
         staticUrl = APICatalogSync.trim(staticUrl);
         URLStatic newUrlStatic = new URLStatic(staticUrl, urlStatic.getMethod());
-        if (strictURLToMethods.containsKey(newUrlStatic)) {
+        policyCatalog = strictURLToMethods.get(newUrlStatic);
+        if (policyCatalog != null) {
             filterSampleData.getId().getApiInfoKey().setUrl(staticUrl);
-            strictURLToMethods.get(urlStatic).getFilterSampleDataMap().put(filterSampleData.getId().getFilterId(), filterSampleData);
+            Map<Integer, FilterSampleData> filterSampleDataMap = policyCatalog.getFilterSampleDataMap();
+            if (filterSampleDataMap == null) {
+                filterSampleDataMap =new HashMap<>();
+                policyCatalog.setFilterSampleDataMap(filterSampleDataMap);
+            }
+            filterSampleDataMap.put(filterSampleData.getId().getFilterId(), filterSampleData);
             return;
         }
 
+        Map<URLTemplate, PolicyCatalog> templateURLToMethods = apiInfoCatalog.getTemplateURLToMethods();
+        if (templateURLToMethods == null) {
+            templateURLToMethods = new HashMap<>();
+            apiInfoCatalog.setTemplateURLToMethods(templateURLToMethods);
+        }
         for (URLTemplate urlTemplate: templateURLToMethods.keySet()) {
+            PolicyCatalog templatePolicyCatalog = templateURLToMethods.get(urlTemplate);
+            if (templatePolicyCatalog == null) continue;
+
             if (urlTemplate.match(urlStatic)) {
                 filterSampleData.getId().getApiInfoKey().setUrl(urlTemplate.getTemplateString());
                 // merge with existing apiInfo if present
-                FilterSampleData filterSampleDataFromMap = templateURLToMethods.get(urlTemplate).getFilterSampleDataMap().get(filterSampleData.getId().getFilterId());
+                Map<Integer, FilterSampleData> filterSampleDataMap = templatePolicyCatalog.getFilterSampleDataMap();
+                if (filterSampleDataMap == null) {
+                    filterSampleDataMap = new HashMap<>();
+                    templatePolicyCatalog.setFilterSampleDataMap(filterSampleDataMap);
+                }
+                FilterSampleData filterSampleDataFromMap = filterSampleDataMap.get(filterSampleData.getId().getFilterId());
                 if (filterSampleDataFromMap != null) {
                     filterSampleData.merge(filterSampleDataFromMap);
                 }
-                templateURLToMethods.get(urlTemplate).getFilterSampleDataMap().put(filterSampleData.getId().getFilterId(), filterSampleData);
+                filterSampleDataMap.put(filterSampleData.getId().getFilterId(), filterSampleData);
                 return;
             }
         }
@@ -160,11 +227,18 @@ public class AktoPolicy {
             return;
         }
 
+        List<ApiInfo.ApiInfoKey> deletedInfo = apiInfoCatalog.getDeletedInfo();
+        if (deletedInfo == null) {
+            deletedInfo = new ArrayList<>();
+            apiInfoCatalog.setDeletedInfo(deletedInfo);
+        }
+
         Map<URLStatic, PolicyCatalog> strictURLToMethods = apiInfoCatalog.getStrictURLToMethods();
         Map<URLTemplate, PolicyCatalog> templateURLToMethods = apiInfoCatalog.getTemplateURLToMethods();
         URLStatic urlStatic = new URLStatic(apiInfoKey.getUrl(), apiInfoKey.getMethod());
-        if (strictURLToMethods.containsKey(urlStatic)) {
-            strictURLToMethods.get(urlStatic).setApiInfo(apiInfo);
+        PolicyCatalog policyCatalog = strictURLToMethods.get(urlStatic);
+        if (policyCatalog != null) {
+            policyCatalog.setApiInfo(apiInfo);
             return;
         }
 
@@ -172,49 +246,48 @@ public class AktoPolicy {
         String staticUrl = urlStatic.getUrl();
         staticUrl = APICatalogSync.trim(staticUrl);
         URLStatic newUrlStatic = new URLStatic(staticUrl, urlStatic.getMethod());
-        if (strictURLToMethods.containsKey(newUrlStatic)) {
+        policyCatalog = strictURLToMethods.get(newUrlStatic);
+        if (policyCatalog != null) {
             apiInfo.getId().setUrl(staticUrl);
-            strictURLToMethods.get(newUrlStatic).setApiInfo(apiInfo);
+            policyCatalog.setApiInfo(apiInfo);
             return;
         }
 
         for (URLTemplate urlTemplate: templateURLToMethods.keySet()) {
+            policyCatalog = templateURLToMethods.get(urlTemplate);
+            if (policyCatalog == null) continue;;
             if (urlTemplate.match(urlStatic)) {
                 // need to delete duplicate from db. For example in db if url is api/books/1 now it becomes api/books/INTEGER so we need to delete api/books/1
                 if (!urlTemplate.getTemplateString().equals(urlStatic.getUrl()) && shouldDeleteFromDb) {
                     // created new object because apiInfo id is altered below
-                    apiInfoCatalog.getDeletedInfo().add(new ApiInfo.ApiInfoKey(apiInfo.getId().getApiCollectionId(), apiInfo.getId().getUrl(), apiInfo.getId().getMethod()));
+                    deletedInfo.add(new ApiInfo.ApiInfoKey(apiInfo.getId().getApiCollectionId(), apiInfo.getId().getUrl(), apiInfo.getId().getMethod()));
                 }
                 // change api info url to template url
                 apiInfo.getId().setUrl(urlTemplate.getTemplateString());
                 // merge with existing apiInfo if present
-                ApiInfo apiInfoFromMap = templateURLToMethods.get(urlTemplate).getApiInfo();
+                ApiInfo apiInfoFromMap = policyCatalog.getApiInfo();
                 if (apiInfoFromMap != null) {
                     apiInfo.merge(apiInfoFromMap);
                 }
-                templateURLToMethods.get(urlTemplate).setApiInfo(apiInfo);
+                policyCatalog.setApiInfo(apiInfo);
                 return;
             }
         }
 
         if (shouldDeleteFromDb) {
-            apiInfoCatalog.getDeletedInfo().add(apiInfo.getId());
+            deletedInfo.add(apiInfo.getId());
         }
 
     }
 
     public void main(List<HttpResponseParams> httpResponseParamsList, APICatalogSync apiCatalogSync) throws Exception {
-        boolean syncImmediately = false;
-
+        if (httpResponseParamsList == null) httpResponseParamsList = new ArrayList<>();
         for (HttpResponseParams httpResponseParams: httpResponseParamsList) {
             try {
                 process(httpResponseParams);
             } catch (Exception e) {
                 logger.error(e.toString());
                 e.printStackTrace();
-            }
-            if (httpResponseParams.getSource().equals(HttpResponseParams.Source.HAR) || httpResponseParams.getSource().equals(HttpResponseParams.Source.PCAP)) {
-                syncImmediately = true;
             }
             currentBatchSize += 1;
         }
@@ -250,6 +323,10 @@ public class AktoPolicy {
         }
         ApiInfo apiInfo = policyCatalog.getApiInfo();
         Map<Integer, FilterSampleData> filterSampleDataMap = policyCatalog.getFilterSampleDataMap();
+        if (filterSampleDataMap == null) {
+            filterSampleDataMap = new HashMap<>();
+            policyCatalog.setFilterSampleDataMap(filterSampleDataMap);
+        }
 
         int statusCode = httpResponseParams.getStatusCode();
         addToReserve = addToReserve && statusCode >= 200 && statusCode < 300;
@@ -315,39 +392,53 @@ public class AktoPolicy {
         }
 
         Map<URLStatic, PolicyCatalog> strictURLToMethods = apiInfoCatalog.getStrictURLToMethods();
+        if (strictURLToMethods == null) {
+            strictURLToMethods = new HashMap<>();
+            apiInfoCatalog.setStrictURLToMethods(strictURLToMethods);
+        }
+
         Map<URLTemplate, PolicyCatalog> templateURLToMethods = apiInfoCatalog.getTemplateURLToMethods();
+        if (templateURLToMethods == null) {
+            templateURLToMethods = new HashMap<>();
+            apiInfoCatalog.setTemplateURLToMethods(templateURLToMethods);
+        }
+
         URLStatic urlStatic = new URLStatic(apiInfoKey.getUrl(), apiInfoKey.getMethod());
-        if (strictURLToMethods.containsKey(urlStatic)) {
-            ApiInfo a = strictURLToMethods.get(urlStatic).getApiInfo();
+        PolicyCatalog policyCatalog = strictURLToMethods.get(urlStatic);
+        if (policyCatalog != null) {
+            ApiInfo a = policyCatalog.getApiInfo();
             if (a == null) {
                 a = new ApiInfo(apiInfoKey);
-                strictURLToMethods.get(urlStatic).setApiInfo(a);
+                policyCatalog.setApiInfo(a);
             }
-            return strictURLToMethods.get(urlStatic);
+            return policyCatalog;
         }
 
         // there is a bug that /api/books was stored as api/books in db. So lastSeen has to be handled for this
         String staticUrl = urlStatic.getUrl();
         staticUrl = APICatalogSync.trim(staticUrl);
         URLStatic newUrlStatic = new URLStatic(staticUrl, urlStatic.getMethod());
-        if (strictURLToMethods.containsKey(newUrlStatic)) {
-            ApiInfo a = strictURLToMethods.get(newUrlStatic).getApiInfo();
+        policyCatalog = strictURLToMethods.get(newUrlStatic);
+        if (policyCatalog != null) {
+            ApiInfo a = policyCatalog.getApiInfo();
             if (a == null) {
                 apiInfoKey.setUrl(newUrlStatic.getUrl());
                 a = new ApiInfo(apiInfoKey);
-                strictURLToMethods.get(newUrlStatic).setApiInfo(a);
+                policyCatalog.setApiInfo(a);
             }
-            return strictURLToMethods.get(newUrlStatic);
+            return policyCatalog;
         }
 
         for (URLTemplate urlTemplate: templateURLToMethods.keySet()) {
+            policyCatalog = templateURLToMethods.get(urlTemplate);
+            if (policyCatalog == null) continue;
             if (urlTemplate.match(urlStatic)) {
-                ApiInfo a = templateURLToMethods.get(urlTemplate).getApiInfo();
+                ApiInfo a = policyCatalog.getApiInfo();
                 if (a == null) {
                     a = new ApiInfo(apiInfoKey.getApiCollectionId(), urlTemplate.getTemplateString(), apiInfoKey.getMethod());
-                    templateURLToMethods.get(urlTemplate).setApiInfo(a);
+                    policyCatalog.setApiInfo(a);
                 }
-                return templateURLToMethods.get(urlTemplate);
+                return policyCatalog;
             }
         }
 
@@ -360,20 +451,36 @@ public class AktoPolicy {
         List<ApiInfo.ApiInfoKey> deletedApiInfoKeys = new ArrayList<>();
         for (ApiInfoCatalog apiInfoCatalog: apiInfoCatalogMap.values()) {
 
-            for (PolicyCatalog policyCatalog: apiInfoCatalog.getStrictURLToMethods().values()) {
+            Map<URLStatic, PolicyCatalog> strictURLToMethods = apiInfoCatalog.getStrictURLToMethods();
+            if (strictURLToMethods == null) {
+                strictURLToMethods = new HashMap<>();
+                apiInfoCatalog.setStrictURLToMethods(strictURLToMethods);
+            }
+            for (PolicyCatalog policyCatalog: strictURLToMethods.values()) {
                 ApiInfo apiInfo = policyCatalog.getApiInfo();
                 if (apiInfo != null) {
                     apiInfoList.add(apiInfo);
                 }
-                filterSampleDataList.addAll(policyCatalog.getFilterSampleDataMap().values());
+                Map<Integer, FilterSampleData> filterSampleDataMap = policyCatalog.getFilterSampleDataMap();
+                if (filterSampleDataMap != null) {
+                    filterSampleDataList.addAll(filterSampleDataMap.values());
+                }
             }
 
-            for (PolicyCatalog policyCatalog: apiInfoCatalog.getTemplateURLToMethods().values()) {
+            Map<URLTemplate, PolicyCatalog> templateURLToMethods = apiInfoCatalog.getTemplateURLToMethods();
+            if (templateURLToMethods == null) {
+                templateURLToMethods = new HashMap<>();
+                apiInfoCatalog.setTemplateURLToMethods(templateURLToMethods);
+            }
+            for (PolicyCatalog policyCatalog: templateURLToMethods.values()) {
                 ApiInfo apiInfo = policyCatalog.getApiInfo();
                 if (apiInfo != null) {
                     apiInfoList.add(apiInfo);
                 }
-                filterSampleDataList.addAll(policyCatalog.getFilterSampleDataMap().values());
+                Map<Integer, FilterSampleData> filterSampleDataMap = policyCatalog.getFilterSampleDataMap();
+                if (filterSampleDataMap != null) {
+                    filterSampleDataList.addAll(filterSampleDataMap.values());
+                }
             }
 
             deletedApiInfoKeys.addAll(apiInfoCatalog.getDeletedInfo());
@@ -422,7 +529,7 @@ public class AktoPolicy {
 
             // violations
             Map<String,Integer> violationsMap = apiInfo.getViolations();
-            if (violationsMap.isEmpty()) {
+            if (violationsMap == null || violationsMap.isEmpty()) {
                 // to make sure no field is null (so setting empty objects)
                 subUpdates.add(Updates.setOnInsert(ApiInfo.VIOLATIONS, new HashMap<>()));
             } else {
@@ -444,6 +551,7 @@ public class AktoPolicy {
 
         }
 
+        if (deletedApiInfoList == null) deletedApiInfoList = new ArrayList<>();
         for (ApiInfo.ApiInfoKey apiInfoKey: deletedApiInfoList) {
             updates.add(
                     new DeleteOneModel<>(
@@ -458,6 +566,8 @@ public class AktoPolicy {
 
     public static List<WriteModel<FilterSampleData>> getUpdatesForSampleData(List<FilterSampleData> filterSampleDataList, List<ApiInfo.ApiInfoKey> apiInfoRemoveList) {
         ArrayList<WriteModel<FilterSampleData>> bulkUpdates = new ArrayList<>();
+        if (filterSampleDataList == null) filterSampleDataList = new ArrayList<>();
+        if (apiInfoRemoveList == null) apiInfoRemoveList= new ArrayList<>();
 
         for (FilterSampleData filterSampleData: filterSampleDataList) {
             List<String> sampleData = filterSampleData.getSamples().get();
