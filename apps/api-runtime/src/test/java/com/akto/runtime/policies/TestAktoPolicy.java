@@ -15,6 +15,8 @@ import org.junit.jupiter.api.Assertions;
 
 import java.util.*;
 
+import static org.junit.Assert.*;
+
 public class TestAktoPolicy extends MongoBasedTest {
     private static int currAccountId = 0;
 
@@ -356,5 +358,32 @@ public class TestAktoPolicy extends MongoBasedTest {
         Assertions.assertNotNull(filterSampleDataIdList.get(1));
         Assertions.assertNotNull(filterSampleDataIdList.get(2));
         Assertions.assertNotNull(filterSampleDataIdList.get(3));
+    }
+
+    @Test
+    public void testConstructorInitialisation() {
+        ApiInfoDao.instance.getMCollection().drop();
+        ApiInfo apiInfo = new ApiInfo(0, "/url1", URLMethods.Method.GET);
+        ApiInfoDao.instance.insertOne(apiInfo);
+
+        FilterSampleDataDao.instance.getMCollection().drop();
+        FilterSampleData filterSampleData = new FilterSampleData(new ApiInfo.ApiInfoKey(0, "/url1", URLMethods.Method.GET), 0);
+        FilterSampleDataDao.instance.insertOne(filterSampleData);
+
+        APICatalogSync apiCatalogSync = new APICatalogSync("", 0);
+        Map<Integer, APICatalog> dbState = new HashMap<>();
+        Map<URLStatic, RequestTemplate> strictURLToMethods = new HashMap<>();
+        strictURLToMethods.put(new URLStatic("url1", URLMethods.Method.GET), new RequestTemplate());
+        Map<URLTemplate,RequestTemplate> templateURLToMethods = new HashMap<>();
+        dbState.put(0, new APICatalog(0, strictURLToMethods, templateURLToMethods));
+
+        apiCatalogSync.dbState = dbState;
+
+        AktoPolicy aktoPolicy = new AktoPolicy(apiCatalogSync);
+        Map<Integer, ApiInfoCatalog> apiInfoCatalogMap = aktoPolicy.getApiInfoCatalogMap();
+        Map<URLStatic, PolicyCatalog> strictPolicyMap = apiInfoCatalogMap.get(0).getStrictURLToMethods();
+        assertEquals(strictPolicyMap.size(), 1);
+        assertNotNull(strictPolicyMap.get(new URLStatic("url1", URLMethods.Method.GET)));
+
     }
 }
