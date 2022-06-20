@@ -109,9 +109,7 @@ public class AuthMechanismAction extends UserAction {
 
         ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(0, "/api/board", Method.POST);
         Map<String, TestResult> testResults = new HashMap<String, TestResult>();
-        testResults.put("NoAuthTest", new TestResult(sampleData.getSamples().get(0), true, new ArrayList<>()));
-        testResults.put("DiffAuthTest", new TestResult(sampleData.getSamples().get(0), false, new ArrayList<>()));
-        testResults.put("OtherAuthTest", new TestResult(sampleData.getSamples().get(0), true, new ArrayList<>()));
+        testResults.put("BOLA", new TestResult(sampleData.getSamples().get(0), true, new ArrayList<>()));
         TestingRunResult testingRunResult = new TestingRunResult(testIds.iterator().next(), apiInfoKey, testResults);
         testingRunResult.setId(testIds.iterator().next());
         this.testingRunResults.add(testingRunResult);
@@ -119,10 +117,7 @@ public class AuthMechanismAction extends UserAction {
 
         ApiInfo.ApiInfoKey apiInfoKey2 = new ApiInfo.ApiInfoKey(0, "/api/fetchDataFromMySQL", Method.POST);
         Map<String, TestResult> testResults2 = new HashMap<String, TestResult>();
-        testResults2.put("NoAuthTest", new TestResult(sampleData.getSamples().get(0), true, new ArrayList<>()));
-        testResults2.put("DiffAuthTest", new TestResult(sampleData.getSamples().get(0), true, new ArrayList<>()));
-        testResults2.put("OtherAuthTest", new TestResult(sampleData.getSamples().get(0), true, new ArrayList<>()));
-        testResults2.put("YetOtherAuthTest", new TestResult(sampleData.getSamples().get(0), true, new ArrayList<>()));
+        testResults2.put("Broken User Authentication", new TestResult(sampleData.getSamples().get(0), true, new ArrayList<>()));
         TestingRunResult testingRunResult2 = new TestingRunResult(testIds.iterator().next(), apiInfoKey2, testResults2);
         testingRunResult2.setId(testIds.iterator().next());
         this.testingRunResults.add(testingRunResult2);
