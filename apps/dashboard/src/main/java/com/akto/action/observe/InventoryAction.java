@@ -50,7 +50,7 @@ public class InventoryAction extends UserAction {
     //     return Action.SUCCESS.toUpperCase();
     // }
 
-    public final static int deltaPeriodValue = 60 * 24 * 60 * 60;
+    public final static int DELTA_PERIOD_VALUE = 60 * 24 * 60 * 60;
 
     public List<SingleTypeInfo> fetchSensitiveParams() {
         Bson filterStandardSensitiveParams = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId, url, method);
@@ -60,15 +60,18 @@ public class InventoryAction extends UserAction {
         return list;        
     }
 
+    private int startTimestamp = 0; 
+    private int endTimestamp = 0;
 
-    public List<BasicDBObject> fetchRecentEndpoints(int deltaPeriodValue) {
+    public List<BasicDBObject> fetchRecentEndpoints(int startTimestamp, int endTimestamp) {
         List<Bson> pipeline = new ArrayList<>();
         BasicDBObject groupedId = 
             new BasicDBObject("apiCollectionId", "$apiCollectionId")
             .append("url", "$url")
             .append("method", "$method");
         pipeline.add(Aggregates.group(groupedId, Accumulators.min("startTs", "$timestamp")));
-        pipeline.add(Aggregates.match(Filters.gte("startTs", Context.now() - deltaPeriodValue)));
+        pipeline.add(Aggregates.match(Filters.gte("startTs", startTimestamp)));
+        pipeline.add(Aggregates.match(Filters.lte("startTs", endTimestamp)));
         pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
         MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
 
@@ -88,7 +91,7 @@ public class InventoryAction extends UserAction {
             .append("method", "$method");
             pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
 
-            int recentEpoch = Context.now() - deltaPeriodValue;
+            int recentEpoch = Context.now() - DELTA_PERIOD_VALUE;
 
 
             Bson projections = Projections.fields(
@@ -282,7 +285,7 @@ public class InventoryAction extends UserAction {
     }
 
     public String loadRecentEndpoints() {
-        List<BasicDBObject> list = fetchRecentEndpoints(deltaPeriodValue);
+        List<BasicDBObject> list = fetchRecentEndpoints(startTimestamp, endTimestamp);
         attachTagsInAPIList(list);
         attachAPIInfoListInResponse(list);
         return Action.SUCCESS.toUpperCase();
@@ -326,7 +329,8 @@ public class InventoryAction extends UserAction {
 
     public String fetchNewParametersTrend() {
         List<Bson> pipeline = new ArrayList<>();
-        pipeline.add(Aggregates.match(Filters.gte("timestamp", Context.now() - deltaPeriodValue)));
+        pipeline.add(Aggregates.match(Filters.gte("timestamp", startTimestamp)));
+        pipeline.add(Aggregates.match(Filters.lte("timestamp", endTimestamp)));
         pipeline.add(Aggregates.project(Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$timestamp", 86400}))));
         pipeline.add(Aggregates.project(Projections.computed("dayOfYear", new BasicDBObject("$trunc", new Object[]{"$dayOfYearFloat", 0}))));
         pipeline.add(Aggregates.group("$dayOfYear", Accumulators.sum("count", 1)));
@@ -373,11 +377,9 @@ public class InventoryAction extends UserAction {
     private Map<String, String> filterOperators;
 
     private Bson prepareFilters() {
-        int now = Context.now();
-        int twoMonthsAgo = now - deltaPeriodValue;
-
         ArrayList<Bson> filterList = new ArrayList<>();
-        filterList.add(Filters.gt("timestamp", twoMonthsAgo));
+        filterList.add(Filters.gt("timestamp", startTimestamp));
+        filterList.add(Filters.lt("timestamp", endTimestamp));
         for(Map.Entry<String, List> entry: filters.entrySet()) {
             String key = entry.getKey();
             List value = entry.getValue();
@@ -543,4 +545,11 @@ public class InventoryAction extends UserAction {
         this.method = method;
     }
 
+    public void setStartTimestamp(int startTimestamp) {
+        this.startTimestamp = startTimestamp;
+    }
+
+    public void setEndTimestamp(int endTimestamp) {
+        this.endTimestamp = endTimestamp;
+    }
 }

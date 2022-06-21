@@ -11,7 +11,7 @@ export default {
             }
         })
     },
-    fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators) {
+    fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, startTimestamp, endTimestamp) {
         return request({
             url: '/api/fetchChanges',
             method: 'post',
@@ -24,17 +24,19 @@ export default {
                     z[e[0]] = [...e[1]]
                     return z
                 }, {}), 
-                filterOperators
+                filterOperators,
+                startTimestamp, 
+                endTimestamp
             }
         }).then(resp => {
             return resp.response.data
         })
     },
-    fetchNewParametersTrend() {
+    fetchNewParametersTrend(startTimestamp, endTimestamp) {
         return request({
             url: '/api/fetchNewParametersTrend',
             method: 'post',
-            data: {}
+            data: {startTimestamp, endTimestamp}
         }).then(resp => {
             return resp.data.endpoints
         })
