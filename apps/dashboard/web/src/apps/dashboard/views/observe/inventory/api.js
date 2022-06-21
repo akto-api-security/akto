@@ -97,11 +97,11 @@ export default {
             data: {}
         })
     },
-    loadRecentEndpoints () {
+    loadRecentEndpoints (startTimestamp, endTimestamp) {
         return request({
             url: '/api/loadRecentEndpoints',
             method: 'post',
-            data: {}
+            data: {startTimestamp, endTimestamp}
         }).then((resp) => {
             return resp
         })
