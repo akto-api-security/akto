@@ -31,7 +31,13 @@ public class Main {
                     sampleTestingRun.setScheduleTimestamp(now); //insert in DB
                     TestingRunDao.instance.insertOne(sampleTestingRun);
                     int nextTs = ts.getStartTimestamp() + 86400; // update in DB
-                    TestingSchedulesDao.instance.updateOne(Filters.eq("_id", ts.getId()), Updates.set(TestingSchedule.START_TIMESTAMP, nextTs));
+
+                    Bson query = Filters.eq("_id", ts.getId());
+                    if (ts.getRecurringDaily()) {
+                        TestingSchedulesDao.instance.updateOne(query, Updates.set(TestingSchedule.START_TIMESTAMP, nextTs));
+                    } else {
+                        TestingSchedulesDao.instance.deleteAll(query)
+                    }
                 }
             }
         }, 0, 5, TimeUnit.MINUTES);
