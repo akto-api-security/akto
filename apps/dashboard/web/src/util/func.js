@@ -68,7 +68,10 @@ export default {
     },
     dayStart: () => {
         let date = new Date(Date.now())
-        return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+        date.setHours(0)
+        date.setMinutes(0)
+        date.setSeconds(0)
+        return date
     },
     weekStart (date) {
         let date1 = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
