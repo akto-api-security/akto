@@ -33,10 +33,10 @@ public class Main {
                     int nextTs = ts.getStartTimestamp() + 86400; // update in DB
 
                     Bson query = Filters.eq("_id", ts.getId());
-                    if (ts.getRecurringDaily()) {
+                    if (ts.getRecurring()) {
                         TestingSchedulesDao.instance.updateOne(query, Updates.set(TestingSchedule.START_TIMESTAMP, nextTs));
                     } else {
-                        TestingSchedulesDao.instance.deleteAll(query)
+                        TestingSchedulesDao.instance.deleteAll(query);
                     }
                 }
             }
