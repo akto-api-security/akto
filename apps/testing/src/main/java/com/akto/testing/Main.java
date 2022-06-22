@@ -3,6 +3,7 @@ package com.akto.testing;
 import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.testing.*;
+import com.akto.dao.testing.*;
 import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.mongodb.ConnectionString;
@@ -28,7 +29,7 @@ public class Main {
                 for(TestingSchedule ts: TestingSchedulesDao.instance.findAll(Filters.lte(TestingSchedule.START_TIMESTAMP, now))) {
                     TestingRun sampleTestingRun = ts.getSampleTestingRun();
                     sampleTestingRun.setScheduleTimestamp(now); //insert in DB
-                    TestingRunDao.instance.insert(sampleTestingRun);
+                    TestingRunDao.instance.insertOne(sampleTestingRun);
                     int nextTs = ts.getStartTimestamp() + 86400; // update in DB
                     TestingSchedulesDao.instance.updateOne(Filters.eq("_id", ts.getId()), Updates.set(TestingSchedule.START_TIMESTAMP, nextTs));
                 }
