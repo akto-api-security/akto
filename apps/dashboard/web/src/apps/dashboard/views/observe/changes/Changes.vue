@@ -440,8 +440,8 @@ export default {
                 this.$store.dispatch('changes/loadRecentEndpoints', {startTimestamp: this.startTimestamp, endTimestamp: this.endTimestamp})
                 api.fetchNewParametersTrend(this.startTimestamp, this.endTimestamp).then(resp => {
                     let newParametersCount = 0
-                    let todayDate = func.todayDate()
-                    let twoMonthsAgo = func.incrDays(todayDate, -func.recencyPeriod/86400)
+                    let todayDate = new Date(this.endTimestamp * 1000)
+                    let twoMonthsAgo = new Date(this.startTimestamp * 1000)
                     
                     let currDate = twoMonthsAgo
                     let ret = []
@@ -462,8 +462,8 @@ export default {
             }
         },
         changesTrend (data) {
-            let todayDate = func.todayDate()
-            let twoMonthsAgo = func.incrDays(todayDate, -func.recencyPeriod/86400)
+            let todayDate = new Date(this.endTimestamp * 1000)
+            let twoMonthsAgo = new Date(this.startTimestamp * 1000)
             
             let currDate = twoMonthsAgo
             let ret = []
