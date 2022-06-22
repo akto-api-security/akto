@@ -24,9 +24,10 @@ const testing = {
             state.testingRunResults = []
             state.testingSchedules = []
         },
-        SAVE_DETAILS (state, {authMechanism, testingRuns}) {
+        SAVE_DETAILS (state, {authMechanism, testingRuns, testingSchedules}) {
             state.authMechanism = authMechanism
             state.testingRuns = testingRuns
+            state.testingSchedules = testingSchedules
         },
         SAVE_TESTING_RUNS (state, {testingRuns}) {
             state.testingRuns = testingRuns

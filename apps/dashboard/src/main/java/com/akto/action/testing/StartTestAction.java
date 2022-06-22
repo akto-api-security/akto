@@ -67,6 +67,7 @@ public class StartTestAction extends UserAction {
         BasicDBObject query = new BasicDBObject("testingEndpoints.type", "COLLECTION_WISE");
         testingRuns = TestingRunDao.instance.findAll(query);
         testingRuns.sort((o1, o2) -> o2.getScheduleTimestamp() - o1.getScheduleTimestamp());
+        this.testingSchedules = TestingSchedulesDao.instance.findAll(new BasicDBObject());
         return SUCCESS.toUpperCase();
     }
 
