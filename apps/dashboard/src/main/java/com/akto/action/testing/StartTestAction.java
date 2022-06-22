@@ -4,6 +4,7 @@ import com.akto.action.UserAction;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunDao;
+import com.akto.dao.testing.TestingSchedulesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
 import com.akto.dto.testing.*;
@@ -117,6 +118,25 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    int startTimestamp;
+    boolean recurringDaily;
+    List<TestingSchedule> testingSchedules = null;
+    public String scheduleTest() {
+        String author = getSUser().getLogin();
+        int now = Context.now();
+        TestingRun sampleTestingRun = new TestingRun(-1, author, new CollectionWiseTestingEndpoints(apiCollectionId), 0, TestingRun.State.SCHEDULED);
+        TestingSchedule ts = new TestingSchedule(author, now, author, now, now, startTimestamp, recurringDaily, sampleTestingRun);
+        TestingSchedulesDao.instance.insertOne(ts);
+        this.testingSchedules = TestingSchedulesDao.instance.findAll(new BasicDBObject());
+        return SUCCESS.toUpperCase();
+    }
+
+    public String stopSchedule() {
+        TestingSchedulesDao.instance.deleteAll(Filters.eq("sampleTestingRun.testingEndpoints.apiCollectionId", apiCollectionId));
+        this.testingSchedules = TestingSchedulesDao.instance.findAll(new BasicDBObject());
+        return SUCCESS.toUpperCase();
+    }
+
     public void setType(TestingEndpoints.Type type) {
         this.type = type;
     }
@@ -144,4 +164,26 @@ public class StartTestAction extends UserAction {
     public void setAuthMechanism(AuthMechanism authMechanism) {
         this.authMechanism = authMechanism;
     }
+
+    public int getStartTimestamp() {
+        return this.startTimestamp;
+    }
+
+    public void setStartTimestamp(int startTimestamp) {
+        this.startTimestamp = startTimestamp;
+    }
+
+    public boolean getRecurringDaily() {
+        return this.recurringDaily;
+    }
+
+    public void setRecurringDaily(boolean recurringDaily) {
+        this.recurringDaily = recurringDaily;
+    }
+
+    public List<TestingSchedule> getTestingSchedules() {
+        return this.testingSchedules;
+    }
+
+
 }

@@ -9,7 +9,8 @@ var state = {
     loading: false,
     testingRuns: [],
     authMechanism: null,
-    testingRunResults: []
+    testingRunResults: [],
+    testingSchedules: []
 }
 
 const testing = {
@@ -21,6 +22,7 @@ const testing = {
             state.testingRuns = []
             state.authMechanism = null
             state.testingRunResults = []
+            state.testingSchedules = []
         },
         SAVE_DETAILS (state, {authMechanism, testingRuns}) {
             state.authMechanism = authMechanism
@@ -28,6 +30,9 @@ const testing = {
         },
         SAVE_TESTING_RUNS (state, {testingRuns}) {
             state.testingRuns = testingRuns
+        },
+        SAVE_TESTING_SCHEDULES (state, {testingSchedules}) {
+            state.testingSchedules = testingSchedules
         },
         SAVE_AUTH_MECHANISM (state, {authMechanism}) {
             state.authMechanism = authMechanism
@@ -55,9 +60,19 @@ const testing = {
                 commit('SAVE_TESTING_RUNS', resp)
             })
         },
+        scheduleTestForCollection({commit}, {apiCollectionId, startTimestamp, recurringDaily} ) {
+            return api.scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily).then((resp) => {
+                commit('SAVE_TESTING_SCHEDULES', resp)
+            })
+        },
         stopTestForCollection({commit}, apiCollectionId) {
             return api.stopTestForCollection(apiCollectionId).then((resp) => {
                 commit('SAVE_TESTING_RUNS', resp)
+            })
+        },
+        stopScheduleForCollection({commit}, apiCollectionId) {
+            return api.stopScheduleForCollection(apiCollectionId).then((resp) => {
+                commit('SAVE_TESTING_SCHEDULES', resp)
             })
         },
         addAuthMechanism({commit}, {key, value, location}) {

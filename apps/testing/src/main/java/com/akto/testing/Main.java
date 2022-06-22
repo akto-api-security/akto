@@ -2,7 +2,6 @@ package com.akto.testing;
 
 import com.akto.DaoInit;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.TestingRunDao;
 import com.akto.dto.testing.*;
 import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
@@ -21,6 +20,22 @@ public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
+    public static void invokeScheduledTests() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                Context.accountId.set(1_000_000);
+                int now = Context.now();
+                for(TestingSchedule ts: TestingSchedulesDao.instance.findAll(Filters.lte(TestingSchedule.START_TIMESTAMP, now))) {
+                    TestingRun sampleTestingRun = ts.getSampleTestingRun();
+                    sampleTestingRun.setScheduleTimestamp(now); //insert in DB
+                    TestingRunDao.instance.insert(sampleTestingRun);
+                    int nextTs = ts.getStartTimestamp() + 86400; // update in DB
+                    TestingSchedulesDao.instance.updateOne(Filters.eq("_id", ts.getId()), Updates.set(TestingSchedule.START_TIMESTAMP, nextTs));
+                }
+            }
+        }, 0, 5, TimeUnit.MINUTES);
+    }
+
     public static void main(String[] args) throws InterruptedException {
         logger.info("Starting testing module....");
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
@@ -31,16 +46,11 @@ public class Main {
             public void run() {
                 Context.accountId.set(1_000_000);
                 SampleMessageStore.fetchSampleMessages();
-            }
-        }, 5, 5, TimeUnit.MINUTES);
-
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            public void run() {
-                Context.accountId.set(1_000_000);
                 AuthMechanismStore.fetchAuthMechanism();
             }
         }, 5, 5, TimeUnit.MINUTES);
 
+        invokeScheduledTests();
 
         int delta = Context.now() - 20*60;
 
@@ -98,10 +108,5 @@ public class Main {
 
             logger.info("Tests completed in " + (Context.now() - start) + " seconds");
         }
-
-
-
-
-
     }
 }

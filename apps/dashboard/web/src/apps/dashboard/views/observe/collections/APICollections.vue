@@ -31,7 +31,34 @@
                     /></td></template>
                 </template>
             </simple-table>
+            <v-dialog
+                v-model="showScheduleTestBox"
+                width="400px"
+            >
+                <div class="show-schedule-box">
+                    <v-time-picker
+                        v-model="timePicker"
+                        ampm-in-title
+                        color="#6200EA"
+                        header-color="#6200EA"
+                        full-width	
+                    />
 
+                    <v-checkbox
+                        v-model="recurringDaily"
+                        label="Run daily"
+                        on-icon="$far_check-square"
+                        off-icon="$far_square"
+                        class="ml-2"
+                        :ripple="false"
+                    />
+
+
+                    <v-btn primary dark color="#6200EA" @click="scheduleTest" class="ma-2">
+                        Schedule {{recurringDaily ? "daily" : "today"}} at {{timePicker}}
+                    </v-btn>
+                </div>
+            </v-dialog>
         </div>
     </div>        
 </template>
@@ -87,10 +114,21 @@ export default {
                     func: item => this.executeOperationForTest(item),
                     success: (resp, item) => {},
                     failure: (err, item) => {}
+                },
+                {
+                    isValid: item => this.isValidForSchedule(item),
+                    icon: item => this.getIconForSchedule(item),
+                    text: item => this.getTextForSchedule(item),
+                    func: item => this.executeOperationForSchedule(item),
+                    success: (resp, item) => {},
+                    failure: (err, item) => {}
                 }
             ],
             showNewRow: false,
-            deletedCollection: null
+            deletedCollection: null,
+            showScheduleTestBox: false,
+            timePicker: "10:00",
+            recurringDaily: false
         }
     },
     methods: {
@@ -134,12 +172,21 @@ export default {
         isValidForTest(item) {
             return !this.isRunning(item)
         },
+        isValidForSchedule (item) {
+            return true
+        },
         isRunning(item) {
             let latestRun = this.testingRuns.find(x => x.testingEndpoints.apiCollectionId === item.id)
             return (latestRun != null && (latestRun.state == "RUNNING" || latestRun.state == "SCHEDULED"))
         },
+        isScheduled(item) {
+            return this.testingSchedules.find(x => {return x.sampleTestingRun.testingEndpoints.apiCollectionId === item.id}) != null
+        },
         getIconForTest(item) {
             return this.isRunning(item) ? "$fas_stop" : "$fas_play"
+        },
+        getIconForSchedule (item) {
+            return this.isScheduled(item) ? "$fas_calendar-times" : "$fas_calendar-plus"
         },
         getTextForTest(item) {
             let latestRun = this.testingRuns.find(x => x.testingEndpoints.apiCollectionId === item.id)
@@ -152,17 +199,39 @@ export default {
                 return "Run new test. Last started " + func.prettifyEpoch(latestRun.scheduleTimestamp)
             }
         },
+        getTextForSchedule(item) {
+            if (this.isScheduled(item)) {
+                return "Stop schedule"
+            } else {
+                return "Schedule test"
+            }
+        },
         async executeOperationForTest (item) {
             if (this.isRunning(item)){
                 await this.$store.dispatch('testing/stopTestForCollection', item.id)
             } else {
                 await this.$store.dispatch('testing/startTestForCollection', item.id)
             }
+        },
+        async executeOperationForSchedule(item) {
+            if (this.isScheduled(item)) {
+                await this.$store.dispatch('testing/stopScheduleForCollection', item.id)
+            } else {
+                this.showScheduleTestBox = true
+                this.scheduleTestCollectionId = item.id
+            }
+        },
+        async scheduleTest() {
+            let hours = this.timePicker.split(":")[0]
+            let minutes = this.timePicker.split(":")[1]
+            let startTimestamp = parseInt(+func.dayStart()/1000) + hours * 60 * 60 + minutes * 60
+            await this.$store.dispatch('testing/scheduleTestForCollection', {apiCollectionId: this.scheduleTestCollectionId, startTimestamp, recurringDaily: this.recurringDaily})
+            this.showScheduleTestBox = false
         }
     },
     computed: {
         ...mapState('collections', ['apiCollections', 'loading', 'testingRuns']),
-        ...mapState('testing', ['testingRuns', 'authMechanism']),
+        ...mapState('testing', ['testingRuns', 'authMechanism', 'testingSchedules']),
         apiCollectionsForTable() {
             return this.apiCollections.map(c => {
                 return {
@@ -182,8 +251,19 @@ export default {
 </script>
 
 <style lang="sass" scoped>
-    .default-info
-        color: #47466A
-        font-size: 12px
-        margin-top: 16px
+.default-info
+    color: #47466A
+    font-size: 12px
+    margin-top: 16px
+
+.show-schedule-box
+    background: #FFFFFF        
+</style>
+
+<style lang="sass">
+.v-time-picker-clock__item
+    color: #47466A
+
+.v-time-picker-clock__item--active
+    color: #FFFFFF    
 </style>

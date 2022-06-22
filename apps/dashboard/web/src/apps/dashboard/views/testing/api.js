@@ -21,11 +21,31 @@ export default {
         })        
     },
 
+    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily) {
+        return request({
+            url: '/api/scheduleTest',
+            method: 'post',
+            data: {apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily}
+        }).then((resp) => {
+            return resp
+        })        
+    },
+
     stopTestForCollection(apiCollectionId) {
         return request({
             url: '/api/stopTest',
             method: 'post',
             data: {apiCollectionId, type: "COLLECTION_WISE"}
+        }).then((resp) => {
+            return resp
+        })        
+    },
+
+    stopScheduleForCollection(apiCollectionId) {
+        return request({
+            url: '/api/stopSchedule',
+            method: 'post',
+            data: {apiCollectionId}
         }).then((resp) => {
             return resp
         })        
