@@ -2,6 +2,7 @@ package com.akto.runtime;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
@@ -35,6 +36,8 @@ import org.bson.conversions.Bson;
 import org.bson.json.JsonParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static com.akto.dto.type.KeyTypes.patternToSubType;
 
 public class APICatalogSync {
     
@@ -232,7 +235,7 @@ public class APICatalogSync {
                         continue;
                     }
 
-                    if (dbTemplate.compare(newTemplate, mergedTemplate)) {
+                    if (areBothUuidUrls(newUrl,dbUrl,mergedTemplate) || dbTemplate.compare(newTemplate, mergedTemplate)) {
                         Set<RequestTemplate> similarTemplates = potentialMerges.get(mergedTemplate);
                         if (similarTemplates == null) {
                             similarTemplates = new HashSet<>();
@@ -275,7 +278,7 @@ public class APICatalogSync {
             for (URLStatic deltaUrl: deltaCatalog.getStrictURLToMethods().keySet()) {
                 RequestTemplate deltaTemplate = deltaTemplates.get(deltaUrl);
                 URLTemplate mergedTemplate = tryMergeUrls(deltaUrl, newUrl);
-                if (mergedTemplate == null || RequestTemplate.isMergedOnStr(mergedTemplate)) {
+                if (mergedTemplate == null || (RequestTemplate.isMergedOnStr(mergedTemplate) && !areBothUuidUrls(newUrl,deltaUrl,mergedTemplate))) {
                     continue;
                 }
 
@@ -303,6 +306,24 @@ public class APICatalogSync {
             deltaTemplates.put(newUrl, newTemplate);
             iterator.remove();
         }
+    }
+
+    public static boolean areBothUuidUrls(URLStatic newUrl, URLStatic deltaUrl, URLTemplate mergedTemplate) {
+        String[] n = tokenize(newUrl.getUrl());
+        String[] o = tokenize(deltaUrl.getUrl());
+        SuperType[] b = mergedTemplate.getTypes();
+        for (int idx =0 ; idx < b.length; idx++) {
+            SuperType c = b[idx];
+            if (Objects.equals(c, SuperType.STRING) && o.length > idx) {
+                String val = n[idx];
+                Pattern pattern = patternToSubType.get(SingleTypeInfo.UUID);
+                if(pattern.matcher(val).matches() && pattern.matcher(o[idx]).matches()) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
 
