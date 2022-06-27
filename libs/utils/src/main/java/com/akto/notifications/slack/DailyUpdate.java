@@ -2,6 +2,7 @@ package com.akto.notifications.slack;
 
 import java.util.Map;
 
+import com.akto.dao.context.Context;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
@@ -12,20 +13,20 @@ public class DailyUpdate {
         return ret;
     }
 
-    private static BasicDBObject createNumberSection(String title, int number) {
+    private static BasicDBObject createNumberSection(String title, int number, String link) {
         BasicDBList fieldsList = new BasicDBList();
         BasicDBObject ret = new BasicDBObject("type", "section").append("fields", fieldsList);
 
-        fieldsList.add(new BasicDBObject("type", "mrkdwn").append("text", "*"+title+"*\n"+number));
+        fieldsList.add(new BasicDBObject("type", "mrkdwn").append("text", "*"+title+"*\n<"+link+"|"+number+">"));
         return ret;
     }
 
-    private static BasicDBObject createNumberSection(String title1, int number1, String title2, int number2) {
+    private static BasicDBObject createNumberSection(String title1, int number1, String link1, String title2, int number2, String link2) {
         BasicDBList fieldsList = new BasicDBList();
         BasicDBObject ret = new BasicDBObject("type", "section").append("fields", fieldsList);
 
-        BasicDBObject field1 = new BasicDBObject("type", "mrkdwn").append("text", "*"+title1+"*\n"+number1);
-        BasicDBObject field2 = new BasicDBObject("type", "mrkdwn").append("text", "*"+title2+"*\n"+number2);
+        BasicDBObject field1 = new BasicDBObject("type", "mrkdwn").append("text", "*"+title1+"*\n<"+link1+"|"+number1+">");
+        BasicDBObject field2 = new BasicDBObject("type", "mrkdwn").append("text", "*"+title2+"*\n<"+link2+"|"+number2+">");
 
         fieldsList.add(field1);
         fieldsList.add(field2);
@@ -88,8 +89,23 @@ public class DailyUpdate {
 
         sectionsList.add(createHeader("Summary for today: "));        
         // sectionsList.add(createNumberSection("Total Sensitive Endpoints", totalSensitiveEndpoints, "Total Endpoints", totalEndpoints));
-        sectionsList.add(createNumberSection("New Sensitive Endpoints", newSensitiveEndpoints, "New Endpoints", newEndpoints));
-        sectionsList.add(createNumberSection("New Sensitive Parameters", newSensitiveParams));
+
+        int end = Context.now();
+        int start = end - 24 * 60 * 60;
+
+        String linkNewEndpoints = dashboardLink + "/dashboard/observe/changes?tab=endpoints&start="+start+"&end="+end;
+        BasicDBObject topNumberSection = createNumberSection(
+            "New Sensitive Endpoints", 
+            newSensitiveEndpoints, 
+            linkNewEndpoints, 
+            "New Endpoints", 
+            newEndpoints, 
+            linkNewEndpoints
+        );
+        sectionsList.add(topNumberSection);
+
+        String linkSensitiveParams = dashboardLink + "/dashboard/observe/changes?tab=parameters&start="+start+"&end="+end;
+        sectionsList.add(createNumberSection("New Sensitive Parameters", newSensitiveParams, linkSensitiveParams));
 
         if (mapEndpointToSubtypes.size() > 0) {
             sectionsList.addAll(createApiListSection(mapEndpointToSubtypes, dashboardLink));

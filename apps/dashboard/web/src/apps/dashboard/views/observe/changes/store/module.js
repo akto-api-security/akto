@@ -64,11 +64,11 @@ const changes = {
         emptyState({commit}, payload, options) {
             commit('EMPTY_STATE', payload, options)
         },
-        loadRecentEndpoints({commit}, options) {
+        loadRecentEndpoints({commit}, {startTimestamp, endTimestamp}, options) {
             commit('EMPTY_STATE')
             state.loading = true
             state.lastFetched = new Date() / 1000
-            return api.loadRecentEndpoints().then((resp) => {
+            return api.loadRecentEndpoints(startTimestamp, endTimestamp).then((resp) => {
                 commit('SAVE_API_COLLECTION', {data: resp.data}, options)
                 api.loadSensitiveParameters().then(allSensitiveFields => {
                     commit('SAVE_SENSITIVE', allSensitiveFields.data.endpoints)

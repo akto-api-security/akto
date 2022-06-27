@@ -4,6 +4,9 @@
     </div>
     <div v-else>
         <simple-layout title="API Changes"/>
+        <div class="d-flex jc-end">
+            <date-range v-model="dateRange"/>
+        </div>
         <div class="d-flex pa-4">
             <count-box title="New endpoints" :count="newEndpoints.length" colorTitle="Total" />
             <count-box title="New sensitive endpoints" :count="newSensitiveEndpoints.length" colorTitle="Overdue" />
@@ -25,7 +28,7 @@
                 class="pa-5"
             />
         </a-card>
-        <layout-with-tabs title="" :tabs="['New endpoints', 'New parameters']">
+        <layout-with-tabs title="" :tabs="tabList">
             <template slot="actions-tray">
                 <div class="d-flex jc-end">
                     <v-tooltip bottom>
@@ -156,6 +159,7 @@ import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import ServerTable from '@/apps/dashboard/shared/components/ServerTable'
 import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
 import TagChipGroup from '@/apps/dashboard/shared/components/TagChipGroup'
+import obj from '@/util/obj'
 import func from '@/util/func'
 import constants from '@/util/constants'
 import {mapState} from 'vuex'
@@ -163,9 +167,15 @@ import BatchOperation from './components/BatchOperation'
 import api from './api.js'
 import inventorApi from '../inventory/api.js'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
+import DateRange from '@/apps/dashboard/shared/components/DateRange'
 
 export default {
     name: "ApiChanges",
+    props: {
+        openTab: obj.strR,
+        defaultStartTimestamp: obj.numN,
+        defaultEndTimestamp: obj.numN,
+    },
     components: { 
         SimpleLayout, 
         CountBox, 
@@ -178,14 +188,22 @@ export default {
         TagChipGroup,
         LineChart,
         BatchOperation,
-        Spinner
+        Spinner,
+        DateRange
     },
     data () {
+        let tabList = ['New endpoints', 'New parameters']
+        if (this.openTab === "parameters") {
+            tabList = tabList.reverse()
+        }
         return {
+            tabList: tabList,
             showDialog1: false,
             showDialog2: false,
             newParamsTrend: [],
             newParametersCount: 0,
+            startTimestamp: this.defaultStartTimestamp || (func.timeNow() - func.recencyPeriod),
+            endTimestamp: this.defaultEndTimestamp || func.timeNow(),
             endpointHeaders: [
                 {
                     text: '',
@@ -276,6 +294,12 @@ export default {
         }
     },
     methods: {
+        toHyphenatedDate(epochInMs) {
+            return func.toDateStrShort(new Date(epochInMs))
+        },
+        toEpochInMs(hyphenatedDate) {
+            return +func.toDate(hyphenatedDate.replace(/\-/g, ''))
+        },
         isSubTypeSensitive(x) {
             return func.isSubTypeSensitive(x)
         },
@@ -393,7 +417,7 @@ export default {
             }
         },
         async fetchRecentParams(sortKey, sortOrder, skip, limit, filters, filterOperators) {
-            return await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators)
+            return await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, this.startTimestamp, this.endTimestamp)
         },
         async fetchSensitiveParams() {
             return await inventorApi.listAllSensitiveFields().then(resp => {
@@ -413,8 +437,8 @@ export default {
         },
         refreshPage(hardRefresh) {
             if (hardRefresh || ((new Date() / 1000) - this.lastFetched > 60*5)) {
-                this.$store.dispatch('changes/loadRecentEndpoints')
-                api.fetchNewParametersTrend().then(resp => {
+                this.$store.dispatch('changes/loadRecentEndpoints', {startTimestamp: this.startTimestamp, endTimestamp: this.endTimestamp})
+                api.fetchNewParametersTrend(this.startTimestamp, this.endTimestamp).then(resp => {
                     let newParametersCount = 0
                     let todayDate = func.todayDate()
                     let twoMonthsAgo = func.incrDays(todayDate, -func.recencyPeriod/86400)
@@ -474,8 +498,18 @@ export default {
         },
         newSensitiveParameters() {
             let now = func.timeNow()
-            return this.sensitiveParams.filter(x => x.timestamp > now - func.recencyPeriod && func.isSubTypeSensitive(x))
+            return this.sensitiveParams.filter(x => x.timestamp > this.startTimestamp && x.timestamp < this.endTimestamp && func.isSubTypeSensitive(x))
         },
+        dateRange: {
+            get () {
+                return [this.toHyphenatedDate(this.startTimestamp * 1000), this.toHyphenatedDate(this.endTimestamp * 1000)]
+            },
+            set(newDateRange) {
+                this.startTimestamp = parseInt(this.toEpochInMs(newDateRange[0]) / 1000)
+                this.endTimestamp = parseInt(this.toEpochInMs(newDateRange[1]) / 1000)
+                this.refreshPage(true)
+            }
+        }
     },
     mounted() {
         this.refreshPage(false)
