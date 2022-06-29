@@ -1,11 +1,14 @@
 package com.akto.testing;
 
 import com.akto.DaoInit;
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.testing.*;
 import com.akto.dao.testing.*;
 import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
+import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -77,7 +80,13 @@ public class Main {
 
         logger.info("Starting.......");
 
-        StatusCodeAnalyser.run();
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(new BasicDBObject());
+        boolean runStatusCodeAnalyser = accountSettings == null ||
+                accountSettings.getSetupType() != AccountSettings.SetupType.PROD;
+
+        if (runStatusCodeAnalyser) {
+            StatusCodeAnalyser.run();
+        }
 
         while (true) {
             int start = Context.now();

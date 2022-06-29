@@ -108,10 +108,11 @@ public class ApiExecutor {
         Request.Builder builder = new Request.Builder();
 
         // add headers
+        List<String> forbiddenHeaders = Arrays.asList("content-length", "accept-encoding");
         Map<String, List<String>> headersMap = httpRequestParams.getHeaders();
         if (headersMap == null) headersMap = new HashMap<>();
         for (String headerName: headersMap.keySet()) {
-            if (headerName.equals("content-length")) continue;
+            if (forbiddenHeaders.contains(headerName)) continue;
             List<String> headerValueList = headersMap.get(headerName);
             if (headerValueList == null || headerValueList.isEmpty()) continue;
             for (String headerValue: headerValueList) {
