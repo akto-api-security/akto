@@ -131,6 +131,18 @@ export default {
         })
     },
 
+    updateSetupType(setupType) {
+        return request({
+            url: '/api/updateSetupType',
+            method: 'post',
+            data: {
+                setupType
+            }
+        }).then((resp) => {
+            return resp
+        })
+    },
+
     fetchAdminSettings() {
         return request({
             url: '/api/fetchAdminSettings',

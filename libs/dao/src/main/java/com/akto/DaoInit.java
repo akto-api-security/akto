@@ -98,7 +98,8 @@ public class DaoInit {
             new EnumCodec<>(TestResult.TestError.class),
             new EnumCodec<>(AuthParam.Location.class),
             new EnumCodec<>(TestingEndpoints.Type.class),
-            new EnumCodec<>(TestingRun.State.class)
+            new EnumCodec<>(TestingRun.State.class),
+            new EnumCodec<>(AccountSettings.SetupType.class)
         );
 
         CodecRegistry codecRegistry = fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry, customEnumCodecs);
