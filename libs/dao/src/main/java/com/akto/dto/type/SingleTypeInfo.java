@@ -350,6 +350,13 @@ public class SingleTypeInfo {
     public SingleTypeInfo() {
     }
 
+    public SingleTypeInfo (String url, String  method, int responseCode, boolean isHeader, String param, SubType subType, int apiCollectionId) {
+        this(
+                new ParamId(url, method, responseCode, isHeader, param, subType, apiCollectionId),
+                new HashSet<>(), new HashSet<>(), 0, Context.now(), 0
+        );
+    }
+
     public SingleTypeInfo(ParamId paramId, Set<Object> examples, Set<String> userIds, int count, int timestamp, int duration) {
         this.url = paramId.url;
         this.method = paramId.method;

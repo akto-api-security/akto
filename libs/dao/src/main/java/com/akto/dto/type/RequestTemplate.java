@@ -1,5 +1,7 @@
 package com.akto.dto.type;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -10,6 +12,7 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.HttpRequestParams;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.TrafficInfo;
@@ -164,7 +167,7 @@ public class RequestTemplate {
             insertTime += (System.currentTimeMillis() - s);
             int now = Context.now();
 
-            BasicDBObject flattened = JSONUtils.flatten(payload);
+            Map<String, Set<Object>> flattened = JSONUtils.flatten(payload);
             s = System.currentTimeMillis();
             for(String param: flattened.keySet()) {
                 if (parameters.size() > 1000) {
@@ -193,7 +196,9 @@ public class RequestTemplate {
                     }
                 }
 
-                keyTypes.process(url, method, responseCode, false, param, flattened.get(param), userId, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap);
+                for (Object obj: flattened.get(param)) {
+                    keyTypes.process(url, method, responseCode, false, param, obj, userId, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap);
+                }
             }
 
             processTime += (System.currentTimeMillis() - s);
@@ -588,5 +593,66 @@ public class RequestTemplate {
 
     public boolean compare(RequestTemplate that, URLTemplate mergedUrl) {
         return compareKeys(this, that, mergedUrl);
+    }
+
+    public static BasicDBObject parseRequestPayload(HttpRequestParams requestParams) {
+
+        String reqPayload = requestParams.getPayload();
+
+        if (reqPayload == null || reqPayload.isEmpty()) {
+            reqPayload = "{}";
+        }
+
+        if(reqPayload.startsWith("[")) {
+            reqPayload = "{\"json\": "+reqPayload+"}";
+        }
+
+        String urlWithParams = requestParams.getURL();
+        BasicDBObject queryParams = getQueryJSON(urlWithParams);
+
+        BasicDBObject payload = null;
+        if (reqPayload.startsWith("{")) {
+            payload = BasicDBObject.parse(reqPayload);
+            payload.putAll(queryParams.toMap());
+        }
+
+        return payload;
+    }
+
+    public static BasicDBObject getQueryJSON(String url) {
+        BasicDBObject ret = new BasicDBObject();
+        if (url == null) {
+            return ret;
+        }
+
+        String[] splitURL = url.split("\\?");
+
+        if (splitURL.length != 2) {
+            return ret;
+        }
+
+        String queryParamsStr = splitURL[1];
+        if (queryParamsStr == null) {
+            return ret;
+        }
+
+        String[] queryParams = queryParamsStr.split("&");
+
+        for(String queryParam: queryParams) {
+            String[] keyVal = queryParam.split("=");
+            if (keyVal.length != 2) {
+                continue;
+            }
+            try {
+                keyVal[0] = URLDecoder.decode(keyVal[0], "UTF-8");
+                keyVal[1] = URLDecoder.decode(keyVal[1], "UTF-8");
+                ret.put(keyVal[0], keyVal[1]);
+            } catch (UnsupportedEncodingException e) {
+                continue;
+            }
+        }
+
+        return ret;
+
     }
 }

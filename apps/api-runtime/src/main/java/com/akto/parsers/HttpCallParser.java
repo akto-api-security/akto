@@ -227,6 +227,18 @@ public class HttpCallParser {
         return null;
     }
 
+    public static boolean useHostCondition(String hostName, HttpResponseParams.Source source) {
+        List<HttpResponseParams.Source> whiteListSource = Arrays.asList(HttpResponseParams.Source.MIRRORING);
+        boolean hostNameCondition;
+        if (hostName == null) {
+            hostNameCondition = false;
+        } else {
+            hostNameCondition = ! ( hostName.toLowerCase().equals(hostName.toUpperCase()) );
+        }
+        return whiteListSource.contains(source) &&  hostNameCondition && ApiCollection.useHost;
+    }
+
+
     public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
         for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
@@ -236,15 +248,8 @@ public class HttpCallParser {
             String hostName = getHostName(httpResponseParam.getRequestParams().getHeaders());
             int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
             int apiCollectionId ;
-            List<HttpResponseParams.Source> whiteListSource = Arrays.asList(HttpResponseParams.Source.MIRRORING);
-            boolean hostNameCondition;
-            if (hostName == null) {
-                hostNameCondition = false;
-            } else {
-                hostNameCondition = ! ( hostName.toLowerCase().equals(hostName.toUpperCase()) );
-            }
 
-            if (whiteListSource.contains(httpResponseParam.getSource()) &&  hostNameCondition && ApiCollection.useHost) {
+            if (useHostCondition(hostName, httpResponseParam.getSource())) {
                 hostName = hostName.toLowerCase();
                 hostName = hostName.trim();
 

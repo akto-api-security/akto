@@ -156,13 +156,16 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
     }
 
 
-    public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(int apiCollectionId) {
+    public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(Integer apiCollectionId) {
         List<Bson> pipeline = new ArrayList<>();
         BasicDBObject groupedId =
                 new BasicDBObject("apiCollectionId", "$apiCollectionId")
                         .append("url", "$url")
                         .append("method", "$method");
-        pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
+
+        if (apiCollectionId != null) {
+            pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
+        }
 
         Bson projections = Projections.fields(
                 Projections.include("timestamp", "apiCollectionId", "url", "method")

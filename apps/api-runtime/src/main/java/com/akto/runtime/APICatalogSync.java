@@ -74,7 +74,6 @@ public class APICatalogSync {
         String methodStr = requestParams.getMethod();
         URLStatic baseURL = URLAggregator.getBaseURL(urlWithParams, methodStr);
         responseParams.requestParams.url = baseURL.getUrl();
-        BasicDBObject queryParams = URLAggregator.getQueryJSON(urlWithParams);
         int statusCode = responseParams.getStatusCode();
         Method method = Method.valueOf(methodStr);
         String userId = extractUserId(responseParams, userIdentifier);
@@ -83,19 +82,9 @@ public class APICatalogSync {
             requestTemplate.processTraffic(responseParams.getTime());
         }
         if (statusCode >= 200 && statusCode < 300) {
-            String reqPayload = requestParams.getPayload();
-
-            if (reqPayload == null || reqPayload.isEmpty()) {
-                reqPayload = "{}";
-            }
-
             requestTemplate.processHeaders(requestParams.getHeaders(), baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap);
-            if(reqPayload.startsWith("[")) {
-                reqPayload = "{\"json\": "+reqPayload+"}";
-            }
-            if (reqPayload.startsWith("{")) {
-                BasicDBObject payload = BasicDBObject.parse(reqPayload);
-                payload.putAll(queryParams.toMap());
+            BasicDBObject payload = RequestTemplate.parseRequestPayload(requestParams);
+            if (payload != null) {
                 deletedInfo.addAll(requestTemplate.process2(payload, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap));
             }
             requestTemplate.recordMessage(responseParams.getOrig());
@@ -721,6 +710,10 @@ public class APICatalogSync {
         }
     }
 
+    public static boolean isTemplateUrl(String url) {
+        return url.contains("STRING") || url.contains("INTEGER");
+    }
+
     private static Map<Integer, APICatalog> build(List<SingleTypeInfo> allParams) {
         Map<Integer, APICatalog> ret = new HashMap<>();
         
@@ -734,7 +727,7 @@ public class APICatalogSync {
                 ret.put(collId, catalog);
             }
             RequestTemplate reqTemplate;
-            if (url.contains("STRING") || url.contains("INTEGER")) {
+            if (isTemplateUrl(url)) {
                 URLTemplate urlTemplate = createUrlTemplate(url, Method.valueOf(param.getMethod()));
                 reqTemplate = catalog.getTemplateURLToMethods().get(urlTemplate);
 
