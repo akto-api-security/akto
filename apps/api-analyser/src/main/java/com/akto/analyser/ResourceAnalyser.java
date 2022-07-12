@@ -26,6 +26,7 @@ public class ResourceAnalyser {
     BloomFilter<CharSequence> valuesBF;
     Map<String, ParamTypeInfo> countMap = new HashMap<>();
 
+    int last_sync = 0;
 
     public ResourceAnalyser(int duplicateCheckerBfSize, double duplicateCheckerBfFpp, int valuesBfSize, double valuesBfFpp) {
         duplicateCheckerBF = BloomFilter.create(
@@ -54,6 +55,10 @@ public class ResourceAnalyser {
 
     public void analyse(HttpResponseParams responseParams) {
         if (responseParams.statusCode < 200 || responseParams.statusCode >= 300) return;
+
+        if (countMap.keySet().size() > 200_000 || (Context.now() - last_sync) > 120) {
+            syncWithDb();
+        }
 
 
         HttpRequestParams requestParams = responseParams.getRequestParams();
@@ -251,6 +256,8 @@ public class ResourceAnalyser {
         System.out.println("delete count: " + dbUpdates.size());
         dbUpdates.addAll(getDbUpdatesForParamTypeInfo());
         System.out.println("total count: " + dbUpdates.size());
+        countMap = new HashMap<>();
+        last_sync = Context.now();
         if (dbUpdates.size() > 0) {
             ParamTypeInfoDao.instance.getMCollection().bulkWrite(dbUpdates);
         }
@@ -259,13 +266,13 @@ public class ResourceAnalyser {
     public List<WriteModel<ParamTypeInfo>> getDbUpdatesForParamTypeInfo() {
         List<WriteModel<ParamTypeInfo>> bulkUpdates = new ArrayList<>();
         for (ParamTypeInfo paramTypeInfo: countMap.values()) {
+            if (paramTypeInfo.uniqueCount == 0 && paramTypeInfo.getPublicCount() == 0) continue;
             Bson filter = ParamTypeInfoDao.createFilters(paramTypeInfo);
             Bson update = Updates.combine(
                     Updates.inc(ParamTypeInfo.UNIQUE_COUNT, paramTypeInfo.getUniqueCount()),
                     Updates.inc(ParamTypeInfo.PUBLIC_COUNT, paramTypeInfo.getPublicCount())
             );
             bulkUpdates.add(new UpdateOneModel<>(filter, update, new UpdateOptions().upsert(true)));
-            paramTypeInfo.reset();
         }
 
         return bulkUpdates;
