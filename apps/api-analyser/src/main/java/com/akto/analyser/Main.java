@@ -26,13 +26,13 @@ public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
     public static void main(String[] args) {
-        String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
-        String kafkaBrokerUrl = System.getenv("AKTO_KAFKA_BROKER_URL");
+        String topicName = System.getenv("AKTO_CENTRAL_KAFKA_TOPIC_NAME");
+        String kafkaBrokerUrl = System.getenv("AKTO_CENTRAL_KAFKA_BROKER_URL");
         String groupIdConfig =  System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG");
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
 
-        if (topicName == null) topicName = "akto.api.logs";
+        if (topicName == null) topicName = "akto.central";
 
         DaoInit.init(new ConnectionString(mongoURI));
         Context.accountId.set(1_000_000);
@@ -67,12 +67,13 @@ public class Main {
                     try {
                         HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
                         int accountId = Integer.parseInt(httpResponseParams.getAccountId());
+                        System.out.println("path: " + httpResponseParams.requestParams.url);
                         ResourceAnalyser resourceAnalyser = resourceAnalyserMap.get(accountId);
                         if (resourceAnalyser == null) {
                             resourceAnalyser = new ResourceAnalyser(300_000_000, 0.01, 100_000_000, 0.01);
                             resourceAnalyserMap.put(accountId, resourceAnalyser);
                         }
-//                        resourceAnalyser.analyse(httpResponseParams);
+                        resourceAnalyser.analyse(httpResponseParams);
                     } catch (Exception e) {
                         // todo: check cause
                         logger.error("Error parsing http response params : " + e.getMessage() + " " + e.getCause());

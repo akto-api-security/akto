@@ -14,6 +14,7 @@ import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.KafkaHealthMetric;
+import com.akto.kafka.Kafka;
 import com.akto.parsers.HttpCallParser;
 import com.akto.dto.HttpResponseParams;
 import com.akto.runtime.policies.AktoPolicy;
@@ -104,6 +105,16 @@ public class Main {
         String kafkaBrokerUrl = System.getenv("AKTO_KAFKA_BROKER_URL");
         String groupIdConfig =  System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG");
         int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
+
+        String centralKafkaBrokerUrl = System.getenv("AKTO_CENTRAL_KAFKA_BROKER_URL");
+        String centralKafkaTopicName = System.getenv("AKTO_CENTRAL_KAFKA_NAME");
+        if (centralKafkaTopicName == null) centralKafkaTopicName = "akto.central";
+        Kafka kafka = null;
+        if (centralKafkaBrokerUrl != null) {
+            int centralKafkaBatchSize = Integer.parseInt(System.getenv("AKTO_CENTRAL_KAFKA_BATCH_SIZE"));
+            int centralKafkaLingerMS = Integer.parseInt(System.getenv("AKTO_CENTRAL_KAFKA_LINGER_MS"));
+            kafka = new Kafka(centralKafkaBrokerUrl, centralKafkaLingerMS, centralKafkaBatchSize);
+        }
 
         if (topicName == null) topicName = "akto.api.logs";
 
@@ -239,6 +250,18 @@ public class Main {
                     try {
                         List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
                         APICatalogSync apiCatalogSync = parser.syncFunction(accWiseResponse);
+
+                        // send to central kafka
+                        if (kafka != null) {
+                            for (HttpResponseParams httpResponseParams: accWiseResponse) {
+                                try {
+                                    kafka.send(httpResponseParams.getOrig(), centralKafkaTopicName);
+                                } catch (Exception e) {
+                                    logger.error(e.getMessage());
+                                }
+                            }
+                        }
+
                         // flow.init(accWiseResponse);
                         aktoPolicy.main(accWiseResponse, apiCatalogSync);
                     } catch (Exception e) {

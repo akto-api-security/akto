@@ -52,7 +52,7 @@ public class ResourceAnalyser {
     }
 
 
-    public void analyse(HttpResponseParams responseParams, int originalApiCollectionId) {
+    public void analyse(HttpResponseParams responseParams) {
         if (responseParams.statusCode < 200 || responseParams.statusCode >= 300) return;
 
 
@@ -205,7 +205,6 @@ public class ResourceAnalyser {
             URLMethods.Method method = apiInfoKey.getMethod();
             Catalog catalog = catalogMap.get(apiCollectionId);
             if (catalog == null) {
-                System.out.println("Catalog missing for " + apiCollectionId);
                 bulkUpdates.add(new DeleteManyModel<>(Filters.eq(ParamTypeInfo.API_COLLECTION_ID, apiCollectionId)));
                 continue;
             }
@@ -234,7 +233,6 @@ public class ResourceAnalyser {
                         Filters.eq(ParamTypeInfo.URL, url),
                         Filters.eq(ParamTypeInfo.METHOD, method.name())
                 );
-                System.out.println(apiCollectionId + " " + url + " " + method.name());
                 bulkUpdates.add(new DeleteManyModel<>(filter));
             }
 
@@ -341,7 +339,7 @@ public class ResourceAnalyser {
         for (SampleData sampleData:sampleDataList) {
             for (String s: sampleData.getSamples()) {
                 HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(s);
-                resourceAnalyser.analyse(httpResponseParams, sampleData.getId().getApiCollectionId());
+                resourceAnalyser.analyse(httpResponseParams);
             }
         }
 
@@ -351,7 +349,7 @@ public class ResourceAnalyser {
             SensitiveSampleData sensitiveSampleData = cursor.next();
             for (String s: sensitiveSampleData.getSampleData()) {
                 HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(s);
-                resourceAnalyser.analyse(httpResponseParams, sensitiveSampleData.getId().getApiCollectionId());
+                resourceAnalyser.analyse(httpResponseParams);
             }
 //            System.out.println(i);
             i+=1;
