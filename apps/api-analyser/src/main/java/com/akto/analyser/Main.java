@@ -67,7 +67,6 @@ public class Main {
                     try {
                         HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
                         int accountId = Integer.parseInt(httpResponseParams.getAccountId());
-                        System.out.println("path: " + httpResponseParams.requestParams.url);
                         ResourceAnalyser resourceAnalyser = resourceAnalyserMap.get(accountId);
                         if (resourceAnalyser == null) {
                             resourceAnalyser = new ResourceAnalyser(300_000_000, 0.01, 100_000_000, 0.01);
