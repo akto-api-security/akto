@@ -93,11 +93,17 @@ public class APICatalogSync {
             if(reqPayload.startsWith("[")) {
                 reqPayload = "{\"json\": "+reqPayload+"}";
             }
-            if (reqPayload.startsWith("{")) {
-                BasicDBObject payload = BasicDBObject.parse(reqPayload);
-                payload.putAll(queryParams.toMap());
-                deletedInfo.addAll(requestTemplate.process2(payload, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap));
+
+            BasicDBObject payload;
+            try {
+                payload = BasicDBObject.parse(reqPayload);
+            } catch (Exception e) {
+                payload = BasicDBObject.parse("{}");
             }
+
+            payload.putAll(queryParams.toMap());
+            deletedInfo.addAll(requestTemplate.process2(payload, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap));
+
             requestTemplate.recordMessage(responseParams.getOrig());
         }
 
@@ -120,13 +126,18 @@ public class APICatalogSync {
                 respPayload = "{\"json\": "+respPayload+"}";
             }
 
-            if (respPayload.startsWith("{")) {
-                BasicDBObject payload = BasicDBObject.parse(respPayload);
-                deletedInfo.addAll(responseTemplate.process2(payload, baseURL.getUrl(), methodStr, statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap));
-                responseTemplate.processHeaders(responseParams.getHeaders(), baseURL.getUrl(), method.name(), statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap);
-                if (!responseParams.getIsPending()) {
-                    responseTemplate.processTraffic(responseParams.getTime());
-                }
+
+            BasicDBObject payload;
+            try {
+                payload = BasicDBObject.parse(respPayload);
+            } catch (Exception e) {
+                payload = BasicDBObject.parse("{}");
+            }
+
+            deletedInfo.addAll(responseTemplate.process2(payload, baseURL.getUrl(), methodStr, statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap));
+            responseTemplate.processHeaders(responseParams.getHeaders(), baseURL.getUrl(), method.name(), statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap);
+            if (!responseParams.getIsPending()) {
+                responseTemplate.processTraffic(responseParams.getTime());
             }
 
         } catch (JsonParseException e) {
