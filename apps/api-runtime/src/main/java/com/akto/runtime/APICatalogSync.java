@@ -120,14 +120,17 @@ public class APICatalogSync {
                 respPayload = "{\"json\": "+respPayload+"}";
             }
 
-            BasicDBObject payload = BasicDBObject.parse(respPayload);
-            deletedInfo.addAll(responseTemplate.process2(payload, baseURL.getUrl(), methodStr, statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap));
-            responseTemplate.processHeaders(responseParams.getHeaders(), baseURL.getUrl(), method.name(), statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap);
-            if (!responseParams.getIsPending()) {
-                responseTemplate.processTraffic(responseParams.getTime());
+            if (respPayload.startsWith("{")) {
+                BasicDBObject payload = BasicDBObject.parse(respPayload);
+                deletedInfo.addAll(responseTemplate.process2(payload, baseURL.getUrl(), methodStr, statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap));
+                responseTemplate.processHeaders(responseParams.getHeaders(), baseURL.getUrl(), method.name(), statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap);
+                if (!responseParams.getIsPending()) {
+                    responseTemplate.processTraffic(responseParams.getTime());
+                }
             }
-        } catch (JsonParseException e) {
 
+        } catch (JsonParseException e) {
+            logger.error("Failed to parse json payload " + e.getMessage());
         }
     }
 
