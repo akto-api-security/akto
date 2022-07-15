@@ -400,9 +400,6 @@ export default {
             return ret
         }
     },
-    mounted() {
-        this.refreshPage(true)
-    }
 }
 </script>
 
