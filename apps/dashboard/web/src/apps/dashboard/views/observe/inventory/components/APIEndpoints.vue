@@ -359,6 +359,7 @@ export default {
           return this.allEndpoints.filter(x => x.open)
         },
         allEndpoints () {
+            console.log(this.tableHeaders);
             return func.mergeApiInfoAndApiCollection(this.apiCollection, this.apiInfoList)
         },
         sensitiveEndpoints() {

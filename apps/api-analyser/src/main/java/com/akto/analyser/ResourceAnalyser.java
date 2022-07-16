@@ -119,7 +119,9 @@ public class ResourceAnalyser {
         for (String headerName: requestHeaders.keySet()) {
             // todo: standard headers need to be handled
             List<String> headerValues = requestHeaders.get(headerName);
-            if (headerValues == null) continue;
+            if (headerValues == null) {
+                headerValues = Collections.singletonList("null");
+            }
             for (String headerValue: headerValues) {
                 analysePayload(headerValue, headerName, combinedUrl, userId, url,
                         method, responseParams.statusCode, apiCollectionId, true, false);
@@ -304,7 +306,7 @@ public class ResourceAnalyser {
     }
 
     public String convertToParamValue(Object value) {
-        if (value == null || (value instanceof Boolean)) return null;
+        if (value == null) return "null";
         return value.toString();
     }
 
@@ -337,36 +339,39 @@ public class ResourceAnalyser {
     }
 
     public static void main(String[] args) throws Exception {
-        DaoInit.init(new ConnectionString("mongodb://172.22.0.2:27017/admini"));
+        DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
         Context.accountId.set(1_000_000);
         ApiCollection.useHost = true;
         ResourceAnalyser resourceAnalyser = new ResourceAnalyser(10_000_000, 0.01, 10_000_000, 0.01);
 
         List<SampleData> sampleDataList = SampleDataDao.instance.findAll(new BasicDBObject());
+        int i = 0;
         for (SampleData sampleData:sampleDataList) {
+            System.out.println(i);
             for (String s: sampleData.getSamples()) {
                 HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(s);
                 resourceAnalyser.analyse(httpResponseParams);
             }
+            i ++;
         }
 
         MongoCursor<SensitiveSampleData> cursor = SensitiveSampleDataDao.instance.getMCollection().find().cursor();
-        int i = 0;
+        i = 0;
         while (cursor.hasNext()) {
             SensitiveSampleData sensitiveSampleData = cursor.next();
             for (String s: sensitiveSampleData.getSampleData()) {
                 HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(s);
                 resourceAnalyser.analyse(httpResponseParams);
             }
-//            System.out.println(i);
+           System.out.println(i);
             i+=1;
         }
 
         System.out.println("DONE");
 
         for (ParamTypeInfo paramTypeInfo: resourceAnalyser.countMap.values()) {
-            int a = paramTypeInfo.uniqueCount;
-            int b = paramTypeInfo.publicCount;
+            long a = paramTypeInfo.uniqueCount;
+            long b = paramTypeInfo.publicCount;
 
             if (a > 10 && (1.0*b)/a < 0.1) {
                 System.out.println(paramTypeInfo.getUrl()+" " + paramTypeInfo.getMethod() + " " + paramTypeInfo.getParam() + " " + paramTypeInfo.getApiCollectionId());

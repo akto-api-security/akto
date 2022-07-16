@@ -10,6 +10,7 @@ import com.mongodb.BasicDBObject;
 import org.bson.types.ObjectId;
 import org.junit.Test;
 
+import java.util.HashMap;
 import java.util.List;
 
 import static org.junit.Assert.*;
@@ -52,7 +53,7 @@ public class TestTestPlugin extends MongoBasedTest {
     @Test
     public void testAddWithoutRequestError() {
         TestingRunResultDao.instance.getMCollection().drop();
-        TestPlugin bolaTest = new BOLATest();
+        TestPlugin bolaTest = new BOLATest(new HashMap<>());
         TestPlugin noAuthTest = new NoAuthTest();
 
         ApiInfo.ApiInfoKey apiInfoKey1 = new ApiInfo.ApiInfoKey(0,"url1", URLMethods.Method.GET);

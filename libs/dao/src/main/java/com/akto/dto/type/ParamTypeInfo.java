@@ -21,9 +21,9 @@ public class ParamTypeInfo {
     public static final String PARAM = "param";
     public String param;
     public static final String UNIQUE_COUNT = "uniqueCount";
-    public int uniqueCount;
+    public long uniqueCount;
     public static final String PUBLIC_COUNT = "publicCount";
-    public int publicCount;
+    public long publicCount;
 
     public ParamTypeInfo() { }
 
@@ -47,11 +47,6 @@ public class ParamTypeInfo {
         this.publicCount += inc;
     }
 
-    public void reset() {
-        this.publicCount = 0;
-        this.uniqueCount = 0;
-    }
-
     public String composeKey() {
         return StringUtils.joinWith("@", apiCollectionId, url, method, responseCode, isHeader, isUrlParam, param);
     }
@@ -68,6 +63,22 @@ public class ParamTypeInfo {
     @Override
     public int hashCode() {
         return Objects.hash(apiCollectionId, url, method, responseCode, isHeader, isUrlParam, param);
+    }
+
+
+    @Override
+    public String toString() {
+        return "{" +
+            " apiCollectionId='" + getApiCollectionId() + "'" +
+            ", url='" + getUrl() + "'" +
+            ", method='" + getMethod() + "'" +
+            ", responseCode='" + getResponseCode() + "'" +
+            ", isHeader='" + isHeader() + "'" +
+            ", isUrlParam='" + isUrlParam() + "'" +
+            ", param='" + getParam() + "'" +
+            ", uniqueCount='" + getUniqueCount() + "'" +
+            ", publicCount='" + getPublicCount() + "'" +
+            "}";
     }
 
     public int getApiCollectionId() {
@@ -118,19 +129,19 @@ public class ParamTypeInfo {
         this.param = param;
     }
 
-    public int getUniqueCount() {
+    public long getUniqueCount() {
         return uniqueCount;
     }
 
-    public void setUniqueCount(int uniqueCount) {
+    public void setUniqueCount(long uniqueCount) {
         this.uniqueCount = uniqueCount;
     }
 
-    public int getPublicCount() {
+    public long getPublicCount() {
         return publicCount;
     }
 
-    public void setPublicCount(int publicCount) {
+    public void setPublicCount(long publicCount) {
         this.publicCount = publicCount;
     }
 

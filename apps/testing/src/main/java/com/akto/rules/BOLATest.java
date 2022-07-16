@@ -5,13 +5,21 @@ import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.type.ParamTypeInfo;
 import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.StatusCodeAnalyser;
 import org.bson.types.ObjectId;
 
+import java.util.Map;
+
 public class BOLATest extends TestPlugin {
+    private final Map<String, ParamTypeInfo> paramTypeInfoMap;
+
+    public BOLATest(Map<String, ParamTypeInfo> paramTypeInfoMap) {
+         this.paramTypeInfoMap = paramTypeInfoMap;
+    }
 
     @Override
     public boolean start(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId) {
