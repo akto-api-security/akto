@@ -10,6 +10,10 @@ public class AccountSettings {
     private boolean redactPayload;
     public static final String SAMPLE_DATA_COLLECTION_DROPPED = "sampleDataCollectionDropped";
     private boolean sampleDataCollectionDropped;
+    public static final String DASHBOARD_VERSION = "dashboardVersion";
+    private String dashboardVersion;
+    public static final String API_RUNTIME_VERSION = "apiRuntimeVersion";
+    private String apiRuntimeVersion;
 
     public AccountSettings() {
     }
@@ -55,5 +59,21 @@ public class AccountSettings {
 
     public void setSampleDataCollectionDropped(boolean sampleDataCollectionDropped) {
         this.sampleDataCollectionDropped = sampleDataCollectionDropped;
+    }
+
+    public String getDashboardVersion() {
+        return dashboardVersion;
+    }
+
+    public void setDashboardVersion(String dashboardVersion) {
+        this.dashboardVersion = dashboardVersion;
+    }
+
+    public String getApiRuntimeVersion() {
+        return apiRuntimeVersion;
+    }
+
+    public void setApiRuntimeVersion(String apiRuntimeVersion) {
+        this.apiRuntimeVersion = apiRuntimeVersion;
     }
 }
