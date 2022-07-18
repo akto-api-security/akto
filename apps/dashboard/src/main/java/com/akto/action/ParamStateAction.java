@@ -50,7 +50,7 @@ public class ParamStateAction extends UserAction {
 
         pipeline.add(Aggregates.project(projections));
 
-        pipeline.add(Aggregates.match(Filters.lte(computedFieldName,0.01)));
+        pipeline.add(Aggregates.match(Filters.lte(computedFieldName,ParamTypeInfo.THRESHOLD)));
 
         pipeline.add(Aggregates.limit(1000));
 

@@ -25,6 +25,8 @@ public class ParamTypeInfo {
     public static final String PUBLIC_COUNT = "publicCount";
     public long publicCount;
 
+    public static final double THRESHOLD = 0.1;
+
     public ParamTypeInfo() { }
 
     public ParamTypeInfo(int apiCollectionId, String url, String method, int responseCode, boolean isHeader, boolean isUrlParam, String param) {

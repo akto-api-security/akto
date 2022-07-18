@@ -6,20 +6,26 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.type.APICatalog;
+import com.akto.dto.type.RequestTemplate;
+import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLTemplate;
+import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.RelationshipSync;
+import com.akto.store.SampleMessageStore;
+import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
-import java.io.IOException;
 import java.util.*;
 
-import static com.akto.runtime.RelationshipSync.extractAllValuesFromPayload;
 
 
 public abstract class TestPlugin {
@@ -116,14 +122,36 @@ public abstract class TestPlugin {
         );
     }
 
-    public boolean containsRequestPayload(HttpRequestParams httpRequestParams) {
-        String url = httpRequestParams.getURL();
-        if (url.contains("INTEGER") || url.contains("STRING") || url.contains("?")) return true;
+    public boolean containsPrivateResource(HttpRequestParams httpRequestParams, ApiInfo.ApiInfoKey apiInfoKey) {
+        String url = apiInfoKey.url;
+        URLMethods.Method method = apiInfoKey.getMethod();
 
-        String payload = httpRequestParams.getPayload();
-        if (payload == null || payload.equals("{}") || payload.isEmpty()) return false;
+        // check private resource in
+        // 1. url
+        if (APICatalog.isTemplateUrl(url)) {
+            URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, method);
+            String[] tokens = urlTemplate.getTokens();
+            for (int i = 0;i < tokens.length; i++) {
+                if (tokens[i] == null) {
+                    SampleMessageStore.State state = SampleMessageStore.findState(i+"", true,apiInfoKey, false);
+                    if (state.equals(SampleMessageStore.State.PRIVATE) || state.equals(SampleMessageStore.State.NA)  ) {
+                        return true;
+                    }
+                }
+            }
+        }
 
-        return true;
+        // 2. payload
+        BasicDBObject payload = RequestTemplate.parseRequestPayload(httpRequestParams);
+        Map<String, Set<Object>> flattened = JSONUtils.flatten(payload);
+        for (String param: flattened.keySet()) {
+            SampleMessageStore.State state = SampleMessageStore.findState(param,false,apiInfoKey, false);
+            if (state.equals(SampleMessageStore.State.PRIVATE) || state.equals(SampleMessageStore.State.NA)  ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
 }

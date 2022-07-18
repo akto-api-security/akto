@@ -710,9 +710,6 @@ public class APICatalogSync {
         }
     }
 
-    public static boolean isTemplateUrl(String url) {
-        return url.contains("STRING") || url.contains("INTEGER");
-    }
 
     private static Map<Integer, APICatalog> build(List<SingleTypeInfo> allParams) {
         Map<Integer, APICatalog> ret = new HashMap<>();
@@ -727,7 +724,7 @@ public class APICatalogSync {
                 ret.put(collId, catalog);
             }
             RequestTemplate reqTemplate;
-            if (isTemplateUrl(url)) {
+            if (APICatalog.isTemplateUrl(url)) {
                 URLTemplate urlTemplate = createUrlTemplate(url, Method.valueOf(param.getMethod()));
                 reqTemplate = catalog.getTemplateURLToMethods().get(urlTemplate);
 

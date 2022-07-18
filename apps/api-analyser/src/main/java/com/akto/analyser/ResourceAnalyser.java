@@ -98,7 +98,7 @@ public class ResourceAnalyser {
                 SingleTypeInfo.SuperType type = types[idx];
                 String value = tokens[idx];
                 if (type != null) {
-                    analysePayload(value, idx+"", combinedUrl, userId, url, method, responseParams.statusCode,
+                    analysePayload(value, idx+"", combinedUrl, userId, url, method, -1,
                             apiCollectionId, false, true);
                 }
             }
@@ -110,23 +110,23 @@ public class ResourceAnalyser {
         for (String param: flattened.keySet()) {
             for (Object val: flattened.get(param) ) {
                 analysePayload(val, param, combinedUrl, userId, url,
-                        method, responseParams.statusCode, apiCollectionId, false, false);
+                        method, -1, apiCollectionId, false, false);
             }
         }
 
         // analyse request headers
-        Map<String, List<String>> requestHeaders = requestParams.getHeaders();
-        for (String headerName: requestHeaders.keySet()) {
-            // todo: standard headers need to be handled
-            List<String> headerValues = requestHeaders.get(headerName);
-            if (headerValues == null) {
-                headerValues = Collections.singletonList("null");
-            }
-            for (String headerValue: headerValues) {
-                analysePayload(headerValue, headerName, combinedUrl, userId, url,
-                        method, responseParams.statusCode, apiCollectionId, true, false);
-            }
-        }
+//        Map<String, List<String>> requestHeaders = requestParams.getHeaders();
+//        for (String headerName: requestHeaders.keySet()) {
+//            if (StandardHeaders.isStandardHeader(headerName)) continue;
+//            List<String> headerValues = requestHeaders.get(headerName);
+//            if (headerValues == null) {
+//                headerValues = Collections.singletonList("null");
+//            }
+//            for (String headerValue: headerValues) {
+//                analysePayload(headerValue, headerName, combinedUrl, userId, url,
+//                        method, -1, apiCollectionId, true, false);
+//            }
+//        }
     }
 
 
@@ -138,15 +138,13 @@ public class ResourceAnalyser {
 
         ParamTypeInfo paramTypeInfo = new ParamTypeInfo(apiCollectionId, url, method, statusCode,isHeader, isUrlParam, param);
 
-        // todo: check if param has been marked public
+        // check if moved
+        boolean moved = checkIfMoved(combinedUrl, param, paramValue);
+        if (moved) return;
 
         // check if duplicate
         boolean isNew = checkDuplicate(userId, combinedUrl,param, paramValue);
         if (!isNew) return;
-
-        // check if moved
-        boolean moved = checkIfMoved(combinedUrl, param, paramValue);
-        if (moved) return;
 
         // check if present
         boolean present = checkIfPresent(combinedUrl, param, paramValue);
@@ -191,7 +189,7 @@ public class ResourceAnalyser {
             List<URLTemplate> urlTemplates = catalog.templateUrls;
             Set<URLStatic> strictUrls = catalog.strictUrls;
 
-            if (APICatalogSync.isTemplateUrl(url)) {
+            if (APICatalog.isTemplateUrl(url)) {
                 URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, URLMethods.Method.valueOf(method));
                 urlTemplates.add(urlTemplate);
             } else {
@@ -338,7 +336,27 @@ public class ResourceAnalyser {
         }
     }
 
-    public static void main(String[] args) throws Exception {
+
+    public static void main(String[] args) {
+        DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
+        Context.accountId.set(1_000_000);
+        List<ParamTypeInfo> paramTypeInfoList = ParamTypeInfoDao.instance.findAll(
+                Filters.and(
+                        Filters.eq(ParamTypeInfo.IS_HEADER, true),
+                        Filters.gte(ParamTypeInfo.UNIQUE_COUNT, 5)
+                )
+        );
+        Set<String> v = new HashSet<>();
+        for (ParamTypeInfo paramTypeInfo: paramTypeInfoList) {
+            v.add(paramTypeInfo.getParam());
+        }
+
+        for (String vv: v) {
+            System.out.println("headers.add(\"" + vv + "\")");
+        }
+    }
+
+    public static void main1(String[] args) throws Exception {
         DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
         Context.accountId.set(1_000_000);
         ApiCollection.useHost = true;

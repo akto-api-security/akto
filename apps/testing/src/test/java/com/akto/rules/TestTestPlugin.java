@@ -53,7 +53,7 @@ public class TestTestPlugin extends MongoBasedTest {
     @Test
     public void testAddWithoutRequestError() {
         TestingRunResultDao.instance.getMCollection().drop();
-        TestPlugin bolaTest = new BOLATest(new HashMap<>());
+        TestPlugin bolaTest = new BOLATest();
         TestPlugin noAuthTest = new NoAuthTest();
 
         ApiInfo.ApiInfoKey apiInfoKey1 = new ApiInfo.ApiInfoKey(0,"url1", URLMethods.Method.GET);

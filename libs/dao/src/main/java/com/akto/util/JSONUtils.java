@@ -54,6 +54,7 @@ public class JSONUtils {
 
     public static Map<String, Set<Object>> flatten(BasicDBObject object) {
         Map<String, Set<Object>> ret = new HashMap<>();
+        if (object == null) return ret;
         String prefix = "";
         flatten(object, prefix, ret);
         return ret;

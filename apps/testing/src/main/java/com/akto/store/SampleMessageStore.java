@@ -1,24 +1,82 @@
 package com.akto.store;
 
+import com.akto.dao.ParamTypeInfoDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.testing.CollectionWiseTestingEndpoints;
+import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.type.APICatalog;
+import com.akto.dto.type.ParamTypeInfo;
 import com.akto.parsers.HttpCallParser;
 import com.akto.testing.ApiExecutor;
-import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.ListIterator;
-import java.util.Map;
+import java.util.*;
 
 public class SampleMessageStore {
 
     public static Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
+    public static Map<String, ParamTypeInfo> paramTypeInfoMap = new HashMap<>();
+
+    private static final Logger logger = LoggerFactory.getLogger(SampleMessageStore.class);
+    public static void buildParameterInfoMap(TestingEndpoints testingEndpoints) {
+        if (testingEndpoints == null) return;
+        TestingEndpoints.Type type = testingEndpoints.getType();
+        List<ParamTypeInfo> paramTypeInfoList = new ArrayList<>();
+        paramTypeInfoMap = new HashMap<>();
+        try {
+            if (type.equals(TestingEndpoints.Type.COLLECTION_WISE)) {
+                CollectionWiseTestingEndpoints collectionWiseTestingEndpoints = (CollectionWiseTestingEndpoints) testingEndpoints;
+                int apiCollectionId = collectionWiseTestingEndpoints.getApiCollectionId();
+                paramTypeInfoList = ParamTypeInfoDao.instance.findAll(Filters.eq(ParamTypeInfo.API_COLLECTION_ID, apiCollectionId));
+            } else {
+                logger.error("ONLY COLLECTION TYPE TESTING ENDPOINTS ALLOWED");
+            }
+
+            for (ParamTypeInfo paramTypeInfo: paramTypeInfoList) {
+                paramTypeInfoMap.put(paramTypeInfo.composeKey(), paramTypeInfo);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static State findState(String param, boolean isUrlParam,
+                                             ApiInfo.ApiInfoKey apiInfoKey, boolean isHeader) {
+
+        String url = apiInfoKey.url;
+        // this is done because of a bug in runtime where some static urls lose their leading slash
+        if (!APICatalog.isTemplateUrl(url) && !url.startsWith("/")) {
+            url = "/" + url;
+        }
+
+        String key = new ParamTypeInfo(
+                apiInfoKey.getApiCollectionId(), url, apiInfoKey.method.name(), -1, isHeader,
+                isUrlParam, param).composeKey();
+
+        ParamTypeInfo paramTypeInfo = paramTypeInfoMap.get(key);
+        if (paramTypeInfo == null) {
+            return State.NA;
+        }
+
+        long publicCount = paramTypeInfo.getPublicCount();
+        long uniqueCount = paramTypeInfo.getUniqueCount();
+
+        double v = (1.0*publicCount) / uniqueCount;
+        if (v <= ParamTypeInfo.THRESHOLD) {
+            return State.PRIVATE;
+        } else {
+            return State.PUBLIC;
+        }
+
+    }
 
     public static void fetchSampleMessages() {
         List<SampleData> sampleDataList = SampleDataDao.instance.findAll(new BasicDBObject());
@@ -87,6 +145,10 @@ public class SampleMessageStore {
         }
 
         return null;
+    }
+
+    public enum State {
+        PUBLIC, PRIVATE, NA
     }
 
 }
