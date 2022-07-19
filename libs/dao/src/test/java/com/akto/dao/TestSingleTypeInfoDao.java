@@ -10,6 +10,7 @@ import com.akto.dto.data_types.RegexPredicate;
 import com.akto.dto.data_types.StartsWithPredicate;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.types.CappedSet;
 import com.akto.utils.MongoBasedTest;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -33,7 +34,7 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
     public void testInsertAndFetchAktoDefined() {
         SingleTypeInfoDao.instance.getMCollection().drop();
         SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(
-                "url", "GET",200, false, "param#key", SingleTypeInfo.EMAIL, 0
+                "url", "GET",200, false, "param#key", SingleTypeInfo.EMAIL, 0, false
         );
         SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 0,0,0);
         SingleTypeInfoDao.instance.updateOne(
@@ -63,7 +64,7 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         assertEquals(SingleTypeInfo.customDataTypeMap.keySet().size(), 1);
 
         SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(
-                "url", "GET",200, false, "param#key", customDataType.toSubType(), 0
+                "url", "GET",200, false, "param#key", customDataType.toSubType(), 0, false
         );
         SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 0,0,0);
         SingleTypeInfoDao.instance.updateOne(
@@ -82,7 +83,7 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
     private WriteModel<SingleTypeInfo> createSingleTypeInfoUpdate(String url, String method, SingleTypeInfo.SubType subType, int apiCollectionId, int responseCode) {
         SingleTypeInfoDao.instance.getMCollection().drop();
         SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(
-                url, method,responseCode, false, "param", subType, apiCollectionId
+                url, method,responseCode, false, "param", subType, apiCollectionId, false
         );
         SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 100,0,0);
         UpdateOptions updateOptions = new UpdateOptions();

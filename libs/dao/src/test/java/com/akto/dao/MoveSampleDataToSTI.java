@@ -50,7 +50,7 @@ public class MoveSampleDataToSTI {
             Key id = cursor.next().getId();
             aci.add(id.getApiCollectionId());
             SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(
-                id.getUrl(), id.getMethod().name(),-1, true, "host", SingleTypeInfo.GENERIC, id.getApiCollectionId()
+                id.getUrl(), id.getMethod().name(),-1, true, "host", SingleTypeInfo.GENERIC, id.getApiCollectionId(), false
             );
             SingleTypeInfo singleTypeInfo = new SingleTypeInfo(
                     paramId,new HashSet<>(), new HashSet<>(), 0, Context.now(), 0

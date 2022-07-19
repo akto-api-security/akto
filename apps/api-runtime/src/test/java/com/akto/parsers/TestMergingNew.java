@@ -351,13 +351,13 @@ public class TestMergingNew extends MongoBasedTest {
 
         List<HttpResponseParams> responseParams = new ArrayList<>();
 
-        HttpResponseParams resp = TestDump2.createSampleParams("user1", url+1);
+        HttpResponseParams resp = TestDump2.createSampleParams("user1", url + 1);
         ArrayList<String> newHeader = new ArrayList<>();
         newHeader.add("hnew");
         resp.getHeaders().put("new header", newHeader);
         responseParams.add(resp);
         resp.setSource(HttpResponseParams.Source.HAR);
-        HttpCallParser parser = new HttpCallParser("access-token", 10,40,10);
+        HttpCallParser parser = new HttpCallParser("access-token", 10, 40, 10);
 
         /* tryMergingWithKnownStrictURLs - put in delta-static */
         parser.syncFunction(responseParams);
@@ -367,11 +367,11 @@ public class TestMergingNew extends MongoBasedTest {
         parser.syncFunction(responseParams);
 
         /* tryMergingWithKnownStrictURLs - merge with delta-static */
-        responseParams.add(TestDump2.createSampleParams("user"+2, url+2));
-        responseParams.add(TestDump2.createSampleParams("user"+3, url+3));
+        responseParams.add(TestDump2.createSampleParams("user" + 2, url + 2));
+        responseParams.add(TestDump2.createSampleParams("user" + 3, url + 3));
 
         /* tryMergingWithKnownStrictURLs - merge with delta-template */
-        responseParams.add(TestDump2.createSampleParams("user"+4, url+4));
+        responseParams.add(TestDump2.createSampleParams("user" + 4, url + 4));
         parser.syncFunction(responseParams);
         assertTrue(parser.getSyncCount() == 0);
 
@@ -382,16 +382,115 @@ public class TestMergingNew extends MongoBasedTest {
         /* tryMergingWithKnownStrictURLs - merge with Db url */
         url = "payment/";
         responseParams = new ArrayList<>();
-        responseParams.add(TestDump2.createSampleParams("user"+2, url+2));
+        responseParams.add(TestDump2.createSampleParams("user" + 2, url + 2));
         responseParams.get(0).setSource(HttpResponseParams.Source.HAR);
         parser.syncFunction(responseParams);
         responseParams = new ArrayList<>();
-        responseParams.add(TestDump2.createSampleParams("user"+3, url+3));
+        responseParams.add(TestDump2.createSampleParams("user" + 3, url + 3));
 
         /* tryMergingWithKnownStrictURLs - merge with Db url - template already exists in delta */
-        responseParams.add(TestDump2.createSampleParams("user"+4, url+4));
+        responseParams.add(TestDump2.createSampleParams("user" + 4, url + 4));
         responseParams.get(0).setSource(HttpResponseParams.Source.HAR);
         parser.syncFunction(responseParams);
+    }
 
+    @Test
+    public void testUrlParamSingleTypeInfoAndValues() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+        HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1);
+        String url = "api/";
+        List<HttpResponseParams> responseParams = new ArrayList<>();
+        List<String> urls = new ArrayList<>();
+        for (int i=0; i< 100; i++) {
+            urls.add(url + i + "/books/" + (i+1) + "/cars/" + (i+3));
+        }
+        for (String c: urls) {
+            BasicDBObject ret = new BasicDBObject();
+            ret.put("name", c);
+            HttpRequestParams httpRequestParams = new HttpRequestParams("GET", c, "", new HashMap<>(), ret.toJson(), 123);
+            HttpResponseParams resp = new HttpResponseParams("", 200,"", new HashMap<>(), ret.toJson(),httpRequestParams, 0,"0",false, HttpResponseParams.Source.MIRRORING,"", "");
+            responseParams.add(resp);
+        }
+
+        parser.syncFunction(responseParams.subList(0,10));
+        parser.apiCatalogSync.syncWithDB();
+
+        Map<URLTemplate, RequestTemplate> templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
+        for (URLTemplate urlTemplate: templateURLToMethods.keySet()) {
+            RequestTemplate requestTemplate = templateURLToMethods.get(urlTemplate);
+            List<SingleTypeInfo> singleTypeInfoList = requestTemplate.getAllTypeInfo();
+            assertEquals(singleTypeInfoList.size(),2);
+            for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
+                assertEquals(singleTypeInfo.getValues().getElements().size(), 10);
+            }
+        }
+
+        parser.syncFunction(responseParams.subList(10,55));
+        parser.apiCatalogSync.syncWithDB();
+        assertEquals(0, getStaticURLsSize(parser));
+
+        templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
+        for (URLTemplate urlTemplate: templateURLToMethods.keySet()) {
+            RequestTemplate requestTemplate = templateURLToMethods.get(urlTemplate);
+            List<SingleTypeInfo> singleTypeInfoList = requestTemplate.getAllTypeInfo();
+            assertEquals(singleTypeInfoList.size(),5);
+            for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
+                if (singleTypeInfo.isUrlParam()) {
+                    assertEquals(singleTypeInfo.getValues().getElements().size(), 45);
+                } else {
+                    assertEquals(singleTypeInfo.getValues().getElements().size(), 55);
+                }
+            }
+
+        }
+
+        parser.apiCatalogSync.syncWithDB();
+        parser.apiCatalogSync.syncWithDB();
+
+        templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
+        for (URLTemplate urlTemplate: templateURLToMethods.keySet()) {
+            RequestTemplate requestTemplate = templateURLToMethods.get(urlTemplate);
+            List<SingleTypeInfo> singleTypeInfoList = requestTemplate.getAllTypeInfo();
+            assertEquals(singleTypeInfoList.size(),5);
+            for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
+                if (singleTypeInfo.isUrlParam()) {
+                    assertEquals(singleTypeInfo.getValues().getElements().size(), 45);
+                } else {
+                    assertEquals(singleTypeInfo.getValues().getElements().size(), 0);
+                }
+            }
+
+        }
+
+    }
+
+    @Test
+    public void testMinMaxAndLastSeenNew() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+        HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1);
+        String url = "api/";
+        List<HttpResponseParams> responseParams = new ArrayList<>();
+        List<String> urls = new ArrayList<>();
+        for (int i=0; i< 100; i++) {
+            urls.add(url + i + "/books/" + (i+1) + "/cars/" + (i+3));
+        }
+        List<Float> floats = Arrays.asList(23.3F,-29F, 100F, -39F);
+        int idx =0;
+        for (String c: urls) {
+            BasicDBObject ret = new BasicDBObject();
+            ret.put("value", floats.get(idx%4));
+            HttpRequestParams httpRequestParams = new HttpRequestParams("GET", c, "", new HashMap<>(), ret.toJson(), 123);
+            HttpResponseParams resp = new HttpResponseParams("", 200,"", new HashMap<>(), ret.toJson(),httpRequestParams, 0,"0",false, HttpResponseParams.Source.MIRRORING,"", "");
+            responseParams.add(resp);
+            idx+=1;
+        }
+
+        parser.syncFunction(responseParams.subList(0,20));
+        parser.apiCatalogSync.syncWithDB();
+
+        parser.syncFunction(responseParams.subList(20,40));
+        parser.apiCatalogSync.syncWithDB();
     }
 }
