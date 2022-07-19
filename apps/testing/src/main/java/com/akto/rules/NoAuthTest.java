@@ -11,6 +11,8 @@ import com.akto.testing.ApiExecutor;
 import com.akto.testing.StatusCodeAnalyser;
 import org.bson.types.ObjectId;
 
+import java.util.ArrayList;
+
 
 public class NoAuthTest extends TestPlugin {
 
@@ -44,7 +46,7 @@ public class NoAuthTest extends TestPlugin {
         int statusCode = StatusCodeAnalyser.getStatusCode(httpResponseParams);
         boolean vulnerable = isStatusGood(statusCode);
 
-        addTestSuccessResult(apiInfoKey, httpResponseParams,testRunId, vulnerable);
+        addTestSuccessResult(apiInfoKey, httpResponseParams,testRunId, vulnerable, new ArrayList<>());
 
         return vulnerable;
     }

@@ -6,10 +6,7 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.testing.TestResult;
-import com.akto.dto.type.APICatalog;
-import com.akto.dto.type.RequestTemplate;
-import com.akto.dto.type.URLMethods;
-import com.akto.dto.type.URLTemplate;
+import com.akto.dto.type.*;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.RelationshipSync;
 import com.akto.store.SampleMessageStore;
@@ -80,7 +77,7 @@ public abstract class TestPlugin {
 
     public void addWithoutRequestError(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestResult.TestError testError) {
         Bson filter = TestingRunResultDao.generateFilter(testRunId, apiInfoKey.getApiCollectionId(), apiInfoKey.url, apiInfoKey.method.name());
-        Bson update = Updates.set("resultMap." + testName(), new TestResult(null,false, Collections.singletonList(testError)));
+        Bson update = Updates.set("resultMap." + testName(), new TestResult(null,false, Collections.singletonList(testError), new ArrayList<>()));
         TestingRunResultDao.instance.updateOne(filter, update);
     }
 
@@ -94,12 +91,12 @@ public abstract class TestPlugin {
             e.printStackTrace();
         }
 
-        Bson update = Updates.set("resultMap." + testName(), new TestResult(message,false, Collections.singletonList(testError)));
+        Bson update = Updates.set("resultMap." + testName(), new TestResult(message,false, Collections.singletonList(testError), new ArrayList<>()));
         TestingRunResultDao.instance.updateOne(filter, update);
     }
 
 
-    public void addTestSuccessResult(ApiInfo.ApiInfoKey apiInfoKey, HttpResponseParams httpResponseParams, ObjectId testRunId, boolean vulnerable) {
+    public void addTestSuccessResult(ApiInfo.ApiInfoKey apiInfoKey, HttpResponseParams httpResponseParams, ObjectId testRunId, boolean vulnerable, List<ParamTypeInfo> paramTypeInfoList) {
         String message = null;
         try {
             message = RedactSampleData.convertHttpRespToOriginalString(httpResponseParams);
@@ -111,7 +108,7 @@ public abstract class TestPlugin {
         if (message == null) return;
 
         Bson filter = TestingRunResultDao.generateFilter(testRunId, apiInfoKey);
-        Bson update = Updates.set("resultMap." + testName(), new TestResult(message, vulnerable, new ArrayList<>()));
+        Bson update = Updates.set("resultMap." + testName(), new TestResult(message, vulnerable, new ArrayList<>(), paramTypeInfoList));
         TestingRunResultDao.instance.updateOne(filter, update);
     }
 
@@ -122,9 +119,10 @@ public abstract class TestPlugin {
         );
     }
 
-    public boolean containsPrivateResource(HttpRequestParams httpRequestParams, ApiInfo.ApiInfoKey apiInfoKey) {
+    public List<ParamTypeInfo> containsPrivateResource(HttpRequestParams httpRequestParams, ApiInfo.ApiInfoKey apiInfoKey) {
         String url = apiInfoKey.url;
         URLMethods.Method method = apiInfoKey.getMethod();
+        List<ParamTypeInfo> privateParamTypeInfos = new ArrayList<>();
 
         // check private resource in
         // 1. url
@@ -133,9 +131,10 @@ public abstract class TestPlugin {
             String[] tokens = urlTemplate.getTokens();
             for (int i = 0;i < tokens.length; i++) {
                 if (tokens[i] == null) {
-                    SampleMessageStore.State state = SampleMessageStore.findState(i+"", true,apiInfoKey, false);
-                    if (state.equals(SampleMessageStore.State.PRIVATE) || state.equals(SampleMessageStore.State.NA)  ) {
-                        return true;
+                    ParamTypeInfo paramTypeInfo = SampleMessageStore.buildParamTypeInfo(i+"", true,apiInfoKey, false);
+                    SampleMessageStore.State state = SampleMessageStore.findState(paramTypeInfo.composeKey());
+                    if (state.equals(SampleMessageStore.State.PRIVATE)) {
+                        privateParamTypeInfos.add(paramTypeInfo);
                     }
                 }
             }
@@ -145,13 +144,14 @@ public abstract class TestPlugin {
         BasicDBObject payload = RequestTemplate.parseRequestPayload(httpRequestParams);
         Map<String, Set<Object>> flattened = JSONUtils.flatten(payload);
         for (String param: flattened.keySet()) {
-            SampleMessageStore.State state = SampleMessageStore.findState(param,false,apiInfoKey, false);
-            if (state.equals(SampleMessageStore.State.PRIVATE) || state.equals(SampleMessageStore.State.NA)  ) {
-                return true;
+            ParamTypeInfo paramTypeInfo = SampleMessageStore.buildParamTypeInfo(param,false,apiInfoKey, false);
+            SampleMessageStore.State state = SampleMessageStore.findState(paramTypeInfo.composeKey());
+            if (state.equals(SampleMessageStore.State.PRIVATE)) {
+                privateParamTypeInfos.add(paramTypeInfo);
             }
         }
 
-        return false;
+        return privateParamTypeInfos;
     }
 
 }

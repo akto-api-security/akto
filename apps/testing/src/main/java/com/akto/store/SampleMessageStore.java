@@ -48,8 +48,8 @@ public class SampleMessageStore {
         }
     }
 
-    public static State findState(String param, boolean isUrlParam,
-                                             ApiInfo.ApiInfoKey apiInfoKey, boolean isHeader) {
+    public static ParamTypeInfo buildParamTypeInfo(String param, boolean isUrlParam,
+                                                   ApiInfo.ApiInfoKey apiInfoKey, boolean isHeader) {
 
         String url = apiInfoKey.url;
         // this is done because of a bug in runtime where some static urls lose their leading slash
@@ -57,9 +57,13 @@ public class SampleMessageStore {
             url = "/" + url;
         }
 
-        String key = new ParamTypeInfo(
+        return new ParamTypeInfo(
                 apiInfoKey.getApiCollectionId(), url, apiInfoKey.method.name(), -1, isHeader,
-                isUrlParam, param).composeKey();
+                isUrlParam, param);
+
+    }
+
+    public static State findState(String key) {
 
         ParamTypeInfo paramTypeInfo = paramTypeInfoMap.get(key);
         if (paramTypeInfo == null) {

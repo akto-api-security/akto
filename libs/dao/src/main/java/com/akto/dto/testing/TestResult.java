@@ -1,5 +1,7 @@
 package com.akto.dto.testing;
 
+import com.akto.dto.type.ParamTypeInfo;
+
 import java.util.List;
 
 public class TestResult {
@@ -8,14 +10,17 @@ public class TestResult {
     private boolean vulnerable;
     private List<TestError> errors;
 
+    private List<ParamTypeInfo> privateParamTypeInfoList;
+
     public enum TestError {
         NO_PATH, NO_HAPPY_PATH, NO_AUTH_MECHANISM, API_REQUEST_FAILED
     }
 
-    public TestResult(String message, boolean vulnerable, List<TestError> errors) {
+    public TestResult(String message, boolean vulnerable, List<TestError> errors, List<ParamTypeInfo> paramTypeInfoList) {
         this.message = message;
         this.vulnerable = vulnerable;
         this.errors = errors;
+        this.privateParamTypeInfoList = paramTypeInfoList;
     }
 
     public TestResult() {
@@ -43,5 +48,13 @@ public class TestResult {
 
     public void setErrors(List<TestError> errors) {
         this.errors = errors;
+    }
+
+    public List<ParamTypeInfo> getPrivateParamTypeInfoList() {
+        return privateParamTypeInfoList;
+    }
+
+    public void setPrivateParamTypeInfoList(List<ParamTypeInfo> privateParamTypeInfoList) {
+        this.privateParamTypeInfoList = privateParamTypeInfoList;
     }
 }

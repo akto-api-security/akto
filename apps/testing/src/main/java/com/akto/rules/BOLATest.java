@@ -20,6 +20,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import org.bson.types.ObjectId;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class BOLATest extends TestPlugin {
@@ -44,10 +45,10 @@ public class BOLATest extends TestPlugin {
         boolean result = authMechanism.addAuthToRequest(httpRequestParams);
         if (!result) return false; // this means that auth token was not there in original request so exit
 
-        boolean containsPrivateResource = containsPrivateResource(httpRequestParams, apiInfoKey);
-        if (!containsPrivateResource) {
+        List<ParamTypeInfo> privateParamTypeInfos = containsPrivateResource(httpRequestParams, apiInfoKey);
+        if (privateParamTypeInfos.isEmpty()) {
             HttpResponseParams newHttpResponseParams = generateEmptyResponsePayload(httpRequestParams);
-            addTestSuccessResult(apiInfoKey, newHttpResponseParams, testRunId, false);
+            addTestSuccessResult(apiInfoKey, newHttpResponseParams, testRunId, false, new ArrayList<>());
             return false;
         }
 
@@ -67,7 +68,7 @@ public class BOLATest extends TestPlugin {
             vulnerable = val > 90;
         }
 
-        addTestSuccessResult(apiInfoKey,httpResponseParams, testRunId, vulnerable);
+        addTestSuccessResult(apiInfoKey,httpResponseParams, testRunId, vulnerable, privateParamTypeInfos);
 
         return vulnerable;
     }
@@ -97,8 +98,8 @@ public class BOLATest extends TestPlugin {
             try {
                 HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(message);
                 ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(sampleData.getId().getApiCollectionId(), sampleData.getId().getUrl() ,sampleData.getId().method);
-                boolean f = bolaTest.containsPrivateResource(httpResponseParams.requestParams, apiInfoKey);
-                if (f) {
+                List<ParamTypeInfo> f = bolaTest.containsPrivateResource(httpResponseParams.requestParams, apiInfoKey);
+                if (f.size() > 0) {
                     idx += 1;
                     System.out.println(apiInfoKey);
                     String[] v = httpResponseParams.requestParams.url.split("\\?");
