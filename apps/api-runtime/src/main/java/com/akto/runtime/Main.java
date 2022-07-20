@@ -106,16 +106,6 @@ public class Main {
         String groupIdConfig =  System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG");
         int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
 
-        String centralKafkaBrokerUrl = System.getenv("AKTO_CENTRAL_KAFKA_BROKER_URL");
-        String centralKafkaTopicName = System.getenv("AKTO_CENTRAL_KAFKA_NAME");
-        if (centralKafkaTopicName == null) centralKafkaTopicName = "akto.central";
-        Kafka kafka = null;
-        if (centralKafkaBrokerUrl != null) {
-            int centralKafkaBatchSize = Integer.parseInt(System.getenv("AKTO_CENTRAL_KAFKA_BATCH_SIZE"));
-            int centralKafkaLingerMS = Integer.parseInt(System.getenv("AKTO_CENTRAL_KAFKA_LINGER_MS"));
-            kafka = new Kafka(centralKafkaBrokerUrl, centralKafkaLingerMS, centralKafkaBatchSize);
-        }
-
         if (topicName == null) topicName = "akto.api.logs";
 
         // mongoURI = "mongodb://write_ops:write_ops@cluster0-shard-00-00.yg43a.mongodb.net:27017,cluster0-shard-00-01.yg43a.mongodb.net:27017,cluster0-shard-00-02.yg43a.mongodb.net:27017/myFirstDatabase?ssl=true&replicaSet=atlas-qd3mle-shard-0&authSource=admin&retryWrites=true&w=majority";
@@ -126,6 +116,22 @@ public class Main {
 
         createIndices();
         insertRuntimeFilters();
+
+        Kafka kafka = null;
+        String centralKafkaTopicName = null;
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        if (accountSettings != null && accountSettings.getCentralKafkaIp()!= null) {
+            String centralKafkaBrokerUrl = accountSettings.getCentralKafkaIp();
+            centralKafkaTopicName = accountSettings.getCentralKafkaTopicName();
+            int centralKafkaBatchSize = accountSettings.getCentralKafkaBatchSize();
+            int centralKafkaLingerMS = accountSettings.getCentralKafkaLingerMS();
+            if (centralKafkaTopicName == null) centralKafkaTopicName = "akto.central";
+            if (centralKafkaBrokerUrl != null) {
+                kafka = new Kafka(centralKafkaBrokerUrl, centralKafkaLingerMS, centralKafkaBatchSize);
+            }
+
+            logger.info("Connected to central kafka @ " + Context.now());
+        }
 
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("_id", 0);
         if (apiCollection == null) {

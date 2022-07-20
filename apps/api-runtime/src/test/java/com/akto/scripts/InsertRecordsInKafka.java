@@ -1,12 +1,18 @@
 package com.akto.scripts;
 
+import com.akto.DaoInit;
+import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.KafkaHealthMetric;
+import com.akto.dto.traffic.SampleData;
 import com.akto.kafka.Kafka;
 import com.akto.runtime.Main;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.TopicPartition;
@@ -16,8 +22,44 @@ import java.util.*;
 
 public class InsertRecordsInKafka {
 
-    public static void main1(String[] args) throws InterruptedException {
-        String topicName = "akto.api.logs";
+    public static final String RUNTIME_TOPIC = "akto.api.logs";
+    public static final String ANALYSE_TOPIC = "akto.central";
+    public static final String KAFKA_URL = "localhost:29092";
+
+    public static void main(String[] args) {
+//        insertSampleDataIntoKafka();
+        checkKafkaQueueSize(ANALYSE_TOPIC, "asdfd3", KAFKA_URL);
+        //209447
+        try {
+            Thread.sleep(10_000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static void insertSampleDataIntoKafka() {
+        DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
+        Context.accountId.set(1_000_000);
+        Kafka kafka = new Kafka(KAFKA_URL,0, 999900);
+        List<SampleData> sampleDataList = SampleDataDao.instance.findAll(new BasicDBObject());
+        System.out.println("size: " + sampleDataList.size());
+        int i =0;
+        for (SampleData sampleData: sampleDataList) {
+            for (String message: sampleData.getSamples()){
+                i += 1;
+//                kafka.send(message, RUNTIME_TOPIC);
+            }
+        }
+
+        System.out.println("sent: " + i);
+        try {
+            Thread.sleep(3000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void insertRandomRecords() throws InterruptedException {
         String kafkaBrokerUrl = "localhost:29092";
 
         Kafka kafka = new Kafka(kafkaBrokerUrl, 1000, 999900);
@@ -31,7 +73,7 @@ public class InsertRecordsInKafka {
                                     "/"+url, method, "192.100.23." + ip, generateRequestPayload(), generateResponsePayload(url, method), apiCollectionId
                             );
                             String message= mapper.writeValueAsString(data);
-                            kafka.send(message, topicName);
+                            kafka.send(message, RUNTIME_TOPIC);
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
@@ -90,11 +132,9 @@ public class InsertRecordsInKafka {
         return mapper.writeValueAsString(v);
     }
 
-    public static void main(String[] args) throws InterruptedException {
-        String topicName = "akto.central";
-//        String topicName = "akto.api.logs";
+    public static void checkSize() throws InterruptedException {
         String kafkaBrokerUrl = "localhost:29092";
-        checkKafkaQueueSize(topicName,"asdf", kafkaBrokerUrl);
+        checkKafkaQueueSize(RUNTIME_TOPIC,"asdf", kafkaBrokerUrl);
 
         while (true) {
             Thread.sleep(10_000);
@@ -107,7 +147,6 @@ public class InsertRecordsInKafka {
         Consumer<String, String> consumer = new KafkaConsumer<>(properties);
         consumer.subscribe(Collections.singleton(topicName));
         ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(10000));
-        System.out.println(records.isEmpty());
 
         System.out.println(consumer.assignment().size());
         for (TopicPartition tp: consumer.assignment()) {
@@ -118,5 +157,6 @@ public class InsertRecordsInKafka {
             System.out.println(" ");
         }
 
+        consumer.close();
     }
 }

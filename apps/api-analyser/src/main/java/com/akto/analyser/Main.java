@@ -1,10 +1,10 @@
 package com.akto.analyser;
 
 import com.akto.DaoInit;
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ParamTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.type.ParamTypeInfo;
 import com.akto.parsers.HttpCallParser;
 import com.mongodb.ConnectionString;
 import org.apache.kafka.clients.consumer.Consumer;
@@ -16,10 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 
 public class Main {
     private Consumer<String, String> consumer;
@@ -30,6 +27,7 @@ public class Main {
         String kafkaBrokerUrl = System.getenv("AKTO_CENTRAL_KAFKA_BROKER_URL");
         String groupIdConfig =  System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG");
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
+        String currentInstanceIp = System.getenv("AKTO_CURRENT_INSTANCE_IP");
         int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
 
         if (topicName == null) topicName = "akto.central";
@@ -38,6 +36,11 @@ public class Main {
         Context.accountId.set(1_000_000);
 
         ParamTypeInfoDao.instance.createIndicesIfAbsent();
+
+        // register central kafka url in mongo
+        if (currentInstanceIp != null) {
+            AccountSettingsDao.instance.updateCentralKafkaDetails(currentInstanceIp + ":9092", topicName);
+        }
 
         final Main main = new Main();
         Properties properties = com.akto.runtime.Main.configProperties(kafkaBrokerUrl, groupIdConfig, maxPollRecordsConfig);

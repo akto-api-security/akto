@@ -13,6 +13,15 @@ public class AccountSettings {
     public static final String SETUP_TYPE = "setupType";
     private SetupType setupType = SetupType.STAGING;
 
+    public static final String CENTRAL_KAFKA_IP = "centralKafkaIp";
+    private String centralKafkaIp;
+    public static final String CENTRAL_KAFKA_TOPIC_NAME = "centralKafkaTopicName";
+    private String centralKafkaTopicName;
+    public static final String CENTRAL_KAFKA_BATCH_SIZE = "centralKafkaBatchSize";
+    private int centralKafkaBatchSize;
+    public static final String CENTRAL_KAFKA_LINGER_MS = "centralKafkaLingerMS";
+    private int centralKafkaLingerMS;
+
     public AccountSettings() {
     }
 
@@ -71,4 +80,39 @@ public class AccountSettings {
     public void setSetupType(SetupType setupType) {
         this.setupType = setupType;
     }
+
+    public String getCentralKafkaIp() {
+        return centralKafkaIp;
+    }
+
+    public void setCentralKafkaIp(String centralKafkaIp) {
+        this.centralKafkaIp = centralKafkaIp;
+    }
+
+    public String getCentralKafkaTopicName() {
+        return centralKafkaTopicName;
+    }
+
+    public void setCentralKafkaTopicName(String centralKafkaTopicName) {
+        this.centralKafkaTopicName = centralKafkaTopicName;
+    }
+
+    public int getCentralKafkaBatchSize() {
+        return centralKafkaBatchSize;
+    }
+
+    public void setCentralKafkaBatchSize(int centralKafkaBatchSize) {
+        this.centralKafkaBatchSize = centralKafkaBatchSize;
+    }
+
+    public int getCentralKafkaLingerMS() {
+        return centralKafkaLingerMS;
+    }
+
+    public void setCentralKafkaLingerMS(int centralKafkaLingerMS) {
+        this.centralKafkaLingerMS = centralKafkaLingerMS;
+    }
+
+    public static final int DEFAULT_CENTRAL_KAFKA_BATCH_SIZE = 999900;
+    public static final int DEFAULT_CENTRAL_KAFKA_LINGER_MS = 60_000;
 }
