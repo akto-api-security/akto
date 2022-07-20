@@ -595,7 +595,7 @@ public class RequestTemplate {
         return compareKeys(this, that, mergedUrl);
     }
 
-    public static BasicDBObject parseRequestPayload(HttpRequestParams requestParams) {
+    public static BasicDBObject parseRequestPayload(HttpRequestParams requestParams, String urlWithParams) {
 
         String reqPayload = requestParams.getPayload();
 
@@ -607,7 +607,6 @@ public class RequestTemplate {
             reqPayload = "{\"json\": "+reqPayload+"}";
         }
 
-        String urlWithParams = requestParams.getURL();
         BasicDBObject queryParams = getQueryJSON(urlWithParams);
 
         BasicDBObject payload = null;

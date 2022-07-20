@@ -120,6 +120,7 @@ public abstract class TestPlugin {
     }
 
     public List<ParamTypeInfo> containsPrivateResource(HttpRequestParams httpRequestParams, ApiInfo.ApiInfoKey apiInfoKey) {
+        String urlWithParams = httpRequestParams.getURL();
         String url = apiInfoKey.url;
         URLMethods.Method method = apiInfoKey.getMethod();
         List<ParamTypeInfo> privateParamTypeInfos = new ArrayList<>();
@@ -141,7 +142,7 @@ public abstract class TestPlugin {
         }
 
         // 2. payload
-        BasicDBObject payload = RequestTemplate.parseRequestPayload(httpRequestParams);
+        BasicDBObject payload = RequestTemplate.parseRequestPayload(httpRequestParams, urlWithParams);
         Map<String, Set<Object>> flattened = JSONUtils.flatten(payload);
         for (String param: flattened.keySet()) {
             ParamTypeInfo paramTypeInfo = SampleMessageStore.buildParamTypeInfo(param,false,apiInfoKey, false);

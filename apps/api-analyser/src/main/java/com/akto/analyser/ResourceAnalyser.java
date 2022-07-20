@@ -62,6 +62,7 @@ public class ResourceAnalyser {
 
 
         HttpRequestParams requestParams = responseParams.getRequestParams();
+        String urlWithParams = requestParams.getURL();
 
         // user id
         List<String> ipList = responseParams.getRequestParams().getHeaders().get(X_FORWARDED_FOR);
@@ -105,7 +106,7 @@ public class ResourceAnalyser {
         }
 
         // analyse request payload
-        BasicDBObject payload = RequestTemplate.parseRequestPayload(requestParams);
+        BasicDBObject payload = RequestTemplate.parseRequestPayload(requestParams, urlWithParams);
         Map<String, Set<Object>> flattened = JSONUtils.flatten(payload);
         for (String param: flattened.keySet()) {
             for (Object val: flattened.get(param) ) {

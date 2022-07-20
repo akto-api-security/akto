@@ -83,7 +83,7 @@ public class APICatalogSync {
         }
         if (statusCode >= 200 && statusCode < 300) {
             requestTemplate.processHeaders(requestParams.getHeaders(), baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap);
-            BasicDBObject payload = RequestTemplate.parseRequestPayload(requestParams);
+            BasicDBObject payload = RequestTemplate.parseRequestPayload(requestParams, urlWithParams);
             if (payload != null) {
                 deletedInfo.addAll(requestTemplate.process2(payload, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap));
             }
