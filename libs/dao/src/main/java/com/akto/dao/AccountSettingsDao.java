@@ -2,10 +2,7 @@ package com.akto.dao;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.UpdateOneModel;
-import com.mongodb.client.model.Updates;
-import com.mongodb.client.model.WriteModel;
+import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
@@ -38,7 +35,8 @@ public class AccountSettingsDao extends AccountsContextDao<AccountSettings> {
         bulkWrites.add(
                 new UpdateOneModel<>(
                         AccountSettingsDao.generateFilter(),
-                        Updates.set(AccountSettings.CENTRAL_KAFKA_IP, currentInstanceIp)
+                        Updates.set(AccountSettings.CENTRAL_KAFKA_IP, currentInstanceIp),
+                        new UpdateOptions().upsert(true)
                 )
         );
 

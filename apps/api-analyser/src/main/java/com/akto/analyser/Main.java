@@ -1,6 +1,7 @@
 package com.akto.analyser;
 
 import com.akto.DaoInit;
+import com.akto.InstanceDetails;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ParamTypeInfoDao;
 import com.akto.dao.context.Context;
@@ -23,24 +24,17 @@ public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
     public static void main(String[] args) {
-        String topicName = System.getenv("AKTO_CENTRAL_KAFKA_TOPIC_NAME");
         String kafkaBrokerUrl = System.getenv("AKTO_CENTRAL_KAFKA_BROKER_URL");
-        String groupIdConfig =  System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG");
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
-        String currentInstanceIp = System.getenv("AKTO_CURRENT_INSTANCE_IP");
         int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
 
-        if (topicName == null) topicName = "akto.central";
+        String topicName = "akto.central";
+        String groupIdConfig = "analyzer-group-config";
 
         DaoInit.init(new ConnectionString(mongoURI));
         Context.accountId.set(1_000_000);
 
         ParamTypeInfoDao.instance.createIndicesIfAbsent();
-
-        // register central kafka url in mongo
-        if (currentInstanceIp != null) {
-            AccountSettingsDao.instance.updateCentralKafkaDetails(currentInstanceIp + ":9092", topicName);
-        }
 
         final Main main = new Main();
         Properties properties = com.akto.runtime.Main.configProperties(kafkaBrokerUrl, groupIdConfig, maxPollRecordsConfig);

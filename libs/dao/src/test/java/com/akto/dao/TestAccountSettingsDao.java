@@ -17,6 +17,21 @@ public class TestAccountSettingsDao extends MongoBasedTest {
     public void testUpdateCentralKafkaDetailsInitial() {
         AccountSettingsDao.instance.getMCollection().drop();
 
+        // No initial account settings exists
+        String ip1 = "ip1";
+        String topic1 = "topic1";
+
+        AccountSettingsDao.instance.updateCentralKafkaDetails(ip1, topic1);
+        AccountSettings accountSettingsFromDb = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        assertEquals(ip1, accountSettingsFromDb.getCentralKafkaIp());
+        assertEquals(topic1, accountSettingsFromDb.getCentralKafkaTopicName());
+        assertEquals(AccountSettings.DEFAULT_CENTRAL_KAFKA_LINGER_MS, accountSettingsFromDb.getCentralKafkaLingerMS());
+        assertEquals(AccountSettings.DEFAULT_CENTRAL_KAFKA_BATCH_SIZE, accountSettingsFromDb.getCentralKafkaBatchSize());
+
+        AccountSettingsDao.instance.getMCollection().drop();
+
+        // Account settings exists but doesn't contain kafka details
+
         AccountSettings accountSettings = new AccountSettings(
                 Context.accountId.get(), new ArrayList<>(), false, AccountSettings.SetupType.PROD
         );
@@ -26,15 +41,15 @@ public class TestAccountSettingsDao extends MongoBasedTest {
                 Updates.set(AccountSettings.SETUP_TYPE, accountSettings.getSetupType())
         );
 
-        String ip1 = "ip1";
-        String topic1 = "topic1";
         AccountSettingsDao.instance.updateCentralKafkaDetails(ip1, topic1);
 
-        AccountSettings accountSettingsFromDb = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        accountSettingsFromDb = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
         assertEquals(ip1, accountSettingsFromDb.getCentralKafkaIp());
         assertEquals(topic1, accountSettingsFromDb.getCentralKafkaTopicName());
         assertEquals(AccountSettings.DEFAULT_CENTRAL_KAFKA_LINGER_MS, accountSettingsFromDb.getCentralKafkaLingerMS());
         assertEquals(AccountSettings.DEFAULT_CENTRAL_KAFKA_BATCH_SIZE, accountSettingsFromDb.getCentralKafkaBatchSize());
+
+        // Account settings exists and contain kafka details
 
         AccountSettingsDao.instance.updateOne(
                 AccountSettingsDao.generateFilter(),
