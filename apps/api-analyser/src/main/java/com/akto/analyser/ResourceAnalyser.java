@@ -3,7 +3,9 @@ package com.akto.analyser;
 import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestingRunDao;
 import com.akto.dto.*;
+import com.akto.dto.testing.TestingRun;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
 import com.akto.parsers.HttpCallParser;
@@ -338,29 +340,34 @@ public class ResourceAnalyser {
     }
 
 
-    public static void main(String[] args) {
+    public static void main1(String[] args) {
         DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
         Context.accountId.set(1_000_000);
         List<ParamTypeInfo> paramTypeInfoList = ParamTypeInfoDao.instance.findAll(
                 Filters.and(
-                        Filters.eq(ParamTypeInfo.IS_HEADER, true),
                         Filters.gte(ParamTypeInfo.UNIQUE_COUNT, 5)
                 )
         );
         Set<String> v = new HashSet<>();
         for (ParamTypeInfo paramTypeInfo: paramTypeInfoList) {
-            v.add(paramTypeInfo.getParam());
+            System.out.println(paramTypeInfo.getParam());
         }
 
-        for (String vv: v) {
-            System.out.println("headers.add(\"" + vv + "\")");
-        }
     }
 
-    public static void main1(String[] args) throws Exception {
+    public static void main(String[] args) {
         DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
         Context.accountId.set(1_000_000);
-        ApiCollection.useHost = true;
+        TestingRunDao.instance.getMCollection().updateMany(
+                new BasicDBObject(),
+                Updates.set(TestingRun.STATE, "SCHEDULED")
+        );
+    }
+
+    public static void main2(String[] args) {
+        DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
+        Context.accountId.set(1_000_000);
+        ApiCollection.useHost = false;
         ResourceAnalyser resourceAnalyser = new ResourceAnalyser(10_000_000, 0.01, 10_000_000, 0.01);
 
         List<SampleData> sampleDataList = SampleDataDao.instance.findAll(new BasicDBObject());
@@ -368,7 +375,15 @@ public class ResourceAnalyser {
         for (SampleData sampleData:sampleDataList) {
             System.out.println(i);
             for (String s: sampleData.getSamples()) {
-                HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(s);
+                HttpResponseParams httpResponseParams = null;
+                try {
+                    httpResponseParams = HttpCallParser.parseKafkaMessage(s);
+                } catch (Exception e) {
+                    System.out.println(s);
+                    e.printStackTrace();
+                    continue;
+                }
+                httpResponseParams.requestParams.setApiCollectionId(sampleData.getId().getApiCollectionId());
                 resourceAnalyser.analyse(httpResponseParams);
             }
             i ++;
@@ -379,7 +394,15 @@ public class ResourceAnalyser {
         while (cursor.hasNext()) {
             SensitiveSampleData sensitiveSampleData = cursor.next();
             for (String s: sensitiveSampleData.getSampleData()) {
-                HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(s);
+                HttpResponseParams httpResponseParams = null;
+                try {
+                    httpResponseParams = HttpCallParser.parseKafkaMessage(s);
+                } catch (Exception e) {
+                    System.out.println(s);
+                    e.printStackTrace();
+                    continue;
+                }
+                httpResponseParams.requestParams.setApiCollectionId(sensitiveSampleData.getId().getApiCollectionId());
                 resourceAnalyser.analyse(httpResponseParams);
             }
            System.out.println(i);
