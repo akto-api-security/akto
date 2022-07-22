@@ -93,7 +93,7 @@ public class KeyTypes {
             sensitiveParamInfoBooleanMap.put(sensitiveParamInfo,true);
         }
 
-        singleTypeInfo.incr(object);
+        singleTypeInfo.incr();
     }
 
     public static SubType findSubType(Object o,String key) {

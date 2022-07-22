@@ -392,7 +392,7 @@ public class SingleTypeInfo {
         return StringUtils.joinWith("@", url, method, responseCode, isHeader, param, subType, apiCollectionId, isUrlParam);
     }
 
-    public void incr(Object object) {
+    public void incr() {
         this.count++;
     }
     
@@ -418,6 +418,8 @@ public class SingleTypeInfo {
         SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, copyExamples, copyUserIds, this.count,
                 this.timestamp, this.duration);
         singleTypeInfo.setValues(copyValues);
+        singleTypeInfo.minValue = this.minValue;
+        singleTypeInfo.maxValue = this.maxValue;
         return singleTypeInfo;
     }
 

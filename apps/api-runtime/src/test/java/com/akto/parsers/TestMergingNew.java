@@ -416,53 +416,47 @@ public class TestMergingNew extends MongoBasedTest {
         parser.syncFunction(responseParams.subList(0,10));
         parser.apiCatalogSync.syncWithDB();
 
-        Map<URLTemplate, RequestTemplate> templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
-        for (URLTemplate urlTemplate: templateURLToMethods.keySet()) {
-            RequestTemplate requestTemplate = templateURLToMethods.get(urlTemplate);
-            List<SingleTypeInfo> singleTypeInfoList = requestTemplate.getAllTypeInfo();
-            assertEquals(singleTypeInfoList.size(),2);
-            for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
-                assertEquals(singleTypeInfo.getValues().getElements().size(), 10);
-            }
-        }
+        // dbState doesn't have any template URLs initially so no urlParams are considered
+        testSampleSizeAndDomainOfSti(parser,0, 10, SingleTypeInfo.Domain.ENUM, SingleTypeInfo.Domain.ENUM);
 
         parser.syncFunction(responseParams.subList(10,55));
         parser.apiCatalogSync.syncWithDB();
-        assertEquals(0, getStaticURLsSize(parser));
 
-        templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
-        for (URLTemplate urlTemplate: templateURLToMethods.keySet()) {
-            RequestTemplate requestTemplate = templateURLToMethods.get(urlTemplate);
-            List<SingleTypeInfo> singleTypeInfoList = requestTemplate.getAllTypeInfo();
-            assertEquals(singleTypeInfoList.size(),5);
-            for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
-                if (singleTypeInfo.isUrlParam()) {
-                    assertEquals(singleTypeInfo.getValues().getElements().size(), 45);
-                } else {
-                    assertEquals(singleTypeInfo.getValues().getElements().size(), 55);
-                }
-            }
-
-        }
+        // Now dbState has template URLs so urlParam values are now stored
+        assertEquals(0,getStaticURLsSize(parser));
+        testSampleSizeAndDomainOfSti(parser, 45, 55, SingleTypeInfo.Domain.ENUM, SingleTypeInfo.Domain.ENUM);
 
         parser.apiCatalogSync.syncWithDB();
         parser.apiCatalogSync.syncWithDB();
 
-        templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
-        for (URLTemplate urlTemplate: templateURLToMethods.keySet()) {
-            RequestTemplate requestTemplate = templateURLToMethods.get(urlTemplate);
-            List<SingleTypeInfo> singleTypeInfoList = requestTemplate.getAllTypeInfo();
-            assertEquals(singleTypeInfoList.size(),5);
-            for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
+        testSampleSizeAndDomainOfSti(parser, 45, 0, SingleTypeInfo.Domain.ENUM, SingleTypeInfo.Domain.ANY);
+
+        parser.syncFunction(responseParams.subList(55,70));
+        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(70,100));
+        parser.apiCatalogSync.syncWithDB();
+        parser.apiCatalogSync.syncWithDB();
+
+        // both now range
+        testSampleSizeAndDomainOfSti(parser, 0, 0, SingleTypeInfo.Domain.RANGE, SingleTypeInfo.Domain.ANY);
+
+
+    }
+
+    private void testSampleSizeAndDomainOfSti(HttpCallParser parser, int urlParamValuesSize, int nonUrlParamValuesSize,
+                                              SingleTypeInfo.Domain urlParamDomain, SingleTypeInfo.Domain nonUrlParamDomain)  {
+        Map<URLTemplate, RequestTemplate> templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
+        for (RequestTemplate requestTemplate: templateURLToMethods.values()) {
+            for (SingleTypeInfo singleTypeInfo: requestTemplate.getAllTypeInfo()) {
                 if (singleTypeInfo.isUrlParam()) {
-                    assertEquals(singleTypeInfo.getValues().getElements().size(), 45);
+                    assertEquals(urlParamValuesSize, singleTypeInfo.getValues().getElements().size());
+                    assertEquals(urlParamDomain,singleTypeInfo.getDomain());
                 } else {
-                    assertEquals(singleTypeInfo.getValues().getElements().size(), 0);
+                    assertEquals(nonUrlParamValuesSize, singleTypeInfo.getValues().getElements().size());
+                    assertEquals(nonUrlParamDomain, singleTypeInfo.getDomain());
                 }
             }
-
         }
-
     }
 
     @Test
@@ -471,26 +465,82 @@ public class TestMergingNew extends MongoBasedTest {
         ApiCollectionsDao.instance.getMCollection().drop();
         HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1);
         String url = "api/";
-        List<HttpResponseParams> responseParams = new ArrayList<>();
-        List<String> urls = new ArrayList<>();
-        for (int i=0; i< 100; i++) {
-            urls.add(url + i + "/books/" + (i+1) + "/cars/" + (i+3));
-        }
-        List<Float> floats = Arrays.asList(23.3F,-29F, 100F, -39F);
-        int idx =0;
-        for (String c: urls) {
-            BasicDBObject ret = new BasicDBObject();
-            ret.put("value", floats.get(idx%4));
-            HttpRequestParams httpRequestParams = new HttpRequestParams("GET", c, "", new HashMap<>(), ret.toJson(), 123);
-            HttpResponseParams resp = new HttpResponseParams("", 200,"", new HashMap<>(), ret.toJson(),httpRequestParams, 0,"0",false, HttpResponseParams.Source.MIRRORING,"", "");
-            responseParams.add(resp);
-            idx+=1;
-        }
 
-        parser.syncFunction(responseParams.subList(0,20));
+        // test for 1 url
+        HttpResponseParams httpResponseParams1 = createHttpResponseForMinMax(url+"books1", 23.4F,-98F );
+        HttpResponseParams httpResponseParams2 = createHttpResponseForMinMax(url+"books1", 2.3F,-200.5F );
+        HttpResponseParams httpResponseParams3 = createHttpResponseForMinMax(url+"books1", 2500.9F,-200F );
+        parser.syncFunction(Arrays.asList(httpResponseParams1, httpResponseParams2, httpResponseParams3));
+
+        parser.apiCatalogSync.syncWithDB();
+        Collection<RequestTemplate> requestTemplates = parser.apiCatalogSync.getDbState(123).getStrictURLToMethods().values();
+        validateMinMax(requestTemplates, 2500, 2, -98, -200);
+
+        // merge the urls
+        float reqMax = 2500.9f;
+        float reqMin = 2.3f;
+        float respMax = -98f;
+        float respMin = -200.5f;
+        for (int i=0; i< APICatalogSync.STRING_MERGING_THRESHOLD; i++) {
+            reqMax += 1;
+            reqMin -= 1;
+            respMax += 1;
+            respMin -= 1;
+            HttpResponseParams httpResponseParams = createHttpResponseForMinMax(url+"books"+i, reqMax, respMax);
+            parser.syncFunction(Collections.singletonList(httpResponseParams));
+
+            httpResponseParams = createHttpResponseForMinMax(url+"books"+i, reqMin, respMin);
+            parser.syncFunction(Collections.singletonList(httpResponseParams));
+        }
         parser.apiCatalogSync.syncWithDB();
 
-        parser.syncFunction(responseParams.subList(20,40));
+        HttpResponseParams httpResponseParams = createHttpResponseForMinMax(url+"books99", 190f, -190f);
+        parser.syncFunction(Collections.singletonList(httpResponseParams));
         parser.apiCatalogSync.syncWithDB();
+
+        httpResponseParams = createHttpResponseForMinMax(url+"books100", 190f, -190f);
+        parser.syncFunction(Collections.singletonList(httpResponseParams));
+        parser.apiCatalogSync.syncWithDB();
+
+        assertEquals(0,parser.apiCatalogSync.getDbState(123).getStrictURLToMethods().size());
+        assertEquals(1,parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods().size());
+
+        requestTemplates = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods().values();
+        validateMinMax(requestTemplates, Double.valueOf(reqMax+"").longValue(), Double.valueOf(reqMin+"").longValue(), Double.valueOf(respMax+"").longValue(), Double.valueOf(respMin+"").longValue());
+
+        httpResponseParams = createHttpResponseForMinMax(url+"books10", 19000f, -190f);
+        parser.syncFunction(Collections.singletonList(httpResponseParams));
+        httpResponseParams = createHttpResponseForMinMax(url+"books15", 19f, -19000f);
+        parser.syncFunction(Collections.singletonList(httpResponseParams));
+        parser.apiCatalogSync.syncWithDB();
+        requestTemplates = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods().values();
+        validateMinMax(requestTemplates, 19000, Double.valueOf(reqMin+"").longValue(), Double.valueOf(respMax+"").longValue(), -19000);
+
+    }
+
+    private HttpResponseParams createHttpResponseForMinMax(String url, float reqPayload, float respPayload)  {
+        BasicDBObject reqRet = new BasicDBObject();
+        reqRet.put("value", reqPayload);
+        BasicDBObject respRet = new BasicDBObject();
+        respRet.put("value", respPayload);
+
+        HttpRequestParams httpRequestParams = new HttpRequestParams("GET", url, "", new HashMap<>(), reqRet.toJson(), 123);
+        return new HttpResponseParams("", 200,"", new HashMap<>(), respRet.toJson(),httpRequestParams, 0,"0",false, HttpResponseParams.Source.MIRRORING,"", "");
+    }
+
+    private void validateMinMax(Collection<RequestTemplate> requestTemplateCollections, long reqMaxValue, long reqMinValue,
+                                long respMaxValue, long respMinValue) {
+        for (RequestTemplate requestTemplate: requestTemplateCollections) {
+            for (SingleTypeInfo singleTypeInfo: requestTemplate.getAllTypeInfo()) {
+                if (singleTypeInfo.isIsHeader() || singleTypeInfo.isUrlParam()) continue;
+                if (singleTypeInfo.getResponseCode() == -1) {
+                    assertEquals(reqMaxValue, singleTypeInfo.getMaxValue());
+                    assertEquals(reqMinValue, singleTypeInfo.getMinValue());
+                } else {
+                    assertEquals(respMaxValue, singleTypeInfo.getMaxValue());
+                    assertEquals(respMinValue, singleTypeInfo.getMinValue());
+                }
+            }
+        }
     }
 }

@@ -601,12 +601,15 @@ public class RequestTemplate {
         this.urlParams = urlParams;
     }
 
+    // unit tests for "fillUrlParams" written in TestApiCatalogSync
     public void fillUrlParams(String[] tokenizedUrl, URLTemplate urlTemplate, int apiCollectionId) {
         if (this.urlParams == null) this.urlParams = new HashMap<>();
 
         SuperType[] types = urlTemplate.getTypes();
         String url = urlTemplate.getTemplateString();
         String method = urlTemplate.getMethod().name();
+
+        if (tokenizedUrl.length != types.length) return;
 
         for (int idx=0; idx < types.length; idx++) {
             SuperType superType = types[idx];
@@ -627,9 +630,11 @@ public class RequestTemplate {
             SingleTypeInfo singleTypeInfo = this.urlParams.get(idx);
             if (singleTypeInfo == null) {
                 ParamId paramId = new ParamId(url, method,-1,false,idx+"", subType, apiCollectionId, true);
-                singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 1, Context.now(), 0);
+                singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 0, Context.now(), 0);
                 this.urlParams.put(idx, singleTypeInfo);
             }
+
+            singleTypeInfo.incr();
 
             singleTypeInfo.getValues().add(val.hashCode());
             singleTypeInfo.setMinMaxValues(val);

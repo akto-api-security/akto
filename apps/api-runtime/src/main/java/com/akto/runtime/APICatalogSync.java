@@ -59,6 +59,7 @@ public class APICatalogSync {
         this.sensitiveParamInfoBooleanMap = new HashMap<>();
     }
 
+    public static final int STRING_MERGING_THRESHOLD = 20;
 
     public void processResponse(RequestTemplate requestTemplate, Collection<HttpResponseParams> responses, List<SingleTypeInfo> deletedInfo) {
         Iterator<HttpResponseParams> iter = responses.iterator();
@@ -206,7 +207,12 @@ public class APICatalogSync {
             String[] tokens = tokenize(newUrl.getUrl());
 
             if (tokens.length == 1) {
-                deltaTemplates.put(newUrl, newTemplate);
+                RequestTemplate rt = deltaTemplates.get(newUrl);
+                if (rt != null) {
+                    rt.mergeFrom(newTemplate);
+                } else {
+                    deltaTemplates.put(newUrl, newTemplate);
+                }
                 iterator.remove();
                 continue;
             }
@@ -249,7 +255,7 @@ public class APICatalogSync {
                      }
                 }
                      
-                if (countSimilarURLs >= 20) {
+                if (countSimilarURLs >= STRING_MERGING_THRESHOLD) {
                     URLTemplate mergedTemplate = potentialMerges.keySet().iterator().next();
                     RequestTemplate alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(mergedTemplate);
                     RequestTemplate dbTemplate = potentialMerges.get(mergedTemplate).iterator().next();
@@ -262,7 +268,10 @@ public class APICatalogSync {
                         deltaCatalog.getTemplateURLToMethods().put(mergedTemplate, dbCopy);
                     }
 
+                    alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(mergedTemplate);
+
                     for (RequestTemplate rt: potentialMerges.getOrDefault(mergedTemplate, new HashSet<>())) {
+                        alreadyInDelta.mergeFrom(rt);
                         deltaCatalog.getDeletedInfo().addAll(rt.getAllTypeInfo());
                     }
                     deltaCatalog.getDeletedInfo().addAll(dbTemplate.getAllTypeInfo());
@@ -306,7 +315,12 @@ public class APICatalogSync {
                 continue;
             }
 
-            deltaTemplates.put(newUrl, newTemplate);
+            RequestTemplate rt = deltaTemplates.get(newUrl);
+            if (rt != null) {
+                rt.mergeFrom(newTemplate);
+            } else {
+                deltaTemplates.put(newUrl, newTemplate);
+            }
             iterator.remove();
         }
     }
@@ -446,7 +460,7 @@ public class APICatalogSync {
                     RequestTemplate requestTemplate = deltaCatalog.getStrictURLToMethods().get(url);
                     if (requestTemplate == null) {
                         requestTemplate = strictMatch.copy();
-                        deltaCatalog.getStrictURLToMethods().put(url, requestTemplate);
+                        strictMatch.mergeFrom(requestTemplate);
                     }
 
                     processResponse(requestTemplate, responseParamsList, deletedInfo);
@@ -717,15 +731,6 @@ public class APICatalogSync {
         return urlTemplate;
     }
 
-    public static void main(String[] args) {
-        DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
-        Context.accountId.set(1_000_000);
-        List<SingleTypeInfo> allParams = SingleTypeInfoDao.instance.fetchAll();
-        for (SingleTypeInfo singleTypeInfo: allParams) {
-            System.out.println(singleTypeInfo.getMaxValue());
-            System.out.println(singleTypeInfo.getMinValue());
-        }
-    }
 
     public void buildFromDB(boolean calcDiff) {
         List<SingleTypeInfo> allParams = SingleTypeInfoDao.instance.fetchAll();
