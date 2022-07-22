@@ -6,25 +6,23 @@
             :errors="{}"
         />                    
         <div>
-            <div>
-                <span class="log-title">Latest logs</span>
-                <v-select
-                    :items="['akto-dashboard', 'akto-runtime']"
-                    v-model= "logGroupName"
-                    label="Select log group"
-                    solo
-                    outlined
-                    flat
-                    hide-details
-                />
+            <div class="d-flex mt-5">
+                <div class="log-title mr-2">Latest logs</div>
+                <div style="width: 200px" class="mr-2">
+                    <form-field-menu
+                        :items="[{text: 'akto-dashboard', value: 'akto-dashboard'}, {text: 'akto-runtime', value: 'akto-runtime'}]"
+                        v-model="logGroupName"
+                        label="Select log group"
+                    />
+                </div>
 
-                <span>
+                <span class="mr-2">
                     <v-tooltip bottom>
                         <template v-slot:activator='{on, attrs}'>
                             <v-btn 
                                 icon 
                                 color="#47466A" 
-                                @click="refreshLogs(null, true, Date.now())"
+                                @click="refreshClick()"
                                 v-on="on"
                                 v-bind="attrs"
                             >
@@ -34,9 +32,44 @@
                         Refresh
                     </v-tooltip>
                 </span>                
+                <span class="mr-2">
+                    <v-tooltip bottom>
+                        <template v-slot:activator='{on, attrs}'>
+                            <v-btn 
+                                icon 
+                                color="#47466A" 
+                                @click="previousClick()"
+                                v-on="on"
+                                v-bind="attrs"
+                                :disabled="initTime == -1"
+                            >
+                                    -5m
+                            </v-btn>
+                        </template>
+                        Previous 5 mins
+                    </v-tooltip>
+                </span>                
+                <span class="mr-2">
+                    <v-tooltip bottom>
+                        <template v-slot:activator='{on, attrs}'>
+                            <v-btn 
+                                icon 
+                                color="#47466A" 
+                                @click="nextClick()"
+                                v-on="on"
+                                v-bind="attrs"
+                                :disabled="initTime == -1"
+                            >
+                                    +5m
+                            </v-btn>
+                        </template>
+                        Next 5 mins
+                    </v-tooltip>
+                </span>                
             </div>
             <div class="log-content">
-                {{logContent}}
+                <div v-for="(line, index) in logContent" :key="index">{{line}}
+                </div>
             </div>   
         </div>
     </div>
@@ -45,36 +78,50 @@
 <script>
 import api from '../api'
 import JsonViewer from "@/apps/dashboard/shared/components/JSONViewer"
+import FormFieldMenu from "@/apps/dashboard/shared/components/integrations/FormFieldMenu"
+
 export default {
     name: "Health",
     components: {
-        JsonViewer
+        JsonViewer,
+        FormFieldMenu
     },
     data() {
         return {
             content: {},
             logGroupName: 'akto-dashboard',
-            logContent: '',
+            logContent: [],
+            initTime: -1,
+            fiveMins: 1000 * 60 * 5
         }
     },
     methods: {
-        refreshLogs(nextToken, firstCall, startEpoch) {
-            if (firstCall) {
-                this.logContent = '';
-            } else if (!nextToken) {
-                return
+        async refreshClick() {
+            this.initTime = Date.now(); 
+            this.logContent = await this.refreshLogs(null, true, Date.now(), [])
+        },
+        async previousClick() {
+            this.logContent = (await this.refreshLogs(null, true, this.initTime - this.fiveMins, [])).concat(this.logContent)
+        },
+        async nextClick() {
+            this.logContent = this.logContent.concat(await this.refreshLogs(null, true, this.initTime - this.fiveMins, []))
+        },
+        async refreshLogs(nextToken, firstCall, startEpoch, logContent) {
+            // console.log("refreshLogs", nextToken, firstCall, startEpoch, logContent)
+            if (!firstCall && !nextToken) {
+                // console.log("returning", logContent)
+                return logContent
             }
 
-            let fiveMins = 1000 * 60 * 5
-            let startTime = parseInt(startEpoch/fiveMins) * fiveMins
-            let endTime = startTime + fiveMins
+            let startTime = parseInt(startEpoch/this.fiveMins) * this.fiveMins
+            let endTime = startTime + this.fiveMins
             let _this = this
-            api.fetchLogs(this.logGroupName, startTime, endTime, 1000, "-WARN -AnnotationParser").then(resp => {
-                _this.logContent += resp.output
-                _this.refreshLogs(resp.nextToken, false, startEpoch)
-            }).catch(e => {
-                console.log(e)
-            })
+            let resp = await api.fetchLogs(this.logGroupName, startTime, endTime, 1000, "-WARN -AnnotationParser")
+            // console.log("resp", resp)
+            logContent = logContent.concat(resp.output.split("\n"))
+            logContent = await _this.refreshLogs(resp.nextToken, false, startEpoch, logContent)
+            // console.log("final", logContent)
+            return logContent
         }
     },
     created() {
@@ -88,7 +135,7 @@ export default {
 <style lang="sass" scoped>
 .log-title
     font-weight: 500
-    font-size: 14px
+    font-size: 16px
     color: #47466A
 
 .log-content
@@ -96,5 +143,6 @@ export default {
     color: #47466A
     width: 100%
     height: 100%
-    background: rgba(0, 0, 0, 0.2)
+    font-family: monospace
+    background: #FFFFFF
 </style>

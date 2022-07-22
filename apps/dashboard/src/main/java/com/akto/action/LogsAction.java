@@ -50,10 +50,6 @@ public class LogsAction extends UserAction {
             }
             
             int counter = 0;
-
-            
-                
-            
             
             do {
                 filterLogEventsRequest.setNextToken(nextToken);
@@ -65,7 +61,7 @@ public class LogsAction extends UserAction {
                 this.nextToken = filterLogEventsResult.getNextToken();
             } while (nextToken != null && counter < limit);
         } catch (Exception e) {
-            this.output += e.getMessage();
+            this.output += e.getMessage() + "\n";
         }
 
         return SUCCESS.toUpperCase();
