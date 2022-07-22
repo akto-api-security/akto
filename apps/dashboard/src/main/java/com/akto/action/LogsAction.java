@@ -49,13 +49,13 @@ public class LogsAction extends UserAction {
                 filterLogEventsRequest.setFilterPattern(filterPattern);
             }
             
-            if (nextToken != null) {
-                filterLogEventsRequest.setNextToken(nextToken);
-            }
-            
             int counter = 0;
 
             do {
+                if (nextToken != null) {
+                    filterLogEventsRequest.setNextToken(nextToken);
+                }
+                
                 FilterLogEventsResult filterLogEventsResult = awsLogs.filterLogEvents(filterLogEventsRequest);
                 for(FilteredLogEvent filteredLogEvent: filterLogEventsResult.getEvents()) {
                     this.output += filteredLogEvent.getTimestamp() +  ": " + filteredLogEvent.getMessage() + "\n";
