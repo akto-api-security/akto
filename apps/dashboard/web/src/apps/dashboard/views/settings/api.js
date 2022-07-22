@@ -147,7 +147,7 @@ export default {
             data: {}
         })
     },
-    fetchLogs(logGroupName, startTime, endTime, limit) {
+    fetchLogs(logGroupName, startTime, endTime, limit, filterPattern) {
         return request({
             url: '/api/fetchLogs',
             method: 'post',
@@ -155,7 +155,8 @@ export default {
                 logGroupName,
                 startTime,
                 endTime,
-                limit
+                limit,
+                filterPattern
             }
         })
     }

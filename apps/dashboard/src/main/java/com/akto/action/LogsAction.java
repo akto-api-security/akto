@@ -19,8 +19,6 @@ public class LogsAction extends UserAction {
 
     public String fetchLogs() {
 
-        System.out.println(logGroupName + " " + startTime + " " + endTime + " " + limit);
-
         if (!logGroupName.startsWith("akto-")) {
             return ERROR.toUpperCase();
         }
@@ -59,7 +57,6 @@ public class LogsAction extends UserAction {
 
             do {
                 FilterLogEventsResult filterLogEventsResult = awsLogs.filterLogEvents(filterLogEventsRequest);
-                System.out.println(filterLogEventsResult);
                 for(FilteredLogEvent filteredLogEvent: filterLogEventsResult.getEvents()) {
                     this.output += filteredLogEvent.getTimestamp() +  ": " + filteredLogEvent.getMessage() + "\n";
                     counter++;
