@@ -5,7 +5,6 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
 
 import com.akto.DaoInit;
 import com.akto.dao.*;
@@ -161,7 +160,7 @@ public class Main {
         long lastSyncOffset = 0;
 
         try {
-            main.consumer.subscribe(Pattern.compile(".*"));
+            main.consumer.subscribe(Arrays.asList(topicName, "har_"+topicName));
             while (true) {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 main.consumer.commitSync();
