@@ -69,7 +69,7 @@ export default {
             let startTime = parseInt(startEpoch/fiveMins) * fiveMins
             let endTime = startTime + fiveMins
             let _this = this
-            api.fetchLogs(this.logGroupName, startTime, endTime, 1000, "-WARNING").then(resp => {
+            api.fetchLogs(this.logGroupName, startTime, endTime, 1000, "-WARN -AnnotationParser").then(resp => {
                 _this.logContent += resp.output
                 _this.refreshLogs(resp.nextToken, false, startEpoch)
             }).catch(e => {
