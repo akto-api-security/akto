@@ -49,23 +49,6 @@
                         Previous 5 mins
                     </v-tooltip>
                 </span>                
-                <span class="mr-2">
-                    <v-tooltip bottom>
-                        <template v-slot:activator='{on, attrs}'>
-                            <v-btn 
-                                icon 
-                                color="#47466A" 
-                                @click="nextClick()"
-                                v-on="on"
-                                v-bind="attrs"
-                                :disabled="initTime == -1"
-                            >
-                                    +5m
-                            </v-btn>
-                        </template>
-                        Next 5 mins
-                    </v-tooltip>
-                </span>                
             </div>
             <div class="log-content">
                 <div v-for="(line, index) in logContent" :key="index">{{line}}
@@ -97,14 +80,14 @@ export default {
     },
     methods: {
         async refreshClick() {
-            this.initTime = Date.now(); 
+            if (this.initTime == -1) {
+                this.initTime = Date.now();
+            } 
             this.logContent = await this.refreshLogs(null, true, Date.now(), [])
         },
         async previousClick() {
             this.logContent = (await this.refreshLogs(null, true, this.initTime - this.fiveMins, [])).concat(this.logContent)
-        },
-        async nextClick() {
-            this.logContent = this.logContent.concat(await this.refreshLogs(null, true, this.initTime - this.fiveMins, []))
+            this.initTime = this.initTime - this.fiveMins
         },
         async refreshLogs(nextToken, firstCall, startEpoch, logContent) {
             // console.log("refreshLogs", nextToken, firstCall, startEpoch, logContent)
