@@ -10,14 +10,21 @@ public class AccountSettings {
     private boolean redactPayload;
     public static final String SAMPLE_DATA_COLLECTION_DROPPED = "sampleDataCollectionDropped";
     private boolean sampleDataCollectionDropped;
+    public static final String SETUP_TYPE = "setupType";
+    private SetupType setupType = SetupType.PROD;
 
     public AccountSettings() {
     }
 
-    public AccountSettings(int id, List<String> privateCidrList, Boolean redactPayload) {
+    public AccountSettings(int id, List<String> privateCidrList, Boolean redactPayload, SetupType setupType) {
         this.id = id;
         this.privateCidrList = privateCidrList;
         this.redactPayload = redactPayload;
+        this.setupType = setupType;
+    }
+
+    public enum SetupType {
+        PROD, QA, STAGING, DEV
     }
 
 
@@ -55,5 +62,13 @@ public class AccountSettings {
 
     public void setSampleDataCollectionDropped(boolean sampleDataCollectionDropped) {
         this.sampleDataCollectionDropped = sampleDataCollectionDropped;
+    }
+
+    public SetupType getSetupType() {
+        return setupType;
+    }
+
+    public void setSetupType(SetupType setupType) {
+        this.setupType = setupType;
     }
 }

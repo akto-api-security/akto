@@ -66,6 +66,13 @@ export default {
     todayDate: () => {
         return new Date(Date.now())
     },
+    dayStart: () => {
+        let date = new Date(Date.now())
+        date.setHours(0)
+        date.setMinutes(0)
+        date.setSeconds(0)
+        return date
+    },
     weekStart (date) {
         let date1 = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
         return new Date(date1.setDate(date1.getDate() - date1.getDay() + (date1.getDay() === 0 ? -6 : 1)))

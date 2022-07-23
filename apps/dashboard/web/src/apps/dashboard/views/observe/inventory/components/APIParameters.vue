@@ -71,7 +71,7 @@ import obj from '@/util/obj'
 import func from '@/util/func'
 import SensitiveParamsCard from '@/apps/dashboard/shared/components/SensitiveParamsCard'
 import LineChart from '@/apps/dashboard/shared/components/LineChart'
-import SampleData from './SampleData.vue'
+import SampleData from '@/apps/dashboard/shared/components/SampleData'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
 
 import api from '../api'

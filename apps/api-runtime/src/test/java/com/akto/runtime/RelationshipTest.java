@@ -71,7 +71,7 @@ public class RelationshipTest {
         JsonNode node = mapper.readTree(jp);
         Map<String,Set<String>> values= new HashMap<>();
         RelationshipSync.extractAllValuesFromPayload(node, new ArrayList<>(), values);
-        assertEquals(2,values.keySet().size());
+        assertEquals(4,values.keySet().size());
         assertTrue(values.get("age").contains("99"));
         assertTrue(values.get("finalAge").contains("99"));
     }
