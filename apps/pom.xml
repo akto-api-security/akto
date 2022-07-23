@@ -37,6 +37,17 @@
                 <module>api-runtime</module>
             </modules>
         </profile>
+        <profile>
+            <id>testing</id>
+            <activation>
+                <file>
+                    <exists>testing/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>testing</module>
+            </modules>
+        </profile>
     </profiles>
 </project>
 

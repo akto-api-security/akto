@@ -98,6 +98,9 @@
     color: unset !important
     text-decoration: auto
 
+.v-application .primary--text
+    color: #6200EA !important
+
 .active-tab
     color: #2d2434
     font-weight: 500

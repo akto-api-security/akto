@@ -216,7 +216,7 @@ public class RelationshipSync {
         if (node == null) return;
         if (node.isValueNode()) {
             String textValue = node.asText();
-            if (checkIfValidText(textValue)) {
+            if (textValue != null) {
                 String param = String.join("",params);
                 if (param.startsWith("#")) {
                     param = param.substring(1);

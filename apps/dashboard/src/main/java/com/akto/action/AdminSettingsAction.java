@@ -1,11 +1,9 @@
 package com.akto.action;
 
-import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.runtime.Main;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
@@ -20,7 +18,17 @@ public class AdminSettingsAction extends UserAction {
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     @Override
     public String execute() throws Exception {
-         accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        return SUCCESS.toUpperCase();
+    }
+
+    public AccountSettings.SetupType setupType;
+    public String updateSetupType() {
+        AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.SETUP_TYPE, this.setupType),
+                new UpdateOptions().upsert(true)
+        );
 
         return SUCCESS.toUpperCase();
     }
@@ -81,6 +89,7 @@ public class AdminSettingsAction extends UserAction {
         this.redactPayload = redactPayload;
     }
 
-
-
+    public void setSetupType(AccountSettings.SetupType setupType) {
+        this.setupType = setupType;
+    }
 }
