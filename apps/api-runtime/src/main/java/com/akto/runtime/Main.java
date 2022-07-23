@@ -160,7 +160,7 @@ public class Main {
         long lastSyncOffset = 0;
 
         try {
-            main.consumer.subscribe(Collections.singleton(topicName));
+            main.consumer.subscribe(Arrays.asList(topicName, "har_"+topicName));
             while (true) {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 main.consumer.commitSync();
