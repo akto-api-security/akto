@@ -122,10 +122,9 @@ public class Main {
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
         if (accountSettings != null && accountSettings.getCentralKafkaIp()!= null) {
             String centralKafkaBrokerUrl = accountSettings.getCentralKafkaIp();
-            centralKafkaTopicName = accountSettings.getCentralKafkaTopicName();
-            int centralKafkaBatchSize = accountSettings.getCentralKafkaBatchSize();
-            int centralKafkaLingerMS = accountSettings.getCentralKafkaLingerMS();
-            if (centralKafkaTopicName == null) centralKafkaTopicName = "akto.central";
+            centralKafkaTopicName = AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME;
+            int centralKafkaBatchSize = AccountSettings.DEFAULT_CENTRAL_KAFKA_BATCH_SIZE;
+            int centralKafkaLingerMS = AccountSettings.DEFAULT_CENTRAL_KAFKA_LINGER_MS;
             if (centralKafkaBrokerUrl != null) {
                 kafka = new Kafka(centralKafkaBrokerUrl, centralKafkaLingerMS, centralKafkaBatchSize);
             }

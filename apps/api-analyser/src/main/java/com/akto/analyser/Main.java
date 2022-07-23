@@ -5,9 +5,11 @@ import com.akto.InstanceDetails;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ParamTypeInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.HttpResponseParams;
 import com.akto.parsers.HttpCallParser;
 import com.mongodb.ConnectionString;
+import com.mongodb.client.model.Updates;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -24,20 +26,28 @@ public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
     public static void main(String[] args) {
-        String kafkaBrokerUrl = System.getenv("AKTO_CENTRAL_KAFKA_BROKER_URL");
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
-        int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
-
-        String topicName = "akto.central";
-        String groupIdConfig = "analyzer-group-config";
+        String centralBrokerIp = System.getenv("AKTO_CENTRAL_KAFKA_IP");
+        String currentInstanceIp = System.getenv("AKTO_CURRENT_INSTANCE_IP");
 
         DaoInit.init(new ConnectionString(mongoURI));
         Context.accountId.set(1_000_000);
 
+        if (currentInstanceIp != null) {
+            AccountSettingsDao.instance.updateOne(
+                    AccountSettingsDao.generateFilter(),
+                    Updates.set(AccountSettings.CENTRAL_KAFKA_IP, currentInstanceIp+":9092")
+            );
+        }
+
+        int maxPollRecordsConfig = AccountSettings.DEFAULT_CENTRAL_KAFKA_MAX_POLL_RECORDS_CONFIG;
+        String topicName = AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME;
+        String groupIdConfig = "analyzer-group-config";
+
         ParamTypeInfoDao.instance.createIndicesIfAbsent();
 
         final Main main = new Main();
-        Properties properties = com.akto.runtime.Main.configProperties(kafkaBrokerUrl, groupIdConfig, maxPollRecordsConfig);
+        Properties properties = com.akto.runtime.Main.configProperties(centralBrokerIp, groupIdConfig, maxPollRecordsConfig);
         main.consumer = new KafkaConsumer<>(properties);
 
         final Thread mainThread = Thread.currentThread();
@@ -55,6 +65,7 @@ public class Main {
 
         Map<Integer, ResourceAnalyser> resourceAnalyserMap = new HashMap<>();
 
+        long i = 0;
         try {
             main.consumer.subscribe(Collections.singleton(topicName));
             while (true) {
@@ -62,6 +73,7 @@ public class Main {
                 main.consumer.commitSync();
                 for (ConsumerRecord<String,String> r: records) {
                     try {
+                        System.out.println(i);
                         HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
                         int accountId = Integer.parseInt(httpResponseParams.getAccountId());
                         ResourceAnalyser resourceAnalyser = resourceAnalyserMap.get(accountId);
