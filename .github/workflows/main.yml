@@ -78,7 +78,12 @@ jobs:
           echo "Pushing image to ECR..."
           docker push $ECR_REGISTRY/$ECR_REPOSITORY-api-runtime:$IMAGE_TAG
           echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-api-runtime:$IMAGE_TAG"
-       
+          cd ../testing
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-api-testing:$IMAGE_TAG .
+          echo "Pushing image to ECR..."
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY-api-testing:$IMAGE_TAG
+          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-api-testing:$IMAGE_TAG"
+
       - name: Deploy to AWS CloudFormation
         if: ${{ github.event.inputs.Environment == 'staging'}}
         uses: aws-actions/aws-cloudformation-github-deploy@v1
@@ -115,3 +120,8 @@ jobs:
           echo "Pushing image to ECR..."
           docker push $ECR_REGISTRY/$ECR_REPOSITORY-runtime:$IMAGE_TAG
           echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-runtime:$IMAGE_TAG"       
+          cd ../testing
+          docker build -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG .
+          echo "Pushing image to ECR..."
+          docker push $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG
+          echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"       
