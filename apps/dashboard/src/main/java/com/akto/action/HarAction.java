@@ -76,7 +76,7 @@ public class HarAction extends UserAction {
             for (String message: messages){
                 if (message.length() < 0.8 * Kafka.BATCH_SIZE_CONFIG) {
                     if (!skipKafka) {
-                        KafkaListener.kafka.send(message,topic);
+                        KafkaListener.kafka.send(message,"har_" + topic);
                     } else {
                         HttpResponseParams responseParams =  HttpCallParser.parseKafkaMessage(message);
                         responseParams.getRequestParams().setApiCollectionId(apiCollectionId);
