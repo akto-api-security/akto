@@ -94,6 +94,7 @@
 				</executions>
 				<configuration>
                     <destFile>${jacoco.reportPath}</destFile>
+                    <dataFile>${jacoco.reportPath}</dataFile>
                     <append>true</append>
 				</configuration>
             </plugin>                 
