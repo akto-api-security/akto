@@ -17,6 +17,7 @@
         <sonar.organization>akto-api-security</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
         <jacoco.version>0.8.5</jacoco.version>     
+        <jacoco.reportPath>${project.basedir}/../../target/jacoco.exec</jacoco.reportPath>
     </properties>
 
     <modules>
@@ -82,10 +83,6 @@
 						<goals>
 							<goal>report</goal>
 						</goals>
-						<configuration>
-							<dataFile>target/jacoco.exec</dataFile>
-							<outputDirectory>target/jacoco-ut</outputDirectory>
-						</configuration>
 					</execution>
 					<execution>
 						<id>post-unit-test</id>
@@ -93,16 +90,11 @@
 						<goals>
 							<goal>report</goal>
 						</goals>
-						<configuration>
-							<dataFile>target/jacoco.exec</dataFile>
-							<outputDirectory>target/jacoco-ut</outputDirectory>
-						</configuration>
 					</execution>
 				</executions>
 				<configuration>
-					<systemPropertyVariables>
-						<jacoco-agent.destfile>target/jacoco.exec</jacoco-agent.destfile>
-					</systemPropertyVariables>
+                    <destFile>${jacoco.reportPath}</destFile>
+                    <append>true</append>
 				</configuration>
             </plugin>                 
         </plugins>
