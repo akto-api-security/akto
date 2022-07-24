@@ -1,5 +1,5 @@
 <template>
-    <div v-if="loading">
+    <div v-if="parametersLoading">
         <spinner/>
     </div>
     <div v-else>
@@ -185,7 +185,7 @@ export default {
         }
     },
     computed: {
-        ...mapState('inventory', ['parameters', 'loading']),
+        ...mapState('inventory', ['parameters', 'parametersLoading']),
         url () {
             return this.urlAndMethod.split(" ")[0]
         },
