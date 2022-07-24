@@ -67,13 +67,13 @@ public class VCDemoData {
     }
 
     public static void fill(List<SingleTypeInfo> singleTypeInfoList, List<ApiInfo> apiInfos, String url, SingleTypeInfo.SubType subType, int acid, int r) {
-        SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(url, "GET", 200, false, "", subType, acid);
+        SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(url, "GET", 200, false, "", subType, acid, false);
         SingleTypeInfo sit = new SingleTypeInfo(paramId, null,null, 0,Context.now(),0);
 
         singleTypeInfoList.add(sit);
 
         for (int i=0;i < r; i++) {
-            SingleTypeInfo.ParamId paramId1 = new SingleTypeInfo.ParamId(url, "GET", 200, false, i+"", SingleTypeInfo.GENERIC, acid);
+            SingleTypeInfo.ParamId paramId1 = new SingleTypeInfo.ParamId(url, "GET", 200, false, i+"", SingleTypeInfo.GENERIC, acid, false);
             SingleTypeInfo sit1 = new SingleTypeInfo(paramId1, null,null, 0,Context.now(),0);
             singleTypeInfoList.add(sit1);
         }

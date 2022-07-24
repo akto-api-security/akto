@@ -65,10 +65,18 @@ public class KeyTypes {
             Set<String> userIds = new HashSet<>();
             userIds.add(userId);
             
-            ParamId paramId = new ParamId(url, method, responseCode, isHeader, param, subType, apiCollectionId);
+            ParamId paramId = new ParamId(url, method, responseCode, isHeader, param, subType, apiCollectionId, false);
             singleTypeInfo = new SingleTypeInfo(paramId, examples, userIds, 1, Context.now(), 0);
 
             occurrences.put(subType, singleTypeInfo);
+        }
+
+        singleTypeInfo.setLastSeen(Context.now());
+        singleTypeInfo.setMinMaxValues(object);
+
+        SingleTypeInfo.Domain domain = singleTypeInfo.getDomain();
+        if (domain == null || domain == SingleTypeInfo.Domain.ENUM) {
+            singleTypeInfo.getValues().add(object.hashCode());
         }
 
         SensitiveParamInfo sensitiveParamInfo = new SensitiveParamInfo(
@@ -85,7 +93,7 @@ public class KeyTypes {
             sensitiveParamInfoBooleanMap.put(sensitiveParamInfo,true);
         }
 
-        singleTypeInfo.incr(object);
+        singleTypeInfo.incr();
     }
 
     public static SubType findSubType(Object o,String key) {
@@ -258,6 +266,20 @@ public class KeyTypes {
         boolean canBeIpv6 = (s.length() < 45 && s.split(":").length > 6);
         if (!(canBeIpv4 || canBeIpv6)) return false;
         return ipAddressValidator.isValid(s);
+    }
+
+    public void merge(KeyTypes that) {
+        if (that == null || that.getOccurrences() == null) return;
+        for (SubType subType: that.getOccurrences().keySet()) {
+            SingleTypeInfo a = this.getOccurrences().get(subType);
+            SingleTypeInfo b = that.getOccurrences().get(subType);
+            if (b == null) continue;
+            if (a == null) {
+                this.getOccurrences().put(subType, b);
+            } else {
+                a.merge(b);
+            }
+        }
     }
 
 }

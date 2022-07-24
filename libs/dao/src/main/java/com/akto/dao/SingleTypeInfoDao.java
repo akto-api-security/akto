@@ -70,7 +70,8 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
                 Filters.eq("isHeader", info.getIsHeader()),
                 Filters.eq("param", info.getParam()),
                 Filters.eq("subType", info.getSubType().getName()),
-                Filters.eq("apiCollectionId", info.getApiCollectionId())
+                Filters.eq("apiCollectionId", info.getApiCollectionId()),
+                Filters.eq("isUrlParam", info.isUrlParam())
         );
     }
 
