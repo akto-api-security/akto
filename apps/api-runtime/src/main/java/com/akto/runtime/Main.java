@@ -116,6 +116,12 @@ public class Main {
         createIndices();
         insertRuntimeFilters();
 
+        try {
+            AccountSettingsDao.instance.updateVersion(AccountSettings.API_RUNTIME_VERSION);
+        } catch (Exception e) {
+            logger.error("error while updating dashboard version: " + e.getMessage());
+        }
+
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("_id", 0);
         if (apiCollection == null) {
             Set<String> urls = new HashSet<>();

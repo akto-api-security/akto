@@ -256,5 +256,11 @@ public class InitializerListener implements ServletContextListener {
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
         dropSampleDataIfEarlierNotDroped(accountSettings);
+
+        try {
+            AccountSettingsDao.instance.updateVersion(AccountSettings.DASHBOARD_VERSION);
+        } catch (Exception e) {
+            logger.error("error while updating dashboard version: " + e.getMessage());
+        }
     }
 }

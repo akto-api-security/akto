@@ -14,6 +14,8 @@ const team = {
         fetchTs: 0,
         team: {},
         redactPayload: null,
+        dashboardVersion: null,
+        apiRuntimeVersion: null,
         setupType: null
     },
     getters: {
@@ -22,6 +24,8 @@ const team = {
         getName: (state) => state.name,
         getTeam: (state) => state.team,
         getRedactPayload: (state) => state.redactPayload,
+        getDashboardVersion: (state) => state.dashboardVersion,
+        getApiRuntimeVersion: (state) => state.apiRuntimeVersion,
         getSetupType: (state) => state.setupType
     },
     mutations: {
@@ -42,8 +46,13 @@ const team = {
         SET_ADMIN_SETTINGS(state, resp) {
             if (!resp.accountSettings) {
                 state.redactPayload = false
-                state.setupType = "STAGING"
+                state.apiRuntimeVersion = "-"
+                state.dashboardVersion = "-"
             } else {
+                state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
+                state.apiRuntimeVersion = resp.accountSettings.apiRuntimeVersion ? resp.accountSettings.apiRuntimeVersion : "-"
+                state.dashboardVersion = resp.accountSettings.dashboardVersion ? resp.accountSettings.dashboardVersion : "-"
+                state.setupType = "STAGING"
                 state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
                 state.setupType = resp.accountSettings.setupType
             }
