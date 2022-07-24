@@ -11,11 +11,16 @@ import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.lambda.AWSLambda;
 import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
+import com.amazonaws.services.lambda.model.AWSLambdaException;
+import com.amazonaws.services.lambda.model.FunctionConfiguration;
 import com.amazonaws.services.lambda.model.InvokeRequest;
 import com.amazonaws.services.lambda.model.InvokeResult;
+import com.amazonaws.services.lambda.model.ListFunctionsResult;
 import com.amazonaws.services.lambda.model.ServiceException;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Iterator;
+import java.util.List;
 
 import static com.mongodb.client.model.Filters.eq;
 
@@ -30,32 +35,49 @@ public class AccountAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    private void invokeLambda(String functionName) {
+    private void invokeExactLambda(String functionName, AWSLambda awsLambda) {
+
         InvokeRequest invokeRequest = new InvokeRequest()
-                .withFunctionName(functionName)
-                .withPayload("{}");
+            .withFunctionName(functionName)
+            .withPayload("{}");
         InvokeResult invokeResult = null;
-
         try {
-            AWSLambda awsLambda = AWSLambdaClientBuilder.standard().build();
 
+            System.out.println("Invoke lambda "+functionName);
             invokeResult = awsLambda.invoke(invokeRequest);
 
             String ans = new String(invokeResult.getPayload().array(), StandardCharsets.UTF_8);
 
             //write out the return value
-            System.out.println(ans);
-
-        } catch (ServiceException e) {
+            System.out.println(ans);        
+        } catch (AWSLambdaException e) {
             System.out.println(e);
         }
+    }
 
-        System.out.println(invokeResult.getStatusCode());
+    private void listMatchingLambda(String functionName) {
+        AWSLambda awsLambda = AWSLambdaClientBuilder.standard().build();
+        try {
+            ListFunctionsResult functionResult = awsLambda.listFunctions();
+
+            List<FunctionConfiguration> list = functionResult.getFunctions();
+
+            for (FunctionConfiguration config: list) {
+                System.out.println("The function name is "+config.getFunctionName());
+
+                if(config.getFunctionName().contains(functionName)) {
+                    invokeExactLambda(config.getFunctionName(), awsLambda);
+                }
+            }
+        } catch (AWSLambdaException e) {
+            System.out.println(e);
+            invokeExactLambda(functionName, awsLambda);
+        }
     }
 
     public String takeUpdate() {
-        invokeLambda("TrafficMirroringInstanceRefreshHandler");
-        invokeLambda("DashboardInstanceRefreshHandler");
+        listMatchingLambda("TrafficMirroringInstanceRefreshHandler");
+        listMatchingLambda("DashboardInstanceRefreshHandler");
         return Action.SUCCESS.toUpperCase();
     }
 
