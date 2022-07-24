@@ -11,7 +11,7 @@ public class AccountSettings {
     public static final String SAMPLE_DATA_COLLECTION_DROPPED = "sampleDataCollectionDropped";
     private boolean sampleDataCollectionDropped;
     public static final String SETUP_TYPE = "setupType";
-    private SetupType setupType = SetupType.STAGING;
+    private SetupType setupType = SetupType.PROD;
 
     public static final String CENTRAL_KAFKA_IP = "centralKafkaIp";
     private String centralKafkaIp;

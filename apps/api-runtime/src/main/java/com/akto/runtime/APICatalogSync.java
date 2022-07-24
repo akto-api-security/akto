@@ -109,14 +109,22 @@ public class APICatalogSync {
                 respPayload = "{\"json\": "+respPayload+"}";
             }
 
-            BasicDBObject payload = BasicDBObject.parse(respPayload);
+
+            BasicDBObject payload;
+            try {
+                payload = BasicDBObject.parse(respPayload);
+            } catch (Exception e) {
+                payload = BasicDBObject.parse("{}");
+            }
+
             deletedInfo.addAll(responseTemplate.process2(payload, baseURL.getUrl(), methodStr, statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap));
             responseTemplate.processHeaders(responseParams.getHeaders(), baseURL.getUrl(), method.name(), statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap);
             if (!responseParams.getIsPending()) {
                 responseTemplate.processTraffic(responseParams.getTime());
             }
-        } catch (JsonParseException e) {
 
+        } catch (JsonParseException e) {
+            logger.error("Failed to parse json payload " + e.getMessage());
         }
     }
 
