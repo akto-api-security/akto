@@ -1,5 +1,5 @@
 <template>
-  <v-app>
+  <v-app class="akto-app">
     <v-navigation-drawer
       v-model="drawer"
       app
@@ -231,6 +231,9 @@
 
 .group-nav-drawer
   padding: 0px
+
+.akto-app
+  color: #47466A
 
 .akto-background
   background: linear-gradient(180deg, #D500F9 -7.13%, #6200EA 16.86%, #2E006D 64.29%)

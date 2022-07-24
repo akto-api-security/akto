@@ -46,12 +46,12 @@ const team = {
         SET_ADMIN_SETTINGS(state, resp) {
             if (!resp.accountSettings) {
                 state.redactPayload = false
-                state.apiRuntimeVersion = "null"
-                state.dashboardVersion = "null"
+                state.apiRuntimeVersion = "-"
+                state.dashboardVersion = "-"
             } else {
                 state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
-                state.apiRuntimeVersion = resp.accountSettings.apiRuntimeVersion ? resp.accountSettings.apiRuntimeVersion : "null"
-                state.dashboardVersion = resp.accountSettings.dashboardVersion ? resp.accountSettings.dashboardVersion : "null"
+                state.apiRuntimeVersion = resp.accountSettings.apiRuntimeVersion ? resp.accountSettings.apiRuntimeVersion : "-"
+                state.dashboardVersion = resp.accountSettings.dashboardVersion ? resp.accountSettings.dashboardVersion : "-"
                 state.setupType = "STAGING"
                 state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
                 state.setupType = resp.accountSettings.setupType
