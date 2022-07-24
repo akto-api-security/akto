@@ -14,14 +14,21 @@ public class AccountSettings {
     private String dashboardVersion;
     public static final String API_RUNTIME_VERSION = "apiRuntimeVersion";
     private String apiRuntimeVersion;
+    public static final String SETUP_TYPE = "setupType";
+    private SetupType setupType = SetupType.PROD;
 
     public AccountSettings() {
     }
 
-    public AccountSettings(int id, List<String> privateCidrList, Boolean redactPayload) {
+    public AccountSettings(int id, List<String> privateCidrList, Boolean redactPayload, SetupType setupType) {
         this.id = id;
         this.privateCidrList = privateCidrList;
         this.redactPayload = redactPayload;
+        this.setupType = setupType;
+    }
+
+    public enum SetupType {
+        PROD, QA, STAGING, DEV
     }
 
 
@@ -75,5 +82,13 @@ public class AccountSettings {
 
     public void setApiRuntimeVersion(String apiRuntimeVersion) {
         this.apiRuntimeVersion = apiRuntimeVersion;
+    }
+    
+    public SetupType getSetupType() {
+        return setupType;
+    }
+
+    public void setSetupType(SetupType setupType) {
+        this.setupType = setupType;
     }
 }

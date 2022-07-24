@@ -131,6 +131,18 @@ export default {
         })
     },
 
+    updateSetupType(setupType) {
+        return request({
+            url: '/api/updateSetupType',
+            method: 'post',
+            data: {
+                setupType
+            }
+        }).then((resp) => {
+            return resp
+        })
+    },
+
     fetchAdminSettings() {
         return request({
             url: '/api/fetchAdminSettings',
@@ -145,6 +157,19 @@ export default {
             url: '/api/takeUpdate',
             method: 'post',
             data: {}
+        })
+    },
+    fetchLogs(logGroupName, startTime, endTime, limit, filterPattern) {
+        return request({
+            url: '/api/fetchLogs',
+            method: 'post',
+            data: {
+                logGroupName,
+                startTime,
+                endTime,
+                limit,
+                filterPattern
+            }
         })
     }
 }

@@ -35,8 +35,11 @@ public class ApiInfo {
     }
 
     public static class ApiInfoKey {
+        public static final String API_COLLECTION_ID = "apiCollectionId";
         int apiCollectionId;
+        public static final String URL = "url";
         public String url;
+        public static final String METHOD = "method";
         public URLMethods.Method method;
 
         public ApiInfoKey() {

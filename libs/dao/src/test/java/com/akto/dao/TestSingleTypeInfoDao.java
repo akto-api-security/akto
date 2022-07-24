@@ -1,6 +1,7 @@
 package com.akto.dao;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomDataType;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.data_types.Conditions;
@@ -152,6 +153,29 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
                 fail();
             }
         }
+
+    }
+
+    @Test
+    public void testFetchEndpointsInCollection() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+
+        List<WriteModel<SingleTypeInfo>> bulkWrites = new ArrayList<>();
+        bulkWrites.add(createSingleTypeInfoUpdate("A", "GET", SingleTypeInfo.EMAIL, 0,200));
+        bulkWrites.add(createSingleTypeInfoUpdate("A", "GET", SingleTypeInfo.GENERIC, 0,200));
+        bulkWrites.add(createSingleTypeInfoUpdate("A", "GET", SingleTypeInfo.EMAIL, 0,201));
+        bulkWrites.add(createSingleTypeInfoUpdate("A", "POST", SingleTypeInfo.EMAIL, 0,200));
+        bulkWrites.add(createSingleTypeInfoUpdate("B", "POST", SingleTypeInfo.EMAIL, 0,200));
+        bulkWrites.add(createSingleTypeInfoUpdate("B", "GET", SingleTypeInfo.EMAIL, 0,200));
+        bulkWrites.add(createSingleTypeInfoUpdate("A", "GET", SingleTypeInfo.EMAIL, 1,200));
+        bulkWrites.add(createSingleTypeInfoUpdate("C", "GET", SingleTypeInfo.EMAIL, 1,200));
+        SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkWrites);
+
+        List<ApiInfo.ApiInfoKey> apiInfoKeyList0 = SingleTypeInfoDao.instance.fetchEndpointsInCollection(0);
+        List<ApiInfo.ApiInfoKey> apiInfoKeyList1 = SingleTypeInfoDao.instance.fetchEndpointsInCollection(1);
+
+        assertEquals(apiInfoKeyList0.size(), 4);
+        assertEquals(apiInfoKeyList1.size(), 2);
 
     }
 }
