@@ -58,6 +58,7 @@ public class RequestTemplate {
     Map<String, KeyTypes> parameters;
     AllParams allParams = new AllParams();
     Map<String, KeyTypes> headers;
+    Map<Integer, SingleTypeInfo> urlParams = new HashMap<>();
     Map<Integer, RequestTemplate> responseTemplates;
     Set<String> userIds = new HashSet<>();
     TrafficRecorder trafficRecorder = new TrafficRecorder();
@@ -353,7 +354,7 @@ public class RequestTemplate {
 
         Map<SubType, SingleTypeInfo> occ = new HashMap<>();
 
-        ParamId paramId = new ParamId(url, method, responseCode, false, prefix + "#" + node.getPathElem(),SingleTypeInfo.DICT, apiCollectionId);
+        ParamId paramId = new ParamId(url, method, responseCode, false, prefix + "#" + node.getPathElem(),SingleTypeInfo.DICT, apiCollectionId, false);
         occ.put(SingleTypeInfo.DICT, new SingleTypeInfo(paramId, new HashSet<>(), node.getValue().getSecond(), 1, Context.now(), 0));
         node.getValue().setFirst(new KeyTypes(occ, false));
 
@@ -406,7 +407,7 @@ public class RequestTemplate {
             if (thisKeyTypes == null) {
                 this.parameters.put(paramName, thatKeyTypes.copy());
             } else {
-                thisKeyTypes.getOccurrences().putAll(thatKeyTypes.getOccurrences());
+                thisKeyTypes.merge(thatKeyTypes);
             }
         }
 
@@ -416,7 +417,7 @@ public class RequestTemplate {
             if (thisKeyTypes == null) {
                 this.headers.put(header, thatKeyTypes.copy());
             } else {
-                thisKeyTypes.getOccurrences().putAll(thatKeyTypes.getOccurrences());
+                thisKeyTypes.merge(thatKeyTypes);
             }
         }
 
@@ -463,6 +464,8 @@ public class RequestTemplate {
         for(KeyTypes k: headers.values()) {
             ret.addAll(k.getAllTypeInfo());
         }
+
+        ret.addAll(urlParams.values());
 
         if (responseTemplates != null) {
             for(RequestTemplate responseParams: responseTemplates.values()) {
@@ -588,5 +591,53 @@ public class RequestTemplate {
 
     public boolean compare(RequestTemplate that, URLTemplate mergedUrl) {
         return compareKeys(this, that, mergedUrl);
+    }
+
+    public Map<Integer, SingleTypeInfo> getUrlParams() {
+        return urlParams;
+    }
+
+    public void setUrlParams(Map<Integer, SingleTypeInfo> urlParams) {
+        this.urlParams = urlParams;
+    }
+
+    // unit tests for "fillUrlParams" written in TestApiCatalogSync
+    public void fillUrlParams(String[] tokenizedUrl, URLTemplate urlTemplate, int apiCollectionId) {
+        if (this.urlParams == null) this.urlParams = new HashMap<>();
+
+        SuperType[] types = urlTemplate.getTypes();
+        String url = urlTemplate.getTemplateString();
+        String method = urlTemplate.getMethod().name();
+
+        if (tokenizedUrl.length != types.length) return;
+
+        for (int idx=0; idx < types.length; idx++) {
+            SuperType superType = types[idx];
+            if (superType == null) continue;
+            String val = tokenizedUrl[idx];
+            SubType subType;
+            switch (superType) {
+                case INTEGER:
+                    subType = SingleTypeInfo.INTEGER_32;
+                    break;
+                case FLOAT:
+                    subType = SingleTypeInfo.FLOAT;
+                    break;
+                default:
+                    subType = KeyTypes.findSubType(val,null);
+            }
+
+            SingleTypeInfo singleTypeInfo = this.urlParams.get(idx);
+            if (singleTypeInfo == null) {
+                ParamId paramId = new ParamId(url, method,-1,false,idx+"", subType, apiCollectionId, true);
+                singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 0, Context.now(), 0);
+                this.urlParams.put(idx, singleTypeInfo);
+            }
+
+            singleTypeInfo.incr();
+
+            singleTypeInfo.getValues().add(val.hashCode());
+            singleTypeInfo.setMinMaxValues(val);
+        }
     }
 }

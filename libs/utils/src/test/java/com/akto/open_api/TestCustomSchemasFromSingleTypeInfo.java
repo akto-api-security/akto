@@ -1,6 +1,7 @@
 package com.akto.open_api;
 
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.types.CappedSet;
 import io.swagger.v3.oas.models.media.*;
 import org.junit.Test;
 
@@ -13,7 +14,7 @@ import java.util.List;
 public class TestCustomSchemasFromSingleTypeInfo {
 
     public static SingleTypeInfo generateSingleTypeInfo(String param, SingleTypeInfo.SubType subType) {
-        SingleTypeInfo.ParamId p = new SingleTypeInfo.ParamId("/api","GET",200,false,param,subType,0);
+        SingleTypeInfo.ParamId p = new SingleTypeInfo.ParamId("/api","GET",200,false,param,subType,0, false);
         return new SingleTypeInfo(p,new HashSet<>(),new HashSet<>(),0,0,0);
     }
     @Test
