@@ -25,7 +25,7 @@
         <dependency>
             <groupId>com.itextpdf</groupId>
             <artifactId>itextpdf</artifactId>
-            <version>5.5.10</version>
+            <version>5.5.12</version>
         </dependency>
         <dependency>
             <groupId>org.apache.pdfbox</groupId>
@@ -35,7 +35,7 @@
         <dependency>
             <groupId>org.mongodb</groupId>
             <artifactId>mongodb-driver-sync</artifactId>
-            <version>4.2.0</version>
+            <version>4.2.1</version>
         </dependency>
         <dependency>
             <groupId>com.google.api-client</groupId>
@@ -76,7 +76,7 @@
         <dependency>
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
-            <version>8.0.23</version>
+            <version>8.0.28</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/com.amazon.redshift/redshift-jdbc42 -->
         <dependency>
@@ -93,7 +93,7 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.12.2</version>
+            <version>2.12.6.1</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
