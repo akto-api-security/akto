@@ -31,6 +31,13 @@
             <artifactId>api-runtime</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.akto.libs.utils</groupId>
+            <artifactId>utils</artifactId>
+            <type>test-jar</type>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

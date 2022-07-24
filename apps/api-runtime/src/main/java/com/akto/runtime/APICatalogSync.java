@@ -2,6 +2,7 @@ package com.akto.runtime;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
@@ -35,6 +36,8 @@ import org.bson.conversions.Bson;
 import org.bson.json.JsonParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static com.akto.dto.type.KeyTypes.patternToSubType;
 
 public class APICatalogSync {
     
@@ -90,11 +93,17 @@ public class APICatalogSync {
             if(reqPayload.startsWith("[")) {
                 reqPayload = "{\"json\": "+reqPayload+"}";
             }
-            if (reqPayload.startsWith("{")) {
-                BasicDBObject payload = BasicDBObject.parse(reqPayload);
-                payload.putAll(queryParams.toMap());
-                deletedInfo.addAll(requestTemplate.process2(payload, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap));
+
+            BasicDBObject payload;
+            try {
+                payload = BasicDBObject.parse(reqPayload);
+            } catch (Exception e) {
+                payload = BasicDBObject.parse("{}");
             }
+
+            payload.putAll(queryParams.toMap());
+            deletedInfo.addAll(requestTemplate.process2(payload, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap));
+
             requestTemplate.recordMessage(responseParams.getOrig());
         }
 
@@ -117,14 +126,22 @@ public class APICatalogSync {
                 respPayload = "{\"json\": "+respPayload+"}";
             }
 
-            BasicDBObject payload = BasicDBObject.parse(respPayload);
+
+            BasicDBObject payload;
+            try {
+                payload = BasicDBObject.parse(respPayload);
+            } catch (Exception e) {
+                payload = BasicDBObject.parse("{}");
+            }
+
             deletedInfo.addAll(responseTemplate.process2(payload, baseURL.getUrl(), methodStr, statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap));
             responseTemplate.processHeaders(responseParams.getHeaders(), baseURL.getUrl(), method.name(), statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap);
             if (!responseParams.getIsPending()) {
                 responseTemplate.processTraffic(responseParams.getTime());
             }
-        } catch (JsonParseException e) {
 
+        } catch (JsonParseException e) {
+            logger.error("Failed to parse json payload " + e.getMessage());
         }
     }
 
@@ -232,7 +249,7 @@ public class APICatalogSync {
                         continue;
                     }
 
-                    if (dbTemplate.compare(newTemplate, mergedTemplate)) {
+                    if (areBothUuidUrls(newUrl,dbUrl,mergedTemplate) || dbTemplate.compare(newTemplate, mergedTemplate)) {
                         Set<RequestTemplate> similarTemplates = potentialMerges.get(mergedTemplate);
                         if (similarTemplates == null) {
                             similarTemplates = new HashSet<>();
@@ -275,7 +292,7 @@ public class APICatalogSync {
             for (URLStatic deltaUrl: deltaCatalog.getStrictURLToMethods().keySet()) {
                 RequestTemplate deltaTemplate = deltaTemplates.get(deltaUrl);
                 URLTemplate mergedTemplate = tryMergeUrls(deltaUrl, newUrl);
-                if (mergedTemplate == null || RequestTemplate.isMergedOnStr(mergedTemplate)) {
+                if (mergedTemplate == null || (RequestTemplate.isMergedOnStr(mergedTemplate) && !areBothUuidUrls(newUrl,deltaUrl,mergedTemplate))) {
                     continue;
                 }
 
@@ -303,6 +320,24 @@ public class APICatalogSync {
             deltaTemplates.put(newUrl, newTemplate);
             iterator.remove();
         }
+    }
+
+    public static boolean areBothUuidUrls(URLStatic newUrl, URLStatic deltaUrl, URLTemplate mergedTemplate) {
+        String[] n = tokenize(newUrl.getUrl());
+        String[] o = tokenize(deltaUrl.getUrl());
+        SuperType[] b = mergedTemplate.getTypes();
+        for (int idx =0 ; idx < b.length; idx++) {
+            SuperType c = b[idx];
+            if (Objects.equals(c, SuperType.STRING) && o.length > idx) {
+                String val = n[idx];
+                Pattern pattern = patternToSubType.get(SingleTypeInfo.UUID);
+                if(pattern.matcher(val).matches() && pattern.matcher(o[idx]).matches()) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
 
@@ -787,7 +822,7 @@ public class APICatalogSync {
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
 
         boolean redact = false;
-        if (accountSettings != null && accountSettings.isRedactPayload() != null) {
+        if (accountSettings != null) {
             redact =  accountSettings.isRedactPayload();
         }
 

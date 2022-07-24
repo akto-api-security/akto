@@ -5,6 +5,44 @@
             <div class="entry-value">{{getActiveAccount()}}</div>
         </div>
 
+        <div class="account-id">
+            <div class="entry-text">Dashboard Version</div>
+            <div class="entry-value">{{this.dashboardVersion}}</div>
+        </div>
+
+        <div class="account-id">
+            <div class="entry-text">Runtime Version</div>
+            <div class="entry-value">{{this.apiRuntimeVersion}}</div>
+        </div>
+
+        <div class="toggle-redact-feature" v-if="localSetupType !== null">
+            <div class="entry-text">Setup Type</div>
+            <div class="entry-value">
+                <div class="text-center">
+                    <v-menu offset-y>
+                        <template v-slot:activator="{ on, attrs }">
+                            <span
+                                v-bind="attrs"
+                                v-on="on"
+                                style="text-decoration: underline"
+                            >
+                                {{localSetupType}}
+                            </span>
+                        </template>
+                        <v-list>
+                            <v-list-item
+                                v-for="(item, index) in setup_types"
+                                :key="index"
+                                @click="localSetupType = item"
+                            >
+                                <v-list-item-title>{{ item }}</v-list-item-title>
+                            </v-list-item>
+                        </v-list>
+                    </v-menu>
+                </div>
+            </div>
+        </div>
+
         <div class="toggle-redact-feature" v-if="localRedactPayload !== null">
             <div class="entry-text">Redact sample data</div>
             <div class="entry-value">
@@ -26,6 +64,7 @@ import {mapState} from 'vuex'
         },
         data () {
             return {
+                setup_types: ["STAGING", "PROD", "QA", "DEV"]
             }
         },
         methods: {
@@ -37,7 +76,7 @@ import {mapState} from 'vuex'
             this.$store.dispatch('team/fetchAdminSettings')
         },
         computed: {
-            ...mapState('team', ['redactPayload']),
+            ...mapState('team', ['redactPayload', 'setupType', 'dashboardVersion', 'apiRuntimeVersion']),
             localRedactPayload: {
                 get() {
                     return this.redactPayload
@@ -45,6 +84,14 @@ import {mapState} from 'vuex'
                 set(v) {
                     this.$store.dispatch('team/toggleRedactFeature', v)
                 }
+            },
+            localSetupType: {
+              get() {
+                return this.setupType
+              },
+              set(v) {
+                this.$store.dispatch('team/updateSetupType', v)
+              }
             }
         }
     }
@@ -54,17 +101,19 @@ import {mapState} from 'vuex'
 .entry-text
     font-weight: 500
     margin-right: 16px
+    width: 200px
 
 
 .account-id
     display: flex
-    height: 40px
+    height: 50px
+    vertical-align: middle
+    line-height: 50px
+
 
 .toggle-redact-feature
     display: flex
     height: 60px
-    vertical-align: middle
-    text-align: center
     line-height: 60px
 </style>
 

@@ -6,14 +6,14 @@ name: CI
 on:
   # Triggers the workflow on push or pull request events but only for the master branch
   push:
-    branches: [ master ]
+    branches: [ master, develop ]
   pull_request:
     branches: [ master, develop ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
     inputs:
-      Tag: 
+      Tag:
         required: true
         default: 'latest'
       Environment:
@@ -47,7 +47,7 @@ jobs:
       - name: Prepare Dashboard UI
         working-directory: ./apps/dashboard/
         run: npm install && npm run build
-      - run: mvn package
+      - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=${{steps.current-time.outputs.readableTime}}
       - name: Configure AWS credentials
         if: ${{ github.event.inputs.Environment == 'staging' }}
         uses: aws-actions/configure-aws-credentials@v1
@@ -78,7 +78,12 @@ jobs:
           echo "Pushing image to ECR..."
           docker push $ECR_REGISTRY/$ECR_REPOSITORY-api-runtime:$IMAGE_TAG
           echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-api-runtime:$IMAGE_TAG"
-       
+          cd ../testing
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-api-testing:$IMAGE_TAG .
+          echo "Pushing image to ECR..."
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY-api-testing:$IMAGE_TAG
+          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-api-testing:$IMAGE_TAG"
+
       - name: Deploy to AWS CloudFormation
         if: ${{ github.event.inputs.Environment == 'staging'}}
         uses: aws-actions/aws-cloudformation-github-deploy@v1
@@ -114,5 +119,30 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-runtime:$IMAGE_TAG .
           echo "Pushing image to ECR..."
           docker push $ECR_REGISTRY/$ECR_REPOSITORY-runtime:$IMAGE_TAG
-          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-runtime:$IMAGE_TAG"
-       
+          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-runtime:$IMAGE_TAG"       
+          cd ../testing
+          docker build -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG .
+          echo "Pushing image to ECR..."
+          docker push $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG
+          echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"       
+      - name: Set up JDK 11
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v1
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+      - name: Cache Maven packages
+        uses: actions/cache@v1
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+      - name: Build and analyze
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=akto-api-security_mono

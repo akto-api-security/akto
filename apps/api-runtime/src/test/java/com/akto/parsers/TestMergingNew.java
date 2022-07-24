@@ -61,6 +61,40 @@ public class TestMergingNew extends MongoBasedTest {
     }
 
     @Test
+    public void testUUIDForceMerge() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+        HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1);
+        String url = "api/notifications/";
+        List<HttpResponseParams> responseParams = new ArrayList<>();
+        List<String> urls = new ArrayList<>();
+        while (urls.size() < 50) {
+            UUID uuid = UUID.randomUUID();
+            String finalUrl = url + uuid + "/received";
+            urls.add(finalUrl);
+        }
+
+        int i = 0;
+        for (String c: urls) {
+            HttpResponseParams resp = createDifferentHttpResponseParams(i*100, c);
+            responseParams.add(resp);
+            i +=1;
+        }
+
+        parser.syncFunction(responseParams.subList(0,1));
+        parser.apiCatalogSync.syncWithDB();
+        assertEquals(1, getStaticURLsSize(parser));
+
+        parser.syncFunction(responseParams.subList(1,2));
+        parser.apiCatalogSync.syncWithDB();
+        assertEquals(0, getStaticURLsSize(parser));
+
+//        parser.syncFunction(responseParams.subList(28,33));
+//        parser.apiCatalogSync.syncWithDB();
+//        assertEquals(0, getStaticURLsSize(parser));
+    }
+
+    @Test
     public void testParameterizedURLsTestString() {
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
@@ -90,6 +124,40 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.syncWithDB();
         assertEquals(0, getStaticURLsSize(parser));
     }
+
+    @Test
+    public void testNonJsonResponsePayloadPayload() throws Exception {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+
+        String a = "{\"path\": \"https://invoices.razorpay.com/v1/l/inv_\", \"method\": \"POST\", \"type\": \"HTTP/1.1\", \"requestHeaders\": \"{\\\"X-Killbill-ApiKey\\\": \\\"mplgaming\\\", \\\"Authorization\\\": \\\"Basic somerandom=\\\", \\\"X-Killbill-ApiSecret\\\": \\\"something\\\", \\\"Accept\\\": \\\"application/json\\\", \\\"X-MPL-COUNTRYCODE\\\": \\\"IN\\\", \\\"X-Killbill-CreatedBy\\\": \\\"test-payment\\\", \\\"Content-type\\\": \\\"application/json\\\"}\", \"requestPayload\": \"{}\", \"statusCode\": \"200\", \"responseHeaders\": \"{\\\"Date\\\": \\\"Mon, 18 Apr 2022 13:05:16 GMT\\\", \\\"Content-Type\\\": \\\"application/json\\\", \\\"Transfer-Encoding\\\": \\\"chunked\\\", \\\"Connection\\\": \\\"keep-alive\\\", \\\"Server\\\": \\\"Apache-Coyote/1.1\\\", \\\"Access-Control-Allow-Origin\\\": \\\"*\\\", \\\"Access-Control-Allow-Methods\\\": \\\"GET, POST, DELETE, PUT, OPTIONS\\\", \\\"Access-Control-Allow-Headers\\\": \\\"Authorization,Content-Type,Location,X-Killbill-ApiKey,X-Killbill-ApiSecret,X-Killbill-Comment,X-Killbill-CreatedBy,X-Killbill-Pagination-CurrentOffset,X-Killbill-Pagination-MaxNbRecords,X-Killbill-Pagination-NextOffset,X-Killbill-Pagination-NextPageUri,X-Killbill-Pagination-TotalNbRecords,X-Killbill-Reason\\\", \\\"Access-Control-Expose-Headers\\\": \\\"Authorization,Content-Type,Location,X-Killbill-ApiKey,X-Killbill-ApiSecret,X-Killbill-Comment,X-Killbill-CreatedBy,X-Killbill-Pagination-CurrentOffset,X-Killbill-Pagination-MaxNbRecords,X-Killbill-Pagination-NextOffset,X-Killbill-Pagination-NextPageUri,X-Killbill-Pagination-TotalNbRecords,X-Killbill-Reason\\\", \\\"Access-Control-Allow-Credentials\\\": \\\"true\\\"}\", \"status\": \"OK\", \"responsePayload\": \"aaaaa\", \"ip\": \"\", \"time\": \"1650287116\", \"akto_account_id\": \"1000000\", \"akto_vxlan_id\": 123, \"source\": \"OTHER\"}";
+        List<HttpResponseParams> responseParams = new ArrayList<>();
+        for (int i = 0; i < 30; i++) {
+            HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(a);
+            httpResponseParams.requestParams.url += i;
+            responseParams.add(httpResponseParams);
+        }
+
+        HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1);
+
+        parser.syncFunction(responseParams.subList(0,10));
+        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(10,25));
+        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(25,30));
+        parser.apiCatalogSync.syncWithDB();
+
+
+        Map<URLTemplate, RequestTemplate> urlTemplateMap = parser.apiCatalogSync.getDelta(0).getTemplateURLToMethods();
+        Map<URLStatic, RequestTemplate> urlStaticMap = parser.apiCatalogSync.getDelta(0).getStrictURLToMethods();
+
+        assertEquals(urlTemplateMap.size(), 1);
+        assertEquals(urlStaticMap.size(), 0);
+
+    }
+
+
+
 
     @Test
     public void testEmptyResponsePayload() throws Exception {
@@ -223,6 +291,29 @@ public class TestMergingNew extends MongoBasedTest {
         return ret.toJson();
     }
 
+    public static String createDifferentResponsePayload(String k, int start) {
+        BasicDBObject ret = new BasicDBObject();
+
+        while (start < 10) {
+            ret.append(k+"_"+start, "Avneesh");
+            start += 1;
+        }
+
+        return ret.toJson();
+    }
+
+    public static HttpResponseParams createDifferentHttpResponseParams(int start, String url) {
+        HttpRequestParams httpRequestParams = new HttpRequestParams(
+                "GET", url, "", new HashMap<>(), createDifferentResponsePayload("req",start), 123
+        );
+
+        return new HttpResponseParams(
+                "", 200, "", new HashMap<>(), createDifferentResponsePayload("resp", start), httpRequestParams,
+                0,"1000000",false, HttpResponseParams.Source.MIRRORING,"", ""
+        );
+    }
+
+
     public static String createSimpleResponsePayload(String k) {
         BasicDBObject ret = new BasicDBObject();
 
@@ -284,5 +375,57 @@ public class TestMergingNew extends MongoBasedTest {
         ret.requestParams.setApiCollectionId(123);
         ret.setOrig(ret.toString());
         return ret;
+    }
+
+    @Test
+    public void testAllPaths() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+        String url = "link/";
+
+        List<HttpResponseParams> responseParams = new ArrayList<>();
+
+        HttpResponseParams resp = TestDump2.createSampleParams("user1", url+1);
+        ArrayList<String> newHeader = new ArrayList<>();
+        newHeader.add("hnew");
+        resp.getHeaders().put("new header", newHeader);
+        responseParams.add(resp);
+        resp.setSource(HttpResponseParams.Source.HAR);
+        HttpCallParser parser = new HttpCallParser("access-token", 10,40,10);
+
+        /* tryMergingWithKnownStrictURLs - put in delta-static */
+        parser.syncFunction(responseParams);
+        assertTrue(parser.getSyncCount() == 0);
+
+        /* processKnownStaticURLs */
+        parser.syncFunction(responseParams);
+
+        /* tryMergingWithKnownStrictURLs - merge with delta-static */
+        responseParams.add(TestDump2.createSampleParams("user"+2, url+2));
+        responseParams.add(TestDump2.createSampleParams("user"+3, url+3));
+
+        /* tryMergingWithKnownStrictURLs - merge with delta-template */
+        responseParams.add(TestDump2.createSampleParams("user"+4, url+4));
+        parser.syncFunction(responseParams);
+        assertTrue(parser.getSyncCount() == 0);
+
+        /* tryMergingWithKnownTemplates */
+        parser.syncFunction(responseParams);
+        assertTrue(parser.getSyncCount() == 0);
+
+        /* tryMergingWithKnownStrictURLs - merge with Db url */
+        url = "payment/";
+        responseParams = new ArrayList<>();
+        responseParams.add(TestDump2.createSampleParams("user"+2, url+2));
+        responseParams.get(0).setSource(HttpResponseParams.Source.HAR);
+        parser.syncFunction(responseParams);
+        responseParams = new ArrayList<>();
+        responseParams.add(TestDump2.createSampleParams("user"+3, url+3));
+
+        /* tryMergingWithKnownStrictURLs - merge with Db url - template already exists in delta */
+        responseParams.add(TestDump2.createSampleParams("user"+4, url+4));
+        responseParams.get(0).setSource(HttpResponseParams.Source.HAR);
+        parser.syncFunction(responseParams);
+
     }
 }

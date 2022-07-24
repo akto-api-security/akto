@@ -1,11 +1,14 @@
 package com.akto.testing;
 
 import com.akto.DaoInit;
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.TestingRunDao;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.testing.*;
+import com.akto.dao.testing.*;
 import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
+import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -21,6 +24,28 @@ public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
+    public static void invokeScheduledTests() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                Context.accountId.set(1_000_000);
+                int now = Context.now();
+                for(TestingSchedule ts: TestingSchedulesDao.instance.findAll(Filters.lte(TestingSchedule.START_TIMESTAMP, now))) {
+                    TestingRun sampleTestingRun = ts.getSampleTestingRun();
+                    sampleTestingRun.setScheduleTimestamp(now); //insert in DB
+                    TestingRunDao.instance.insertOne(sampleTestingRun);
+                    int nextTs = ts.getStartTimestamp() + 86400; // update in DB
+
+                    Bson query = Filters.eq("_id", ts.getId());
+                    if (ts.getRecurring()) {
+                        TestingSchedulesDao.instance.updateOne(query, Updates.set(TestingSchedule.START_TIMESTAMP, nextTs));
+                    } else {
+                        TestingSchedulesDao.instance.deleteAll(query);
+                    }
+                }
+            }
+        }, 0, 5, TimeUnit.MINUTES);
+    }
+
     public static void main(String[] args) throws InterruptedException {
         logger.info("Starting testing module....");
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
@@ -31,18 +56,13 @@ public class Main {
             public void run() {
                 Context.accountId.set(1_000_000);
                 SampleMessageStore.fetchSampleMessages();
-            }
-        }, 5, 5, TimeUnit.MINUTES);
-
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            public void run() {
-                Context.accountId.set(1_000_000);
                 AuthMechanismStore.fetchAuthMechanism();
             }
         }, 5, 5, TimeUnit.MINUTES);
 
+        invokeScheduledTests();
 
-        int delta = Context.now() - 60*60;
+        int delta = Context.now() - 20*60;
 
         Bson filter1 = Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED);
         Bson filter2 = Filters.and(
@@ -59,6 +79,14 @@ public class Main {
         AuthMechanismStore.fetchAuthMechanism();
 
         logger.info("Starting.......");
+
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(new BasicDBObject());
+        boolean runStatusCodeAnalyser = accountSettings == null ||
+                accountSettings.getSetupType() != AccountSettings.SetupType.PROD;
+
+        if (runStatusCodeAnalyser) {
+            StatusCodeAnalyser.run();
+        }
 
         while (true) {
             int start = Context.now();
@@ -82,7 +110,7 @@ public class Main {
             try {
                 TestExecutor.init(testingRun);
             } catch (Exception e) {
-                // TODO:
+                e.printStackTrace();
             }
 
             Bson completedUpdate = Updates.combine(
@@ -96,10 +124,5 @@ public class Main {
 
             logger.info("Tests completed in " + (Context.now() - start) + " seconds");
         }
-
-
-
-
-
     }
 }

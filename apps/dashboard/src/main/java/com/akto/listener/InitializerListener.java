@@ -147,8 +147,9 @@ public class InitializerListener implements ServletContextListener {
         try {
             
             ChangesInfo ret = new ChangesInfo();
-            List<BasicDBObject> newEndpointsSmallerDuration = new InventoryAction().fetchRecentEndpoints(newSensitiveParamsDays * 24 * 60 * 60);
-            List<BasicDBObject> newEndpointsBiggerDuration = new InventoryAction().fetchRecentEndpoints(newEndpointsDays * 24 * 60 * 60);
+            int now = Context.now();
+            List<BasicDBObject> newEndpointsSmallerDuration = new InventoryAction().fetchRecentEndpoints(now - newSensitiveParamsDays * 24 * 60 * 60, now);
+            List<BasicDBObject> newEndpointsBiggerDuration = new InventoryAction().fetchRecentEndpoints(now - newEndpointsDays * 24 * 60 * 60, now);
 
             for (BasicDBObject singleTypeInfo: newEndpointsSmallerDuration) {
                 singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
@@ -163,7 +164,6 @@ public class InitializerListener implements ServletContextListener {
             List<SingleTypeInfo> sensitiveParamsList = new InventoryAction().fetchSensitiveParams();
             ret.totalSensitiveParams = sensitiveParamsList.size();
             ret.recentSentiiveParams = 0;
-            int now = Context.now();
             int delta = newSensitiveParamsDays * 24 * 60 * 60;
             Map<Pair<String, String>, Set<String>> endpointToSubTypes = new HashMap<>();
             for(SingleTypeInfo sti: sensitiveParamsList) {
@@ -217,7 +217,7 @@ public class InitializerListener implements ServletContextListener {
 
     public void dropSampleDataIfEarlierNotDroped(AccountSettings accountSettings) {
         if (accountSettings == null) return;
-        if (accountSettings.isRedactPayload() == true && !accountSettings.isSampleDataCollectionDropped()) {
+        if (accountSettings.isRedactPayload() && !accountSettings.isSampleDataCollectionDropped()) {
             AdminSettingsAction.dropCollections(Context.accountId.get());
         }
 
@@ -256,5 +256,11 @@ public class InitializerListener implements ServletContextListener {
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
         dropSampleDataIfEarlierNotDroped(accountSettings);
+
+        try {
+            AccountSettingsDao.instance.updateVersion(AccountSettings.DASHBOARD_VERSION);
+        } catch (Exception e) {
+            logger.error("error while updating dashboard version: " + e.getMessage());
+        }
     }
 }

@@ -13,14 +13,20 @@ const team = {
         name: '',
         fetchTs: 0,
         team: {},
-        redactPayload: null
+        redactPayload: null,
+        dashboardVersion: null,
+        apiRuntimeVersion: null,
+        setupType: null
     },
     getters: {
         getId: (state) => state.id,
         getUsers: (state) => state.users,
         getName: (state) => state.name,
         getTeam: (state) => state.team,
-        getRedactPayload: (state) => state.redactPayload
+        getRedactPayload: (state) => state.redactPayload,
+        getDashboardVersion: (state) => state.dashboardVersion,
+        getApiRuntimeVersion: (state) => state.apiRuntimeVersion,
+        getSetupType: (state) => state.setupType
     },
     mutations: {
         SET_TEAM_DETAILS(state, details) {
@@ -38,11 +44,17 @@ const team = {
             state.team = {}
         },
         SET_ADMIN_SETTINGS(state, resp) {
-            console.log(resp)
             if (!resp.accountSettings) {
                 state.redactPayload = false
+                state.apiRuntimeVersion = "null"
+                state.dashboardVersion = "null"
             } else {
                 state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
+                state.apiRuntimeVersion = resp.accountSettings.apiRuntimeVersion ? resp.accountSettings.apiRuntimeVersion : "null"
+                state.dashboardVersion = resp.accountSettings.dashboardVersion ? resp.accountSettings.dashboardVersion : "null"
+                state.setupType = "STAGING"
+                state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
+                state.setupType = resp.accountSettings.setupType
             }
         },
     },
@@ -60,6 +72,16 @@ const team = {
         toggleRedactFeature({commit, dispatch, state}, v) {
             api.toggleRedactFeature(v).then((resp => {
                 state.redactPayload = v
+            }))
+        },
+        updateSetupType({commit, dispatch, state}, v) {
+            api.updateSetupType(v).then((resp => {
+                state.setupType = v
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: "Setup type updated successfully",
+                    color: 'green'
+                })
             }))
         },
         removeUser({commit, dispatch}, user) {

@@ -1,26 +1,15 @@
 package com.akto.testing;
 
-import com.akto.DaoInit;
-import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.parsers.HttpCallParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import kotlin.Pair;
 import okhttp3.*;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URLEncoder;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -108,7 +97,8 @@ public class ApiExecutor {
     }
 
     public static HttpResponseParams sendRequest(HttpRequestParams httpRequestParams) throws Exception {
-        String url = httpRequestParams.url.toLowerCase();
+        // don't lowercase url because query params will change and will result in incorrect request
+        String url = httpRequestParams.url;
         url = url.trim();
         if (!url.startsWith("http")) {
             url = makeUrlAbsolute(url, httpRequestParams.getHeaders());
@@ -118,8 +108,11 @@ public class ApiExecutor {
         Request.Builder builder = new Request.Builder();
 
         // add headers
+        List<String> forbiddenHeaders = Arrays.asList("content-length", "accept-encoding");
         Map<String, List<String>> headersMap = httpRequestParams.getHeaders();
+        if (headersMap == null) headersMap = new HashMap<>();
         for (String headerName: headersMap.keySet()) {
+            if (forbiddenHeaders.contains(headerName)) continue;
             List<String> headerValueList = headersMap.get(headerName);
             if (headerValueList == null || headerValueList.isEmpty()) continue;
             for (String headerValue: headerValueList) {
@@ -130,9 +123,7 @@ public class ApiExecutor {
 
         URLMethods.Method method = URLMethods.Method.valueOf(httpRequestParams.getMethod());
 
-        if (!method.equals(URLMethods.Method.GET)) { // GET url is added later in pipeline
-            builder = builder.url(url);
-        }
+        builder = builder.url(url);
 
         HttpResponseParams httpResponseParams = null;
         switch (method) {
@@ -156,31 +147,6 @@ public class ApiExecutor {
     }
 
     public static HttpResponseParams getRequest(HttpRequestParams httpRequestParams, Request.Builder builder)  throws Exception{
-        String url = httpRequestParams.getURL();
-//        URI u = new URI(url);
-//
-//        StringBuilder sb = new StringBuilder(u.getQuery() == null ? "" : u.getQuery());
-//
-//        // add query params
-//        String payload = httpRequestParams.getPayload();
-//        JsonNode node = mapper.readTree(payload);
-//        if (node.isObject()) {
-//            Iterator<String> fieldNames = node.fieldNames();
-//            while(fieldNames.hasNext()) {
-//                String fieldName = fieldNames.next();
-//                JsonNode fieldValue = node.get(fieldName);
-//                if (fieldValue.isValueNode()) {
-//                    if (sb.length() > 0) sb.append('&');
-//                    sb.append(URLEncoder.encode(fieldName, "UTF-8"));
-//                    sb.append('=');
-//                    sb.append(URLEncoder.encode(fieldValue.asText(), "UTF-8")); //TODO: asText is not always the best option
-//                }
-//            }
-//            u = new URI(u.getScheme(), u.getAuthority(), u.getPath(),
-//                    sb.toString(), u.getFragment());
-//        }
-
-        builder = builder.url(url);
         Request request = builder.build();
         return common(request);
     }

@@ -116,6 +116,12 @@ public class Main {
         createIndices();
         insertRuntimeFilters();
 
+        try {
+            AccountSettingsDao.instance.updateVersion(AccountSettings.API_RUNTIME_VERSION);
+        } catch (Exception e) {
+            logger.error("error while updating dashboard version: " + e.getMessage());
+        }
+
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("_id", 0);
         if (apiCollection == null) {
             Set<String> urls = new HashSet<>();
@@ -160,7 +166,7 @@ public class Main {
         long lastSyncOffset = 0;
 
         try {
-            main.consumer.subscribe(Collections.singleton(topicName));
+            main.consumer.subscribe(Arrays.asList(topicName, "har_"+topicName));
             while (true) {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 main.consumer.commitSync();

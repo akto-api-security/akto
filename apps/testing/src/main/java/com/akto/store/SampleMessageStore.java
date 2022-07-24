@@ -25,6 +25,7 @@ public class SampleMessageStore {
         System.out.println("SampleDataSize " + sampleDataList.size());
         Map<ApiInfo.ApiInfoKey, List<String>> tempSampleDataMap = new HashMap<>();
         for (SampleData sampleData: sampleDataList) {
+            if (sampleData.getSamples() == null) continue;
             Key key = sampleData.getId();
             ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(key.getApiCollectionId(), key.getUrl(), key.getMethod());
             if (tempSampleDataMap.containsKey(apiInfoKey)) {
@@ -38,18 +39,24 @@ public class SampleMessageStore {
     }
 
 
-    public static HttpRequestParams fetchPath(ApiInfo.ApiInfoKey apiInfoKey) {
+    public static HttpResponseParams fetchOriginalMessage(ApiInfo.ApiInfoKey apiInfoKey) {
         List<String> samples = sampleDataMap.get(apiInfoKey);
         if (samples == null || samples.isEmpty()) return null;
         String message = samples.get(0);
         try {
-                HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(message);
-                return httpResponseParams.getRequestParams();
+            return HttpCallParser.parseKafkaMessage(message);
         } catch(Exception e) {
             return null;
         }
     }
 
+    public static HttpRequestParams fetchPath(ApiInfo.ApiInfoKey apiInfoKey) {
+        HttpResponseParams httpResponseParams = fetchOriginalMessage(apiInfoKey);
+        if (httpResponseParams == null) return null;
+        return httpResponseParams.getRequestParams();
+    }
+
+    // TODO: if being used then make sure to add unit tests
     public static HttpRequestParams fetchHappyPath(ApiInfo.ApiInfoKey apiInfoKey) {
         List<String> samples = sampleDataMap.get(apiInfoKey);
         if (samples == null || samples.isEmpty()) return null;

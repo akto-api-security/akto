@@ -107,7 +107,12 @@ const router =  new Router({
                         {
                             path: 'changes',
                             name: 'changes',
-                            component: ApiChanges
+                            component: ApiChanges,
+                            props: route => ({
+                                openTab: route.query.tab === "parameters" ? "parameters" : "endpoints",
+                                defaultStartTimestamp: +route.query.start,
+                                defaultEndTimestamp: +route.query.end
+                            })
                         },
                         {
                             path: 'sensitive',

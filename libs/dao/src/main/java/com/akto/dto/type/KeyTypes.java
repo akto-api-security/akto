@@ -22,10 +22,10 @@ public class KeyTypes {
     public static InetAddressValidator ipAddressValidator = InetAddressValidator.getInstance();
     public static final Map<SubType, Pattern> patternToSubType = new HashMap<>();
     static {
-        patternToSubType.put(SingleTypeInfo.EMAIL, Pattern.compile("^[a-zA-Z0-9_+&*-]+(?:\\.[a-zA-Z0-9_+&*-]+)*@(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,7}$"));
-        patternToSubType.put(SingleTypeInfo.URL, Pattern.compile("^((((https?|ftps?|gopher|telnet|nntp)://)|(mailto:|news:))([-%()_.!~*';/?:@&=+$,A-Za-z0-9])+)$"));
-        patternToSubType.put(SingleTypeInfo.SSN, Pattern.compile("^\\d{3}-\\d{2}-\\d{4}$"));
-        patternToSubType.put(SingleTypeInfo.UUID, Pattern.compile("^[A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{12}$"));
+        patternToSubType.put(SingleTypeInfo.EMAIL, Pattern.compile("^[a-zA-Z0-9_+&*-]+(?:\\.[a-zA-Z0-9_+&*-]+)*@(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,7}$", Pattern.CASE_INSENSITIVE));
+        patternToSubType.put(SingleTypeInfo.URL, Pattern.compile("^((((https?|ftps?|gopher|telnet|nntp)://)|(mailto:|news:))([-%()_.!~*';/?:@&=+$,A-Za-z0-9])+)$", Pattern.CASE_INSENSITIVE));
+        patternToSubType.put(SingleTypeInfo.SSN, Pattern.compile("^\\d{3}-\\d{2}-\\d{4}$", Pattern.CASE_INSENSITIVE));
+        patternToSubType.put(SingleTypeInfo.UUID, Pattern.compile("^[A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{12}$", Pattern.CASE_INSENSITIVE));
 
     }
 
@@ -88,15 +88,24 @@ public class KeyTypes {
         singleTypeInfo.incr(object);
     }
 
-    private SubType findSubType(Object o,String key) {
+    public static SubType findSubType(Object o,String key) {
         if (o == null) {
             return SingleTypeInfo.NULL;
+        }
+
+        if (o instanceof Boolean) {
+            Boolean bool = (Boolean) o;
+            return bool ? SingleTypeInfo.TRUE : SingleTypeInfo.FALSE;
         }
 
         for (CustomDataType customDataType: SingleTypeInfo.customDataTypesSortedBySensitivity) {
             if (!customDataType.isActive()) continue;
             boolean result = customDataType.validate(o,key);
             if (result) return customDataType.toSubType();
+        }
+
+        if (isCreditCard(o.toString())) {
+            return SingleTypeInfo.CREDIT_CARD;
         }
 
         if (NumberUtils.isDigits(o.toString())) {
@@ -127,11 +136,6 @@ public class KeyTypes {
             return SingleTypeInfo.FLOAT;
         }
 
-        if (o instanceof Boolean) {
-            Boolean bool = (Boolean) o;
-            return bool ? SingleTypeInfo.TRUE : SingleTypeInfo.FALSE;
-        }
-
         if (o instanceof String) {
             String str = o.toString();
             for(SubType subType: patternToSubType.keySet()) {
@@ -148,9 +152,6 @@ public class KeyTypes {
                 return SingleTypeInfo.PHONE_NUMBER;
             }
 
-            if (isCreditCard(str)) {
-                return SingleTypeInfo.CREDIT_CARD;
-            }
             if (isIP(str)) {
                 return SingleTypeInfo.IP_ADDRESS;
             }
@@ -244,8 +245,9 @@ public class KeyTypes {
     }
 
     public static boolean isCreditCard(String s) {
-        String cc = s.replaceAll(" ", "");
-        if (cc.length() < 12 || cc.length() > 23) return false;
+        if (s.length() < 12) return false;
+        String cc = s.replaceAll(" ", "").replaceAll("-", "");
+        if (cc.length() > 23) return false;
         if (!cc.toLowerCase().equals(cc.toUpperCase())) return false; // only numbers
         return creditCardValidator.isValid(cc);
     }

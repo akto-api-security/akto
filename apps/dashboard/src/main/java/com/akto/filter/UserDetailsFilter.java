@@ -50,6 +50,11 @@ public class UserDetailsFilter implements Filter {
 
     private void redirectIfNotLoginURI(FilterChain filterChain, HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse) throws IOException, ServletException {
 
+        if (httpServletRequest.getRequestURI().contains(API_URI)) {
+            httpServletResponse.sendError(403);
+            return ;
+        }
+
         if (!httpServletRequest.getRequestURI().contains(LOGIN_URI) && !httpServletRequest.getRequestURI().contains("/auth/login") && !httpServletRequest.getRequestURI().contains("api/googleConfig")) {
             System.out.println("redirecting from " + httpServletRequest.getRequestURI() + " to login");
             httpServletResponse.sendRedirect(LOGIN_URI+"?redirect_uri="+httpServletRequest.getRequestURI());
@@ -144,9 +149,20 @@ public class UserDetailsFilter implements Filter {
         }
 
         HttpSession session = httpServletRequest.getSession(apiKeyFlag);
+        // session will be non-null for external API Key requests and when session data has not been deleted
         if (session == null ) {
-            redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
-            return ;
+            System.out.println("Session expired");
+            Token tempToken = AccessTokenAction.generateAccessTokenFromServletRequest(httpServletRequest);
+            // If we are able to extract token from Refresh Token then this means RT is valid and new session can be created
+            if (tempToken== null) {
+                redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
+                return;
+            }
+            session = httpServletRequest.getSession(true);
+            session.setAttribute("username", username);
+            session.setAttribute("login", Context.now());
+            session.setAttribute("signedUp", signedUp);
+            System.out.println("New session created");
         }
 
         // only for access-token based auth we check if session is valid or not
