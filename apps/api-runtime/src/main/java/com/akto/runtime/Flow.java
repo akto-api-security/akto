@@ -65,7 +65,7 @@ public class Flow {
         HttpCallParser h =  new HttpCallParser("access-token", 10,10,10);
         List<String> kk = new ArrayList<>();
 
-        FileInputStream fstream = new FileInputStream("/home/avneesh/Desktop/akto-security/api-runtime/src/resources/log_check.json");
+        FileInputStream fstream = new FileInputStream("/home/avneesh/Desktop/akto-security/api-runtime/src/main/resources/log_check.json");
         BufferedReader br = new BufferedReader(new InputStreamReader(fstream));
         String strLine;
         while ((strLine = br.readLine()) != null)   {
