@@ -119,9 +119,13 @@ export default {
                     text: 'Discovered',
                     value: 'date',
                     sortKey: 'detectedTs'
-                }                
+                },
+                {
+                  text: 'Domain',
+                  value: 'domain',
+                }
             ],
-            actions: [
+          actions: [
                 {
                     isValid: item => this.isValid(item),
                     icon: item => item.x.savedAsSensitive ? '$fas_lock-open' : '$fas_lock',
@@ -155,7 +159,8 @@ export default {
                 date: this.prettifyDate(x.timestamp),
                 detectedTs: x.timestamp,
                 location: (x.responseCode == -1 ? 'Request' : 'Response') + ' ' + (x.isHeader ? 'headers' : 'payload'),
-                x: x
+                x: x,
+                domain: x.domain
             }
         },
         toggleSensitiveFieldFunc (item) {

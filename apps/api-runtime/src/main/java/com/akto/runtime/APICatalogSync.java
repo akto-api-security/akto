@@ -4,7 +4,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
-import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
@@ -23,7 +22,6 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.types.CappedSet;
 import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.DeleteOneModel;
 import com.mongodb.client.model.DeleteOptions;
@@ -650,7 +648,7 @@ public class APICatalogSync {
                 } else {
                     deltaInfo.setDomain(dbInfo.getDomain());
                     deltaInfo.setValues(new CappedSet<>());
-                    if (dbInfo.getValues().getElements().size() > 0) {
+                    if (dbInfo.getValues().getElements().isEmpty()) {
                         Bson bson = Updates.set(SingleTypeInfo.VALUES+".elements",new ArrayList<>());
                         update = Updates.combine(update, bson);
                     }

@@ -30,6 +30,23 @@ import static org.junit.Assert.*;
 
 public class TestSingleTypeInfoDao extends MongoBasedTest {
 
+    // testDefaultDomain to test if single type info in db has domain value null then if default gets set to ENUM or not
+    @Test
+    public void testDefaultDomain() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(
+                "url", "GET",200, false, "param#key", SingleTypeInfo.EMAIL, 0, false
+        );
+        SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 0,0,0);
+        SingleTypeInfoDao.instance.updateOne(
+                SingleTypeInfoDao.createFilters(singleTypeInfo), Updates.inc("count",1)
+        );
+
+        SingleTypeInfo singleTypeInfoFromDb = SingleTypeInfoDao.instance.findOne(new BasicDBObject());
+        assertEquals(SingleTypeInfo.Domain.ENUM, singleTypeInfoFromDb.getDomain());
+
+    }
+
     @Test
     public void testInsertAndFetchAktoDefined() {
         SingleTypeInfoDao.instance.getMCollection().drop();

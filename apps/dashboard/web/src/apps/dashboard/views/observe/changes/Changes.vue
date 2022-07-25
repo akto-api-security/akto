@@ -289,6 +289,10 @@ export default {
                     text: constants.DISCOVERED,
                     value: 'added',
                     sortKey: 'timestamp'
+                },
+                {
+                  text: 'Domain',
+                  value: 'domain',
                 }
             ]
         }
@@ -413,7 +417,8 @@ export default {
                 detectedTs: x.timestamp,
                 apiCollectionId: x.apiCollectionId,
                 apiCollectionName: idToNameMap[x.apiCollectionId] || '-',
-                x: x
+                x: x,
+                domain: x.domain
             }
         },
         async fetchRecentParams(sortKey, sortOrder, skip, limit, filters, filterOperators) {

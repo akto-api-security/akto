@@ -14,12 +14,15 @@ import io.swagger.v3.oas.models.media.*;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.codecs.pojo.annotations.BsonProperty;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static com.google.common.primitives.Longs.min;
 import static java.lang.Long.max;
 
 public class SingleTypeInfo {
 
+    private static final Logger logger = LoggerFactory.getLogger(SingleTypeInfo.class);
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     public static void init() {
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -613,11 +616,11 @@ public class SingleTypeInfo {
                 // this is done so that both integer and decimal values can be parsed
                 // But while storing double we omit the decimal part
                 double d = Double.parseDouble(o.toString());
-                long l = Double.valueOf(d).longValue();
+                long l = (long) d;
                 this.minValue = min(this.minValue, l);
                 this.maxValue = max(this.maxValue, l);
             } catch (Exception e) {
-                System.out.println("ERROR: while parsing long for min max in sti" + o.toString());
+                logger.error("ERROR: while parsing long for min max in sti " + o.toString());
             }
         }
     }
