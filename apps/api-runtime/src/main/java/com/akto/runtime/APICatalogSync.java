@@ -648,7 +648,7 @@ public class APICatalogSync {
                 } else {
                     deltaInfo.setDomain(dbInfo.getDomain());
                     deltaInfo.setValues(new CappedSet<>());
-                    if (dbInfo.getValues().getElements().isEmpty()) {
+                    if (!dbInfo.getValues().getElements().isEmpty()) {
                         Bson bson = Updates.set(SingleTypeInfo.VALUES+".elements",new ArrayList<>());
                         update = Updates.combine(update, bson);
                     }
