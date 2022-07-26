@@ -330,7 +330,7 @@ public class SingleTypeInfo {
     boolean isUrlParam;
     public static final String VALUES = "values";
     public static final int VALUES_LIMIT = 50;
-    CappedSet<Integer> values = new CappedSet<>();
+    CappedSet<String> values = new CappedSet<String>();
     public static final String DOMAIN = "domain";
     Domain domain = Domain.ENUM;
     public static final String MIN_VALUE = "minValue";
@@ -406,7 +406,7 @@ public class SingleTypeInfo {
         Set<String> copyUserIds = new HashSet<>();
         copyUserIds.addAll(this.userIds);
 
-        CappedSet<Integer> copyValues = new CappedSet<>(new HashSet<>(this.values.getElements()));
+        CappedSet<String> copyValues = new CappedSet<String>(new HashSet<>(this.values.getElements()));
 
         ParamId paramId = new ParamId();
         paramId.url = url;
@@ -586,11 +586,11 @@ public class SingleTypeInfo {
     }
 
 
-    public CappedSet<Integer> getValues() {
+    public CappedSet<String> getValues() {
         return values;
     }
 
-    public void setValues(CappedSet<Integer> values) {
+    public void setValues(CappedSet<String> values) {
         this.values = values;
     }
 

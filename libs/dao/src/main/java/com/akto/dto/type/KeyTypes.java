@@ -76,7 +76,7 @@ public class KeyTypes {
 
         SingleTypeInfo.Domain domain = singleTypeInfo.getDomain();
         if (domain == null || domain == SingleTypeInfo.Domain.ENUM) {
-            singleTypeInfo.getValues().add(object.hashCode());
+            singleTypeInfo.getValues().add(object.toString());
         }
 
         SensitiveParamInfo sensitiveParamInfo = new SensitiveParamInfo(

@@ -636,7 +636,7 @@ public class RequestTemplate {
 
             singleTypeInfo.incr();
 
-            singleTypeInfo.getValues().add(val.hashCode());
+            singleTypeInfo.getValues().add(val);
             singleTypeInfo.setMinMaxValues(val);
         }
     }

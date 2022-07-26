@@ -630,8 +630,8 @@ public class APICatalogSync {
             if (dbInfo != null) {
                 SingleTypeInfo.Domain domain = dbInfo.getDomain();
                 if (domain ==  SingleTypeInfo.Domain.ENUM) {
-                    CappedSet<Integer> values = dbInfo.getValues();
-                    Set<Integer> elements = new HashSet<>();
+                    CappedSet<String> values = dbInfo.getValues();
+                    Set<String> elements = new HashSet<>();
                     if (values != null) {
                         elements = values.getElements();
                     }
@@ -656,9 +656,16 @@ public class APICatalogSync {
             }
 
             if (dbInfo == null || dbInfo.getDomain() == SingleTypeInfo.Domain.ENUM) {
-                CappedSet<Integer> values = deltaInfo.getValues();
+                CappedSet<String> values = deltaInfo.getValues();
                 if (values != null) {
-                    Set<Integer> elements = values.getElements();
+                    Set<String> elements = new HashSet<>();
+                    for (String el: values.getElements()) {
+                        if (redactSampleData) {
+                            elements.add(el.hashCode()+"");
+                        } else {
+                            elements.add(el);
+                        }
+                    }
                     Bson bson = Updates.addEachToSet(SingleTypeInfo.VALUES+".elements",new ArrayList<>(elements));
                     update = Updates.combine(update, bson);
                     deltaInfo.setValues(new CappedSet<>());

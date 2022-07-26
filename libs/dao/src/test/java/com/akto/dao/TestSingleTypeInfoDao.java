@@ -196,4 +196,32 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         assertEquals(apiInfoKeyList1.size(), 2);
 
     }
+
+    @Test
+    public void testDeleteValues() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+
+        List<WriteModel<SingleTypeInfo>> bulkWrites = new ArrayList<>();
+        bulkWrites.add(createSingleTypeInfoUpdate("A", "GET", SingleTypeInfo.EMAIL, 0,200));
+        bulkWrites.add(createSingleTypeInfoUpdate("A", "GET", SingleTypeInfo.GENERIC, 0,200));
+        SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkWrites);
+
+        SingleTypeInfoDao.instance.getMCollection().updateMany(
+                new BasicDBObject(),
+                Updates.addEachToSet(SingleTypeInfo.VALUES+".elements",Arrays.asList("a","b","c"))
+        );
+
+        List<SingleTypeInfo> singleTypeInfoList = SingleTypeInfoDao.instance.fetchAll();
+        assertEquals(singleTypeInfoList.size(), 2);
+        for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
+            assertEquals(3, singleTypeInfo.getValues().getElements().size());
+        }
+
+        SingleTypeInfoDao.instance.deleteValues();
+        singleTypeInfoList = SingleTypeInfoDao.instance.fetchAll();
+        assertEquals(singleTypeInfoList.size(), 2);
+        for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
+            assertEquals(0, singleTypeInfo.getValues().getElements().size());
+        }
+    }
 }
