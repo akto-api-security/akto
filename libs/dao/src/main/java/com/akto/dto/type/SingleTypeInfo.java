@@ -334,9 +334,11 @@ public class SingleTypeInfo {
     public static final String DOMAIN = "domain";
     Domain domain = Domain.ENUM;
     public static final String MIN_VALUE = "minValue";
-    long minValue = Long.MAX_VALUE; // this value will be used when field doesn't exist in db
+    public static final long acceptedMaxValue =  Long.MAX_VALUE - 100_000;
+    long minValue = acceptedMaxValue; // this value will be used when field doesn't exist in db
     public static final String MAX_VALUE = "maxValue";
-    long maxValue = Long.MIN_VALUE;  // this value will be used when field doesn't exist in db
+    public static final long acceptedMinValue =  Long.MIN_VALUE + 100_000;
+    long maxValue = acceptedMinValue;  // this value will be used when field doesn't exist in db
     public static final String LAST_SEEN = "lastSeen";
     long lastSeen;
 
@@ -387,8 +389,6 @@ public class SingleTypeInfo {
         this.timestamp = timestamp;
         this.duration = duration;
         this.lastSeen = Context.now();
-        this.minValue = Long.MAX_VALUE;
-        this.maxValue = Long.MIN_VALUE;
     }
 
     public String composeKey() {
@@ -618,7 +618,13 @@ public class SingleTypeInfo {
                 double d = Double.parseDouble(o.toString());
                 long l = (long) d;
                 this.minValue = min(this.minValue, l);
+                if (this.minValue < acceptedMinValue) {
+                    this.minValue = acceptedMinValue;
+                }
                 this.maxValue = max(this.maxValue, l);
+                if (this.maxValue > acceptedMaxValue) {
+                    this.maxValue = acceptedMaxValue;
+                }
             } catch (Exception e) {
                 logger.error("ERROR: while parsing long for min max in sti " + o.toString());
             }

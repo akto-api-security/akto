@@ -13,11 +13,11 @@ public class TestApiCatalogSync {
     public void testFillUrlParams() {
         RequestTemplate requestTemplate1 = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder());
         validateSubTypeAndMinMax(requestTemplate1, "/api/books/378282246310005", "/api/books/STRING",
-                SingleTypeInfo.CREDIT_CARD, Long.MAX_VALUE, Long.MIN_VALUE, 1,1);
+                SingleTypeInfo.CREDIT_CARD, SingleTypeInfo.acceptedMaxValue, SingleTypeInfo.acceptedMinValue, 1,1);
         validateSubTypeAndMinMax(requestTemplate1, "api/books/378282246310005", "/api/books/STRING",
-                SingleTypeInfo.CREDIT_CARD, Long.MAX_VALUE, Long.MIN_VALUE, 2, 1);
+                SingleTypeInfo.CREDIT_CARD, SingleTypeInfo.acceptedMaxValue, SingleTypeInfo.acceptedMinValue, 2, 1);
         validateSubTypeAndMinMax(requestTemplate1, "api/books/4111111111111111/", "/api/books/STRING",
-                SingleTypeInfo.CREDIT_CARD, Long.MAX_VALUE, Long.MIN_VALUE, 3, 2);
+                SingleTypeInfo.CREDIT_CARD, SingleTypeInfo.acceptedMaxValue, SingleTypeInfo.acceptedMinValue, 3, 2);
 
         RequestTemplate requestTemplate2 = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder());
         validateSubTypeAndMinMax(requestTemplate2, "/api/books/234", "/api/books/INTEGER",

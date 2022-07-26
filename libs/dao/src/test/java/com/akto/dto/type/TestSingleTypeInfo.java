@@ -1,6 +1,9 @@
 package com.akto.dto.type;
 
+import com.akto.dao.context.Context;
 import org.junit.Test;
+
+import java.util.HashSet;
 
 import static org.junit.Assert.*;
 
@@ -39,6 +42,60 @@ public class TestSingleTypeInfo {
 
         position = SingleTypeInfo.findPosition(-1,true);
         assertEquals(SingleTypeInfo.Position.REQUEST_HEADER, position);
+    }
+
+    @Test
+    public void testSetMinMaxValuesForNonNumbers() {
+        SingleTypeInfo singleTypeInfo = generateSTI(SingleTypeInfo.EMAIL);
+        assertEquals(SingleTypeInfo.acceptedMinValue, singleTypeInfo.getMaxValue());
+
+        singleTypeInfo.setMinMaxValues(10000000);
+        singleTypeInfo.setMinMaxValues(-1000000);
+        assertEquals(SingleTypeInfo.acceptedMinValue, singleTypeInfo.getMaxValue());
+        assertEquals(SingleTypeInfo.acceptedMaxValue, singleTypeInfo.getMinValue());
+    }
+
+    @Test
+    public void testSetMinMaxValuesForNumbers() {
+        SingleTypeInfo singleTypeInfo = generateSTI(SingleTypeInfo.INTEGER_32);
+        assertEquals(SingleTypeInfo.acceptedMinValue, singleTypeInfo.getMaxValue());
+        assertEquals(SingleTypeInfo.acceptedMaxValue, singleTypeInfo.getMinValue());
+
+        singleTypeInfo.setMinMaxValues(Long.MAX_VALUE);
+        singleTypeInfo.setMinMaxValues(Long.MIN_VALUE);
+        assertEquals(SingleTypeInfo.acceptedMaxValue, singleTypeInfo.getMaxValue());
+        assertEquals(SingleTypeInfo.acceptedMinValue, singleTypeInfo.getMinValue());
+
+        singleTypeInfo.setMinMaxValues(10000000);
+        singleTypeInfo.setMinMaxValues(-1000000);
+        assertEquals(SingleTypeInfo.acceptedMaxValue, singleTypeInfo.getMaxValue());
+        assertEquals(SingleTypeInfo.acceptedMinValue, singleTypeInfo.getMinValue());
+
+        singleTypeInfo = generateSTI(SingleTypeInfo.INTEGER_32);
+
+        singleTypeInfo.setMinMaxValues(10000000);
+        singleTypeInfo.setMinMaxValues(-10000000);
+        assertEquals(10000000, singleTypeInfo.getMaxValue());
+        assertEquals(-10000000, singleTypeInfo.getMinValue());
+
+        singleTypeInfo.setMinMaxValues(20000000);
+        singleTypeInfo.setMinMaxValues(-20000000);
+        assertEquals(20000000, singleTypeInfo.getMaxValue());
+        assertEquals(-20000000, singleTypeInfo.getMinValue());
+
+        singleTypeInfo.setMinMaxValues(20000);
+        singleTypeInfo.setMinMaxValues(-2000);
+        assertEquals(20000000, singleTypeInfo.getMaxValue());
+        assertEquals(-20000000, singleTypeInfo.getMinValue());
+    }
+
+    private SingleTypeInfo generateSTI(SingleTypeInfo.SubType subType) {
+        SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(
+                "url", "GET", 200, true, "param", subType, 0, false
+        );
+        return  new SingleTypeInfo(
+                paramId, new HashSet<>(), new HashSet<>(), 100, Context.now(), 0
+        );
     }
 
 
