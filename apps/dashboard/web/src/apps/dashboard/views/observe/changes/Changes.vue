@@ -186,7 +186,6 @@ export default {
         ServerTable,
         SensitiveChipGroup,
         TagChipGroup,
-        LineChart,
         BatchOperation,
         Spinner,
         DateRange
@@ -412,13 +411,13 @@ export default {
                 url: x.url,
                 method: x.method,
                 added: func.prettifyEpoch(x.timestamp),
-                location: (x.responseCode == -1 ? 'Request' : 'Response') + ' ' + (x.isHeader ? 'headers' : 'payload'),
+                location: (x.responseCode === -1 ? 'Request' : 'Response') + ' ' + (x.isHeader ? 'headers' : 'payload'),
                 type: x.subType.name,
                 detectedTs: x.timestamp,
                 apiCollectionId: x.apiCollectionId,
                 apiCollectionName: idToNameMap[x.apiCollectionId] || '-',
                 x: x,
-                domain: x.domain
+                domain: func.prepareDomain(x)
             }
         },
         async fetchRecentParams(sortKey, sortOrder, skip, limit, filters, filterOperators) {

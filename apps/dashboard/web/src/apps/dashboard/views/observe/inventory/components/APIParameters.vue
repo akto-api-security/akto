@@ -158,9 +158,9 @@ export default {
                 container: x.isHeader ? 'Headers' : 'Payload ',
                 date: this.prettifyDate(x.timestamp),
                 detectedTs: x.timestamp,
-                location: (x.responseCode == -1 ? 'Request' : 'Response') + ' ' + (x.isHeader ? 'headers' : 'payload'),
+                location: (x.responseCode === -1 ? 'Request' : 'Response') + ' ' + (x.isHeader ? 'headers' : 'payload'),
                 x: x,
-                domain: x.domain
+                domain: func.prepareDomain(x)
             }
         },
         toggleSensitiveFieldFunc (item) {

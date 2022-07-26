@@ -506,5 +506,23 @@ export default {
             case "SLACK":
                 return {name: '$slack', color: '#fe7b5b'}
         }
-    }
+    },
+
+    prepareDomain(x) {
+        if (x.domain === "RANGE") {
+            return x.minValue + " - " + x.maxValue
+        } else if (x.domain === "ANY") {
+            return "ANY"
+        } else {
+            let values = x["values"]
+            let size = values["elements"].length ? values["elements"].length : 0
+            if (size === 0) {
+                return "No values recorded"
+            } else if (size === 1) {
+                return "1 unique value"
+            } else {
+                return size + " unique values"
+            }
+        }
+    },
 }

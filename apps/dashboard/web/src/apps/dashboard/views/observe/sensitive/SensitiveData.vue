@@ -114,10 +114,6 @@ export default {
                 {
                     text: 'Location',
                     value: 'location'
-                },
-                {
-                  text: 'Domain',
-                  value: 'domain'
                 }
             ]
         }
@@ -134,7 +130,6 @@ export default {
                 type: x.subType.name || "OTHER",
                 apiCollectionId: x.apiCollectionId,
                 apiCollectionName: this.mapCollectionIdToName[x.apiCollectionId] || '-',
-                domain: x.domain
             }
         },
         prettifyDate(ts) {
