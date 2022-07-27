@@ -1,21 +1,55 @@
 import React, { useCallback } from 'react';
 import ReactFlow, {
   addEdge,
+  applyNodeChanges,
+  applyEdgeChanges,
   MiniMap,
   Controls,
   Background,
   useNodesState,
   useEdgesState,
 } from 'react-flow-renderer';
+import create from 'zustand';
+
+const useStore = create((set, get) => ({
+  nodes: [],
+  edges: [],
+  setInitialState: (initialNodes, initialEdges) => {
+    set({
+      nodes: initialNodes,
+      edges: initialEdges
+    })
+  },
+  onNodesChange: (changes) => {
+    set({
+      nodes: applyNodeChanges(changes, get().nodes),
+    });
+  },
+  onEdgesChange: (changes) => {
+    set({
+      edges: applyEdgeChanges(changes, get().edges),
+    });
+  },
+  onConnect: (connection) => {
+    set({
+      edges: addEdge(connection, get().edges),
+    });
+  },
+}));
+
 
 const onInit = (reactFlowInstance) => console.log('flow loaded:', reactFlowInstance);
 
-const HelloReact = ({endpointsList, initialNodes, initialEdges}) => {
-  console.log({endpointsList, initialNodes, initialEdges})
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const onConnect = useCallback((params) => setEdges((eds) => addEdge(params, eds)), []);
+const HelloReactChild = () => {
+  const nodes = useStore((state) => state.nodes)
+  const edges = useStore((state) => state.edges)
 
+  const onNodesChange = useStore((state) => state.onNodesChange)
+  const onEdgesChange = useStore((state) => state.onEdgesChange)
+  const onConnect = useStore((state) => state.onConnect)
+
+  console.log(nodes, edges)
+ 
   return (
     <ReactFlow
       nodes={nodes}
@@ -49,4 +83,15 @@ const HelloReact = ({endpointsList, initialNodes, initialEdges}) => {
   );
 };
 
+const HelloReact = ({endpointsList, initialNodes, initialEdges}) => {
+  console.log({endpointsList, initialNodes, initialEdges})
+  
+  const setInitialState = useStore((state) => state.setInitialState)
+
+  setInitialState(initialNodes, initialEdges)
+  
+  return (
+    <HelloReactChild />
+  )
+}
 export default HelloReact
