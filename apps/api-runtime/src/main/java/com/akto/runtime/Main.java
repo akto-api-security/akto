@@ -101,8 +101,13 @@ public class Main {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         String configName = System.getenv("AKTO_CONFIG_NAME");
         String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
-        String kafkaBrokerUrl = System.getenv("AKTO_KAFKA_BROKER_URL");
+        String kafkaBrokerUrl = "kafka1:19092"; //System.getenv("AKTO_KAFKA_BROKER_URL");
         String groupIdConfig =  System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG");
+        String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
+        boolean syncImmediately = false;
+        if (instanceType != null && instanceType.equals("DASHBOARD")) {
+            syncImmediately = true;
+        }
         int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
 
         if (topicName == null) topicName = "akto.api.logs";
@@ -244,7 +249,7 @@ public class Main {
 
                     try {
                         List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
-                        APICatalogSync apiCatalogSync = parser.syncFunction(accWiseResponse);
+                        APICatalogSync apiCatalogSync = parser.syncFunction(accWiseResponse, syncImmediately);
                         // flow.init(accWiseResponse);
                         aktoPolicy.main(accWiseResponse, apiCatalogSync);
                     } catch (Exception e) {
