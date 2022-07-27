@@ -79,6 +79,22 @@
                     <template #item.type="{item}">
                         <sensitive-chip-group :sensitiveTags="[item.type]" />
                     </template>
+
+                    <template #item.domain="{item}">
+                        <v-tooltip bottom max-width="300px">
+                            <template v-slot:activator='{ on, attrs }'>
+                                <div
+                                    v-bind="attrs"
+                                    v-on="on"
+                                >
+                                  {{item.domain}}
+                                </div>
+                            </template>
+                            <div>
+                                {{item.valuesString}}
+                            </div>
+                        </v-tooltip>
+                    </template>
                     
                     <!-- <template #add-new-row-btn="{filters, filterOperators, sortKey, sortDesc, total}">
                         <div class="ma-1 d-flex">
@@ -417,7 +433,8 @@ export default {
                 apiCollectionId: x.apiCollectionId,
                 apiCollectionName: idToNameMap[x.apiCollectionId] || '-',
                 x: x,
-                domain: func.prepareDomain(x)
+                domain: func.prepareDomain(x),
+                valuesString: func.prepareValuesTooltip(x)
             }
         },
         async fetchRecentParams(sortKey, sortOrder, skip, limit, filters, filterOperators) {
@@ -523,5 +540,6 @@ export default {
 </script>
 
 <style lang="sass" scoped>
-
+    .v-tooltip__content
+        font-size: 15px !important
 </style>

@@ -525,4 +525,22 @@ export default {
             }
         }
     },
+
+    prepareValuesTooltip(x) {
+        let result = "";
+        let values = x["values"]
+        if (!values) return result
+        let elements = values["elements"] ? values["elements"] : []
+        let count = 0;
+        elements.forEach((elem) => {
+            if (count > 50) return result
+            if (count !== 0) {
+                result +=  ", "
+            }
+            result += elem
+            count += 1
+        })
+
+        return result
+    }
 }
