@@ -1,18 +1,18 @@
 <template>
     <div>
-        <HelloReact style="height: 500px" :endpointsList="endpointsList" :initialNodes="defaultNodes" :initialEdges="defaultEdges" />
+        <workflow-builder style="height: 500px" :endpointsList="endpointsList" :initialNodes="defaultNodes" :initialEdges="defaultEdges" />
     </div>
 </template>
 
 <script>
-import HelloReact from '../../../testing/components/react/HelloReact.jsx'
+import WorkflowBuilder from '../../../testing/components/react/WorkflowBuilder.jsx'
 
 import obj from '@/util/obj'
 
 export default {
     name: "WorkflowTestBuilder",
     components: {
-        HelloReact
+        'workflow-builder': WorkflowBuilder
     },
     props: {
         endpointsList: obj.arrR,
