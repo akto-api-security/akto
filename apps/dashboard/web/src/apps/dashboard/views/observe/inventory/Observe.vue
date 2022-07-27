@@ -1,6 +1,8 @@
 <template>
     <div>
-        <router-view/>
+        <keep-alive include="ApiChanges,SensitiveData">
+            <router-view/>
+        </keep-alive>
     </div>    
 </template>
 

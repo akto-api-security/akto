@@ -19,7 +19,9 @@
                     </template>
 
                 </v-breadcrumbs>
-                <router-view @selectedItem="selectedItem" @mountedView="mountedView"/>
+                <keep-alive exclude="ApiParameters" >
+                    <router-view @selectedItem="selectedItem" @mountedView="mountedView"/>
+                </keep-alive>
         </div>
             
     </div>

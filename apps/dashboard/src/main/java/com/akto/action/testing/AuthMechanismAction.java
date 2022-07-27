@@ -100,7 +100,6 @@ public class AuthMechanismAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-
     public AuthParam.Location getLocation() {
         return this.location;
     }

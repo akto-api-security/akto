@@ -10,7 +10,11 @@
                 <div class="log-title mr-2">Latest logs</div>
                 <div style="width: 200px" class="mr-2">
                     <form-field-menu
-                        :items="[{text: 'akto-dashboard', value: 'akto-dashboard'}, {text: 'akto-runtime', value: 'akto-runtime'}]"
+                        :items="[
+                            {text: 'akto-dashboard', value: 'akto-dashboard'}, 
+                            {text: 'akto-runtime', value: 'akto-runtime'},
+                            {text: 'akto-testing', value: 'akto-testing'}
+                        ]"
                         v-model="logGroupName"
                         label="Select log group"
                     />
