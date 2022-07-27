@@ -29,7 +29,7 @@
             <count-box title="All Endpoints" :count="allEndpoints.length" colorTitle="Total"/>
         </div>    
 
-        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Unauthenticated', 'Undocumented', 'Deprecated', 'Documented']">
+        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Unauthenticated', 'Undocumented', 'Deprecated', 'Documented', 'Tests']">
             <template slot="actions-tray">
             </template>
             <template slot="All">
@@ -120,15 +120,10 @@
                     </template>
                 </simple-table>
             </template>
-            <!-- <template slot="Policies">
-                <filters
-                    :tableHeaders=tableHeaders
-                    :items=allEndpoints
-                    :filters=filters
-                    @rowClicked=rowClicked
-                >
-                </filters>
-            </template> -->
+            <template slot="Tests">
+                <workflow-test-builder :endpointsList=allEndpoints />
+                
+            </template>
         </layout-with-tabs>
 
     </div>
@@ -150,7 +145,7 @@ import { saveAs } from 'file-saver'
 import UploadFile from '@/apps/dashboard/shared/components/UploadFile'
 import JsonViewer from "@/apps/dashboard/shared/components/JSONViewer"
 import IconMenu from '@/apps/dashboard/shared/components/IconMenu'
-
+import WorkflowTestBuilder from './WorkflowTestBuilder'
 
 export default {
     name: "ApiEndpoints",
@@ -163,7 +158,9 @@ export default {
         Spinner,
         UploadFile,
         JsonViewer,
-        IconMenu
+        IconMenu,
+        WorkflowTestBuilder
+        
     },
     props: {
         apiCollectionId: obj.numR

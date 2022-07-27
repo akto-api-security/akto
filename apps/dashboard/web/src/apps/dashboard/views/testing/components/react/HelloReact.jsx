@@ -8,11 +8,10 @@ import ReactFlow, {
   useEdgesState,
 } from 'react-flow-renderer';
 
-import { nodes as initialNodes, edges as initialEdges } from './initial-elements';
-
 const onInit = (reactFlowInstance) => console.log('flow loaded:', reactFlowInstance);
 
-const HelloReact = () => {
+const HelloReact = ({endpointsList, initialNodes, initialEdges}) => {
+  console.log({endpointsList, initialNodes, initialEdges})
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const onConnect = useCallback((params) => setEdges((eds) => addEdge(params, eds)), []);
@@ -50,4 +49,4 @@ const HelloReact = () => {
   );
 };
 
-export default HelloReact;
+export default HelloReact
