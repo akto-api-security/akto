@@ -153,7 +153,7 @@ export default {
                     sortKey: 'detectedTs'
                 },
                 {
-                  text: 'Domain',
+                  text: 'Values',
                   value: 'domain',
                 }
             ],

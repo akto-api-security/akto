@@ -509,20 +509,44 @@ export default {
     },
 
     prepareDomain(x) {
+        let NO_VALUES_RECORDED = "No values recorded";
         if (x.domain === "RANGE") {
             return x.minValue + " - " + x.maxValue
         } else if (x.domain === "ANY") {
             return "ANY"
         } else {
             let values = x["values"]
-            let size = values["elements"].length ? values["elements"].length : 0
+            if (!values) return NO_VALUES_RECORDED
+
+            let elements = values["elements"]
+            if (!elements) return NO_VALUES_RECORDED
+
+            let size = elements.length
+
             if (size === 0) {
-                return "No values recorded"
-            } else if (size === 1) {
-                return "1 unique value"
-            } else {
-                return size + " unique values"
+                return NO_VALUES_RECORDED
+            } 
+
+            let count = 0
+            let result = ""
+            const limit = 2
+            for (var elem of elements) {
+                if (count >= limit) {
+                    result += " and " + (size - limit) + " more"
+                    return result
+                }
+
+                if (count !== 0) {
+                    result +=  ", "
+                }
+
+                result += elem
+                count += 1
+
             }
+
+            return result;
+            
         }
     },
 
@@ -532,14 +556,14 @@ export default {
         if (!values) return result
         let elements = values["elements"] ? values["elements"] : []
         let count = 0;
-        elements.forEach((elem) => {
+        for (var elem of elements) {
             if (count > 50) return result
             if (count !== 0) {
                 result +=  ", "
             }
             result += elem
             count += 1
-        })
+        }
 
         return result
     }

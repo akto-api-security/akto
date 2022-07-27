@@ -306,7 +306,7 @@ export default {
                     sortKey: 'timestamp'
                 },
                 {
-                  text: 'Domain',
+                  text: 'Values',
                   value: 'domain',
                 }
             ]
