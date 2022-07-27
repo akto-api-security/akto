@@ -643,13 +643,13 @@ public class APICatalogSync {
                         } else {
                             newDomain = SingleTypeInfo.Domain.ANY;
                         }
-                        update = Updates.combine(update, Updates.set(SingleTypeInfo.DOMAIN, newDomain));
+                        update = Updates.combine(update, Updates.set(SingleTypeInfo._DOMAIN, newDomain));
                     }
                 } else {
                     deltaInfo.setDomain(dbInfo.getDomain());
                     deltaInfo.setValues(new CappedSet<>());
                     if (!dbInfo.getValues().getElements().isEmpty()) {
-                        Bson bson = Updates.set(SingleTypeInfo.VALUES+".elements",new ArrayList<>());
+                        Bson bson = Updates.set(SingleTypeInfo._VALUES +".elements",new ArrayList<>());
                         update = Updates.combine(update, bson);
                     }
                 }
@@ -666,7 +666,7 @@ public class APICatalogSync {
                             elements.add(el);
                         }
                     }
-                    Bson bson = Updates.addEachToSet(SingleTypeInfo.VALUES+".elements",new ArrayList<>(elements));
+                    Bson bson = Updates.addEachToSet(SingleTypeInfo._VALUES +".elements",new ArrayList<>(elements));
                     update = Updates.combine(update, bson);
                     deltaInfo.setValues(new CappedSet<>());
                 }

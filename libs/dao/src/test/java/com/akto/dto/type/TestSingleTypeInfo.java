@@ -47,29 +47,29 @@ public class TestSingleTypeInfo {
     @Test
     public void testSetMinMaxValuesForNonNumbers() {
         SingleTypeInfo singleTypeInfo = generateSTI(SingleTypeInfo.EMAIL);
-        assertEquals(SingleTypeInfo.acceptedMinValue, singleTypeInfo.getMaxValue());
+        assertEquals(SingleTypeInfo.ACCEPTED_MIN_VALUE, singleTypeInfo.getMaxValue());
 
         singleTypeInfo.setMinMaxValues(10000000);
         singleTypeInfo.setMinMaxValues(-1000000);
-        assertEquals(SingleTypeInfo.acceptedMinValue, singleTypeInfo.getMaxValue());
-        assertEquals(SingleTypeInfo.acceptedMaxValue, singleTypeInfo.getMinValue());
+        assertEquals(SingleTypeInfo.ACCEPTED_MIN_VALUE, singleTypeInfo.getMaxValue());
+        assertEquals(SingleTypeInfo.ACCEPTED_MAX_VALUE, singleTypeInfo.getMinValue());
     }
 
     @Test
     public void testSetMinMaxValuesForNumbers() {
         SingleTypeInfo singleTypeInfo = generateSTI(SingleTypeInfo.INTEGER_32);
-        assertEquals(SingleTypeInfo.acceptedMinValue, singleTypeInfo.getMaxValue());
-        assertEquals(SingleTypeInfo.acceptedMaxValue, singleTypeInfo.getMinValue());
+        assertEquals(SingleTypeInfo.ACCEPTED_MIN_VALUE, singleTypeInfo.getMaxValue());
+        assertEquals(SingleTypeInfo.ACCEPTED_MAX_VALUE, singleTypeInfo.getMinValue());
 
         singleTypeInfo.setMinMaxValues(Long.MAX_VALUE);
         singleTypeInfo.setMinMaxValues(Long.MIN_VALUE);
-        assertEquals(SingleTypeInfo.acceptedMaxValue, singleTypeInfo.getMaxValue());
-        assertEquals(SingleTypeInfo.acceptedMinValue, singleTypeInfo.getMinValue());
+        assertEquals(SingleTypeInfo.ACCEPTED_MAX_VALUE, singleTypeInfo.getMaxValue());
+        assertEquals(SingleTypeInfo.ACCEPTED_MIN_VALUE, singleTypeInfo.getMinValue());
 
         singleTypeInfo.setMinMaxValues(10000000);
         singleTypeInfo.setMinMaxValues(-1000000);
-        assertEquals(SingleTypeInfo.acceptedMaxValue, singleTypeInfo.getMaxValue());
-        assertEquals(SingleTypeInfo.acceptedMinValue, singleTypeInfo.getMinValue());
+        assertEquals(SingleTypeInfo.ACCEPTED_MAX_VALUE, singleTypeInfo.getMaxValue());
+        assertEquals(SingleTypeInfo.ACCEPTED_MIN_VALUE, singleTypeInfo.getMinValue());
 
         singleTypeInfo = generateSTI(SingleTypeInfo.INTEGER_32);
 

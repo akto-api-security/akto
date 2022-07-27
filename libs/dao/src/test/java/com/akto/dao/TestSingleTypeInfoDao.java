@@ -8,22 +8,16 @@ import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.EndsWithPredicate;
 import com.akto.dto.data_types.RegexPredicate;
 import com.akto.dto.data_types.StartsWithPredicate;
-import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.types.CappedSet;
 import com.akto.utils.MongoBasedTest;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
-import org.apache.commons.collections.list.SynchronizedList;
 import org.bson.conversions.Bson;
 import org.junit.Test;
-import org.springframework.security.core.parameters.P;
 
-import java.security.PolicySpi;
 import java.util.*;
 
 import static org.junit.Assert.*;
@@ -208,18 +202,18 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
 
         SingleTypeInfoDao.instance.getMCollection().updateMany(
                 new BasicDBObject(),
-                Updates.addEachToSet(SingleTypeInfo.VALUES+".elements",Arrays.asList("a","b","c"))
+                Updates.addEachToSet(SingleTypeInfo._VALUES +".elements",Arrays.asList("a","b","c"))
         );
 
         List<SingleTypeInfo> singleTypeInfoList = SingleTypeInfoDao.instance.fetchAll();
-        assertEquals(singleTypeInfoList.size(), 2);
+        assertEquals(2, singleTypeInfoList.size());
         for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
             assertEquals(3, singleTypeInfo.getValues().getElements().size());
         }
 
         SingleTypeInfoDao.instance.deleteValues();
         singleTypeInfoList = SingleTypeInfoDao.instance.fetchAll();
-        assertEquals(singleTypeInfoList.size(), 2);
+        assertEquals(2, singleTypeInfoList.size());
         for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
             assertEquals(0, singleTypeInfo.getValues().getElements().size());
         }

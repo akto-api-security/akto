@@ -328,17 +328,17 @@ public class SingleTypeInfo {
     @BsonIgnore
     boolean sensitive;
     boolean isUrlParam;
-    public static final String VALUES = "values";
+    public static final String _VALUES = "values";
     public static final int VALUES_LIMIT = 50;
-    CappedSet<String> values = new CappedSet<String>();
-    public static final String DOMAIN = "domain";
+    CappedSet<String> values = new CappedSet<>();
+    public static final String _DOMAIN = "domain";
     Domain domain = Domain.ENUM;
     public static final String MIN_VALUE = "minValue";
-    public static final long acceptedMaxValue =  Long.MAX_VALUE - 100_000;
-    long minValue = acceptedMaxValue; // this value will be used when field doesn't exist in db
+    public static final long ACCEPTED_MAX_VALUE =  Long.MAX_VALUE - 100_000;
+    long minValue = ACCEPTED_MAX_VALUE; // this value will be used when field doesn't exist in db
     public static final String MAX_VALUE = "maxValue";
-    public static final long acceptedMinValue =  Long.MIN_VALUE + 100_000;
-    long maxValue = acceptedMinValue;  // this value will be used when field doesn't exist in db
+    public static final long ACCEPTED_MIN_VALUE =  Long.MIN_VALUE + 100_000;
+    long maxValue = ACCEPTED_MIN_VALUE;  // this value will be used when field doesn't exist in db
     public static final String LAST_SEEN = "lastSeen";
     long lastSeen;
 
@@ -406,7 +406,7 @@ public class SingleTypeInfo {
         Set<String> copyUserIds = new HashSet<>();
         copyUserIds.addAll(this.userIds);
 
-        CappedSet<String> copyValues = new CappedSet<String>(new HashSet<>(this.values.getElements()));
+        CappedSet<String> copyValues = new CappedSet<>(new HashSet<>(this.values.getElements()));
 
         ParamId paramId = new ParamId();
         paramId.url = url;
@@ -618,12 +618,12 @@ public class SingleTypeInfo {
                 double d = Double.parseDouble(o.toString());
                 long l = (long) d;
                 this.minValue = min(this.minValue, l);
-                if (this.minValue < acceptedMinValue) {
-                    this.minValue = acceptedMinValue;
+                if (this.minValue < ACCEPTED_MIN_VALUE) {
+                    this.minValue = ACCEPTED_MIN_VALUE;
                 }
                 this.maxValue = max(this.maxValue, l);
-                if (this.maxValue > acceptedMaxValue) {
-                    this.maxValue = acceptedMaxValue;
+                if (this.maxValue > ACCEPTED_MAX_VALUE) {
+                    this.maxValue = ACCEPTED_MAX_VALUE;
                 }
             } catch (Exception e) {
                 logger.error("ERROR: while parsing long for min max in sti " + o.toString());
