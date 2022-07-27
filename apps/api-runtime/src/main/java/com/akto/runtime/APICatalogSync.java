@@ -471,8 +471,8 @@ public class APICatalogSync {
                 if (strictMatch != null) {
                     RequestTemplate requestTemplate = deltaCatalog.getStrictURLToMethods().get(url);
                     if (requestTemplate == null) {
-                        requestTemplate = strictMatch.copy();
-                        strictMatch.mergeFrom(requestTemplate);
+                        requestTemplate = strictMatch.copy(); // to further process the requestTemplate
+                        strictMatch.mergeFrom(requestTemplate); // to update the existing requestTemplate in db with new data
                     }
 
                     processResponse(requestTemplate, responseParamsList, deletedInfo);

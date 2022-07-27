@@ -5,7 +5,7 @@ import java.util.Set;
 
 public class CappedSet<T> {
 
-    private final static int limit = 50;
+    public static final int limit = 50;
     Set<T> elements;
 
     public CappedSet(Set<T> elements) {
