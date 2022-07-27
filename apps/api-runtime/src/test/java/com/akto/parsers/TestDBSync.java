@@ -74,7 +74,7 @@ public class TestDBSync extends MongoBasedTest {
             aggr.addURL(TestDump2.createSampleParams("user"+i, url+i));
         }
         sync.computeDelta(aggr, true, 0);
-        sync.syncWithDB(); 
+        sync.syncWithDB(false);
 
         assertEquals(0, sync.getDelta(0).getStrictURLToMethods().size());
         assertEquals(1, sync.getDelta(0).getTemplateURLToMethods().size());
@@ -110,14 +110,14 @@ public class TestDBSync extends MongoBasedTest {
 
         HttpCallParser parser = new HttpCallParser("access-token", 1,40,10);
 
-        parser.syncFunction(responseParams);
+        parser.syncFunction(responseParams, false);
         assertTrue(parser.getSyncCount() == 0);
         
-        parser.syncFunction(responseParams);
+        parser.syncFunction(responseParams, false);
         assertFalse(parser.getSyncCount() == 0);
 
         responseParams.get(0).setSource(Source.HAR);
-        parser.syncFunction(responseParams);
+        parser.syncFunction(responseParams, false);
         assertTrue(parser.getSyncCount() == 0);
 
         SampleData sd = SampleDataDao.instance.findOne(Filters.eq("_id.url", "immediate/INTEGER"));
@@ -140,11 +140,11 @@ public class TestDBSync extends MongoBasedTest {
         HttpCallParser parser = new HttpCallParser("access-token", 10,40,10);
 
         /* tryMergingWithKnownStrictURLs - put in delta-static */
-        parser.syncFunction(responseParams);
+        parser.syncFunction(responseParams, false);
         assertTrue(parser.getSyncCount() == 0);
 
         /* processKnownStaticURLs */
-        parser.syncFunction(responseParams);
+        parser.syncFunction(responseParams, false);
 
         /* tryMergingWithKnownStrictURLs - merge with delta-static */        
         responseParams.add(TestDump2.createSampleParams("user"+2, url+2));
@@ -152,11 +152,11 @@ public class TestDBSync extends MongoBasedTest {
 
         /* tryMergingWithKnownStrictURLs - merge with delta-template */  
         responseParams.add(TestDump2.createSampleParams("user"+4, url+4));
-        parser.syncFunction(responseParams);
+        parser.syncFunction(responseParams, false);
         assertTrue(parser.getSyncCount() == 0);
         
         /* tryMergingWithKnownTemplates */
-        parser.syncFunction(responseParams);
+        parser.syncFunction(responseParams, false);
         assertTrue(parser.getSyncCount() == 0);
 
         /* tryMergingWithKnownStrictURLs - merge with Db url */
@@ -164,14 +164,14 @@ public class TestDBSync extends MongoBasedTest {
         responseParams = new ArrayList<>();
         responseParams.add(TestDump2.createSampleParams("user"+2, url+2));
         responseParams.get(0).setSource(Source.HAR);
-        parser.syncFunction(responseParams);
+        parser.syncFunction(responseParams, false);
         responseParams = new ArrayList<>();
         responseParams.add(TestDump2.createSampleParams("user"+3, url+3));
 
         /* tryMergingWithKnownStrictURLs - merge with Db url - template already exists in delta */
         responseParams.add(TestDump2.createSampleParams("user"+4, url+4));
         responseParams.get(0).setSource(Source.HAR);
-        parser.syncFunction(responseParams);
+        parser.syncFunction(responseParams, false);
 
     }  
 
@@ -184,7 +184,7 @@ public class TestDBSync extends MongoBasedTest {
             aggr.addURL(TestDump2.createSampleParams("user"+i, "payment/id"+i));
         }
         sync.computeDelta(aggr, true, 123);
-        sync.syncWithDB(); 
+        sync.syncWithDB(false);
 
 
         assertEquals(30, sync.getDelta(123).getStrictURLToMethods().size());
@@ -198,7 +198,7 @@ public class TestDBSync extends MongoBasedTest {
         aggr2.addURL(resp2);
         
         sync.computeDelta(aggr2, true, 123);
-        sync.syncWithDB();
+        sync.syncWithDB(false);
 
         assertEquals(0, sync.getDelta(123).getStrictURLToMethods().size());
         assertEquals(1, sync.getDelta(123).getTemplateURLToMethods().size());
