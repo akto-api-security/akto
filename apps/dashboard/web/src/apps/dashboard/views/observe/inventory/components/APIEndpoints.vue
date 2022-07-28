@@ -1,5 +1,5 @@
 <template>
-    <spinner v-if="loading" />
+    <spinner v-if="endpointsLoading" />
     <div class="pr-4 api-endpoints" v-else>
         <div>
             <div class="d-flex jc-end">
@@ -167,6 +167,9 @@ export default {
     },
     props: {
         apiCollectionId: obj.numR
+    },
+    activated(){
+        this.refreshPage(true)
     },
     data() {
         return {
@@ -354,7 +357,7 @@ export default {
         }
     },
     computed: {
-        ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'loading', 'swaggerContent', 'apiInfoList', 'filters', 'lastFetched', 'unusedEndpoints']),
+        ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'endpointsLoading', 'swaggerContent', 'apiInfoList', 'filters', 'lastFetched', 'unusedEndpoints']),
         openEndpoints() {
           return this.allEndpoints.filter(x => x.open)
         },
@@ -398,9 +401,6 @@ export default {
             return ret
         }
     },
-    mounted() {
-        this.refreshPage(true)
-    }
 }
 </script>
 

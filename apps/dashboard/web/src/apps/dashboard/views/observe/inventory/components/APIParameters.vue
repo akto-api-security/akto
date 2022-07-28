@@ -1,5 +1,5 @@
 <template>
-    <div v-if="loading">
+    <div v-if="parametersLoading">
         <spinner/>
     </div>
     <div v-else>
@@ -37,7 +37,23 @@
                     name="Request" 
                     sortKeyDefault="sensitive" 
                     :sortDescDefault="true" 
-                />
+                >
+                    <template #item.domain="{item}">
+                        <v-tooltip bottom max-width="300px">
+                            <template v-slot:activator='{ on, attrs }'>
+                                <div
+                                    v-bind="attrs"
+                                    v-on="on"
+                                >
+                                  {{item.domain}}
+                                </div>
+                            </template>
+                            <div>
+                                {{item.valuesString}}
+                            </div>
+                        </v-tooltip>
+                    </template>
+                </simple-table>
             </template>
             <template slot="Response">
                 <simple-table 
@@ -47,7 +63,23 @@
                     name="Response" 
                     sortKeyDefault="sensitive" 
                     :sortDescDefault="true"
-                />
+                >
+                    <template #item.domain="{item}">
+                        <v-tooltip bottom max-width="300px">
+                            <template v-slot:activator='{ on, attrs }'>
+                                <div
+                                    v-bind="attrs"
+                                    v-on="on"
+                                >
+                                  {{item.domain}}
+                                </div>
+                            </template>
+                            <div>
+                                {{item.valuesString}}
+                            </div>
+                        </v-tooltip>
+                    </template>
+                </simple-table>
             </template>
             <template slot="Values">
                 <sample-data :messages="sampleData" v-if="sampleData"/>
@@ -119,9 +151,13 @@ export default {
                     text: 'Discovered',
                     value: 'date',
                     sortKey: 'detectedTs'
-                }                
+                },
+                {
+                  text: 'Values',
+                  value: 'domain',
+                }
             ],
-            actions: [
+          actions: [
                 {
                     isValid: item => this.isValid(item),
                     icon: item => item.x.savedAsSensitive ? '$fas_lock-open' : '$fas_lock',
@@ -154,8 +190,10 @@ export default {
                 container: x.isHeader ? 'Headers' : 'Payload ',
                 date: this.prettifyDate(x.timestamp),
                 detectedTs: x.timestamp,
-                location: (x.responseCode == -1 ? 'Request' : 'Response') + ' ' + (x.isHeader ? 'headers' : 'payload'),
-                x: x
+                location: (x.responseCode === -1 ? 'Request' : 'Response') + ' ' + (x.isHeader ? 'headers' : 'payload'),
+                x: x,
+                domain: func.prepareDomain(x),
+                valuesString: func.prepareValuesTooltip(x)
             }
         },
         toggleSensitiveFieldFunc (item) {
@@ -185,7 +223,7 @@ export default {
         }
     },
     computed: {
-        ...mapState('inventory', ['parameters', 'loading']),
+        ...mapState('inventory', ['parameters', 'parametersLoading']),
         url () {
             return this.urlAndMethod.split(" ")[0]
         },
@@ -279,9 +317,11 @@ export default {
 </script>
 
 <style lang="sass" scoped>
-.table-title
-    font-size: 16px    
-    color: #47466A
-    font-weight: 500
-    padding-top: 16px
+    .table-title
+        font-size: 16px    
+        color: #47466A
+        font-weight: 500
+        padding-top: 16px
+    .v-tooltip__content
+        font-size: 15px !important
 </style>

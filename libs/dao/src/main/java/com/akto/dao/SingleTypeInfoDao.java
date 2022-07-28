@@ -197,4 +197,11 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
         return endpoints;
     }
+
+    public void deleteValues() {
+        instance.getMCollection().updateMany(
+                Filters.exists(SingleTypeInfo._VALUES),
+                Updates.unset(SingleTypeInfo._VALUES)
+        );
+    }
 }

@@ -465,14 +465,17 @@ public class TestMergingNew extends MongoBasedTest {
 
         testSampleSizeAndDomainOfSti(parser, 45, 0, SingleTypeInfo.Domain.ENUM, SingleTypeInfo.Domain.ANY);
 
-        parser.syncFunction(responseParams.subList(55,70));
-        parser.apiCatalogSync.syncWithDB();
-        parser.syncFunction(responseParams.subList(70,100));
-        parser.apiCatalogSync.syncWithDB();
-        parser.apiCatalogSync.syncWithDB();
+        // changing the parser symbolizes instance restart
+        // using the new or old parser shouldn't change the result
+        HttpCallParser parserNew = new HttpCallParser("userIdentifier", 1, 1, 1);
+        parserNew.syncFunction(responseParams.subList(55,70));
+        parserNew.apiCatalogSync.syncWithDB();
+        parserNew.syncFunction(responseParams.subList(70,100));
+        parserNew.apiCatalogSync.syncWithDB();
+        parserNew.apiCatalogSync.syncWithDB();
 
         // both now range
-        testSampleSizeAndDomainOfSti(parser, 0, 0, SingleTypeInfo.Domain.RANGE, SingleTypeInfo.Domain.ANY);
+        testSampleSizeAndDomainOfSti(parserNew, 0, 0, SingleTypeInfo.Domain.RANGE, SingleTypeInfo.Domain.ANY);
 
 
     }
@@ -536,18 +539,22 @@ public class TestMergingNew extends MongoBasedTest {
         parser.syncFunction(Collections.singletonList(httpResponseParams));
         parser.apiCatalogSync.syncWithDB();
 
-        assertEquals(0,parser.apiCatalogSync.getDbState(123).getStrictURLToMethods().size());
-        assertEquals(1,parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods().size());
+        // changing the parser symbolizes instance restart
+        // using the new or old parser shouldn't change the result
+        HttpCallParser parserNew = new HttpCallParser("userIdentifier", 1, 1, 1);
 
-        requestTemplates = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods().values();
+        assertEquals(0,parserNew.apiCatalogSync.getDbState(123).getStrictURLToMethods().size());
+        assertEquals(1,parserNew.apiCatalogSync.getDbState(123).getTemplateURLToMethods().size());
+
+        requestTemplates = parserNew.apiCatalogSync.getDbState(123).getTemplateURLToMethods().values();
         validateMinMax(requestTemplates, Double.valueOf(reqMax+"").longValue(), Double.valueOf(reqMin+"").longValue(), Double.valueOf(respMax+"").longValue(), Double.valueOf(respMin+"").longValue());
 
         httpResponseParams = createHttpResponseForMinMax(url+"books10", 19000f, -190f);
-        parser.syncFunction(Collections.singletonList(httpResponseParams));
+        parserNew.syncFunction(Collections.singletonList(httpResponseParams));
         httpResponseParams = createHttpResponseForMinMax(url+"books15", 19f, -19000f);
-        parser.syncFunction(Collections.singletonList(httpResponseParams));
-        parser.apiCatalogSync.syncWithDB();
-        requestTemplates = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods().values();
+        parserNew.syncFunction(Collections.singletonList(httpResponseParams));
+        parserNew.apiCatalogSync.syncWithDB();
+        requestTemplates = parserNew.apiCatalogSync.getDbState(123).getTemplateURLToMethods().values();
         validateMinMax(requestTemplates, 19000, Double.valueOf(reqMin+"").longValue(), Double.valueOf(respMax+"").longValue(), -19000);
 
     }

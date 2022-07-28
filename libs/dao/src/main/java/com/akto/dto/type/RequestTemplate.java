@@ -640,7 +640,7 @@ public class RequestTemplate {
 
         String[] queryParams = queryParamsStr.split("&");
 
-        for(String queryParam: queryParams) {
+        for (String queryParam : queryParams) {
             String[] keyVal = queryParam.split("=");
             if (keyVal.length != 2) {
                 continue;
@@ -655,6 +655,7 @@ public class RequestTemplate {
         }
 
         return ret;
+    }
 
     public Map<Integer, SingleTypeInfo> getUrlParams() {
         return urlParams;
@@ -699,7 +700,7 @@ public class RequestTemplate {
 
             singleTypeInfo.incr();
 
-            singleTypeInfo.getValues().add(val.hashCode());
+            singleTypeInfo.getValues().add(val);
             singleTypeInfo.setMinMaxValues(val);
         }
     }

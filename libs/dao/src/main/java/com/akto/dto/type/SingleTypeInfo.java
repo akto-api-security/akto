@@ -14,12 +14,15 @@ import io.swagger.v3.oas.models.media.*;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.codecs.pojo.annotations.BsonProperty;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static com.google.common.primitives.Longs.min;
 import static java.lang.Long.max;
 
 public class SingleTypeInfo {
 
+    private static final Logger logger = LoggerFactory.getLogger(SingleTypeInfo.class);
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     public static void init() {
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -325,15 +328,17 @@ public class SingleTypeInfo {
     @BsonIgnore
     boolean sensitive;
     boolean isUrlParam;
-    public static final String VALUES = "values";
+    public static final String _VALUES = "values";
     public static final int VALUES_LIMIT = 50;
-    CappedSet<Integer> values = new CappedSet<>();
-    public static final String DOMAIN = "domain";
+    CappedSet<String> values = new CappedSet<>();
+    public static final String _DOMAIN = "domain";
     Domain domain = Domain.ENUM;
     public static final String MIN_VALUE = "minValue";
-    long minValue = Long.MAX_VALUE; // this value will be used when field doesn't exist in db
+    public static final long ACCEPTED_MAX_VALUE =  Long.MAX_VALUE - 100_000;
+    long minValue = ACCEPTED_MAX_VALUE; // this value will be used when field doesn't exist in db
     public static final String MAX_VALUE = "maxValue";
-    long maxValue = Long.MIN_VALUE;  // this value will be used when field doesn't exist in db
+    public static final long ACCEPTED_MIN_VALUE =  Long.MIN_VALUE + 100_000;
+    long maxValue = ACCEPTED_MIN_VALUE;  // this value will be used when field doesn't exist in db
     public static final String LAST_SEEN = "lastSeen";
     long lastSeen;
 
@@ -384,8 +389,6 @@ public class SingleTypeInfo {
         this.timestamp = timestamp;
         this.duration = duration;
         this.lastSeen = Context.now();
-        this.minValue = Long.MAX_VALUE;
-        this.maxValue = Long.MIN_VALUE;
     }
 
     public String composeKey() {
@@ -403,7 +406,7 @@ public class SingleTypeInfo {
         Set<String> copyUserIds = new HashSet<>();
         copyUserIds.addAll(this.userIds);
 
-        CappedSet<Integer> copyValues = new CappedSet<>(new HashSet<>(this.values.getElements()));
+        CappedSet<String> copyValues = new CappedSet<>(new HashSet<>(this.values.getElements()));
 
         ParamId paramId = new ParamId();
         paramId.url = url;
@@ -583,11 +586,11 @@ public class SingleTypeInfo {
     }
 
 
-    public CappedSet<Integer> getValues() {
+    public CappedSet<String> getValues() {
         return values;
     }
 
-    public void setValues(CappedSet<Integer> values) {
+    public void setValues(CappedSet<String> values) {
         this.values = values;
     }
 
@@ -613,11 +616,17 @@ public class SingleTypeInfo {
                 // this is done so that both integer and decimal values can be parsed
                 // But while storing double we omit the decimal part
                 double d = Double.parseDouble(o.toString());
-                long l = Double.valueOf(d).longValue();
+                long l = (long) d;
                 this.minValue = min(this.minValue, l);
+                if (this.minValue < ACCEPTED_MIN_VALUE) {
+                    this.minValue = ACCEPTED_MIN_VALUE;
+                }
                 this.maxValue = max(this.maxValue, l);
+                if (this.maxValue > ACCEPTED_MAX_VALUE) {
+                    this.maxValue = ACCEPTED_MAX_VALUE;
+                }
             } catch (Exception e) {
-                System.out.println("ERROR: while parsing long for min max in sti" + o.toString());
+                logger.error("ERROR: while parsing long for min max in sti " + o.toString());
             }
         }
     }

@@ -8,27 +8,38 @@ import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.EndsWithPredicate;
 import com.akto.dto.data_types.RegexPredicate;
 import com.akto.dto.data_types.StartsWithPredicate;
-import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.types.CappedSet;
 import com.akto.utils.MongoBasedTest;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
-import org.apache.commons.collections.list.SynchronizedList;
 import org.bson.conversions.Bson;
 import org.junit.Test;
-import org.springframework.security.core.parameters.P;
 
-import java.security.PolicySpi;
 import java.util.*;
 
 import static org.junit.Assert.*;
 
 public class TestSingleTypeInfoDao extends MongoBasedTest {
+
+    // testDefaultDomain to test if single type info in db has domain value null then if default gets set to ENUM or not
+    @Test
+    public void testDefaultDomain() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(
+                "url", "GET",200, false, "param#key", SingleTypeInfo.EMAIL, 0, false
+        );
+        SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 0,0,0);
+        SingleTypeInfoDao.instance.updateOne(
+                SingleTypeInfoDao.createFilters(singleTypeInfo), Updates.inc("count",1)
+        );
+
+        SingleTypeInfo singleTypeInfoFromDb = SingleTypeInfoDao.instance.findOne(new BasicDBObject());
+        assertEquals(SingleTypeInfo.Domain.ENUM, singleTypeInfoFromDb.getDomain());
+
+    }
 
     @Test
     public void testInsertAndFetchAktoDefined() {
@@ -178,5 +189,33 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         assertEquals(apiInfoKeyList0.size(), 4);
         assertEquals(apiInfoKeyList1.size(), 2);
 
+    }
+
+    @Test
+    public void testDeleteValues() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+
+        List<WriteModel<SingleTypeInfo>> bulkWrites = new ArrayList<>();
+        bulkWrites.add(createSingleTypeInfoUpdate("A", "GET", SingleTypeInfo.EMAIL, 0,200));
+        bulkWrites.add(createSingleTypeInfoUpdate("A", "GET", SingleTypeInfo.GENERIC, 0,200));
+        SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkWrites);
+
+        SingleTypeInfoDao.instance.getMCollection().updateMany(
+                new BasicDBObject(),
+                Updates.addEachToSet(SingleTypeInfo._VALUES +".elements",Arrays.asList("a","b","c"))
+        );
+
+        List<SingleTypeInfo> singleTypeInfoList = SingleTypeInfoDao.instance.fetchAll();
+        assertEquals(2, singleTypeInfoList.size());
+        for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
+            assertEquals(3, singleTypeInfo.getValues().getElements().size());
+        }
+
+        SingleTypeInfoDao.instance.deleteValues();
+        singleTypeInfoList = SingleTypeInfoDao.instance.fetchAll();
+        assertEquals(2, singleTypeInfoList.size());
+        for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
+            assertEquals(0, singleTypeInfo.getValues().getElements().size());
+        }
     }
 }

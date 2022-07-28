@@ -7,7 +7,8 @@ import func from "@/util/func"
 Vue.use(Vuex)
 
 var state = {
-    loading: false,
+    parametersLoading: false,
+    endpointsLoading: false,
     fetchTs: 0,
     apiCollectionId: 0,
     apiCollectionName: '',
@@ -36,7 +37,8 @@ const inventory = {
     state: state,
     mutations: {
         EMPTY_STATE (state) {
-            state.loading = false
+            state.parametersLoading = false
+            state.endpointsLoading = false
             state.fetchTs = 0
             state.apiCollectionId = 0
             state.apiCollection = []
@@ -47,7 +49,7 @@ const inventory = {
             state.method = ''
         },
         EMPTY_PARAMS (state) {
-            state.loading = false
+            state.parametersLoading = false
             state.parameters = []
             state.url = ''
             state.method = ''
@@ -118,7 +120,7 @@ const inventory = {
             state.lastFetched = new Date() / 1000
             commit('EMPTY_STATE')
             if (shouldLoad) {
-                state.loading = true
+                state.endpointsLoading = true
             }
             return api.fetchAPICollection(apiCollectionId).then((resp) => {
                 commit('SAVE_API_COLLECTION', {data: resp.data, apiCollectionId: apiCollectionId, unusedEndpoints: resp.unusedEndpoints}, options)
@@ -135,14 +137,14 @@ const inventory = {
                         state.filters[x.customFieldName] = x
                     })
                 })
-                state.loading = false
+                state.endpointsLoading = false
             }).catch(() => {
-                state.loading = false
+                state.endpointsLoading = false
             })
         },
         loadParamsOfEndpoint({commit}, {apiCollectionId, url, method}) {
             commit('EMPTY_PARAMS')
-            state.loading = true    
+            state.parametersLoading = true    
             return api.loadParamsOfEndpoint(apiCollectionId, url, method).then(resp => {
                 api.loadSensitiveParameters(apiCollectionId, url, method).then(allSensitiveFields => {
                     allSensitiveFields.data.endpoints.filter(x => x.sensitive).forEach(sensitive => {
@@ -163,7 +165,7 @@ const inventory = {
 
                     })
                     commit('SAVE_PARAMS', {parameters: resp.data.params, apiCollectionId, url, method})
-                    state.loading = false
+                    state.parametersLoading = false
                 })
             })
 
@@ -190,14 +192,14 @@ const inventory = {
             })
         },
         saveContent({ commit, dispatch, state }, {swaggerContent, filename, apiCollectionId}) {
-            state.loading = true
+            state.endpointsLoading = true
             api.saveContent({swaggerContent, filename, apiCollectionId}).then(resp => {
                 state.filename = filename
                 state.swaggerContent = swaggerContent
                 state.apiCollectionId = apiCollectionId
-                state.loading = false
+                state.endpointsLoading = false
             }).catch(() => {
-                state.loading = false
+                state.endpointsLoading = false
             })
         },
         fetchApiInfoList({commit,dispatch, state}, {apiCollectionId}) {
@@ -216,7 +218,6 @@ const inventory = {
     },
     getters: {
         getFetchTs: (state) => state.fetchTs,
-        getLoading: (state) => state.loading,
         getAPICollection: (state) => state.apiCollection,
         getAPICollectionId: (state) => state.apiCollectionId,
         getAPICollectionName: (state) => state.apiCollectionName,

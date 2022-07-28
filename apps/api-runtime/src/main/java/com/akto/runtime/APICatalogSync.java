@@ -4,7 +4,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
-import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
@@ -23,7 +22,6 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.types.CappedSet;
 import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.DeleteOneModel;
 import com.mongodb.client.model.DeleteOptions;
@@ -456,8 +454,8 @@ public class APICatalogSync {
                 if (strictMatch != null) {
                     RequestTemplate requestTemplate = deltaCatalog.getStrictURLToMethods().get(url);
                     if (requestTemplate == null) {
-                        requestTemplate = strictMatch.copy();
-                        strictMatch.mergeFrom(requestTemplate);
+                        requestTemplate = strictMatch.copy(); // to further process the requestTemplate
+                        strictMatch.mergeFrom(requestTemplate); // to update the existing requestTemplate in db with new data
                     }
 
                     processResponse(requestTemplate, responseParamsList, deletedInfo);
@@ -615,8 +613,8 @@ public class APICatalogSync {
             if (dbInfo != null) {
                 SingleTypeInfo.Domain domain = dbInfo.getDomain();
                 if (domain ==  SingleTypeInfo.Domain.ENUM) {
-                    CappedSet<Integer> values = dbInfo.getValues();
-                    Set<Integer> elements = new HashSet<>();
+                    CappedSet<String> values = dbInfo.getValues();
+                    Set<String> elements = new HashSet<>();
                     if (values != null) {
                         elements = values.getElements();
                     }
@@ -628,23 +626,30 @@ public class APICatalogSync {
                         } else {
                             newDomain = SingleTypeInfo.Domain.ANY;
                         }
-                        update = Updates.combine(update, Updates.set(SingleTypeInfo.DOMAIN, newDomain));
+                        update = Updates.combine(update, Updates.set(SingleTypeInfo._DOMAIN, newDomain));
                     }
                 } else {
                     deltaInfo.setDomain(dbInfo.getDomain());
                     deltaInfo.setValues(new CappedSet<>());
-                    if (dbInfo.getValues().getElements().size() > 0) {
-                        Bson bson = Updates.set(SingleTypeInfo.VALUES+".elements",new ArrayList<>());
+                    if (!dbInfo.getValues().getElements().isEmpty()) {
+                        Bson bson = Updates.set(SingleTypeInfo._VALUES +".elements",new ArrayList<>());
                         update = Updates.combine(update, bson);
                     }
                 }
             }
 
             if (dbInfo == null || dbInfo.getDomain() == SingleTypeInfo.Domain.ENUM) {
-                CappedSet<Integer> values = deltaInfo.getValues();
+                CappedSet<String> values = deltaInfo.getValues();
                 if (values != null) {
-                    Set<Integer> elements = values.getElements();
-                    Bson bson = Updates.addEachToSet(SingleTypeInfo.VALUES+".elements",new ArrayList<>(elements));
+                    Set<String> elements = new HashSet<>();
+                    for (String el: values.getElements()) {
+                        if (redactSampleData) {
+                            elements.add(el.hashCode()+"");
+                        } else {
+                            elements.add(el);
+                        }
+                    }
+                    Bson bson = Updates.addEachToSet(SingleTypeInfo._VALUES +".elements",new ArrayList<>(elements));
                     update = Updates.combine(update, bson);
                     deltaInfo.setValues(new CappedSet<>());
                 }

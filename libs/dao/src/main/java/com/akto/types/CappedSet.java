@@ -5,7 +5,7 @@ import java.util.Set;
 
 public class CappedSet<T> {
 
-    private final static int limit = 50;
+    public static final int LIMIT = 50;
     Set<T> elements;
 
     public CappedSet(Set<T> elements) {
@@ -18,7 +18,7 @@ public class CappedSet<T> {
 
 
     public boolean add(T t) {
-        if (elements.size() >= limit) return false;
+        if (elements.size() >= LIMIT) return false;
         elements.add(t);
         return true;
     }
