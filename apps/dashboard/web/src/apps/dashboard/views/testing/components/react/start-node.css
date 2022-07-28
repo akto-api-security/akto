@@ -1,10 +1,61 @@
 .start-node {
     background: #fff;
-    border: 1px solid #1a192b;
+    border: 1px solid #47466A;
     border-radius: 3px;
-    color: #222;
+    color: #47466A;
     font-size: 12px;
     padding: 10px;
     text-align: center;
-    width: 150px;
+    width: 200px;
+}
+
+.red-boundary {
+    border: 1px solid #f44336 !important;
+}
+
+.green-boundary {
+    border: 1px solid #6200EA !important;
+}
+
+.MuiInput-input {
+    color: #47466A !important;
+    font-size: 12px !important;
+}
+
+.MuiFormControl-root {
+    margin: 0px !important;
+}
+
+.autocomplete-options {
+    font-size: 12px !important;
+    color: #47466A !important;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.autocomplete-options:hover {
+    text-overflow: clip;
+    white-space: normal;
+    word-break: break-all;
+}
+
+.GET {
+    color: #61affe !important;
+}
+
+.POST {
+    color: #49cc90 !important;
+}
+
+[method="GET"] {
+    color: #61affe !important;
+}
+
+[method="POST"] {
+    color: #49cc90 !important;
+}
+
+.react-flow__attribution a {
+    display: none;
 }

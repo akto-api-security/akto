@@ -1,7 +1,5 @@
 import React, { useState } from 'react'
 import ReactFlow, {
-  MiniMap,
-  Controls,
   Background,
   getRectOfNodes
 } from 'react-flow-renderer';
@@ -41,7 +39,7 @@ const Workflow = () => {
     const refNode = nodes.find(x => x.id === currentSource.nodeId)
 
     if (enteredNode && enteredNode.id !== refNode.id) {
-      const newEdge = {source: refNode.id, target: enteredNode.id, id: getId(), selected: true}
+      const newEdge = {source: refNode.id, target: enteredNode.id, id: getId(), selected: true, markerEnd: {type: 'arrow'}}
       onConnect(newEdge)
     } else {
       const deltaX = event.screenX - currentSource.x
@@ -56,7 +54,7 @@ const Workflow = () => {
       }
       lastNode.hidden = false
       lastNode.id = getId()
-      const newEdge = {source: refNode.id, target: lastNode.id, id: getId(), selected: true}
+      const newEdge = {source: refNode.id, target: lastNode.id, id: getId(), selected: true, markerEnd: {type: 'arrow'}}
       addNode(lastNode, newEdge)
     }
   } 

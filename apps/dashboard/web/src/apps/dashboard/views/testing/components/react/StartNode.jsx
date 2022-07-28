@@ -8,7 +8,6 @@ const StartNode = () => {
     return (
         <div className={"start-node"}>
             <div>Start</div>
-
             <Handle
                 type="source"
                 position={Position.Bottom}

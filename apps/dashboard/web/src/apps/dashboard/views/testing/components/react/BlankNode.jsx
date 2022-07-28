@@ -8,17 +8,31 @@ import InputAdornment from '@mui/material/InputAdornment';
 import TextField from '@mui/material/TextField'
 import FormControl from '@mui/material/FormControl';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faSearch } from '@fortawesome/free-solid-svg-icons'
+import { faSearch, faGripLines } from '@fortawesome/free-solid-svg-icons'
 
 import './start-node.css';
 import useStore from './store'
 
-const BlankNode = () => {
-
+const BlankNode = (nodeData) => {
     const endpointsList = useStore(state => state.endpointsList)
+    const nodeEndpointMap = useStore(state => state.nodeEndpointMap)
+    const addNodeEndpoint = useStore(state => state.addNodeEndpoint)
 
+    const onEndpointChange = (event, endpointData) => {
+        addNodeEndpoint(nodeData.id, endpointData)
+    }
+
+    const onEndpointInputChange = (event, newInputValue) => {
+        let endpointData = nodeEndpointMap[nodeData.id]
+        if (endpointData) {
+            if (newInputValue !== (endpointData.method + " " + endpointData.endpoint)) {
+                addNodeEndpoint(nodeData.id, null)
+            }
+        }
+        
+    }
     return (
-        <div className="start-node nodrag">
+        <div className={"start-node " + (nodeEndpointMap[nodeData.id] ? "green-boundary" : "red-boundary") }>
             <Handle
                 type="target"
                 position={Position.Top}
@@ -32,27 +46,45 @@ const BlankNode = () => {
             </Handle>
 
             <div>
-                {<FormControl sx={{ m: 1, minWidth: 120 }} size="small">
+                {<FormControl sx={{ m: 1, minWidth: 120 }} fullWidth>
                     <Autocomplete
-                        color="#6200EA"
                         options={endpointsList}
                         autoHighlight
                         disableClearable
-                        getOptionLabel={option => {return option.method + " " + option.endpoint}}
+                        openOnFocus={!nodeEndpointMap[nodeData.id]}
+                        freeSolo
+                        onChange={onEndpointChange}
+                        onInputChange={onEndpointInputChange}
+                        getOptionLabel={option => {return option.endpoint || ""}}
                         renderOption={(props, option) => (
-                              <Box  component="li" {...props}>{option.method} {option.endpoint}</Box>
+                            <Box  component="li" {...props}>
+                                <span className="autocomplete-options ">
+                                    <span method={option.method}>{option.method} </span>
+                                    {option.endpoint}
+                                </span>
+                            </Box>
                         )}
-                        renderInput={(params) => (
-                            <TextField
+                        renderInput={(params) => {
+                            let method = nodeEndpointMap[nodeData.id] ? nodeEndpointMap[nodeData.id].method : ""
+                            return (<TextField
                               {...params}
-                              label="Select API"
-                              inputProps={{
-                                ...params.inputProps,
-                                autoComplete: 'new-password'
+                              placeholder="Select API"
+                              InputProps={{
+                                ...params.InputProps,
+                                componentsProps: { input: params.inputProps },
+                                autoComplete: 'new-password',
+                                disableUnderline: true,
+                                startAdornment: (
+                                    <span className={"MuiInput-input " + method}>
+                                        {method}
+                                    </span>
+                                )
                               }}
-                            />
-                          )}
-                        variant="standard"
+                              
+                              variant="standard"
+                            />)
+                        }}
+                        
                     ></Autocomplete>
                 </FormControl>}
             </div>      
