@@ -25,8 +25,9 @@ export default {
             {
                 id: '1',
                 type: 'startNode',
-                position: { x: 250, y: 100 },
-                draggable: false
+                position: { x: 0, y: 0 },
+                draggable: false,
+                selectable: false
             },
             {
                 id: '2',
@@ -34,8 +35,14 @@ export default {
                 position: { x: 250, y: 0 },
                 draggable: true,
                 hidden: true
+            },
+            {
+                id: '3',
+                type: 'endNode',
+                position: { x: 400, y: 400 },
+                draggable: false,
+                selectable: false
             }
-
         ]
 
         let defEdges = [

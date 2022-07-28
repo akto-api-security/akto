@@ -7,10 +7,11 @@ import ReactFlow, {
 import useStore from './store'
 import StartNode from './StartNode.jsx';
 import BlankNode from './BlankNode.jsx';
+import EndNode from './EndNode.jsx';
 
 const onInit = (reactFlowInstance) => console.log('flow loaded:', reactFlowInstance);
 
-const nodeTypes = { startNode: StartNode, blankNode: BlankNode };
+const nodeTypes = { startNode: StartNode, blankNode: BlankNode, endNode: EndNode };
 
 const Workflow = () => {
   const nodes = useStore((state) => state.nodes)
@@ -35,11 +36,51 @@ const Workflow = () => {
     return ''+parseInt(Math.random() * 10000000)
   }
 
+
+
+    function getCycle(graph) {
+      let queue = Object.keys(graph).map( node => [node] );
+      while (queue.length) {
+        const batch = [];
+        for (const path of queue) {
+            const parents = graph[path[0]] || [];
+            for (const node of parents) {
+                if (node === path[path.length-1]) return [node, ...path];
+                batch.push([node, ...path]);
+            }
+        }
+        queue = batch;
+    }
+  }
+
+  const cyclesPresent = (newEdge) => {
+    let graph = {}
+    for (const edge of [...edges, newEdge]) {
+      let source = edge.source
+      let target = edge.target
+      if (!graph[target]) {
+        graph[target] = []
+      }
+
+      graph[target].push(source)
+    }
+    return getCycle(graph)
+  }
+
   const onConnectStop = (event) => {
     const refNode = nodes.find(x => x.id === currentSource.nodeId)
 
     if (enteredNode && enteredNode.id !== refNode.id) {
       const newEdge = {source: refNode.id, target: enteredNode.id, id: getId(), selected: true, markerEnd: {type: 'arrow'}}
+
+      if (cyclesPresent(newEdge)) {
+         newEdge.style = {
+           stroke: "red"
+         }
+         newEdge.data = {
+           label: "invalid edge"
+         }
+      }
       onConnect(newEdge)
     } else {
       const deltaX = event.screenX - currentSource.x
@@ -90,6 +131,7 @@ const Workflow = () => {
       onNodeMouseEnter={onNodeMouseEnter}
       onNodeMouseLeave={onNodeMouseLeave}
       attributionPosition="top-right"
+      fitView
     >
       <Background color="#aaa" gap={16} />
     </ReactFlow>
