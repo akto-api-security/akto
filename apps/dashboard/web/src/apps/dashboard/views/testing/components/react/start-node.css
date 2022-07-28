@@ -1,0 +1,10 @@
+.start-node {
+    background: #fff;
+    border: 1px solid #1a192b;
+    border-radius: 3px;
+    color: #222;
+    font-size: 12px;
+    padding: 10px;
+    text-align: center;
+    width: 150px;
+}
