@@ -34,14 +34,14 @@ public class TestMergingNew extends MongoBasedTest {
             responseParams.add(resp);
         }
 
-        parser.syncFunction(responseParams.subList(0,10));
-        parser.apiCatalogSync.syncWithDB();
-        parser.syncFunction(responseParams.subList(10,15));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(0,10), false);
+        parser.apiCatalogSync.syncWithDB(false);
+        parser.syncFunction(responseParams.subList(10,15), false);
+        parser.apiCatalogSync.syncWithDB(false);
         assertEquals(0, getStaticURLsSize(parser));
 
-        parser.syncFunction(responseParams.subList(15,20));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(15,20), false);
+        parser.apiCatalogSync.syncWithDB(false);
         assertEquals(0, getStaticURLsSize(parser));
 
 
@@ -81,12 +81,12 @@ public class TestMergingNew extends MongoBasedTest {
             i +=1;
         }
 
-        parser.syncFunction(responseParams.subList(0,1));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(0,1), false);
+        parser.apiCatalogSync.syncWithDB(false);
         assertEquals(1, getStaticURLsSize(parser));
 
-        parser.syncFunction(responseParams.subList(1,2));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(1,2), false);
+        parser.apiCatalogSync.syncWithDB(false);
         assertEquals(0, getStaticURLsSize(parser));
 
 //        parser.syncFunction(responseParams.subList(28,33));
@@ -112,16 +112,16 @@ public class TestMergingNew extends MongoBasedTest {
             responseParams.add(resp);
         }
 
-        parser.syncFunction(responseParams.subList(0,23));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(0,23), false);
+        parser.apiCatalogSync.syncWithDB(false);
         assertEquals(23, getStaticURLsSize(parser));
 
-        parser.syncFunction(responseParams.subList(23,28));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(23,28), false);
+        parser.apiCatalogSync.syncWithDB(false);
         assertEquals(0, getStaticURLsSize(parser));
 
-        parser.syncFunction(responseParams.subList(28,33));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(28,33), false);
+        parser.apiCatalogSync.syncWithDB(false);
         assertEquals(0, getStaticURLsSize(parser));
     }
 
@@ -140,12 +140,12 @@ public class TestMergingNew extends MongoBasedTest {
 
         HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1);
 
-        parser.syncFunction(responseParams.subList(0,10));
-        parser.apiCatalogSync.syncWithDB();
-        parser.syncFunction(responseParams.subList(10,25));
-        parser.apiCatalogSync.syncWithDB();
-        parser.syncFunction(responseParams.subList(25,30));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(0,10), false);
+        parser.apiCatalogSync.syncWithDB(false);
+        parser.syncFunction(responseParams.subList(10,25), false);
+        parser.apiCatalogSync.syncWithDB(false);
+        parser.syncFunction(responseParams.subList(25,30), false);
+        parser.apiCatalogSync.syncWithDB(false);
 
 
         Map<URLTemplate, RequestTemplate> urlTemplateMap = parser.apiCatalogSync.getDelta(0).getTemplateURLToMethods();
@@ -176,12 +176,12 @@ public class TestMergingNew extends MongoBasedTest {
 
         HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1);
 
-        parser.syncFunction(responseParams.subList(0,10));
-        parser.apiCatalogSync.syncWithDB();
-        parser.syncFunction(responseParams.subList(10,25));
-        parser.apiCatalogSync.syncWithDB();
-        parser.syncFunction(responseParams.subList(25,30));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(0,10), false);
+        parser.apiCatalogSync.syncWithDB(false);
+        parser.syncFunction(responseParams.subList(10,25), false);
+        parser.apiCatalogSync.syncWithDB(false);
+        parser.syncFunction(responseParams.subList(25,30), false);
+        parser.apiCatalogSync.syncWithDB(false);
 
 
         Map<URLTemplate, RequestTemplate> urlTemplateMap = parser.apiCatalogSync.getDelta(0).getTemplateURLToMethods();
@@ -214,12 +214,12 @@ public class TestMergingNew extends MongoBasedTest {
         URLTemplate urlTemplate = APICatalogSync.tryMergeUrls(new URLStatic(responseParams.get(0).requestParams.url, URLMethods.Method.GET), new URLStatic(responseParams.get(1).requestParams.url, URLMethods.Method.GET));
         parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods().put(urlTemplate, new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>())));
 
-        parser.syncFunction(responseParams.subList(0,15));
-        parser.apiCatalogSync.syncWithDB();
-        parser.syncFunction(responseParams.subList(15,25));
-        parser.apiCatalogSync.syncWithDB();
-        parser.syncFunction(responseParams.subList(25,30));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(0,15), false);
+        parser.apiCatalogSync.syncWithDB(false);
+        parser.syncFunction(responseParams.subList(15,25), false);
+        parser.apiCatalogSync.syncWithDB(false);
+        parser.syncFunction(responseParams.subList(25,30), false);
+        parser.apiCatalogSync.syncWithDB(false);
 
 
         Map<URLTemplate, RequestTemplate> urlTemplateMap = parser.apiCatalogSync.getDelta(123).getTemplateURLToMethods();
@@ -246,12 +246,12 @@ public class TestMergingNew extends MongoBasedTest {
             responseParams.add(resp);
         }
 
-        parser.syncFunction(responseParams.subList(0,23));
-        parser.apiCatalogSync.syncWithDB();
-        parser.syncFunction(responseParams.subList(23,28));
-        parser.apiCatalogSync.syncWithDB();
-        parser.syncFunction(responseParams.subList(28,33));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(0,23), false);
+        parser.apiCatalogSync.syncWithDB(false);
+        parser.syncFunction(responseParams.subList(23,28), false);
+        parser.apiCatalogSync.syncWithDB(false);
+        parser.syncFunction(responseParams.subList(28,33), false);
+        parser.apiCatalogSync.syncWithDB(false);
 
 
         Map<URLTemplate, RequestTemplate> urlTemplateMap = parser.apiCatalogSync.getDelta(123).getTemplateURLToMethods();
@@ -394,23 +394,23 @@ public class TestMergingNew extends MongoBasedTest {
         HttpCallParser parser = new HttpCallParser("access-token", 10, 40, 10);
 
         /* tryMergingWithKnownStrictURLs - put in delta-static */
-        parser.syncFunction(responseParams);
+        parser.syncFunction(responseParams, false);
         assertTrue(parser.getSyncCount() == 0);
 
         /* processKnownStaticURLs */
-        parser.syncFunction(responseParams);
+        parser.syncFunction(responseParams, false);
 
         /* tryMergingWithKnownStrictURLs - merge with delta-static */
         responseParams.add(TestDump2.createSampleParams("user" + 2, url + 2));
         responseParams.add(TestDump2.createSampleParams("user" + 3, url + 3));
 
         /* tryMergingWithKnownStrictURLs - merge with delta-template */
-        responseParams.add(TestDump2.createSampleParams("user" + 4, url + 4));
-        parser.syncFunction(responseParams);
+        responseParams.add(TestDump2.createSampleParams("user"+4, url+4));
+        parser.syncFunction(responseParams, false);
         assertTrue(parser.getSyncCount() == 0);
 
         /* tryMergingWithKnownTemplates */
-        parser.syncFunction(responseParams);
+        parser.syncFunction(responseParams, false);
         assertTrue(parser.getSyncCount() == 0);
 
         /* tryMergingWithKnownStrictURLs - merge with Db url */
@@ -418,14 +418,14 @@ public class TestMergingNew extends MongoBasedTest {
         responseParams = new ArrayList<>();
         responseParams.add(TestDump2.createSampleParams("user" + 2, url + 2));
         responseParams.get(0).setSource(HttpResponseParams.Source.HAR);
-        parser.syncFunction(responseParams);
+        parser.syncFunction(responseParams, false);
         responseParams = new ArrayList<>();
         responseParams.add(TestDump2.createSampleParams("user" + 3, url + 3));
 
         /* tryMergingWithKnownStrictURLs - merge with Db url - template already exists in delta */
         responseParams.add(TestDump2.createSampleParams("user" + 4, url + 4));
         responseParams.get(0).setSource(HttpResponseParams.Source.HAR);
-        parser.syncFunction(responseParams);
+        parser.syncFunction(responseParams, false);
     }
 
     @Test
@@ -447,32 +447,32 @@ public class TestMergingNew extends MongoBasedTest {
             responseParams.add(resp);
         }
 
-        parser.syncFunction(responseParams.subList(0,10));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(0,10), false);
+        parser.apiCatalogSync.syncWithDB(false);
 
         // dbState doesn't have any template URLs initially so no urlParams are considered
         testSampleSizeAndDomainOfSti(parser,0, 10, SingleTypeInfo.Domain.ENUM, SingleTypeInfo.Domain.ENUM);
 
-        parser.syncFunction(responseParams.subList(10,55));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(10,55), false);
+        parser.apiCatalogSync.syncWithDB(false);
 
         // Now dbState has template URLs so urlParam values are now stored
         assertEquals(0,getStaticURLsSize(parser));
         testSampleSizeAndDomainOfSti(parser, 45, 55, SingleTypeInfo.Domain.ENUM, SingleTypeInfo.Domain.ENUM);
 
-        parser.apiCatalogSync.syncWithDB();
-        parser.apiCatalogSync.syncWithDB();
+        parser.apiCatalogSync.syncWithDB(false);
+        parser.apiCatalogSync.syncWithDB(false);
 
         testSampleSizeAndDomainOfSti(parser, 45, 0, SingleTypeInfo.Domain.ENUM, SingleTypeInfo.Domain.ANY);
 
         // changing the parser symbolizes instance restart
         // using the new or old parser shouldn't change the result
         HttpCallParser parserNew = new HttpCallParser("userIdentifier", 1, 1, 1);
-        parserNew.syncFunction(responseParams.subList(55,70));
-        parserNew.apiCatalogSync.syncWithDB();
-        parserNew.syncFunction(responseParams.subList(70,100));
-        parserNew.apiCatalogSync.syncWithDB();
-        parserNew.apiCatalogSync.syncWithDB();
+        parserNew.syncFunction(responseParams.subList(55,70), false);
+        parserNew.apiCatalogSync.syncWithDB(false);
+        parserNew.syncFunction(responseParams.subList(70,100), false);
+        parserNew.apiCatalogSync.syncWithDB(false);
+        parserNew.apiCatalogSync.syncWithDB(false);
 
         // both now range
         testSampleSizeAndDomainOfSti(parserNew, 0, 0, SingleTypeInfo.Domain.RANGE, SingleTypeInfo.Domain.ANY);
@@ -507,9 +507,9 @@ public class TestMergingNew extends MongoBasedTest {
         HttpResponseParams httpResponseParams1 = createHttpResponseForMinMax(url+"books1", 23.4F,-98F );
         HttpResponseParams httpResponseParams2 = createHttpResponseForMinMax(url+"books1", 2.3F,-200.5F );
         HttpResponseParams httpResponseParams3 = createHttpResponseForMinMax(url+"books1", 2500.9F,-200F );
-        parser.syncFunction(Arrays.asList(httpResponseParams1, httpResponseParams2, httpResponseParams3));
+        parser.syncFunction(Arrays.asList(httpResponseParams1, httpResponseParams2, httpResponseParams3), false);
 
-        parser.apiCatalogSync.syncWithDB();
+        parser.apiCatalogSync.syncWithDB(false);
         Collection<RequestTemplate> requestTemplates = parser.apiCatalogSync.getDbState(123).getStrictURLToMethods().values();
         validateMinMax(requestTemplates, 2500, 2, -98, -200);
 
@@ -524,20 +524,20 @@ public class TestMergingNew extends MongoBasedTest {
             respMax += 1;
             respMin -= 1;
             HttpResponseParams httpResponseParams = createHttpResponseForMinMax(url+"books"+i, reqMax, respMax);
-            parser.syncFunction(Collections.singletonList(httpResponseParams));
+            parser.syncFunction(Collections.singletonList(httpResponseParams), false);
 
             httpResponseParams = createHttpResponseForMinMax(url+"books"+i, reqMin, respMin);
-            parser.syncFunction(Collections.singletonList(httpResponseParams));
+            parser.syncFunction(Collections.singletonList(httpResponseParams), false);
         }
-        parser.apiCatalogSync.syncWithDB();
+        parser.apiCatalogSync.syncWithDB(false);
 
         HttpResponseParams httpResponseParams = createHttpResponseForMinMax(url+"books99", 190f, -190f);
-        parser.syncFunction(Collections.singletonList(httpResponseParams));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(Collections.singletonList(httpResponseParams), false);
+        parser.apiCatalogSync.syncWithDB(false);
 
         httpResponseParams = createHttpResponseForMinMax(url+"books100", 190f, -190f);
-        parser.syncFunction(Collections.singletonList(httpResponseParams));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(Collections.singletonList(httpResponseParams), false);
+        parser.apiCatalogSync.syncWithDB(false);
 
         // changing the parser symbolizes instance restart
         // using the new or old parser shouldn't change the result
@@ -550,10 +550,10 @@ public class TestMergingNew extends MongoBasedTest {
         validateMinMax(requestTemplates, Double.valueOf(reqMax+"").longValue(), Double.valueOf(reqMin+"").longValue(), Double.valueOf(respMax+"").longValue(), Double.valueOf(respMin+"").longValue());
 
         httpResponseParams = createHttpResponseForMinMax(url+"books10", 19000f, -190f);
-        parserNew.syncFunction(Collections.singletonList(httpResponseParams));
+        parserNew.syncFunction(Collections.singletonList(httpResponseParams), false);
         httpResponseParams = createHttpResponseForMinMax(url+"books15", 19f, -19000f);
-        parserNew.syncFunction(Collections.singletonList(httpResponseParams));
-        parserNew.apiCatalogSync.syncWithDB();
+        parserNew.syncFunction(Collections.singletonList(httpResponseParams), false);
+        parserNew.apiCatalogSync.syncWithDB(false);
         requestTemplates = parserNew.apiCatalogSync.getDbState(123).getTemplateURLToMethods().values();
         validateMinMax(requestTemplates, 19000, Double.valueOf(reqMin+"").longValue(), Double.valueOf(respMax+"").longValue(), -19000);
 

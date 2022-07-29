@@ -204,7 +204,7 @@ public class HttpCallParser {
 
     int numberOfSyncs = 0;
 
-    public APICatalogSync syncFunction(List<HttpResponseParams> responseParams)  {
+    public APICatalogSync syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately)  {
         // USE ONLY filteredResponseParams and not responseParams
         List<HttpResponseParams> filteredResponseParams = filterHttpResponseParams(responseParams);
         boolean isHarOrPcap = aggregate(filteredResponseParams);
@@ -216,9 +216,9 @@ public class HttpCallParser {
 
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
-        if (this.sync_count >= syncThresh || (Context.now() - this.last_synced) > this.sync_threshold_time || isHarOrPcap) {
+        if (syncImmediately || this.sync_count >= syncThresh || (Context.now() - this.last_synced) > this.sync_threshold_time || isHarOrPcap) {
             numberOfSyncs++;
-            apiCatalogSync.syncWithDB();
+            apiCatalogSync.syncWithDB(syncImmediately);
             this.last_synced = Context.now();
             this.sync_count = 0;
             return apiCatalogSync;

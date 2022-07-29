@@ -89,7 +89,7 @@ public class HarAction extends UserAction {
             
             if(skipKafka) {
                 SingleTypeInfo.fetchCustomDataTypes();
-                APICatalogSync apiCatalogSync = parser.syncFunction(responses);
+                APICatalogSync apiCatalogSync = parser.syncFunction(responses, true);
                 AktoPolicy aktoPolicy = new AktoPolicy(parser.apiCatalogSync); // keep inside if condition statement because db call when initialised
                 aktoPolicy.main(responses, apiCatalogSync);
             }
