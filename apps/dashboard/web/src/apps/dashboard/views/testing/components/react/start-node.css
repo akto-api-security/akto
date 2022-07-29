@@ -9,12 +9,24 @@
     width: 200px;
 }
 
+.start-node:hover {
+    box-shadow: 0px 0px 3px 3px #47466a3d;
+}
+
 .red-boundary {
     border: 1px solid #f44336 !important;
 }
 
+.red-boundary:hover {
+    box-shadow: 0px 0px 3px 3px #f443363d;
+}
+
 .green-boundary {
     border: 1px solid #6200EA !important;
+}
+
+.green-boundary:hover {
+    box-shadow: 0px 0px 3px 3px #6200EA3d !important;
 }
 
 .MuiInput-input {
@@ -59,3 +71,11 @@
 .react-flow__attribution a {
     display: none;
 }
+
+  
+.react-flow__edge-path:hover {
+    stroke-width: 2px;
+    filter: drop-shadow(3px 5px 2px #47466A3d);
+    cursor: pointer;
+}
+  
