@@ -7,6 +7,7 @@ import {
 
 const useStore = create((set, get) => ({
   endpointsList: [],
+  fetchSampleDataFunc: null,
   nodes: [],
   edges: [],
   currentSource: null,
@@ -34,9 +35,10 @@ const useStore = create((set, get) => ({
       edgeVariablesMap: ret
     })
   },
-  setEndpointsList: (newList) => {
+  setEndpointsList: (newList, newFetchSampleDataFunc) => {
     set({
-      endpointsList: newList
+      endpointsList: newList,
+      fetchSampleDataFunc: newFetchSampleDataFunc
     })
   },
   setZoom: (newZoom) => {

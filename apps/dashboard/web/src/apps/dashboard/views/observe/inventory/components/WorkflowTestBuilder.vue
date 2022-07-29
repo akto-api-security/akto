@@ -1,12 +1,12 @@
 <template>
     <div>
-        <workflow-builder style="height: 500px" :endpointsList="endpointsList" :initialNodes="defaultNodes" :initialEdges="defaultEdges" />
+        <workflow-builder style="height: 500px" :endpointsList="endpointsList" :initialNodes="defaultNodes" :initialEdges="defaultEdges" :fetchSampleDataFunc="fetchSampleDataFunc"/>
     </div>
 </template>
 
 <script>
 import WorkflowBuilder from '../../../testing/components/react/WorkflowBuilder.jsx'
-
+import api from '../api'
 import obj from '@/util/obj'
 
 export default {
@@ -51,7 +51,8 @@ export default {
 
         return {
             defaultNodes: this.initialNodes || defNodes,
-            defaultEdges: this.initialEdges || defEdges
+            defaultEdges: this.initialEdges || defEdges,
+            fetchSampleDataFunc: api.fetchSampleData
         }
     }
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 import { Handle, Position } from 'react-flow-renderer';
 import Box from '@mui/material/Box'
@@ -13,10 +13,17 @@ const BlankNode = (nodeData) => {
     const endpointsList = useStore(state => state.endpointsList)
     const nodeEndpointMap = useStore(state => state.nodeEndpointMap)
     const addNodeEndpoint = useStore(state => state.addNodeEndpoint)
+    const fetchSampleDataFunc = useStore(state => state.fetchSampleDataFunc)
+
+    let [endpointDetails, setEndpointDetails] = React.useState(null)
 
     const onEndpointChange = (event, endpointData) => {
         addNodeEndpoint(nodeData.id, endpointData)
+        console.log("onEndpointChange setting", endpointDetails)
+        setEndpointDetails(endpointData)
+        console.log("onEndpointChange set complete", endpointDetails)
     }
+
 
     const onEndpointInputChange = (event, newInputValue) => {
         let endpointData = nodeEndpointMap[nodeData.id]
@@ -27,8 +34,9 @@ const BlankNode = (nodeData) => {
         }
         
     }
+
     return (
-        <div className={"start-node " + (nodeEndpointMap[nodeData.id] ? "green-boundary" : "red-boundary") }>
+        <div className={"start-node " + (endpointDetails ? "green-boundary" : "red-boundary") }>
             <Handle
                 type="target"
                 position={Position.Top}
@@ -48,11 +56,11 @@ const BlankNode = (nodeData) => {
                         options={endpointsList}
                         autoHighlight
                         disableClearable
-                        openOnFocus={!nodeEndpointMap[nodeData.id]}
+                        openOnFocus={!endpointDetails}
                         freeSolo
                         onChange={onEndpointChange}
                         onInputChange={onEndpointInputChange}
-                        getOptionLabel={option => {return option.endpoint || ""}}
+                        getOptionLabel={option => {return option.method ? (option.method + " " + option.endpoint) : "";}}
                         renderOption={(props, option) => (
                             <Box  component="li" {...props}>
                                 <span className="autocomplete-options ">
@@ -62,7 +70,12 @@ const BlankNode = (nodeData) => {
                             </Box>
                         )}
                         renderInput={(params) => {
-                            let method = nodeEndpointMap[nodeData.id] ? nodeEndpointMap[nodeData.id].method : ""
+                            let method = "";
+                            if (params.inputProps.value && params.inputProps.value.indexOf(" ") > -1) {
+                                let origValue = params.inputProps.value
+                                params.inputProps.value = origValue.split(" ")[1];
+                                method = origValue.split(" ")[0];
+                            }
                             return (<TextField
                               {...params}
                               placeholder="Select API"
@@ -84,7 +97,7 @@ const BlankNode = (nodeData) => {
                         
                     ></Autocomplete>
                 </FormControl>}
-                <InputArgumentsDialog/>
+                {endpointDetails && <InputArgumentsDialog endpointDetails={endpointDetails} fetchSampleDataFunc={fetchSampleDataFunc} />}
             </div>      
             <Handle
                 type="source"

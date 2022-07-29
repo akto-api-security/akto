@@ -24,7 +24,7 @@ const theme = createTheme({
   }
 });
 
-const WorkflowBuilder = ({endpointsList, initialNodes, initialEdges}) => {  
+const WorkflowBuilder = ({endpointsList, initialNodes, initialEdges, fetchSampleDataFunc}) => {  
   const setInitialState = useStore((state) => state.setInitialState);
   const setEndpointsList = useStore((state) => state.setEndpointsList);
 
@@ -32,7 +32,7 @@ const WorkflowBuilder = ({endpointsList, initialNodes, initialEdges}) => {
   endpointsList.forEach(x => {
     x.method = x.method.toUpperCase()
   })
-  setEndpointsList(endpointsList);
+  setEndpointsList(endpointsList, fetchSampleDataFunc);
   
   return (
     <Workflow theme={theme}/>

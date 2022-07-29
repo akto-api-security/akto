@@ -1,7 +1,6 @@
 import * as React from 'react';
 import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
-import TextField from '@mui/material/TextField';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
@@ -12,8 +11,39 @@ import { faEdit } from '@fortawesome/free-regular-svg-icons'
 
 import './start-node.css'
 
-export default function InputArgumentsDialog() {
+const RequestEditor = ({sampleApiCall}) => {
+  return (
+    <div>
+      <div className="request-title">Query params</div>
+      <div className="request-editor request-editor-path">
+        {sampleApiCall.path.indexOf("?") > -1 ?sampleApiCall.path.split("?")[1] : "-"}
+      </div>
+      <div className="request-title">Headers</div>
+      <div className="request-editor request-editor-headers">
+        {sampleApiCall.requestHeaders}
+      </div>
+      <div className="request-title">Payload</div>
+      <div className="request-editor request-editor-payload">
+        {sampleApiCall.requestPayload}
+      </div>
+    </div>
+  )
+}
+
+export default function InputArgumentsDialog({endpointDetails, fetchSampleDataFunc}) {
+  console.log("InputArgumentsDialog", endpointDetails)
   const [open, setOpen] = React.useState(false);
+  const [sampleData, updateSampleData] = React.useState({});
+  React.useEffect(() => {
+      const getSampleData = async () => {
+        const json = await fetchSampleDataFunc(endpointDetails.endpoint, endpointDetails.apiCollectionId, endpointDetails.method)
+        updateSampleData(json);
+      }
+      getSampleData();
+    }, 
+    [endpointDetails]
+  );
+
 
   const handleClickOpen = () => {
     setOpen(true);
@@ -31,24 +61,19 @@ export default function InputArgumentsDialog() {
         </IconButton>
       </div>
       <Dialog open={open} onClose={handleClose} className="input-arguments-dialog">
-        <DialogTitle>Set API request parameters</DialogTitle>
+        <div className="request-title"></div>
         <DialogContent>
-          <DialogContentText>
-            The default for each parameter is taken from lastest sample data. You can change to a constant.
-          </DialogContentText>
-          <TextField
-            autoFocus
-            margin="dense"
-            id="name"
-            label="Email Address"
-            type="email"
-            fullWidth
-            variant="standard"
-          />
+            { 
+              sampleData && 
+              sampleData.sampleDataList && 
+              sampleData.sampleDataList[0] && 
+              sampleData.sampleDataList[0].samples && 
+              sampleData.sampleDataList[0].samples[0] && 
+              <RequestEditor sampleApiCall={console.log(sampleData) || JSON.parse(sampleData.sampleDataList[0].samples[0])}/>
+            }
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleClose}>Cancel</Button>
-          <Button onClick={handleClose}>Subscribe</Button>
+          <Button onClick={handleClose} variant="contained" style={{textTransform: "unset"}}>Save</Button>
         </DialogActions>
       </Dialog>
     </div>
