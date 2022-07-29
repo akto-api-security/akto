@@ -2,14 +2,10 @@ import React, { useState } from 'react';
 
 import { Handle, Position } from 'react-flow-renderer';
 import Box from '@mui/material/Box'
-import InputLabel from '@mui/material/InputLabel'
 import Autocomplete from '@mui/material/Autocomplete';
-import InputAdornment from '@mui/material/InputAdornment';
 import TextField from '@mui/material/TextField'
 import FormControl from '@mui/material/FormControl';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faSearch, faGripLines } from '@fortawesome/free-solid-svg-icons'
-
+import InputArgumentsDialog from './InputArgumentsDialog.jsx'
 import './start-node.css';
 import useStore from './store'
 
@@ -45,7 +41,7 @@ const BlankNode = (nodeData) => {
             >
             </Handle>
 
-            <div>
+            <div style={{display: "flex", justifyContent: "space-between"}}>
                 {<FormControl sx={{ m: 1, minWidth: 120 }} fullWidth>
                     <Autocomplete
                         options={endpointsList}
@@ -87,6 +83,7 @@ const BlankNode = (nodeData) => {
                         
                     ></Autocomplete>
                 </FormControl>}
+                <InputArgumentsDialog/>
             </div>      
             <Handle
                 type="source"

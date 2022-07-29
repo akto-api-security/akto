@@ -21,15 +21,6 @@ const theme = createTheme({
     warning: {
       main: "rgba(243, 107, 107)"
     }
-  },
-  components: {
-    MuiInputBase: {
-      styleOverrides: {
-        input: {
-          color: "#47466A"
-        },
-      }
-    }
   }
 });
 

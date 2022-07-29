@@ -38,6 +38,10 @@
     margin: 0px !important;
 }
 
+.MuiIconButton-root {
+    padding-top: 8px !important;
+}
+
 .autocomplete-options {
     font-size: 12px !important;
     color: #47466A !important;
@@ -77,5 +81,10 @@
     stroke-width: 2px;
     filter: drop-shadow(3px 5px 2px #47466A3d);
     cursor: pointer;
+}
+
+.primary-btn {
+    color: #6200EA;
+    font-size: 12px;
 }
   
