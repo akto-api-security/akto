@@ -50,7 +50,7 @@ public class StartTestAction extends UserAction {
                 return ERROR.toUpperCase();
         }
 
-        // 65 seconds added to give testing module to get the latest sample messages (which runs every 60 secs)
+        // 65 seconds added to give testing module time to get the latest sample messages (which runs every 60 secs)
         TestingRun testingRun = new TestingRun(
                 Context.now()+65, user.getLogin(), testingEndpoints, testIdConfig, TestingRun.State.SCHEDULED
         );
@@ -111,7 +111,7 @@ public class StartTestAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        // 65 seconds added to give testing module to get the latest sample messages (which runs every 60 secs)
+        // 65 seconds added to give testing module time to get the latest sample messages (which runs every 60 secs)
         TestingRun newTestingRun = new TestingRun(
                 Context.now()+65, user.getLogin(), testingRun.getTestingEndpoints(), testingRun.getTestIdConfig(), TestingRun.State.SCHEDULED
         );
