@@ -898,7 +898,7 @@ public class APICatalogSync {
 
     int counter = 0;
 
-    public void syncWithDB() {
+    public void syncWithDB(boolean syncImmediately) {
         List<WriteModel<SingleTypeInfo>> writesForParams = new ArrayList<>();
         List<WriteModel<SensitiveSampleData>> writesForSensitiveSampleData = new ArrayList<>();
         List<WriteModel<TrafficInfo>> writesForTraffic = new ArrayList<>();
@@ -922,7 +922,7 @@ public class APICatalogSync {
             writesForSensitiveParamInfo.addAll(dbUpdateReturn.bulkUpdatesForSensitiveParamInfo);
             writesForTraffic.addAll(getDBUpdatesForTraffic(apiCollectionId, deltaCatalog));
             deltaCatalog.setDeletedInfo(new ArrayList<>());
-            if (counter < 10 || counter % 10 == 0) {
+            if (syncImmediately || counter < 10 || counter % 10 == 0) {
                 writesForSampleData.addAll(getDBUpdatesForSampleData(apiCollectionId, deltaCatalog, redact));
             }
         }
