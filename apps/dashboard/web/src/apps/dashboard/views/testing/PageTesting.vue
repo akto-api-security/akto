@@ -146,8 +146,9 @@ export default {
         },
         async openDetails(row) {
             let r = await api.fetchRequestAndResponseForTest(row.x)
-            this.requestAndResponse = r.testingRunResults && r.testingRunResults[0] ? Object.entries(r.testingRunResults[0].resultMap).filter(x => x[1].vulnerable).map(x => {return {message: x[1].message, title: x[0], highlightPaths:this.getHighlightMap(x)}}) : []
+            this.requestAndResponse = r.testingRunResults && r.testingRunResults[0] ? Object.entries(r.testingRunResults[0].resultMap).filter(x => x[1].vulnerable).map(x => {return {message: x[1].message, title: x[0], highlightPaths:[]}}) : []
             this.openDetailsDialog = true
+            console.log(r.testingRunResults[0])
         },
         getHighlightMap(x) {
             let v = x[1].privateParamTypeInfoList

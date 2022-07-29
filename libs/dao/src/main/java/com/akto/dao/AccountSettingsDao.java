@@ -2,11 +2,6 @@ package com.akto.dao;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
-import com.mongodb.client.model.*;
-import org.bson.conversions.Bson;
-
-import java.util.ArrayList;
-import java.util.List;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;

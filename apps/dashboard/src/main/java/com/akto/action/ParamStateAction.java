@@ -36,6 +36,8 @@ public class ParamStateAction extends UserAction {
         String computedJson = "{'$divide': ['$" + ParamTypeInfo.PUBLIC_COUNT + "', '$"+ParamTypeInfo.UNIQUE_COUNT+"']}";
         String computedFieldName = "computedValue";
 
+        pipeline.add(Aggregates.match(Filters.gt(ParamTypeInfo.UNIQUE_COUNT,0)));
+
         Bson projections = Projections.fields(
                 Projections.include(
                     ParamTypeInfo.API_COLLECTION_ID, ParamTypeInfo.URL, ParamTypeInfo.METHOD,
@@ -52,7 +54,7 @@ public class ParamStateAction extends UserAction {
 
         pipeline.add(Aggregates.match(Filters.lte(computedFieldName,ParamTypeInfo.THRESHOLD)));
 
-        pipeline.add(Aggregates.limit(1000));
+        pipeline.add(Aggregates.limit(3000));
 
         MongoCursor<ParamTypeInfo> cursor = ParamTypeInfoDao.instance.getMCollection().aggregate(pipeline, ParamTypeInfo.class).cursor();
 

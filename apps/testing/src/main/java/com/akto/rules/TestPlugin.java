@@ -133,7 +133,7 @@ public abstract class TestPlugin {
             for (int i = 0;i < tokens.length; i++) {
                 if (tokens[i] == null) {
                     ParamTypeInfo paramTypeInfo = SampleMessageStore.buildParamTypeInfo(i+"", true,apiInfoKey, false);
-                    SampleMessageStore.State state = SampleMessageStore.findState(paramTypeInfo.composeKey());
+                    SampleMessageStore.State state = SampleMessageStore.findState(paramTypeInfo, true);
                     if (state.equals(SampleMessageStore.State.PRIVATE)) {
                         privateParamTypeInfos.add(paramTypeInfo);
                     }
@@ -146,7 +146,7 @@ public abstract class TestPlugin {
         Map<String, Set<Object>> flattened = JSONUtils.flatten(payload);
         for (String param: flattened.keySet()) {
             ParamTypeInfo paramTypeInfo = SampleMessageStore.buildParamTypeInfo(param,false,apiInfoKey, false);
-            SampleMessageStore.State state = SampleMessageStore.findState(paramTypeInfo.composeKey());
+            SampleMessageStore.State state = SampleMessageStore.findState(paramTypeInfo, true);
             if (state.equals(SampleMessageStore.State.PRIVATE)) {
                 privateParamTypeInfos.add(paramTypeInfo);
             }

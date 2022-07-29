@@ -79,12 +79,14 @@ public class ResourceAnalyser {
         if (apiCollectionId == null) return;
 
         String method = requestParams.getMethod();
-        String originalUrl = requestParams.getURL()+"";
 
-        // get actual url
+        // get actual url (without any query params)
         URLStatic urlStatic = URLAggregator.getBaseURL(requestParams.getURL(), method);
-        String url = urlStatic.getUrl();
+        String baseUrl = urlStatic.getUrl();
+        String url = baseUrl;
 
+        // URLs received by api analyser are raw urls (i.e. not templatised)
+        // So checking if it can be merged with any existing template URLs from db
         URLTemplate urlTemplate = matchWithUrlTemplate(apiCollectionId, url, method);
         if (urlTemplate != null) {
             url = urlTemplate.getTemplateString();
@@ -92,15 +94,20 @@ public class ResourceAnalyser {
 
         String combinedUrl = apiCollectionId + "#" + url + "#" + method;
 
+        // different URL variables and corresponding examples. Use accordingly
+        // urlWithParams : /api/books/2?user=User1
+        // baseUrl: /api/books/2
+        // url: api/books/INTEGER
+
         // analyse url params
         if (urlTemplate != null) {
-            String[] tokens = APICatalogSync.tokenize(originalUrl);
+            String[] tokens = APICatalogSync.tokenize(baseUrl); // tokenize only the base url
             SingleTypeInfo.SuperType[] types = urlTemplate.getTypes();
             int size = tokens.length;
             for (int idx=0; idx < size; idx++) {
                 SingleTypeInfo.SuperType type = types[idx];
                 String value = tokens[idx];
-                if (type != null) {
+                if (type != null) { // only analyse the INTEGER/STRING part of the url
                     analysePayload(value, idx+"", combinedUrl, userId, url, method, -1,
                             apiCollectionId, false, true);
                 }
@@ -108,7 +115,7 @@ public class ResourceAnalyser {
         }
 
         // analyse request payload
-        BasicDBObject payload = RequestTemplate.parseRequestPayload(requestParams, urlWithParams);
+        BasicDBObject payload = RequestTemplate.parseRequestPayload(requestParams, urlWithParams); // using urlWithParams to extract any query parameters
         Map<String, Set<Object>> flattened = JSONUtils.flatten(payload);
         for (String param: flattened.keySet()) {
             for (Object val: flattened.get(param) ) {
@@ -204,6 +211,8 @@ public class ResourceAnalyser {
     }
 
 
+    // this function is responsible for cleaning any paramInfo whose URLs got merged or got deleted
+    // for example -> if /api/books/1 got converted to api/books/INTEGER it will delete all /api/books/1 data (obviously taking apiCollectionId and method into account)
     public List<WriteModel<ParamTypeInfo>> clean() {
         List<WriteModel<ParamTypeInfo>> bulkUpdates = new ArrayList<>();
         List<ApiInfo.ApiInfoKey> apis = ParamTypeInfoDao.instance.fetchEndpointsInCollection();
@@ -340,92 +349,6 @@ public class ResourceAnalyser {
     }
 
 
-    public static void main1(String[] args) {
-        DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
-        Context.accountId.set(1_000_000);
-        List<ParamTypeInfo> paramTypeInfoList = ParamTypeInfoDao.instance.findAll(
-                Filters.and(
-                        Filters.gte(ParamTypeInfo.UNIQUE_COUNT, 5)
-                )
-        );
-        Set<String> v = new HashSet<>();
-        for (ParamTypeInfo paramTypeInfo: paramTypeInfoList) {
-            System.out.println(paramTypeInfo.getParam());
-        }
-
-    }
-
-    public static void main(String[] args) {
-        DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
-        Context.accountId.set(1_000_000);
-        TestingRunDao.instance.getMCollection().updateMany(
-                new BasicDBObject(),
-                Updates.set(TestingRun.STATE, "SCHEDULED")
-        );
-    }
-
-    public static void main2(String[] args) {
-        DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
-        Context.accountId.set(1_000_000);
-        ApiCollection.useHost = false;
-        ResourceAnalyser resourceAnalyser = new ResourceAnalyser(10_000_000, 0.01, 10_000_000, 0.01);
-
-        List<SampleData> sampleDataList = SampleDataDao.instance.findAll(new BasicDBObject());
-        int i = 0;
-        for (SampleData sampleData:sampleDataList) {
-            System.out.println(i);
-            for (String s: sampleData.getSamples()) {
-                HttpResponseParams httpResponseParams = null;
-                try {
-                    httpResponseParams = HttpCallParser.parseKafkaMessage(s);
-                } catch (Exception e) {
-                    System.out.println(s);
-                    e.printStackTrace();
-                    continue;
-                }
-                httpResponseParams.requestParams.setApiCollectionId(sampleData.getId().getApiCollectionId());
-                resourceAnalyser.analyse(httpResponseParams);
-            }
-            i ++;
-        }
-
-        MongoCursor<SensitiveSampleData> cursor = SensitiveSampleDataDao.instance.getMCollection().find().cursor();
-        i = 0;
-        while (cursor.hasNext()) {
-            SensitiveSampleData sensitiveSampleData = cursor.next();
-            for (String s: sensitiveSampleData.getSampleData()) {
-                HttpResponseParams httpResponseParams = null;
-                try {
-                    httpResponseParams = HttpCallParser.parseKafkaMessage(s);
-                } catch (Exception e) {
-                    System.out.println(s);
-                    e.printStackTrace();
-                    continue;
-                }
-                httpResponseParams.requestParams.setApiCollectionId(sensitiveSampleData.getId().getApiCollectionId());
-                resourceAnalyser.analyse(httpResponseParams);
-            }
-           System.out.println(i);
-            i+=1;
-        }
-
-        System.out.println("DONE");
-
-        for (ParamTypeInfo paramTypeInfo: resourceAnalyser.countMap.values()) {
-            long a = paramTypeInfo.uniqueCount;
-            long b = paramTypeInfo.publicCount;
-
-            if (a > 10 && (1.0*b)/a < 0.1) {
-                System.out.println(paramTypeInfo.getUrl()+" " + paramTypeInfo.getMethod() + " " + paramTypeInfo.getParam() + " " + paramTypeInfo.getApiCollectionId());
-                System.out.println(a + " " + b);
-                System.out.println(" ");
-            }
-
-        }
-
-        resourceAnalyser.syncWithDb();
-
-    }
 }
 
 

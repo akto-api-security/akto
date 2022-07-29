@@ -10,7 +10,6 @@ import com.mongodb.BasicDBObject;
 import org.bson.types.ObjectId;
 import org.junit.Test;
 
-import java.util.HashMap;
 import java.util.List;
 
 import static org.junit.Assert.*;

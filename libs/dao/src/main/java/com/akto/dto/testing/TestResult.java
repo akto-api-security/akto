@@ -2,6 +2,7 @@ package com.akto.dto.testing;
 
 import com.akto.dto.type.ParamTypeInfo;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class TestResult {
@@ -10,7 +11,7 @@ public class TestResult {
     private boolean vulnerable;
     private List<TestError> errors;
 
-    private List<ParamTypeInfo> privateParamTypeInfoList;
+    private List<ParamTypeInfo> privateParamTypeInfoList = new ArrayList<>();
 
     public enum TestError {
         NO_PATH, NO_HAPPY_PATH, NO_AUTH_MECHANISM, API_REQUEST_FAILED

@@ -53,6 +53,7 @@ public class SampleMessageStore {
 
         String url = apiInfoKey.url;
         // this is done because of a bug in runtime where some static urls lose their leading slash
+        // but in apiAnalyser it is guaranteed to have leading slash. So to be consistent we force add one.
         if (!APICatalog.isTemplateUrl(url) && !url.startsWith("/")) {
             url = "/" + url;
         }
@@ -63,8 +64,9 @@ public class SampleMessageStore {
 
     }
 
-    public static State findState(String key) {
+    public static State findState(ParamTypeInfo originalParamTypeInfo, boolean updateWithCount) {
 
+        String key = originalParamTypeInfo.composeKey();
         ParamTypeInfo paramTypeInfo = paramTypeInfoMap.get(key);
         if (paramTypeInfo == null) {
             return State.NA;
@@ -72,6 +74,14 @@ public class SampleMessageStore {
 
         long publicCount = paramTypeInfo.getPublicCount();
         long uniqueCount = paramTypeInfo.getUniqueCount();
+
+        // update original paramTypeInfo
+        if (updateWithCount) {
+            originalParamTypeInfo.setUniqueCount(uniqueCount);
+            originalParamTypeInfo.setPublicCount(publicCount);
+        }
+
+        if (uniqueCount == 0) return State.PUBLIC;
 
         double v = (1.0*publicCount) / uniqueCount;
         if (v <= ParamTypeInfo.THRESHOLD) {

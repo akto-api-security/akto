@@ -185,9 +185,11 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
 
         List<ApiInfo.ApiInfoKey> apiInfoKeyList0 = SingleTypeInfoDao.instance.fetchEndpointsInCollection(0);
         List<ApiInfo.ApiInfoKey> apiInfoKeyList1 = SingleTypeInfoDao.instance.fetchEndpointsInCollection(1);
+        List<ApiInfo.ApiInfoKey> apiInfoKeyList2 = SingleTypeInfoDao.instance.fetchEndpointsInCollection(null);
 
         assertEquals(apiInfoKeyList0.size(), 4);
         assertEquals(apiInfoKeyList1.size(), 2);
+        assertEquals(apiInfoKeyList2.size(), 6);
 
     }
 

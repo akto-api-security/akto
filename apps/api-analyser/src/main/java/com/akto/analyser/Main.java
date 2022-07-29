@@ -27,7 +27,7 @@ public class Main {
 
     public static void main(String[] args) {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
-        String centralBrokerIp = System.getenv("AKTO_CENTRAL_KAFKA_IP");
+        String centralBrokerIp = "kafka1:19092";
         String currentInstanceIp = System.getenv("AKTO_CURRENT_INSTANCE_IP");
 
         DaoInit.init(new ConnectionString(mongoURI));
@@ -72,8 +72,10 @@ public class Main {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 main.consumer.commitSync();
                 for (ConsumerRecord<String,String> r: records) {
+                    if ( (i<1000 && i%100 == 0) || (i>10_000 && i%10_000==0)) logger.info(i+"");
+                    i ++;
+
                     try {
-                        System.out.println(i);
                         HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
                         int accountId = Integer.parseInt(httpResponseParams.getAccountId());
                         ResourceAnalyser resourceAnalyser = resourceAnalyserMap.get(accountId);

@@ -613,10 +613,13 @@ public class RequestTemplate {
         BasicDBObject queryParams = getQueryJSON(urlWithParams);
 
         BasicDBObject payload = null;
-        if (reqPayload.startsWith("{")) {
+        try {
             payload = BasicDBObject.parse(reqPayload);
-            payload.putAll(queryParams.toMap());
+        } catch (Exception e) {
+            payload = BasicDBObject.parse("{}");
         }
+
+        payload.putAll(queryParams.toMap());
 
         return payload;
     }
