@@ -41,7 +41,8 @@ const BlankNode = (nodeData) => {
             >
             </Handle>
 
-            <div style={{display: "flex", justifyContent: "space-between"}}>
+            <div style={{display: "flex", justifyContent: "space-between", position: "relative"}}>
+                <span className="variable-name">{nodeData.id}</span>
                 {<FormControl sx={{ m: 1, minWidth: 120 }} fullWidth>
                     <Autocomplete
                         options={endpointsList}

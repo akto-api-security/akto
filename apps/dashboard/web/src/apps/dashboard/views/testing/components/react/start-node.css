@@ -42,6 +42,14 @@
     padding-top: 8px !important;
 }
 
+.variable-name {
+    position: absolute;
+    top: -8px;
+    left: 0px;
+    font-size: 10px !important;
+    color: #6200EA !important;
+}
+
 .autocomplete-options {
     font-size: 12px !important;
     color: #47466A !important;
@@ -88,3 +96,6 @@
     font-size: 12px;
 }
   
+.MuiPaper-root {
+    color: #47466A !important
+}

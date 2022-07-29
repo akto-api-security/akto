@@ -14,6 +14,12 @@ const useStore = create((set, get) => ({
   enteredNode: null,
   nodeEndpointMap: {},
   edgeVariablesMap: {},
+  counter: 1,
+  incrementCounter: () => {
+    set({
+      counter: (get().counter + 1)
+    })
+  },
   addNodeEndpoint: (nodeId, endpointData) => {
     let ret = get().nodeEndpointMap
     ret[nodeId] = endpointData

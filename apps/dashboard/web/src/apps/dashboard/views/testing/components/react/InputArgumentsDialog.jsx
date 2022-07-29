@@ -1,5 +1,6 @@
 import * as React from 'react';
 import IconButton from '@mui/material/IconButton';
+import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
@@ -9,6 +10,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faEdit } from '@fortawesome/free-regular-svg-icons'
 
+import './start-node.css'
 
 export default function InputArgumentsDialog() {
   const [open, setOpen] = React.useState(false);
@@ -28,12 +30,11 @@ export default function InputArgumentsDialog() {
           <FontAwesomeIcon icon={faEdit} className="primary-btn" />
         </IconButton>
       </div>
-      <Dialog open={open} onClose={handleClose}>
-        <DialogTitle>Subscribe</DialogTitle>
+      <Dialog open={open} onClose={handleClose} className="input-arguments-dialog">
+        <DialogTitle>Set API request parameters</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            To subscribe to this website, please enter your email address here. We
-            will send updates occasionally.
+            The default for each parameter is taken from lastest sample data. You can change to a constant.
           </DialogContentText>
           <TextField
             autoFocus
@@ -45,6 +46,10 @@ export default function InputArgumentsDialog() {
             variant="standard"
           />
         </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClose}>Cancel</Button>
+          <Button onClick={handleClose}>Subscribe</Button>
+        </DialogActions>
       </Dialog>
     </div>
   );

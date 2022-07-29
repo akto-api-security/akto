@@ -30,10 +30,14 @@ const Workflow = () => {
 
   const onConnectStart = (event, {nodeId, handleType}) => {
     setCurrentSource({x: event.screenX, y: event.screenY, nodeId, handleType})
-  } 
+  }
+
+  const counter = useStore(state => state.counter)
+  const incrementCounter = useStore(state => state.incrementCounter)
 
   const getId = () => {
-    return ''+parseInt(Math.random() * 10000000)
+    incrementCounter()
+    return 'x'+counter
   }
 
 
