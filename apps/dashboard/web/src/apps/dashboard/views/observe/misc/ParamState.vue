@@ -53,6 +53,10 @@ export default {
                 {
                     text: 'Unique Count',
                     value: 'uniqueCount'  
+                },
+                {
+                  text: 'Public Count',
+                  value: 'publicCount'
                 }
             ],
             items: []
