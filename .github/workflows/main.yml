@@ -83,6 +83,11 @@ jobs:
           echo "Pushing image to ECR..."
           docker push $ECR_REGISTRY/$ECR_REPOSITORY-api-testing:$IMAGE_TAG
           echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-api-testing:$IMAGE_TAG"
+          cd ../api-analyser
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-api-context-analyzer:$IMAGE_TAG .
+          echo "Pushing image to ECR..."
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY-api-testing:$IMAGE_TAG
+          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-api-testing:$IMAGE_TAG"
 
       - name: Deploy to AWS CloudFormation
         if: ${{ github.event.inputs.Environment == 'staging'}}
@@ -125,6 +130,11 @@ jobs:
           echo "Pushing image to ECR..."
           docker push $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG
           echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"       
+          cd ../api-analyser
+          docker build -t $ECR_REGISTRY/akto-api-context-analyzer:$IMAGE_TAG .
+          echo "Pushing image to ECR..."
+          docker push $ECR_REGISTRY/akto-api-context-analyzer:$IMAGE_TAG
+          echo "::set-output name=image::$ECR_REGISTRY/akto-api-context-analyzer:$IMAGE_TAG"
       - name: Set up JDK 11
         uses: actions/setup-java@v1
         with:
