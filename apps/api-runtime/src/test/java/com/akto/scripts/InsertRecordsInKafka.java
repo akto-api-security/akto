@@ -27,7 +27,7 @@ public class InsertRecordsInKafka {
     public static final String KAFKA_URL = "localhost:29092";
 
     public static void main(String[] args) {
-//        insertSampleDataIntoKafka();
+    //    insertSampleDataIntoKafka();
         checkKafkaQueueSize(ANALYSE_TOPIC, "asdfd3", KAFKA_URL);
         //209447
         try {
@@ -38,7 +38,7 @@ public class InsertRecordsInKafka {
     }
 
     public static void insertSampleDataIntoKafka() {
-        DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
+        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
         Context.accountId.set(1_000_000);
         Kafka kafka = new Kafka(KAFKA_URL,0, 999900);
         List<SampleData> sampleDataList = SampleDataDao.instance.findAll(new BasicDBObject());
@@ -47,8 +47,9 @@ public class InsertRecordsInKafka {
         for (SampleData sampleData: sampleDataList) {
             for (String message: sampleData.getSamples()){
                 i += 1;
-//                kafka.send(message, RUNTIME_TOPIC);
+               kafka.send(message, RUNTIME_TOPIC);
             }
+            System.out.println("s: " + i);
         }
 
         System.out.println("sent: " + i);

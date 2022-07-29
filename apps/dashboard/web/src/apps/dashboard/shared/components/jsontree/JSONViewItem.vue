@@ -41,10 +41,19 @@
       v-if="data.type === 'value'"
       @mouseover="upHere = true" @mouseleave="upHere = false"
     >
-      <span class="value-key">{{ data.key }}:</span>
-      <span :style="getValueStyle(data.value)">
-        {{ dataValue }}
-      </span>
+      <v-tooltip bottom :disabled="!this.sensitiveHighlightValue">
+        <template v-slot:activator="{on, attrs}">
+          <div v-on="on" v-bind="attrs">
+            <span class="value-key">{{ data.key }}:</span>
+            <span :style="getValueStyle(data.value)">
+              {{ dataValue }}
+            </span>
+          </div>
+        </template>
+        <span>
+          {{this.sensitiveHighlightValue}}
+        </span>
+      </v-tooltip>
     </div>
   </div>
 </template>

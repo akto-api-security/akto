@@ -310,7 +310,20 @@ export default {
         let sensitiveDataResp = await api.fetchSensitiveSampleData(this.url, this.apiCollectionId, this.method)
         this.sensitiveSampleData = []
         for (const c in sensitiveDataResp.sensitiveSampleData) {
-            this.sensitiveSampleData.push({"message": c, "highlightPaths": sensitiveDataResp.sensitiveSampleData[c]})
+            let paramInfoList = sensitiveDataResp.sensitiveSampleData[c]
+            if (!paramInfoList) {
+                paramInfoList = []
+            }
+
+            let highlightPaths = paramInfoList.map((x) => {
+                let subType = x["subType"]
+                if (subType) {
+                    x["highlightValue"] = subType["name"]
+                    return x
+                }
+            })
+
+            this.sensitiveSampleData.push({"message": c, "highlightPaths": highlightPaths})
         }
     }
 }
