@@ -20,7 +20,7 @@ const TemplateStringEditor = ({defaultText}) => {
     }
 
     return (
-       <div style={{position: "relative", width: "550px"}}>
+       <div style={{position: "relative"}}>
           {toggle && <TextFieldCloseable text={text}/> }
           {!toggle && <InputBase value={text} onChange={onChange} fullWidth multiline inputProps={{className: 'request-editor'}} variant="standard"/>}
           <div style={{position: "absolute", top: "4px", right: "10px"}}>

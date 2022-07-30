@@ -47,6 +47,10 @@
     margin: 0 12px 12px 0 !important;
 }
 
+.MuiDialog-paperScrollPaper {
+    min-width: 850px;
+}
+
 .variable-name {
     position: absolute;
     top: -8px;
@@ -151,6 +155,7 @@
     color: #47466A !important;
     letter-spacing: unset !important;
     line-height: 23px !important;
+    word-wrap: break-word !important;
 }
 
 .request-editor-matched {

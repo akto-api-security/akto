@@ -13,18 +13,30 @@ import './start-node.css'
 
 const RequestEditor = ({sampleApiCall}) => {
   return (
-    <div>
-      <div className="request-title">Query params</div>
-      <div className="request-editor request-editor-path">
-        <TemplateStringEditor defaultText={sampleApiCall.path.indexOf("?") > -1 ?sampleApiCall.path.split("?")[1] : "-"}/>
+    <div style={{display: "flex"}}>
+      <div style={{width: "400px"}}>
+        <div className="request-title">[Request] Query params</div>
+        <div className="request-editor request-editor-path">
+          <TemplateStringEditor defaultText={sampleApiCall.path.indexOf("?") > -1 ?sampleApiCall.path.split("?")[1] : "-"}/>
+        </div>
+        <div className="request-title">[Request] Headers</div>
+        <div className="request-editor request-editor-headers">
+          {<TemplateStringEditor defaultText={sampleApiCall.requestHeaders}/>}
+        </div>
+        <div className="request-title">[Request] Payload</div>
+        <div className="request-editor request-editor-payload">
+          <TemplateStringEditor defaultText={sampleApiCall.requestPayload}/>
+        </div>
       </div>
-      <div className="request-title">Headers</div>
-      <div className="request-editor request-editor-headers">
-        {<TemplateStringEditor defaultText={sampleApiCall.requestHeaders}/>}
-      </div>
-      <div className="request-title">Payload</div>
-      <div className="request-editor request-editor-payload">
-        <TemplateStringEditor defaultText={sampleApiCall.requestPayload}/>
+      <div style={{width: "400px", opacity: "0.5"}}>
+        <div className="request-title">[Response] Headers</div>
+        <div className="request-editor request-editor-headers">
+          {sampleApiCall.responseHeaders}
+        </div>
+        <div className="request-title">[Response] Payload</div>
+        <div className="request-editor request-editor-payload">
+          {sampleApiCall.responsePayload}
+        </div>
       </div>
     </div>
   )
@@ -59,7 +71,7 @@ export default function InputArgumentsDialog({endpointDetails, fetchSampleDataFu
           <FontAwesomeIcon icon={faEdit} className="primary-btn" />
         </IconButton>
       </div>
-      <Dialog open={open} onClose={handleClose} className="input-arguments-dialog">
+      <Dialog open={open} onClose={handleClose} className="input-arguments-dialog" style={{minWidth: "850px"}}>
         <div className="request-title"></div>
         <DialogContent>
             { 
