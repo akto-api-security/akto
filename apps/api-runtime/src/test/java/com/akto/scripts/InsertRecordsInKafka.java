@@ -26,8 +26,8 @@ public class InsertRecordsInKafka {
     public static final String ANALYSE_TOPIC = "akto.central";
     public static final String KAFKA_URL = "localhost:29092";
 
-    public static void main(String[] args) {
-    //    insertSampleDataIntoKafka();
+    public static void main(String[] args) throws InterruptedException {
+//        insertSampleDataIntoKafka();
         checkKafkaQueueSize(ANALYSE_TOPIC, "asdfd3", KAFKA_URL);
         //209447
         try {
@@ -40,16 +40,27 @@ public class InsertRecordsInKafka {
     public static void insertSampleDataIntoKafka() {
         DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
         Context.accountId.set(1_000_000);
-        Kafka kafka = new Kafka(KAFKA_URL,0, 999900);
+        Kafka kafka = new Kafka(KAFKA_URL,0, 0);
         List<SampleData> sampleDataList = SampleDataDao.instance.findAll(new BasicDBObject());
         System.out.println("size: " + sampleDataList.size());
         int i =0;
         for (SampleData sampleData: sampleDataList) {
-            for (String message: sampleData.getSamples()){
+            for (String message: sampleData.getSamples()) {
                 i += 1;
-               kafka.send(message, RUNTIME_TOPIC);
+                System.out.println("s: " + i);
+                kafka.send(message, RUNTIME_TOPIC);
+
+                if (i%30 == 0 && !kafka.producerReady) {
+                    kafka = new Kafka(KAFKA_URL,0, 0);
+                }
+
+                try {
+//                    Thread.sleep(1000);
+                } catch (Exception ignored) {
+
+                }
             }
-            System.out.println("s: " + i);
+
         }
 
         System.out.println("sent: " + i);
