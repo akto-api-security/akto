@@ -4,10 +4,10 @@ import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
-import DialogContentText from '@mui/material/DialogContentText';
-import DialogTitle from '@mui/material/DialogTitle';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faEdit } from '@fortawesome/free-regular-svg-icons'
+
+import TemplateStringEditor from './TemplateStringEditor.jsx';
 
 import './start-node.css'
 
@@ -16,22 +16,21 @@ const RequestEditor = ({sampleApiCall}) => {
     <div>
       <div className="request-title">Query params</div>
       <div className="request-editor request-editor-path">
-        {sampleApiCall.path.indexOf("?") > -1 ?sampleApiCall.path.split("?")[1] : "-"}
+        <TemplateStringEditor defaultText={sampleApiCall.path.indexOf("?") > -1 ?sampleApiCall.path.split("?")[1] : "-"}/>
       </div>
       <div className="request-title">Headers</div>
       <div className="request-editor request-editor-headers">
-        {sampleApiCall.requestHeaders}
+        {<TemplateStringEditor defaultText={sampleApiCall.requestHeaders}/>}
       </div>
       <div className="request-title">Payload</div>
       <div className="request-editor request-editor-payload">
-        {sampleApiCall.requestPayload}
+        <TemplateStringEditor defaultText={sampleApiCall.requestPayload}/>
       </div>
     </div>
   )
 }
 
 export default function InputArgumentsDialog({endpointDetails, fetchSampleDataFunc}) {
-  console.log("InputArgumentsDialog", endpointDetails)
   const [open, setOpen] = React.useState(false);
   const [sampleData, updateSampleData] = React.useState({});
   React.useEffect(() => {
@@ -69,7 +68,7 @@ export default function InputArgumentsDialog({endpointDetails, fetchSampleDataFu
               sampleData.sampleDataList[0] && 
               sampleData.sampleDataList[0].samples && 
               sampleData.sampleDataList[0].samples[0] && 
-              <RequestEditor sampleApiCall={console.log(sampleData) || JSON.parse(sampleData.sampleDataList[0].samples[0])}/>
+              <RequestEditor sampleApiCall={JSON.parse(sampleData.sampleDataList[0].samples[0])}/>
             }
         </DialogContent>
         <DialogActions>

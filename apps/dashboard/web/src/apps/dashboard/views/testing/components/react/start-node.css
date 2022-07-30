@@ -146,9 +146,16 @@
 }
 
 .request-editor {
-    font-size: 12px;
-    font-family: monospace;
-    color: #47466A;
+    font-size: 12px !important;
+    font-family: monospace !important;
+    color: #47466A !important;
+    letter-spacing: unset !important;
+    line-height: 23px !important;
+}
+
+.request-editor-matched {
+    color: #6200EA !important;
+    font-weight: 600 !important;
 }
 
 .request-title {

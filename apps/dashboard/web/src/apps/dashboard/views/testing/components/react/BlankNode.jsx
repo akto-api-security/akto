@@ -19,9 +19,7 @@ const BlankNode = (nodeData) => {
 
     const onEndpointChange = (event, endpointData) => {
         addNodeEndpoint(nodeData.id, endpointData)
-        console.log("onEndpointChange setting", endpointDetails)
         setEndpointDetails(endpointData)
-        console.log("onEndpointChange set complete", endpointDetails)
     }
 
 
