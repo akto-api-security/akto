@@ -77,15 +77,10 @@ const Workflow = () => {
     if (enteredNode && enteredNode.id !== refNode.id) {
       const newEdge = {source: refNode.id, target: enteredNode.id, id: getId(), selected: true, markerEnd: {type: 'arrow'}}
 
-      if (cyclesPresent(newEdge)) {
-         newEdge.style = {
-           stroke: "red"
-         }
-         newEdge.data = {
-           label: "invalid edge"
-         }
+      if (refNode.id !== '3' && !cyclesPresent(newEdge) ) {
+         onConnect(newEdge)
       }
-      onConnect(newEdge)
+      
     } else {
       const deltaX = event.screenX - currentSource.x
       const deltaY = event.screenY - currentSource.y
