@@ -30,13 +30,14 @@ const BlankNode = (nodeData) => {
         if (endpointData) {
             if (newInputValue !== (endpointData.method + " " + endpointData.endpoint)) {
                 addNodeEndpoint(nodeData.id, null)
+                setEndpointDetails(null)
             }
         }
         
     }
 
     return (
-        <div className={"start-node " + (endpointDetails ? "green-boundary" : "red-boundary") }>
+        <div className={"start-node " + ((endpointDetails && endpointDetails.method) ? "green-boundary" : "red-boundary") }>
             <Handle
                 type="target"
                 position={Position.Top}

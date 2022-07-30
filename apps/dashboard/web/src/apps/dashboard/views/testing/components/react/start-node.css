@@ -77,12 +77,52 @@
     color: #49cc90 !important;
 }
 
+.PUT {
+    color: #fca130 !important;
+}
+
+.DELETE {
+    color: #f93e3e !important;
+}
+
+.PATCH {
+    color: #50e3c2 !important;
+}
+
+.HEAD {
+    color: #9012fe !important;
+}
+
+.OPTIONS {
+    color: #0d5aa7 !important;
+}
+
 [method="GET"] {
     color: #61affe !important;
 }
 
 [method="POST"] {
     color: #49cc90 !important;
+}
+
+[method="PUT"] {
+    color: #fca130 !important;
+}
+
+[method="DELETE"] {
+    color: #f93e3e !important;
+}
+
+[method="PATCH"] {
+    color: #50e3c2 !important;
+}
+
+[method="HEAD"] {
+    color: #9012fe !important;
+}
+
+[method="OPTIONS"] {
+    color: #0d5aa7 !important;
 }
 
 .react-flow__attribution a {
