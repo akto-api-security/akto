@@ -88,9 +88,10 @@ export default function InputArgumentsDialog({nodeId, endpointDetails, fetchSamp
   const nodeEndpointMap = useStore(state => state.nodeEndpointMap)
 
   const onChangeApiRequest = (key, newData) => {
-    let currNewSampleData = {...newSampleData, orig: sampleData}
+    let currNewSampleData = {orig: sampleData}
     currNewSampleData[key] = newData
-    setNewSampleData(currNewSampleData)
+    let updatedSampleData = {...nodeEndpointMap[nodeId].updatedSampleData, ...currNewSampleData}
+    addNodeEndpoint(nodeId, {...endpointDetails, updatedSampleData})
   }
 
   const handleClickOpen = () => {
@@ -99,8 +100,6 @@ export default function InputArgumentsDialog({nodeId, endpointDetails, fetchSamp
 
   const handleClose = () => {
     setOpen(false);
-    let updatedSampleData = {...endpointDetails.updatedSampleData, ...newSampleData}
-    addNodeEndpoint(nodeId, {...endpointDetails, updatedSampleData})
   };
 
   return (
@@ -117,9 +116,6 @@ export default function InputArgumentsDialog({nodeId, endpointDetails, fetchSamp
           <RequestEditor sampleApiCall={sampleData} updatedSampleData={nodeEndpointMap[nodeId].updatedSampleData} onChangeApiRequest={onChangeApiRequest}/>
             
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClose} variant="contained" style={{textTransform: "unset"}}>Save</Button>
-        </DialogActions>
       </Dialog>
     </div>
   );
