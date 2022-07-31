@@ -15,6 +15,26 @@ const useStore = create((set, get) => ({
   enteredNode: null,
   nodeEndpointMap: {},
   counter: 1,
+  createWorkflowTest: null,
+  editWorkflowTest: null,
+  editWorkflowNodeDetails: null,
+  originalState: null,
+  setUtilityFuncs: (newCreateWorkflowTest, newEditWorkflowTest, newEditWorkflowNodeDetails) => {
+    set({
+      createWorkflowTest: newCreateWorkflowTest, 
+      editWorkflowTest: newEditWorkflowTest, 
+      editWorkflowNodeDetails: newEditWorkflowNodeDetails
+    })
+  }, 
+  setOriginalState: (originalStateFromDb) => {
+    set({
+      originalState: originalStateFromDb,
+      counter: originalStateFromDb.lastEdited,
+      nodes: originalStateFromDb.nodes.map(x => JSON.parse(x)),
+      edges: originalStateFromDb.edges.map(x => JSON.parse(x)),
+      nodeEndpointMap: {...originalStateFromDb.mapNodeIdToWorkflowNodeDetails}
+    })
+  },
   incrementCounter: () => {
     set({
       counter: (get().counter + 1)
@@ -41,12 +61,6 @@ const useStore = create((set, get) => ({
   setEnteredNode: (newNode) => {
     set({
       enteredNode: newNode
-    })
-  },
-  setInitialState: (initialNodes, initialEdges) => {
-    set({
-      nodes: initialNodes,
-      edges: initialEdges
     })
   },
   addNode: (newNode, newEdge) => {

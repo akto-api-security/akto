@@ -1,27 +1,25 @@
 package com.akto.dto.testing;
 
-import com.akto.dto.traffic.SampleData;
-
 public class WorkflowUpdatedSampleData {
-    SampleData orig;
+    String orig;
     String queryParams;
     String requestHeaders;
     String requestPayload;
 
     public WorkflowUpdatedSampleData() {}
 
-    public WorkflowUpdatedSampleData(SampleData orig, String queryParams, String requestHeaders, String requestPayload) {
+    public WorkflowUpdatedSampleData(String orig, String queryParams, String requestHeaders, String requestPayload) {
         this.orig = orig;
         this.queryParams = queryParams;
         this.requestHeaders = requestHeaders;
         this.requestPayload = requestPayload;
     }
 
-    public SampleData getOrig() {
+    public String getOrig() {
         return this.orig;
     }
 
-    public void setOrig(SampleData orig) {
+    public void setOrig(String orig) {
         this.orig = orig;
     }
 

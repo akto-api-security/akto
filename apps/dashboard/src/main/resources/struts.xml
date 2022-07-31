@@ -952,7 +952,7 @@
             </result>
         </action>
 
-        <action name="api/setStatus" class="com.akto.action.testing.WorkflowTestAction" method="setStatus">
+        <action name="api/setWorkflowTestState" class="com.akto.action.testing.WorkflowTestAction" method="setWorkflowTestState">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
@@ -962,7 +962,7 @@
             </result>
         </action>
 
-        <action name="api/exportAsString" class="com.akto.action.testing.WorkflowTestAction" method="exportAsString">
+        <action name="api/exportWorkflowTestAsString" class="com.akto.action.testing.WorkflowTestAction" method="exportWorkflowTestAsString">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
@@ -972,7 +972,17 @@
             </result>
         </action>
 
-        <action name="api/editNodeDetails" class="com.akto.action.testing.WorkflowTestAction" method="editNodeDetails">
+        <action name="api/editWorkflowNodeDetails" class="com.akto.action.testing.WorkflowTestAction" method="editWorkflowNodeDetails">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/fetchWorkflowTests" class="com.akto.action.testing.WorkflowTestAction" method="fetchWorkflowTests">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>

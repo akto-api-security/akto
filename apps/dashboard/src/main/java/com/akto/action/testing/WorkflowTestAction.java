@@ -11,6 +11,7 @@ import com.akto.dto.testing.WorkflowNodeDetails;
 import com.akto.dto.testing.WorkflowTest;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.InsertOneResult;
 
@@ -25,6 +26,11 @@ public class WorkflowTestAction extends UserAction {
     int id;
     String str;
     private List<WorkflowTest> workflowTests;
+
+    public String fetchWorkflowTests() {
+        workflowTests = WorkflowTestsDao.instance.findAll(new BasicDBObject());
+        return SUCCESS.toUpperCase();
+    }
 
     public String createWorkflowTest() {
         int id = Context.now();
@@ -60,7 +66,7 @@ public class WorkflowTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public String setStatus() {
+    public String setWorkflowTestState() {
         WorkflowTest workflowTest = findWorkflowTest(id);
         if (workflowTest == null) {
             return ERROR.toUpperCase();
@@ -71,7 +77,7 @@ public class WorkflowTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public String exportAsString() {
+    public String exportWorkflowTestAsString() {
         WorkflowTest workflowTest = findWorkflowTest(id);
         if (workflowTest == null) {
             return ERROR.toUpperCase();
@@ -86,7 +92,7 @@ public class WorkflowTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public String editNodeDetails() {
+    public String editWorkflowNodeDetails() {
         WorkflowTest workflowTest = findWorkflowTest(id);
         if (workflowTest == null || mapNodeIdToWorkflowNodeDetails.size() != 1) {
             return ERROR.toUpperCase();

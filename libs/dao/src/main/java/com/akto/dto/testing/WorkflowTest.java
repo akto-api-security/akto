@@ -19,7 +19,7 @@ public class WorkflowTest {
     int createdTimestamp;
 
     String editor;
-    int lastEditedBy;
+    int lastEdited;
 
     List<String> nodeIds;
     List<String> edges;
@@ -29,13 +29,13 @@ public class WorkflowTest {
 
     public WorkflowTest() {}
 
-    public WorkflowTest(int id, int apiCollectionId, String author, int createdTimestamp, String editor, int lastEditedBy, List<String> nodeIds, List<String> edges, Map<String,WorkflowNodeDetails> mapNodeIdToWorkflowNodeDetails, State state) {
+    public WorkflowTest(int id, int apiCollectionId, String author, int createdTimestamp, String editor, int lastEdited, List<String> nodeIds, List<String> edges, Map<String,WorkflowNodeDetails> mapNodeIdToWorkflowNodeDetails, State state) {
         this.id = id;
         this.apiCollectionId = apiCollectionId;
         this.author = author;
         this.createdTimestamp = createdTimestamp;
         this.editor = editor;
-        this.lastEditedBy = lastEditedBy;
+        this.lastEdited = lastEdited;
         this.nodeIds = nodeIds;
         this.edges = edges;
         this.mapNodeIdToWorkflowNodeDetails = mapNodeIdToWorkflowNodeDetails;
@@ -82,12 +82,12 @@ public class WorkflowTest {
         this.editor = editor;
     }
 
-    public int getLastEditedBy() {
-        return this.lastEditedBy;
+    public int getLastEdited() {
+        return this.lastEdited;
     }
 
-    public void setLastEditedBy(int lastEditedBy) {
-        this.lastEditedBy = lastEditedBy;
+    public void setLastEdited(int lastEdited) {
+        this.lastEdited = lastEdited;
     }
 
     public List<String> getNodeIds() {
@@ -130,7 +130,7 @@ public class WorkflowTest {
             ", author='" + getAuthor() + "'" +
             ", createdTimestamp='" + getCreatedTimestamp() + "'" +
             ", editor='" + getEditor() + "'" +
-            ", lastEditedBy='" + getLastEditedBy() + "'" +
+            ", lastEdited='" + getLastEdited() + "'" +
             ", nodeIds='" + getNodeIds() + "'" +
             ", edges='" + getEdges() + "'" +
             ", mapNodeIdToWorkflowNodeDetails='" + getMapNodeIdToWorkflowNodeDetails() + "'" +

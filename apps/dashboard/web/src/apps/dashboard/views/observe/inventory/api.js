@@ -205,5 +205,56 @@ export default {
         }).then((resp) => {
             return resp
         })
+    },
+
+    fetchWorkflowTests() {
+        return request({
+            url: '/api/fetchWorkflowTests',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    createWorkflowTest(nodeIds, edges, mapNodeIdToWorkflowNodeDetails, state) {
+        return request({
+            url: '/api/createWorkflowTest',
+            method: 'post',
+            data: {nodeIds, edges, mapNodeIdToWorkflowNodeDetails, state}
+        })
+    },
+
+    editWorkflowTest(id, nodeIds, edges, mapNodeIdToWorkflowNodeDetails) {
+        return request({
+            url: '/api/editWorkflowTest',
+            method: 'post',
+            data: {id, nodeIds, edges, mapNodeIdToWorkflowNodeDetails}
+        })
+    },
+
+    setWorkflowTestState(id, state) {
+        return request({
+            url: '/api/setWorkflowTestState',
+            method: 'post',
+            data: {id, state}
+        })
+    },
+
+    exportWorkflowTestAsString(id) {
+        return request({
+            url: '/api/exportWorkflowTestAsString',
+            method: 'post',
+            data: {id}
+        })
+    },
+
+    editWorkflowNodeDetails(id, nodeId, workflowNodeDetails) {
+        let mapNodeIdToWorkflowNodeDetails = {}
+        mapNodeIdToWorkflowNodeDetails[nodeId] = workflowNodeDetails
+        return request({
+            url: '/api/editWorkflowNodeDetails',
+            method: 'post',
+            data: {id, mapNodeIdToWorkflowNodeDetails}
+        })
     }
+
 }

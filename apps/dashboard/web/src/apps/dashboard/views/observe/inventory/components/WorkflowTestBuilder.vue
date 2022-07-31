@@ -1,6 +1,14 @@
 <template>
     <div>
-        <workflow-builder style="height: 500px" :endpointsList="endpointsList" :initialNodes="defaultNodes" :initialEdges="defaultEdges" :fetchSampleDataFunc="fetchSampleDataFunc"/>
+        <workflow-builder 
+            :endpointsList="endpointsList" 
+            :originalStateFromDb="originalState" 
+            :fetchSampleDataFunc="fetchSampleDataFunc"
+            :createWorkflowTest="createWorkflowTest"
+            :editWorkflowTest="editWorkflowTest"
+            :editWorkflowNodeDetails="editWorkflowNodeDetails"
+            style="height: 500px" 
+        />
     </div>
 </template>
 
@@ -16,8 +24,7 @@ export default {
     },
     props: {
         endpointsList: obj.arrR,
-        initialNodes: obj.arrN,
-        initialEdges: obj.arrN
+        originalStateFromDb: obj.objN
     },
     data() {
 
@@ -49,10 +56,14 @@ export default {
 
         ]
 
+        let defaultState = {nodes: defNodes.map(JSON.stringify), edges: defEdges.map(JSON.stringify), lastEdited: 1, mapNodeIdToWorkflowNodeDetails: {}}
+
         return {
-            defaultNodes: this.initialNodes || defNodes,
-            defaultEdges: this.initialEdges || defEdges,
-            fetchSampleDataFunc: api.fetchSampleData
+            fetchSampleDataFunc: api.fetchSampleData,
+            createWorkflowTest: api.createWorkflowTest,
+            editWorkflowTest: api.editWorkflowTest,
+            editWorkflowNodeDetails: api.editWorkflowNodeDetails,
+            originalState: this.originalState || defaultState
         }
     }
 }
