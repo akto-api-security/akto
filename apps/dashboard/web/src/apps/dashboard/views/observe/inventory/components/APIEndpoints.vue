@@ -138,8 +138,8 @@
                         v-if="showWorkflowTestBuilder"
                         width="80%"
                     >
-                        <v-btn primary dark color="#6200EA" @click="() => {originalStateFromDb = null; showWorkflowTestBuilder = false}">
-                            Close
+                        <v-btn icon primary dark color="#6200EA" class="float-right" @click="() => {originalStateFromDb = null; showWorkflowTestBuilder = false}">
+                            <v-icon>$fas_times</v-icon>
                         </v-btn>
                         <workflow-test-builder :endpointsList=allEndpoints :apiCollectionId="apiCollectionId" :originalStateFromDb="originalStateFromDb" class="white-background"/>
                     </div>
