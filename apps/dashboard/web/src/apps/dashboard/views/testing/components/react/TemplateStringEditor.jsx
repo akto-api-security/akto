@@ -9,20 +9,25 @@ import TextFieldCloseable from './TextFieldCloseable.jsx'
 
 import './start-node.css';
 
-const TemplateStringEditor = ({defaultText}) => {
+const TemplateStringEditor = ({defaultText, onChange}) => {
 
     const [toggle, setToggle] = useState(true);
-    const toggleChecked = () => setToggle(toggle => !toggle);
+    const toggleChecked = () => { 
+      if (!toggle) {
+        onChange(text)
+      }
+      setToggle(toggle => !toggle);
+    }
     let [text, setText] = React.useState(defaultText);
 
-    const onChange = (a, b) => {
+    const onChangeInputBase = (a, b) => {
         setText(a.target.value)
     }
 
     return (
        <div style={{position: "relative"}}>
           {toggle && <TextFieldCloseable text={text}/> }
-          {!toggle && <InputBase value={text} onChange={onChange} fullWidth multiline inputProps={{className: 'request-editor'}} variant="standard"/>}
+          {!toggle && <InputBase value={text} onChange={onChangeInputBase} fullWidth multiline inputProps={{className: 'request-editor'}} variant="standard"/>}
           <div style={{position: "absolute", top: "4px", right: "10px"}}>
             <IconButton onClick={toggleChecked}>
                 <FontAwesomeIcon icon={toggle ? faEdit : faCheckSquare} className="primary-btn" />

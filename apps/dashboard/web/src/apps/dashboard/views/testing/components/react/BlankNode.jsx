@@ -18,8 +18,9 @@ const BlankNode = (nodeData) => {
     let [endpointDetails, setEndpointDetails] = React.useState(null)
 
     const onEndpointChange = (event, endpointData) => {
-        addNodeEndpoint(nodeData.id, endpointData)
-        setEndpointDetails(endpointData)
+        let newEndpointData = {...endpointData, updatedSampleData: {}}
+        addNodeEndpoint(nodeData.id, newEndpointData)
+        setEndpointDetails(newEndpointData)
     }
 
 
@@ -96,7 +97,7 @@ const BlankNode = (nodeData) => {
                         
                     ></Autocomplete>
                 </FormControl>}
-                {endpointDetails && <InputArgumentsDialog endpointDetails={endpointDetails} fetchSampleDataFunc={fetchSampleDataFunc} />}
+                {endpointDetails && <InputArgumentsDialog nodeId={nodeData.id} endpointDetails={endpointDetails} fetchSampleDataFunc={fetchSampleDataFunc} />}
             </div>      
             <Handle
                 type="source"
