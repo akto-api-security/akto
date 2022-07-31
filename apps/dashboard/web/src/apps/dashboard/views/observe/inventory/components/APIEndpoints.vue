@@ -121,8 +121,31 @@
                 </simple-table>
             </template>
             <template slot="Tests">
-                <workflow-test-builder :endpointsList=allEndpoints :apiCollectionId="apiCollectionId"/>
+                <div>
+                    <div class="d-flex jc-end ma-2">
+                        <v-btn v-if="!showWorkflowTestBuilder" primary dark color="#6200EA" @click="() => {originalStateFromDb = null; showWorkflowTestBuilder = true}">
+                            Create new workflow
+                        </v-btn>
+                    </div>
+                    <simple-table 
+                        v-if="!showWorkflowTestBuilder"
+                        :headers="workflowTestHeaders" 
+                        :items="workflowTests"
+                        @rowClicked="item => {originalStateFromDb = item; showWorkflowTestBuilder = true}"
+                        name="Deprecated"
+                    />
+                    <div
+                        v-if="showWorkflowTestBuilder"
+                        width="80%"
+                    >
+                        <v-btn primary dark color="#6200EA" @click="() => {originalStateFromDb = null; showWorkflowTestBuilder = false}">
+                            Close
+                        </v-btn>
+                        <workflow-test-builder :endpointsList=allEndpoints :apiCollectionId="apiCollectionId" :originalStateFromDb="originalStateFromDb" class="white-background"/>
+                    </div>
+                    
                 
+                </div>
             </template>
         </layout-with-tabs>
 
@@ -257,7 +280,24 @@ export default {
                     label: "Download CSV file",
                     click: this.downloadData
                 }
-            ]
+            ],
+            workflowTestHeaders: [
+                {
+                    text: '',
+                    value: 'color'
+                },                
+                {
+                    text: 'Test',
+                    value: 'id'
+                },
+                {
+                    text: 'Author',
+                    value: 'author'
+                }
+            ],
+            showWorkflowTestBuilder: false,
+            originalStateFromDb: null,
+            workflowTests: []
         }
     },
     methods: {
@@ -397,6 +437,14 @@ export default {
             return ret
         }
     },
+    async mounted() {
+        this.workflowTests = (await api.fetchWorkflowTests()).workflowTests.filter(x => x.apiCollectionId === this.apiCollectionId).map(x => {
+            return {
+                ...x,
+                color: "#FFFFFF"
+            }
+        })
+    }
 }
 </script>
 

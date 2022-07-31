@@ -15,7 +15,7 @@ const BlankNode = (nodeData) => {
     const addNodeEndpoint = useStore(state => state.addNodeEndpoint)
     const fetchSampleDataFunc = useStore(state => state.fetchSampleDataFunc)
 
-    let [endpointDetails, setEndpointDetails] = React.useState(null)
+    let [endpointDetails, setEndpointDetails] = React.useState(nodeEndpointMap[nodeData.id])
 
     const onEndpointChange = (event, endpointData) => {
         let newEndpointData = {...endpointData, updatedSampleData: {}}
@@ -59,6 +59,7 @@ const BlankNode = (nodeData) => {
                         openOnFocus={!endpointDetails}
                         freeSolo
                         onChange={onEndpointChange}
+                        defaultValue={endpointDetails}
                         onInputChange={onEndpointInputChange}
                         getOptionLabel={option => {return option.method ? (option.method + " " + option.endpoint) : "";}}
                         renderOption={(props, option) => (

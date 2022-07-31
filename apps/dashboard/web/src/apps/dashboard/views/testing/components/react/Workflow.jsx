@@ -132,7 +132,7 @@ const Workflow = ({apiCollectionId}) => {
   }
 
   return (
-    <div style={{height: "500px"}}>
+    <div style={{height: "800px"}}>
       <IconButton onClick={onSave} style={{float : "right"}}>
         <FontAwesomeIcon icon={faSave} className="request-editor-matched"  size="sm"/>
       </IconButton>
@@ -140,7 +140,7 @@ const Workflow = ({apiCollectionId}) => {
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        defaultPosition={[0, -90]}
+        defaultPosition={[200, 0]}
         defaultZoom={1}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
@@ -153,7 +153,6 @@ const Workflow = ({apiCollectionId}) => {
         onNodeMouseEnter={onNodeMouseEnter}
         onNodeMouseLeave={onNodeMouseLeave}
         attributionPosition="top-right"
-        fitView
       >
         <Background color="#aaa" gap={16} />
       </ReactFlow>

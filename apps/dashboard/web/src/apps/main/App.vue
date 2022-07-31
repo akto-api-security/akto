@@ -178,4 +178,7 @@
 
 .grey-text
     color: #949597
+
+.white-background
+    background-color: #FFFFFF    
 </style>
