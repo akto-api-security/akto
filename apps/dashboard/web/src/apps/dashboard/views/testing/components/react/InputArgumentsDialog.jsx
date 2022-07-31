@@ -17,6 +17,11 @@ const RequestEditor = ({sampleApiCall, updatedSampleData, onChangeApiRequest}) =
   let REQUEST_HEADERS = "requestHeaders"
   let REQUEST_PAYLOAD = "requestPayload"
 
+
+  let oldParams = sampleApiCall.path.indexOf("?") > -1 ?sampleApiCall.path.split("?")[1] : "";
+  let oldHeaders = sampleApiCall.requestHeaders
+  let oldPayload = sampleApiCall.requestPayload
+
   const onChangeQueryParams = (newParams) => {
     onChangeApiRequest(QUERY_PARAMS, newParams);
   }
@@ -34,15 +39,15 @@ const RequestEditor = ({sampleApiCall, updatedSampleData, onChangeApiRequest}) =
       <div style={{width: "400px"}}>
         <div className="request-title">[Request] Query params</div>
         <div className="request-editor request-editor-path">
-          <TemplateStringEditor defaultText={updatedSampleData[QUERY_PARAMS] || sampleApiCall.path.indexOf("?") > -1 ?sampleApiCall.path.split("?")[1] : "-"} onChange={onChangeQueryParams}/>
+          <TemplateStringEditor defaultText={updatedSampleData[QUERY_PARAMS] || oldParams} onChange={onChangeQueryParams}/>
         </div>
         <div className="request-title">[Request] Headers</div>
         <div className="request-editor request-editor-headers">
-          {<TemplateStringEditor defaultText={updatedSampleData[REQUEST_HEADERS] || sampleApiCall.requestHeaders} onChange={onChangeRequestHeaders}/>}
+          {<TemplateStringEditor defaultText={updatedSampleData[REQUEST_HEADERS] || oldHeaders} onChange={onChangeRequestHeaders}/>}
         </div>
         <div className="request-title">[Request] Payload</div>
         <div className="request-editor request-editor-payload">
-          <TemplateStringEditor defaultText={updatedSampleData[REQUEST_PAYLOAD] || sampleApiCall.requestPayload} onChange={onChangeRequestPayload}/>
+          <TemplateStringEditor defaultText={updatedSampleData[REQUEST_PAYLOAD] || oldPayload} onChange={onChangeRequestPayload}/>
         </div>
       </div>
       <div style={{width: "400px", opacity: "0.5"}}>
@@ -67,7 +72,12 @@ export default function InputArgumentsDialog({nodeId, endpointDetails, fetchSamp
   React.useEffect(() => {
       const getSampleData = async () => {
         const json = await fetchSampleDataFunc(endpointDetails.endpoint, endpointDetails.apiCollectionId, endpointDetails.method)
-        updateSampleData(json);
+               
+        updateSampleData(json && 
+          json.sampleDataList && 
+          json.sampleDataList[0] && 
+          json.sampleDataList[0].samples && 
+          json.sampleDataList[0].samples[0] && JSON.parse(json.sampleDataList[0].samples[0]) || {});
       }
       getSampleData();
     }, 
@@ -78,7 +88,7 @@ export default function InputArgumentsDialog({nodeId, endpointDetails, fetchSamp
   const nodeEndpointMap = useStore(state => state.nodeEndpointMap)
 
   const onChangeApiRequest = (key, newData) => {
-    let currNewSampleData = {...newSampleData}
+    let currNewSampleData = {...newSampleData, orig: sampleData}
     currNewSampleData[key] = newData
     setNewSampleData(currNewSampleData)
   }
@@ -103,14 +113,9 @@ export default function InputArgumentsDialog({nodeId, endpointDetails, fetchSamp
       <Dialog open={open} onClose={handleClose} className="input-arguments-dialog" style={{minWidth: "850px"}}>
         <div className="request-title"></div>
         <DialogContent>
-            { 
-              sampleData && 
-              sampleData.sampleDataList && 
-              sampleData.sampleDataList[0] && 
-              sampleData.sampleDataList[0].samples && 
-              sampleData.sampleDataList[0].samples[0] && 
-              <RequestEditor sampleApiCall={JSON.parse(sampleData.sampleDataList[0].samples[0])} updatedSampleData={nodeEndpointMap[nodeId].updatedSampleData} onChangeApiRequest={onChangeApiRequest}/>
-            }
+            
+          <RequestEditor sampleApiCall={sampleData} updatedSampleData={nodeEndpointMap[nodeId].updatedSampleData} onChangeApiRequest={onChangeApiRequest}/>
+            
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClose} variant="contained" style={{textTransform: "unset"}}>Save</Button>
