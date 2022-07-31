@@ -121,7 +121,7 @@
                 </simple-table>
             </template>
             <template slot="Tests">
-                <workflow-test-builder :endpointsList=allEndpoints />
+                <workflow-test-builder :endpointsList=allEndpoints :apiCollectionId="apiCollectionId"/>
                 
             </template>
         </layout-with-tabs>

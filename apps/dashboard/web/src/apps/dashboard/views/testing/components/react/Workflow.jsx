@@ -3,6 +3,9 @@ import ReactFlow, {
   Background,
   getRectOfNodes
 } from 'react-flow-renderer';
+import { faSave } from '@fortawesome/free-regular-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import IconButton from "@mui/material/IconButton"
 
 import useStore from './store'
 import StartNode from './StartNode.jsx';
@@ -13,9 +16,11 @@ const onInit = (reactFlowInstance) => console.log('flow loaded:', reactFlowInsta
 
 const nodeTypes = { startNode: StartNode, blankNode: BlankNode, endNode: EndNode };
 
-const Workflow = () => {
+const Workflow = ({apiCollectionId}) => {
   const nodes = useStore((state) => state.nodes)
+  const originalState = useStore((state) => state.originalState)
   const edges = useStore((state) => state.edges)
+  const nodeEndpointMap = useStore((state) => state.nodeEndpointMap)
   const currentSource = useStore((state) => state.currentSource)
 
   const onNodesChange = useStore((state) => state.onNodesChange)
@@ -113,27 +118,46 @@ const Workflow = () => {
     setEnteredNode(null)
   }
 
+  const createWorkflowTest = useStore(state => state.createWorkflowTest)
+  const editWorkflowTest = useStore(state => state.editWorkflowTest)
+  const setOriginalState = useStore(state => state.setOriginalState)
+  const onSave = () => {
+    if (originalState.id) {
+      editWorkflowTest(originalState.id, nodes.map(JSON.stringify), edges.map(JSON.stringify), nodeEndpointMap)
+    } else {
+      createWorkflowTest(nodes.map(JSON.stringify), edges.map(JSON.stringify), nodeEndpointMap, "DRAFT", apiCollectionId).then(resp => {
+        setOriginalState(resp.workflowTests[0])
+      })
+    }
+  }
+
   return (
-    <ReactFlow
-      nodes={nodes}
-      edges={edges}
-      defaultPosition={[0, -90]}
-      defaultZoom={1}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      onConnect={onConnect}
-      onInit={onInit}
-      nodeTypes={nodeTypes}
-      onConnectStart={onConnectStart}
-      onConnectStop={onConnectStop}
-      onMoveEnd={onMoveEnd}
-      onNodeMouseEnter={onNodeMouseEnter}
-      onNodeMouseLeave={onNodeMouseLeave}
-      attributionPosition="top-right"
-      fitView
-    >
-      <Background color="#aaa" gap={16} />
-    </ReactFlow>
+    <div style={{height: "500px"}}>
+      <IconButton onClick={onSave} style={{float : "right"}}>
+        <FontAwesomeIcon icon={faSave} className="request-editor-matched"  size="sm"/>
+      </IconButton>
+
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        defaultPosition={[0, -90]}
+        defaultZoom={1}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onInit={onInit}
+        nodeTypes={nodeTypes}
+        onConnectStart={onConnectStart}
+        onConnectStop={onConnectStop}
+        onMoveEnd={onMoveEnd}
+        onNodeMouseEnter={onNodeMouseEnter}
+        onNodeMouseLeave={onNodeMouseLeave}
+        attributionPosition="top-right"
+        fitView
+      >
+        <Background color="#aaa" gap={16} />
+      </ReactFlow>
+    </div>
   );
 };
 

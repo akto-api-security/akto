@@ -215,19 +215,19 @@ export default {
         })
     },
 
-    createWorkflowTest(nodeIds, edges, mapNodeIdToWorkflowNodeDetails, state) {
+    createWorkflowTest(nodes, edges, mapNodeIdToWorkflowNodeDetails, state, apiCollectionId) {
         return request({
             url: '/api/createWorkflowTest',
             method: 'post',
-            data: {nodeIds, edges, mapNodeIdToWorkflowNodeDetails, state}
+            data: {nodes, edges, mapNodeIdToWorkflowNodeDetails, state, apiCollectionId}
         })
     },
 
-    editWorkflowTest(id, nodeIds, edges, mapNodeIdToWorkflowNodeDetails) {
+    editWorkflowTest(id, nodes, edges, mapNodeIdToWorkflowNodeDetails) {
         return request({
             url: '/api/editWorkflowTest',
             method: 'post',
-            data: {id, nodeIds, edges, mapNodeIdToWorkflowNodeDetails}
+            data: {id, nodes, edges, mapNodeIdToWorkflowNodeDetails}
         })
     },
 

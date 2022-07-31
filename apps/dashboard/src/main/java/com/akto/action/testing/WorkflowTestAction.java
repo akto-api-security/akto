@@ -19,7 +19,7 @@ import org.bson.conversions.Bson;
 
 public class WorkflowTestAction extends UserAction {
     int apiCollectionId;
-    private List<String> nodeIds;
+    private List<String> nodes;
     private List<String> edges;
     private Map<String, WorkflowNodeDetails> mapNodeIdToWorkflowNodeDetails;
     WorkflowTest.State state;
@@ -39,7 +39,7 @@ public class WorkflowTestAction extends UserAction {
         String editor = author;
         int lastEdited = createdTimestamp;
         WorkflowTest workflowTest = new WorkflowTest(id, apiCollectionId, author, createdTimestamp, editor, 
-            lastEdited, nodeIds, edges, mapNodeIdToWorkflowNodeDetails, state);
+            lastEdited, nodes, edges, mapNodeIdToWorkflowNodeDetails, state);
 
         InsertOneResult result = WorkflowTestsDao.instance.insertOne(workflowTest);
         int newId = result.getInsertedId().asInt32().intValue();
@@ -56,7 +56,7 @@ public class WorkflowTestAction extends UserAction {
         }
 
         Bson updates = Updates.combine(
-            Updates.set("nodes", nodeIds),
+            Updates.set("nodes", nodes),
             Updates.set("edges", edges),
             Updates.set("mapNodeIdToWorkflowNodeDetails", mapNodeIdToWorkflowNodeDetails)
         );
@@ -137,12 +137,12 @@ public class WorkflowTestAction extends UserAction {
         this.apiCollectionId = apiCollectionId;
     }
 
-    public List<String> getNodeIds() {
-        return this.nodeIds;
+    public List<String> getNodes() {
+        return this.nodes;
     }
 
-    public void setNodeIds(List<String> nodeIds) {
-        this.nodeIds = nodeIds;
+    public void setNodes(List<String> nodes) {
+        this.nodes = nodes;
     }
 
     public List<String> getEdges() {

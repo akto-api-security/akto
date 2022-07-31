@@ -1,10 +1,11 @@
 import React from 'react';
+import { createTheme } from '@mui/material/styles';
 
 import Workflow from './Workflow.jsx';
 
 import useStore from './store'
+import './start-node.css'
 
-import { createTheme } from '@mui/material/styles';
 
 // use default theme
 // const theme = createTheme();
@@ -24,7 +25,7 @@ const theme = createTheme({
   }
 });
 
-const WorkflowBuilder = ({endpointsList, originalStateFromDb, fetchSampleDataFunc, createWorkflowTest, editWorkflowTest, editWorkflowNodeDetails}) => {  
+const WorkflowBuilder = ({endpointsList, originalStateFromDb, fetchSampleDataFunc, createWorkflowTest, editWorkflowTest, editWorkflowNodeDetails, apiCollectionId}) => {  
   const setOriginalState = useStore((state) => state.setOriginalState);
   const setEndpointsList = useStore((state) => state.setEndpointsList);
   const setUtilityFuncs = useStore((state) => state.setUtilityFuncs);
@@ -36,9 +37,9 @@ const WorkflowBuilder = ({endpointsList, originalStateFromDb, fetchSampleDataFun
     x.method = x.method.toUpperCase()
   })
   setEndpointsList(endpointsList, fetchSampleDataFunc);
-  
+
   return (
-    <Workflow theme={theme}/>
+    <Workflow theme={theme} apiCollectionId={apiCollectionId}/>
   )
 }
 export default WorkflowBuilder

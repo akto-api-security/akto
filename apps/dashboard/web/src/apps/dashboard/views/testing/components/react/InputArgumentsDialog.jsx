@@ -88,7 +88,7 @@ export default function InputArgumentsDialog({nodeId, endpointDetails, fetchSamp
   const nodeEndpointMap = useStore(state => state.nodeEndpointMap)
 
   const onChangeApiRequest = (key, newData) => {
-    let currNewSampleData = {orig: sampleData}
+    let currNewSampleData = {orig: JSON.stringify(sampleData)}
     currNewSampleData[key] = newData
     let updatedSampleData = {...nodeEndpointMap[nodeId].updatedSampleData, ...currNewSampleData}
     addNodeEndpoint(nodeId, {...endpointDetails, updatedSampleData})

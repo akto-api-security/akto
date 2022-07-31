@@ -21,7 +21,7 @@ public class WorkflowTest {
     String editor;
     int lastEdited;
 
-    List<String> nodeIds;
+    List<String> nodes;
     List<String> edges;
 
     Map<String, WorkflowNodeDetails> mapNodeIdToWorkflowNodeDetails;
@@ -29,14 +29,14 @@ public class WorkflowTest {
 
     public WorkflowTest() {}
 
-    public WorkflowTest(int id, int apiCollectionId, String author, int createdTimestamp, String editor, int lastEdited, List<String> nodeIds, List<String> edges, Map<String,WorkflowNodeDetails> mapNodeIdToWorkflowNodeDetails, State state) {
+    public WorkflowTest(int id, int apiCollectionId, String author, int createdTimestamp, String editor, int lastEdited, List<String> nodes, List<String> edges, Map<String,WorkflowNodeDetails> mapNodeIdToWorkflowNodeDetails, State state) {
         this.id = id;
         this.apiCollectionId = apiCollectionId;
         this.author = author;
         this.createdTimestamp = createdTimestamp;
         this.editor = editor;
         this.lastEdited = lastEdited;
-        this.nodeIds = nodeIds;
+        this.nodes = nodes;
         this.edges = edges;
         this.mapNodeIdToWorkflowNodeDetails = mapNodeIdToWorkflowNodeDetails;
         this.state = state;
@@ -90,12 +90,12 @@ public class WorkflowTest {
         this.lastEdited = lastEdited;
     }
 
-    public List<String> getNodeIds() {
-        return this.nodeIds;
+    public List<String> getNodes() {
+        return this.nodes;
     }
 
-    public void setNodeIds(List<String> nodeIds) {
-        this.nodeIds = nodeIds;
+    public void setNodes(List<String> nodes) {
+        this.nodes = nodes;
     }
 
     public List<String> getEdges() {
@@ -131,7 +131,7 @@ public class WorkflowTest {
             ", createdTimestamp='" + getCreatedTimestamp() + "'" +
             ", editor='" + getEditor() + "'" +
             ", lastEdited='" + getLastEdited() + "'" +
-            ", nodeIds='" + getNodeIds() + "'" +
+            ", nodes='" + getNodes() + "'" +
             ", edges='" + getEdges() + "'" +
             ", mapNodeIdToWorkflowNodeDetails='" + getMapNodeIdToWorkflowNodeDetails() + "'" +
             ", state='" + getState() + "'" +

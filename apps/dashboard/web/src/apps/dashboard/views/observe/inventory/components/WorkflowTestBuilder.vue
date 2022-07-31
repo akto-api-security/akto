@@ -1,13 +1,14 @@
 <template>
     <div>
         <workflow-builder 
+            v-if="originalState"
+            :apiCollectionId="apiCollectionId"
             :endpointsList="endpointsList" 
             :originalStateFromDb="originalState" 
             :fetchSampleDataFunc="fetchSampleDataFunc"
             :createWorkflowTest="createWorkflowTest"
             :editWorkflowTest="editWorkflowTest"
             :editWorkflowNodeDetails="editWorkflowNodeDetails"
-            style="height: 500px" 
         />
     </div>
 </template>
@@ -23,11 +24,11 @@ export default {
         'workflow-builder': WorkflowBuilder
     },
     props: {
+        apiCollectionId: obj.numR,
         endpointsList: obj.arrR,
         originalStateFromDb: obj.objN
     },
     data() {
-
         let defNodes = [
             {
                 id: '1',
@@ -52,18 +53,14 @@ export default {
             }
         ]
 
-        let defEdges = [
-
-        ]
-
-        let defaultState = {nodes: defNodes.map(JSON.stringify), edges: defEdges.map(JSON.stringify), lastEdited: 1, mapNodeIdToWorkflowNodeDetails: {}}
+        let defaultState = {nodes: defNodes.map(JSON.stringify), edges: [], mapNodeIdToWorkflowNodeDetails: {}, lastEdited: 1, state: "DRAFT"}
 
         return {
             fetchSampleDataFunc: api.fetchSampleData,
             createWorkflowTest: api.createWorkflowTest,
             editWorkflowTest: api.editWorkflowTest,
             editWorkflowNodeDetails: api.editWorkflowNodeDetails,
-            originalState: this.originalState || defaultState
+            originalState: this.originalStateFromDb || defaultState
         }
     }
 }
