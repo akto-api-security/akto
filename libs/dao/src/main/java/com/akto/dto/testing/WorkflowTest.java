@@ -1,0 +1,141 @@
+package com.akto.dto.testing;
+
+import java.util.List;
+import java.util.Map;
+
+import org.bson.codecs.pojo.annotations.BsonId;
+
+public class WorkflowTest {
+
+    public enum State {
+        DRAFT, COMPLETE, STOPPED;
+    }
+
+    @BsonId
+    int id;
+
+    int apiCollectionId;
+    String author;
+    int createdTimestamp;
+
+    String editor;
+    int lastEditedBy;
+
+    List<String> nodeIds;
+    List<String> edges;
+
+    Map<String, WorkflowNodeDetails> mapNodeIdToWorkflowNodeDetails;
+    State state;
+
+    public WorkflowTest() {}
+
+    public WorkflowTest(int id, int apiCollectionId, String author, int createdTimestamp, String editor, int lastEditedBy, List<String> nodeIds, List<String> edges, Map<String,WorkflowNodeDetails> mapNodeIdToWorkflowNodeDetails, State state) {
+        this.id = id;
+        this.apiCollectionId = apiCollectionId;
+        this.author = author;
+        this.createdTimestamp = createdTimestamp;
+        this.editor = editor;
+        this.lastEditedBy = lastEditedBy;
+        this.nodeIds = nodeIds;
+        this.edges = edges;
+        this.mapNodeIdToWorkflowNodeDetails = mapNodeIdToWorkflowNodeDetails;
+        this.state = state;
+    }
+
+    public int getId() {
+        return this.id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public int getApiCollectionId() {
+        return this.apiCollectionId;
+    }
+
+    public void setApiCollectionId(int apiCollectionId) {
+        this.apiCollectionId = apiCollectionId;
+    }
+
+    public String getAuthor() {
+        return this.author;
+    }
+
+    public void setAuthor(String author) {
+        this.author = author;
+    }
+
+    public int getCreatedTimestamp() {
+        return this.createdTimestamp;
+    }
+
+    public void setCreatedTimestamp(int createdTimestamp) {
+        this.createdTimestamp = createdTimestamp;
+    }
+
+    public String getEditor() {
+        return this.editor;
+    }
+
+    public void setEditor(String editor) {
+        this.editor = editor;
+    }
+
+    public int getLastEditedBy() {
+        return this.lastEditedBy;
+    }
+
+    public void setLastEditedBy(int lastEditedBy) {
+        this.lastEditedBy = lastEditedBy;
+    }
+
+    public List<String> getNodeIds() {
+        return this.nodeIds;
+    }
+
+    public void setNodeIds(List<String> nodeIds) {
+        this.nodeIds = nodeIds;
+    }
+
+    public List<String> getEdges() {
+        return this.edges;
+    }
+
+    public void setEdges(List<String> edges) {
+        this.edges = edges;
+    }
+
+    public Map<String,WorkflowNodeDetails> getMapNodeIdToWorkflowNodeDetails() {
+        return this.mapNodeIdToWorkflowNodeDetails;
+    }
+
+    public void setMapNodeIdToWorkflowNodeDetails(Map<String,WorkflowNodeDetails> mapNodeIdToWorkflowNodeDetails) {
+        this.mapNodeIdToWorkflowNodeDetails = mapNodeIdToWorkflowNodeDetails;
+    }
+
+    public State getState() {
+        return this.state;
+    }
+
+    public void setState(State state) {
+        this.state = state;
+    }
+
+    @Override
+    public String toString() {
+        return "{" +
+            " id='" + getId() + "'" +
+            ", apiCollectionId='" + getApiCollectionId() + "'" +
+            ", author='" + getAuthor() + "'" +
+            ", createdTimestamp='" + getCreatedTimestamp() + "'" +
+            ", editor='" + getEditor() + "'" +
+            ", lastEditedBy='" + getLastEditedBy() + "'" +
+            ", nodeIds='" + getNodeIds() + "'" +
+            ", edges='" + getEdges() + "'" +
+            ", mapNodeIdToWorkflowNodeDetails='" + getMapNodeIdToWorkflowNodeDetails() + "'" +
+            ", state='" + getState() + "'" +
+            "}";
+    }
+
+}

@@ -14,7 +14,6 @@ const useStore = create((set, get) => ({
   zoom: 1,
   enteredNode: null,
   nodeEndpointMap: {},
-  edgeVariablesMap: {},
   counter: 1,
   incrementCounter: () => {
     set({
@@ -26,13 +25,6 @@ const useStore = create((set, get) => ({
     ret[nodeId] = endpointData
     set({
       nodeEndpointMap: ret
-    })
-  },
-  addEdgeVariable: (edgeId, variablesData) => {
-    let ret = {...get().edgeVariablesMap}
-    ret[edgeId] = variablesData
-    set({
-      edgeVariablesMap: ret
     })
   },
   setEndpointsList: (newList, newFetchSampleDataFunc) => {
