@@ -2,9 +2,6 @@ package com.akto.runtime;
 
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 import com.akto.DaoInit;
 import com.akto.dao.*;
@@ -13,24 +10,19 @@ import com.akto.dto.APIConfig;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dto.KafkaHealthMetric;
 import com.akto.kafka.Kafka;
 import com.akto.parsers.HttpCallParser;
 import com.akto.dto.HttpResponseParams;
 import com.akto.runtime.policies.AktoPolicy;
 import com.google.gson.Gson;
-import com.google.protobuf.Api;
-import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
 import org.apache.kafka.clients.consumer.*;
-import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,6 +89,22 @@ public class Main {
         RuntimeFilterDao.instance.initialiseFilters();
     }
 
+    public static Kafka kafkaProducer = null;
+    private static void buildKafka() {
+        System.out.println("Building kafka...................");
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        if (accountSettings != null && accountSettings.getCentralKafkaIp()!= null) {
+            String centralKafkaBrokerUrl = accountSettings.getCentralKafkaIp();
+            int centralKafkaBatchSize = 0;
+            int centralKafkaLingerMS = 0;
+            if (centralKafkaBrokerUrl != null) {
+                kafkaProducer = new Kafka(centralKafkaBrokerUrl, centralKafkaLingerMS, centralKafkaBatchSize);
+                logger.info("Connected to central kafka @ " + Context.now());
+            }
+
+        }
+    }
+
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
@@ -122,20 +130,9 @@ public class Main {
         createIndices();
         insertRuntimeFilters();
 
-        Kafka kafka = null;
-        String centralKafkaTopicName = null;
-        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-        if (accountSettings != null && accountSettings.getCentralKafkaIp()!= null) {
-            String centralKafkaBrokerUrl = accountSettings.getCentralKafkaIp();
-            centralKafkaTopicName = AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME;
-            int centralKafkaBatchSize = AccountSettings.DEFAULT_CENTRAL_KAFKA_BATCH_SIZE;
-            int centralKafkaLingerMS = AccountSettings.DEFAULT_CENTRAL_KAFKA_LINGER_MS;
-            if (centralKafkaBrokerUrl != null) {
-                kafka = new Kafka(centralKafkaBrokerUrl, centralKafkaLingerMS, centralKafkaBatchSize);
-            }
-
-            logger.info("Connected to central kafka @ " + Context.now());
-        }
+        String centralKafkaTopicName = AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME;
+        buildKafka();
+        int lastKafkaProducerSync = Context.now();
 
         try {
             AccountSettingsDao.instance.updateVersion(AccountSettings.API_RUNTIME_VERSION);
@@ -191,6 +188,12 @@ public class Main {
             while (true) {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 main.consumer.commitSync();
+                if (lastKafkaProducerSync < (Context.now() - 120)) {
+                    if (kafkaProducer == null || !kafkaProducer.producerReady) {
+                        buildKafka();
+                        lastKafkaProducerSync = Context.now();
+                    }
+                }
                 
                 // TODO: what happens if exception
                 Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
@@ -268,11 +271,13 @@ public class Main {
                         APICatalogSync apiCatalogSync = parser.syncFunction(accWiseResponse, syncImmediately);
 
                         // send to central kafka
-                        if (kafka != null) {
+                        if (kafkaProducer != null) {
                             for (HttpResponseParams httpResponseParams: accWiseResponse) {
                                 try {
-                                    kafka.send(httpResponseParams.getOrig(), centralKafkaTopicName);
+                                    kafkaProducer.send(httpResponseParams.getOrig(), centralKafkaTopicName);
                                 } catch (Exception e) {
+                                    // force close it
+                                    kafkaProducer.close();
                                     logger.error(e.getMessage());
                                 }
                             }
