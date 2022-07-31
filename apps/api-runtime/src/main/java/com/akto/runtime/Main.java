@@ -188,7 +188,7 @@ public class Main {
             while (true) {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 main.consumer.commitSync();
-                if (lastKafkaProducerSync < (Context.now() - 60)) {
+                if (lastKafkaProducerSync < (Context.now() - 120)) {
                     if (kafkaProducer == null || !kafkaProducer.producerReady) {
                         buildKafka();
                         lastKafkaProducerSync = Context.now();
@@ -277,7 +277,6 @@ public class Main {
                                     kafkaProducer.send(httpResponseParams.getOrig(), centralKafkaTopicName);
                                 } catch (Exception e) {
                                     // force close it
-                                    kafkaProducer.producerReady = false;
                                     kafkaProducer.close();
                                     logger.error(e.getMessage());
                                 }

@@ -18,9 +18,7 @@ public class Kafka {
         try {
             setProducer(brokerIP, lingerMS, batchSize);
         } catch (Exception e) {
-            System.out.println("************************************************");
             e.printStackTrace();
-            System.out.println("************************************************");
         }
     }
 
@@ -29,12 +27,11 @@ public class Kafka {
 
         ProducerRecord<String, String> record = new ProducerRecord<>(topic,message);
         producer.send(record, new DemoProducerCallback());
-        System.out.println("SENT");
     }
 
     public void close() {
-        producer.close(Duration.ofMillis(0)); // close immediately
         this.producerReady = false;
+        producer.close(Duration.ofMillis(0)); // close immediately
     }
 
     private void setProducer(String brokerIP, int lingerMS, int batchSize) {
@@ -68,7 +65,7 @@ public class Kafka {
         public void onCompletion(RecordMetadata recordMetadata, Exception e) {
             if (e != null) {
                 Kafka.this.close();
-                System.out.println(e.getMessage());
+                System.out.println("onCompletion error: " + e.getMessage());
             }
         }
     }
