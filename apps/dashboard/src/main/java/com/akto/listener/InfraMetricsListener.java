@@ -17,13 +17,20 @@ public class InfraMetricsListener implements ServletContextListener {
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
 
-        System.out.println("Infra metrics initializing.......");
-        new JvmThreadMetrics().bindTo(registry);
-        new JvmGcMetrics().bindTo(registry);
-        new JvmMemoryMetrics().bindTo(registry);
-        new DiskSpaceMetrics(new File("/")).bindTo(registry);
-        new ProcessorMetrics().bindTo(registry); // metrics related to the CPU stats
-        new UptimeMetrics().bindTo(registry);
+        try {
+            System.out.println("Infra metrics initializing.......");
+            new JvmThreadMetrics().bindTo(registry);
+            new JvmGcMetrics().bindTo(registry);
+            new JvmMemoryMetrics().bindTo(registry);
+            new DiskSpaceMetrics(new File("/")).bindTo(registry);
+            new ProcessorMetrics().bindTo(registry); // metrics related to the CPU stats
+            new UptimeMetrics().bindTo(registry);
+        } catch (Exception e) {
+            System.out.println("********************************************************************************");
+            System.out.println("ERROR while setting up InfraMetricsListener");
+            e.printStackTrace();
+            System.out.println("********************************************************************************");
+        }
 
 
         System.out.println("Infra metrics initialized!!!!");
