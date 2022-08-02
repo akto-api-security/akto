@@ -255,6 +255,28 @@ export default {
             method: 'post',
             data: {id, mapNodeIdToWorkflowNodeDetails}
         })
+    },
+
+    runWorkflowTest(id) {
+        return request({
+            url: '/api/startTest',
+            method: 'post',
+            data: {
+                "testIdConfig" : 1,
+                "workflowTestId": id,
+                "type": "WORKFLOW"
+            }
+        })
+    },
+
+    fetchWorkflowResult(id) {
+        return request({
+            url: '/api/fetchWorkflowResult',
+            method: 'post',
+            data: {
+                "workflowTestId": id,
+            }
+        })
     }
 
 }

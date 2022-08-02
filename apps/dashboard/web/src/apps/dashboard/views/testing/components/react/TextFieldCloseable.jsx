@@ -6,7 +6,7 @@ import './start-node.css';
 
 const TextFieldCloseable = ({text}) => {
 
-    var r = /\$\{x(\d+)\.([\w\.]+)\}/g;
+    var r = /\$\{x(\d+)\.([\w\[\]\.]+)\}/g;
     let m = r.exec(text)
 
     return (

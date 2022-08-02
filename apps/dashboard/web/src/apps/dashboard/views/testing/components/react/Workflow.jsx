@@ -4,6 +4,7 @@ import ReactFlow, {
   getRectOfNodes
 } from 'react-flow-renderer';
 import { faSave } from '@fortawesome/free-regular-svg-icons';
+import { faPlayCircle } from '@fortawesome/free-regular-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import IconButton from "@mui/material/IconButton"
 
@@ -121,6 +122,8 @@ const Workflow = ({apiCollectionId}) => {
   const createWorkflowTest = useStore(state => state.createWorkflowTest)
   const editWorkflowTest = useStore(state => state.editWorkflowTest)
   const setOriginalState = useStore(state => state.setOriginalState)
+  const runWorkflowTest = useStore(state => state.runWorkflowTest)
+  const fetchWorkflowResult = useStore(state => state.fetchWorkflowResult)
   const onSave = () => {
     if (originalState.id) {
       editWorkflowTest(originalState.id, nodes.map(JSON.stringify), edges.map(JSON.stringify), nodeEndpointMap)
@@ -131,10 +134,37 @@ const Workflow = ({apiCollectionId}) => {
     }
   }
 
+  const runTest = () => {
+      if (!originalState.id) {
+          console.log("Please save test first")
+          return;
+      }
+
+      runWorkflowTest(originalState.id)
+
+      let interval = setInterval(() => {
+          fetchWorkflowResult(originalState.id).then((resp) => {
+            if (resp !== null) {
+              let workflowTestResult = resp["workflowTestResult"]
+              if (workflowTestResult !== null) {
+                  let testResultMap = workflowTestResult["testResultMap"];
+                  console.log(testResultMap)
+                  clearInterval(interval)
+              }
+            }
+          })
+      }, 5000)
+
+  }
+
   return (
     <div style={{height: "800px"}}>
       <IconButton onClick={onSave} style={{float : "right"}}>
         <FontAwesomeIcon icon={faSave} className="request-editor-matched"  size="sm"/>
+      </IconButton>
+
+      <IconButton onClick={runTest} style={{float : "right"}}>
+        <FontAwesomeIcon icon={faPlayCircle} className="request-editor-matched"  size="sm"/>
       </IconButton>
 
       <ReactFlow

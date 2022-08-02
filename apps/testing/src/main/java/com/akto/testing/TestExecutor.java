@@ -3,6 +3,8 @@ package com.akto.testing;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.TestingRun;
+import com.akto.dto.testing.WorkflowTest;
+import com.akto.dto.testing.WorkflowTestingEndpoints;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.rules.BOLATest;
 import com.akto.rules.NoAuthTest;
@@ -23,7 +25,30 @@ public class TestExecutor {
     }
 
     private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
+
     public static void init(TestingRun testingRun) {
+        if (testingRun.getTestIdConfig() == 0)     {
+            apiWiseInit(testingRun);
+        } else {
+            workflowInit(testingRun);
+        }
+    }
+
+    public static void workflowInit (TestingRun testingRun) {
+        TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
+        if (!testingEndpoints.getType().equals(TestingEndpoints.Type.WORKFLOW)) {
+            logger.error("Invalid workflow type");
+            return;
+        }
+
+        WorkflowTestingEndpoints workflowTestingEndpoints = (WorkflowTestingEndpoints) testingEndpoints;
+        WorkflowTest workflowTest = workflowTestingEndpoints.getWorkflowTest();
+
+        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
+        apiWorkflowExecutor.init(workflowTest, testingRun.getId());
+    }
+
+    public static void  apiWiseInit(TestingRun testingRun) {
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;

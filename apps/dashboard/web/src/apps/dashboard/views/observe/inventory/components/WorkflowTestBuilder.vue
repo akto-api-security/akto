@@ -9,6 +9,8 @@
             :createWorkflowTest="createWorkflowTest"
             :editWorkflowTest="editWorkflowTest"
             :editWorkflowNodeDetails="editWorkflowNodeDetails"
+            :runWorkflowTest="runWorkflowTest"
+            :fetchWorkflowResult="fetchWorkflowResult"
         />
     </div>
 </template>
@@ -60,7 +62,9 @@ export default {
             createWorkflowTest: api.createWorkflowTest,
             editWorkflowTest: api.editWorkflowTest,
             editWorkflowNodeDetails: api.editWorkflowNodeDetails,
-            originalState: this.originalStateFromDb || defaultState
+            originalState: this.originalStateFromDb || defaultState,
+            runWorkflowTest: api.runWorkflowTest,
+            fetchWorkflowResult: api.fetchWorkflowResult
         }
     }
 }

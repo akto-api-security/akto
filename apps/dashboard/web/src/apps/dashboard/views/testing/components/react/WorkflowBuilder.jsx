@@ -25,13 +25,13 @@ const theme = createTheme({
   }
 });
 
-const WorkflowBuilder = ({endpointsList, originalStateFromDb, fetchSampleDataFunc, createWorkflowTest, editWorkflowTest, editWorkflowNodeDetails, apiCollectionId}) => {  
+const WorkflowBuilder = ({endpointsList, originalStateFromDb, fetchSampleDataFunc, createWorkflowTest, editWorkflowTest, editWorkflowNodeDetails, apiCollectionId, runWorkflowTest, fetchWorkflowResult}) => {
   const setOriginalState = useStore((state) => state.setOriginalState);
   const setEndpointsList = useStore((state) => state.setEndpointsList);
   const setUtilityFuncs = useStore((state) => state.setUtilityFuncs);
 
   setOriginalState(originalStateFromDb);
-  setUtilityFuncs(createWorkflowTest, editWorkflowTest, editWorkflowNodeDetails);
+  setUtilityFuncs(createWorkflowTest, editWorkflowTest, editWorkflowNodeDetails, runWorkflowTest, fetchWorkflowResult);
 
   endpointsList.forEach(x => {
     x.method = x.method.toUpperCase()

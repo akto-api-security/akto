@@ -4,12 +4,13 @@ import com.akto.dao.context.Context;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.type.URLMethods;
-import com.akto.parsers.HttpCallParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mongodb.BasicDBObject;
 import kotlin.Pair;
 import okhttp3.*;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -128,7 +129,7 @@ public class ApiExecutor {
         HttpResponseParams httpResponseParams = null;
         switch (method) {
             case GET:
-                httpResponseParams = getRequest(httpRequestParams, builder);
+                httpResponseParams = getRequest(httpRequestParams, builder, url);
                 break;
             case POST:
             case PUT:
@@ -146,9 +147,38 @@ public class ApiExecutor {
         return httpResponseParams;
     }
 
-    public static HttpResponseParams getRequest(HttpRequestParams httpRequestParams, Request.Builder builder)  throws Exception{
+
+    public static HttpResponseParams getRequest(HttpRequestParams httpRequestParams, Request.Builder builder, String url)  throws Exception{
+        String requestPayload = httpRequestParams.getPayload();
+        if (requestPayload != null && !requestPayload.isEmpty()) {
+            String rawQuery = getRawQueryFromJson(requestPayload);
+            if (rawQuery != null) {
+                String newUrl = url + "?" + rawQuery;
+                builder.url(newUrl);
+            }
+        }
+
         Request request = builder.build();
         return common(request);
+    }
+
+    public static String getRawQueryFromJson(String requestPayload) {
+        HttpUrl.Builder builder = new HttpUrl.Builder()
+                .scheme("https")
+                .host("www.google.com");
+
+        BasicDBObject obj = BasicDBObject.parse(requestPayload);
+        Set<String> keySet = obj.keySet();
+        if (keySet.isEmpty()) return null;
+
+        for(String key: keySet) {
+            Object val = obj.get(key);
+            builder.addQueryParameter(key, val.toString());
+        }
+
+        URI uri = builder.build().uri();
+
+        return uri.getRawQuery();
     }
 
 

@@ -72,6 +72,8 @@ public class DaoInit {
         ClassModel<TestingEndpoints> testingEndpointsClassModel = ClassModel.builder(TestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<CustomTestingEndpoints> customTestingEndpointsClassModel = ClassModel.builder(CustomTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<CollectionWiseTestingEndpoints> collectionWiseTestingEndpointsClassModel = ClassModel.builder(CollectionWiseTestingEndpoints.class).enableDiscriminator(true).build();
+        ClassModel<WorkflowTestingEndpoints>  workflowTestingEndpointsClassModel = ClassModel.builder(WorkflowTestingEndpoints.class).enableDiscriminator(true).build();
+        ClassModel<WorkflowTestResult>  workflowTestResultClassModel = ClassModel.builder(WorkflowTestResult.class).enableDiscriminator(true).build();
 
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(queueEntryClassModel, configClassModel, 
@@ -83,7 +85,8 @@ public class DaoInit {
                 fieldExistsFilterClassModel, accountSettingsClassModel, responseCodeRuntimeFilterClassModel, cappedListClassModel,
                 equalsToPredicateClassModel, isNumberPredicateClassModel, testingRunClassModel, testingRunResultClassModel, testResultClassModel,
                 authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel,
-                testingEndpointsClassModel, customTestingEndpointsClassModel, collectionWiseTestingEndpointsClassModel
+                testingEndpointsClassModel, customTestingEndpointsClassModel, collectionWiseTestingEndpointsClassModel,
+                workflowTestingEndpointsClassModel, workflowTestResultClassModel
         ).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(

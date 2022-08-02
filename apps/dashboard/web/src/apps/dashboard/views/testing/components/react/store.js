@@ -19,11 +19,15 @@ const useStore = create((set, get) => ({
   editWorkflowTest: null,
   editWorkflowNodeDetails: null,
   originalState: null,
-  setUtilityFuncs: (newCreateWorkflowTest, newEditWorkflowTest, newEditWorkflowNodeDetails) => {
+  runWorkflowTest: null,
+  fetchWorkflowResult: null,
+  setUtilityFuncs: (newCreateWorkflowTest, newEditWorkflowTest, newEditWorkflowNodeDetails, runWorkflowTest, fetchWorkflowResult) => {
     set({
       createWorkflowTest: newCreateWorkflowTest, 
       editWorkflowTest: newEditWorkflowTest, 
-      editWorkflowNodeDetails: newEditWorkflowNodeDetails
+      editWorkflowNodeDetails: newEditWorkflowNodeDetails,
+      runWorkflowTest: runWorkflowTest,
+      fetchWorkflowResult: fetchWorkflowResult
     })
   }, 
   setOriginalState: (originalStateFromDb) => {

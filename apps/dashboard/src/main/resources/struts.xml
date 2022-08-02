@@ -991,6 +991,17 @@
                 <param name="status">401</param>
             </result>
         </action>
+
+        <action name="api/fetchWorkflowResult" class="com.akto.action.testing.AuthMechanismAction" method="fetchWorkflowResult">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
     </package>
 
 </struts>

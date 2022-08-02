@@ -1,15 +1,19 @@
 package com.akto.action.testing;
 
+import com.akto.DaoInit;
 import com.akto.action.UserAction;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.SampleDataDao;
+import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dto.testing.*;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -100,6 +104,26 @@ public class AuthMechanismAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+
+    private int workflowTestId;
+    private WorkflowTestResult workflowTestResult;
+    public String fetchWorkflowResult() {
+        TestingRun testingRun = TestingRunDao.instance.findLatestOne(
+                Filters.eq(TestingRun._TESTING_ENDPOINTS+"."+WorkflowTestingEndpoints._WORK_FLOW_TEST+"._id", workflowTestId)
+        );
+
+        if (testingRun == null) {
+            addActionError("No test run found. Please run test again");
+            return ERROR.toUpperCase();
+        }
+
+        workflowTestResult  = WorkflowTestResultsDao.instance.findOne(
+                Filters.eq(WorkflowTestResult._TEST_RUN_ID, testingRun.getId())
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
     public AuthParam.Location getLocation() {
         return this.location;
     }
@@ -130,5 +154,13 @@ public class AuthMechanismAction extends UserAction {
 
     public void setValue(String value) {
         this.value = value;
+    }
+
+    public void setWorkflowTestId(int workflowTestId) {
+        this.workflowTestId = workflowTestId;
+    }
+
+    public WorkflowTestResult getWorkflowTestResult() {
+        return workflowTestResult;
     }
 }

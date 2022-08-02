@@ -5,6 +5,7 @@ import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingSchedulesDao;
+import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
 import com.akto.dto.testing.*;
@@ -23,12 +24,13 @@ public class StartTestAction extends UserAction {
     private int apiCollectionId;
     private List<ApiInfo.ApiInfoKey> apiInfoKeyList;
 
+    private int testIdConfig;
+    private int workflowTestId;
     public String startTest() {
         User user = getSUser();
-        int testIdConfig = 0;
 
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
-        if (authMechanism == null) {
+        if (authMechanism == null && testIdConfig == 0) {
             addActionError("Please set authentication mechanism before you test any APIs");
             return ERROR.toUpperCase();
         }
@@ -44,6 +46,15 @@ public class StartTestAction extends UserAction {
                 break;
             case COLLECTION_WISE:
                 testingEndpoints = new CollectionWiseTestingEndpoints(apiCollectionId);
+                break;
+            case WORKFLOW:
+                WorkflowTest workflowTest = WorkflowTestsDao.instance.findOne(Filters.eq("_id", this.workflowTestId));
+                if (workflowTest == null) {
+                    addActionError("Couldn't find workflow test");
+                    return ERROR.toUpperCase();
+                }
+                testingEndpoints = new WorkflowTestingEndpoints(workflowTest);
+                testIdConfig = 1;
                 break;
             default:
                 addActionError("Invalid APIs type");
@@ -186,5 +197,11 @@ public class StartTestAction extends UserAction {
         return this.testingSchedules;
     }
 
+    public void setTestIdConfig(int testIdConfig) {
+        this.testIdConfig = testIdConfig;
+    }
 
+    public void setWorkflowTestId(int workflowTestId) {
+        this.workflowTestId = workflowTestId;
+    }
 }

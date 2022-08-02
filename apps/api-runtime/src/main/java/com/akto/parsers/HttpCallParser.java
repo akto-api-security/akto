@@ -47,7 +47,6 @@ public class HttpCallParser {
     }
     
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
-        Gson gson = new Gson();
 
         //convert java object to JSON format
         Map<String, Object> json = gson.fromJson(message, Map.class);
@@ -55,7 +54,7 @@ public class HttpCallParser {
         String method = (String) json.get("method");
         String url = (String) json.get("path");
         String type = (String) json.get("type");
-        Map<String,List<String>> requestHeaders = getHeaders(gson, json, "requestHeaders");
+        Map<String,List<String>> requestHeaders = getHeaders(json, "requestHeaders");
 
         String requestPayload = (String) json.get("requestPayload");
         requestPayload = requestPayload.trim();
@@ -89,7 +88,7 @@ public class HttpCallParser {
 
         int statusCode = Integer.parseInt(json.get("statusCode").toString());
         String status = (String) json.get("status");
-        Map<String,List<String>> responseHeaders = getHeaders(gson, json, "responseHeaders");
+        Map<String,List<String>> responseHeaders = getHeaders(json, "responseHeaders");
         String payload = (String) json.get("responsePayload");
         int time = Integer.parseInt(json.get("time").toString());
         String accountId = (String) json.get("akto_account_id");
@@ -106,8 +105,13 @@ public class HttpCallParser {
 
     }
 
-    public static Map<String,List<String>> getHeaders(Gson gson, Map json, String key) {
-        Map headersFromRequest = gson.fromJson((String) json.get(key),Map.class);
+    private static final Gson gson = new Gson();
+    public static Map<String,List<String>> getHeaders(Map json, String key) {
+        return getHeaders((String) json.get(key));
+    }
+
+    public static Map<String,List<String>> getHeaders(String headersString) {
+        Map headersFromRequest = gson.fromJson(headersString, Map.class);
         Map<String,List<String>> headers = new HashMap<>();
         if (headersFromRequest == null) return headers;
         for (Object k: headersFromRequest.keySet()) {

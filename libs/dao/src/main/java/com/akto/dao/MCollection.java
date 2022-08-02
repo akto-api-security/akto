@@ -90,6 +90,17 @@ public abstract class MCollection<T> {
         return this.findOne(eq(key, values));
     }
 
+    public T findLatestOne(Bson q) {
+        MongoCursor<T> cursor = this.getMCollection().find(q).limit(1).sort(Sorts.descending("_id")).cursor();
+
+        while(cursor.hasNext()) {
+            T elem = cursor.next();
+            return elem;
+        }
+
+        return null;
+    }
+
     public T findOne(Bson q) {
         MongoCursor<T> cursor = this.getMCollection().find(q).cursor();
 
