@@ -258,7 +258,7 @@ public class InitializerListener implements ServletContextListener {
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             dropSampleDataIfEarlierNotDroped(accountSettings);
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("error while setting up dashboard: " + e.getMessage());
         }
 
         try {
