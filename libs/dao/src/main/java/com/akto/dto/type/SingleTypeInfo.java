@@ -423,6 +423,7 @@ public class SingleTypeInfo {
         singleTypeInfo.setValues(copyValues);
         singleTypeInfo.minValue = this.minValue;
         singleTypeInfo.maxValue = this.maxValue;
+        singleTypeInfo.domain = this.domain;
         return singleTypeInfo;
     }
 
