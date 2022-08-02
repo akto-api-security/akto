@@ -618,10 +618,10 @@ public class SingleTypeInfo {
                 double d = Double.parseDouble(o.toString());
                 long l = (long) d;
                 this.minValue = min(this.minValue, l);
-                if (this.minValue < ACCEPTED_MIN_VALUE) {
-                    this.minValue = ACCEPTED_MIN_VALUE;
-                }
+                this.minValue = max(this.minValue, ACCEPTED_MIN_VALUE);
+
                 this.maxValue = max(this.maxValue, l);
+                this.maxValue = min(this.maxValue, ACCEPTED_MAX_VALUE);
                 if (this.maxValue > ACCEPTED_MAX_VALUE) {
                     this.maxValue = ACCEPTED_MAX_VALUE;
                 }

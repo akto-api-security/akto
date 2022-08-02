@@ -836,7 +836,7 @@ public class APICatalogSync {
             }
 
             if (param.isUrlParam()) {
-                Map<Integer, SingleTypeInfo> urlParams = reqTemplate.getUrlParams();
+                Map<Integer, KeyTypes> urlParams = reqTemplate.getUrlParams();
                 if (urlParams == null) {
                     urlParams = new HashMap<>();
                     reqTemplate.setUrlParams(urlParams);
@@ -845,7 +845,12 @@ public class APICatalogSync {
                 String p = param.getParam();
                 try {
                     int position = Integer.parseInt(p);
-                    urlParams.put(position, param);
+                    KeyTypes keyTypes = urlParams.get(position);
+                    if (keyTypes == null) {
+                        keyTypes = new KeyTypes(new HashMap<>(), false);
+                        urlParams.put(position, keyTypes);
+                    }
+                    keyTypes.getOccurrences().put(param.getSubType(), param);
                 } catch (Exception e) {
                     logger.error("ERROR while parsing url param position: " + p);
                 }

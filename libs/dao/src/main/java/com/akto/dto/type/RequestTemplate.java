@@ -58,7 +58,7 @@ public class RequestTemplate {
     Map<String, KeyTypes> parameters;
     AllParams allParams = new AllParams();
     Map<String, KeyTypes> headers;
-    Map<Integer, SingleTypeInfo> urlParams = new HashMap<>();
+    Map<Integer, KeyTypes> urlParams = new HashMap<>();
     Map<Integer, RequestTemplate> responseTemplates;
     Set<String> userIds = new HashSet<>();
     TrafficRecorder trafficRecorder = new TrafficRecorder();
@@ -122,7 +122,7 @@ public class RequestTemplate {
             }
         } else {
             //url, method, responseCode, true, header, value, userId
-            root.getValue().getFirst().process(url, method, responseCode, false, prefix, obj, userId, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap);
+            root.getValue().getFirst().process(url, method, responseCode, false, prefix, obj, userId, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap, false);
             add(root.getValue().getSecond(), userId);   
         }
     }
@@ -136,7 +136,7 @@ public class RequestTemplate {
             }
 
             for(String value: headerPayload.get(header)) {
-                keyTypes.process(url, method, responseCode, true, header, value, userId, apiCollectionId, rawMessage,  sensitiveParamInfoBooleanMap);
+                keyTypes.process(url, method, responseCode, true, header, value, userId, apiCollectionId, rawMessage,  sensitiveParamInfoBooleanMap, false);
             }
         }
     }
@@ -194,7 +194,7 @@ public class RequestTemplate {
                     }
                 }
 
-                keyTypes.process(url, method, responseCode, false, param, flattened.get(param), userId, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap);
+                keyTypes.process(url, method, responseCode, false, param, flattened.get(param), userId, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap, false);
             }
 
             processTime += (System.currentTimeMillis() - s);
@@ -465,7 +465,9 @@ public class RequestTemplate {
             ret.addAll(k.getAllTypeInfo());
         }
 
-        ret.addAll(urlParams.values());
+        for (KeyTypes k: urlParams.values()) {
+            ret.addAll(k.getAllTypeInfo());
+        }
 
         if (responseTemplates != null) {
             for(RequestTemplate responseParams: responseTemplates.values()) {
@@ -593,11 +595,11 @@ public class RequestTemplate {
         return compareKeys(this, that, mergedUrl);
     }
 
-    public Map<Integer, SingleTypeInfo> getUrlParams() {
+    public Map<Integer, KeyTypes> getUrlParams() {
         return urlParams;
     }
 
-    public void setUrlParams(Map<Integer, SingleTypeInfo> urlParams) {
+    public void setUrlParams(Map<Integer, KeyTypes> urlParams) {
         this.urlParams = urlParams;
     }
 
@@ -614,30 +616,23 @@ public class RequestTemplate {
         for (int idx=0; idx < types.length; idx++) {
             SuperType superType = types[idx];
             if (superType == null) continue;
-            String val = tokenizedUrl[idx];
-            SubType subType;
-            switch (superType) {
-                case INTEGER:
-                    subType = SingleTypeInfo.INTEGER_32;
-                    break;
-                case FLOAT:
-                    subType = SingleTypeInfo.FLOAT;
-                    break;
-                default:
-                    subType = KeyTypes.findSubType(val,null);
+            Object val = tokenizedUrl[idx];
+
+            if (superType.equals(SuperType.INTEGER)) {
+                val = Integer.parseInt(val.toString());
+            } else if (superType.equals(SuperType.FLOAT)) {
+                val = Float.parseFloat(val.toString());
             }
 
-            SingleTypeInfo singleTypeInfo = this.urlParams.get(idx);
-            if (singleTypeInfo == null) {
-                ParamId paramId = new ParamId(url, method,-1,false,idx+"", subType, apiCollectionId, true);
-                singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 0, Context.now(), 0);
-                this.urlParams.put(idx, singleTypeInfo);
+            KeyTypes keyTypes = this.urlParams.get(idx);
+            if (keyTypes == null) {
+                keyTypes = new KeyTypes(new HashMap<>(), false);
+                this.urlParams.put(idx, keyTypes);
             }
 
-            singleTypeInfo.incr();
+            String userId = "";
+            keyTypes.process(url, method, -1, false, idx+"", val,userId, apiCollectionId, "", new HashMap<>(), true);
 
-            singleTypeInfo.getValues().add(val);
-            singleTypeInfo.setMinMaxValues(val);
         }
     }
 }
