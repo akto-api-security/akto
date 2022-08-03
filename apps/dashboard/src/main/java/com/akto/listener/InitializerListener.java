@@ -239,6 +239,8 @@ public class InitializerListener implements ServletContextListener {
         DaoInit.init(new ConnectionString(mongoURI));
 
         Context.accountId.set(1_000_000);
+        SingleTypeInfoDao.instance.createIndicesIfAbsent();
+        ApiInfoDao.instance.createIndicesIfAbsent();
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
         if (backwardCompatibility == null) {
             backwardCompatibility = new BackwardCompatibility();

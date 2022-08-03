@@ -62,7 +62,8 @@ export default {
             url: '/api/fetchAPICollection',
             method: 'post',
             data: {
-                apiCollectionId: apiCollectionId
+                apiCollectionId: apiCollectionId,
+                useHost: !!window.useHost
             }
         }).then((resp) => {
             return resp

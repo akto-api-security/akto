@@ -5,12 +5,14 @@ import java.util.*;
 
 import com.akto.action.UserAction;
 import com.akto.dao.APISpecDao;
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.TagConfigsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.APISpec;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.TagConfig;
@@ -83,27 +85,30 @@ public class InventoryAction extends UserAction {
         return endpoints;
     }
 
+    public static final int LIMIT = 2000;
     public List<BasicDBObject> fetchEndpointsInCollection(int apiCollectionId) {
         List<Bson> pipeline = new ArrayList<>();
         BasicDBObject groupedId = 
             new BasicDBObject("apiCollectionId", "$apiCollectionId")
             .append("url", "$url")
             .append("method", "$method");
-            pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
+            
+        pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
 
-            int recentEpoch = Context.now() - DELTA_PERIOD_VALUE;
+        int recentEpoch = Context.now() - DELTA_PERIOD_VALUE;
 
+        Bson projections = Projections.fields(
+            Projections.include("timestamp", "apiCollectionId", "url", "method"),
+            Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$timestamp", recentEpoch})),
+            Projections.computed("dayOfYear", new BasicDBObject("$trunc", new Object[]{"$dayOfYearFloat", 0}))
+        );
 
-            Bson projections = Projections.fields(
-                Projections.include("timestamp", "apiCollectionId", "url", "method"),
-                Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$timestamp", recentEpoch})),
-                Projections.computed("dayOfYear", new BasicDBObject("$trunc", new Object[]{"$dayOfYearFloat", 0}))
-            );
-
-            pipeline.add(Aggregates.project(projections));
-            pipeline.add(Aggregates.group(groupedId, Accumulators.min("startTs", "$timestamp"), Accumulators.sum("changesCount", 1)));
-            pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
-
+        pipeline.add(Aggregates.project(projections));
+        pipeline.add(Aggregates.group(groupedId, Accumulators.min("startTs", "$timestamp"), Accumulators.sum("changesCount", 1)));
+        pipeline.add(Aggregates.skip(skip));
+        pipeline.add(Aggregates.limit(LIMIT));
+        pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
+        
         MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
 
         List<BasicDBObject> endpoints = new ArrayList<>();
@@ -112,6 +117,30 @@ public class InventoryAction extends UserAction {
         }
 
         return endpoints;
+    }
+
+    private boolean useHost;
+    public List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId) {
+
+        ApiCollection apiCollection = ApiCollectionsDao.instance.findAll(Filters.eq("_id", apiCollectionId), Projections.exclude("urls")).get(0);
+
+        if (apiCollection.getHostName() == null || apiCollection.getHostName().length() == 0 || !useHost) {
+            return fetchEndpointsInCollection(apiCollectionId);
+        } else {
+            Bson filterQ = Filters.and(Filters.eq("param", "host"), Filters.eq("apiCollectionId", apiCollectionId));
+            List<SingleTypeInfo> allUrlsInCollection = SingleTypeInfoDao.instance.findAll(filterQ, skip, LIMIT, null);
+
+            List<BasicDBObject> endpoints = new ArrayList<>();
+            for(SingleTypeInfo singleTypeInfo: allUrlsInCollection) {
+                BasicDBObject groupId = new BasicDBObject("apiCollectionId", singleTypeInfo.getApiCollectionId())
+                    .append("url", singleTypeInfo.getUrl())
+                    .append("method", singleTypeInfo.getMethod());
+                endpoints.add(new BasicDBObject("startTs", singleTypeInfo.getTimestamp()).append("_id", groupId));
+            }
+    
+            return endpoints;
+    
+        }
     }
 
     private void attachTagsInAPIList(List<BasicDBObject> list) {
@@ -129,7 +158,7 @@ public class InventoryAction extends UserAction {
         }
     }
 
-    private void attachAPIInfoListInResponse(List<BasicDBObject> list) {
+    private void attachAPIInfoListInResponse(List<BasicDBObject> list, int apiCollectionId) {
         response = new BasicDBObject();
         List<ApiInfo> apiInfoList = new ArrayList<>();
 
@@ -139,12 +168,31 @@ public class InventoryAction extends UserAction {
             apiInfoKeys.add(new ApiInfoKey(singleTypeInfo.getInt("apiCollectionId"),singleTypeInfo.getString("url"), Method.valueOf(singleTypeInfo.getString("method"))));
         }
 
-        List<ApiInfo> fromDb = ApiInfoDao.instance.findAll(new BasicDBObject());
-        for (ApiInfo a: fromDb) {
-            if (apiInfoKeys.contains(a.getId())) {
-                a.calculateActualAuth();
-                apiInfoList.add(a);
-            }
+        BasicDBObject query = new BasicDBObject();
+        if (apiCollectionId > -1) {
+            query.append("_id.apiCollectionId", apiCollectionId);
+        }
+
+        int counter = 0;
+        int batchSize = 4;
+
+        List<String> urlsToSearch = new ArrayList<>();
+        
+        for(ApiInfoKey apiInfoKey: apiInfoKeys) {
+            urlsToSearch.add(apiInfoKey.getUrl());
+            counter++;
+            if (counter % batchSize == 0 || counter == apiInfoKeys.size()) {
+                query.append("_id.url", new BasicDBObject("$in", urlsToSearch));
+                List<ApiInfo> fromDb = ApiInfoDao.instance.findAll(query);
+                for (ApiInfo a: fromDb) {
+                    System.out.println("ApiInfo a: " + a);
+                    if (apiInfoKeys.contains(a.getId())) {
+                        a.calculateActualAuth();
+                        apiInfoList.add(a);
+                    }
+                }
+                urlsToSearch.clear();
+            } 
         }
 
 
@@ -259,7 +307,7 @@ public class InventoryAction extends UserAction {
     }
 
     public String fetchAPICollection() {
-        List<BasicDBObject> list = fetchEndpointsInCollection(apiCollectionId);
+        List<BasicDBObject> list = fetchEndpointsInCollectionUsingHost(apiCollectionId);
 
         APISpec apiSpec = APISpecDao.instance.findById(apiCollectionId);
         Set<String> unused = null;
@@ -274,7 +322,7 @@ public class InventoryAction extends UserAction {
         }
 
         attachTagsInAPIList(list);
-        attachAPIInfoListInResponse(list);
+        attachAPIInfoListInResponse(list, apiCollectionId);
 
         if (unused == null) {
             unused = new HashSet<>();
@@ -287,7 +335,7 @@ public class InventoryAction extends UserAction {
     public String loadRecentEndpoints() {
         List<BasicDBObject> list = fetchRecentEndpoints(startTimestamp, endTimestamp);
         attachTagsInAPIList(list);
-        attachAPIInfoListInResponse(list);
+        attachAPIInfoListInResponse(list, -1);
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -551,5 +599,9 @@ public class InventoryAction extends UserAction {
 
     public void setEndTimestamp(int endTimestamp) {
         this.endTimestamp = endTimestamp;
+    }
+
+    public void setUseHost(boolean useHost) {
+        this.useHost = useHost;
     }
 }

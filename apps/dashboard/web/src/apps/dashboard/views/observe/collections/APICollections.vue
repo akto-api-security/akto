@@ -234,11 +234,13 @@ export default {
         ...mapState('testing', ['testingRuns', 'authMechanism', 'testingSchedules']),
         apiCollectionsForTable() {
             return this.apiCollections.map(c => {
+                let [count, ts] = (c.urls[0] || "0_0").split("_")
                 return {
                     ...c,
                     color: "#FFFFFF",
-                    endpoints: (c.urls || []).length,
-                    detected: func.prettifyEpoch(c.startTs)
+                    endpoints: +count,
+                    detected: func.prettifyEpoch(c.startTs),
+                    lastAdded: +ts === 0 ? "-" : func.prettifyEpoch(+ts)
                 }
             })
         }
