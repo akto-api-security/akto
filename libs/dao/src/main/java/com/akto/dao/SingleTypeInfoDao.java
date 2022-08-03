@@ -56,6 +56,16 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             String[] fieldNames = {"url", "method", "responseCode", "isHeader", "param", "subType", "apiCollectionId"};
             SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
         }
+
+        if (counter == 2) {
+            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(new String[]{"apiCollectionId"}));
+            counter++;
+        }
+
+        if (counter == 3) {
+            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(new String[]{"param", "apiCollectionId"}));
+            counter++;
+        }
     }
 
     public List<SingleTypeInfo> fetchAll() {
