@@ -1,20 +1,27 @@
 package com.akto.action;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 
 import com.akto.dao.APISpecDao;
 import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.MarkovDao;
-import com.akto.dao.RelationshipDao;
 import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
+import com.akto.util.Pair;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
+
+import org.bson.conversions.Bson;
 
 public class ApiCollectionsAction extends UserAction {
     
@@ -24,7 +31,6 @@ public class ApiCollectionsAction extends UserAction {
     public String fetchAllCollections() {
         this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         return Action.SUCCESS.toUpperCase();
-
     }
 
     static int maxCollectionNameLength = 25;
