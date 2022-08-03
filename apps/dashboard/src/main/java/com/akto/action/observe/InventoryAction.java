@@ -174,7 +174,7 @@ public class InventoryAction extends UserAction {
         }
 
         int counter = 0;
-        int batchSize = 4;
+        int batchSize = 100;
 
         List<String> urlsToSearch = new ArrayList<>();
         
@@ -185,7 +185,6 @@ public class InventoryAction extends UserAction {
                 query.append("_id.url", new BasicDBObject("$in", urlsToSearch));
                 List<ApiInfo> fromDb = ApiInfoDao.instance.findAll(query);
                 for (ApiInfo a: fromDb) {
-                    System.out.println("ApiInfo a: " + a);
                     if (apiInfoKeys.contains(a.getId())) {
                         a.calculateActualAuth();
                         apiInfoList.add(a);

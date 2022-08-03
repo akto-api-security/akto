@@ -39,6 +39,19 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         if (counter == 1) {
             String[] fieldNames = {"_id.apiCollectionId"};
             ApiInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
+            counter++;
+        }
+
+        if (counter == 2) {
+            String[] fieldNames = {"_id.url"};
+            ApiInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
+            counter++;
+        }
+
+        if (counter == 3) {
+            String[] fieldNames = {"_id.apiCollectionId", "_id.url"};
+            ApiInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
+            counter++;
         }
     }
 
