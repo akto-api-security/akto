@@ -29,43 +29,8 @@ public class ApiCollectionsAction extends UserAction {
     int apiCollectionId;
 
     public String fetchAllCollections() {
-        this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject(), Projections.exclude("urls"));
-
-        List<Bson> pipeline = new ArrayList<>();
-        BasicDBObject groupedId = 
-            new BasicDBObject("apiCollectionId", "$apiCollectionId")
-            .append("url", "$url")
-            .append("method", "$method");
-        pipeline.add(Aggregates.group(groupedId, Accumulators.min("startTs", "$timestamp")));
-        MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
-
-        Map<Integer, Pair<Integer, Integer>> mapIdToCountAndTs = new HashMap<>();
-        
-        while(endpointsCursor.hasNext()) {
-            BasicDBObject endpoint = endpointsCursor.next();
-            BasicDBObject endpointId = (BasicDBObject) endpoint.get("_id");
-            int apiCollectionId = endpointId.getInt("apiCollectionId");
-
-            mapIdToCountAndTs.putIfAbsent(apiCollectionId, new Pair<Integer, Integer>(0, 0));
-
-            Pair<Integer, Integer> countAndTs = mapIdToCountAndTs.get(apiCollectionId);
-            int currCount = countAndTs.getFirst();
-            int currTs = countAndTs.getSecond();
-            countAndTs.setFirst(currCount + 1);
-            countAndTs.setSecond(Math.max(currTs, endpoint.getInt("startTs")));
-        }
-
-        for (ApiCollection apiCollection: this.apiCollections) {
-            Pair<Integer, Integer> countAndTs = mapIdToCountAndTs.get(apiCollection.getId());
-            if (countAndTs == null) {
-                countAndTs = new Pair<>(0, 0);
-            }
-            apiCollection.setUrls(new HashSet<>());
-            apiCollection.getUrls().add(countAndTs.getFirst()+"_"+countAndTs.getSecond());
-        }
-        
+        this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         return Action.SUCCESS.toUpperCase();
-
     }
 
     static int maxCollectionNameLength = 25;
