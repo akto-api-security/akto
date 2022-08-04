@@ -122,6 +122,13 @@ export default {
 }
 </script>
 
-<style scoped>
+<style lang="sass" scoped>
+.details-dialog
+    background-color: #FFFFFF
+</style>
 
+<style scoped>
+.details-dialog >>> .v-card {
+    margin: 0px !important;
+}
 </style>

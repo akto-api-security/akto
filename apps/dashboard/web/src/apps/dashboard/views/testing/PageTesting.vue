@@ -58,7 +58,6 @@ import SampleData from '@/apps/dashboard/shared/components/SampleData'
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import TestResultsTable from './components/TestResultsTable'
 
-import api from './api'
 import func from '@/util/func'
 import { mapState } from 'vuex'
 
@@ -130,7 +129,7 @@ export default {
             return this.testingRunResults.filter(x => x.resultMap && Object.values(x.resultMap).find(y => y.vulnerable)).map(this.prepareItemForTable)
         },
         allTestingRunResults() {
-            return this.testingRunResults.filter(x => x.resultMap && Object.values(x.resultMap).find(y => true)).map(this.prepareItemForTable)
+            return this.testingRunResults.filter(x => x.resultMap && Object.values(x.resultMap).find(_y => true)).map(this.prepareItemForTable)
         },
     },
     mounted() {
@@ -159,8 +158,6 @@ export default {
     padding-right: 8px
     color: #47466A
 
-.details-dialog
-    background-color: #FFFFFF
 </style>
 
 <style scoped>
@@ -175,7 +172,4 @@ export default {
   font-weight: 400;
 }
 
-.details-dialog >>> .v-card {
-    margin: 0px !important;
-}
 </style>
