@@ -29,5 +29,13 @@ export default {
         }).then((resp) => {
             return resp
         })
+    },
+
+    deleteMultipleCollections(items) {
+        return request({
+            url: '/api/deleteMultipleCollections',
+            method: 'post',
+            data: {apiCollections: items}
+        })        
     }
 }
