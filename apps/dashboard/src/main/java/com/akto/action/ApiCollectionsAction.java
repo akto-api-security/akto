@@ -23,6 +23,8 @@ import com.opensymphony.xwork2.Action;
 
 import org.bson.conversions.Bson;
 
+import freemarker.template.utility.NullArgumentException;
+
 public class ApiCollectionsAction extends UserAction {
     
     List<ApiCollection> apiCollections = new ArrayList<>();
@@ -72,18 +74,32 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String deleteCollection() {
-        if(apiCollectionId == 0) {
-            return Action.SUCCESS.toUpperCase();
+        
+        this.apiCollections = new ArrayList<>();
+        this.apiCollections.add(new ApiCollection(apiCollectionId, null, 0, null, null, 0));
+        return Action.SUCCESS.toUpperCase();
+    } 
+
+    public String deleteMultipleCollections() {
+        List<Integer> apiCollectionIds = new ArrayList<>();
+        for(ApiCollection apiCollection: this.apiCollections) {
+            if(apiCollectionId == 0) {
+                continue;
+            }
+            apiCollectionIds.add(apiCollection.getId());
         }
-        ApiCollectionsDao.instance.deleteAll(Filters.eq("_id", apiCollectionId));
-        SingleTypeInfoDao.instance.deleteAll(Filters.eq("apiCollectionId", apiCollectionId));
-        APISpecDao.instance.deleteAll(Filters.eq("apiCollectionId", apiCollectionId));
-        SensitiveParamInfoDao.instance.deleteAll(Filters.eq("apiCollectionId", apiCollectionId));
+
+        ApiCollectionsDao.instance.deleteAll(Filters.in("_id", apiCollectionIds));
+        SingleTypeInfoDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
+        APISpecDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
+        SensitiveParamInfoDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));      
         // TODO : Markov and Relationship
         // MarkovDao.instance.deleteAll()
         // RelationshipDao.instance.deleteAll();
-        return Action.SUCCESS.toUpperCase();
-    } 
+              
+
+        return SUCCESS.toUpperCase();
+    }
 
     public List<ApiCollection> getApiCollections() {
         return this.apiCollections;

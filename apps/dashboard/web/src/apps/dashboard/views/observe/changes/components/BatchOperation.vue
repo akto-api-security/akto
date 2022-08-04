@@ -41,35 +41,17 @@ export default {
     },
     props: {
         title: obj.strR,
-        itemsSearch: obj.objR,
-        operationName: obj.strR,
-        fetchParams: Function
+        items: obj.arrR,
+        operationName: obj.strR
     },
     data () {
         return {
-            allItems: {},
-            limitedItems: [],
-            filters: this.itemsSearch.filters, 
-            filterOperators: this.itemsSearch.filterOperators, 
-            sortKey: this.itemsSearch.sortKey, 
-            sortDesc: this.itemsSearch.sortDesc, 
-            total: this.itemsSearch.total, 
-            isSensitive: this.itemsSearch.isSensitive,
             maxN: 1000,
             currPage: 1,
             loading: false
         }
     },
     methods: {
-        toFilterListObj(x) {
-            let location = (x.responseCode == -1 ? 'Request' : x.responseCode) + ' ' + (x.isHeader ? 'headers' : 'payload')
-            let apiCollectionName = this.mapCollectionIdToName[x.apiCollectionId]
-            return {
-                value: x.param + " " + location + " " + x.method + " " + x.url + " " + apiCollectionName,
-                title: x.param,
-                subtitle: location + " " + x.method + " " + x.url + " (" + apiCollectionName + ")"
-            }
-        },
         appliedFilter ({item, checked}) {
             this.allItems[item.value].selected = checked
         },
@@ -78,64 +60,27 @@ export default {
                 this.allItems[items[index].value].selected = checked
             }
         },
-        fetchRecentParams() {
-            let skip = (this.currPage-1)*this.maxN
-            let _toFilterListObj = this.toFilterListObj
-            this.fetchParams(this.sortKey, this.sortDesc? -1 : 1, skip, this.maxN, this.filters, this.filterOperators).then(resp => {
-                this.loading = false
-                let allII = {}
-                for(let index in resp.endpoints) {
-                    let item = _toFilterListObj(resp.endpoints[index])
-                    allII[item.value] = item
-                    item.selected = false
-                }
-                this.allItems = {...allII}
-
-            }).catch(e => {
-                this.loading = false
-            })            
-        },
-        getDataFromApi () {
-            this.loading = true
-            this.fetchRecentParams()
-        },
-        calcLimitedItems() {
-            this.limitedItems = Object.values(this.allItems)
-        },
         btnClicked() {
             this.$emit('btnClicked', {items: this.limitedItems.filter(x => x.selected)})
         }
     },
     computed: {
-        mapCollectionIdToName() {
-            return this.$store.state.collections.apiCollections.reduce((m, e) => {
-                m[e.id] = e.displayName
-                return m
+        allItems () {
+            return this.items.reduce((z, e) => {
+                console.log(e);
+                z[e.id] = {
+                    title: e.displayName,
+                    value: e.id
+                }
+                return z
             }, {})
-        }
-    },
-    watch: {
-      currPage: {
-        handler () {
-          this.getDataFromApi()
         },
-        deep: true,
-      },
-      allItems: {
-          handler() {
-              this.calcLimitedItems()
-          }
-      },
-      itemsSearch: {
-          handler() {
-              this.allItems = []
-              this.fetchRecentParams()
-          },
-          deep: true
-      }
-    },
-    mounted () {
-        this.fetchRecentParams()
+        limitedItems() {
+            return Object.values(this.allItems)
+        },
+        total() {
+            return this.items.length
+        }
     }
 }
 </script>
