@@ -30,45 +30,20 @@
                 <span class="heading">API Testing Results</span>
             </div>
 
-            <simple-table
-                :headers="endpointHeaders" 
-                :items="flattenedTestingRunResults" 
-                name="API Testing Results" 
-                @rowClicked="openDetails"
-            >
-                <template #item.tests="{item}">
-                    <sensitive-chip-group :sensitiveTags="Array.from(item.tests || new Set())" />
+            <layout-with-tabs title="" :tabs="['Vulnerable', 'All']">
+                <template slot="Vulnerable">
+                    <test-results-table
+                        :testingRunResults="flattenedTestingRunResults"
+                        :showVulnerableOnly="true"
+                    />
                 </template>
-            </simple-table>
-
-            <v-dialog
-                v-model="openDetailsDialog"
-            >
-                <div class="details-dialog">
-                    <a-card
-                        title="Test details"
-                        color="rgba(33, 150, 243)"
-                        subtitle=""
-                        icon="$fas_stethoscope"
-                    >
-                        <template #title-bar>
-                            <v-btn
-                                plain
-                                icon
-                                @click="openDetailsDialog = false"
-                                style="margin-left: auto"
-                            >
-                                <v-icon>$fas_times</v-icon>
-                            </v-btn>
-                        </template>
-                        <div class="pa-4">
-                            <sample-data :messages='requestAndResponse'/>
-                        </div>
-                    </a-card>
-                </div>
-
-            </v-dialog>
-
+                <template slot="All">
+                    <test-results-table
+                        :testingRunResults="allTestingRunResults"
+                        :showVulnerableOnly="false"
+                    />
+                </template>
+            </layout-with-tabs>
         </div>
     </simple-layout>
 </template>
@@ -80,6 +55,8 @@ import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
 import ACard from '@/apps/dashboard/shared/components/ACard'
 import SampleData from '@/apps/dashboard/shared/components/SampleData'
+import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
+import TestResultsTable from './components/TestResultsTable'
 
 import api from './api'
 import func from '@/util/func'
@@ -92,7 +69,9 @@ export default {
         SimpleTable,
         SensitiveChipGroup,
         ACard,
-        SampleData
+        SampleData,
+        LayoutWithTabs,
+        TestResultsTable
     },
     props: {
 
@@ -101,35 +80,6 @@ export default {
         return  {
             newKey: this.nonNullAuth ? this.nonNullAuth.key : null,
             newVal: this.nonNullAuth ? this.nonNullAuth.value: null,
-            openDetailsDialog: false,
-            requestAndResponse: null,
-            endpointHeaders: [
-                {
-                    text: "color",
-                    value: ""
-                },
-                {
-                    text: "Endpoint",
-                    value: "url"
-                },
-                {
-                    text: "Method",
-                    value: "method"
-                },
-                {
-                    text: "Collection",
-                    value: "collectionName"
-                },
-                {
-                    text: "Tests",
-                    value: "tests"
-                },
-                {
-                    text: "Time",
-                    value: "timestamp"
-                }
-                
-            ]
         }
     },
     methods: {
@@ -143,22 +93,6 @@ export default {
         },
         saveAuthMechanism() {
             this.$store.dispatch('testing/addAuthMechanism', {key: this.newKey, value: this.newVal, location: "HEADER"})
-        },
-        async openDetails(row) {
-            let r = await api.fetchRequestAndResponseForTest(row.x)
-            this.requestAndResponse = r.testingRunResults && r.testingRunResults[0] ? Object.entries(r.testingRunResults[0].resultMap).filter(x => x[1].vulnerable).map(x => {return {message: x[1].message, title: x[0], highlightPaths:[]}}) : []
-            this.openDetailsDialog = true
-        },
-        goToEndpoint(row) {
-            let routeObj = {
-                name: 'apiCollection/urlAndMethod',
-                params: {
-                    apiCollectionId: row.x.apiInfoKey.apiCollectionId,
-                    urlAndMethod: btoa(row.x.apiInfoKey.url+ " " + row.x.apiInfoKey.method)
-                }
-            }
-
-            this.$router.push(routeObj)
         },
         prepareItemForTable(x){
             return {
@@ -194,7 +128,10 @@ export default {
         },
         flattenedTestingRunResults() {
             return this.testingRunResults.filter(x => x.resultMap && Object.values(x.resultMap).find(y => y.vulnerable)).map(this.prepareItemForTable)
-        }
+        },
+        allTestingRunResults() {
+            return this.testingRunResults.filter(x => x.resultMap && Object.values(x.resultMap).find(y => true)).map(this.prepareItemForTable)
+        },
     },
     mounted() {
         this.$store.dispatch('testing/loadTestingDetails')        
