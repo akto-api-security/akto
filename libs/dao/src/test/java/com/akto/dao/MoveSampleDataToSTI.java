@@ -11,6 +11,7 @@ import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.types.CappedSet;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
@@ -53,7 +54,7 @@ public class MoveSampleDataToSTI {
                 id.getUrl(), id.getMethod().name(),-1, true, "host", SingleTypeInfo.GENERIC, id.getApiCollectionId(), false
             );
             SingleTypeInfo singleTypeInfo = new SingleTypeInfo(
-                    paramId,new HashSet<>(), new HashSet<>(), 0, Context.now(), 0
+                    paramId,new HashSet<>(), new HashSet<>(), 0, Context.now(), 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE
             );
             Bson updateKey = SingleTypeInfoDao.createFilters(singleTypeInfo);
             Bson update = Updates.set("timestamp", Context.now());

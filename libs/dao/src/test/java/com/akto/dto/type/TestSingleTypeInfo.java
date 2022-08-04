@@ -1,6 +1,7 @@
 package com.akto.dto.type;
 
 import com.akto.dao.context.Context;
+import com.akto.types.CappedSet;
 import org.junit.Test;
 
 import java.util.HashSet;
@@ -94,7 +95,7 @@ public class TestSingleTypeInfo {
                 "url", "GET", 200, true, "param", subType, 0, false
         );
         return  new SingleTypeInfo(
-                paramId, new HashSet<>(), new HashSet<>(), 100, Context.now(), 0
+                paramId, new HashSet<>(), new HashSet<>(), 100, Context.now(), 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE
         );
     }
 

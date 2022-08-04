@@ -17,6 +17,7 @@ import com.akto.dto.type.SingleTypeInfo.ParamId;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.types.CappedSet;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.akto.util.Trie;
@@ -355,7 +356,7 @@ public class RequestTemplate {
         Map<SubType, SingleTypeInfo> occ = new HashMap<>();
 
         ParamId paramId = new ParamId(url, method, responseCode, false, prefix + "#" + node.getPathElem(),SingleTypeInfo.DICT, apiCollectionId, false);
-        occ.put(SingleTypeInfo.DICT, new SingleTypeInfo(paramId, new HashSet<>(), node.getValue().getSecond(), 1, Context.now(), 0));
+        occ.put(SingleTypeInfo.DICT, new SingleTypeInfo(paramId, new HashSet<>(), node.getValue().getSecond(), 1, Context.now(), 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE));
         node.getValue().setFirst(new KeyTypes(occ, false));
 
         node.getChildren().clear();
