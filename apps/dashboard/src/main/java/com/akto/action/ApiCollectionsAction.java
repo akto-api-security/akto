@@ -65,7 +65,7 @@ public class ApiCollectionsAction extends UserAction {
         
         this.apiCollections = new ArrayList<>();
         this.apiCollections.add(new ApiCollection(apiCollectionId, null, 0, null, null, 0));
-        return Action.SUCCESS.toUpperCase();
+        return this.deleteMultipleCollections();
     } 
 
     public String deleteMultipleCollections() {
