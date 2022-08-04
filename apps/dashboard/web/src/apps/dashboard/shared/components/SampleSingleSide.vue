@@ -58,6 +58,10 @@ export default {
     },
     methods: {
       copyToClipboard(text) {
+          // main reason to use domElement like this instead of document.body is that execCommand works only if current
+          // component is not above normal document. For example in testing page, we show SampleSingleSide.vue in a v-dialog
+          // NOTE: Do not use navigator.clipboard because it only works for HTTPS sites
+          let domElement = this.$el;
           if (window.clipboardData && window.clipboardData.setData) {
               // Internet Explorer-specific code path to prevent textarea being shown while dialog is visible.
               return window.clipboardData.setData("Text", text);
@@ -67,7 +71,7 @@ export default {
               var textarea = document.createElement("textarea");
               textarea.textContent = text;
               textarea.style.position = "fixed";  // Prevent scrolling to bottom of page in Microsoft Edge.
-              document.body.appendChild(textarea);
+              domElement.appendChild(textarea);
               textarea.select();
               try {
                   return document.execCommand("copy");  // Security exception may be thrown by some browsers.
@@ -77,7 +81,7 @@ export default {
                   // return prompt("Copy to clipboard: Ctrl+C, Enter", text);
               }
               finally {
-                  document.body.removeChild(textarea);
+                  domElement.removeChild(textarea);
               }
           }
       },
