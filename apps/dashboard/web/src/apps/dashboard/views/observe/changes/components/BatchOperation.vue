@@ -67,7 +67,6 @@ export default {
     computed: {
         allItems () {
             return this.items.reduce((z, e) => {
-                console.log(e);
                 z[e.id] = {
                     title: e.displayName,
                     value: e.id

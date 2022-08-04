@@ -169,9 +169,10 @@ export default {
             let noOfItems = Object.keys(items).length
             if (noOfItems > 0) {
                 items.forEach(x => x.id = x.value)
-                let resp = await api.deleteMultipleCollections({items});
-                this.deleteCollection = ""+noOfItems+" collections";
+                let resp = await api.deleteMultipleCollections(items);
+                this.deletedCollection = ""+noOfItems+" collections";
                 this.successfullyDeleted();
+                this.$store.dispatch('collections/loadAllApiCollections')
             }
         },
         rowClicked(item) {
