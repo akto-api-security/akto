@@ -57,6 +57,11 @@ public class HarAction extends UserAction {
             apiCollectionId = apiCollection.getId();
         }
 
+        if (KafkaListener.kafka == null) {
+            addActionError("Dashboard kafka not running");
+            return ERROR.toUpperCase();
+        }
+
         if (harString == null) {
             harString = this.content.toString();
         }

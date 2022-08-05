@@ -248,16 +248,20 @@ public class InitializerListener implements ServletContextListener {
         }
 
         // backward compatibility
-        dropFilterSampleDataCollection(backwardCompatibility);
-        resetSingleTypeInfoCount(backwardCompatibility);
+        try {
+            dropFilterSampleDataCollection(backwardCompatibility);
+            resetSingleTypeInfoCount(backwardCompatibility);
 
-        SingleTypeInfo.init();
+            SingleTypeInfo.init();
 
-        setUpWeeklyScheduler();
-        setUpDailyScheduler();
+            setUpWeeklyScheduler();
+            setUpDailyScheduler();
 
-        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-        dropSampleDataIfEarlierNotDroped(accountSettings);
+            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            dropSampleDataIfEarlierNotDroped(accountSettings);
+        } catch (Exception e) {
+            logger.error("error while setting up dashboard: " + e.getMessage());
+        }
 
         try {
             AccountSettingsDao.instance.updateVersion(AccountSettings.DASHBOARD_VERSION);
