@@ -9,6 +9,7 @@ import com.akto.dto.data_types.EndsWithPredicate;
 import com.akto.dto.data_types.RegexPredicate;
 import com.akto.dto.data_types.StartsWithPredicate;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.types.CappedSet;
 import com.akto.utils.MongoBasedTest;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.UpdateOneModel;
@@ -31,7 +32,7 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(
                 "url", "GET",200, false, "param#key", SingleTypeInfo.EMAIL, 0, false
         );
-        SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 0,0,0);
+        SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 0,0,0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
         SingleTypeInfoDao.instance.updateOne(
                 SingleTypeInfoDao.createFilters(singleTypeInfo), Updates.inc("count",1)
         );
@@ -47,7 +48,7 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(
                 "url", "GET",200, false, "param#key", SingleTypeInfo.EMAIL, 0, false
         );
-        SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 0,0,0);
+        SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 0,0,0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
         SingleTypeInfoDao.instance.updateOne(
                 SingleTypeInfoDao.createFilters(singleTypeInfo), Updates.inc("count",1)
         );
@@ -77,7 +78,7 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(
                 "url", "GET",200, false, "param#key", customDataType.toSubType(), 0, false
         );
-        SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 0,0,0);
+        SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 0,0,0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
         SingleTypeInfoDao.instance.updateOne(
                 SingleTypeInfoDao.createFilters(singleTypeInfo), Updates.inc("count",1)
         );
@@ -96,7 +97,7 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(
                 url, method,responseCode, false, "param", subType, apiCollectionId, false
         );
-        SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 100,0,0);
+        SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 100,0,0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
         return new UpdateOneModel<>(SingleTypeInfoDao.createFilters(singleTypeInfo), Updates.set("count",1),updateOptions);

@@ -374,7 +374,7 @@ public class SingleTypeInfo {
     }
 
     public SingleTypeInfo(ParamId paramId, Set<Object> examples, Set<String> userIds, int count, int timestamp,
-                          int duration) {
+                          int duration, CappedSet<String> values, Domain domain, long minValue, long maxValue) {
         this.url = paramId.url;
         this.method = paramId.method;
         this.responseCode = paramId.responseCode;
@@ -389,6 +389,10 @@ public class SingleTypeInfo {
         this.timestamp = timestamp;
         this.duration = duration;
         this.lastSeen = Context.now();
+        this.values = values;
+        this.domain = domain;
+        this.minValue = minValue;
+        this.maxValue = maxValue;
     }
 
     public String composeKey() {
@@ -419,10 +423,11 @@ public class SingleTypeInfo {
         paramId.isUrlParam = isUrlParam;
 
         SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, copyExamples, copyUserIds, this.count,
-                this.timestamp, this.duration);
+                this.timestamp, this.duration, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
         singleTypeInfo.setValues(copyValues);
         singleTypeInfo.minValue = this.minValue;
         singleTypeInfo.maxValue = this.maxValue;
+        singleTypeInfo.domain = this.domain;
         return singleTypeInfo;
     }
 
@@ -618,10 +623,10 @@ public class SingleTypeInfo {
                 double d = Double.parseDouble(o.toString());
                 long l = (long) d;
                 this.minValue = min(this.minValue, l);
-                if (this.minValue < ACCEPTED_MIN_VALUE) {
-                    this.minValue = ACCEPTED_MIN_VALUE;
-                }
+                this.minValue = max(this.minValue, ACCEPTED_MIN_VALUE);
+
                 this.maxValue = max(this.maxValue, l);
+                this.maxValue = min(this.maxValue, ACCEPTED_MAX_VALUE);
                 if (this.maxValue > ACCEPTED_MAX_VALUE) {
                     this.maxValue = ACCEPTED_MAX_VALUE;
                 }

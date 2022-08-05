@@ -9,6 +9,7 @@ import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.type.SingleTypeInfo.ParamId;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 
+import com.akto.types.CappedSet;
 import com.google.i18n.phonenumbers.PhoneNumberUtil;
 import com.google.i18n.phonenumbers.Phonenumber;
 import org.apache.commons.lang3.math.NumberUtils;
@@ -47,7 +48,8 @@ public class KeyTypes {
     }
 
     public void process(String url, String method, int responseCode, boolean isHeader, String param, Object object,
-                        String userId, int apiCollectionId, String rawMessage, Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap) {
+                        String userId, int apiCollectionId, String rawMessage, Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap,
+                        boolean isUrlParam) {
 
         String key = param.replaceAll("#", ".").replaceAll("\\.\\$", "");
         String[] keyArr = key.split("\\.");
@@ -65,8 +67,8 @@ public class KeyTypes {
             Set<String> userIds = new HashSet<>();
             userIds.add(userId);
             
-            ParamId paramId = new ParamId(url, method, responseCode, isHeader, param, subType, apiCollectionId, false);
-            singleTypeInfo = new SingleTypeInfo(paramId, examples, userIds, 1, Context.now(), 0);
+            ParamId paramId = new ParamId(url, method, responseCode, isHeader, param, subType, apiCollectionId, isUrlParam);
+            singleTypeInfo = new SingleTypeInfo(paramId, examples, userIds, 0, Context.now(), 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
 
             occurrences.put(subType, singleTypeInfo);
         }

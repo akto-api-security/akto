@@ -36,7 +36,8 @@ public class TestApiCatalogSync {
         requestTemplate.fillUrlParams(tokenizedUrl, urlTemplate, 0);
 
         assertEquals(1, requestTemplate.getUrlParams().size());
-        SingleTypeInfo singleTypeInfo= requestTemplate.getUrlParams().get(2);
+        KeyTypes keyTypes = requestTemplate.getUrlParams().get(2);
+        SingleTypeInfo singleTypeInfo= keyTypes.getOccurrences().get(subType);
         assertEquals(subType, singleTypeInfo.getSubType());
         assertEquals(maxValue, singleTypeInfo.getMaxValue());
         assertEquals(minValue, singleTypeInfo.getMinValue());

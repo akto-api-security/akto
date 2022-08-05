@@ -6,6 +6,7 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
+import com.akto.types.CappedSet;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.UpdateOneModel;
@@ -68,13 +69,13 @@ public class VCDemoData {
 
     public static void fill(List<SingleTypeInfo> singleTypeInfoList, List<ApiInfo> apiInfos, String url, SingleTypeInfo.SubType subType, int acid, int r) {
         SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(url, "GET", 200, false, "", subType, acid, false);
-        SingleTypeInfo sit = new SingleTypeInfo(paramId, null,null, 0,Context.now(),0);
+        SingleTypeInfo sit = new SingleTypeInfo(paramId, null,null, 0,Context.now(),0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
 
         singleTypeInfoList.add(sit);
 
         for (int i=0;i < r; i++) {
             SingleTypeInfo.ParamId paramId1 = new SingleTypeInfo.ParamId(url, "GET", 200, false, i+"", SingleTypeInfo.GENERIC, acid, false);
-            SingleTypeInfo sit1 = new SingleTypeInfo(paramId1, null,null, 0,Context.now(),0);
+            SingleTypeInfo sit1 = new SingleTypeInfo(paramId1, null,null, 0,Context.now(),0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
             singleTypeInfoList.add(sit1);
         }
 

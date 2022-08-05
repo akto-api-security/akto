@@ -13,8 +13,7 @@ import org.junit.Test;
 import java.util.*;
 
 import static com.akto.parsers.TestDump2.createList;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class TestMergingNew extends MongoBasedTest {
 
@@ -89,9 +88,25 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.syncWithDB(false);
         assertEquals(0, getStaticURLsSize(parser));
 
-//        parser.syncFunction(responseParams.subList(28,33));
-//        parser.apiCatalogSync.syncWithDB();
-//        assertEquals(0, getStaticURLsSize(parser));
+        Map<URLTemplate, RequestTemplate> templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
+        assertEquals(1, templateURLToMethods.size());
+
+        parser.syncFunction(responseParams.subList(3,10), false);
+        parser.syncFunction(Collections.singletonList(createDifferentHttpResponseParams(10000, url+"avneesh@akto.io"+"/received")), false); // adding this just to see if multiple subTypes of urlParams are recorded or not (not for UUID merging)
+        parser.apiCatalogSync.syncWithDB(false);
+        assertEquals(0, getStaticURLsSize(parser));
+
+        templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
+        URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url+"STRING"+"/received", URLMethods.Method.GET);
+        RequestTemplate requestTemplate = templateURLToMethods.get(urlTemplate);
+        Map<Integer, KeyTypes> keyTypesMap = requestTemplate.getUrlParams();
+        KeyTypes keyTypes = keyTypesMap.get(2);
+
+        assertEquals(2, keyTypes.getOccurrences().size());
+        SingleTypeInfo singleTypeInfo1 = keyTypes.getOccurrences().get(SingleTypeInfo.UUID);
+        assertNotNull(singleTypeInfo1);
+        SingleTypeInfo singleTypeInfo2 = keyTypes.getOccurrences().get(SingleTypeInfo.EMAIL);
+        assertNotNull(singleTypeInfo2);
     }
 
     @Test

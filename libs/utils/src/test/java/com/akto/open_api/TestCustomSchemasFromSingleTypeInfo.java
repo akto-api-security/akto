@@ -15,7 +15,7 @@ public class TestCustomSchemasFromSingleTypeInfo {
 
     public static SingleTypeInfo generateSingleTypeInfo(String param, SingleTypeInfo.SubType subType) {
         SingleTypeInfo.ParamId p = new SingleTypeInfo.ParamId("/api","GET",200,false,param,subType,0, false);
-        return new SingleTypeInfo(p,new HashSet<>(),new HashSet<>(),0,0,0);
+        return new SingleTypeInfo(p,new HashSet<>(),new HashSet<>(),0,0,0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
     }
     @Test
     public void testSimple() throws Exception {
