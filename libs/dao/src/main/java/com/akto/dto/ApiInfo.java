@@ -103,7 +103,7 @@ public class ApiInfo {
             return new ApiInfo.ApiInfoKey(
                     httpResponseParams.getRequestParams().getApiCollectionId(),
                     httpResponseParams.getRequestParams().getURL(),
-                    URLMethods.Method.valueOf(httpResponseParams.getRequestParams().getMethod())
+                    URLMethods.Method.fromString(httpResponseParams.getRequestParams().getMethod())
             );
         }
 
@@ -128,7 +128,7 @@ public class ApiInfo {
         this(
                 httpResponseParams.getRequestParams().getApiCollectionId(),
                 httpResponseParams.getRequestParams().getURL(),
-                URLMethods.Method.valueOf(httpResponseParams.getRequestParams().getMethod())
+                URLMethods.Method.fromString(httpResponseParams.getRequestParams().getMethod())
         );
     }
 
@@ -175,7 +175,7 @@ public class ApiInfo {
     public static String keyFromHttpResponseParams(HttpResponseParams httpResponseParams) {
         return mainKey(
                 httpResponseParams.getRequestParams().getURL(),
-                URLMethods.Method.valueOf(httpResponseParams.getRequestParams().getMethod()),
+                URLMethods.Method.fromString(httpResponseParams.getRequestParams().getMethod()),
                 httpResponseParams.getRequestParams().getApiCollectionId()
         );
     }

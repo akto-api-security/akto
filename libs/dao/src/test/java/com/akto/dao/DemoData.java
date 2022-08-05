@@ -46,7 +46,7 @@ public class DemoData extends DaoConnect {
     private void updateTraffic(Map<String, String> origToNewURL) {
 
         for(String newUrlAndMethod: origToNewURL.keySet()) {
-            Method method = Method.valueOf(newUrlAndMethod.split(" ")[1]);
+            Method method = Method.fromString(newUrlAndMethod.split(" ")[1]);
             String url = newUrlAndMethod.split(" ")[0];
             TrafficInfoDao.instance.deleteAll(Filters.eq("_id.url", url));
 
@@ -78,7 +78,7 @@ public class DemoData extends DaoConnect {
     private void updateApiInfo(Map<String, String> origToNewURL) {
 
         for(String newUrlAndMethod: origToNewURL.keySet()) {
-            Method method = Method.valueOf(newUrlAndMethod.split(" ")[1]);
+            Method method = Method.fromString(newUrlAndMethod.split(" ")[1]);
             ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(0, newUrlAndMethod.split(" ")[0], method);
 
             ApiInfo apiInfo = new ApiInfo(apiInfoKey);
