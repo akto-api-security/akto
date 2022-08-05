@@ -182,7 +182,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
                 ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(
                         (int) vv.get("apiCollectionId"),
                         (String) vv.get("url"),
-                        URLMethods.Method.valueOf((String) vv.get("method"))
+                        URLMethods.Method.fromString((String) vv.get("method"))
                 );
                 endpoints.add(apiInfoKey);
             } catch (Exception e) {

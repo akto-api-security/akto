@@ -128,7 +128,7 @@ public class TestDump2 {
             Map<URLStatic, RequestTemplate> urlMethodsMap = sync.getDelta(collectionId).getStrictURLToMethods();
             assertEquals(1, urlMethodsMap.size());
 
-            Method method = Method.valueOf(resp.getRequestParams().getMethod());
+            Method method = Method.fromString(resp.getRequestParams().getMethod());
             RequestTemplate reqTemplate = urlMethodsMap.get(new URLStatic(resp.getRequestParams().getURL(), method));
             
             assertEquals(1, reqTemplate.getUserIds().size());
@@ -170,7 +170,7 @@ public class TestDump2 {
         assertEquals(1, urlMethodsMap.size());
 
         assertEquals(baseurl, urlMethodsMap.keySet().iterator().next().getUrl());
-        RequestTemplate reqTemplate = urlMethodsMap.get(new URLStatic(baseurl, Method.valueOf(resp.getRequestParams().method)));
+        RequestTemplate reqTemplate = urlMethodsMap.get(new URLStatic(baseurl, Method.fromString(resp.getRequestParams().method)));
         assertEquals(1, reqTemplate.getUserIds().size());
         assertEquals(5, reqTemplate.getParameters().size());
 
@@ -193,7 +193,7 @@ public class TestDump2 {
     
         URLAggregator aggr = new URLAggregator();
         APICatalogSync sync = new APICatalogSync("access-token", 5);
-        Method method = Method.valueOf(resp.getRequestParams().getMethod());
+        Method method = Method.fromString(resp.getRequestParams().getMethod());
         aggr.addURL(responses, new URLStatic(resp.getRequestParams().getURL(), method));
         sync.computeDelta(aggr, false, 0);
 
@@ -270,7 +270,7 @@ public class TestDump2 {
             responseParams.add(resp);    
         }
 
-        Method method = Method.valueOf(resp.getRequestParams().getMethod());
+        Method method = Method.fromString(resp.getRequestParams().getMethod());
 
         URLAggregator aggr = new URLAggregator();
         APICatalogSync sync = new APICatalogSync("access-token", 5);
