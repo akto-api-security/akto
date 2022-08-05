@@ -57,15 +57,18 @@ public class TestGraph {
         Node node9 = new Node("9", new WorkflowNodeDetails());
         Node node10 = new Node("10", new WorkflowNodeDetails());
 
-        //       2 -- 4 -- 5---------------9
-        //       /          \               \
-        //      /            \                10
-        // 1 __/              \__7___8_______/
-        //     \              /
-        //      \            /
-        //       3 ------- 6
+        // all arrows move from left to right (1->2->4->5->9 and 7)
+        //         2 -- 4 -- 5---------------9
+        //         /          \               \
+        //        /            \                10
+        //   1 __/              \__7___8_______/
+        //   |   \              /  |
+        //   |    \            /   |
+        //   |     3 ------- 6     |
+        //   |_____________________|
+        //
 
-        node1.addNeighbours(node2.getId(), node3.getId());
+        node1.addNeighbours(node2.getId(), node3.getId(), node7.getId());
         node2.addNeighbours(node4.getId());
         node4.addNeighbours(node5.getId());
         node5.addNeighbours(node7.getId(), node9.getId());

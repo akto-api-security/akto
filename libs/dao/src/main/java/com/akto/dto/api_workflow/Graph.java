@@ -21,7 +21,7 @@ public class Graph {
             String targetId = basicDBObject.getString("target");
             if (sourceId == null || targetId == null) continue;
 
-            // check if START or END nodes
+            // Skip if START node
             if (sourceId.equals("1")) continue;
 
             Node node = getNode(sourceId);
@@ -53,11 +53,7 @@ public class Graph {
 
         for (String neighbourId: node.getNeighbours()) {
             Node neighbour = getNode(neighbourId);
-            if (neighbour == null) {
-                // todo:
-                continue;
-            }
-            if (visited.contains(neighbourId)) continue;
+            if (neighbour == null || visited.contains(neighbourId)) continue;
             rec(neighbour, visited, result);
         }
 

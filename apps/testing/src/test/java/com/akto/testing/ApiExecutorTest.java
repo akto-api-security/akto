@@ -1,5 +1,7 @@
 package com.akto.testing;
 
+import com.akto.runtime.URLAggregator;
+import com.mongodb.BasicDBObject;
 import org.junit.Test;
 
 import java.util.*;
@@ -41,5 +43,13 @@ public class ApiExecutorTest {
         headers.put("host", Collections.singletonList("127.0.0.1"));
         url = ApiExecutor.makeUrlAbsolute(originalUrl, headers);
         assertEquals(url, "http://127.0.0.1/dashboard");
+    }
+
+    @Test
+    public void testGetRawQueryFromJson() {
+        String normalReq = "{\"name\": \"avneesh\", \"cities\": [{\"name\": \"Mumbai\"}, {\"name\": \"Bangalore\"}], \"age\": 99}";
+        String resultNormalReq = ApiExecutor.getRawQueryFromJson(normalReq);
+        BasicDBObject queryParams = URLAggregator.getQueryJSON("?"+ resultNormalReq);
+        assertEquals(3, queryParams.size());
     }
 }
