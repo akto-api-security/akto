@@ -82,7 +82,7 @@ public class APICatalogSync {
         if (!responseParams.getIsPending()) {
             requestTemplate.processTraffic(responseParams.getTime());
         }
-        if (statusCode >= 200 && statusCode < 300) {
+        if (HttpResponseParams.validHttpResponseCode(statusCode)) {
             String reqPayload = requestParams.getPayload();
 
             if (reqPayload == null || reqPayload.isEmpty()) {

@@ -8,6 +8,7 @@ import FormControl from '@mui/material/FormControl';
 import InputArgumentsDialog from './InputArgumentsDialog.jsx'
 import './start-node.css';
 import useStore from './store'
+import { Tooltip } from '@mui/material';
 
 const BlankNode = (nodeData) => {
     const endpointsList = useStore(state => state.endpointsList)
@@ -77,23 +78,27 @@ const BlankNode = (nodeData) => {
                                 params.inputProps.value = origValue.split(" ")[1];
                                 method = origValue.split(" ")[0];
                             }
-                            return (<TextField
-                              {...params}
-                              placeholder="Select API"
-                              InputProps={{
-                                ...params.InputProps,
-                                componentsProps: { input: params.inputProps },
-                                autoComplete: 'new-password',
-                                disableUnderline: true,
-                                startAdornment: (
-                                    <span className={"MuiInput-input " + method}>
-                                        {method}
-                                    </span>
-                                )
-                              }}
-                              
-                              variant="standard"
-                            />)
+                            return (
+                            
+                            <Tooltip title={params.inputProps.value}>
+                                <TextField
+                                {...params}
+                                placeholder="Select API"
+                                InputProps={{
+                                    ...params.InputProps,
+                                    componentsProps: { input: params.inputProps },
+                                    autoComplete: 'new-password',
+                                    disableUnderline: true,
+                                    startAdornment: (
+                                        <span className={"MuiInput-input " + method}>
+                                            {method}
+                                        </span>
+                                    )
+                                }}
+                                
+                                variant="standard"
+                                />
+                            </Tooltip>)
                         }}
                         
                     ></Autocomplete>

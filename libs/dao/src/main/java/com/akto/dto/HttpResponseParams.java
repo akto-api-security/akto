@@ -43,6 +43,10 @@ public class HttpResponseParams {
         this.sourceIP = sourceIP;
     }
 
+    public static boolean validHttpResponseCode(int statusCode)  {
+        return statusCode > 200 && (statusCode < 300 || statusCode == 302);
+    }
+
     public String getPayload() {
         return payload;
     }

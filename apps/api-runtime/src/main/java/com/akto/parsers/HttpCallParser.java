@@ -234,7 +234,7 @@ public class HttpCallParser {
     public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
         for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
-            boolean cond = httpResponseParam.statusCode >= 200 && httpResponseParam.statusCode < 300;
+            boolean cond = HttpResponseParams.validHttpResponseCode(httpResponseParam.getStatusCode());
             if (!cond) continue;
 
             String hostName = getHostName(httpResponseParam.getRequestParams().getHeaders());

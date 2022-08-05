@@ -2,17 +2,19 @@ package com.akto.dto.testing;
 
 public class WorkflowUpdatedSampleData {
     String orig;
+    String requestUrl;
     String queryParams;
     String requestHeaders;
     String requestPayload;
 
     public WorkflowUpdatedSampleData() {}
 
-    public WorkflowUpdatedSampleData(String orig, String queryParams, String requestHeaders, String requestPayload) {
+    public WorkflowUpdatedSampleData(String orig, String queryParams, String requestHeaders, String requestPayload, String requestUrl) {
         this.orig = orig;
         this.queryParams = queryParams;
         this.requestHeaders = requestHeaders;
         this.requestPayload = requestPayload;
+        this.requestUrl = requestUrl;
     }
 
     public String getOrig() {
@@ -47,13 +49,22 @@ public class WorkflowUpdatedSampleData {
         this.requestPayload = requestPayload;
     }
 
+    public String getRequestUrl() {
+        return requestUrl;
+    }
+
+    public void setRequestUrl(String requestUrl) {
+        this.requestUrl = requestUrl;
+    }
+
     @Override
     public String toString() {
-        return "{" +
-            " orig='" + getOrig() + "'" +
-            ", queryParams='" + getQueryParams() + "'" +
-            ", requestHeaders='" + getRequestHeaders() + "'" +
-            ", requestPayload='" + getRequestPayload() + "'" +
-            "}";
+        return "WorkflowUpdatedSampleData{" +
+                "orig='" + orig + '\'' +
+                ", requestUrl='" + requestUrl + '\'' +
+                ", queryParams='" + queryParams + '\'' +
+                ", requestHeaders='" + requestHeaders + '\'' +
+                ", requestPayload='" + requestPayload + '\'' +
+                '}';
     }
 }

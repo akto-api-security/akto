@@ -16,11 +16,13 @@ const RequestEditor = ({sampleApiCall, updatedSampleData, onChangeApiRequest}) =
   let QUERY_PARAMS = "queryParams"
   let REQUEST_HEADERS = "requestHeaders"
   let REQUEST_PAYLOAD = "requestPayload"
+  let REQUEST_URL = "requestUrl"
 
 
   let oldParams = sampleApiCall.path.indexOf("?") > -1 ?sampleApiCall.path.split("?")[1] : "";
   let oldHeaders = sampleApiCall.requestHeaders
   let oldPayload = sampleApiCall.requestPayload
+  let oldUrl = sampleApiCall.path.split("?")[0]
 
   const onChangeQueryParams = (newParams) => {
     onChangeApiRequest(QUERY_PARAMS, newParams);
@@ -34,9 +36,17 @@ const RequestEditor = ({sampleApiCall, updatedSampleData, onChangeApiRequest}) =
     onChangeApiRequest(REQUEST_PAYLOAD, newPayload);
   }
 
+  const onChangeRequestUrl = (newUrl) => {
+    onChangeApiRequest(REQUEST_URL, newUrl);
+  }
+
   return (
     <div style={{display: "flex"}}>
       <div style={{width: "400px"}}>
+        <div className="request-title">[Request] URL</div>
+        <div className="request-editor request-editor-path">
+          <TemplateStringEditor defaultText={updatedSampleData[REQUEST_URL] || oldUrl} onChange={onChangeRequestUrl}/>
+        </div>
         <div className="request-title">[Request] Query params</div>
         <div className="request-editor request-editor-path">
           <TemplateStringEditor defaultText={updatedSampleData[QUERY_PARAMS] || oldParams} onChange={onChangeQueryParams}/>

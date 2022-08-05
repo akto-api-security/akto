@@ -183,7 +183,18 @@ public class ApiExecutor {
 
 
     public static HttpResponseParams sendWithRequestBody(HttpRequestParams httpRequestParams, Request.Builder builder) throws Exception {
-        RequestBody body = RequestBody.create(httpRequestParams.getPayload(), MediaType.parse("application/json; charset=utf-8"));
+        Map<String,List<String>> headers = httpRequestParams.getHeaders();
+        if (headers == null) {
+            headers = new HashMap<>();
+            httpRequestParams.setHeaders(headers);
+        }
+
+        List<String> contentTypes = headers.get("content-type");
+        String contentType = "application/json; charset=utf-8";
+        if (contentTypes != null && !contentTypes.isEmpty()) {
+             contentType = contentTypes.get(0);
+        }
+        RequestBody body = RequestBody.create(httpRequestParams.getPayload(), MediaType.parse(contentType));
         builder = builder.method(httpRequestParams.getMethod(), body);
         Request request = builder.build();
         return common(request);

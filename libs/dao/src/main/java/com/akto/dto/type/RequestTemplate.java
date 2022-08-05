@@ -10,6 +10,7 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.HttpResponseParams;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.TrafficInfo;
@@ -551,7 +552,7 @@ public class RequestTemplate {
         }
 
         for (int aStatus: a.getResponseTemplates().keySet()) {
-            if (aStatus >= 200 && aStatus < 300) {
+            if (HttpResponseParams.validHttpResponseCode(aStatus)) {
                 if (!b.getResponseTemplates().containsKey(aStatus)) {
                     return false;
                 }
@@ -559,7 +560,7 @@ public class RequestTemplate {
         }
 
         for (int bStatus: b.getResponseTemplates().keySet()) {
-            if (bStatus >= 200 && bStatus < 300) {
+            if (HttpResponseParams.validHttpResponseCode(bStatus)) {
                 if (!a.getResponseTemplates().containsKey(bStatus)) {
                     return false;
                 }
@@ -568,7 +569,7 @@ public class RequestTemplate {
 
         boolean has2XXStatus = false;
         for (int aStatus: a.getResponseTemplates().keySet()) {
-            if (aStatus >= 200 && aStatus < 300) {
+            if (HttpResponseParams.validHttpResponseCode(aStatus)) {
                 has2XXStatus = true;
                 RequestTemplate aResp = a.getResponseTemplates().get(aStatus);
                 RequestTemplate bResp = b.getResponseTemplates().get(aStatus);

@@ -12,6 +12,7 @@ import com.akto.dto.api_workflow.Node;
 import com.akto.dto.testing.*;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.parsers.HttpCallParser;
+import com.akto.runtime.URLAggregator;
 import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -83,17 +84,22 @@ public class ApiWorkflowExecutor {
     public void populateValuesMap(Map<String, Object> valuesMap, HttpResponseParams httpResponseParams,
                                   String nodeId) {
         String respPayload = httpResponseParams.getPayload();
-        if (respPayload == null) return;
-        populateValuesMap(valuesMap, respPayload, nodeId, httpResponseParams.getHeaders(), false);
+        if (respPayload != null) {
+            populateValuesMap(valuesMap, respPayload, nodeId, httpResponseParams.getHeaders(), false, null);
+        }
 
         HttpRequestParams httpRequestParams = httpResponseParams.requestParams;
+        String urlWithParams = httpRequestParams.getURL();
+        BasicDBObject queryParams = URLAggregator.getQueryJSON(urlWithParams);
         String requestPayload = httpRequestParams.getPayload();
-        populateValuesMap(valuesMap, requestPayload, nodeId, httpRequestParams.getHeaders(),true);
+        if (requestPayload != null) {
+            populateValuesMap(valuesMap, requestPayload, nodeId, httpRequestParams.getHeaders(),true, queryParams);
+        }
 
     }
 
     public void populateValuesMap(Map<String, Object> valuesMap, String payloadStr, String nodeId, Map<String,
-            List<String>> headers, boolean isRequest) {
+            List<String>> headers, boolean isRequest, BasicDBObject queryParams) {
         boolean isList = false;
         if (payloadStr.startsWith("[")) {
             payloadStr = "{\"json\": "+payloadStr+"}";
@@ -106,6 +112,10 @@ public class ApiWorkflowExecutor {
         } catch (Exception e) {
             e.printStackTrace();
             payloadObj = BasicDBObject.parse("{}");
+        }
+
+        if (queryParams != null) {
+            payloadObj.putAll(queryParams.toMap());
         }
 
         Object obj = payloadObj;
@@ -147,11 +157,17 @@ public class ApiWorkflowExecutor {
         String queryParams = updatedSampleData.getQueryParams(); // todo:
         String requestHeaders = updatedSampleData.getRequestHeaders();
         String requestPayload = updatedSampleData.getRequestPayload();
+        String requestUrl = updatedSampleData.getRequestUrl();
 
         HttpRequestParams httpRequestParams = httpResponseParams.requestParams;
 
         String regex = "\\$\\{x(\\d+)\\.([\\w\\[\\].]+)\\}"; // todo: integer inside brackets
         Pattern p = Pattern.compile(regex);
+
+        if (requestUrl != null) {
+            String finalUrl = replaceVariables(p, requestUrl, valuesMap);
+            httpRequestParams.url = finalUrl;
+        }
 
         if (requestPayload != null) {
             String finalPayload = replaceVariables(p,requestPayload, valuesMap);
