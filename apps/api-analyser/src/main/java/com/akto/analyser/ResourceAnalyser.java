@@ -1,12 +1,8 @@
 package com.akto.analyser;
 
-import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.TestingRunDao;
 import com.akto.dto.*;
-import com.akto.dto.testing.TestingRun;
-import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
@@ -16,8 +12,6 @@ import com.google.common.base.Charsets;
 import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnels;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
-import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 
@@ -42,13 +36,13 @@ public class ResourceAnalyser {
         syncWithDb();
     }
 
-    public static final String X_FORWARDED_FOR = "x-forwarded-for";
+    private static final String X_FORWARDED_FOR = "x-forwarded-for";
 
     public URLTemplate matchWithUrlTemplate(int apiCollectionId, String url, String method) {
-        Catalog catalog = catalogMap.get(apiCollectionId);
+        APICatalog catalog = catalogMap.get(apiCollectionId);
         if (catalog == null) return null;
         URLStatic urlStatic = new URLStatic(url, URLMethods.Method.valueOf(method));
-        for (URLTemplate urlTemplate: catalog.templateUrls) {
+        for (URLTemplate urlTemplate: catalog.getTemplateURLToMethods().keySet()) {
             if (urlTemplate.match(urlStatic)) return urlTemplate;
         }
         return null;
@@ -169,18 +163,8 @@ public class ResourceAnalyser {
     }
 
 
-    public static class Catalog {
-        List<URLTemplate> templateUrls;
-        Set<URLStatic> strictUrls;
 
-        public Catalog() {
-            this.templateUrls = new ArrayList<>();
-            this.strictUrls = new HashSet<>();
-        }
-
-    }
-
-    public Map<Integer, Catalog> catalogMap = new HashMap<>();
+    public Map<Integer, APICatalog> catalogMap = new HashMap<>();
 
     public void buildCatalog() {
         List<ApiInfo.ApiInfoKey> apis = SingleTypeInfoDao.instance.fetchEndpointsInCollection(null);
@@ -190,21 +174,21 @@ public class ResourceAnalyser {
             String url = apiInfoKey.getUrl();
             String method = apiInfoKey.getMethod().name();
 
-            Catalog catalog = catalogMap.get(apiCollectionId);
+            APICatalog catalog = catalogMap.get(apiCollectionId);
             if (catalog == null) {
-                catalog = new Catalog();
+                catalog = new APICatalog(0, new HashMap<>(), new HashMap<>());
                 catalogMap.put(apiCollectionId, catalog);
             }
 
-            List<URLTemplate> urlTemplates = catalog.templateUrls;
-            Set<URLStatic> strictUrls = catalog.strictUrls;
+            Map<URLTemplate,RequestTemplate> urlTemplates = catalog.getTemplateURLToMethods();
+            Map<URLStatic, RequestTemplate> strictUrls = catalog.getStrictURLToMethods();
 
             if (APICatalog.isTemplateUrl(url)) {
                 URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, URLMethods.Method.valueOf(method));
-                urlTemplates.add(urlTemplate);
+                urlTemplates.put(urlTemplate, null);
             } else {
                 URLStatic urlStatic = new URLStatic(url, URLMethods.Method.valueOf(method));
-                strictUrls.add(urlStatic);
+                strictUrls.put(urlStatic, null);
             }
         }
 
@@ -220,24 +204,24 @@ public class ResourceAnalyser {
             int apiCollectionId = apiInfoKey.getApiCollectionId();
             String url = apiInfoKey.url;
             URLMethods.Method method = apiInfoKey.getMethod();
-            Catalog catalog = catalogMap.get(apiCollectionId);
+            APICatalog catalog = catalogMap.get(apiCollectionId);
             if (catalog == null) {
                 bulkUpdates.add(new DeleteManyModel<>(Filters.eq(ParamTypeInfo.API_COLLECTION_ID, apiCollectionId)));
                 continue;
             }
 
             URLStatic urlStatic = new URLStatic(url, method);
-            if (catalog.strictUrls.contains(urlStatic)) {
+            if (catalog.getStrictURLToMethods().containsKey(urlStatic)) {
                 continue;
             }
 
             String trimmedUrl = APICatalogSync.trim(url);
-            if (catalog.strictUrls.contains(new URLStatic(trimmedUrl, method))) {
+            if (catalog.getStrictURLToMethods().containsKey(new URLStatic(trimmedUrl, method))) {
                 continue;
             }
 
             boolean flag = false;
-            for (URLTemplate urlTemplate: catalog.templateUrls) {
+            for (URLTemplate urlTemplate: catalog.getTemplateURLToMethods().keySet()) {
                 if (urlTemplate.match(urlStatic)) {
                     flag = true;
                     break;
