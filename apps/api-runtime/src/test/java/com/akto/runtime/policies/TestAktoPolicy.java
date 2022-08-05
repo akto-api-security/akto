@@ -133,7 +133,7 @@ public class TestAktoPolicy extends MongoBasedTest {
         parser.apiCatalogSync.syncWithDB(false);
 
         AktoPolicy aktoPolicy = new AktoPolicy(parser.apiCatalogSync);
-        URLStatic urlStatic = new URLStatic(hrp1.requestParams.url, URLMethods.Method.valueOf(hrp1.requestParams.method));
+        URLStatic urlStatic = new URLStatic(hrp1.requestParams.url, URLMethods.Method.fromString(hrp1.requestParams.method));
         PolicyCatalog policyCatalog = aktoPolicy.getApiInfoCatalogMap().get(0).getStrictURLToMethods().get(urlStatic);
         Assertions.assertNull(policyCatalog.getApiInfo());
 

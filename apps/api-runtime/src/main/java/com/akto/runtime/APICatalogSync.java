@@ -76,7 +76,7 @@ public class APICatalogSync {
         responseParams.requestParams.url = baseURL.getUrl();
         BasicDBObject queryParams = URLAggregator.getQueryJSON(urlWithParams);
         int statusCode = responseParams.getStatusCode();
-        Method method = Method.valueOf(methodStr);
+        Method method = Method.fromString(methodStr);
         String userId = extractUserId(responseParams, userIdentifier);
 
         if (!responseParams.getIsPending()) {
@@ -622,7 +622,7 @@ public class APICatalogSync {
         }
 
         for(SingleTypeInfo deleted: currentDelta.getDeletedInfo()) {
-            currentDelta.getStrictURLToMethods().remove(new URLStatic(deleted.getUrl(), Method.valueOf(deleted.getMethod())));
+            currentDelta.getStrictURLToMethods().remove(new URLStatic(deleted.getUrl(), Method.fromString(deleted.getMethod())));
             bulkUpdates.add(new DeleteOneModel<>(SingleTypeInfoDao.createFilters(deleted), new DeleteOptions()));
             bulkUpdatesForSampleData.add(new DeleteOneModel<>(SensitiveSampleDataDao.getFilters(deleted), new DeleteOptions()));
         }
@@ -749,7 +749,7 @@ public class APICatalogSync {
             }
             RequestTemplate reqTemplate;
             if (url.contains("STRING") || url.contains("INTEGER")) {
-                URLTemplate urlTemplate = createUrlTemplate(url, Method.valueOf(param.getMethod()));
+                URLTemplate urlTemplate = createUrlTemplate(url, Method.fromString(param.getMethod()));
                 reqTemplate = catalog.getTemplateURLToMethods().get(urlTemplate);
 
                 if (reqTemplate == null) {
@@ -758,7 +758,7 @@ public class APICatalogSync {
                 }
 
             } else {
-                URLStatic urlStatic = new URLStatic(url, Method.valueOf(param.getMethod()));
+                URLStatic urlStatic = new URLStatic(url, Method.fromString(param.getMethod()));
                 reqTemplate = catalog.getStrictURLToMethods().get(urlStatic);
                 if (reqTemplate == null) {
                     reqTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>()));
