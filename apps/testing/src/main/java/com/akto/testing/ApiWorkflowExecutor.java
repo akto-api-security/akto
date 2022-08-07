@@ -4,30 +4,29 @@ import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
-import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.api_workflow.Node;
 import com.akto.dto.testing.*;
-import com.akto.dto.type.SingleTypeInfo;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.URLAggregator;
 import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
-import com.mongodb.client.model.Filters;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class ApiWorkflowExecutor {
+
+    private static final Logger logger = LoggerFactory.getLogger(ApiWorkflowExecutor.class);
 
     public static void main(String[] args) {
         DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
@@ -52,20 +51,31 @@ public class ApiWorkflowExecutor {
             List<TestResult.TestError> testErrors = new ArrayList<>();
             WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
             WorkflowUpdatedSampleData updatedSampleData = workflowNodeDetails.getUpdatedSampleData();
+            WorkflowNodeDetails.Type type = workflowNodeDetails.getType();
 
             HttpResponseParams originalHttpResponseParams = buildHttpResponseParam(updatedSampleData, valuesMap);
             if (originalHttpResponseParams == null) return;
 
             HttpRequestParams originalHttpRequestParams = originalHttpResponseParams.getRequestParams();
 
-            HttpResponseParams httpResponseParams;
-            try {
-                httpResponseParams = ApiExecutor.sendRequest(originalHttpRequestParams);
-                populateValuesMap(valuesMap, httpResponseParams, node.getId());
-            } catch (Exception e) {
-                e.printStackTrace();
-                return;
+            HttpResponseParams httpResponseParams = null;
+            int maxRetries = type.equals(WorkflowNodeDetails.Type.POLL) ? 10 : 1;
+            for (int i = 0; i < maxRetries; i++) {
+                try {
+                    httpResponseParams = ApiExecutor.sendRequest(originalHttpRequestParams);
+                    if (HttpResponseParams.validHttpResponseCode(httpResponseParams.statusCode)) {
+                        populateValuesMap(valuesMap, httpResponseParams, node.getId());
+                        break;
+                    }
+                    int sleep = 6000;
+                    logger.info("Waiting "+ (sleep/1000) +" before sending another request......");
+                    Thread.sleep(sleep);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
+
+            if (httpResponseParams == null) break;
 
             String message = null;
             try {

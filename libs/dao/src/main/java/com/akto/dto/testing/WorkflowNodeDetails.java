@@ -8,14 +8,21 @@ public class WorkflowNodeDetails {
     Method method;
     WorkflowUpdatedSampleData updatedSampleData;
 
+    Type type = Type.API;
+
+    public enum Type {
+        POLL, API
+    }
+
     public WorkflowNodeDetails() {
     }
 
-    public WorkflowNodeDetails(int apiCollectionId, String endpoint, Method method, WorkflowUpdatedSampleData updatedSampleData) {
+    public WorkflowNodeDetails(int apiCollectionId, String endpoint, Method method, WorkflowUpdatedSampleData updatedSampleData, Type type) {
         this.apiCollectionId = apiCollectionId;
         this.endpoint = endpoint;
         this.method = method;
         this.updatedSampleData = updatedSampleData;
+        this.type = type;
     }
 
     public int getApiCollectionId() {
@@ -48,6 +55,14 @@ public class WorkflowNodeDetails {
 
     public void setUpdatedSampleData(WorkflowUpdatedSampleData updatedSampleData) {
         this.updatedSampleData = updatedSampleData;
+    }
+
+    public Type getType() {
+        return type;
+    }
+
+    public void setType(Type type) {
+        this.type = type;
     }
 
     @Override

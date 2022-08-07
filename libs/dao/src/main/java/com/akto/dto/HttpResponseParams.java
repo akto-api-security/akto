@@ -44,7 +44,7 @@ public class HttpResponseParams {
     }
 
     public static boolean validHttpResponseCode(int statusCode)  {
-        return statusCode > 200 && (statusCode < 300 || statusCode == 302);
+        return statusCode >= 200 && (statusCode < 300 || statusCode == 302);
     }
 
     public String getPayload() {
