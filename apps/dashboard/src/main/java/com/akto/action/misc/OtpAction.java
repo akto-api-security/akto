@@ -1,15 +1,9 @@
 package com.akto.action.misc;
 
-import com.akto.DaoInit;
 import com.akto.action.UserAction;
 import com.akto.dao.OtpMessagesDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.TestingRunDao;
 import com.akto.dto.OTPMessage;
-import com.akto.dto.testing.TestingRun;
-import com.akto.dto.testing.WorkflowTestingEndpoints;
-import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 
@@ -20,16 +14,27 @@ import java.util.regex.Pattern;
 public class OtpAction extends UserAction {
 
 
-    public static void main(String[] args) {
-        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
+    private String from;
+    private String text;
+    @Override
+    public String execute() {
         Context.accountId.set(1_000_000);
-        TestingRun testingRun = TestingRunDao.instance.findOne(new BasicDBObject());
-        WorkflowTestingEndpoints w = (WorkflowTestingEndpoints) testingRun.getTestingEndpoints();
-        System.out.println(w.getWorkflowTest().getMapNodeIdToWorkflowNodeDetails().get("x6").getType());
+
+        System.out.println(text);
+        if (text == null || !text.contains("OTP")) {
+            System.out.println("But doesn't contain the word 'OTP' ");
+            return SUCCESS.toUpperCase();
+        }
+
+        System.out.println("And contains OTP");
+        OTPMessage otpMessage = new OTPMessage(Context.now(), from, text, Context.now());
+        OtpMessagesDao.instance.insertOne(otpMessage);
+        return SUCCESS.toUpperCase();
     }
 
     private String otp;
     public String fetchRecentOtp() {
+        Context.accountId.set(1_000_000);
         List<OTPMessage> OTPMessageList = OtpMessagesDao.instance.findAll(Filters.gte("timestamp", Context.now() - 90));
         if (OTPMessageList.isEmpty()) return Action.ERROR.toUpperCase();
 
@@ -44,11 +49,20 @@ public class OtpAction extends UserAction {
         if (val == null || val.isEmpty()) return ERROR.toUpperCase();
 
         otp = val;
+        System.out.println("found otp: " + otp);
 
         return SUCCESS.toUpperCase();
     }
 
     public String getOtp() {
         return otp;
+    }
+
+    public void setFrom(String from) {
+        this.from = from;
+    }
+
+    public void setText(String text) {
+        this.text = text;
     }
 }

@@ -1,8 +1,6 @@
 package com.akto.rules;
 
-import com.akto.dto.ApiInfo;
-import com.akto.dto.HttpRequestParams;
-import com.akto.dto.HttpResponseParams;
+import com.akto.dto.*;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
 import com.akto.store.AuthMechanismStore;
@@ -15,11 +13,14 @@ public class BOLATest extends TestPlugin {
 
     @Override
     public boolean start(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId) {
-        HttpResponseParams originalHttpResponseParams = SampleMessageStore.fetchOriginalMessage(apiInfoKey);
-        if (originalHttpResponseParams == null) {
+        RawApi rawApi = SampleMessageStore.fetchOriginalMessage(apiInfoKey);
+        if (rawApi == null) {
             addWithoutRequestError(apiInfoKey, testRunId, TestResult.TestError.NO_PATH);
             return false;
         }
+
+        OriginalHttpRequest originalHttpRequest = rawApi.getRequest();
+        OriginalHttpResponse originalHttpResponse = rawApi.getResponse();
 
         AuthMechanism authMechanism = AuthMechanismStore.getAuthMechanism();
         if (authMechanism == null) {
@@ -27,34 +28,31 @@ public class BOLATest extends TestPlugin {
             return false;
         }
 
-        HttpRequestParams httpRequestParams = originalHttpResponseParams.getRequestParams();
-        boolean result = authMechanism.addAuthToRequest(httpRequestParams);
+        boolean result = authMechanism.addAuthToRequest(originalHttpRequest);
         if (!result) return false; // this means that auth token was not there in original request so exit
 
-        boolean containsReqPayload = containsRequestPayload(httpRequestParams);
+        boolean containsReqPayload = containsRequestPayload(originalHttpRequest);
         if (!containsReqPayload) {
-            HttpResponseParams newHttpResponseParams = generateEmptyResponsePayload(httpRequestParams);
-            addTestSuccessResult(apiInfoKey, newHttpResponseParams, testRunId, false);
+            addTestSuccessResult(apiInfoKey, originalHttpRequest, null, testRunId, false);
             return false;
         }
 
-        HttpResponseParams httpResponseParams = null;
+        OriginalHttpResponse response = null;
         try {
-            httpResponseParams = ApiExecutor.sendRequest(httpRequestParams);
+            response = ApiExecutor.sendRequest(originalHttpRequest);
         } catch (Exception e) {
-            HttpResponseParams newHttpResponseParams = generateEmptyResponsePayload(httpRequestParams);
-            addWithRequestError(apiInfoKey, testRunId, TestResult.TestError.API_REQUEST_FAILED, newHttpResponseParams);
+            addWithRequestError(apiInfoKey, testRunId, TestResult.TestError.API_REQUEST_FAILED, originalHttpRequest);
             return false;
         }
 
-        int statusCode = StatusCodeAnalyser.getStatusCode(httpResponseParams);
+        int statusCode = StatusCodeAnalyser.getStatusCode(response.getBody(), response.getStatusCode());
         boolean vulnerable = isStatusGood(statusCode);
         if (vulnerable) {
-            double val = compareWithOriginalResponse(originalHttpResponseParams.getPayload(), httpResponseParams.getPayload());
+            double val = compareWithOriginalResponse(originalHttpResponse.getBody(), response.getBody());
             vulnerable = val > 90;
         }
 
-        addTestSuccessResult(apiInfoKey,httpResponseParams, testRunId, vulnerable);
+        addTestSuccessResult(apiInfoKey,originalHttpRequest, response, testRunId, vulnerable);
 
         return vulnerable;
     }

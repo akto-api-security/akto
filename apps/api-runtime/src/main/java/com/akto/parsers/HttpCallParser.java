@@ -6,9 +6,7 @@ import java.util.*;
 import com.akto.DaoInit;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.ApiCollection;
-import com.akto.dto.HttpRequestParams;
-import com.akto.dto.HttpResponseParams;
+import com.akto.dto.*;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
 
@@ -54,7 +52,7 @@ public class HttpCallParser {
         String method = (String) json.get("method");
         String url = (String) json.get("path");
         String type = (String) json.get("type");
-        Map<String,List<String>> requestHeaders = getHeaders(json, "requestHeaders");
+        Map<String,List<String>> requestHeaders = OriginalHttpRequest.buildHeadersMap(json, "requestHeaders");
 
         String requestPayload = (String) json.get("requestPayload");
         requestPayload = requestPayload.trim();
@@ -88,7 +86,7 @@ public class HttpCallParser {
 
         int statusCode = Integer.parseInt(json.get("statusCode").toString());
         String status = (String) json.get("status");
-        Map<String,List<String>> responseHeaders = getHeaders(json, "responseHeaders");
+        Map<String,List<String>> responseHeaders = OriginalHttpRequest.buildHeadersMap(json, "responseHeaders");
         String payload = (String) json.get("responsePayload");
         int time = Integer.parseInt(json.get("time").toString());
         String accountId = (String) json.get("akto_account_id");
@@ -106,27 +104,12 @@ public class HttpCallParser {
     }
 
     private static final Gson gson = new Gson();
-    public static Map<String,List<String>> getHeaders(Map json, String key) {
-        return getHeaders((String) json.get(key));
-    }
-
-    public static Map<String,List<String>> getHeaders(String headersString) {
-        Map headersFromRequest = gson.fromJson(headersString, Map.class);
-        Map<String,List<String>> headers = new HashMap<>();
-        if (headersFromRequest == null) return headers;
-        for (Object k: headersFromRequest.keySet()) {
-            List<String> values = headers.getOrDefault(k,new ArrayList<>());
-            values.add(headersFromRequest.get(k).toString());
-            headers.put(k.toString().toLowerCase(),values);
-        }
-        return headers;
-    }
 
     public static String getHostName(Map<String,List<String>> headers) {
         if (headers == null) return null;
         for (String k: headers.keySet()) {
             if (k.equalsIgnoreCase("host")) {
-                List<String> hosts = headers.get(k);
+                List<String> hosts = headers.getOrDefault(k, new ArrayList<>());
                 if (hosts.size() > 0) return hosts.get(0);
                 return null;
             }

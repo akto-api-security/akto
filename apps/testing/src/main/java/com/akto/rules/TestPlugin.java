@@ -2,9 +2,7 @@ package com.akto.rules;
 
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunResultDao;
-import com.akto.dto.ApiInfo;
-import com.akto.dto.HttpRequestParams;
-import com.akto.dto.HttpResponseParams;
+import com.akto.dto.*;
 import com.akto.dto.testing.TestResult;
 import com.akto.runtime.RelationshipSync;
 import com.akto.utils.RedactSampleData;
@@ -78,12 +76,12 @@ public abstract class TestPlugin {
         TestingRunResultDao.instance.updateOne(filter, update);
     }
 
-    public void addWithRequestError(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestResult.TestError testError, HttpResponseParams httpResponseParams) {
+    public void addWithRequestError(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestResult.TestError testError, OriginalHttpRequest request) {
         Bson filter = TestingRunResultDao.generateFilter(testRunId, apiInfoKey.getApiCollectionId(), apiInfoKey.url, apiInfoKey.method.name());
 
         String message = null;
         try {
-            message = RedactSampleData.convertHttpRespToOriginalString(httpResponseParams);
+            message = RedactSampleData.convertOriginalReqRespToString(request, null);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -93,16 +91,15 @@ public abstract class TestPlugin {
     }
 
 
-    public void addTestSuccessResult(ApiInfo.ApiInfoKey apiInfoKey, HttpResponseParams httpResponseParams, ObjectId testRunId, boolean vulnerable) {
+    public void addTestSuccessResult(ApiInfo.ApiInfoKey apiInfoKey, OriginalHttpRequest request, OriginalHttpResponse response, ObjectId testRunId, boolean vulnerable) {
         String message = null;
         try {
-            message = RedactSampleData.convertHttpRespToOriginalString(httpResponseParams);
+            message = RedactSampleData.convertOriginalReqRespToString(request, response);
         } catch (Exception e) {
             // TODO:
             e.printStackTrace();
             return;
         }
-        if (message == null) return;
 
         Bson filter = TestingRunResultDao.generateFilter(testRunId, apiInfoKey);
         Bson update = Updates.set("resultMap." + testName(), new TestResult(message, vulnerable, new ArrayList<>()));
@@ -116,11 +113,11 @@ public abstract class TestPlugin {
         );
     }
 
-    public boolean containsRequestPayload(HttpRequestParams httpRequestParams) {
-        String url = httpRequestParams.getURL();
+    public boolean containsRequestPayload(OriginalHttpRequest originalHttpRequest) {
+        String url = originalHttpRequest.getFullUrlWithParams();
         if (url.contains("INTEGER") || url.contains("STRING") || url.contains("?")) return true;
 
-        String payload = httpRequestParams.getPayload();
+        String payload = originalHttpRequest.getBody();
         if (payload == null || payload.equals("{}") || payload.isEmpty()) return false;
 
         return true;

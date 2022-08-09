@@ -2,6 +2,8 @@ package com.akto.utils;
 
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.parsers.HttpCallParser;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
@@ -11,6 +13,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
+import com.mongodb.BasicDBObject;
 
 import java.io.IOException;
 import java.util.*;
@@ -97,6 +100,29 @@ public class RedactSampleData {
             }
         }
 
+    }
+
+    public static String convertOriginalReqRespToString(OriginalHttpRequest request, OriginalHttpResponse response)  {
+        BasicDBObject req = new BasicDBObject();
+        if (request != null) {
+            req.put("url", request.getUrl());
+            req.put("queryParams", request.getQueryParams());
+            req.put("body", request.getBody());
+            req.put("headers", convertHeaders(request.getHeaders()));
+        }
+
+        BasicDBObject resp = new BasicDBObject();
+        if (response != null) {
+            resp.put("statusCode", response.getStatusCode());
+            resp.put("body", response.getBody());
+            resp.put("headers", convertHeaders(response.getHeaders()));
+        }
+
+        BasicDBObject ret = new BasicDBObject();
+        ret.put("request", req);
+        ret.put("response", resp);
+
+        return ret.toString();
     }
 
     public static String convertHttpRespToOriginalString(HttpResponseParams httpResponseParams) throws JsonProcessingException {

@@ -1,9 +1,7 @@
 package com.akto.rules;
 
 
-import com.akto.dto.ApiInfo;
-import com.akto.dto.HttpRequestParams;
-import com.akto.dto.HttpResponseParams;
+import com.akto.dto.*;
 import com.akto.dto.testing.*;
 import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
@@ -16,11 +14,13 @@ public class NoAuthTest extends TestPlugin {
 
     @Override
     public boolean start(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId) {
-        HttpRequestParams httpRequestParams = SampleMessageStore.fetchPath(apiInfoKey);
-        if (httpRequestParams == null) {
+        RawApi rawApi = SampleMessageStore.fetchOriginalMessage(apiInfoKey);
+        if (rawApi == null) {
             addWithoutRequestError(apiInfoKey, testRunId, TestResult.TestError.NO_PATH);
             return false;
         }
+
+        OriginalHttpRequest originalHttpRequest = rawApi.getRequest();
 
         AuthMechanism authMechanism = AuthMechanismStore.getAuthMechanism();
         if (authMechanism == null) {
@@ -28,23 +28,21 @@ public class NoAuthTest extends TestPlugin {
             return false;
         }
 
-        boolean result = authMechanism.removeAuthFromRequest(httpRequestParams);
+        boolean result = authMechanism.removeAuthFromRequest(originalHttpRequest);
         if (!result) return false;
-        
-        HttpResponseParams httpResponseParams = null;
+
+        OriginalHttpResponse response = null;
         try {
-            httpResponseParams = ApiExecutor.sendRequest(httpRequestParams);
+            response = ApiExecutor.sendRequest(originalHttpRequest);
         } catch (Exception e) {
-            HttpResponseParams newHttpResponseParams = generateEmptyResponsePayload(httpRequestParams);
-            addWithRequestError(apiInfoKey, testRunId, TestResult.TestError.API_REQUEST_FAILED, newHttpResponseParams);
-            // TODO:
+            addWithRequestError(apiInfoKey, testRunId, TestResult.TestError.API_REQUEST_FAILED, originalHttpRequest);
             return false;
         }
 
-        int statusCode = StatusCodeAnalyser.getStatusCode(httpResponseParams);
+        int statusCode = StatusCodeAnalyser.getStatusCode(response.getBody(), response.getStatusCode());
         boolean vulnerable = isStatusGood(statusCode);
 
-        addTestSuccessResult(apiInfoKey, httpResponseParams,testRunId, vulnerable);
+        addTestSuccessResult(apiInfoKey, originalHttpRequest, response, testRunId, vulnerable);
 
         return vulnerable;
     }

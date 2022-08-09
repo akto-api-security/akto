@@ -2,9 +2,7 @@ package com.akto.testing;
 
 import com.akto.DaoInit;
 import com.akto.dao.context.Context;
-import com.akto.dto.ApiInfo;
-import com.akto.dto.HttpRequestParams;
-import com.akto.dto.HttpResponseParams;
+import com.akto.dto.*;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
@@ -104,33 +102,35 @@ public class StatusCodeAnalyser {
     public static boolean fillFrequencyMap(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<Set<String>, Map<String,Integer>> frequencyMap) {
 
         // fetch sample message
-        HttpResponseParams originalHttpResponseParams = SampleMessageStore.fetchOriginalMessage(apiInfoKey);
-        if (originalHttpResponseParams == null) return false;
+        RawApi rawApi = SampleMessageStore.fetchOriginalMessage(apiInfoKey);
+        if (rawApi == null) return false;
+
+        OriginalHttpRequest request = rawApi.getRequest();
+        OriginalHttpResponse response = rawApi.getResponse();
 
         // discard if payload is null or empty
-        String originalPayload = originalHttpResponseParams.getPayload();
+        String originalPayload = response.getBody();
         if (originalPayload == null || originalPayload.equals("{}") || originalPayload.isEmpty()) {
             return false;
         }
 
         // if auth token is not passed originally -> skip
-        HttpRequestParams httpRequestParams = originalHttpResponseParams.getRequestParams();
-        boolean result = authMechanism.removeAuthFromRequest(httpRequestParams);
+        boolean result = authMechanism.removeAuthFromRequest(request);
         if (!result) return false;
 
         // execute API
-        HttpResponseParams httpResponseParams;
+        OriginalHttpResponse finalResponse;
         try {
-            httpResponseParams = ApiExecutor.sendRequest(httpRequestParams);
+            finalResponse = ApiExecutor.sendRequest(request);
         } catch (Exception e) {
             return false;
         }
 
         // if non 2xx then skip this api
-        if (httpResponseParams.statusCode < 200 || httpResponseParams.statusCode >= 300) return false;
+        if (finalResponse.getStatusCode() < 200 || finalResponse.getStatusCode() >= 300) return false;
 
         // store response keys and values in map
-        String payload = httpResponseParams.getPayload();
+        String payload = finalResponse.getBody();
         Map<String, Set<String>> responseParamMap = new HashMap<>();
         Map<String, Set<String>> originalResponseParamMap = new HashMap<>();
         try {
@@ -192,9 +192,7 @@ public class StatusCodeAnalyser {
         return potentialStatusCodeKeys;
     }
 
-    public static int getStatusCode(HttpResponseParams httpResponseParams) {
-        int statusCode = httpResponseParams.getStatusCode();
-        String payload = httpResponseParams.getPayload();
+    public static int getStatusCode(String payload, int statusCode) {
         if (statusCode < 200 || statusCode >= 300) return statusCode;
 
         Map<String, Set<String>> responseParamMap = new HashMap<>();

@@ -1,6 +1,7 @@
 package com.akto.dto.testing;
 
 import com.akto.dto.HttpRequestParams;
+import com.akto.dto.OriginalHttpRequest;
 import org.junit.Test;
 
 import java.util.*;
@@ -9,21 +10,21 @@ import static org.junit.Assert.*;
 
 public class AuthMechanismTests {
 
-    private void validate(HttpRequestParams httpRequestParams, String key, List<String> modifiedValue) {
+    private void validate(OriginalHttpRequest request, String key, List<String> modifiedValue) {
         String value = "Value";
         String finalKey = key.toLowerCase().trim();
         AuthMechanism authMechanism = new AuthMechanism();
         authMechanism.setAuthParams(Collections.singletonList(new HardcodedAuthParam(AuthParam.Location.HEADER, key, value)));
 
-        boolean result = authMechanism.addAuthToRequest(httpRequestParams);
+        boolean result = authMechanism.addAuthToRequest(request);
         assertEquals(result, modifiedValue!=null);
-        List<String> modifiedHeader = httpRequestParams.getHeaders().get(finalKey);
+        List<String> modifiedHeader = request.getHeaders().get(finalKey);
         assertEquals(modifiedHeader, modifiedValue);
 
-        result = authMechanism.removeAuthFromRequest(httpRequestParams);
+        result = authMechanism.removeAuthFromRequest(request);
         assertEquals(result, modifiedValue!=null);
         if (modifiedValue == null) return;
-        modifiedHeader = httpRequestParams.getHeaders().get(finalKey);
+        modifiedHeader = request.getHeaders().get(finalKey);
         assertEquals(modifiedHeader, Collections.singletonList(null));
     }
 
@@ -34,11 +35,12 @@ public class AuthMechanismTests {
         headers.put("header2", null);
         headers.put("header3", Collections.emptyList());
         headers.put("header4", Collections.singletonList("1"));
-        HttpRequestParams httpRequestParams = new HttpRequestParams("", "", "",headers ,"", 0);
 
-        validate(httpRequestParams, "Header1", Collections.singletonList("Value"));
-        validate(httpRequestParams, " Header2  ", Collections.singletonList("Value"));
-        validate(httpRequestParams, "InvalidHeader", null);
+        OriginalHttpRequest request = new OriginalHttpRequest("", "", "GET", "",headers);
+
+        validate(request, "Header1", Collections.singletonList("Value"));
+        validate(request, " Header2  ", Collections.singletonList("Value"));
+        validate(request, "InvalidHeader", null);
 
 
     }

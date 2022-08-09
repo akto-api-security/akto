@@ -1,20 +1,23 @@
 package com.akto.testing;
 
 import com.akto.DaoInit;
+import com.akto.dao.OtpMessagesDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
-import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.OTPMessage;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.api_workflow.Node;
 import com.akto.dto.testing.*;
-import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.URLAggregator;
 import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
+import com.mongodb.client.model.Filters;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
@@ -53,18 +56,19 @@ public class ApiWorkflowExecutor {
             WorkflowUpdatedSampleData updatedSampleData = workflowNodeDetails.getUpdatedSampleData();
             WorkflowNodeDetails.Type type = workflowNodeDetails.getType();
 
-            HttpResponseParams originalHttpResponseParams = buildHttpResponseParam(updatedSampleData, valuesMap);
-            if (originalHttpResponseParams == null) return;
+            OriginalHttpRequest request = buildHttpRequest(updatedSampleData, valuesMap);
+            if (request == null) return;
+            populateValuesMap(valuesMap, request.getBody(), node.getId(), request.getHeaders(),
+                    true, request.getQueryParams());
 
-            HttpRequestParams originalHttpRequestParams = originalHttpResponseParams.getRequestParams();
-
-            HttpResponseParams httpResponseParams = null;
-            int maxRetries = type.equals(WorkflowNodeDetails.Type.POLL) ? 10 : 1;
+            OriginalHttpResponse response = null;
+            int maxRetries = type.equals(WorkflowNodeDetails.Type.POLL) ? 20 : 1;
             for (int i = 0; i < maxRetries; i++) {
                 try {
-                    httpResponseParams = ApiExecutor.sendRequest(originalHttpRequestParams);
-                    if (HttpResponseParams.validHttpResponseCode(httpResponseParams.statusCode)) {
-                        populateValuesMap(valuesMap, httpResponseParams, node.getId());
+                    System.out.println(request.getFullUrlWithParams() + " " + request.getBody());
+                    response = ApiExecutor.sendRequest(request);
+                    if (HttpResponseParams.validHttpResponseCode(response.getStatusCode())) {
+                        populateValuesMap(valuesMap, response.getBody(), node.getId(), response.getHeaders(), false, null);
                         break;
                     }
                     int sleep = 6000;
@@ -75,11 +79,9 @@ public class ApiWorkflowExecutor {
                 }
             }
 
-            if (httpResponseParams == null) break;
-
             String message = null;
             try {
-                message = RedactSampleData.convertHttpRespToOriginalString(httpResponseParams);
+                message = RedactSampleData.convertOriginalReqRespToString(request, response);
             } catch (Exception e) {
                 // todo: what to do if message = null
                 e.printStackTrace();
@@ -91,26 +93,10 @@ public class ApiWorkflowExecutor {
         WorkflowTestResultsDao.instance.insertOne(workflowTestResult);
     }
 
-    public void populateValuesMap(Map<String, Object> valuesMap, HttpResponseParams httpResponseParams,
-                                  String nodeId) {
-        String respPayload = httpResponseParams.getPayload();
-        if (respPayload != null) {
-            populateValuesMap(valuesMap, respPayload, nodeId, httpResponseParams.getHeaders(), false, null);
-        }
-
-        HttpRequestParams httpRequestParams = httpResponseParams.requestParams;
-        String urlWithParams = httpRequestParams.getURL();
-        BasicDBObject queryParams = URLAggregator.getQueryJSON(urlWithParams);
-        String requestPayload = httpRequestParams.getPayload();
-        if (requestPayload != null) {
-            populateValuesMap(valuesMap, requestPayload, nodeId, httpRequestParams.getHeaders(),true, queryParams);
-        }
-
-    }
-
     public void populateValuesMap(Map<String, Object> valuesMap, String payloadStr, String nodeId, Map<String,
-            List<String>> headers, boolean isRequest, BasicDBObject queryParams) {
+            List<String>> headers, boolean isRequest, String queryParams) {
         boolean isList = false;
+        if (payloadStr == null) payloadStr = "{}";
         if (payloadStr.startsWith("[")) {
             payloadStr = "{\"json\": "+payloadStr+"}";
             isList = true;
@@ -120,17 +106,30 @@ public class ApiWorkflowExecutor {
         try {
             payloadObj = BasicDBObject.parse(payloadStr);
         } catch (Exception e) {
-            e.printStackTrace();
-            payloadObj = BasicDBObject.parse("{}");
+            boolean isPostFormData = payloadStr.contains("&") && payloadStr.contains("=");
+            if (isPostFormData) {
+                String mockUrl = "url?"+ payloadStr; // because getQueryJSON function needs complete url
+                payloadObj = URLAggregator.getQueryJSON(mockUrl);
+            } else {
+                payloadObj = BasicDBObject.parse("{}");
+            }
         }
 
+        BasicDBObject queryParamsObject = null;
         if (queryParams != null) {
-            payloadObj.putAll(queryParams.toMap());
+            try {
+                String mockUrl = "url?"+ queryParams; // because getQueryJSON function needs complete url
+                queryParamsObject = URLAggregator.getQueryJSON(mockUrl);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
 
-        Object obj = payloadObj;
+        Object obj;
         if (isList) {
             obj = payloadObj.get("json");
+        } else {
+            obj = payloadObj;
         }
 
         BasicDBObject flattened = JSONUtils.flattenWithDots(obj);
@@ -140,6 +139,14 @@ public class ApiWorkflowExecutor {
         for (String param: flattened.keySet()) {
             String key = nodeId + "." + reqOrResp + "." + "body" + "." + param;
             valuesMap.put(key, flattened.get(param));
+        }
+
+        if (queryParamsObject != null) {
+            BasicDBObject queryFlattened = JSONUtils.flattenWithDots(queryParamsObject);
+            for (String param: queryFlattened.keySet()) {
+                String key = nodeId + "." + reqOrResp + "." + "query" + "." + param;
+                valuesMap.put(key, flattened.get(param));
+            }
         }
 
         for (String headerName: headers.keySet()) {
@@ -153,44 +160,52 @@ public class ApiWorkflowExecutor {
 
 
 
-    public HttpResponseParams buildHttpResponseParam(WorkflowUpdatedSampleData updatedSampleData, Map<String, Object> valuesMap) {
+
+    public OriginalHttpRequest buildHttpRequest(WorkflowUpdatedSampleData updatedSampleData, Map<String, Object> valuesMap) {
 
         String sampleData = updatedSampleData.getOrig();
-        HttpResponseParams httpResponseParams = null;
-        try {
-            httpResponseParams = HttpCallParser.parseKafkaMessage(sampleData);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
-        }
+        OriginalHttpRequest request = new OriginalHttpRequest();
+        request.buildFromSampleMessage(sampleData);
 
-        String queryParams = updatedSampleData.getQueryParams(); // todo:
+        String queryParams = updatedSampleData.getQueryParams();
         String requestHeaders = updatedSampleData.getRequestHeaders();
         String requestPayload = updatedSampleData.getRequestPayload();
         String requestUrl = updatedSampleData.getRequestUrl();
-
-        HttpRequestParams httpRequestParams = httpResponseParams.requestParams;
 
         String regex = "\\$\\{x(\\d+)\\.([\\w\\[\\].]+)\\}"; // todo: integer inside brackets
         Pattern p = Pattern.compile(regex);
 
         if (requestUrl != null) {
-            String finalUrl = replaceVariables(p, requestUrl, valuesMap);
-            httpRequestParams.url = finalUrl;
+            String rawUrl = replaceVariables(p, requestUrl, valuesMap);
+            // this url might contain urlQueryParams. We need to move it queryParams
+            String[] rawUrlArr = rawUrl.split("\\?");
+            request.setUrl(rawUrlArr[0]);
+            if (rawUrlArr.length > 1) {
+                request.setQueryParams(rawUrlArr[1]);
+            }
         }
 
         if (requestPayload != null) {
             String finalPayload = replaceVariables(p,requestPayload, valuesMap);
-            httpRequestParams.setPayload(finalPayload);
+            request.setBody(finalPayload);
         }
 
         if (requestHeaders != null) {
             String finalPayload = replaceVariables(p, requestHeaders, valuesMap);
-            Map<String, List<String>> res = HttpCallParser.getHeaders(finalPayload);
-            httpRequestParams.setHeaders(res);
+            Map<String, List<String>> res = OriginalHttpRequest.buildHeadersMap(finalPayload);
+            request.setHeaders(res);
         }
 
-        return httpResponseParams;
+        if (queryParams != null) {
+            String ogQuery = request.getQueryParams();
+            if (ogQuery == null || ogQuery.isEmpty()) {
+                request.setQueryParams(queryParams);
+            } else {
+                request.setQueryParams(ogQuery+"&"+ queryParams);
+            }
+        }
+
+        return request;
     }
 
     // todo: test invalid cases
