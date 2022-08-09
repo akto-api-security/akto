@@ -383,12 +383,19 @@ export default {
                 this.$store.dispatch('inventory/saveContent', { swaggerContent: JSON.parse(reader.result), filename: this.swaggerFile.name, apiCollectionId : this.apiCollectionId})
             }
         },
-        refreshPage(shouldLoad) {
+        async refreshPage(shouldLoad) {
             // if (!this.apiCollection || this.apiCollection.length === 0 || this.$store.state.inventory.apiCollectionId !== this.apiCollectionId) {
             let collectionIdChanged = this.$store.state.inventory.apiCollectionId !== this.apiCollectionId
             if (collectionIdChanged || !shouldLoad || ((new Date() / 1000) - this.lastFetched > 60*5)) {
                 this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId, shouldLoad: shouldLoad})
             }
+
+            this.workflowTests = (await api.fetchWorkflowTests()).workflowTests.filter(x => x.apiCollectionId === this.apiCollectionId).map(x => {
+                return {
+                    ...x,
+                    color: "#FFFFFF"
+                }
+            })
 
             this.$emit('mountedView', {type: 1, apiCollectionId: this.apiCollectionId})
         }
@@ -437,14 +444,7 @@ export default {
             return ret
         }
     },
-    async mounted() {
-        this.workflowTests = (await api.fetchWorkflowTests()).workflowTests.filter(x => x.apiCollectionId === this.apiCollectionId).map(x => {
-            return {
-                ...x,
-                color: "#FFFFFF"
-            }
-        })
-    }
+    async mounted() {}
 }
 </script>
 
