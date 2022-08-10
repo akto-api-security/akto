@@ -37,6 +37,7 @@ public class Kafka {
     private void setProducer(String brokerIP, int lingerMS, int batchSize) {
         if (producer != null) close(); // close existing producer connection
 
+        int requestTimeoutMs = 5000;
         Properties kafkaProps = new Properties();
         kafkaProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, brokerIP);
         kafkaProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
@@ -44,8 +45,8 @@ public class Kafka {
         kafkaProps.put(ProducerConfig.BATCH_SIZE_CONFIG, batchSize);
         kafkaProps.put(ProducerConfig.LINGER_MS_CONFIG, lingerMS);
         kafkaProps.put(ProducerConfig.RETRIES_CONFIG, 0);
-        kafkaProps.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 5000);
-        kafkaProps.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 10000);
+        kafkaProps.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, requestTimeoutMs);
+        kafkaProps.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, lingerMS + requestTimeoutMs);
         producer = new KafkaProducer<String, String>(kafkaProps);
 
         // test if connection successful by sending a test message in a blocking way
