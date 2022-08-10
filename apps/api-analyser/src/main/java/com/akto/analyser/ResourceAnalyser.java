@@ -49,6 +49,38 @@ public class ResourceAnalyser {
         return null;
     }
 
+    public URLStatic matchWithUrlStatic(int apiCollectionId, String url, String method) {
+        APICatalog catalog = catalogMap.get(apiCollectionId);
+        if (catalog == null) return null;
+        URLStatic urlStatic = new URLStatic(url, URLMethods.Method.valueOf(method));
+
+        Map<URLStatic, RequestTemplate> strictURLToMethods = catalog.getStrictURLToMethods();
+        if (strictURLToMethods.containsKey(urlStatic)) return urlStatic;
+
+        if (url.length() < 2) return null;
+
+        List<String> urlVariations = new ArrayList<>();
+        if (url.startsWith("/")) {
+            urlVariations.add(url.substring(1));
+            urlVariations.add(url.substring(1).toLowerCase());
+        }
+        urlVariations.add(url.toLowerCase());
+
+        if (url.endsWith("/")) {
+            urlVariations.add(url.substring(0, url.length()-1));
+            urlVariations.add(url.substring(0, url.length()-1).toLowerCase());
+        }
+
+        for (String modifiedUrl: urlVariations) {
+            URLStatic urlStaticModified = new URLStatic(modifiedUrl, URLMethods.Method.valueOf(method));
+            if (strictURLToMethods.containsKey(urlStaticModified)) {
+                return urlStaticModified;
+            };
+        }
+
+        return null;
+    }
+
 
     public void analyse(HttpResponseParams responseParams) {
         if (responseParams.statusCode < 200 || responseParams.statusCode >= 300) return;
@@ -80,11 +112,23 @@ public class ResourceAnalyser {
         String baseUrl = urlStatic.getUrl();
         String url = baseUrl;
 
-        // URLs received by api analyser are raw urls (i.e. not templatised)
-        // So checking if it can be merged with any existing template URLs from db
-        URLTemplate urlTemplate = matchWithUrlTemplate(apiCollectionId, url, method);
-        if (urlTemplate != null) {
-            url = urlTemplate.getTemplateString();
+        // there is a bug in runtime because of which some static URLs don't have leading slash
+        // this checks and returns the actual url to be used
+        // if we don't find it then check in templates
+        // It is possible we don't find it still because of sync of runtime happening after analyser receiving data
+        // in that case we still update (assuming leading slash bug doesn't exist)
+        // if by the time update is made db has that url then good else update will fail as upsert is false
+        URLTemplate urlTemplate = null;
+        URLStatic urlStaticFromDb = matchWithUrlStatic(apiCollectionId, url, method);
+        if (urlStaticFromDb != null) {
+            url = urlStaticFromDb.getUrl();
+        } else {
+            // URLs received by api analyser are raw urls (i.e. not templatised)
+            // So checking if it can be merged with any existing template URLs from db
+            urlTemplate = matchWithUrlTemplate(apiCollectionId, url, method);
+            if (urlTemplate != null) {
+                url = urlTemplate.getTemplateString();
+            }
         }
 
         String combinedUrl = apiCollectionId + "#" + url + "#" + method;
@@ -203,7 +247,7 @@ public class ResourceAnalyser {
         buildCatalog();
         populateHostNameToIdMap();
 
-        List<WriteModel<SingleTypeInfo>> dbUpdates = getDbUpdatesForParamTypeInfo();
+        List<WriteModel<SingleTypeInfo>> dbUpdates = getDbUpdatesForSingleTypeInfo();
         System.out.println("total count: " + dbUpdates.size());
         countMap = new HashMap<>();
         last_sync = Context.now();
@@ -212,16 +256,16 @@ public class ResourceAnalyser {
         }
     }
 
-    public List<WriteModel<SingleTypeInfo>> getDbUpdatesForParamTypeInfo() {
+    public List<WriteModel<SingleTypeInfo>> getDbUpdatesForSingleTypeInfo() {
         List<WriteModel<SingleTypeInfo>> bulkUpdates = new ArrayList<>();
         for (SingleTypeInfo singleTypeInfo: countMap.values()) {
             if (singleTypeInfo.getUniqueCount() == 0 && singleTypeInfo.getPublicCount() == 0) continue;
-            Bson filter = SingleTypeInfoDao.createFilters(singleTypeInfo);
+            Bson filter = SingleTypeInfoDao.createFiltersWithoutSubType(singleTypeInfo);
             Bson update = Updates.combine(
                     Updates.inc(SingleTypeInfo._UNIQUE_COUNT, singleTypeInfo.getUniqueCount()),
                     Updates.inc(SingleTypeInfo._PUBLIC_COUNT, singleTypeInfo.getPublicCount())
             );
-            bulkUpdates.add(new UpdateOneModel<>(filter, update, new UpdateOptions().upsert(true)));
+            bulkUpdates.add(new UpdateManyModel<>(filter, update, new UpdateOptions().upsert(false)));
         }
 
         return bulkUpdates;
