@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.regex.Pattern;
 
 public class Main {
     private Consumer<String, String> consumer;
@@ -64,7 +65,7 @@ public class Main {
 
         long i = 0;
         try {
-            main.consumer.subscribe(Collections.singleton(topicName));
+            main.consumer.subscribe(Pattern.compile(".*central"));
             while (true) {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 main.consumer.commitSync();
