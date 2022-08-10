@@ -3,7 +3,6 @@ package com.akto.analyser;
 import com.akto.DaoInit;
 import com.akto.InstanceDetails;
 import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.ParamTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.HttpResponseParams;
@@ -43,8 +42,6 @@ public class Main {
         int maxPollRecordsConfig = AccountSettings.DEFAULT_CENTRAL_KAFKA_MAX_POLL_RECORDS_CONFIG;
         String topicName = AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME;
         String groupIdConfig = "analyzer-group-config";
-
-        ParamTypeInfoDao.instance.createIndicesIfAbsent();
 
         final Main main = new Main();
         Properties properties = com.akto.runtime.Main.configProperties(centralBrokerIp, groupIdConfig, maxPollRecordsConfig);

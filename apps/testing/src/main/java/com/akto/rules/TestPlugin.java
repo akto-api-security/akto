@@ -96,7 +96,7 @@ public abstract class TestPlugin {
     }
 
 
-    public void addTestSuccessResult(ApiInfo.ApiInfoKey apiInfoKey, HttpResponseParams httpResponseParams, ObjectId testRunId, boolean vulnerable, List<ParamTypeInfo> paramTypeInfoList) {
+    public void addTestSuccessResult(ApiInfo.ApiInfoKey apiInfoKey, HttpResponseParams httpResponseParams, ObjectId testRunId, boolean vulnerable, List<SingleTypeInfo> paramTypeInfoList) {
         String message = null;
         try {
             message = RedactSampleData.convertHttpRespToOriginalString(httpResponseParams);
@@ -119,11 +119,11 @@ public abstract class TestPlugin {
         );
     }
 
-    public List<ParamTypeInfo> containsPrivateResource(HttpRequestParams httpRequestParams, ApiInfo.ApiInfoKey apiInfoKey) {
+    public List<SingleTypeInfo> containsPrivateResource(HttpRequestParams httpRequestParams, ApiInfo.ApiInfoKey apiInfoKey) {
         String urlWithParams = httpRequestParams.getURL();
         String url = apiInfoKey.url;
         URLMethods.Method method = apiInfoKey.getMethod();
-        List<ParamTypeInfo> privateParamTypeInfos = new ArrayList<>();
+        List<SingleTypeInfo> privateParamTypeInfos = new ArrayList<>();
 
         // check private resource in
         // 1. url
@@ -132,10 +132,9 @@ public abstract class TestPlugin {
             String[] tokens = urlTemplate.getTokens();
             for (int i = 0;i < tokens.length; i++) {
                 if (tokens[i] == null) {
-                    ParamTypeInfo paramTypeInfo = SampleMessageStore.buildParamTypeInfo(i+"", true,apiInfoKey, false);
-                    SampleMessageStore.State state = SampleMessageStore.findState(paramTypeInfo, true);
-                    if (state.equals(SampleMessageStore.State.PRIVATE)) {
-                        privateParamTypeInfos.add(paramTypeInfo);
+                    SingleTypeInfo singleTypeInfo = SampleMessageStore.findPrivateSTI(i+"", true,apiInfoKey, false, -1);
+                    if (singleTypeInfo != null) {
+                        privateParamTypeInfos.add(singleTypeInfo);
                     }
                 }
             }
@@ -145,10 +144,9 @@ public abstract class TestPlugin {
         BasicDBObject payload = RequestTemplate.parseRequestPayload(httpRequestParams, urlWithParams);
         Map<String, Set<Object>> flattened = JSONUtils.flatten(payload);
         for (String param: flattened.keySet()) {
-            ParamTypeInfo paramTypeInfo = SampleMessageStore.buildParamTypeInfo(param,false,apiInfoKey, false);
-            SampleMessageStore.State state = SampleMessageStore.findState(paramTypeInfo, true);
-            if (state.equals(SampleMessageStore.State.PRIVATE)) {
-                privateParamTypeInfos.add(paramTypeInfo);
+            SingleTypeInfo singleTypeInfo = SampleMessageStore.findPrivateSTI(param, true,apiInfoKey, false, -1);
+            if (singleTypeInfo != null) {
+                privateParamTypeInfos.add(singleTypeInfo);
             }
         }
 

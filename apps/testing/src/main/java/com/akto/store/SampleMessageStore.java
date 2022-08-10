@@ -1,7 +1,7 @@
 package com.akto.store;
 
-import com.akto.dao.ParamTypeInfoDao;
 import com.akto.dao.SampleDataDao;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
@@ -10,7 +10,7 @@ import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.APICatalog;
-import com.akto.dto.type.ParamTypeInfo;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.parsers.HttpCallParser;
 import com.akto.testing.ApiExecutor;
 import com.mongodb.BasicDBObject;
@@ -23,71 +23,64 @@ import java.util.*;
 public class SampleMessageStore {
 
     public static Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
-    public static Map<String, ParamTypeInfo> paramTypeInfoMap = new HashMap<>();
+    public static Map<String, SingleTypeInfo> singleTypeInfos = new HashMap<>();
 
     private static final Logger logger = LoggerFactory.getLogger(SampleMessageStore.class);
     public static void buildParameterInfoMap(TestingEndpoints testingEndpoints) {
         if (testingEndpoints == null) return;
         TestingEndpoints.Type type = testingEndpoints.getType();
-        List<ParamTypeInfo> paramTypeInfoList = new ArrayList<>();
-        paramTypeInfoMap = new HashMap<>();
+        List<SingleTypeInfo> singleTypeInfoList = new ArrayList<>();
+        singleTypeInfos = new HashMap<>();
         try {
             if (type.equals(TestingEndpoints.Type.COLLECTION_WISE)) {
                 CollectionWiseTestingEndpoints collectionWiseTestingEndpoints = (CollectionWiseTestingEndpoints) testingEndpoints;
                 int apiCollectionId = collectionWiseTestingEndpoints.getApiCollectionId();
-                paramTypeInfoList = ParamTypeInfoDao.instance.findAll(Filters.eq(ParamTypeInfo.API_COLLECTION_ID, apiCollectionId));
+                singleTypeInfoList = SingleTypeInfoDao.instance.findAll(
+                        Filters.and(
+                                Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
+                                Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1)
+                        )
+                );
             } else {
                 logger.error("ONLY COLLECTION TYPE TESTING ENDPOINTS ALLOWED");
             }
 
-            for (ParamTypeInfo paramTypeInfo: paramTypeInfoList) {
-                paramTypeInfoMap.put(paramTypeInfo.composeKey(), paramTypeInfo);
+            for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
+                String url = singleTypeInfo.getUrl();
+                // this is done because of a bug in runtime where some static urls lose their leading slash
+                // but in apiAnalyser it is guaranteed to have leading slash. So to be consistent we force add one.
+                if (!APICatalog.isTemplateUrl(url) && !url.startsWith("/")) {
+                    url = "/" + url;
+                }
+                singleTypeInfo.setUrl(url);
+                singleTypeInfos.put(singleTypeInfo.composeKeyWithCustomSubType(SingleTypeInfo.GENERIC), singleTypeInfo);
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    public static ParamTypeInfo buildParamTypeInfo(String param, boolean isUrlParam,
-                                                   ApiInfo.ApiInfoKey apiInfoKey, boolean isHeader) {
+    public static SingleTypeInfo findPrivateSTI(String param, boolean isUrlParam,
+                                                ApiInfo.ApiInfoKey apiInfoKey, boolean isHeader, int responseCode) {
 
-        String url = apiInfoKey.url;
-        // this is done because of a bug in runtime where some static urls lose their leading slash
-        // but in apiAnalyser it is guaranteed to have leading slash. So to be consistent we force add one.
-        if (!APICatalog.isTemplateUrl(url) && !url.startsWith("/")) {
-            url = "/" + url;
-        }
+        String key = SingleTypeInfo.composeKey(
+                apiInfoKey.url, apiInfoKey.method.name(), responseCode, isHeader,
+                param,SingleTypeInfo.GENERIC, apiInfoKey.getApiCollectionId(), isUrlParam
+        );
 
-        return new ParamTypeInfo(
-                apiInfoKey.getApiCollectionId(), url, apiInfoKey.method.name(), -1, isHeader,
-                isUrlParam, param);
+        SingleTypeInfo singleTypeInfo = singleTypeInfos.get(key);
+        if (singleTypeInfo == null) return null;
 
-    }
+        long publicCount = singleTypeInfo.getPublicCount();
+        long uniqueCount = singleTypeInfo.getUniqueCount();
 
-    public static State findState(ParamTypeInfo originalParamTypeInfo, boolean updateWithCount) {
-
-        String key = originalParamTypeInfo.composeKey();
-        ParamTypeInfo paramTypeInfo = paramTypeInfoMap.get(key);
-        if (paramTypeInfo == null) {
-            return State.NA;
-        }
-
-        long publicCount = paramTypeInfo.getPublicCount();
-        long uniqueCount = paramTypeInfo.getUniqueCount();
-
-        // update original paramTypeInfo
-        if (updateWithCount) {
-            originalParamTypeInfo.setUniqueCount(uniqueCount);
-            originalParamTypeInfo.setPublicCount(publicCount);
-        }
-
-        if (uniqueCount == 0) return State.PUBLIC;
+        if (uniqueCount == 0) return null;
 
         double v = (1.0*publicCount) / uniqueCount;
-        if (v <= ParamTypeInfo.THRESHOLD) {
-            return State.PRIVATE;
+        if (v <= SingleTypeInfo.THRESHOLD) {
+            return singleTypeInfo;
         } else {
-            return State.PUBLIC;
+            return null;
         }
 
     }

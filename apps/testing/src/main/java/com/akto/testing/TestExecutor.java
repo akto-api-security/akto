@@ -1,11 +1,9 @@
 package com.akto.testing;
 
-import com.akto.dao.ParamTypeInfoDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.CollectionWiseTestingEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.TestingRun;
-import com.akto.dto.type.ParamTypeInfo;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.rules.BOLATest;
 import com.akto.rules.NoAuthTest;

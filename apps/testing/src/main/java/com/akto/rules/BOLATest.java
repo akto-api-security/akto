@@ -5,7 +5,7 @@ import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
-import com.akto.dto.type.ParamTypeInfo;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.testing.ApiExecutor;
@@ -37,8 +37,8 @@ public class BOLATest extends TestPlugin {
         boolean result = authMechanism.addAuthToRequest(httpRequestParams);
         if (!result) return false; // this means that auth token was not there in original request so exit
 
-        List<ParamTypeInfo> privateParamTypeInfos = containsPrivateResource(httpRequestParams, apiInfoKey);
-        if (privateParamTypeInfos.isEmpty()) {
+        List<SingleTypeInfo> privateSingleTypeInfos = containsPrivateResource(httpRequestParams, apiInfoKey);
+        if (privateSingleTypeInfos.isEmpty()) {
             HttpResponseParams newHttpResponseParams = generateEmptyResponsePayload(httpRequestParams);
             addTestSuccessResult(apiInfoKey, newHttpResponseParams, testRunId, false, new ArrayList<>());
             return false;
@@ -60,7 +60,7 @@ public class BOLATest extends TestPlugin {
             vulnerable = val > 90;
         }
 
-        addTestSuccessResult(apiInfoKey,httpResponseParams, testRunId, vulnerable, privateParamTypeInfos);
+        addTestSuccessResult(apiInfoKey,httpResponseParams, testRunId, vulnerable, privateSingleTypeInfos);
 
         return vulnerable;
     }
