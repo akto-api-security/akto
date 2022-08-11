@@ -26,7 +26,7 @@ public class SampleMessageStore {
     public static Map<String, SingleTypeInfo> singleTypeInfos = new HashMap<>();
 
     private static final Logger logger = LoggerFactory.getLogger(SampleMessageStore.class);
-    public static void buildParameterInfoMap(TestingEndpoints testingEndpoints) {
+    public static void buildSingleTypeInfoMap(TestingEndpoints testingEndpoints) {
         if (testingEndpoints == null) return;
         TestingEndpoints.Type type = testingEndpoints.getType();
         List<SingleTypeInfo> singleTypeInfoList = new ArrayList<>();
@@ -38,7 +38,8 @@ public class SampleMessageStore {
                 singleTypeInfoList = SingleTypeInfoDao.instance.findAll(
                         Filters.and(
                                 Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
-                                Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1)
+                                Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1),
+                                Filters.eq(SingleTypeInfo._IS_HEADER, false)
                         )
                 );
             } else {
