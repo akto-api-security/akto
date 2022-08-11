@@ -310,23 +310,38 @@ public class SingleTypeInfo {
         }
     }
 
+    public static final String _URL = "url";
     String url;
+    public static final String _METHOD = "method";
     String method;
+    public static final String _RESPONSE_CODE = "responseCode";
     int responseCode;
+    public static final String _IS_HEADER = "isHeader";
     boolean isHeader;
+    public static final String _PARAM = "param";
     String param;
+    public static final String SUB_TYPE = "subType";
     @BsonIgnore
     SubType subType;
+    public static final String SUBTYPE_STRING = "subTypeString";
     @BsonProperty("subType")
     String subTypeString;
+    public static final String _EXAMPLES  = "examples";
     Set<Object> examples = new HashSet<>();
+    public static final String _USER_IDS = "userIds";
     Set<String> userIds = new HashSet<>();
+    public static final String _COUNT = "count";
     int count;
+    public static final String _TIMESTAMP = "timestamp";
     int timestamp;
+    public static final String _DURATION = "duration";
     int duration;
+    public static final String _API_COLLECTION_ID = "apiCollectionId";
     int apiCollectionId;
+    public static final String _SENSITIVE = "sensitive";
     @BsonIgnore
     boolean sensitive;
+    public static final String _IS_URL_PARAM = "isUrlParam";
     boolean isUrlParam;
     public static final String _VALUES = "values";
     public static final int VALUES_LIMIT = 50;
@@ -341,6 +356,12 @@ public class SingleTypeInfo {
     long maxValue = ACCEPTED_MIN_VALUE;  // this value will be used when field doesn't exist in db
     public static final String LAST_SEEN = "lastSeen";
     long lastSeen;
+
+    public static final String _UNIQUE_COUNT = "uniqueCount";
+    public long uniqueCount = 0L;
+    public static final String _PUBLIC_COUNT = "publicCount";
+    public long publicCount = 0L;
+    public static final double THRESHOLD = 0.1;
 
     public enum Domain {
         ENUM, RANGE, ANY
@@ -396,8 +417,17 @@ public class SingleTypeInfo {
     }
 
     public String composeKey() {
+        return composeKey(url, method, responseCode, isHeader, param, subType, apiCollectionId, isUrlParam);
+    }
+
+    public String composeKeyWithCustomSubType(SubType s) {
+        return composeKey(url, method, responseCode, isHeader, param, s, apiCollectionId, isUrlParam);
+    }
+
+    public static String composeKey(String url, String method, int responseCode, boolean isHeader, String param, SubType subType, int apiCollectionId, boolean isUrlParam) {
         return StringUtils.joinWith("@", url, method, responseCode, isHeader, param, subType, apiCollectionId, isUrlParam);
     }
+
 
     public void incr() {
         this.count++;
@@ -428,6 +458,8 @@ public class SingleTypeInfo {
         singleTypeInfo.minValue = this.minValue;
         singleTypeInfo.maxValue = this.maxValue;
         singleTypeInfo.domain = this.domain;
+        singleTypeInfo.uniqueCount = this.uniqueCount;
+        singleTypeInfo.publicCount = this.publicCount;
         return singleTypeInfo;
     }
 
@@ -587,6 +619,7 @@ public class SingleTypeInfo {
     }
 
     public boolean getSensitive() {
+        if (this.subType == null) return false; // this was done for paramStateAction because it uses projections and doesn't return subType
         return this.subType.isSensitive(this.findPosition());
     }
 
@@ -636,6 +669,14 @@ public class SingleTypeInfo {
         }
     }
 
+    public void incPublicCount(int c) {
+        this.publicCount += c;
+    }
+
+    public void incUniqueCount(int c) {
+        this.uniqueCount += c;
+    }
+
     public void merge(SingleTypeInfo that) {
         if (that != null) {
             this.count += that.getCount();
@@ -643,6 +684,8 @@ public class SingleTypeInfo {
             this.minValue = min(this.minValue, that.minValue);
             this.maxValue = max(this.maxValue, that.maxValue);
             this.lastSeen = max(this.lastSeen, that.lastSeen);
+            this.publicCount += that.publicCount;
+            this.uniqueCount += that.uniqueCount;
         }
     }
 
@@ -670,4 +713,19 @@ public class SingleTypeInfo {
         this.lastSeen = lastSeen;
     }
 
+    public long getUniqueCount() {
+        return uniqueCount;
+    }
+
+    public void setUniqueCount(long uniqueCount) {
+        this.uniqueCount = uniqueCount;
+    }
+
+    public long getPublicCount() {
+        return publicCount;
+    }
+
+    public void setPublicCount(long publicCount) {
+        this.publicCount = publicCount;
+    }
 }

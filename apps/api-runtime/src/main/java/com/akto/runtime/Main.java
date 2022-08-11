@@ -2,6 +2,9 @@ package com.akto.runtime;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import com.akto.DaoInit;
 import com.akto.dao.*;
@@ -95,8 +98,8 @@ public class Main {
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
         if (accountSettings != null && accountSettings.getCentralKafkaIp()!= null) {
             String centralKafkaBrokerUrl = accountSettings.getCentralKafkaIp();
-            int centralKafkaBatchSize = 0;
-            int centralKafkaLingerMS = 0;
+            int centralKafkaBatchSize = AccountSettings.DEFAULT_CENTRAL_KAFKA_BATCH_SIZE;
+            int centralKafkaLingerMS = AccountSettings.DEFAULT_CENTRAL_KAFKA_LINGER_MS;
             if (centralKafkaBrokerUrl != null) {
                 kafkaProducer = new Kafka(centralKafkaBrokerUrl, centralKafkaLingerMS, centralKafkaBatchSize);
                 logger.info("Connected to central kafka @ " + Context.now());
@@ -104,6 +107,8 @@ public class Main {
 
         }
     }
+
+    public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
@@ -131,8 +136,16 @@ public class Main {
         insertRuntimeFilters();
 
         String centralKafkaTopicName = AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME;
+
         buildKafka();
-        int lastKafkaProducerSync = Context.now();
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                if (kafkaProducer == null || !kafkaProducer.producerReady) {
+                    buildKafka();
+                }
+            }
+        }, 5, 5, TimeUnit.MINUTES);
+
 
         try {
             AccountSettingsDao.instance.updateVersion(AccountSettings.API_RUNTIME_VERSION);
@@ -188,13 +201,7 @@ public class Main {
             while (true) {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 main.consumer.commitSync();
-                if (lastKafkaProducerSync < (Context.now() - 120)) {
-                    if (kafkaProducer == null || !kafkaProducer.producerReady) {
-                        buildKafka();
-                        lastKafkaProducerSync = Context.now();
-                    }
-                }
-                
+
                 // TODO: what happens if exception
                 Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
                 for (ConsumerRecord<String,String> r: records) {

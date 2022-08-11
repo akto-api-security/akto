@@ -1,6 +1,7 @@
 package com.akto.dto.testing;
 
-import com.akto.dto.type.ParamTypeInfo;
+
+import com.akto.dto.type.SingleTypeInfo;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -11,17 +12,17 @@ public class TestResult {
     private boolean vulnerable;
     private List<TestError> errors;
 
-    private List<ParamTypeInfo> privateParamTypeInfoList = new ArrayList<>();
+    private List<SingleTypeInfo> privateSingleTypeInfos = new ArrayList<>();
 
     public enum TestError {
         NO_PATH, NO_HAPPY_PATH, NO_AUTH_MECHANISM, API_REQUEST_FAILED
     }
 
-    public TestResult(String message, boolean vulnerable, List<TestError> errors, List<ParamTypeInfo> paramTypeInfoList) {
+    public TestResult(String message, boolean vulnerable, List<TestError> errors, List<SingleTypeInfo> privateSingleTypeInfos) {
         this.message = message;
         this.vulnerable = vulnerable;
         this.errors = errors;
-        this.privateParamTypeInfoList = paramTypeInfoList;
+        this.privateSingleTypeInfos = privateSingleTypeInfos;
     }
 
     public TestResult() {
@@ -51,11 +52,11 @@ public class TestResult {
         this.errors = errors;
     }
 
-    public List<ParamTypeInfo> getPrivateParamTypeInfoList() {
-        return privateParamTypeInfoList;
+    public List<SingleTypeInfo> getPrivateSingleTypeInfos() {
+        return privateSingleTypeInfos;
     }
 
-    public void setPrivateParamTypeInfoList(List<ParamTypeInfo> privateParamTypeInfoList) {
-        this.privateParamTypeInfoList = privateParamTypeInfoList;
+    public void setPrivateSingleTypeInfos(List<SingleTypeInfo> privateSingleTypeInfos) {
+        this.privateSingleTypeInfos = privateSingleTypeInfos;
     }
 }

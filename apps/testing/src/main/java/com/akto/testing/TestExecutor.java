@@ -1,16 +1,11 @@
 package com.akto.testing;
 
-import com.akto.dao.ParamTypeInfoDao;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.testing.CollectionWiseTestingEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.TestingRun;
-import com.akto.dto.type.ParamTypeInfo;
-import com.akto.dto.type.RequestTemplate;
 import com.akto.rules.BOLATest;
 import com.akto.rules.NoAuthTest;
 import com.akto.store.SampleMessageStore;
-import com.mongodb.client.model.Filters;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +24,7 @@ public class TestExecutor {
     public void init(TestingRun testingRun) {
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
-        SampleMessageStore.buildParameterInfoMap(testingEndpoints);
+        SampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
 
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;

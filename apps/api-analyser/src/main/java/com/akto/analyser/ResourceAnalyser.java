@@ -7,6 +7,7 @@ import com.akto.dto.type.*;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
+import com.akto.types.CappedSet;
 import com.akto.util.JSONUtils;
 import com.google.common.base.Charsets;
 import com.google.common.hash.BloomFilter;
@@ -20,7 +21,7 @@ import java.util.*;
 public class ResourceAnalyser {
     BloomFilter<CharSequence> duplicateCheckerBF;
     BloomFilter<CharSequence> valuesBF;
-    Map<String, ParamTypeInfo> countMap = new HashMap<>();
+    Map<String, SingleTypeInfo> countMap = new HashMap<>();
 
     int last_sync = 0;
 
@@ -45,6 +46,38 @@ public class ResourceAnalyser {
         for (URLTemplate urlTemplate: catalog.getTemplateURLToMethods().keySet()) {
             if (urlTemplate.match(urlStatic)) return urlTemplate;
         }
+        return null;
+    }
+
+    public URLStatic matchWithUrlStatic(int apiCollectionId, String url, String method) {
+        APICatalog catalog = catalogMap.get(apiCollectionId);
+        if (catalog == null) return null;
+        URLStatic urlStatic = new URLStatic(url, URLMethods.Method.valueOf(method));
+
+        Map<URLStatic, RequestTemplate> strictURLToMethods = catalog.getStrictURLToMethods();
+        if (strictURLToMethods.containsKey(urlStatic)) return urlStatic;
+
+        if (url.length() < 2) return null;
+
+        List<String> urlVariations = new ArrayList<>();
+        if (url.startsWith("/")) {
+            urlVariations.add(url.substring(1));
+            urlVariations.add(url.substring(1).toLowerCase());
+        }
+        urlVariations.add(url.toLowerCase());
+
+        if (url.endsWith("/")) {
+            urlVariations.add(url.substring(0, url.length()-1));
+            urlVariations.add(url.substring(0, url.length()-1).toLowerCase());
+        }
+
+        for (String modifiedUrl: urlVariations) {
+            URLStatic urlStaticModified = new URLStatic(modifiedUrl, URLMethods.Method.valueOf(method));
+            if (strictURLToMethods.containsKey(urlStaticModified)) {
+                return urlStaticModified;
+            };
+        }
+
         return null;
     }
 
@@ -79,11 +112,23 @@ public class ResourceAnalyser {
         String baseUrl = urlStatic.getUrl();
         String url = baseUrl;
 
-        // URLs received by api analyser are raw urls (i.e. not templatised)
-        // So checking if it can be merged with any existing template URLs from db
-        URLTemplate urlTemplate = matchWithUrlTemplate(apiCollectionId, url, method);
-        if (urlTemplate != null) {
-            url = urlTemplate.getTemplateString();
+        // there is a bug in runtime because of which some static URLs don't have leading slash
+        // this checks and returns the actual url to be used
+        // if we don't find it then check in templates
+        // It is possible we don't find it still because of sync of runtime happening after analyser receiving data
+        // in that case we still update (assuming leading slash bug doesn't exist)
+        // if by the time update is made db has that url then good else update will fail as upsert is false
+        URLTemplate urlTemplate = null;
+        URLStatic urlStaticFromDb = matchWithUrlStatic(apiCollectionId, url, method);
+        if (urlStaticFromDb != null) {
+            url = urlStaticFromDb.getUrl();
+        } else {
+            // URLs received by api analyser are raw urls (i.e. not templatised)
+            // So checking if it can be merged with any existing template URLs from db
+            urlTemplate = matchWithUrlTemplate(apiCollectionId, url, method);
+            if (urlTemplate != null) {
+                url = urlTemplate.getTemplateString();
+            }
         }
 
         String combinedUrl = apiCollectionId + "#" + url + "#" + method;
@@ -140,7 +185,10 @@ public class ResourceAnalyser {
         String paramValue = convertToParamValue(paramObject);
         if (paramValue == null) return ;
 
-        ParamTypeInfo paramTypeInfo = new ParamTypeInfo(apiCollectionId, url, method, statusCode,isHeader, isUrlParam, param);
+        SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(
+                url, method, statusCode, isHeader, param, SingleTypeInfo.GENERIC, apiCollectionId, isUrlParam
+        );
+        SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 0 , 0, 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
 
         // check if moved
         boolean moved = checkIfMoved(combinedUrl, param, paramValue);
@@ -152,13 +200,13 @@ public class ResourceAnalyser {
 
         // check if present
         boolean present = checkIfPresent(combinedUrl, param, paramValue);
-        ParamTypeInfo paramTypeInfo1 = countMap.computeIfAbsent(paramTypeInfo.composeKey(), k -> paramTypeInfo);
+        SingleTypeInfo singleTypeInfo1 = countMap.computeIfAbsent(singleTypeInfo.composeKey(), k -> singleTypeInfo);
         if (present) {
             markMoved(combinedUrl, param, paramValue);
-            paramTypeInfo1.incPublicCount(1);
+            singleTypeInfo1.incPublicCount(1);
         } else {
             addToValueBF(combinedUrl, param, paramValue);
-            paramTypeInfo1.incUniqueCount(1);
+            singleTypeInfo1.incUniqueCount(1);
         }
     }
 
@@ -195,80 +243,29 @@ public class ResourceAnalyser {
     }
 
 
-    // this function is responsible for cleaning any paramInfo whose URLs got merged or got deleted
-    // for example -> if /api/books/1 got converted to api/books/INTEGER it will delete all /api/books/1 data (obviously taking apiCollectionId and method into account)
-    public List<WriteModel<ParamTypeInfo>> clean() {
-        List<WriteModel<ParamTypeInfo>> bulkUpdates = new ArrayList<>();
-        List<ApiInfo.ApiInfoKey> apis = ParamTypeInfoDao.instance.fetchEndpointsInCollection();
-        for (ApiInfo.ApiInfoKey apiInfoKey: apis) {
-            int apiCollectionId = apiInfoKey.getApiCollectionId();
-            String url = apiInfoKey.url;
-            URLMethods.Method method = apiInfoKey.getMethod();
-            APICatalog catalog = catalogMap.get(apiCollectionId);
-            if (catalog == null) {
-                bulkUpdates.add(new DeleteManyModel<>(Filters.eq(ParamTypeInfo.API_COLLECTION_ID, apiCollectionId)));
-                continue;
-            }
-
-            URLStatic urlStatic = new URLStatic(url, method);
-            if (catalog.getStrictURLToMethods().containsKey(urlStatic)) {
-                continue;
-            }
-
-            String trimmedUrl = APICatalogSync.trim(url);
-            if (catalog.getStrictURLToMethods().containsKey(new URLStatic(trimmedUrl, method))) {
-                continue;
-            }
-
-            boolean flag = false;
-            for (URLTemplate urlTemplate: catalog.getTemplateURLToMethods().keySet()) {
-                if (urlTemplate.match(urlStatic)) {
-                    flag = true;
-                    break;
-                }
-            }
-
-            if (!flag) {
-                Bson filter = Filters.and(
-                        Filters.eq(ParamTypeInfo.API_COLLECTION_ID, apiCollectionId),
-                        Filters.eq(ParamTypeInfo.URL, url),
-                        Filters.eq(ParamTypeInfo.METHOD, method.name())
-                );
-                bulkUpdates.add(new DeleteManyModel<>(filter));
-            }
-
-        }
-
-        return bulkUpdates;
-    }
-
-
-
     public void syncWithDb() {
         buildCatalog();
         populateHostNameToIdMap();
 
-        List<WriteModel<ParamTypeInfo>> dbUpdates = clean();
-        System.out.println("delete count: " + dbUpdates.size());
-        dbUpdates.addAll(getDbUpdatesForParamTypeInfo());
+        List<WriteModel<SingleTypeInfo>> dbUpdates = getDbUpdatesForSingleTypeInfo();
         System.out.println("total count: " + dbUpdates.size());
         countMap = new HashMap<>();
         last_sync = Context.now();
         if (dbUpdates.size() > 0) {
-            ParamTypeInfoDao.instance.getMCollection().bulkWrite(dbUpdates);
+            SingleTypeInfoDao.instance.getMCollection().bulkWrite(dbUpdates);
         }
     }
 
-    public List<WriteModel<ParamTypeInfo>> getDbUpdatesForParamTypeInfo() {
-        List<WriteModel<ParamTypeInfo>> bulkUpdates = new ArrayList<>();
-        for (ParamTypeInfo paramTypeInfo: countMap.values()) {
-            if (paramTypeInfo.uniqueCount == 0 && paramTypeInfo.getPublicCount() == 0) continue;
-            Bson filter = ParamTypeInfoDao.createFilters(paramTypeInfo);
+    public List<WriteModel<SingleTypeInfo>> getDbUpdatesForSingleTypeInfo() {
+        List<WriteModel<SingleTypeInfo>> bulkUpdates = new ArrayList<>();
+        for (SingleTypeInfo singleTypeInfo: countMap.values()) {
+            if (singleTypeInfo.getUniqueCount() == 0 && singleTypeInfo.getPublicCount() == 0) continue;
+            Bson filter = SingleTypeInfoDao.createFiltersWithoutSubType(singleTypeInfo);
             Bson update = Updates.combine(
-                    Updates.inc(ParamTypeInfo.UNIQUE_COUNT, paramTypeInfo.getUniqueCount()),
-                    Updates.inc(ParamTypeInfo.PUBLIC_COUNT, paramTypeInfo.getPublicCount())
+                    Updates.inc(SingleTypeInfo._UNIQUE_COUNT, singleTypeInfo.getUniqueCount()),
+                    Updates.inc(SingleTypeInfo._PUBLIC_COUNT, singleTypeInfo.getPublicCount())
             );
-            bulkUpdates.add(new UpdateOneModel<>(filter, update, new UpdateOptions().upsert(true)));
+            bulkUpdates.add(new UpdateManyModel<>(filter, update, new UpdateOptions().upsert(false)));
         }
 
         return bulkUpdates;

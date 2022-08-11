@@ -28,7 +28,7 @@ public class InsertRecordsInKafka {
 
     public static void main(String[] args) throws InterruptedException {
 //        insertSampleDataIntoKafka();
-        checkKafkaQueueSize(ANALYSE_TOPIC, "asdfd3", KAFKA_URL);
+        checkKafkaQueueSize(RUNTIME_TOPIC, "asdfd3", KAFKA_URL);
         //209447
         try {
             Thread.sleep(10_000);
@@ -50,9 +50,9 @@ public class InsertRecordsInKafka {
                 System.out.println("s: " + i);
                 kafka.send(message, RUNTIME_TOPIC);
 
-                if (i%30 == 0 && !kafka.producerReady) {
-                    kafka = new Kafka(KAFKA_URL,0, 0);
-                }
+//                if (i%30 == 0 && !kafka.producerReady) {
+//                    kafka = new Kafka(KAFKA_URL,0, 0);
+//                }
 
                 try {
 //                    Thread.sleep(1000);
@@ -65,7 +65,7 @@ public class InsertRecordsInKafka {
 
         System.out.println("sent: " + i);
         try {
-            Thread.sleep(3000);
+            Thread.sleep(10_000);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }

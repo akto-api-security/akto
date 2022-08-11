@@ -3,7 +3,6 @@ package com.akto.analyser;
 import com.akto.DaoInit;
 import com.akto.InstanceDetails;
 import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.ParamTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.HttpResponseParams;
@@ -20,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.regex.Pattern;
 
 public class Main {
     private Consumer<String, String> consumer;
@@ -44,8 +44,6 @@ public class Main {
         String topicName = AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME;
         String groupIdConfig = "analyzer-group-config";
 
-        ParamTypeInfoDao.instance.createIndicesIfAbsent();
-
         final Main main = new Main();
         Properties properties = com.akto.runtime.Main.configProperties(centralBrokerIp, groupIdConfig, maxPollRecordsConfig);
         main.consumer = new KafkaConsumer<>(properties);
@@ -67,7 +65,7 @@ public class Main {
 
         long i = 0;
         try {
-            main.consumer.subscribe(Collections.singleton(topicName));
+            main.consumer.subscribe(Pattern.compile(".*central"));
             while (true) {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 main.consumer.commitSync();

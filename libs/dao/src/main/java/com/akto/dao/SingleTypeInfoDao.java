@@ -62,17 +62,28 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return this.findAll(new BasicDBObject());
     }
 
+    public static Bson createFiltersWithoutSubType(SingleTypeInfo info) {
+        List<Bson> filters = createFiltersBasic(info);
+        return Filters.and(filters);
+    }
+
+
+    public static List<Bson> createFiltersBasic(SingleTypeInfo info) {
+        List<Bson> filters = new ArrayList<>();
+        filters.add(Filters.eq("url", info.getUrl()));
+        filters.add(Filters.eq("method", info.getMethod()));
+        filters.add(Filters.eq("responseCode", info.getResponseCode()));
+        filters.add(Filters.eq("isHeader", info.getIsHeader()));
+        filters.add(Filters.eq("param", info.getParam()));
+        filters.add(Filters.eq("apiCollectionId", info.getApiCollectionId()));
+        filters.add(Filters.eq("isUrlParam", info.isUrlParam()));
+        return filters;
+    }
+
     public static Bson createFilters(SingleTypeInfo info) {
-        return Filters.and(
-                Filters.eq("url", info.getUrl()),
-                Filters.eq("method", info.getMethod()),
-                Filters.eq("responseCode", info.getResponseCode()),
-                Filters.eq("isHeader", info.getIsHeader()),
-                Filters.eq("param", info.getParam()),
-                Filters.eq("subType", info.getSubType().getName()),
-                Filters.eq("apiCollectionId", info.getApiCollectionId()),
-                Filters.eq("isUrlParam", info.isUrlParam())
-        );
+        List<Bson> filters = createFiltersBasic(info);
+        filters.add(Filters.eq("subType", info.getSubType().getName()));
+        return Filters.and(filters);
     }
 
     public Set<String> getUniqueEndpoints(int apiCollectionId) {
