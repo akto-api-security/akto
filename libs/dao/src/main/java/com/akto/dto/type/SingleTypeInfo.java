@@ -619,6 +619,7 @@ public class SingleTypeInfo {
     }
 
     public boolean getSensitive() {
+        if (this.subType == null) return false; // this was done for paramStateAction because it uses projections and doesn't return subType
         return this.subType.isSensitive(this.findPosition());
     }
 

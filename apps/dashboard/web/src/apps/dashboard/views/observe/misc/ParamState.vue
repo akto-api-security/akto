@@ -75,9 +75,9 @@ export default {
         fetchParamsStatus() {
             this.items = [];
             api.fetchParamsStatus().then((resp) => {
-                let paramTypeInfoList = resp.paramTypeInfoList
-                for (let idx =0; idx < paramTypeInfoList.length; idx++) {
-                    let paramTypeInfo = paramTypeInfoList[idx]
+                let privateSingleTypeInfo = resp.privateSingleTypeInfo
+                for (let idx =0; idx < privateSingleTypeInfo.length; idx++) {
+                    let paramTypeInfo = privateSingleTypeInfo[idx]
                     let coll = this.apiCollections.find(x => x.id === paramTypeInfo.apiCollectionId);
                     this.items.push(
                         {
