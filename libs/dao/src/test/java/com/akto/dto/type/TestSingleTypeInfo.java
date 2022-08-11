@@ -1,5 +1,6 @@
 package com.akto.dto.type;
 
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.types.CappedSet;
 import org.junit.Test;
@@ -9,6 +10,56 @@ import java.util.HashSet;
 import static org.junit.Assert.*;
 
 public class TestSingleTypeInfo {
+
+    @Test
+    public void testCopy() {
+        SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId("url", "GET", 200, true, "param", SingleTypeInfo.EMAIL, 100, false);
+        CappedSet<String> values = new CappedSet<>();
+        values.add("ankush");
+        values.add("avneesh");
+        values.add("ankita");
+        SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 10,0,0,values, SingleTypeInfo.Domain.ANY, 100, 1000);
+        singleTypeInfo.setUniqueCount(1000);
+        singleTypeInfo.setPublicCount(9999);
+
+        SingleTypeInfo singleTypeInfoCopy = singleTypeInfo.copy();
+
+        assertEquals(singleTypeInfo, singleTypeInfoCopy);
+        assertEquals(singleTypeInfo.getValues().getElements().size(), singleTypeInfoCopy.getValues().getElements().size());
+        assertEquals(singleTypeInfo.getMinValue(), singleTypeInfoCopy.getMinValue());
+        assertEquals(singleTypeInfo.getMaxValue(), singleTypeInfoCopy.getMaxValue());
+        assertEquals(singleTypeInfo.getCount(), singleTypeInfoCopy.getCount());
+        assertEquals(singleTypeInfo.getDomain(), singleTypeInfoCopy.getDomain());
+        assertEquals(singleTypeInfo.getUniqueCount(), singleTypeInfoCopy.getUniqueCount());
+        assertEquals(singleTypeInfo.getPublicCount(), singleTypeInfoCopy.getPublicCount());
+
+    }
+
+    @Test
+    public void testMerge() {
+        SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId("url", "GET", 200, true, "param", SingleTypeInfo.EMAIL, 100, false);
+        CappedSet<String> values1 = new CappedSet<>();
+        values1.add("ankush");
+        values1.add("avneesh");
+        SingleTypeInfo singleTypeInfo1 = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 10,0,0,values1, SingleTypeInfo.Domain.ANY, 100, 1000);
+        singleTypeInfo1.setUniqueCount(100);
+        singleTypeInfo1.setPublicCount(200);
+
+        CappedSet<String> values2 = new CappedSet<>();
+        values2.add("ankita");
+        SingleTypeInfo singleTypeInfo2 = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 3,0,0,values2, SingleTypeInfo.Domain.ANY, 200, 2000);
+        singleTypeInfo2.setUniqueCount(100);
+        singleTypeInfo2.setPublicCount(200);
+
+        singleTypeInfo1.merge(singleTypeInfo2);
+
+        assertEquals(singleTypeInfo1.getCount(),13);
+        assertEquals(singleTypeInfo1.getValues().getElements().size(),3);
+        assertEquals(singleTypeInfo1.getMinValue(), 100);
+        assertEquals(singleTypeInfo1.getMaxValue(), 2000);
+        assertEquals(singleTypeInfo1.getUniqueCount(), 200);
+        assertEquals(singleTypeInfo1.getPublicCount(), 400);
+    }
 
     @Test
     public void testSubTypeIsSensitive() {

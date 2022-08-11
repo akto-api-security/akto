@@ -12,10 +12,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.types.CappedSet;
 import com.akto.utils.MongoBasedTest;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.UpdateOneModel;
-import com.mongodb.client.model.UpdateOptions;
-import com.mongodb.client.model.Updates;
-import com.mongodb.client.model.WriteModel;
+import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.junit.Test;
 
@@ -186,7 +183,7 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
 
         List<ApiInfo.ApiInfoKey> apiInfoKeyList0 = SingleTypeInfoDao.instance.fetchEndpointsInCollection(0);
         List<ApiInfo.ApiInfoKey> apiInfoKeyList1 = SingleTypeInfoDao.instance.fetchEndpointsInCollection(1);
-        List<ApiInfo.ApiInfoKey> apiInfoKeyList2 = SingleTypeInfoDao.instance.fetchEndpointsInCollection(null);
+        List<ApiInfo.ApiInfoKey> apiInfoKeyList2 = SingleTypeInfoDao.instance.fetchEndpointsInCollection(-1);
 
         assertEquals(apiInfoKeyList0.size(), 4);
         assertEquals(apiInfoKeyList1.size(), 2);
@@ -220,5 +217,60 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
             assertEquals(0, singleTypeInfo.getValues().getElements().size());
         }
+    }
+
+    @Test
+    public void testCreateFiltersWithoutSubType() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        // insert 2 identical params but without different subType. Then update using createFiltersWithoutSubType
+
+        SingleTypeInfo.ParamId paramId1 = new SingleTypeInfo.ParamId("url", "GET", 200, false, "param1", SingleTypeInfo.GENERIC, 0, false);
+        SingleTypeInfo sti1 = new SingleTypeInfo(paramId1, new HashSet<>(), new HashSet<>(), 0, 0,0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
+
+        SingleTypeInfo.ParamId paramId2 = new SingleTypeInfo.ParamId("url", "GET", 200, false, "param1", SingleTypeInfo.EMAIL, 0, false);
+        SingleTypeInfo sti2 = new SingleTypeInfo(paramId2, new HashSet<>(), new HashSet<>(), 0, 0,0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
+
+        SingleTypeInfo.ParamId paramId3 = new SingleTypeInfo.ParamId("url_next", "GET", 200, false, "param1", SingleTypeInfo.EMAIL, 0, false);
+        SingleTypeInfo sti3 = new SingleTypeInfo(paramId3, new HashSet<>(), new HashSet<>(), 0, 0,0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
+
+        SingleTypeInfo.ParamId paramId4 = new SingleTypeInfo.ParamId("url", "POST", 200, false, "param1", SingleTypeInfo.EMAIL, 0, false);
+        SingleTypeInfo sti4 = new SingleTypeInfo(paramId4, new HashSet<>(), new HashSet<>(), 0, 0,0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
+
+        SingleTypeInfo.ParamId paramId5 = new SingleTypeInfo.ParamId("url", "GET",200,true, "param1", SingleTypeInfo.EMAIL, 0, false);
+        SingleTypeInfo sti5 = new SingleTypeInfo(paramId5, new HashSet<>(), new HashSet<>(), 0, 0,0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
+
+        SingleTypeInfo.ParamId paramId6 = new SingleTypeInfo.ParamId("url", "GET",200,false, "param1", SingleTypeInfo.EMAIL, 0,true);
+        SingleTypeInfo sti6 = new SingleTypeInfo(paramId6, new HashSet<>(), new HashSet<>(), 0, 0,0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
+
+
+        List<UpdateOneModel<SingleTypeInfo>> bulkWrites = new ArrayList<>();
+        bulkWrites.add(new UpdateOneModel<>(SingleTypeInfoDao.createFilters(sti1), Updates.set("count",1), new UpdateOptions().upsert(true)));
+        bulkWrites.add(new UpdateOneModel<>(SingleTypeInfoDao.createFilters(sti2), Updates.set("count",1), new UpdateOptions().upsert(true)));
+        bulkWrites.add(new UpdateOneModel<>(SingleTypeInfoDao.createFilters(sti3), Updates.set("count",1), new UpdateOptions().upsert(true)));
+        bulkWrites.add(new UpdateOneModel<>(SingleTypeInfoDao.createFilters(sti4), Updates.set("count",1), new UpdateOptions().upsert(true)));
+        bulkWrites.add(new UpdateOneModel<>(SingleTypeInfoDao.createFilters(sti5), Updates.set("count",1), new UpdateOptions().upsert(true)));
+        bulkWrites.add(new UpdateOneModel<>(SingleTypeInfoDao.createFilters(sti6), Updates.set("count",1), new UpdateOptions().upsert(true)));
+
+        SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkWrites);
+
+        List<UpdateManyModel<SingleTypeInfo>> bulkWritesMany = new ArrayList<>();
+        // only 1 update will update both params since only subType is different
+        // but won't update STIs other than sti1 and sti2
+        bulkWritesMany.add(new UpdateManyModel<>(SingleTypeInfoDao.createFiltersWithoutSubType(sti1), Updates.set("count",100), new UpdateOptions().upsert(false)));
+        SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkWritesMany);
+
+        int count = 0;
+        List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(new BasicDBObject());
+        for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
+            if (singleTypeInfo.equals(sti1) || singleTypeInfo.equals(sti2)) {
+                count ++ ;
+                assertEquals(100,singleTypeInfo.getCount());
+            } else {
+                assertEquals(1, singleTypeInfo.getCount());
+            }
+        }
+
+        assertEquals(bulkWrites.size(), singleTypeInfos.size());
+        assertEquals(2, count);
     }
 }

@@ -89,12 +89,13 @@ public class ResourceAnalyser {
             syncWithDb();
         }
 
-
         HttpRequestParams requestParams = responseParams.getRequestParams();
         String urlWithParams = requestParams.getURL();
 
         // user id
-        List<String> ipList = responseParams.getRequestParams().getHeaders().get(X_FORWARDED_FOR);
+        Map<String,List<String>> headers = requestParams.getHeaders();
+        if (headers == null) return;
+        List<String> ipList = headers.get(X_FORWARDED_FOR);
         if (ipList == null || ipList.isEmpty()) return;
         String userId = ipList.get(0);
 
@@ -215,7 +216,7 @@ public class ResourceAnalyser {
     public Map<Integer, APICatalog> catalogMap = new HashMap<>();
 
     public void buildCatalog() {
-        List<ApiInfo.ApiInfoKey> apis = SingleTypeInfoDao.instance.fetchEndpointsInCollection(null);
+        List<ApiInfo.ApiInfoKey> apis = SingleTypeInfoDao.instance.fetchEndpointsInCollection(-1);
         for (ApiInfo.ApiInfoKey apiInfoKey: apis) {
 
             int apiCollectionId = apiInfoKey.getApiCollectionId();

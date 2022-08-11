@@ -168,14 +168,15 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
     }
 
 
-    public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(Integer apiCollectionId) {
+    // to get results irrespective of collections use negative value for apiCollectionId
+    public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(int apiCollectionId) {
         List<Bson> pipeline = new ArrayList<>();
         BasicDBObject groupedId =
                 new BasicDBObject("apiCollectionId", "$apiCollectionId")
                         .append("url", "$url")
                         .append("method", "$method");
 
-        if (apiCollectionId != null) {
+        if (apiCollectionId >= 0) {
             pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
         }
 
