@@ -26,7 +26,7 @@ public class URLAggregator {
             return null;
         }
 
-        return new URLStatic(url.split("\\?")[0], Method.valueOf(method));
+        return new URLStatic(url.split("\\?")[0], Method.fromString(method));
     }
 
 

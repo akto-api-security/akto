@@ -58,22 +58,11 @@ public class Main {
                 SampleMessageStore.fetchSampleMessages();
                 AuthMechanismStore.fetchAuthMechanism();
             }
-        }, 5, 5, TimeUnit.MINUTES);
+        }, 1, 1, TimeUnit.MINUTES);
 
         invokeScheduledTests();
 
         int delta = Context.now() - 20*60;
-
-        Bson filter1 = Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED);
-        Bson filter2 = Filters.and(
-                Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
-                Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, delta)
-        );
-
-        Bson update = Updates.combine(
-                Updates.set(TestingRun.PICKED_UP_TIMESTAMP, Context.now()),
-                Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
-        );
 
         SampleMessageStore.fetchSampleMessages();
         AuthMechanismStore.fetchAuthMechanism();
@@ -92,6 +81,20 @@ public class Main {
 
         while (true) {
             int start = Context.now();
+
+            Bson filter1 = Filters.and(
+                    Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
+                    Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, Context.now())
+            );
+            Bson filter2 = Filters.and(
+                    Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
+                    Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, delta)
+            );
+
+            Bson update = Updates.combine(
+                    Updates.set(TestingRun.PICKED_UP_TIMESTAMP, Context.now()),
+                    Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
+            );
 
             TestingRun testingRun = TestingRunDao.instance.getMCollection().findOneAndUpdate(
                     Filters.or(filter1,filter2), update
