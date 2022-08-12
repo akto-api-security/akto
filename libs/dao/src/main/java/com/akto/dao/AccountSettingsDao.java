@@ -13,7 +13,11 @@ import java.io.InputStreamReader;
 public class AccountSettingsDao extends AccountsContextDao<AccountSettings> {
 
     public static Bson generateFilter() {
-        return Filters.eq("_id", Context.accountId.get());
+        return generateFilter(Context.accountId.get());
+    }
+
+    public static Bson generateFilter(int accountId) {
+        return Filters.eq("_id", accountId);
     }
 
     public static final AccountSettingsDao instance = new AccountSettingsDao();

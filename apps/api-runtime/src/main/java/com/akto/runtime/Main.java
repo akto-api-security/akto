@@ -93,9 +93,9 @@ public class Main {
     }
 
     public static Kafka kafkaProducer = null;
-    private static void buildKafka() {
+    private static void buildKafka(int accountId) {
         System.out.println("Building kafka...................");
-        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter(accountId));
         if (accountSettings != null && accountSettings.getCentralKafkaIp()!= null) {
             String centralKafkaBrokerUrl = accountSettings.getCentralKafkaIp();
             int centralKafkaBatchSize = AccountSettings.DEFAULT_CENTRAL_KAFKA_BATCH_SIZE;
@@ -104,7 +104,8 @@ public class Main {
                 kafkaProducer = new Kafka(centralKafkaBrokerUrl, centralKafkaLingerMS, centralKafkaBatchSize);
                 logger.info("Connected to central kafka @ " + Context.now());
             }
-
+        } else {
+            System.out.println(accountSettings);
         }
     }
 
@@ -137,11 +138,12 @@ public class Main {
 
         String centralKafkaTopicName = AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME;
 
-        buildKafka();
+        int accountIdHardcoded = Context.accountId.get();
+        buildKafka(accountIdHardcoded);
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 if (kafkaProducer == null || !kafkaProducer.producerReady) {
-                    buildKafka();
+                    buildKafka(accountIdHardcoded);
                 }
             }
         }, 5, 5, TimeUnit.MINUTES);
