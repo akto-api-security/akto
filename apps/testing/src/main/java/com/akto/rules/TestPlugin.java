@@ -108,7 +108,7 @@ public abstract class TestPlugin {
         if (message == null) return;
 
         Bson filter = TestingRunResultDao.generateFilter(testRunId, apiInfoKey);
-        Bson update = Updates.set("resultMap." + testName(), new TestResult(message, vulnerable, new ArrayList<>(), paramTypeInfoList));
+        Bson update = Updates.set("resultMap." + testName(), new TestResult(message, vulnerable, new ArrayList<>(), new ArrayList<>()));
         TestingRunResultDao.instance.updateOne(filter, update);
     }
 
