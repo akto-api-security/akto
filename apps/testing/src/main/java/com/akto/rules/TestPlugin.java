@@ -144,7 +144,7 @@ public abstract class TestPlugin {
         BasicDBObject payload = RequestTemplate.parseRequestPayload(httpRequestParams, urlWithParams);
         Map<String, Set<Object>> flattened = JSONUtils.flatten(payload);
         for (String param: flattened.keySet()) {
-            SingleTypeInfo singleTypeInfo = SampleMessageStore.findPrivateSTI(param, true,apiInfoKey, false, -1);
+            SingleTypeInfo singleTypeInfo = SampleMessageStore.findPrivateSTI(param,false,apiInfoKey, false, -1);
             if (singleTypeInfo != null) {
                 privateParamTypeInfos.add(singleTypeInfo);
             }

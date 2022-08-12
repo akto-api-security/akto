@@ -47,13 +47,6 @@ public class SampleMessageStore {
             }
 
             for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
-                String url = singleTypeInfo.getUrl();
-                // this is done because of a bug in runtime where some static urls lose their leading slash
-                // but in apiAnalyser it is guaranteed to have leading slash. So to be consistent we force add one.
-                if (!APICatalog.isTemplateUrl(url) && !url.startsWith("/")) {
-                    url = "/" + url;
-                }
-                singleTypeInfo.setUrl(url);
                 singleTypeInfos.put(singleTypeInfo.composeKeyWithCustomSubType(SingleTypeInfo.GENERIC), singleTypeInfo);
             }
         } catch (Exception e) {
