@@ -95,6 +95,7 @@ public class Main {
     public static Kafka kafkaProducer = null;
     private static void buildKafka(int accountId) {
         System.out.println("Building kafka...................");
+        Context.accountId.set(accountId);
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter(accountId));
         if (accountSettings != null && accountSettings.getCentralKafkaIp()!= null) {
             String centralKafkaBrokerUrl = accountSettings.getCentralKafkaIp();
