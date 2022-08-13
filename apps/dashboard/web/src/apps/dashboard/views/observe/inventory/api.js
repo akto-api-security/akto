@@ -196,6 +196,15 @@ export default {
             return resp
         })
     },
+    convertSampleDataToBurpRequest(sampleData) {
+        return request({
+            url: '/api/convertSamleDataToBurpRequest',
+            method: 'post',
+            data: {sampleData}
+        }).then((resp) => {
+            return resp
+        })
+    },
 
     fetchDataTypeNames() {
         return request({

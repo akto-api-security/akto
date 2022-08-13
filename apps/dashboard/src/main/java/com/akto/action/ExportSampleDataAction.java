@@ -7,6 +7,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.parsers.HttpCallParser;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -37,6 +38,41 @@ public class ExportSampleDataAction extends UserAction {
             }
             ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), urls, null,0));
         }
+    }
+
+    private String burpRequest;
+    public String generateBurpRequest() {
+        if (sampleData == null) {
+            addActionError("Invalid collection name");
+            return ERROR.toUpperCase();
+        }
+
+        OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest();
+        originalHttpRequest.buildFromSampleMessage(sampleData);
+
+        StringBuilder builder = new StringBuilder("");
+
+        // METHOD and PATH
+        builder.append(originalHttpRequest.getMethod()).append(" ").append(originalHttpRequest.getUrl()).append("\n");
+
+        // HEADERS
+        Map<String, List<String>> headers = originalHttpRequest.getHeaders();
+        for (String headerName: headers.keySet()) {
+            List<String> values = headers.get(headerName);
+            if (values == null || values.isEmpty() || headerName.length()<1) continue;
+            String prettyHeaderName = headerName.substring(0, 1).toUpperCase() + headerName.substring(1);
+            String value = String.join(",", values);
+            builder.append(prettyHeaderName).append(": ").append(value);
+            builder.append("\n");
+        }
+
+        // BODY
+        builder.append("\n");
+        builder.append(originalHttpRequest.getBody());
+
+        burpRequest = builder.toString();
+
+        return SUCCESS.toUpperCase();
     }
 
     private String curlString;
@@ -132,6 +168,10 @@ public class ExportSampleDataAction extends UserAction {
 
     public void setSampleData(String sampleData) {
         this.sampleData = sampleData;
+    }
+
+    public String getBurpRequest() {
+        return burpRequest;
     }
 }
 
