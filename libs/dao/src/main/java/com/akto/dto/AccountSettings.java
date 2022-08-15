@@ -17,6 +17,9 @@ public class AccountSettings {
     public static final String SETUP_TYPE = "setupType";
     private SetupType setupType = SetupType.PROD;
 
+    public static final String CENTRAL_KAFKA_IP = "centralKafkaIp";
+    private String centralKafkaIp;
+
     public AccountSettings() {
     }
 
@@ -91,4 +94,20 @@ public class AccountSettings {
     public void setSetupType(SetupType setupType) {
         this.setupType = setupType;
     }
+
+    public String getCentralKafkaIp() {
+        return centralKafkaIp;
+    }
+
+    public void setCentralKafkaIp(String centralKafkaIp) {
+        this.centralKafkaIp = centralKafkaIp;
+    }
+
+
+    public static final int DEFAULT_CENTRAL_KAFKA_BATCH_SIZE = 999900;
+    public static final int DEFAULT_CENTRAL_KAFKA_LINGER_MS = 60_000;
+
+    public static final int DEFAULT_CENTRAL_KAFKA_MAX_POLL_RECORDS_CONFIG = 1_000;
+    public static final String DEFAULT_CENTRAL_KAFKA_TOPIC_NAME = "akto.central";
+
 }

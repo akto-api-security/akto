@@ -15,6 +15,7 @@ const APIEndpoints = () => import("@/apps/dashboard/views/observe/inventory/comp
 const APICollections = () => import("@/apps/dashboard/views/observe/collections/APICollections")
 const SensitiveData = () => import("@/apps/dashboard/views/observe/sensitive/SensitiveData")
 const ApiChanges = () => import("@/apps/dashboard/views/observe/changes/Changes")
+const ParamState = () => import("@/apps/dashboard/views/observe/misc/ParamState")
 
 Vue.use(Router)
 
@@ -118,7 +119,12 @@ const router =  new Router({
                             path: 'sensitive',
                             name: 'sensitive',
                             component: SensitiveData
-                        }        
+                        },
+                        {
+                            path: 'param_state',
+                            name: 'param_state',
+                            component: ParamState,
+                        }
                     ]
                 }
             ]

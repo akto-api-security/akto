@@ -14,6 +14,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.type.URLTemplate;
 import com.akto.types.CappedList;
+import com.akto.types.CappedSet;
 import com.akto.util.EnumCodec;
 import com.akto.dto.Attempt.AttemptResult;
 import com.akto.dto.auth.APIAuth;
@@ -72,6 +73,7 @@ public class DaoInit {
         ClassModel<TestingEndpoints> testingEndpointsClassModel = ClassModel.builder(TestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<CustomTestingEndpoints> customTestingEndpointsClassModel = ClassModel.builder(CustomTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<CollectionWiseTestingEndpoints> collectionWiseTestingEndpointsClassModel = ClassModel.builder(CollectionWiseTestingEndpoints.class).enableDiscriminator(true).build();
+        ClassModel<CappedSet> cappedSetClassModel = ClassModel.builder(CappedSet.class).enableDiscriminator(true).build();
 
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(queueEntryClassModel, configClassModel, 
@@ -83,7 +85,8 @@ public class DaoInit {
                 fieldExistsFilterClassModel, accountSettingsClassModel, responseCodeRuntimeFilterClassModel, cappedListClassModel,
                 equalsToPredicateClassModel, isNumberPredicateClassModel, testingRunClassModel, testingRunResultClassModel, testResultClassModel,
                 authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel,
-                testingEndpointsClassModel, customTestingEndpointsClassModel, collectionWiseTestingEndpointsClassModel
+                testingEndpointsClassModel, customTestingEndpointsClassModel, collectionWiseTestingEndpointsClassModel,
+                cappedSetClassModel
         ).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
@@ -99,7 +102,8 @@ public class DaoInit {
             new EnumCodec<>(AuthParam.Location.class),
             new EnumCodec<>(TestingEndpoints.Type.class),
             new EnumCodec<>(TestingRun.State.class),
-            new EnumCodec<>(AccountSettings.SetupType.class)
+            new EnumCodec<>(AccountSettings.SetupType.class),
+            new EnumCodec<>(SingleTypeInfo.Domain.class)
         );
 
         CodecRegistry codecRegistry = fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry, customEnumCodecs);

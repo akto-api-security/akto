@@ -5,13 +5,19 @@ import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.StatusCodeAnalyser;
 import org.bson.types.ObjectId;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class BOLATest extends TestPlugin {
+
+    public BOLATest() { }
 
     @Override
     public boolean start(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId) {
@@ -31,10 +37,10 @@ public class BOLATest extends TestPlugin {
         boolean result = authMechanism.addAuthToRequest(httpRequestParams);
         if (!result) return false; // this means that auth token was not there in original request so exit
 
-        boolean containsReqPayload = containsRequestPayload(httpRequestParams);
-        if (!containsReqPayload) {
+        List<SingleTypeInfo> privateSingleTypeInfos = containsPrivateResource(httpRequestParams, apiInfoKey);
+        if (privateSingleTypeInfos.isEmpty()) {
             HttpResponseParams newHttpResponseParams = generateEmptyResponsePayload(httpRequestParams);
-            addTestSuccessResult(apiInfoKey, newHttpResponseParams, testRunId, false);
+            addTestSuccessResult(apiInfoKey, newHttpResponseParams, testRunId, false, new ArrayList<>());
             return false;
         }
 
@@ -54,7 +60,7 @@ public class BOLATest extends TestPlugin {
             vulnerable = val > 90;
         }
 
-        addTestSuccessResult(apiInfoKey,httpResponseParams, testRunId, vulnerable);
+        addTestSuccessResult(apiInfoKey,httpResponseParams, testRunId, vulnerable, privateSingleTypeInfos);
 
         return vulnerable;
     }
@@ -63,4 +69,7 @@ public class BOLATest extends TestPlugin {
     public String testName() {
         return "BOLA";
     }
+
+
+
 }

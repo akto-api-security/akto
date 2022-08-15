@@ -19,6 +19,7 @@ import com.akto.dto.type.URLStatic;
 import com.akto.dto.type.URLTemplate;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.types.CappedSet;
 import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;
@@ -56,6 +57,7 @@ public class APICatalogSync {
         this.sensitiveParamInfoBooleanMap = new HashMap<>();
     }
 
+    public static final int STRING_MERGING_THRESHOLD = 20;
 
     public void processResponse(RequestTemplate requestTemplate, Collection<HttpResponseParams> responses, List<SingleTypeInfo> deletedInfo) {
         Iterator<HttpResponseParams> iter = responses.iterator();
@@ -74,7 +76,6 @@ public class APICatalogSync {
         String methodStr = requestParams.getMethod();
         URLStatic baseURL = URLAggregator.getBaseURL(urlWithParams, methodStr);
         responseParams.requestParams.url = baseURL.getUrl();
-        BasicDBObject queryParams = URLAggregator.getQueryJSON(urlWithParams);
         int statusCode = responseParams.getStatusCode();
         Method method = Method.fromString(methodStr);
         String userId = extractUserId(responseParams, userIdentifier);
@@ -83,27 +84,11 @@ public class APICatalogSync {
             requestTemplate.processTraffic(responseParams.getTime());
         }
         if (statusCode >= 200 && statusCode < 300) {
-            String reqPayload = requestParams.getPayload();
-
-            if (reqPayload == null || reqPayload.isEmpty()) {
-                reqPayload = "{}";
-            }
-
             requestTemplate.processHeaders(requestParams.getHeaders(), baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap);
-            if(reqPayload.startsWith("[")) {
-                reqPayload = "{\"json\": "+reqPayload+"}";
+            BasicDBObject payload = RequestTemplate.parseRequestPayload(requestParams, urlWithParams);
+            if (payload != null) {
+                deletedInfo.addAll(requestTemplate.process2(payload, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap));
             }
-
-            BasicDBObject payload;
-            try {
-                payload = BasicDBObject.parse(reqPayload);
-            } catch (Exception e) {
-                payload = BasicDBObject.parse("{}");
-            }
-
-            payload.putAll(queryParams.toMap());
-            deletedInfo.addAll(requestTemplate.process2(payload, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap));
-
             requestTemplate.recordMessage(responseParams.getOrig());
         }
 
@@ -191,7 +176,7 @@ public class APICatalogSync {
         System.out.println("pendingRequests: " + (System.currentTimeMillis() - start));
 
         start = System.currentTimeMillis();
-        tryWithKnownURLTemplates(pendingRequests, deltaCatalog, dbCatalog);
+        tryWithKnownURLTemplates(pendingRequests, deltaCatalog, dbCatalog, apiCollectionId );
         System.out.println("tryWithKnownURLTemplates: " + (System.currentTimeMillis() - start));
 
         start = System.currentTimeMillis();
@@ -217,7 +202,12 @@ public class APICatalogSync {
             String[] tokens = tokenize(newUrl.getUrl());
 
             if (tokens.length == 1) {
-                deltaTemplates.put(newUrl, newTemplate);
+                RequestTemplate rt = deltaTemplates.get(newUrl);
+                if (rt != null) {
+                    rt.mergeFrom(newTemplate);
+                } else {
+                    deltaTemplates.put(newUrl, newTemplate);
+                }
                 iterator.remove();
                 continue;
             }
@@ -260,7 +250,7 @@ public class APICatalogSync {
                      }
                 }
                      
-                if (countSimilarURLs >= 20) {
+                if (countSimilarURLs >= STRING_MERGING_THRESHOLD) {
                     URLTemplate mergedTemplate = potentialMerges.keySet().iterator().next();
                     RequestTemplate alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(mergedTemplate);
                     RequestTemplate dbTemplate = potentialMerges.get(mergedTemplate).iterator().next();
@@ -273,7 +263,10 @@ public class APICatalogSync {
                         deltaCatalog.getTemplateURLToMethods().put(mergedTemplate, dbCopy);
                     }
 
+                    alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(mergedTemplate);
+
                     for (RequestTemplate rt: potentialMerges.getOrDefault(mergedTemplate, new HashSet<>())) {
+                        alreadyInDelta.mergeFrom(rt);
                         deltaCatalog.getDeletedInfo().addAll(rt.getAllTypeInfo());
                     }
                     deltaCatalog.getDeletedInfo().addAll(dbTemplate.getAllTypeInfo());
@@ -317,7 +310,12 @@ public class APICatalogSync {
                 continue;
             }
 
-            deltaTemplates.put(newUrl, newTemplate);
+            RequestTemplate rt = deltaTemplates.get(newUrl);
+            if (rt != null) {
+                rt.mergeFrom(newTemplate);
+            } else {
+                deltaTemplates.put(newUrl, newTemplate);
+            }
             iterator.remove();
         }
     }
@@ -384,7 +382,8 @@ public class APICatalogSync {
     private void tryWithKnownURLTemplates(
         Map<URLStatic, RequestTemplate> pendingRequests, 
         APICatalog deltaCatalog,
-        APICatalog dbCatalog
+        APICatalog dbCatalog,
+        int apiCollectionId
     ) {
         Iterator<Map.Entry<URLStatic, RequestTemplate>> iterator = pendingRequests.entrySet().iterator();
         try {
@@ -398,11 +397,13 @@ public class APICatalogSync {
                         RequestTemplate alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(urlTemplate);
 
                         if (alreadyInDelta != null) {
+                            alreadyInDelta.fillUrlParams(tokenize(newUrl.getUrl()), urlTemplate, apiCollectionId);
                             alreadyInDelta.mergeFrom(newRequestTemplate);
                         } else {
                             RequestTemplate dbTemplate = dbCatalog.getTemplateURLToMethods().get(urlTemplate);
                             RequestTemplate dbCopy = dbTemplate.copy();
-                            dbCopy.mergeFrom(newRequestTemplate);    
+                            dbCopy.mergeFrom(newRequestTemplate);
+                            dbCopy.fillUrlParams(tokenize(newUrl.getUrl()), urlTemplate, apiCollectionId);
                             deltaCatalog.getTemplateURLToMethods().put(urlTemplate, dbCopy);
                         }
                         iterator.remove();
@@ -453,8 +454,8 @@ public class APICatalogSync {
                 if (strictMatch != null) {
                     RequestTemplate requestTemplate = deltaCatalog.getStrictURLToMethods().get(url);
                     if (requestTemplate == null) {
-                        requestTemplate = strictMatch.copy();
-                        deltaCatalog.getStrictURLToMethods().put(url, requestTemplate);
+                        requestTemplate = strictMatch.copy(); // to further process the requestTemplate
+                        strictMatch.mergeFrom(requestTemplate); // to update the existing requestTemplate in db with new data
                     }
 
                     processResponse(requestTemplate, responseParamsList, deletedInfo);
@@ -605,6 +606,56 @@ public class APICatalogSync {
                 update = Updates.combine(update, Updates.set("timestamp", now));
             }
 
+            update = Updates.combine(update, Updates.max(SingleTypeInfo.LAST_SEEN, deltaInfo.getLastSeen()));
+            update = Updates.combine(update, Updates.max(SingleTypeInfo.MAX_VALUE, deltaInfo.getMaxValue()));
+            update = Updates.combine(update, Updates.min(SingleTypeInfo.MIN_VALUE, deltaInfo.getMinValue()));
+
+            if (dbInfo != null) {
+                SingleTypeInfo.Domain domain = dbInfo.getDomain();
+                if (domain ==  SingleTypeInfo.Domain.ENUM) {
+                    CappedSet<String> values = dbInfo.getValues();
+                    Set<String> elements = new HashSet<>();
+                    if (values != null) {
+                        elements = values.getElements();
+                    }
+                    int valuesSize = elements.size();
+                    if (valuesSize >= SingleTypeInfo.VALUES_LIMIT) {
+                        SingleTypeInfo.Domain newDomain;
+                        if (dbInfo.getSubType().equals(SingleTypeInfo.INTEGER_32) || dbInfo.getSubType().equals(SingleTypeInfo.INTEGER_64) || dbInfo.getSubType().equals(SingleTypeInfo.FLOAT)) {
+                            newDomain = SingleTypeInfo.Domain.RANGE;
+                        } else {
+                            newDomain = SingleTypeInfo.Domain.ANY;
+                        }
+                        update = Updates.combine(update, Updates.set(SingleTypeInfo._DOMAIN, newDomain));
+                    }
+                } else {
+                    deltaInfo.setDomain(dbInfo.getDomain());
+                    deltaInfo.setValues(new CappedSet<>());
+                    if (!dbInfo.getValues().getElements().isEmpty()) {
+                        Bson bson = Updates.set(SingleTypeInfo._VALUES +".elements",new ArrayList<>());
+                        update = Updates.combine(update, bson);
+                    }
+                }
+            }
+
+            if (dbInfo == null || dbInfo.getDomain() == SingleTypeInfo.Domain.ENUM) {
+                CappedSet<String> values = deltaInfo.getValues();
+                if (values != null) {
+                    Set<String> elements = new HashSet<>();
+                    for (String el: values.getElements()) {
+                        if (redactSampleData) {
+                            elements.add(el.hashCode()+"");
+                        } else {
+                            elements.add(el);
+                        }
+                    }
+                    Bson bson = Updates.addEachToSet(SingleTypeInfo._VALUES +".elements",new ArrayList<>(elements));
+                    update = Updates.combine(update, bson);
+                    deltaInfo.setValues(new CappedSet<>());
+                }
+            }
+
+
             if (!redactSampleData && deltaInfo.getExamples() != null && !deltaInfo.getExamples().isEmpty()) {
                 Bson bson = Updates.pushEach(SensitiveSampleData.SAMPLE_DATA, Arrays.asList(deltaInfo.getExamples().toArray()), new PushOptions().slice(-1 *SensitiveSampleData.cap));
                 bulkUpdatesForSampleData.add(
@@ -682,6 +733,7 @@ public class APICatalogSync {
         return urlTemplate;
     }
 
+
     public void buildFromDB(boolean calcDiff) {
         List<SingleTypeInfo> allParams = SingleTypeInfoDao.instance.fetchAll();
         this.dbState = build(allParams);
@@ -735,6 +787,7 @@ public class APICatalogSync {
         }
     }
 
+
     private static Map<Integer, APICatalog> build(List<SingleTypeInfo> allParams) {
         Map<Integer, APICatalog> ret = new HashMap<>();
         
@@ -748,8 +801,8 @@ public class APICatalogSync {
                 ret.put(collId, catalog);
             }
             RequestTemplate reqTemplate;
-            if (url.contains("STRING") || url.contains("INTEGER")) {
-                URLTemplate urlTemplate = createUrlTemplate(url, Method.fromString(param.getMethod()));
+            if (APICatalog.isTemplateUrl(url)) {
+                URLTemplate urlTemplate = createUrlTemplate(url, Method.valueOf(param.getMethod()));
                 reqTemplate = catalog.getTemplateURLToMethods().get(urlTemplate);
 
                 if (reqTemplate == null) {
@@ -764,6 +817,28 @@ public class APICatalogSync {
                     reqTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>()));
                     catalog.getStrictURLToMethods().put(urlStatic, reqTemplate);
                 }
+            }
+
+            if (param.isUrlParam()) {
+                Map<Integer, KeyTypes> urlParams = reqTemplate.getUrlParams();
+                if (urlParams == null) {
+                    urlParams = new HashMap<>();
+                    reqTemplate.setUrlParams(urlParams);
+                }
+
+                String p = param.getParam();
+                try {
+                    int position = Integer.parseInt(p);
+                    KeyTypes keyTypes = urlParams.get(position);
+                    if (keyTypes == null) {
+                        keyTypes = new KeyTypes(new HashMap<>(), false);
+                        urlParams.put(position, keyTypes);
+                    }
+                    keyTypes.getOccurrences().put(param.getSubType(), param);
+                } catch (Exception e) {
+                    logger.error("ERROR while parsing url param position: " + p);
+                }
+                continue;
             }
 
             if (param.getResponseCode() > 0) {

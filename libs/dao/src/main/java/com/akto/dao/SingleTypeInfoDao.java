@@ -72,16 +72,28 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return this.findAll(new BasicDBObject());
     }
 
+    public static Bson createFiltersWithoutSubType(SingleTypeInfo info) {
+        List<Bson> filters = createFiltersBasic(info);
+        return Filters.and(filters);
+    }
+
+
+    public static List<Bson> createFiltersBasic(SingleTypeInfo info) {
+        List<Bson> filters = new ArrayList<>();
+        filters.add(Filters.eq("url", info.getUrl()));
+        filters.add(Filters.eq("method", info.getMethod()));
+        filters.add(Filters.eq("responseCode", info.getResponseCode()));
+        filters.add(Filters.eq("isHeader", info.getIsHeader()));
+        filters.add(Filters.eq("param", info.getParam()));
+        filters.add(Filters.eq("apiCollectionId", info.getApiCollectionId()));
+        filters.add(Filters.eq("isUrlParam", info.isUrlParam()));
+        return filters;
+    }
+
     public static Bson createFilters(SingleTypeInfo info) {
-        return Filters.and(
-                Filters.eq("url", info.getUrl()),
-                Filters.eq("method", info.getMethod()),
-                Filters.eq("responseCode", info.getResponseCode()),
-                Filters.eq("isHeader", info.getIsHeader()),
-                Filters.eq("param", info.getParam()),
-                Filters.eq("subType", info.getSubType().getName()),
-                Filters.eq("apiCollectionId", info.getApiCollectionId())
-        );
+        List<Bson> filters = createFiltersBasic(info);
+        filters.add(Filters.eq("subType", info.getSubType().getName()));
+        return Filters.and(filters);
     }
 
     public Set<String> getUniqueEndpoints(int apiCollectionId) {
@@ -166,13 +178,17 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
     }
 
 
+    // to get results irrespective of collections use negative value for apiCollectionId
     public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(int apiCollectionId) {
         List<Bson> pipeline = new ArrayList<>();
         BasicDBObject groupedId =
                 new BasicDBObject("apiCollectionId", "$apiCollectionId")
                         .append("url", "$url")
                         .append("method", "$method");
-        pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
+
+        if (apiCollectionId >= 0) {
+            pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
+        }
 
         Bson projections = Projections.fields(
                 Projections.include("timestamp", "apiCollectionId", "url", "method")
@@ -202,5 +218,12 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         }
 
         return endpoints;
+    }
+
+    public void deleteValues() {
+        instance.getMCollection().updateMany(
+                Filters.exists(SingleTypeInfo._VALUES),
+                Updates.unset(SingleTypeInfo._VALUES)
+        );
     }
 }

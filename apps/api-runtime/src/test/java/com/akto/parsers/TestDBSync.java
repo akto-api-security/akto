@@ -454,11 +454,11 @@ public class TestDBSync extends MongoBasedTest {
     // public void testRemovingStaleStaticURLs() {
     //     ParamId staticParam = new ParamId("api/payment1", "GET", -1, false, "payment_id", SingleTypeInfo.GENERIC, 0);
     //     staticParam.setSubTypeString("GENERIC");
-    //     SingleTypeInfo staticInfo = new SingleTypeInfo(staticParam, null, new HashSet<>(), 1, 1, 1);
+    //     SingleTypeInfo staticInfo = new SingleTypeInfo(staticParam, null, new HashSet<>(), 1, 1, 1, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
     //     staticInfo.setSubTypeString("GENERIC");
     //     ParamId templateParam = new ParamId("api/STRING", "GET", -1, false, "payment_id", SingleTypeInfo.GENERIC, 0);
     //     templateParam.setSubTypeString("GENERIC");
-    //     SingleTypeInfo templateInfo = new SingleTypeInfo(templateParam, null, new HashSet<>(), 1, 1, 1);
+    //     SingleTypeInfo templateInfo = new SingleTypeInfo(templateParam, null, new HashSet<>(), 1, 1, 1, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
     //     templateInfo.setSubTypeString("GENERIC");
     //     SingleTypeInfoDao.instance.insertOne(staticInfo);
     //     SingleTypeInfoDao.instance.insertOne(templateInfo);
