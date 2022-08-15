@@ -107,18 +107,18 @@ public class AuthMechanismAction extends UserAction {
 
     private int workflowTestId;
     private WorkflowTestResult workflowTestResult;
+    private TestingRun workflowTestingRun;
     public String fetchWorkflowResult() {
-        TestingRun testingRun = TestingRunDao.instance.findLatestOne(
+        workflowTestingRun = TestingRunDao.instance.findLatestOne(
                 Filters.eq(TestingRun._TESTING_ENDPOINTS+"."+WorkflowTestingEndpoints._WORK_FLOW_TEST+"._id", workflowTestId)
         );
 
-        if (testingRun == null) {
-            addActionError("No test run found. Please run test again");
-            return ERROR.toUpperCase();
+        if (workflowTestingRun == null) {
+            return SUCCESS.toUpperCase();
         }
 
         workflowTestResult  = WorkflowTestResultsDao.instance.findOne(
-                Filters.eq(WorkflowTestResult._TEST_RUN_ID, testingRun.getId())
+                Filters.eq(WorkflowTestResult._TEST_RUN_ID, workflowTestingRun.getId())
         );
 
         return SUCCESS.toUpperCase();
@@ -163,4 +163,9 @@ public class AuthMechanismAction extends UserAction {
     public WorkflowTestResult getWorkflowTestResult() {
         return workflowTestResult;
     }
+
+    public TestingRun getWorkflowTestingRun() {
+        return workflowTestingRun;
+    }
+
 }

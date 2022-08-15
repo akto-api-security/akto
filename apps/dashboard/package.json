@@ -26,6 +26,7 @@
     "@fortawesome/free-solid-svg-icons": "^5.15.3",
     "@fortawesome/react-fontawesome": "^0.2.0",
     "@fortawesome/vue-fontawesome": "^2.0.2",
+    "@material-ui/core": "^4.12.4",
     "@mdi/font": "^5.6.55",
     "@mui/material": "^5.9.2",
     "are-you-es5": "^2.1.1",

@@ -1,9 +1,9 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect} from 'react'
 import ReactFlow, {
   Background,
   getRectOfNodes
 } from 'react-flow-renderer';
-import { faSave } from '@fortawesome/free-regular-svg-icons';
+import { faEye, faEyeSlash, faSave } from '@fortawesome/free-regular-svg-icons';
 import { faPlayCircle } from '@fortawesome/free-regular-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import IconButton from "@mui/material/IconButton"
@@ -13,9 +13,29 @@ import StartNode from './StartNode.jsx';
 import BlankNode from './BlankNode.jsx';
 import EndNode from './EndNode.jsx';
 
+import Drawer from '@mui/material/Drawer';
+import { AppBar } from '@material-ui/core';
+import { makeStyles } from "@material-ui/core/styles";
+import WorkflowResultsDrawer from './WorkflowResultsDrawer.jsx';
+
+
 const onInit = (reactFlowInstance) => console.log('flow loaded:', reactFlowInstance);
 
 const nodeTypes = { startNode: StartNode, blankNode: BlankNode, endNode: EndNode };
+
+const useStyles = makeStyles({
+  drawer: {
+    position: "relative",
+    marginLeft: "auto",
+    "& .MuiBackdrop-root": {
+      display: "none"
+    },
+    "& .MuiDrawer-paper": {
+      position: "absolute",
+      height: (props) => props.height,
+    }
+  }
+});
 
 const Workflow = ({apiCollectionId}) => {
   const nodes = useStore((state) => state.nodes)
@@ -40,6 +60,18 @@ const Workflow = ({apiCollectionId}) => {
 
   const counter = useStore(state => state.counter)
   const incrementCounter = useStore(state => state.incrementCounter)
+
+
+  const [open, setOpen] = useState(false);
+  const [height, setHeight] = useState(0);
+  const [workflowTestResult, setWorkflowTestResult] = useState(null)
+  const [workflowTestingRun, setWorkflowTestingRun] = useState(null);
+
+  const classes = useStyles({ height: height });
+
+  useEffect(() => {
+    open ? setHeight("100vh") : setHeight(0)
+  }, [open]);
 
   const getId = () => {
     incrementCounter()
@@ -134,6 +166,31 @@ const Workflow = ({apiCollectionId}) => {
     }
   }
 
+  const fetchResult = () => {
+    if (!originalState.id) return
+    return fetchWorkflowResult(originalState.id).then((resp) => {
+      if (!resp) return false
+
+      setWorkflowTestingRun(resp["workflowTestingRun"])
+
+      let w = resp["workflowTestResult"]
+
+      if (!w) return false
+
+      let testResultMap = w["testResultMap"]
+      let keys = Object.keys(testResultMap)
+
+      let finalResult = keys.map((x) => {
+        return {"key": x, ...testResultMap[x]}
+      })
+
+      setWorkflowTestResult(finalResult)
+
+      return true
+    })
+  }
+
+
   const runTest = () => {
       if (!originalState.id) {
           console.log("Please save test first")
@@ -142,20 +199,19 @@ const Workflow = ({apiCollectionId}) => {
 
       runWorkflowTest(originalState.id)
 
+      setWorkflowTestingRun(null)
+      setWorkflowTestResult(null)
+
       let interval = setInterval(() => {
-          fetchWorkflowResult(originalState.id).then((resp) => {
-            if (resp !== null) {
-              let workflowTestResult = resp["workflowTestResult"]
-              if (workflowTestResult !== null) {
-                  let testResultMap = workflowTestResult["testResultMap"];
-                  console.log(testResultMap)
-                  clearInterval(interval)
-              }
-            }
-          })
+        fetchResult().then((result) => {
+          if (result) clearInterval(interval)
+        })
       }, 5000)
 
   }
+
+  const showResult = () => setOpen(!open);
+  React.useEffect(() => {fetchResult()}, []);
 
   return (
     <div style={{height: "800px"}}>
@@ -166,6 +222,28 @@ const Workflow = ({apiCollectionId}) => {
       <IconButton onClick={runTest} style={{float : "right"}}>
         <FontAwesomeIcon icon={faPlayCircle} className="request-editor-matched"  size="sm"/>
       </IconButton>
+
+      <IconButton onClick={showResult} style={{float : "right"}}>
+        <FontAwesomeIcon icon={open ? faEyeSlash : faEye} className="request-editor-matched"  size="sm"/>
+      </IconButton>
+
+      <AppBar position="static">
+      </AppBar>
+
+      <Drawer
+          open={open}
+          variant="persistent"
+          className={classes.drawer}
+          anchor="right"
+          PaperProps={{
+            sx: { width: "60%" ,border: 0.5, borderRadius: 2, borderColor: "grey"},
+          }}
+        >
+          <WorkflowResultsDrawer 
+            workflowTestingRun={workflowTestingRun}
+            workflowTestResult={workflowTestResult}
+          />
+      </Drawer>
 
       <ReactFlow
         nodes={nodes}
