@@ -34,7 +34,7 @@ public class ApiWorkflowExecutor {
     public static void main(String[] args) {
         DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
         Context.accountId.set(1_000_000);
-        TestingRun testingRun = TestingRunDao.instance.findOne(new BasicDBObject());
+        TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq("endTimestamp", 1660674178));
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         WorkflowTestingEndpoints workflowTestingEndpoints = (WorkflowTestingEndpoints) testingRun.getTestingEndpoints();
         apiWorkflowExecutor.init(workflowTestingEndpoints.getWorkflowTest(), testingRun.getId());
@@ -197,15 +197,38 @@ public class ApiWorkflowExecutor {
         }
 
         if (queryParams != null) {
+            String finalQueryParams = replaceVariables(p, queryParams, valuesMap);
             String ogQuery = request.getQueryParams();
             if (ogQuery == null || ogQuery.isEmpty()) {
-                request.setQueryParams(queryParams);
+                request.setQueryParams(finalQueryParams);
             } else {
-                request.setQueryParams(ogQuery+"&"+ queryParams);
+                // combine original query params and user defined query params and latter overriding former
+                String combinedQueryParams = combineQueryParams(ogQuery, finalQueryParams);
+                request.setQueryParams(combinedQueryParams);
             }
         }
 
         return request;
+    }
+
+    // queryString2 overrides queryString1 use accordingly
+    public String combineQueryParams(String queryString1, String queryString2) {
+        if (queryString1 == null) return queryString2;
+        if (queryString2 == null) return queryString1;
+
+        String mockUrl1 = "url?" + queryString1;
+        String mockUrl2 = "url?" + queryString2;
+
+        BasicDBObject queryParamsObject1 = URLAggregator.getQueryJSON(mockUrl1);
+        BasicDBObject queryParamsObject2 = URLAggregator.getQueryJSON(mockUrl2);
+
+        for (String key: queryParamsObject2.keySet()) {
+            queryParamsObject1.put(key, queryParamsObject2.get(key));
+        }
+
+        String json = queryParamsObject1.toJson();
+
+        return ApiExecutor.getRawQueryFromJson(json);
     }
 
     // todo: test invalid cases
