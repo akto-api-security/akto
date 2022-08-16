@@ -75,6 +75,9 @@ public class OtpAction extends UserAction {
 
     private Integer latestMessageId = null;
     public String fetchLatestMessageId() {
+        System.out.println(apiKey);
+        System.out.println(authToken);
+        System.out.println(address);
         BasicDBObject result;
         try {
             result = makeRequestToMySms();

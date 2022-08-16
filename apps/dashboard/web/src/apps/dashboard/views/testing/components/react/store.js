@@ -51,6 +51,16 @@ const useStore = create((set, get) => ({
       nodeEndpointMap: ret
     })
   },
+  setApiType: (nodeId, apiType) => {
+    let ret = get().nodeEndpointMap
+    let endpointData = ret[nodeId]
+    if (!endpointData) return
+    endpointData["type"] = apiType
+    console.log(ret[nodeId]["type"]);
+    set({
+      nodeEndpointMap: ret
+    })
+  },
   setEndpointsList: (newList, newFetchSampleDataFunc) => {
     set({
       endpointsList: newList,

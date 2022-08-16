@@ -10,6 +10,10 @@ import { faEdit } from '@fortawesome/free-regular-svg-icons'
 import TemplateStringEditor from './TemplateStringEditor.jsx';
 import useStore from './store'
 
+import Switch from '@mui/material/Switch';
+import FormControlLabel from '@mui/material/FormControlLabel';
+
+
 import './start-node.css'
 
 const RequestEditor = ({sampleApiCall, updatedSampleData, onChangeApiRequest}) => {
@@ -96,6 +100,8 @@ export default function InputArgumentsDialog({nodeId, endpointDetails, fetchSamp
 
   const addNodeEndpoint = useStore(state => state.addNodeEndpoint)
   const nodeEndpointMap = useStore(state => state.nodeEndpointMap)
+  const setApiType = useStore(state => state.setApiType)
+  const getApiType = useStore(state => state.getApiType)
 
   const onChangeApiRequest = (key, newData) => {
     let currNewSampleData = {orig: JSON.stringify(sampleData)}
@@ -112,6 +118,17 @@ export default function InputArgumentsDialog({nodeId, endpointDetails, fetchSamp
     setOpen(false);
   };
 
+  const handleChange = (event) => {
+    let isPoll = event.target.checked
+    let type = isPoll ? "POLL" : "API"
+    setApiType(nodeId, type)
+  };
+
+  const checked = () => {
+    return endpointDetails["type"] === "POLL"
+  }
+
+
   return (
     <div>
       <div style={{float: "right"}}>
@@ -123,7 +140,20 @@ export default function InputArgumentsDialog({nodeId, endpointDetails, fetchSamp
         <div className="request-title"></div>
         <DialogContent>
             
-          <RequestEditor sampleApiCall={sampleData} updatedSampleData={nodeEndpointMap[nodeId].updatedSampleData} onChangeApiRequest={onChangeApiRequest}/>
+          <div>
+            <div style={{position: "absolute", right: 24,  top: 12}}>
+            <FormControlLabel control={
+              <Switch
+                inputProps={{ 'aria-label': 'controlled' }}
+                label="Poll"
+                size='small'
+                onChange={handleChange}
+                checked={checked()}
+              />
+            } label="Poll" />
+            </div>
+            <RequestEditor sampleApiCall={sampleData} updatedSampleData={nodeEndpointMap[nodeId].updatedSampleData} onChangeApiRequest={onChangeApiRequest}/>
+          </div>
             
         </DialogContent>
       </Dialog>

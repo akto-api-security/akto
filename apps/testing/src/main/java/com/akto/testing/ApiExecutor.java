@@ -179,7 +179,7 @@ public class ApiExecutor {
             contentType = "application/json; charset=utf-8";
             if (payload == null) payload = "{}";
             payload = payload.trim();
-            if (!payload.startsWith("[") || !payload.startsWith("{")) payload = "{}";
+            if (!payload.startsWith("[") && !payload.startsWith("{")) payload = "{}";
         }
 
         if (payload == null) payload = "";
