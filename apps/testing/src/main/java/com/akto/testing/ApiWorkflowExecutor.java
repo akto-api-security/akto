@@ -145,7 +145,7 @@ public class ApiWorkflowExecutor {
             BasicDBObject queryFlattened = JSONUtils.flattenWithDots(queryParamsObject);
             for (String param: queryFlattened.keySet()) {
                 String key = nodeId + "." + reqOrResp + "." + "query" + "." + param;
-                valuesMap.put(key, flattened.get(param));
+                valuesMap.put(key, queryFlattened.get(param));
             }
         }
 
