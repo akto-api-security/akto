@@ -236,7 +236,7 @@ const Workflow = ({apiCollectionId}) => {
           className={classes.drawer}
           anchor="right"
           PaperProps={{
-            sx: { width: "60%" ,border: 0.5, borderRadius: 2, borderColor: "grey"},
+            sx: { width: "60%" ,border: 0.5, borderRadius: 2, borderColor: "grey", overflowY: "scroll"},
           }}
         >
           <WorkflowResultsDrawer 

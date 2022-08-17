@@ -80,6 +80,10 @@ const WorkflowResultsDrawer = (props) => {
                 <div className="request-editor request-editor-payload">
                     {<TextFieldCloseable text={response["headers"]}/> }
                 </div>
+                <div className="request-title">[Response] Status code</div>
+                <div className="request-editor request-editor-payload">
+                    {<TextFieldCloseable text={response["statusCode"]}/> }
+                </div>
                 <div className="request-title">[Response] Payload</div>
                 <div className="request-editor request-editor-payload">
                     {<TextFieldCloseable text={response["body"]}/> }
