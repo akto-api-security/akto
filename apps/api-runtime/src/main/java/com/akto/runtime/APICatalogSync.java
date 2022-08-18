@@ -819,7 +819,7 @@ public class APICatalogSync {
                 }
             }
 
-            if (param.isUrlParam()) {
+            if (param.getIsUrlParam()) {
                 Map<Integer, KeyTypes> urlParams = reqTemplate.getUrlParams();
                 if (urlParams == null) {
                     urlParams = new HashMap<>();

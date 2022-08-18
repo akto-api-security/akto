@@ -86,7 +86,9 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         filters.add(Filters.eq("isHeader", info.getIsHeader()));
         filters.add(Filters.eq("param", info.getParam()));
         filters.add(Filters.eq("apiCollectionId", info.getApiCollectionId()));
-        filters.add(Filters.eq("isUrlParam", info.isUrlParam()));
+        if (info.getIsUrlParam()) {
+            filters.add(Filters.eq("isUrlParam", info.getIsUrlParam()));
+        }
         return filters;
     }
 

@@ -500,7 +500,7 @@ public class TestMergingNew extends MongoBasedTest {
         Map<URLTemplate, RequestTemplate> templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
         for (RequestTemplate requestTemplate: templateURLToMethods.values()) {
             for (SingleTypeInfo singleTypeInfo: requestTemplate.getAllTypeInfo()) {
-                if (singleTypeInfo.isUrlParam()) {
+                if (singleTypeInfo.getIsUrlParam()) {
                     assertEquals(urlParamValuesSize, singleTypeInfo.getValues().getElements().size());
                     assertEquals(urlParamDomain,singleTypeInfo.getDomain());
                 } else {
@@ -588,7 +588,7 @@ public class TestMergingNew extends MongoBasedTest {
                                 long respMaxValue, long respMinValue) {
         for (RequestTemplate requestTemplate: requestTemplateCollections) {
             for (SingleTypeInfo singleTypeInfo: requestTemplate.getAllTypeInfo()) {
-                if (singleTypeInfo.isIsHeader() || singleTypeInfo.isUrlParam()) continue;
+                if (singleTypeInfo.isIsHeader() || singleTypeInfo.getIsUrlParam()) continue;
                 if (singleTypeInfo.getResponseCode() == -1) {
                     assertEquals(reqMaxValue, singleTypeInfo.getMaxValue());
                     assertEquals(reqMinValue, singleTypeInfo.getMinValue());
