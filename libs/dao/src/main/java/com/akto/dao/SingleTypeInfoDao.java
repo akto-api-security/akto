@@ -84,7 +84,6 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
 
     public static List<Bson> createFiltersBasic(SingleTypeInfo info) {
-        System.out.println(info.getUrl() + " " + info.getParam() + " " + info.getIsUrlParam());
         List<Bson> filters = new ArrayList<>();
         filters.add(Filters.eq("url", info.getUrl()));
         filters.add(Filters.eq("method", info.getMethod()));
