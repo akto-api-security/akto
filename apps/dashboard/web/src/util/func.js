@@ -509,7 +509,7 @@ export default {
     },
 
     prepareDomain(x) {
-        let NO_VALUES_RECORDED = "No values recorded";
+        let NO_VALUES_RECORDED = "-";
         if (x.domain === "RANGE") {
             return x.minValue + " - " + x.maxValue
         } else if (x.domain === "ANY") {
@@ -553,7 +553,7 @@ export default {
     prepareValuesTooltip(x) {
         let result = "";
         let values = x["values"]
-        if (!values) return result
+        if (!values) return "No values recorded"
         let elements = values["elements"] ? values["elements"] : []
         let count = 0;
         for (var elem of elements) {
@@ -565,6 +565,6 @@ export default {
             count += 1
         }
 
-        return result
+        return (count == 0 ? "No values recorded" : result)
     }
 }
