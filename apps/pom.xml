@@ -48,6 +48,17 @@
                 <module>testing</module>
             </modules>
         </profile>
+        <profile>
+            <id>api-analyser</id>
+            <activation>
+                <file>
+                    <exists>api-analyser/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>api-analyser</module>
+            </modules>
+        </profile>
     </profiles>
 </project>
 

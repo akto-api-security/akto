@@ -77,6 +77,8 @@ public class Main {
             StatusCodeAnalyser.run();
         }
 
+        TestExecutor testExecutor = new TestExecutor();
+
         while (true) {
             int start = Context.now();
 
@@ -111,7 +113,7 @@ public class Main {
             logger.info("Found one + " + testingRun.getId().toHexString());
 
             try {
-                TestExecutor.init(testingRun);
+                testExecutor.init(testingRun);
             } catch (Exception e) {
                 e.printStackTrace();
             }

@@ -71,6 +71,7 @@ public class AdminSettingsAction extends UserAction {
         SampleDataDao.instance.getMCollection().drop();
         FilterSampleDataDao.instance.getMCollection().drop();
         SensitiveSampleDataDao.instance.getMCollection().drop();
+        SingleTypeInfoDao.instance.deleteValues();
     }
 
     public static void dropCollections(int accountId) {

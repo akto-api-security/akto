@@ -80,7 +80,7 @@ export default {
                     }
 
                     key = key.toLowerCase()
-                    result["highlightPaths"][key] = x["subType"]
+                    result["highlightPaths"][key] = x["highlightValue"]
               }
             }
             return result
@@ -110,7 +110,7 @@ export default {
                         key = "root#"+"responsepayload#"+x["param"];
                     }
                     key = key.toLowerCase();
-                    result["highlightPaths"][key] = x["subType"]
+                    result["highlightPaths"][key] = x["highlightValue"]
                 }
             }
             return result

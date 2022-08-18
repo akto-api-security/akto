@@ -1,5 +1,7 @@
 package com.akto.dto.type;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -10,6 +12,7 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.HttpRequestParams;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.TrafficInfo;
@@ -17,6 +20,7 @@ import com.akto.dto.type.SingleTypeInfo.ParamId;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.types.CappedSet;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.akto.util.Trie;
@@ -58,6 +62,7 @@ public class RequestTemplate {
     Map<String, KeyTypes> parameters;
     AllParams allParams = new AllParams();
     Map<String, KeyTypes> headers;
+    Map<Integer, KeyTypes> urlParams = new HashMap<>();
     Map<Integer, RequestTemplate> responseTemplates;
     Set<String> userIds = new HashSet<>();
     TrafficRecorder trafficRecorder = new TrafficRecorder();
@@ -121,7 +126,7 @@ public class RequestTemplate {
             }
         } else {
             //url, method, responseCode, true, header, value, userId
-            root.getValue().getFirst().process(url, method, responseCode, false, prefix, obj, userId, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap);
+            root.getValue().getFirst().process(url, method, responseCode, false, prefix, obj, userId, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap, false);
             add(root.getValue().getSecond(), userId);   
         }
     }
@@ -135,7 +140,7 @@ public class RequestTemplate {
             }
 
             for(String value: headerPayload.get(header)) {
-                keyTypes.process(url, method, responseCode, true, header, value, userId, apiCollectionId, rawMessage,  sensitiveParamInfoBooleanMap);
+                keyTypes.process(url, method, responseCode, true, header, value, userId, apiCollectionId, rawMessage,  sensitiveParamInfoBooleanMap, false);
             }
         }
     }
@@ -164,7 +169,7 @@ public class RequestTemplate {
             insertTime += (System.currentTimeMillis() - s);
             int now = Context.now();
 
-            BasicDBObject flattened = JSONUtils.flatten(payload);
+            Map<String, Set<Object>> flattened = JSONUtils.flatten(payload);
             s = System.currentTimeMillis();
             for(String param: flattened.keySet()) {
                 if (parameters.size() > 1000) {
@@ -193,7 +198,9 @@ public class RequestTemplate {
                     }
                 }
 
-                keyTypes.process(url, method, responseCode, false, param, flattened.get(param), userId, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap);
+                for (Object obj: flattened.get(param)) {
+                    keyTypes.process(url, method, responseCode, false, param, obj, userId, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap, false);
+                }
             }
 
             processTime += (System.currentTimeMillis() - s);
@@ -353,8 +360,8 @@ public class RequestTemplate {
 
         Map<SubType, SingleTypeInfo> occ = new HashMap<>();
 
-        ParamId paramId = new ParamId(url, method, responseCode, false, prefix + "#" + node.getPathElem(),SingleTypeInfo.DICT, apiCollectionId);
-        occ.put(SingleTypeInfo.DICT, new SingleTypeInfo(paramId, new HashSet<>(), node.getValue().getSecond(), 1, Context.now(), 0));
+        ParamId paramId = new ParamId(url, method, responseCode, false, prefix + "#" + node.getPathElem(),SingleTypeInfo.DICT, apiCollectionId, false);
+        occ.put(SingleTypeInfo.DICT, new SingleTypeInfo(paramId, new HashSet<>(), node.getValue().getSecond(), 1, Context.now(), 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE));
         node.getValue().setFirst(new KeyTypes(occ, false));
 
         node.getChildren().clear();
@@ -406,7 +413,7 @@ public class RequestTemplate {
             if (thisKeyTypes == null) {
                 this.parameters.put(paramName, thatKeyTypes.copy());
             } else {
-                thisKeyTypes.getOccurrences().putAll(thatKeyTypes.getOccurrences());
+                thisKeyTypes.merge(thatKeyTypes);
             }
         }
 
@@ -416,7 +423,7 @@ public class RequestTemplate {
             if (thisKeyTypes == null) {
                 this.headers.put(header, thatKeyTypes.copy());
             } else {
-                thisKeyTypes.getOccurrences().putAll(thatKeyTypes.getOccurrences());
+                thisKeyTypes.merge(thatKeyTypes);
             }
         }
 
@@ -461,6 +468,10 @@ public class RequestTemplate {
         }
 
         for(KeyTypes k: headers.values()) {
+            ret.addAll(k.getAllTypeInfo());
+        }
+
+        for (KeyTypes k: urlParams.values()) {
             ret.addAll(k.getAllTypeInfo());
         }
 
@@ -588,5 +599,108 @@ public class RequestTemplate {
 
     public boolean compare(RequestTemplate that, URLTemplate mergedUrl) {
         return compareKeys(this, that, mergedUrl);
+    }
+
+    public static BasicDBObject parseRequestPayload(HttpRequestParams requestParams, String urlWithParams) {
+
+        String reqPayload = requestParams.getPayload();
+
+        if (reqPayload == null || reqPayload.isEmpty()) {
+            reqPayload = "{}";
+        }
+
+        if(reqPayload.startsWith("[")) {
+            reqPayload = "{\"json\": "+reqPayload+"}";
+        }
+
+        BasicDBObject queryParams = getQueryJSON(urlWithParams);
+
+        BasicDBObject payload = null;
+        try {
+            payload = BasicDBObject.parse(reqPayload);
+        } catch (Exception e) {
+            payload = BasicDBObject.parse("{}");
+        }
+
+        payload.putAll(queryParams.toMap());
+
+        return payload;
+    }
+
+    public static BasicDBObject getQueryJSON(String url) {
+        BasicDBObject ret = new BasicDBObject();
+        if (url == null) {
+            return ret;
+        }
+
+        String[] splitURL = url.split("\\?");
+
+        if (splitURL.length != 2) {
+            return ret;
+        }
+
+        String queryParamsStr = splitURL[1];
+        if (queryParamsStr == null) {
+            return ret;
+        }
+
+        String[] queryParams = queryParamsStr.split("&");
+
+        for (String queryParam : queryParams) {
+            String[] keyVal = queryParam.split("=");
+            if (keyVal.length != 2) {
+                continue;
+            }
+            try {
+                keyVal[0] = URLDecoder.decode(keyVal[0], "UTF-8");
+                keyVal[1] = URLDecoder.decode(keyVal[1], "UTF-8");
+                ret.put(keyVal[0], keyVal[1]);
+            } catch (UnsupportedEncodingException e) {
+                continue;
+            }
+        }
+
+        return ret;
+    }
+
+    public Map<Integer, KeyTypes> getUrlParams() {
+        return urlParams;
+    }
+
+    public void setUrlParams(Map<Integer, KeyTypes> urlParams) {
+        this.urlParams = urlParams;
+    }
+
+    // unit tests for "fillUrlParams" written in TestApiCatalogSync
+    public void fillUrlParams(String[] tokenizedUrl, URLTemplate urlTemplate, int apiCollectionId) {
+        if (this.urlParams == null) this.urlParams = new HashMap<>();
+
+        SuperType[] types = urlTemplate.getTypes();
+        String url = urlTemplate.getTemplateString();
+        String method = urlTemplate.getMethod().name();
+
+        if (tokenizedUrl.length != types.length) return;
+
+        for (int idx=0; idx < types.length; idx++) {
+            SuperType superType = types[idx];
+            if (superType == null) continue;
+            Object val = tokenizedUrl[idx];
+
+            if (superType.equals(SuperType.INTEGER)) {
+                val = Integer.parseInt(val.toString());
+            } else if (superType.equals(SuperType.FLOAT)) {
+                val = Float.parseFloat(val.toString());
+            }
+
+            KeyTypes keyTypes = this.urlParams.get(idx);
+            if (keyTypes == null) {
+                keyTypes = new KeyTypes(new HashMap<>(), false);
+                this.urlParams.put(idx, keyTypes);
+            }
+
+            String userId = "";
+            keyTypes.process(url, method, -1, false, idx+"", val,userId, apiCollectionId, "", new HashMap<>(), true);
+
+        }
     }
 }

@@ -165,7 +165,7 @@ public class InventoryAction extends UserAction {
         Set<ApiInfoKey> apiInfoKeys = new HashSet<ApiInfoKey>();
         for (BasicDBObject singleTypeInfo: list) {
             singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
-            apiInfoKeys.add(new ApiInfoKey(singleTypeInfo.getInt("apiCollectionId"),singleTypeInfo.getString("url"), Method.valueOf(singleTypeInfo.getString("method"))));
+            apiInfoKeys.add(new ApiInfoKey(singleTypeInfo.getInt("apiCollectionId"),singleTypeInfo.getString("url"), Method.fromString(singleTypeInfo.getString("method"))));
         }
 
         BasicDBObject query = new BasicDBObject();

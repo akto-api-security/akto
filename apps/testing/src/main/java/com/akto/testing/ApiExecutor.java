@@ -121,7 +121,7 @@ public class ApiExecutor {
             }
         }
 
-        URLMethods.Method method = URLMethods.Method.valueOf(httpRequestParams.getMethod());
+        URLMethods.Method method = URLMethods.Method.fromString(httpRequestParams.getMethod());
 
         builder = builder.url(url);
 
@@ -135,6 +135,7 @@ public class ApiExecutor {
             case DELETE:
             case HEAD:
             case OPTIONS:
+            case PATCH:
             case TRACE:
                 httpResponseParams = sendWithRequestBody(httpRequestParams, builder);
                 break;

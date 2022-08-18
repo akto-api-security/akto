@@ -1,0 +1,33 @@
+package com.akto.types;
+
+import java.util.HashSet;
+import java.util.Set;
+
+public class CappedSet<T> {
+
+    public static final int LIMIT = 50;
+    Set<T> elements;
+
+    public CappedSet(Set<T> elements) {
+        this.elements = elements;
+    }
+
+    public CappedSet() {
+        this(new HashSet<>());
+    }
+
+
+    public boolean add(T t) {
+        if (elements.size() >= LIMIT) return false;
+        elements.add(t);
+        return true;
+    }
+
+    public Set<T> getElements() {
+        return elements;
+    }
+
+    public void setElements(Set<T> elements) {
+        this.elements = elements;
+    }
+}
