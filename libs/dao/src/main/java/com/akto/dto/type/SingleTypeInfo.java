@@ -689,6 +689,12 @@ public class SingleTypeInfo {
         }
     }
 
+    public boolean isPrivate() {
+        if (uniqueCount == 0) return true;
+        double v = (1.0*publicCount) / uniqueCount;
+        return v <= SingleTypeInfo.THRESHOLD;
+    }
+
     public long getMinValue() {
         return minValue;
     }

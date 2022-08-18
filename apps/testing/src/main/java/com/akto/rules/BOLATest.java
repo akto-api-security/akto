@@ -37,8 +37,8 @@ public class BOLATest extends TestPlugin {
         boolean result = authMechanism.addAuthToRequest(httpRequestParams);
         if (!result) return false; // this means that auth token was not there in original request so exit
 
-        List<SingleTypeInfo> privateSingleTypeInfos = containsPrivateResource(httpRequestParams, apiInfoKey);
-        if (privateSingleTypeInfos.isEmpty()) {
+        ContainsPrivateResourceResult containsPrivateResourceResult = containsPrivateResource(httpRequestParams, apiInfoKey);
+        if (!containsPrivateResourceResult.isPrivate) { // contains 1 or more public parameters... so don't test
             HttpResponseParams newHttpResponseParams = generateEmptyResponsePayload(httpRequestParams);
             addTestSuccessResult(apiInfoKey, newHttpResponseParams, testRunId, false, new ArrayList<>());
             return false;
@@ -60,7 +60,7 @@ public class BOLATest extends TestPlugin {
             vulnerable = val > 90;
         }
 
-        addTestSuccessResult(apiInfoKey,httpResponseParams, testRunId, vulnerable, privateSingleTypeInfos);
+        addTestSuccessResult(apiInfoKey,httpResponseParams, testRunId, vulnerable, containsPrivateResourceResult.findPrivateOnes());
 
         return vulnerable;
     }

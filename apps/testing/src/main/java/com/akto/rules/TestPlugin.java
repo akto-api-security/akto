@@ -119,12 +119,31 @@ public abstract class TestPlugin {
         );
     }
 
-    public List<SingleTypeInfo> containsPrivateResource(HttpRequestParams httpRequestParams, ApiInfo.ApiInfoKey apiInfoKey) {
+    public static class ContainsPrivateResourceResult {
+        boolean isPrivate;
+        List<SingleTypeInfo> singleTypeInfos;
+
+        public ContainsPrivateResourceResult(boolean isPrivate, List<SingleTypeInfo> singleTypeInfos) {
+            this.isPrivate = isPrivate;
+            this.singleTypeInfos = singleTypeInfos;
+        }
+
+        public List<SingleTypeInfo> findPrivateOnes() {
+            List<SingleTypeInfo> res = new ArrayList<>();
+            for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
+                if (singleTypeInfo.isPrivate()) res.add(singleTypeInfo);
+            }
+            return res;
+        }
+    }
+
+    public ContainsPrivateResourceResult containsPrivateResource(HttpRequestParams httpRequestParams, ApiInfo.ApiInfoKey apiInfoKey) {
         String urlWithParams = httpRequestParams.getURL();
         String url = apiInfoKey.url;
         URLMethods.Method method = apiInfoKey.getMethod();
-        List<SingleTypeInfo> privateParamTypeInfos = new ArrayList<>();
+        List<SingleTypeInfo> singleTypeInfoList = new ArrayList<>();
 
+        boolean isPrivate = true;
         // check private resource in
         // 1. url
         if (APICatalog.isTemplateUrl(url)) {
@@ -132,9 +151,10 @@ public abstract class TestPlugin {
             String[] tokens = urlTemplate.getTokens();
             for (int i = 0;i < tokens.length; i++) {
                 if (tokens[i] == null) {
-                    SingleTypeInfo singleTypeInfo = SampleMessageStore.findPrivateSTI(i+"", true,apiInfoKey, false, -1);
+                    SingleTypeInfo singleTypeInfo = SampleMessageStore.findSti(i+"", true,apiInfoKey, false, -1);
                     if (singleTypeInfo != null) {
-                        privateParamTypeInfos.add(singleTypeInfo);
+                        singleTypeInfoList.add(singleTypeInfo);
+                        isPrivate = isPrivate && singleTypeInfo.isPrivate();
                     }
                 }
             }
@@ -144,13 +164,14 @@ public abstract class TestPlugin {
         BasicDBObject payload = RequestTemplate.parseRequestPayload(httpRequestParams, urlWithParams);
         Map<String, Set<Object>> flattened = JSONUtils.flatten(payload);
         for (String param: flattened.keySet()) {
-            SingleTypeInfo singleTypeInfo = SampleMessageStore.findPrivateSTI(param,false,apiInfoKey, false, -1);
+            SingleTypeInfo singleTypeInfo = SampleMessageStore.findSti(param,false,apiInfoKey, false, -1);
             if (singleTypeInfo != null) {
-                privateParamTypeInfos.add(singleTypeInfo);
+                singleTypeInfoList.add(singleTypeInfo);
+                isPrivate = isPrivate && singleTypeInfo.isPrivate();
             }
         }
 
-        return privateParamTypeInfos;
+        return new ContainsPrivateResourceResult(isPrivate, singleTypeInfoList);
     }
 
 }

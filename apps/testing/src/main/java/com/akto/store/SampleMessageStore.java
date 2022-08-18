@@ -9,7 +9,6 @@ import com.akto.dto.testing.CollectionWiseTestingEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.parsers.HttpCallParser;
 import com.akto.testing.ApiExecutor;
@@ -54,29 +53,15 @@ public class SampleMessageStore {
         }
     }
 
-    public static SingleTypeInfo findPrivateSTI(String param, boolean isUrlParam,
-                                                ApiInfo.ApiInfoKey apiInfoKey, boolean isHeader, int responseCode) {
+    public static SingleTypeInfo findSti(String param, boolean isUrlParam,
+                                         ApiInfo.ApiInfoKey apiInfoKey, boolean isHeader, int responseCode) {
 
         String key = SingleTypeInfo.composeKey(
                 apiInfoKey.url, apiInfoKey.method.name(), responseCode, isHeader,
                 param,SingleTypeInfo.GENERIC, apiInfoKey.getApiCollectionId(), isUrlParam
         );
 
-        SingleTypeInfo singleTypeInfo = singleTypeInfos.get(key);
-        if (singleTypeInfo == null) return null;
-
-        long publicCount = singleTypeInfo.getPublicCount();
-        long uniqueCount = singleTypeInfo.getUniqueCount();
-
-        if (uniqueCount == 0) return null;
-
-        double v = (1.0*publicCount) / uniqueCount;
-        if (v <= SingleTypeInfo.THRESHOLD) {
-            return singleTypeInfo;
-        } else {
-            return null;
-        }
-
+        return singleTypeInfos.get(key);
     }
 
     public static void fetchSampleMessages() {
