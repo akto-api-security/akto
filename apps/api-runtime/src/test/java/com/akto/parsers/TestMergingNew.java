@@ -3,11 +3,14 @@ package com.akto.parsers;
 import com.akto.MongoBasedTest;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.type.*;
 import com.akto.runtime.APICatalogSync;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 import org.junit.Test;
 
 import java.util.*;
@@ -599,4 +602,46 @@ public class TestMergingNew extends MongoBasedTest {
             }
         }
     }
+
+    // Test to check if param dbUpdates are made only when certain conditions are true
+    // Case when update shouldn't be made:
+    // delta doesn't have the strict url but db has it and no change in min, max and last seen not older than 30 mins
+    @Test
+    public void testDbUpdateParams() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+        HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1);
+        int collectionId = 123;
+        String url = "api/";
+
+        HttpResponseParams httpResponseParams1 = createHttpResponseForMinMax(url+"books1", 23.4F,-98F );
+        parser.syncFunction(Collections.singletonList(httpResponseParams1),true);
+        assertEquals(1, parser.apiCatalogSync.getDbState(collectionId).getStrictURLToMethods().size());
+
+        APICatalogSync.DbUpdateReturn dbUpdateReturn1 = cleanSync(httpResponseParams1, collectionId);
+        assertEquals(0, dbUpdateReturn1.bulkUpdatesForSingleTypeInfo.size()); // because no change in minMax
+
+        HttpResponseParams httpResponseParams2 = createHttpResponseForMinMax(url+"books1", 230.4F,-98F );
+        APICatalogSync.DbUpdateReturn dbUpdateReturn2 = cleanSync(httpResponseParams2, collectionId);
+        assertEquals(1, dbUpdateReturn2.bulkUpdatesForSingleTypeInfo.size()); // because reqPayload Max changed
+
+        HttpResponseParams httpResponseParams3 = createHttpResponseForMinMax(url+"books1", 100,-98F );
+        APICatalogSync.DbUpdateReturn dbUpdateReturn3 = cleanSync(httpResponseParams3, collectionId);
+        assertEquals(1, dbUpdateReturn3.bulkUpdatesForSingleTypeInfo.size()); // even though minMax didn't change new values were added
+    }
+
+    // this function takes httpResponseParam and does runtime thingy in a clean environment (equivalent to server restart)
+    private APICatalogSync.DbUpdateReturn cleanSync(HttpResponseParams httpResponseParams, int collectionId) {
+        // new httpCallParser to make sure delta is clean
+        HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1000, Context.now() + 1000);
+        parser.numberOfSyncs = 1000; // to make sure it doesn't sync before
+
+        parser.syncFunction(Collections.singletonList(httpResponseParams),false);
+        APICatalogSync apiCatalogSync = parser.apiCatalogSync;
+        return apiCatalogSync.getDBUpdatesForParams(
+                apiCatalogSync.getDelta(collectionId), apiCatalogSync.getDbState(collectionId), false
+        );
+
+    }
+
 }

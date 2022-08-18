@@ -44,10 +44,11 @@
                                 <div
                                     v-bind="attrs"
                                     v-on="on"
+                                    class="table-entry"
                                 >
                                   {{item.domain}}
                                 </div>
-                            </template>
+                            </template class="table-entry">
                             <div>
                                 {{item.valuesString}}
                             </div>
@@ -70,12 +71,12 @@
                                 <div
                                     v-bind="attrs"
                                     v-on="on"
-                                    class="fs-12"
+                                    class="table-entry"
                                 >
                                   {{item.domain}}
                                 </div>
                             </template>
-                            <div>
+                            <div class="fs-12">
                                 {{item.valuesString}}
                             </div>
                         </v-tooltip>

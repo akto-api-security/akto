@@ -273,4 +273,40 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         assertEquals(bulkWrites.size(), singleTypeInfos.size());
         assertEquals(2, count);
     }
+
+    // Test to see what happens when singleTypeInfo
+    @Test
+    public void testAddingIsUrlParam() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+
+        SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(
+                "url", "GET",200, false, "param#key", SingleTypeInfo.EMAIL, 0, false
+        );
+        SingleTypeInfo info = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 0,0,0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
+
+        List<Bson> filters = new ArrayList<>();
+        filters.add(Filters.eq("url", info.getUrl()));
+        filters.add(Filters.eq("method", info.getMethod()));
+        filters.add(Filters.eq("responseCode", info.getResponseCode()));
+        filters.add(Filters.eq("isHeader", info.getIsHeader()));
+        filters.add(Filters.eq("param", info.getParam()));
+        filters.add(Filters.eq("apiCollectionId", info.getApiCollectionId()));
+        filters.add(Filters.eq("subType", info.getSubType().getName()));
+
+        SingleTypeInfoDao.instance.updateOne(Filters.and(filters), Updates.set("count",1));
+        long count = SingleTypeInfoDao.instance.getMCollection().countDocuments();
+        assertEquals(1, count);
+        // to make sure isUrlParam doesn't exist
+        SingleTypeInfo stiFromDb = SingleTypeInfoDao.instance.findOne(Filters.exists(SingleTypeInfo._IS_URL_PARAM));
+        assertNull(stiFromDb);
+
+        SingleTypeInfoDao.instance.updateOne(SingleTypeInfoDao.createFilters(info), Updates.set("count",1));
+        count = SingleTypeInfoDao.instance.getMCollection().countDocuments();
+        assertEquals(1, count);
+
+        info.setIsUrlParam(true);
+        SingleTypeInfoDao.instance.updateOne(SingleTypeInfoDao.createFilters(info), Updates.set("count",1));
+        count = SingleTypeInfoDao.instance.getMCollection().countDocuments();
+        assertEquals(2, count);
+    }
 }
