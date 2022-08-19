@@ -179,15 +179,18 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         bulkWrites.add(createSingleTypeInfoUpdate("B", "GET", SingleTypeInfo.EMAIL, 0,200));
         bulkWrites.add(createSingleTypeInfoUpdate("A", "GET", SingleTypeInfo.EMAIL, 1,200));
         bulkWrites.add(createSingleTypeInfoUpdate("C", "GET", SingleTypeInfo.EMAIL, 1,200));
+        bulkWrites.add(createSingleTypeInfoUpdate("A", "GET", SingleTypeInfo.EMAIL, -1000,200));
         SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkWrites);
 
         List<ApiInfo.ApiInfoKey> apiInfoKeyList0 = SingleTypeInfoDao.instance.fetchEndpointsInCollection(0);
         List<ApiInfo.ApiInfoKey> apiInfoKeyList1 = SingleTypeInfoDao.instance.fetchEndpointsInCollection(1);
         List<ApiInfo.ApiInfoKey> apiInfoKeyList2 = SingleTypeInfoDao.instance.fetchEndpointsInCollection(-1);
+        List<ApiInfo.ApiInfoKey> apiInfoKeyList3 = SingleTypeInfoDao.instance.fetchEndpointsInCollection(-1000);
 
         assertEquals(apiInfoKeyList0.size(), 4);
         assertEquals(apiInfoKeyList1.size(), 2);
-        assertEquals(apiInfoKeyList2.size(), 6);
+        assertEquals(apiInfoKeyList2.size(), 7);
+        assertEquals(apiInfoKeyList3.size(), 1);
 
     }
 

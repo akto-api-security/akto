@@ -199,7 +199,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
                         .append("url", "$url")
                         .append("method", "$method");
 
-        if (apiCollectionId >= 0) {
+        if (apiCollectionId != -1) {
             pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
         }
 
