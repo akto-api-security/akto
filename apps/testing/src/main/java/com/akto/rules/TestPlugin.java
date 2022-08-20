@@ -144,6 +144,7 @@ public abstract class TestPlugin {
         List<SingleTypeInfo> singleTypeInfoList = new ArrayList<>();
 
         boolean isPrivate = true;
+        boolean atLeastOneValueInRequest = false;
         // check private resource in
         // 1. url
         if (APICatalog.isTemplateUrl(url)) {
@@ -151,6 +152,7 @@ public abstract class TestPlugin {
             String[] tokens = urlTemplate.getTokens();
             for (int i = 0;i < tokens.length; i++) {
                 if (tokens[i] == null) {
+                    atLeastOneValueInRequest = true;
                     SingleTypeInfo singleTypeInfo = SampleMessageStore.findSti(i+"", true,apiInfoKey, false, -1);
                     if (singleTypeInfo != null) {
                         singleTypeInfoList.add(singleTypeInfo);
@@ -164,6 +166,7 @@ public abstract class TestPlugin {
         BasicDBObject payload = RequestTemplate.parseRequestPayload(httpRequestParams, urlWithParams);
         Map<String, Set<Object>> flattened = JSONUtils.flatten(payload);
         for (String param: flattened.keySet()) {
+            atLeastOneValueInRequest = true;
             SingleTypeInfo singleTypeInfo = SampleMessageStore.findSti(param,false,apiInfoKey, false, -1);
             if (singleTypeInfo != null) {
                 singleTypeInfoList.add(singleTypeInfo);
@@ -171,7 +174,10 @@ public abstract class TestPlugin {
             }
         }
 
-        return new ContainsPrivateResourceResult(isPrivate, singleTypeInfoList);
+        // For private at least one value in request
+        boolean finalPrivateResult = isPrivate && atLeastOneValueInRequest;
+
+        return new ContainsPrivateResourceResult(finalPrivateResult, singleTypeInfoList);
     }
 
 }
