@@ -110,8 +110,8 @@ public class TestTestPlugin extends MongoBasedTest {
         String payload1 = "{\"param1\": \"avneesh@akto.io\", \"param2\": \"ankush\"}";
         HttpRequestParams httpRequestParams1 = buildHttpReq("/api/books?param3=ankita", apiInfoKey1.getMethod().name(), apiInfoKey1.getApiCollectionId(), payload1);
         TestPlugin.ContainsPrivateResourceResult result1 = bolaTest.containsPrivateResource(httpRequestParams1, apiInfoKey1);
-        assertEquals(result1.singleTypeInfos.size(), 3);
-        assertEquals(result1.findPrivateOnes().size(), 3);
+        assertEquals(3, result1.singleTypeInfos.size());
+        assertEquals(3, result1.findPrivateOnes().size());
         assertTrue(result1.isPrivate);
 
         // SECOND (Contains 2 public resources)
@@ -124,9 +124,9 @@ public class TestTestPlugin extends MongoBasedTest {
         String payload2 = "{\"param1\": \"Ronaldo\", \"param2\": \"Messi\"}";
         HttpRequestParams httpRequestParams2 = buildHttpReq("/api/INTEGER/cars/STRING", apiInfoKey2.getMethod().name(), apiInfoKey2.getApiCollectionId(), payload2);
         TestPlugin.ContainsPrivateResourceResult result2 = bolaTest.containsPrivateResource(httpRequestParams2, apiInfoKey2);
-        assertEquals(result2.singleTypeInfos.size(), 4);
+        assertEquals(4, result2.singleTypeInfos.size());
         assertFalse(result2.isPrivate);
-        assertEquals(result2.findPrivateOnes().size(), 2);
+        assertEquals(2, result2.findPrivateOnes().size());
 
         // THIRD (All missing) [We give missing STI benefit of doubt and consider it to be private]
         ApiInfo.ApiInfoKey apiInfoKey3 = new ApiInfo.ApiInfoKey(123, "/api/bus", URLMethods.Method.GET);
@@ -135,9 +135,9 @@ public class TestTestPlugin extends MongoBasedTest {
         HttpRequestParams httpRequestParams3 = buildHttpReq("/api/bus", apiInfoKey3.getMethod().name(), apiInfoKey3.getApiCollectionId(), payload3);
 
         TestPlugin.ContainsPrivateResourceResult result3 = bolaTest.containsPrivateResource(httpRequestParams3, apiInfoKey3);
-        assertEquals(result3.singleTypeInfos.size(), 0);
+        assertEquals(0, result3.singleTypeInfos.size());
         assertTrue(result3.isPrivate);
-        assertEquals(result3.findPrivateOnes().size(), 0);
+        assertEquals(0, result3.findPrivateOnes().size());
 
         // FOURTH (Empty payload)
         ApiInfo.ApiInfoKey apiInfoKey4 = new ApiInfo.ApiInfoKey(123, "/api/toys", URLMethods.Method.GET);
@@ -146,9 +146,9 @@ public class TestTestPlugin extends MongoBasedTest {
         HttpRequestParams httpRequestParams4 = buildHttpReq("/api/toys", apiInfoKey4.getMethod().name(), apiInfoKey4.getApiCollectionId(), payload4);
 
         TestPlugin.ContainsPrivateResourceResult result4 = bolaTest.containsPrivateResource(httpRequestParams4, apiInfoKey4);
-        assertEquals(result4.singleTypeInfos.size(), 0);
+        assertEquals(0, result4.singleTypeInfos.size());
         assertFalse(result4.isPrivate);
-        assertEquals(result4.findPrivateOnes().size(), 0);
+        assertEquals(0, result4.findPrivateOnes().size());
 
     }
 
