@@ -16,6 +16,10 @@ public class CappedSet<T> {
         this(new HashSet<>());
     }
 
+    public int count() {
+        if (this.elements == null) return 0;
+        return this.elements.size();
+    }
 
     public boolean add(T t) {
         if (elements.size() >= LIMIT) return false;

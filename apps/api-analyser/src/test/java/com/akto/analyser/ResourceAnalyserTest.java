@@ -116,7 +116,7 @@ public class ResourceAnalyserTest extends MongoBasedTest {
                 } else if (singleTypeInfo.getParam().equals("user#company")) {
                     assertEquals(2, singleTypeInfo.getUniqueCount());
                     assertEquals(0, singleTypeInfo.getPublicCount());
-                } else if (singleTypeInfo.getParam().equals("2") && singleTypeInfo.isUrlParam()) {
+                } else if (singleTypeInfo.getParam().equals("2") && singleTypeInfo.getIsUrlParam()) {
                     assertEquals(2, singleTypeInfo.getUniqueCount());
                     assertEquals(0, singleTypeInfo.getPublicCount());
                 } else {

@@ -178,4 +178,7 @@
 
 .grey-text
     color: #949597
+
+.fs-12
+    font-size: 12px
 </style>

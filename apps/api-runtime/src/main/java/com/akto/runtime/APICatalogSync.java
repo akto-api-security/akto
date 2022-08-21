@@ -452,9 +452,11 @@ public class APICatalogSync {
 
                 RequestTemplate strictMatch = dbCatalog.getStrictURLToMethods().get(url);
                 if (strictMatch != null) {
-                    RequestTemplate requestTemplate = deltaCatalog.getStrictURLToMethods().get(url);
+                    Map<URLStatic, RequestTemplate> deltaCatalogStrictURLToMethods = deltaCatalog.getStrictURLToMethods();
+                    RequestTemplate requestTemplate = deltaCatalogStrictURLToMethods.get(url);
                     if (requestTemplate == null) {
                         requestTemplate = strictMatch.copy(); // to further process the requestTemplate
+                        deltaCatalogStrictURLToMethods.put(url, requestTemplate) ;
                         strictMatch.mergeFrom(requestTemplate); // to update the existing requestTemplate in db with new data
                     }
 
@@ -591,8 +593,11 @@ public class APICatalogSync {
             Bson update;
 
             int inc = deltaInfo.getCount() - (dbInfo == null ? 0 : dbInfo.getCount());
+            long lastSeenDiff = deltaInfo.getLastSeen() - (dbInfo == null ? 0 : dbInfo.getLastSeen());
+            boolean minMaxChanged = (dbInfo == null) || (dbInfo.getMinValue() != deltaInfo.getMinValue()) || (dbInfo.getMaxValue() != deltaInfo.getMaxValue());
+            boolean valuesChanged = (dbInfo == null) || (dbInfo.getValues().count() != deltaInfo.getValues().count());
 
-            if (inc == 0) {
+            if (inc == 0 && lastSeenDiff < (60*30) && !minMaxChanged && !valuesChanged) {
                 continue;
             } else {
                 inc = 1;
@@ -819,7 +824,7 @@ public class APICatalogSync {
                 }
             }
 
-            if (param.isUrlParam()) {
+            if (param.getIsUrlParam()) {
                 Map<Integer, KeyTypes> urlParams = reqTemplate.getUrlParams();
                 if (urlParams == null) {
                     urlParams = new HashMap<>();

@@ -640,7 +640,7 @@ public class SingleTypeInfo {
         this.domain = domain;
     }
 
-    public boolean isUrlParam() {
+    public boolean getIsUrlParam() {
         return isUrlParam;
     }
 

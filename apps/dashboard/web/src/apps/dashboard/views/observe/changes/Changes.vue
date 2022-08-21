@@ -86,6 +86,7 @@
                                 <div
                                     v-bind="attrs"
                                     v-on="on"
+                                    class="fs-12"
                                 >
                                   {{item.domain}}
                                 </div>

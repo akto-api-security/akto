@@ -2,13 +2,17 @@ package com.akto.dao;
 
 import java.util.*;
 
+import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomDataType;
+import com.akto.dto.HttpResponseParams;
 import com.akto.dto.SensitiveParamInfo;
+import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 
@@ -78,6 +82,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
     }
 
 
+
     public static List<Bson> createFiltersBasic(SingleTypeInfo info) {
         List<Bson> filters = new ArrayList<>();
         filters.add(Filters.eq("url", info.getUrl()));
@@ -86,7 +91,15 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         filters.add(Filters.eq("isHeader", info.getIsHeader()));
         filters.add(Filters.eq("param", info.getParam()));
         filters.add(Filters.eq("apiCollectionId", info.getApiCollectionId()));
-        filters.add(Filters.eq("isUrlParam", info.isUrlParam()));
+
+        List<Boolean> urlParamQuery;
+        if (info.getIsUrlParam()) {
+            urlParamQuery = Collections.singletonList(true);
+        } else {
+            urlParamQuery = Arrays.asList(false, null);
+        }
+
+        filters.add(Filters.in("isUrlParam", urlParamQuery));
         return filters;
     }
 
@@ -186,7 +199,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
                         .append("url", "$url")
                         .append("method", "$method");
 
-        if (apiCollectionId >= 0) {
+        if (apiCollectionId != -1) {
             pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
         }
 
