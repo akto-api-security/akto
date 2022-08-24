@@ -98,7 +98,7 @@ public class Main {
             // TODO: find a better solution than wait
             if (testingRun == null) {
                 try {
-                    Thread.sleep(60 * 1000L);
+                    Thread.sleep(10 * 1000L);
                     continue;
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);

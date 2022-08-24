@@ -14,24 +14,19 @@ const WorkflowResultsDrawer = (props) => {
 
     const [idx, setIdx] = useState(0);
 
-    const elemStyle = (i) =>  {
-        return {
-            marginY: 3, marginX: 1.5, background: "rgba(71,70,106,.03)", padding: 0, textAlign: "center", height: "30px", 
-            lineHeight: "30px", borderRadius: 2, fontWeight: i === idx ? "bold" : "normal", cursor: "pointer"
-        }
-    };
-
     const elem = (element, i) => {
         return (
-            <Box onClick={()=>{setIdx(i)}} key={i} sx={elemStyle(i)}>
+            <Box onClick={()=>{setIdx(i)}} key={i} className={"results-node " + ((i === idx) ? "results-node-selected" : "ddd")}>
                 {element["key"]}
             </Box>
         )
     }
 
     const elemList = () => {
-        if (!workflowTestResult) return []
-        return workflowTestResult.map((x, i) => elem(x, i))
+        if (!workflowTestResult) return null
+        return  <Box sx={{ borderRight: 1, height: "100%", borderColor: "lightGrey"}}>
+                    {workflowTestResult.map((x, i) => elem(x, i))}
+                </Box>
     }
 
     const testStatus = () => {
@@ -97,13 +92,11 @@ const WorkflowResultsDrawer = (props) => {
             <Grid item xs={12} style={{background: "rgba(239,239,239,.5)"}}>
                 {navBarContent()}
             </Grid>
-            <Grid item xs={1} style={{height: "100vh", paddingTop: 0}}>
-                <Box sx={{ borderRight: 1, height: "100%", borderColor: "lightGrey"}}>
-                    {elemList()}
-                </Box>
+            <Grid item xs={1} style={{paddingTop: 0}}>
+                {elemList()}
             </Grid>
-            <Grid item xs={11} style={{height: "100vh", padding: 0}}>
-                <Box sx={{ height: "100%", background: "white", paddingX: "12px"}}>
+            <Grid item xs={11} style={{padding: 0   }}>
+                <Box sx={{ height: "100%", paddingX: "12px"}}>
                     {mainContent()}
                 </Box>
             </Grid>

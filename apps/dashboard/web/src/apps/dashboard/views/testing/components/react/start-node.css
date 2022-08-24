@@ -158,7 +158,17 @@
     word-wrap: break-word !important;
 }
 
+.workflow-button {
+    color: #6200EA !important;
+    font-weight: 600 !important;
+}
+
 .request-editor-matched {
+    color:  darkblue !important;
+    font-weight: 600 !important;
+}
+
+.request-editor-variable {
     color: #6200EA !important;
     font-weight: 600 !important;
 }
@@ -169,4 +179,28 @@
     color: #47466A;
     font-family: 'Poppins';
     font-weight: 500;
+}
+
+.results-node {
+    margin-top: 24px;
+    margin-bottom: 24px;
+    margin-left: 8px;
+    margin-right: 8px;
+    background: rgba(71,70,106,.03);
+    padding: 0px;
+    text-align: center;
+    line-height: 30px;
+    border-radius: 4px;
+    cursor: pointer;
+    overflow: hidden
+}
+
+.results-node:hover {
+    text-overflow: clip;
+    white-space: normal;
+    word-break: break-all;
+}
+
+.results-node-selected {
+    font-weight: bold;
 }

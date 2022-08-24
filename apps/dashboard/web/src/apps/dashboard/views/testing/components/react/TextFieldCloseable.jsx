@@ -6,19 +6,52 @@ import './start-node.css';
 
 const TextFieldCloseable = ({text}) => {
 
-    var r = /\$\{x(\d+)\.([\w\[\]\.]+)\}/g;
+    var r = /\#\[.*?]#/g;
     let m = r.exec(text)
 
     return (
         <span>
-            {m && <span className="request-editor">{text.substr(0, m.index)}</span>}
-            {m && <span className="request-editor request-editor-matched">{m[0]}</span>}
+            {m && <span className="request-editor">{VariableOutside(text.substr(0, m.index))}</span>}
+            {m && <span className="request-editor">{JavaScriptBlock(m[0])}</span>}
             {m && <TextFieldCloseable text={text.substr(m.index + m[0].length, text.length)}/>}
-            {!m && <span className="request-editor">{text}</span>}
+            {!m && <span className="request-editor">{VariableOutside(text)}</span>}
         </span>
     );
   
         
+}
+
+const VariableOutside = (text) => {
+
+    var r = /\$\{x(\d+)\.([\w\[\]\.]+)\}/g;
+    let m = r.exec(text)
+    return (
+        <span>
+            {m && <span className="request-editor">{text.substr(0, m.index)}</span>}
+            {m && <span className="request-editor request-editor-variable">{m[0]}</span>}
+            {m && <span>{VariableOutside(text.substr(m.index + m[0].length, text.length))}</span>}
+            {!m && <span className="request-editor">{text}</span>}
+        </span>
+    );
+
+
+}
+
+
+const JavaScriptBlock = (text) => {
+
+    var r = /\$\{x(\d+)\.([\w\[\]\.]+)\}/g;
+    let m = r.exec(text)
+    return (
+        <span>
+            {m && <span className=" request-editor-matched">{text.substr(0, m.index)}</span>}
+            {m && <span className="request-editor-matched request-editor-variable">{m[0]}</span>}
+            {m && <span>{JavaScriptBlock(text.substr(m.index + m[0].length, text.length))}</span>}
+            {!m && <span className="request-editor-matched">{text}</span>}
+        </span>
+    );
+
+
 }
 
 export default TextFieldCloseable

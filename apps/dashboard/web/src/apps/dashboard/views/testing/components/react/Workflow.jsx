@@ -1,4 +1,4 @@
-import React, { useState, useEffect} from 'react'
+import React, { useState, useEffect, useRef} from 'react'
 import ReactFlow, {
   Background,
   getRectOfNodes
@@ -66,11 +66,12 @@ const Workflow = ({apiCollectionId}) => {
   const [height, setHeight] = useState(0);
   const [workflowTestResult, setWorkflowTestResult] = useState(null)
   const [workflowTestingRun, setWorkflowTestingRun] = useState(null);
+  const containerRef = useRef();
 
   const classes = useStyles({ height: height });
 
   useEffect(() => {
-    open ? setHeight("100vh") : setHeight(0)
+    open ? setHeight(containerRef.current.clientHeight - 64) : setHeight(0)
   }, [open]);
 
   const getId = () => {
@@ -214,17 +215,17 @@ const Workflow = ({apiCollectionId}) => {
   React.useEffect(() => {fetchResult()}, []);
 
   return (
-    <div style={{height: "800px"}}>
+    <div style={{height: "800px"}} ref={containerRef}>
       <IconButton onClick={onSave} style={{float : "right"}}>
-        <FontAwesomeIcon icon={faSave} className="request-editor-matched"  size="sm"/>
+        <FontAwesomeIcon icon={faSave} className="workflow-button"  size="sm"/>
       </IconButton>
 
       <IconButton onClick={runTest} style={{float : "right"}}>
-        <FontAwesomeIcon icon={faPlayCircle} className="request-editor-matched"  size="sm"/>
+        <FontAwesomeIcon icon={faPlayCircle} className="workflow-button"  size="sm"/>
       </IconButton>
 
       <IconButton onClick={showResult} style={{float : "right"}}>
-        <FontAwesomeIcon icon={open ? faEyeSlash : faEye} className="request-editor-matched"  size="sm"/>
+        <FontAwesomeIcon icon={open ? faEyeSlash : faEye} className="workflow-button"  size="sm"/>
       </IconButton>
 
       <AppBar position="static">
@@ -236,7 +237,7 @@ const Workflow = ({apiCollectionId}) => {
           className={classes.drawer}
           anchor="right"
           PaperProps={{
-            sx: { width: "60%" ,border: 0.5, borderRadius: 2, borderColor: "grey", overflowY: "scroll"},
+            sx: { width: "60%" ,border: 0.5, borderRadius: 2, borderColor: "grey" },
           }}
         >
           <WorkflowResultsDrawer 

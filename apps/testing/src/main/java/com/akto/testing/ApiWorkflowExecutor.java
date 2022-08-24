@@ -1,12 +1,10 @@
 package com.akto.testing;
 
 import com.akto.DaoInit;
-import com.akto.dao.OtpMessagesDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.OTPMessage;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.api_workflow.Graph;
@@ -23,6 +21,9 @@ import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+import javax.script.ScriptException;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -34,7 +35,7 @@ public class ApiWorkflowExecutor {
     public static void main(String[] args) {
         DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
         Context.accountId.set(1_000_000);
-        TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq("endTimestamp", 1660674178));
+        TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq("state", "SCHEDULED"));
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         WorkflowTestingEndpoints workflowTestingEndpoints = (WorkflowTestingEndpoints) testingRun.getTestingEndpoints();
         apiWorkflowExecutor.init(workflowTestingEndpoints.getWorkflowTest(), testingRun.getId());
@@ -172,11 +173,8 @@ public class ApiWorkflowExecutor {
         String requestPayload = updatedSampleData.getRequestPayload();
         String requestUrl = updatedSampleData.getRequestUrl();
 
-        String regex = "\\$\\{x(\\d+)\\.([\\w\\[\\].]+)\\}"; // todo: integer inside brackets
-        Pattern p = Pattern.compile(regex);
-
         if (requestUrl != null) {
-            String rawUrl = replaceVariables(p, requestUrl, valuesMap);
+            String rawUrl = executeCode(requestUrl, valuesMap);
             // this url might contain urlQueryParams. We need to move it queryParams
             String[] rawUrlArr = rawUrl.split("\\?");
             request.setUrl(rawUrlArr[0]);
@@ -186,18 +184,18 @@ public class ApiWorkflowExecutor {
         }
 
         if (requestPayload != null) {
-            String finalPayload = replaceVariables(p,requestPayload, valuesMap);
+            String finalPayload =  executeCode(requestPayload, valuesMap);
             request.setBody(finalPayload);
         }
 
         if (requestHeaders != null) {
-            String finalPayload = replaceVariables(p, requestHeaders, valuesMap);
+            String finalPayload = executeCode(requestHeaders, valuesMap);
             Map<String, List<String>> res = OriginalHttpRequest.buildHeadersMap(finalPayload);
             request.setHeaders(res);
         }
 
         if (queryParams != null) {
-            String finalQueryParams = replaceVariables(p, queryParams, valuesMap);
+            String finalQueryParams = executeCode(queryParams, valuesMap);
             String ogQuery = request.getQueryParams();
             if (ogQuery == null || ogQuery.isEmpty()) {
                 request.setQueryParams(finalQueryParams);
@@ -231,8 +229,47 @@ public class ApiWorkflowExecutor {
         return ApiExecutor.getRawQueryFromJson(json);
     }
 
+    private final ScriptEngineManager factory = new ScriptEngineManager();
+
+    public String executeCode(String ogPayload, Map<String, Object> valuesMap) {
+        String variablesReplacedPayload = replaceVariables(ogPayload,valuesMap);
+
+        String regex = "\\#\\[(.*?)]#";
+        Pattern p = Pattern.compile(regex);
+        Matcher matcher = p.matcher(variablesReplacedPayload);
+        StringBuffer sb = new StringBuffer();
+
+        // create a Nashorn script engine
+        ScriptEngine engine = factory.getEngineByName("nashorn");
+
+        while (matcher.find()) {
+            String code = matcher.group(1);
+            code = code.trim();
+            if (!code.endsWith(";")) code = code+";";
+            try {
+                Object val = engine.eval(code);
+                matcher.appendReplacement(sb, val.toString());
+            } catch (final ScriptException se) {
+                se.printStackTrace();
+            }
+
+        }
+
+        matcher.appendTail(sb); // todo: check if it needs to be called only after appendReplacement
+
+
+
+        // evaluate JavaScript statement
+
+        return sb.toString();
+    }
+
+
     // todo: test invalid cases
-    public String replaceVariables(Pattern p, String payload, Map<String, Object> valuesMap)  {
+    public String replaceVariables(String payload, Map<String, Object> valuesMap)  {
+        String regex = "\\$\\{x(\\d+)\\.([\\w\\[\\].]+)\\}"; // todo: integer inside brackets
+        Pattern p = Pattern.compile(regex);
+
         // replace with values
         Matcher matcher = p.matcher(payload);
         StringBuffer sb = new StringBuffer();

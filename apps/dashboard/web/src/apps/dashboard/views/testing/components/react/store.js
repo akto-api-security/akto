@@ -31,10 +31,20 @@ const useStore = create((set, get) => ({
     })
   }, 
   setOriginalState: (originalStateFromDb) => {
+    let nodes = originalStateFromDb.nodes.map(x => JSON.parse(x))
+    let counter = 0;
+    nodes.forEach((x) => {
+      let id = x["id"];
+      if (id.startsWith("x")) {
+        let numAsString = id.slice(1,x.length)
+        let num = parseInt(numAsString)
+        counter = num > counter ? num : counter
+      }
+    })
     set({
       originalState: originalStateFromDb,
-      counter: originalStateFromDb.lastEdited,
-      nodes: originalStateFromDb.nodes.map(x => JSON.parse(x)),
+      counter: counter+1,
+      nodes: nodes,
       edges: originalStateFromDb.edges.map(x => JSON.parse(x)),
       nodeEndpointMap: {...originalStateFromDb.mapNodeIdToWorkflowNodeDetails}
     })
