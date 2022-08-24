@@ -66,6 +66,7 @@ const Workflow = ({apiCollectionId}) => {
   const [height, setHeight] = useState(0);
   const [workflowTestResult, setWorkflowTestResult] = useState(null)
   const [workflowTestingRun, setWorkflowTestingRun] = useState(null);
+  const [testRunning, setTestRunning] = useState(false);
   const containerRef = useRef();
 
   const classes = useStyles({ height: height });
@@ -198,6 +199,8 @@ const Workflow = ({apiCollectionId}) => {
           return;
       }
 
+      setTestRunning(true)
+
       runWorkflowTest(originalState.id)
 
       setWorkflowTestingRun(null)
@@ -205,7 +208,10 @@ const Workflow = ({apiCollectionId}) => {
 
       let interval = setInterval(() => {
         fetchResult().then((result) => {
-          if (result) clearInterval(interval)
+          if (result) {
+            setTestRunning(false)
+            clearInterval(interval)
+          }
         })
       }, 5000)
 
@@ -243,6 +249,7 @@ const Workflow = ({apiCollectionId}) => {
           <WorkflowResultsDrawer 
             workflowTestingRun={workflowTestingRun}
             workflowTestResult={workflowTestResult}
+            testRunning={testRunning}
           />
       </Drawer>
 

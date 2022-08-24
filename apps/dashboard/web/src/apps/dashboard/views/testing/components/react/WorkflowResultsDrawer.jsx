@@ -5,6 +5,7 @@ import Grid from '@mui/material/Grid';
 import func from "@/util/func";
 import TextFieldCloseable from './TextFieldCloseable.jsx'
 import './start-node.css'
+import LinearProgress from '@mui/material/LinearProgress';
 
 
 const WorkflowResultsDrawer = (props) => {
@@ -13,10 +14,11 @@ const WorkflowResultsDrawer = (props) => {
     let workflowTestingRun = props["workflowTestingRun"]
 
     const [idx, setIdx] = useState(0);
+    let testRunning = props["testRunning"] || (workflowTestingRun && (workflowTestingRun["state"] === "SCHEDULED" || workflowTestingRun["state"] === "RUNNING"))
 
     const elem = (element, i) => {
         return (
-            <Box onClick={()=>{setIdx(i)}} key={i} className={"results-node " + ((i === idx) ? "results-node-selected" : "ddd")}>
+            <Box onClick={()=>{setIdx(i)}} key={i} className={"results-node " + ((i === idx) ? "results-node-selected" : "")}>
                 {element["key"]}
             </Box>
         )
@@ -44,15 +46,22 @@ const WorkflowResultsDrawer = (props) => {
                 <Grid item xs={2} style={{fontSize: "14px", fontStyle: "italic"}}>
                     {testStatus()}
                 </Grid>
+                <Grid item xs={12} style={{padding: 0, margin:0}}>
+                    {testRunning ?  <LinearProgress style={{backgroundColor: "#6200EA"}}/> : null}
+                </Grid>
             </Grid>
         )
     }
 
     const mainContent = () => {
         if (!workflowTestResult) return (<Box></Box>)
-        let data = JSON.parse(workflowTestResult[idx]["message"])
-        let request = data["request"]
-        let response = data["response"]
+        let currentNodeResult = workflowTestResult[idx]
+        if (!currentNodeResult) return (<Box>Result not found</Box>)
+        let message = currentNodeResult["message"]
+        if (!message) return (<Box>Invalid message</Box>)
+        let data = JSON.parse(message)
+        let request = data["request"] ? data["request"] : {}
+        let response = data["response"] ? data["response"] : {}
         return (
             <div style={{paddingTop: "12px"}}>
                 <div className="request-title">[Request] URL</div>
