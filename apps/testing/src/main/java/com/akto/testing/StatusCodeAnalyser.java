@@ -121,7 +121,7 @@ public class StatusCodeAnalyser {
         // execute API
         OriginalHttpResponse finalResponse;
         try {
-            finalResponse = ApiExecutor.sendRequest(request);
+            finalResponse = ApiExecutor.sendRequest(request, true);
         } catch (Exception e) {
             return false;
         }

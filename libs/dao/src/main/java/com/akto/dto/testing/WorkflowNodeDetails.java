@@ -9,6 +9,7 @@ public class WorkflowNodeDetails {
     WorkflowUpdatedSampleData updatedSampleData;
 
     Type type = Type.API;
+    boolean overrideRedirect;
 
     public enum Type {
         POLL, API
@@ -17,12 +18,13 @@ public class WorkflowNodeDetails {
     public WorkflowNodeDetails() {
     }
 
-    public WorkflowNodeDetails(int apiCollectionId, String endpoint, Method method, WorkflowUpdatedSampleData updatedSampleData, Type type) {
+    public WorkflowNodeDetails(int apiCollectionId, String endpoint, Method method, WorkflowUpdatedSampleData updatedSampleData, Type type, boolean overrideRedirect) {
         this.apiCollectionId = apiCollectionId;
         this.endpoint = endpoint;
         this.method = method;
         this.updatedSampleData = updatedSampleData;
         this.type = type;
+        this.overrideRedirect = overrideRedirect;
     }
 
     public int getApiCollectionId() {
@@ -63,6 +65,15 @@ public class WorkflowNodeDetails {
 
     public void setType(Type type) {
         this.type = type;
+    }
+
+
+    public boolean getOverrideRedirect() {
+        return overrideRedirect;
+    }
+
+    public void setOverrideRedirect(boolean overrideRedirect) {
+        this.overrideRedirect = overrideRedirect;
     }
 
     @Override

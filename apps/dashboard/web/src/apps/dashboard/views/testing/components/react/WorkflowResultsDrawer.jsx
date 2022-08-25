@@ -58,7 +58,13 @@ const WorkflowResultsDrawer = (props) => {
         let currentNodeResult = workflowTestResult[idx]
         if (!currentNodeResult) return (<Box>Result not found</Box>)
         let message = currentNodeResult["message"]
-        if (!message) return (<Box>Invalid message</Box>)
+        let testErrors = currentNodeResult["errors"]
+        if (!message) {
+            return (<Box sx={{paddingTop: "24px"}}>
+                {testErrors && testErrors.length > 0 ? testErrors[0] : "Invalid message"}
+            </Box>)
+            return
+        }
         let data = JSON.parse(message)
         let request = data["request"] ? data["request"] : {}
         let response = data["response"] ? data["response"] : {}

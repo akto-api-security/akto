@@ -13,6 +13,13 @@ import useStore from './store'
 import Switch from '@mui/material/Switch';
 import FormControlLabel from '@mui/material/FormControlLabel';
 
+import Menu from '@mui/material/Menu';
+
+import {faCaretSquareDown} from '@fortawesome/free-regular-svg-icons';
+import FormGroup from '@mui/material/FormGroup';
+import Checkbox from '@mui/material/Checkbox';
+
+
 
 import './start-node.css'
 
@@ -101,6 +108,7 @@ export default function InputArgumentsDialog({nodeId, endpointDetails, fetchSamp
   const addNodeEndpoint = useStore(state => state.addNodeEndpoint)
   const nodeEndpointMap = useStore(state => state.nodeEndpointMap)
   const setApiType = useStore(state => state.setApiType)
+  const setRedirect = useStore(state => state.setRedirect)
   const getApiType = useStore(state => state.getApiType)
 
   const onChangeApiRequest = (key, newData) => {
@@ -118,15 +126,33 @@ export default function InputArgumentsDialog({nodeId, endpointDetails, fetchSamp
     setOpen(false);
   };
 
-  const handleChange = (event) => {
+  const handleChangePoll = (event) => {
     let isPoll = event.target.checked
     let type = isPoll ? "POLL" : "API"
     setApiType(nodeId, type)
   };
 
-  const checked = () => {
+  const checkedPoll = () => {
     return endpointDetails["type"] === "POLL"
   }
+
+  const handleChangeRedirect = (event) => {
+    let redirect = event.target.checked
+    setRedirect(nodeId, !redirect)
+  };
+
+  const checkedRedirect = () => {
+    return !endpointDetails["overrideRedirect"]
+  }
+
+  const [anchorEl, setAnchorEl] = React.useState(null);
+  const openSettings = Boolean(anchorEl);
+  const handleSettingsClick = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+  const handleSettingsClose = () => {
+    setAnchorEl(null);
+  };
 
 
   return (
@@ -142,15 +168,30 @@ export default function InputArgumentsDialog({nodeId, endpointDetails, fetchSamp
             
           <div>
             <div style={{position: "absolute", right: 24,  top: 12}}>
-            <FormControlLabel control={
-              <Switch
-                inputProps={{ 'aria-label': 'controlled' }}
-                label="Poll"
-                size='small'
-                onChange={handleChange}
-                checked={checked()}
-              />
-            } label="Poll" />
+              <IconButton
+                aria-label="more"
+                id="long-button"
+                aria-controls={openSettings ? 'long-menu' : undefined}
+                aria-expanded={openSettings ? 'true' : undefined}
+                aria-haspopup="true"
+                onClick={handleSettingsClick}
+              >
+                <FontAwesomeIcon icon={faCaretSquareDown}  size="sm"/>
+              </IconButton>
+              <Menu
+                id="basic-menu"
+                anchorEl={anchorEl}
+                open={openSettings}
+                onClose={handleSettingsClose}
+                MenuListProps={{
+                  'aria-labelledby': 'basic-button',
+                }}
+              >
+                <FormGroup sx={{paddingLeft: 2}}>
+                  <FormControlLabel control={<Checkbox checked={checkedPoll()} onChange={handleChangePoll}/>} label="Poll" />
+                  <FormControlLabel control={<Checkbox checked={checkedRedirect()} onChange={handleChangeRedirect}/>} label="Auto Redirect" />
+                </FormGroup>
+              </Menu>
             </div>
             <RequestEditor sampleApiCall={sampleData} updatedSampleData={nodeEndpointMap[nodeId].updatedSampleData} onChangeApiRequest={onChangeApiRequest}/>
           </div>

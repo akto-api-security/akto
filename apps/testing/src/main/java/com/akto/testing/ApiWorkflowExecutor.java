@@ -51,47 +51,76 @@ public class ApiWorkflowExecutor {
 
         int id = Context.now();
         WorkflowTestResult workflowTestResult = new WorkflowTestResult(id, workflowTest.getId(), new HashMap<>(), testingRunId);
+        Map<String, TestResult> testResultMap = workflowTestResult.getTestResultMap();
         for (Node node: nodes) {
-            List<TestResult.TestError> testErrors = new ArrayList<>();
-            WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
-            WorkflowUpdatedSampleData updatedSampleData = workflowNodeDetails.getUpdatedSampleData();
-            WorkflowNodeDetails.Type type = workflowNodeDetails.getType();
-
-            OriginalHttpRequest request = buildHttpRequest(updatedSampleData, valuesMap);
-            if (request == null) return;
-            populateValuesMap(valuesMap, request.getBody(), node.getId(), request.getHeaders(),
-                    true, request.getQueryParams());
-
-            OriginalHttpResponse response = null;
-            int maxRetries = type.equals(WorkflowNodeDetails.Type.POLL) ? 20 : 1;
-            for (int i = 0; i < maxRetries; i++) {
-                try {
-                    System.out.println(request.getFullUrlWithParams() + " " + request.getBody());
-                    response = ApiExecutor.sendRequest(request);
-                    if (HttpResponseParams.validHttpResponseCode(response.getStatusCode())) {
-                        populateValuesMap(valuesMap, response.getBody(), node.getId(), response.getHeaders(), false, null);
-                        break;
-                    }
-                    int sleep = 6000;
-                    logger.info("Waiting "+ (sleep/1000) +" before sending another request......");
-                    Thread.sleep(sleep);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-
-            String message = null;
+            TestResult testResult;
             try {
-                message = RedactSampleData.convertOriginalReqRespToString(request, response);
+                testResult = processNode(node, valuesMap);
             } catch (Exception e) {
-                // todo: what to do if message = null
                 e.printStackTrace();
+                List<TestResult.TestError> testErrors = new ArrayList<>();
+                testErrors.add(TestResult.TestError.SOMETHING_WENT_WRONG);
+                testResult = new TestResult("{}", false, testErrors);
             }
 
-            workflowTestResult.addNodeResult(node.getId(), message, testErrors);
+            testResultMap.put(node.getId(), testResult);
+
+            if (testResult.getErrors().size() > 0) break;
         }
 
         WorkflowTestResultsDao.instance.insertOne(workflowTestResult);
+    }
+
+    public TestResult processNode(Node node, Map<String, Object> valuesMap) {
+        List<TestResult.TestError> testErrors = new ArrayList<>();
+        WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
+        WorkflowUpdatedSampleData updatedSampleData = workflowNodeDetails.getUpdatedSampleData();
+        WorkflowNodeDetails.Type type = workflowNodeDetails.getType();
+        boolean followRedirects = !workflowNodeDetails.getOverrideRedirect();
+
+        OriginalHttpRequest request;
+        try {
+            request = buildHttpRequest(updatedSampleData, valuesMap);
+            if (request == null) throw new Exception();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new TestResult(null, false, Collections.singletonList(TestResult.TestError.FAILED_BUILDING_REQUEST_BODY));
+        }
+
+        populateValuesMap(valuesMap, request.getBody(), node.getId(), request.getHeaders(),
+                true, request.getQueryParams());
+
+        OriginalHttpResponse response = null;
+        int maxRetries = type.equals(WorkflowNodeDetails.Type.POLL) ? 20 : 1;
+        for (int i = 0; i < maxRetries; i++) {
+            try {
+                if (i > 0) {
+                    int sleep = 6000;
+                    logger.info("Waiting "+ (sleep/1000) +" before sending another request......");
+                    Thread.sleep(sleep);
+                }
+
+                response = ApiExecutor.sendRequest(request, followRedirects);
+                if (HttpResponseParams.validHttpResponseCode(response.getStatusCode())) {
+                    populateValuesMap(valuesMap, response.getBody(), node.getId(), response.getHeaders(), false, null);
+                    break;
+                }
+
+            } catch (Exception e) {
+                testErrors.add(TestResult.TestError.API_REQUEST_FAILED);
+                e.printStackTrace();
+            }
+        }
+
+        String message = null;
+        try {
+            message = RedactSampleData.convertOriginalReqRespToString(request, response);
+        } catch (Exception e) {
+            // todo: what to do if message = null
+            e.printStackTrace();
+        }
+
+        return new TestResult(message, false, testErrors);
     }
 
     public void populateValuesMap(Map<String, Object> valuesMap, String payloadStr, String nodeId, Map<String,
@@ -162,7 +191,7 @@ public class ApiWorkflowExecutor {
 
 
 
-    public OriginalHttpRequest buildHttpRequest(WorkflowUpdatedSampleData updatedSampleData, Map<String, Object> valuesMap) {
+    public OriginalHttpRequest buildHttpRequest(WorkflowUpdatedSampleData updatedSampleData, Map<String, Object> valuesMap) throws Exception {
 
         String sampleData = updatedSampleData.getOrig();
         OriginalHttpRequest request = new OriginalHttpRequest();
@@ -231,7 +260,7 @@ public class ApiWorkflowExecutor {
 
     private final ScriptEngineManager factory = new ScriptEngineManager();
 
-    public String executeCode(String ogPayload, Map<String, Object> valuesMap) {
+    public String executeCode(String ogPayload, Map<String, Object> valuesMap) throws Exception {
         String variablesReplacedPayload = replaceVariables(ogPayload,valuesMap);
 
         String regex = "\\#\\[(.*?)]#";
@@ -266,7 +295,7 @@ public class ApiWorkflowExecutor {
 
 
     // todo: test invalid cases
-    public String replaceVariables(String payload, Map<String, Object> valuesMap)  {
+    public String replaceVariables(String payload, Map<String, Object> valuesMap) throws Exception {
         String regex = "\\$\\{x(\\d+)\\.([\\w\\[\\].]+)\\}"; // todo: integer inside brackets
         Pattern p = Pattern.compile(regex);
 
@@ -284,7 +313,7 @@ public class ApiWorkflowExecutor {
                 System.out.println("couldn't find: ");
                 System.out.println(key);
                 System.out.println(valuesMap.keySet());
-                return null;
+                throw new Exception("Couldn't find " + key);
             }
             String val = obj.toString();
             matcher.appendReplacement(sb, val);

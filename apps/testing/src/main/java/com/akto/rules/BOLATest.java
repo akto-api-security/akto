@@ -39,7 +39,7 @@ public class BOLATest extends TestPlugin {
 
         OriginalHttpResponse response = null;
         try {
-            response = ApiExecutor.sendRequest(originalHttpRequest);
+            response = ApiExecutor.sendRequest(originalHttpRequest, true);
         } catch (Exception e) {
             addWithRequestError(apiInfoKey, testRunId, TestResult.TestError.API_REQUEST_FAILED, originalHttpRequest);
             return false;

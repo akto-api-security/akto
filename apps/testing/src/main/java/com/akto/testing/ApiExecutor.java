@@ -16,12 +16,15 @@ import java.util.concurrent.TimeUnit;
 public class ApiExecutor {
 
     private static final ObjectMapper mapper = new ObjectMapper();
-    private static final OkHttpClient client = new OkHttpClient().newBuilder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .build();
 
-    public static OriginalHttpResponse common(Request request) throws Exception {
+    public static OriginalHttpResponse common(Request request, boolean followRedirects) throws Exception {
+
+        OkHttpClient client = new OkHttpClient().newBuilder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .followRedirects(followRedirects)
+                .build();
+
         Call call = client.newCall(request);
         Response response = null;
         String body;
@@ -89,7 +92,7 @@ public class ApiExecutor {
         return url;
     }
 
-    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request) throws Exception {
+    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects) throws Exception {
         // don't lowercase url because query params will change and will result in incorrect request
         String url = request.getUrl();
         url = url.trim();
@@ -122,7 +125,7 @@ public class ApiExecutor {
         OriginalHttpResponse response = null;
         switch (method) {
             case GET:
-                response = getRequest(request, builder);
+                response = getRequest(request, builder, followRedirects);
                 break;
             case POST:
             case PUT:
@@ -131,7 +134,7 @@ public class ApiExecutor {
             case OPTIONS:
             case PATCH:
             case TRACE:
-                response = sendWithRequestBody(request, builder);
+                response = sendWithRequestBody(request, builder, followRedirects);
                 break;
             case OTHER:
                 throw new Exception("Invalid method name");
@@ -141,9 +144,9 @@ public class ApiExecutor {
     }
 
 
-    public static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder)  throws Exception{
+    public static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects)  throws Exception{
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest);
+        return common(okHttpRequest, followRedirects);
     }
 
     public static String getRawQueryFromJson(String requestPayload) {
@@ -166,7 +169,7 @@ public class ApiExecutor {
     }
 
 
-    public static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder) throws Exception {
+    public static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects) throws Exception {
         Map<String,List<String>> headers = request.getHeaders();
         if (headers == null) {
             headers = new HashMap<>();
@@ -186,7 +189,7 @@ public class ApiExecutor {
         RequestBody body = RequestBody.create(payload, MediaType.parse(contentType));
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest);
+        return common(okHttpRequest, followRedirects);
     }
 
 }
