@@ -36,7 +36,7 @@ public class AuthMechanismTests {
         headers.put("header3", Collections.emptyList());
         headers.put("header4", Collections.singletonList("1"));
 
-        OriginalHttpRequest request = new OriginalHttpRequest("", "", "GET", "",headers);
+        OriginalHttpRequest request = new OriginalHttpRequest("", "", "GET", "",headers, "HTTP/1.1");
 
         validate(request, "Header1", Collections.singletonList("Value"));
         validate(request, " Header2  ", Collections.singletonList("Value"));

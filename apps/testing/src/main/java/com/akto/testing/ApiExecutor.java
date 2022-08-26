@@ -67,37 +67,13 @@ public class ApiExecutor {
         return new OriginalHttpResponse(body, responseHeaders, statusCode);
     }
 
-    public static String makeUrlAbsolute(String url, String host, String protocol) throws Exception {
-        if (host == null) throw new Exception("Host not found");
-        if (!url.startsWith("/")) url = "/" + url;
-        if (host.endsWith("/")) host = host.substring(0, host.length()-1);
-
-        host = host.toLowerCase();
-        if (!host.startsWith("http")) {
-            if (protocol != null) {
-                host = protocol + "://" + host;
-            } else {
-                String firstChar = host.split("")[0];
-                try {
-                    Integer.parseInt(firstChar);
-                    host = "http://" + host;
-                } catch (Exception e) {
-                    host = "https://" + host;
-                }
-            }
-        }
-
-        url = host + url;
-
-        return url;
-    }
 
     public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects) throws Exception {
         // don't lowercase url because query params will change and will result in incorrect request
         String url = request.getUrl();
         url = url.trim();
         if (!url.startsWith("http")) {
-            url = makeUrlAbsolute(url, request.findHostFromHeader(), request.findProtocolFromHeader());
+            url = OriginalHttpRequest.makeUrlAbsolute(url, request.findHostFromHeader(), request.findProtocolFromHeader());
         }
 
         request.setUrl(url);

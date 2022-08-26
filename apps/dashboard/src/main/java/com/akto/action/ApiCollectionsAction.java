@@ -1,23 +1,58 @@
 package com.akto.action;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
+import java.io.IOException;
+import java.util.*;
 
 import com.akto.dao.APISpecDao;
 import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.MarkovDao;
-import com.akto.dao.RelationshipDao;
 import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
+import org.apache.http.HttpEntity;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.util.EntityUtils;
+import org.json.JSONObject;
 
 public class ApiCollectionsAction extends UserAction {
-    
+
+    public static void main(String[] args) throws IOException {
+        HttpPost post = new HttpPost("http://localhost:8092/api/importInBurp");
+        Map<String, String> req = new HashMap<>();
+        req.put("collectionName", "rzp_1");
+        String json = new Gson().toJson(req);
+        HttpEntity e = new StringEntity(json);
+        post.setEntity(e);
+        post.setHeader("Content-type", "application/json");
+        post.setHeader("X-API-KEY", "odjxsHGcJlByeFwdgj8m1x5OtwvdnGI4hbOXUjNv");
+
+        CloseableHttpClient httpClient = HttpClientBuilder.create().setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE).build();
+        CloseableHttpResponse response =  httpClient.execute(post);
+        String responseString = EntityUtils.toString(response.getEntity());
+
+        JsonObject jsonResp = new Gson().fromJson(responseString, JsonObject.class); // String to JSONObject
+        JsonArray importInBurpResult = jsonResp.get("importInBurpResult").getAsJsonArray();
+        for (JsonElement o: importInBurpResult) {
+            JsonObject j = o.getAsJsonObject();
+            System.out.println(j.get("url").getAsString());
+            System.out.println(j.get("req").getAsString());
+            System.out.println(j.get("resp").getAsString());
+            break;
+        }
+    }
+
     List<ApiCollection> apiCollections = new ArrayList<>();
     int apiCollectionId;
 
