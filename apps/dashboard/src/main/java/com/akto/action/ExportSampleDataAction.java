@@ -3,11 +3,10 @@ package com.akto.action;
 import com.akto.DaoInit;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SampleDataDao;
-import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
+import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.parsers.HttpCallParser;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -29,31 +28,13 @@ public class ExportSampleDataAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public static void main(String[] args) throws IOException {
-        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
-        Context.accountId.set(1_000_000);
-        List<SampleData> sampleDataList = SampleDataDao.instance.findAll(Filters.and(
-                Filters.eq("_id.apiCollectionId", 1661402334),
-                Filters.eq("_id.method", "GET")
-        ));
-
-        for (SampleData s: sampleDataList) {
-            List<String> samples = s.getSamples();
-            if (samples.size() < 1) continue;
-            String url = s.getId().getUrl();
-            String msg = samples.get(0);
-//            String req = generateBurpRequestFromSampleData(msg);
-        }
-
-    }
-
     private String collectionName;
-    private String lastFetchedUrl;
-    private String lastFetchedMethod;
+    private String lastUrlFetched;
+    private String lastMethodFetched;
     private int limit;
     private final List<BasicDBObject> importInBurpResult = new ArrayList<>();
     public String importInBurp() {
-        if (limit <= 0 || limit > 100 ) limit = 100;
+        if (limit <= 0 || limit > 500 ) limit = 500;
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.NAME, collectionName));
 
         if (apiCollection == null) {
@@ -63,36 +44,34 @@ public class ExportSampleDataAction extends UserAction {
 
         int apiCollectionId = apiCollection.getId();
 
-//        String resp = "HTTP/1.1 200 OK\n" +
-//                "Date: Tue, 23 Aug 2022 16:44:15 GMT\n" +
-//                "Content-Type: application/json\n" +
-//                "Connection: keep-alive\n" +
-//                "Access-Control-Allow-Origin: *\n" +
-//                "Access-Control-Allow-Methods: GET, POST, DELETE, PUT\n" +
-//                "Access-Control-Allow-Headers: Content-Type, api_key, Authorization\n" +
-//                "Server: Jetty(9.2.9.v20150224)\n" +
-//                "\n" +
-//                "{\"id\":10,\"category\":{\"id\":10,\"name\":\"ZAP\"},\"name\":\"ZAP\",\"photoUrls\":[\"John Doe\"],\"tags\":[{\"id\":10,\"name\":\"ZAP\"}],\"status\":\"thishouldnotexistandhopefullyitwillnot\"}\n";
+        List<SampleData> sampleDataList = SampleDataDao.instance.fetchSampleDataPaginated(apiCollectionId, lastUrlFetched, lastMethodFetched, limit);
 
-        // todo: handle parmeterised url
-        // todo: send actual url
-        // todo: send original response
+        lastMethodFetched = null;
+        lastUrlFetched = null;
 
-        List<SampleData> sampleDataList = SampleDataDao.instance.fetchSampleDataPaginated(apiCollectionId, lastFetchedUrl, lastFetchedMethod, limit);
-        System.out.println(sampleDataList.size());
         for (SampleData s: sampleDataList) {
             List<String> samples = s.getSamples();
             if (samples.size() < 1) continue;
+
             String msg = samples.get(0);
             Map<String, String> burpRequestFromSampleData = generateBurpRequestFromSampleData(msg);
+            // use url from the sample data instead of relying on the id
+            // this is to handle parameterised URLs
             String url = burpRequestFromSampleData.get("url");
             String req = burpRequestFromSampleData.get("request");
-            String resp = generateBurpResponseFromSampleData(msg);
+            String httpType = burpRequestFromSampleData.get("type");
+            String resp = generateBurpResponseFromSampleData(msg, httpType);
+
             BasicDBObject res = new BasicDBObject();
             res.put("url", url);
             res.put("req", req);
             res.put("res", resp);
+
             importInBurpResult.add(res);
+
+            // But for lastUrlFetched we need the id because mongo query uses the one in _id
+            lastUrlFetched = s.getId().url;
+            lastMethodFetched =  s.getId().method.name();
         }
 
         return SUCCESS.toUpperCase();
@@ -128,7 +107,6 @@ public class ExportSampleDataAction extends UserAction {
                 System.out.println(e.getMessage());
             }
         }
-        System.out.println(url);
 
         // METHOD and PATH
         builder.append(originalHttpRequest.getMethod()).append(" ")
@@ -147,19 +125,22 @@ public class ExportSampleDataAction extends UserAction {
         Map<String, String> result = new HashMap<>();
         result.put("request", builder.toString());
         result.put("url", url);
+        result.put("type", originalHttpRequest.getType());
 
         return result;
     }
 
-    private String generateBurpResponseFromSampleData(String sampleData) {
+    private String generateBurpResponseFromSampleData(String sampleData, String httpType) {
         OriginalHttpResponse originalHttpResponse = new OriginalHttpResponse();
         originalHttpResponse.buildFromSampleMessage(sampleData);
+
+        OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest();
+        originalHttpRequest.buildFromSampleMessage(sampleData);
 
         StringBuilder builder = new StringBuilder("");
 
         // HTTP type
-        builder.append("HTTP/1.1 " + originalHttpResponse.getStatusCode() + " OK").append(" ")
-                .append("\n");
+        builder.append(httpType).append(" ").append(originalHttpResponse.getStatusCode()).append(" ").append("\n");
 
         // Headers
         addHeadersBurp(originalHttpResponse.getHeaders(), builder);
@@ -290,16 +271,24 @@ public class ExportSampleDataAction extends UserAction {
         return importInBurpResult;
     }
 
-    public void setLastFetchedUrl(String lastFetchedUrl) {
-        this.lastFetchedUrl = lastFetchedUrl;
+    public void setLastUrlFetched(String lastUrlFetched) {
+        this.lastUrlFetched = lastUrlFetched;
     }
 
-    public void setLastFetchedMethod(String lastFetchedMethod) {
-        this.lastFetchedMethod = lastFetchedMethod;
+    public void setLastMethodFetched(String lastMethodFetched) {
+        this.lastMethodFetched = lastMethodFetched;
     }
 
     public void setLimit(int limit) {
         this.limit = limit;
+    }
+
+    public String getLastUrlFetched() {
+        return lastUrlFetched;
+    }
+
+    public String getLastMethodFetched() {
+        return lastMethodFetched;
     }
 }
 
