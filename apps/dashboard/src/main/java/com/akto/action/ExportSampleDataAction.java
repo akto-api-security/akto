@@ -2,19 +2,20 @@ package com.akto.action;
 
 import com.akto.DaoInit;
 import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.ApiCollection;
-import com.akto.dto.HttpRequestParams;
-import com.akto.dto.HttpResponseParams;
-import com.akto.dto.OriginalHttpRequest;
-import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.*;
+import com.akto.dto.traffic.Key;
+import com.akto.dto.traffic.SampleData;
+import com.akto.dto.type.URLMethods;
 import com.akto.parsers.HttpCallParser;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
+import com.mongodb.client.model.Filters;
 
 import java.io.IOException;
 import java.util.*;
@@ -27,36 +28,132 @@ public class ExportSampleDataAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public static void main(String[] args) throws IOException {
-        DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
-        Context.accountId.set(1_000_000);
-        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("_id", 0);
+    private String collectionName;
+    private String lastUrlFetched;
+    private String lastMethodFetched;
+    private int limit;
+    private final List<BasicDBObject> importInBurpResult = new ArrayList<>();
+    public String importInBurp() {
+        if (limit <= 0 || limit > 500 ) limit = 500;
+        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.NAME, collectionName));
+
         if (apiCollection == null) {
-            Set<String> urls = new HashSet<>();
-            for(SingleTypeInfo singleTypeInfo: SingleTypeInfoDao.instance.fetchAll()) {
-                urls.add(singleTypeInfo.getUrl());
-            }
-            ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), urls, null,0));
+            addActionError("Invalid collection");
+            return ERROR.toUpperCase();
         }
+
+        int apiCollectionId = apiCollection.getId();
+
+        List<SampleData> sampleDataList = SampleDataDao.instance.fetchSampleDataPaginated(apiCollectionId, lastUrlFetched, lastMethodFetched, limit);
+
+        lastMethodFetched = null;
+        lastUrlFetched = null;
+
+        for (SampleData s: sampleDataList) {
+            List<String> samples = s.getSamples();
+            if (samples.size() < 1) continue;
+
+            String msg = samples.get(0);
+            Map<String, String> burpRequestFromSampleData = generateBurpRequestFromSampleData(msg);
+            // use url from the sample data instead of relying on the id
+            // this is to handle parameterised URLs
+            String url = burpRequestFromSampleData.get("url");
+            String req = burpRequestFromSampleData.get("request");
+            String httpType = burpRequestFromSampleData.get("type");
+            String resp = generateBurpResponseFromSampleData(msg, httpType);
+
+            BasicDBObject res = new BasicDBObject();
+            res.put("url", url);
+            res.put("req", req);
+            res.put("res", resp);
+
+            importInBurpResult.add(res);
+
+            // But for lastUrlFetched we need the id because mongo query uses the one in _id
+            lastUrlFetched = s.getId().url;
+            lastMethodFetched =  s.getId().method.name();
+        }
+
+        return SUCCESS.toUpperCase();
     }
 
     private String burpRequest;
     public String generateBurpRequest() {
         if (sampleData == null) {
-            addActionError("Invalid collection name");
+            addActionError("Invalid sample data");
             return ERROR.toUpperCase();
         }
+
+        Map<String, String> result = generateBurpRequestFromSampleData(sampleData);
+        burpRequest = result.get("request");
+        return SUCCESS.toUpperCase();
+    }
+
+
+    private Map<String, String> generateBurpRequestFromSampleData(String sampleData) {
+        OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest();
+        originalHttpRequest.buildFromSampleMessage(sampleData);
+
+        StringBuilder builder = new StringBuilder("");
+
+        String url = originalHttpRequest.getFullUrlWithParams();
+
+        if (!url.startsWith("http")) {
+            String host = originalHttpRequest.findHostFromHeader();
+            String protocol = originalHttpRequest.findProtocolFromHeader();
+            try {
+                url = OriginalHttpRequest.makeUrlAbsolute(url,host, protocol);
+            } catch (Exception e) {
+                System.out.println(e.getMessage());
+            }
+        }
+
+        // METHOD and PATH
+        builder.append(originalHttpRequest.getMethod()).append(" ")
+                .append(url).append(" ")
+                .append(originalHttpRequest.getType())
+                .append("\n");
+
+        // HEADERS
+        addHeadersBurp(originalHttpRequest.getHeaders(), builder);
+
+        builder.append("\n");
+
+        // BODY
+        builder.append(originalHttpRequest.getBody());
+
+        Map<String, String> result = new HashMap<>();
+        result.put("request", builder.toString());
+        result.put("url", url);
+        result.put("type", originalHttpRequest.getType());
+
+        return result;
+    }
+
+    private String generateBurpResponseFromSampleData(String sampleData, String httpType) {
+        OriginalHttpResponse originalHttpResponse = new OriginalHttpResponse();
+        originalHttpResponse.buildFromSampleMessage(sampleData);
 
         OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest();
         originalHttpRequest.buildFromSampleMessage(sampleData);
 
         StringBuilder builder = new StringBuilder("");
 
-        // METHOD and PATH
-        builder.append(originalHttpRequest.getMethod()).append(" ").append(originalHttpRequest.getUrl()).append("\n");
+        // HTTP type
+        builder.append(httpType).append(" ").append(originalHttpResponse.getStatusCode()).append(" ").append("\n");
 
-        // HEADERS
-        Map<String, List<String>> headers = originalHttpRequest.getHeaders();
+        // Headers
+        addHeadersBurp(originalHttpResponse.getHeaders(), builder);
+
+        builder.append("\n");
+
+        // Body
+        builder.append(originalHttpResponse.getBody());
+
+        return builder.toString();
+    }
+
+    private  void addHeadersBurp(Map<String, List<String>> headers, StringBuilder builder) {
         for (String headerName: headers.keySet()) {
             List<String> values = headers.get(headerName);
             if (values == null || values.isEmpty() || headerName.length()<1) continue;
@@ -65,14 +162,6 @@ public class ExportSampleDataAction extends UserAction {
             builder.append(prettyHeaderName).append(": ").append(value);
             builder.append("\n");
         }
-
-        // BODY
-        builder.append("\n");
-        builder.append(originalHttpRequest.getBody());
-
-        burpRequest = builder.toString();
-
-        return SUCCESS.toUpperCase();
     }
 
     private String curlString;
@@ -172,6 +261,34 @@ public class ExportSampleDataAction extends UserAction {
 
     public String getBurpRequest() {
         return burpRequest;
+    }
+
+    public void setCollectionName(String collectionName) {
+        this.collectionName = collectionName;
+    }
+
+    public List<BasicDBObject> getImportInBurpResult() {
+        return importInBurpResult;
+    }
+
+    public void setLastUrlFetched(String lastUrlFetched) {
+        this.lastUrlFetched = lastUrlFetched;
+    }
+
+    public void setLastMethodFetched(String lastMethodFetched) {
+        this.lastMethodFetched = lastMethodFetched;
+    }
+
+    public void setLimit(int limit) {
+        this.limit = limit;
+    }
+
+    public String getLastUrlFetched() {
+        return lastUrlFetched;
+    }
+
+    public String getLastMethodFetched() {
+        return lastMethodFetched;
     }
 }
 

@@ -1,13 +1,9 @@
 package com.akto.action;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
+import java.util.*;
 
 import com.akto.dao.APISpecDao;
 import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.MarkovDao;
-import com.akto.dao.RelationshipDao;
 import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
@@ -17,7 +13,7 @@ import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 
 public class ApiCollectionsAction extends UserAction {
-    
+
     List<ApiCollection> apiCollections = new ArrayList<>();
     int apiCollectionId;
 

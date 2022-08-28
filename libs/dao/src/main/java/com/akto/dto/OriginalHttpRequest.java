@@ -8,6 +8,7 @@ public class OriginalHttpRequest {
 
     private static final Gson gson = new Gson();
     private String url;
+    private String type;
     private String queryParams;
     private String method;
     private String body;
@@ -15,12 +16,13 @@ public class OriginalHttpRequest {
 
     public OriginalHttpRequest() { }
 
-    public OriginalHttpRequest(String url, String queryParams, String method, String body, Map<String, List<String>> headers) {
+    public OriginalHttpRequest(String url, String queryParams, String method, String body, Map<String, List<String>> headers, String type) {
         this.url = url;
         this.queryParams = queryParams;
         this.method = method;
         this.body = body;
         this.headers = headers;
+        this.type = type;
     }
 
     public void buildFromSampleMessage(String message) {
@@ -32,6 +34,8 @@ public class OriginalHttpRequest {
         if (rawUrlArr.length > 1) {
             this.queryParams = rawUrlArr[1];
         }
+
+        this.type = (String) json.get("type");
 
         this.method = (String) json.get("method");
 
@@ -46,6 +50,32 @@ public class OriginalHttpRequest {
         List<String> values = this.headers.get(headerName.trim().toLowerCase());
         if (values == null || values.size() == 0) return null;
         return values.get(0);
+    }
+
+
+    public static String makeUrlAbsolute(String url, String host, String protocol) throws Exception {
+        if (host == null) throw new Exception("Host not found");
+        if (!url.startsWith("/")) url = "/" + url;
+        if (host.endsWith("/")) host = host.substring(0, host.length()-1);
+
+        host = host.toLowerCase();
+        if (!host.startsWith("http")) {
+            if (protocol != null) {
+                host = protocol + "://" + host;
+            } else {
+                String firstChar = host.split("")[0];
+                try {
+                    Integer.parseInt(firstChar);
+                    host = "http://" + host;
+                } catch (Exception e) {
+                    host = "https://" + host;
+                }
+            }
+        }
+
+        url = host + url;
+
+        return url;
     }
 
     public String findContentType() {
@@ -120,5 +150,13 @@ public class OriginalHttpRequest {
 
     public void setMethod(String method) {
         this.method = method;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
     }
 }
