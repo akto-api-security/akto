@@ -24,6 +24,37 @@
                     <div v-if="showName" class="table-name">
                       {{name}}
                     </div>
+                    <div class="mt-3">
+                        <template v-for="(header, index) in headers">
+                            <span :key="'filter_'+index" v-if="header.text && !header.hideFilter">
+                                <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.value]"> 
+                                    <template v-slot:activator="{ on, attrs }">                         
+                                        <v-btn 
+                                            :ripple="false" 
+                                            v-bind="attrs" 
+                                            v-on="on"
+                                            primary 
+                                            plain
+                                            class="px-2"
+                                        >
+                                            <div class="list-header">
+                                                <span>{{header.text}}</span>
+                                                <span v-if="filters[header.value].size > 0">({{filters[header.value].size}})</span>
+                                                <v-icon>$fas_angle-down</v-icon>
+                                            </div>
+                                        </v-btn>
+                                    </template>
+                                    <filter-list 
+                                        :title="header.text" 
+                                        :items="columnValueList[header.value]" 
+                                        @clickedItem="appliedFilter(header.value, $event)" 
+                                        @operatorChanged="operatorChanged(header.value, $event)"
+                                        @selectedAll="selectedAll(header.value, $event)"
+                                    />
+                                </v-menu>
+                            </span>
+                        </template>  
+                    </div>                  
                     <div>
                         <slot name="massActions"/>
                     </div>
@@ -81,34 +112,9 @@
                                 :style="index == 0 ? {'padding': '2px !important'} : {}"
                         >
                             <div v-if="index > 0">
-                                
                                     <span class="table-sub-header">
                                         <span class="clickable"  @click="setSortOrInvertOrder(header)">
                                             {{header.text}} 
-                                        </span>
-                                        <span>
-                                            <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.value]"> 
-                                                <template v-slot:activator="{ on, attrs }">                         
-                                                    <v-btn 
-                                                        :ripple="false" 
-                                                        v-bind="attrs" 
-                                                        v-on="on"
-                                                        primary 
-                                                        icon
-                                                        class="filter-icon" 
-                                                        :style="{display: hover || showFilterMenu[header.value] || filters[header.value].size > 0 ? '' : 'none'}"
-                                                    >
-                                                        <v-icon :size="14">$fas_filter</v-icon>
-                                                    </v-btn>
-                                                </template>
-                                                <filter-list 
-                                                    :title="header.text" 
-                                                    :items="columnValueList[header.value]" 
-                                                    @clickedItem="appliedFilter(header.value, $event)" 
-                                                    @operatorChanged="operatorChanged(header.value, $event)"
-                                                    @selectedAll="selectedAll(header.value, $event)"
-                                                />
-                                            </v-menu>
                                         </span>
                                     </span>
                                 
@@ -437,6 +443,16 @@ export default {
     position: absolute
     right: -35px
     top: -5px
+
+.list-header
+    border: 1px solid #47466A    
+    font-weight: 500
+    padding: 4px 6px
+    color: #47466A
+    background: white
+    opacity: 1
+    font-size: 14px
+
 </style>
 
 <style scoped>

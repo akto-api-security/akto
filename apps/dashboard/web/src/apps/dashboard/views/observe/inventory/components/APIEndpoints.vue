@@ -185,7 +185,8 @@ export default {
             tableHeaders: [
                 {
                     text: '',
-                    value: 'color'
+                    value: 'color',
+                    hideFilter: true
                 },
                 {
                     text: 'Endpoint',
@@ -226,7 +227,8 @@ export default {
                 {
                     text: 'Changes',
                     value: 'changes',
-                    sortKey: 'changesCount'
+                    sortKey: 'changesCount',
+                    hideFilter: true
                 }
             ],
             unusedHeaders: [
