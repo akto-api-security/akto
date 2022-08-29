@@ -33,16 +33,6 @@ public class ApiWorkflowExecutor {
 
     private static final Logger logger = LoggerFactory.getLogger(ApiWorkflowExecutor.class);
 
-    public static void main(String[] args) {
-        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
-        Context.accountId.set(1_000_000);
-        TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq("state", "SCHEDULED"));
-        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
-        WorkflowTestingEndpoints workflowTestingEndpoints = (WorkflowTestingEndpoints) testingRun.getTestingEndpoints();
-        apiWorkflowExecutor.init(workflowTestingEndpoints.getWorkflowTest(), testingRun.getId());
-
-    }
-
     public void init(WorkflowTest workflowTest, ObjectId testingRunId) {
         Graph graph = new Graph();
         graph.buildGraph(workflowTest);
@@ -311,9 +301,7 @@ public class ApiWorkflowExecutor {
             Object obj = valuesMap.get(key);
             if (obj == null) {
                 // todo: check for nested objects
-                System.out.println("couldn't find: ");
-                System.out.println(key);
-                System.out.println(valuesMap.keySet());
+                logger.error("couldn't find: " + key);
                 throw new Exception("Couldn't find " + key);
             }
             String val = obj.toString();
