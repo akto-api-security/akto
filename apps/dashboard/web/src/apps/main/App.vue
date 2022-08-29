@@ -171,7 +171,7 @@
     display: flex
 
 .no-border
-    border: unset! important    
+    border: unset !important
 
 .float-right
     float: right
@@ -179,6 +179,8 @@
 .grey-text
     color: #949597
 
+.white-background
+    background-color: #FFFFFF    
 .fs-12
     font-size: 12px
 </style>

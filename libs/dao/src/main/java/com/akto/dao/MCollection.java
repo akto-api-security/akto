@@ -3,6 +3,7 @@ package com.akto.dao;
 import com.mongodb.client.*;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReplaceOptions;
+import com.mongodb.client.model.Sorts;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.InsertManyResult;
 import com.mongodb.client.result.InsertOneResult;
@@ -99,6 +100,17 @@ public abstract class MCollection<T> {
 
     public<V> T findOne(String key, Collection<V> values) {
         return this.findOne(eq(key, values));
+    }
+
+    public T findLatestOne(Bson q) {
+        MongoCursor<T> cursor = this.getMCollection().find(q).limit(1).sort(Sorts.descending("_id")).cursor();
+
+        while(cursor.hasNext()) {
+            T elem = cursor.next();
+            return elem;
+        }
+
+        return null;
     }
 
     public T findOne(Bson q) {

@@ -4,6 +4,9 @@ import vuetify from '@/plugins/vuetify'
 import router from './router'
 import store from './store/module'
 
+import { VuePlugin } from "vuera";
+Vue.use(VuePlugin);
+
 // Storing the access token from login.jsp
 store.state.auth.access_token = window.ACCESS_TOKEN;
 

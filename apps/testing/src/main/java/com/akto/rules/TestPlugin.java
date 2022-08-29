@@ -2,9 +2,7 @@ package com.akto.rules;
 
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunResultDao;
-import com.akto.dto.ApiInfo;
-import com.akto.dto.HttpRequestParams;
-import com.akto.dto.HttpResponseParams;
+import com.akto.dto.*;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.type.*;
 import com.akto.runtime.APICatalogSync;
@@ -81,12 +79,12 @@ public abstract class TestPlugin {
         TestingRunResultDao.instance.updateOne(filter, update);
     }
 
-    public void addWithRequestError(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestResult.TestError testError, HttpResponseParams httpResponseParams) {
+    public void addWithRequestError(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestResult.TestError testError, OriginalHttpRequest request) {
         Bson filter = TestingRunResultDao.generateFilter(testRunId, apiInfoKey.getApiCollectionId(), apiInfoKey.url, apiInfoKey.method.name());
 
         String message = null;
         try {
-            message = RedactSampleData.convertHttpRespToOriginalString(httpResponseParams);
+            message = RedactSampleData.convertOriginalReqRespToString(request, null);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -96,27 +94,19 @@ public abstract class TestPlugin {
     }
 
 
-    public void addTestSuccessResult(ApiInfo.ApiInfoKey apiInfoKey, HttpResponseParams httpResponseParams, ObjectId testRunId, boolean vulnerable, List<SingleTypeInfo> paramTypeInfoList) {
+    public void addTestSuccessResult(ApiInfo.ApiInfoKey apiInfoKey, OriginalHttpRequest request, OriginalHttpResponse response, ObjectId testRunId, boolean vulnerable) {
         String message = null;
         try {
-            message = RedactSampleData.convertHttpRespToOriginalString(httpResponseParams);
+            message = RedactSampleData.convertOriginalReqRespToString(request, response);
         } catch (Exception e) {
             // TODO:
             e.printStackTrace();
             return;
         }
-        if (message == null) return;
 
         Bson filter = TestingRunResultDao.generateFilter(testRunId, apiInfoKey);
         Bson update = Updates.set("resultMap." + testName(), new TestResult(message, vulnerable, new ArrayList<>(), new ArrayList<>()));
         TestingRunResultDao.instance.updateOne(filter, update);
-    }
-
-    public HttpResponseParams generateEmptyResponsePayload(HttpRequestParams httpRequestParams) {
-        return new HttpResponseParams(
-                "", 0,"", new HashMap<>(), null, httpRequestParams, Context.now(),
-                1_000_000+"",false, HttpResponseParams.Source.OTHER, "",""
-        );
     }
 
     public static class ContainsPrivateResourceResult {
@@ -137,8 +127,8 @@ public abstract class TestPlugin {
         }
     }
 
-    public ContainsPrivateResourceResult containsPrivateResource(HttpRequestParams httpRequestParams, ApiInfo.ApiInfoKey apiInfoKey) {
-        String urlWithParams = httpRequestParams.getURL();
+    public ContainsPrivateResourceResult containsPrivateResource(OriginalHttpRequest originalHttpRequest, ApiInfo.ApiInfoKey apiInfoKey) {
+        String urlWithParams = originalHttpRequest.getFullUrlWithParams();
         String url = apiInfoKey.url;
         URLMethods.Method method = apiInfoKey.getMethod();
         List<SingleTypeInfo> singleTypeInfoList = new ArrayList<>();
@@ -163,7 +153,7 @@ public abstract class TestPlugin {
         }
 
         // 2. payload
-        BasicDBObject payload = RequestTemplate.parseRequestPayload(httpRequestParams, urlWithParams);
+        BasicDBObject payload = RequestTemplate.parseRequestPayload(originalHttpRequest.getBody(), urlWithParams);
         Map<String, Set<Object>> flattened = JSONUtils.flatten(payload);
         for (String param: flattened.keySet()) {
             atLeastOneValueInRequest = true;

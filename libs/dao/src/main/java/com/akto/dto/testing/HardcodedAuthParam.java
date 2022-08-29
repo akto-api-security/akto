@@ -1,6 +1,7 @@
 package com.akto.dto.testing;
 
 import com.akto.dto.HttpRequestParams;
+import com.akto.dto.OriginalHttpRequest;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -22,9 +23,9 @@ public class HardcodedAuthParam extends AuthParam {
     }
 
     @Override
-    public boolean addAuthTokens(HttpRequestParams httpRequestParams) {
+    public boolean addAuthTokens(OriginalHttpRequest request) {
         if (this.key == null) return false;
-        Map<String, List<String>> headers = httpRequestParams.getHeaders();
+        Map<String, List<String>> headers = request.getHeaders();
         String k = this.key.toLowerCase().trim();
         if (!headers.containsKey(k)) return false;
         headers.put(k, Collections.singletonList(this.value));
@@ -32,9 +33,9 @@ public class HardcodedAuthParam extends AuthParam {
     }
 
     @Override
-    public boolean removeAuthTokens(HttpRequestParams httpRequestParams) {
+    public boolean removeAuthTokens(OriginalHttpRequest request) {
         if (this.key == null) return false;
-        Map<String, List<String>> headers = httpRequestParams.getHeaders();
+        Map<String, List<String>> headers = request.getHeaders();
         String k = this.key.toLowerCase().trim();
         if (!headers.containsKey(k)) return false;
         headers.put(k, Collections.singletonList(null));

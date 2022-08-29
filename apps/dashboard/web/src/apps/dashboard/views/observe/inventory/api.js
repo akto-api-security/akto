@@ -197,6 +197,15 @@ export default {
             return resp
         })
     },
+    convertSampleDataToBurpRequest(sampleData) {
+        return request({
+            url: '/api/convertSamleDataToBurpRequest',
+            method: 'post',
+            data: {sampleData}
+        }).then((resp) => {
+            return resp
+        })
+    },
 
     fetchDataTypeNames() {
         return request({
@@ -206,5 +215,78 @@ export default {
         }).then((resp) => {
             return resp
         })
+    },
+
+    fetchWorkflowTests() {
+        return request({
+            url: '/api/fetchWorkflowTests',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    createWorkflowTest(nodes, edges, mapNodeIdToWorkflowNodeDetails, state, apiCollectionId) {
+        return request({
+            url: '/api/createWorkflowTest',
+            method: 'post',
+            data: {nodes, edges, mapNodeIdToWorkflowNodeDetails, state, apiCollectionId}
+        })
+    },
+
+    editWorkflowTest(id, nodes, edges, mapNodeIdToWorkflowNodeDetails) {
+        return request({
+            url: '/api/editWorkflowTest',
+            method: 'post',
+            data: {id, nodes, edges, mapNodeIdToWorkflowNodeDetails}
+        })
+    },
+
+    setWorkflowTestState(id, state) {
+        return request({
+            url: '/api/setWorkflowTestState',
+            method: 'post',
+            data: {id, state}
+        })
+    },
+
+    exportWorkflowTestAsString(id) {
+        return request({
+            url: '/api/exportWorkflowTestAsString',
+            method: 'post',
+            data: {id}
+        })
+    },
+
+    editWorkflowNodeDetails(id, nodeId, workflowNodeDetails) {
+        let mapNodeIdToWorkflowNodeDetails = {}
+        mapNodeIdToWorkflowNodeDetails[nodeId] = workflowNodeDetails
+        return request({
+            url: '/api/editWorkflowNodeDetails',
+            method: 'post',
+            data: {id, mapNodeIdToWorkflowNodeDetails}
+        })
+    },
+
+    runWorkflowTest(id) {
+        return request({
+            url: '/api/startTest',
+            method: 'post',
+            data: {
+                "testIdConfig" : 1,
+                "workflowTestId": id,
+                "type": "WORKFLOW"
+            }
+        })
+    },
+
+    fetchWorkflowResult(id) {
+        return request({
+            url: '/api/fetchWorkflowResult',
+            method: 'post',
+            data: {
+                "workflowTestId": id,
+            }
+        })
     }
+
 }

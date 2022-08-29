@@ -29,7 +29,7 @@
             <count-box title="All Endpoints" :count="allEndpoints.length" colorTitle="Total"/>
         </div>    
 
-        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Unauthenticated', 'Undocumented', 'Deprecated', 'Documented']">
+        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Unauthenticated', 'Undocumented', 'Deprecated', 'Documented', 'Tests']">
             <template slot="actions-tray">
             </template>
             <template slot="All">
@@ -120,15 +120,33 @@
                     </template>
                 </simple-table>
             </template>
-            <!-- <template slot="Policies">
-                <filters
-                    :tableHeaders=tableHeaders
-                    :items=allEndpoints
-                    :filters=filters
-                    @rowClicked=rowClicked
-                >
-                </filters>
-            </template> -->
+            <template slot="Tests">
+                <div>
+                    <div class="d-flex jc-end ma-2">
+                        <v-btn v-if="!showWorkflowTestBuilder" primary dark color="#6200EA" @click="() => {originalStateFromDb = null; showWorkflowTestBuilder = true}">
+                            Create new workflow
+                        </v-btn>
+                    </div>
+                    <simple-table 
+                        v-if="!showWorkflowTestBuilder"
+                        :headers="workflowTestHeaders" 
+                        :items="workflowTests"
+                        @rowClicked="item => {originalStateFromDb = item; showWorkflowTestBuilder = true}"
+                        name="Deprecated"
+                    />
+                    <div
+                        v-if="showWorkflowTestBuilder"
+                        width="80%"
+                    >
+                        <v-btn icon primary dark color="#6200EA" class="float-right" @click="() => {originalStateFromDb = null; showWorkflowTestBuilder = false}">
+                            <v-icon>$fas_times</v-icon>
+                        </v-btn>
+                        <workflow-test-builder :endpointsList=allEndpoints :apiCollectionId="apiCollectionId" :originalStateFromDb="originalStateFromDb" class="white-background"/>
+                    </div>
+                    
+                
+                </div>
+            </template>
         </layout-with-tabs>
 
     </div>
@@ -150,7 +168,7 @@ import { saveAs } from 'file-saver'
 import UploadFile from '@/apps/dashboard/shared/components/UploadFile'
 import JsonViewer from "@/apps/dashboard/shared/components/JSONViewer"
 import IconMenu from '@/apps/dashboard/shared/components/IconMenu'
-
+import WorkflowTestBuilder from './WorkflowTestBuilder'
 
 export default {
     name: "ApiEndpoints",
@@ -163,7 +181,9 @@ export default {
         Spinner,
         UploadFile,
         JsonViewer,
-        IconMenu
+        IconMenu,
+        WorkflowTestBuilder
+        
     },
     props: {
         apiCollectionId: obj.numR
@@ -260,7 +280,24 @@ export default {
                     label: "Download CSV file",
                     click: this.downloadData
                 }
-            ]
+            ],
+            workflowTestHeaders: [
+                {
+                    text: '',
+                    value: 'color'
+                },                
+                {
+                    text: 'Test',
+                    value: 'id'
+                },
+                {
+                    text: 'Author',
+                    value: 'author'
+                }
+            ],
+            showWorkflowTestBuilder: false,
+            originalStateFromDb: null,
+            workflowTests: []
         }
     },
     methods: {
@@ -346,12 +383,19 @@ export default {
                 this.$store.dispatch('inventory/saveContent', { swaggerContent: JSON.parse(reader.result), filename: this.swaggerFile.name, apiCollectionId : this.apiCollectionId})
             }
         },
-        refreshPage(shouldLoad) {
+        async refreshPage(shouldLoad) {
             // if (!this.apiCollection || this.apiCollection.length === 0 || this.$store.state.inventory.apiCollectionId !== this.apiCollectionId) {
             let collectionIdChanged = this.$store.state.inventory.apiCollectionId !== this.apiCollectionId
             if (collectionIdChanged || !shouldLoad || ((new Date() / 1000) - this.lastFetched > 60*5)) {
                 this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId, shouldLoad: shouldLoad})
             }
+
+            this.workflowTests = (await api.fetchWorkflowTests()).workflowTests.filter(x => x.apiCollectionId === this.apiCollectionId).map(x => {
+                return {
+                    ...x,
+                    color: "#FFFFFF"
+                }
+            })
 
             this.$emit('mountedView', {type: 1, apiCollectionId: this.apiCollectionId})
         }
@@ -400,6 +444,7 @@ export default {
             return ret
         }
     },
+    async mounted() {}
 }
 </script>
 

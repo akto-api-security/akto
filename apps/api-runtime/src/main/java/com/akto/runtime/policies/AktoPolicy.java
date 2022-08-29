@@ -329,7 +329,7 @@ public class AktoPolicy {
         }
 
         int statusCode = httpResponseParams.getStatusCode();
-        addToReserve = addToReserve && statusCode >= 200 && statusCode < 300;
+        addToReserve = addToReserve && HttpResponseParams.validHttpResponseCode(statusCode);
 
         for (RuntimeFilter filter: filters) {
             boolean filterResult = filter.process(httpResponseParams);
