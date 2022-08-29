@@ -95,7 +95,7 @@ public class JSONUtils {
 
                 key = anyAlphabetExists ? key: "NUMBER";
                 Object value = basicDBObject.get(key);
-                flattenWithDots(value, prefix + (prefix.isEmpty() ? "" : ".") + key, ret);
+                flattenWithDots(value, prefix + (prefix == null || prefix.isEmpty() ? "" : ".") + key, ret);
             }
         } else if (obj instanceof BasicDBList) {
             int idx = 0;

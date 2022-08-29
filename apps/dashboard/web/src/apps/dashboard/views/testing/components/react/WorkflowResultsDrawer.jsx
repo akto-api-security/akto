@@ -63,7 +63,6 @@ const WorkflowResultsDrawer = (props) => {
             return (<Box sx={{paddingTop: "24px"}}>
                 {testErrors && testErrors.length > 0 ? testErrors[0] : "Invalid message"}
             </Box>)
-            return
         }
         let data = JSON.parse(message)
         let request = data["request"] ? data["request"] : {}

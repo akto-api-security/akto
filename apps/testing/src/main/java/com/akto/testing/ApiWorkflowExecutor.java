@@ -96,7 +96,8 @@ public class ApiWorkflowExecutor {
                     populateValuesMap(valuesMap, response.getBody(), node.getId(), response.getHeaders(), false, null);
                     break;
                 }
-
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             } catch (Exception e) {
                 testErrors.add(TestResult.TestError.API_REQUEST_FAILED);
                 e.printStackTrace();

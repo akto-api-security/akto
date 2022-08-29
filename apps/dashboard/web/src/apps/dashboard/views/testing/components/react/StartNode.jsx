@@ -11,7 +11,6 @@ const StartNode = () => {
             <Handle
                 type="source"
                 position={Position.Bottom}
-                isConnectable={false}
                 style={{
                     height: '13px',
                     width: '13px',
