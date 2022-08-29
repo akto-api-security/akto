@@ -57,6 +57,11 @@ public class HarAction extends UserAction {
             apiCollectionId = apiCollection.getId();
         }
 
+        if (KafkaListener.kafka == null) {
+            addActionError("Dashboard kafka not running");
+            return ERROR.toUpperCase();
+        }
+
         if (harString == null) {
             harString = this.content.toString();
         }
@@ -74,7 +79,7 @@ public class HarAction extends UserAction {
             harErrors = har.getErrors();
             List<HttpResponseParams> responses = new ArrayList<>();
             for (String message: messages){
-                if (message.length() < 0.8 * Kafka.BATCH_SIZE_CONFIG) {
+                if (message.length() < 0.8 * KafkaListener.BATCH_SIZE_CONFIG) {
                     if (!skipKafka) {
                         KafkaListener.kafka.send(message,"har_" + topic);
                     } else {
@@ -89,7 +94,7 @@ public class HarAction extends UserAction {
             
             if(skipKafka) {
                 SingleTypeInfo.fetchCustomDataTypes();
-                APICatalogSync apiCatalogSync = parser.syncFunction(responses);
+                APICatalogSync apiCatalogSync = parser.syncFunction(responses, true);
                 AktoPolicy aktoPolicy = new AktoPolicy(parser.apiCatalogSync); // keep inside if condition statement because db call when initialised
                 aktoPolicy.main(responses, apiCatalogSync);
             }

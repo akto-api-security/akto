@@ -1,6 +1,7 @@
 package com.akto.testing;
 
 import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.type.RequestTemplate;
 import com.akto.runtime.URLAggregator;
 import com.mongodb.BasicDBObject;
 import org.junit.Test;
@@ -38,7 +39,7 @@ public class ApiExecutorTest {
     public void testGetRawQueryFromJson() {
         String normalReq = "{\"name\": \"avneesh\", \"cities\": [{\"name\": \"Mumbai\"}, {\"name\": \"Bangalore\"}], \"age\": 99}";
         String resultNormalReq = ApiExecutor.getRawQueryFromJson(normalReq);
-        BasicDBObject queryParams = URLAggregator.getQueryJSON("?"+ resultNormalReq);
+        BasicDBObject queryParams = RequestTemplate.getQueryJSON("?"+ resultNormalReq);
         assertEquals(3, queryParams.size());
     }
 }

@@ -1,19 +1,24 @@
 package com.akto.util;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
 public class JSONUtils {
-    private static void flatten(Object obj, String prefix, BasicDBObject ret) {        
+    private static void flatten(Object obj, String prefix, Map<String, Set<Object>> ret) {
         if (obj instanceof BasicDBObject) {
             BasicDBObject basicDBObject = (BasicDBObject) obj;
 
             Set<String> keySet = basicDBObject.keySet();
 
             if (prefix != null && !prefix.isEmpty() && (keySet == null || keySet.isEmpty())) {
-                ret.put(prefix, obj);
+                Set<Object> values = ret.getOrDefault(prefix, new HashSet<>());
+                values.add(obj);
+                ret.put(prefix, values);
             }
 
             for(String key: keySet) {
@@ -41,12 +46,15 @@ public class JSONUtils {
                 flatten(elem, prefix+(prefix.isEmpty() ? "$" : "#$"), ret);
             }
         } else {
-            ret.put(prefix, obj);
+            Set<Object> values = ret.getOrDefault(prefix, new HashSet<>());
+            values.add(obj);
+            ret.put(prefix, values);
         }
     }
 
-    public static BasicDBObject flatten(BasicDBObject object) {
-        BasicDBObject ret = new BasicDBObject();
+    public static Map<String, Set<Object>> flatten(BasicDBObject object) {
+        Map<String, Set<Object>> ret = new HashMap<>();
+        if (object == null) return ret;
         String prefix = "";
         flatten(object, prefix, ret);
         return ret;

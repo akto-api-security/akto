@@ -78,6 +78,7 @@ public class AccountAction extends UserAction {
     public String takeUpdate() {
         listMatchingLambda("TrafficMirroringInstanceRefreshHandler");
         listMatchingLambda("DashboardInstanceRefreshHandler");
+        listMatchingLambda("AktoContextAnalyzerInstanceRefreshHandler");
         return Action.SUCCESS.toUpperCase();
     }
 

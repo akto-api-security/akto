@@ -3,18 +3,20 @@ package com.akto.parsers;
 import com.akto.MongoBasedTest;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.type.*;
 import com.akto.runtime.APICatalogSync;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 import org.junit.Test;
 
 import java.util.*;
 
 import static com.akto.parsers.TestDump2.createList;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class TestMergingNew extends MongoBasedTest {
 
@@ -34,14 +36,14 @@ public class TestMergingNew extends MongoBasedTest {
             responseParams.add(resp);
         }
 
-        parser.syncFunction(responseParams.subList(0,10));
-        parser.apiCatalogSync.syncWithDB();
-        parser.syncFunction(responseParams.subList(10,15));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(0,10), false);
+        parser.apiCatalogSync.syncWithDB(false);
+        parser.syncFunction(responseParams.subList(10,15), false);
+        parser.apiCatalogSync.syncWithDB(false);
         assertEquals(0, getStaticURLsSize(parser));
 
-        parser.syncFunction(responseParams.subList(15,20));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(15,20), false);
+        parser.apiCatalogSync.syncWithDB(false);
         assertEquals(0, getStaticURLsSize(parser));
 
 
@@ -81,17 +83,33 @@ public class TestMergingNew extends MongoBasedTest {
             i +=1;
         }
 
-        parser.syncFunction(responseParams.subList(0,1));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(0,1), false);
+        parser.apiCatalogSync.syncWithDB(false);
         assertEquals(1, getStaticURLsSize(parser));
 
-        parser.syncFunction(responseParams.subList(1,2));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(1,2), false);
+        parser.apiCatalogSync.syncWithDB(false);
         assertEquals(0, getStaticURLsSize(parser));
 
-//        parser.syncFunction(responseParams.subList(28,33));
-//        parser.apiCatalogSync.syncWithDB();
-//        assertEquals(0, getStaticURLsSize(parser));
+        Map<URLTemplate, RequestTemplate> templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
+        assertEquals(1, templateURLToMethods.size());
+
+        parser.syncFunction(responseParams.subList(3,10), false);
+        parser.syncFunction(Collections.singletonList(createDifferentHttpResponseParams(10000, url+"avneesh@akto.io"+"/received")), false); // adding this just to see if multiple subTypes of urlParams are recorded or not (not for UUID merging)
+        parser.apiCatalogSync.syncWithDB(false);
+        assertEquals(0, getStaticURLsSize(parser));
+
+        templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
+        URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url+"STRING"+"/received", URLMethods.Method.GET);
+        RequestTemplate requestTemplate = templateURLToMethods.get(urlTemplate);
+        Map<Integer, KeyTypes> keyTypesMap = requestTemplate.getUrlParams();
+        KeyTypes keyTypes = keyTypesMap.get(2);
+
+        assertEquals(2, keyTypes.getOccurrences().size());
+        SingleTypeInfo singleTypeInfo1 = keyTypes.getOccurrences().get(SingleTypeInfo.UUID);
+        assertNotNull(singleTypeInfo1);
+        SingleTypeInfo singleTypeInfo2 = keyTypes.getOccurrences().get(SingleTypeInfo.EMAIL);
+        assertNotNull(singleTypeInfo2);
     }
 
     @Test
@@ -112,16 +130,16 @@ public class TestMergingNew extends MongoBasedTest {
             responseParams.add(resp);
         }
 
-        parser.syncFunction(responseParams.subList(0,23));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(0,23), false);
+        parser.apiCatalogSync.syncWithDB(false);
         assertEquals(23, getStaticURLsSize(parser));
 
-        parser.syncFunction(responseParams.subList(23,28));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(23,28), false);
+        parser.apiCatalogSync.syncWithDB(false);
         assertEquals(0, getStaticURLsSize(parser));
 
-        parser.syncFunction(responseParams.subList(28,33));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(28,33), false);
+        parser.apiCatalogSync.syncWithDB(false);
         assertEquals(0, getStaticURLsSize(parser));
     }
 
@@ -140,12 +158,12 @@ public class TestMergingNew extends MongoBasedTest {
 
         HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1);
 
-        parser.syncFunction(responseParams.subList(0,10));
-        parser.apiCatalogSync.syncWithDB();
-        parser.syncFunction(responseParams.subList(10,25));
-        parser.apiCatalogSync.syncWithDB();
-        parser.syncFunction(responseParams.subList(25,30));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(0,10), false);
+        parser.apiCatalogSync.syncWithDB(false);
+        parser.syncFunction(responseParams.subList(10,25), false);
+        parser.apiCatalogSync.syncWithDB(false);
+        parser.syncFunction(responseParams.subList(25,30), false);
+        parser.apiCatalogSync.syncWithDB(false);
 
 
         Map<URLTemplate, RequestTemplate> urlTemplateMap = parser.apiCatalogSync.getDelta(0).getTemplateURLToMethods();
@@ -176,12 +194,12 @@ public class TestMergingNew extends MongoBasedTest {
 
         HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1);
 
-        parser.syncFunction(responseParams.subList(0,10));
-        parser.apiCatalogSync.syncWithDB();
-        parser.syncFunction(responseParams.subList(10,25));
-        parser.apiCatalogSync.syncWithDB();
-        parser.syncFunction(responseParams.subList(25,30));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(0,10), false);
+        parser.apiCatalogSync.syncWithDB(false);
+        parser.syncFunction(responseParams.subList(10,25), false);
+        parser.apiCatalogSync.syncWithDB(false);
+        parser.syncFunction(responseParams.subList(25,30), false);
+        parser.apiCatalogSync.syncWithDB(false);
 
 
         Map<URLTemplate, RequestTemplate> urlTemplateMap = parser.apiCatalogSync.getDelta(0).getTemplateURLToMethods();
@@ -214,12 +232,12 @@ public class TestMergingNew extends MongoBasedTest {
         URLTemplate urlTemplate = APICatalogSync.tryMergeUrls(new URLStatic(responseParams.get(0).requestParams.url, URLMethods.Method.GET), new URLStatic(responseParams.get(1).requestParams.url, URLMethods.Method.GET));
         parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods().put(urlTemplate, new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>())));
 
-        parser.syncFunction(responseParams.subList(0,15));
-        parser.apiCatalogSync.syncWithDB();
-        parser.syncFunction(responseParams.subList(15,25));
-        parser.apiCatalogSync.syncWithDB();
-        parser.syncFunction(responseParams.subList(25,30));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(0,15), false);
+        parser.apiCatalogSync.syncWithDB(false);
+        parser.syncFunction(responseParams.subList(15,25), false);
+        parser.apiCatalogSync.syncWithDB(false);
+        parser.syncFunction(responseParams.subList(25,30), false);
+        parser.apiCatalogSync.syncWithDB(false);
 
 
         Map<URLTemplate, RequestTemplate> urlTemplateMap = parser.apiCatalogSync.getDelta(123).getTemplateURLToMethods();
@@ -246,12 +264,12 @@ public class TestMergingNew extends MongoBasedTest {
             responseParams.add(resp);
         }
 
-        parser.syncFunction(responseParams.subList(0,23));
-        parser.apiCatalogSync.syncWithDB();
-        parser.syncFunction(responseParams.subList(23,28));
-        parser.apiCatalogSync.syncWithDB();
-        parser.syncFunction(responseParams.subList(28,33));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(responseParams.subList(0,23), false);
+        parser.apiCatalogSync.syncWithDB(false);
+        parser.syncFunction(responseParams.subList(23,28), false);
+        parser.apiCatalogSync.syncWithDB(false);
+        parser.syncFunction(responseParams.subList(28,33), false);
+        parser.apiCatalogSync.syncWithDB(false);
 
 
         Map<URLTemplate, RequestTemplate> urlTemplateMap = parser.apiCatalogSync.getDelta(123).getTemplateURLToMethods();
@@ -385,47 +403,245 @@ public class TestMergingNew extends MongoBasedTest {
 
         List<HttpResponseParams> responseParams = new ArrayList<>();
 
-        HttpResponseParams resp = TestDump2.createSampleParams("user1", url+1);
+        HttpResponseParams resp = TestDump2.createSampleParams("user1", url + 1);
         ArrayList<String> newHeader = new ArrayList<>();
         newHeader.add("hnew");
         resp.getHeaders().put("new header", newHeader);
         responseParams.add(resp);
         resp.setSource(HttpResponseParams.Source.HAR);
-        HttpCallParser parser = new HttpCallParser("access-token", 10,40,10);
+        HttpCallParser parser = new HttpCallParser("access-token", 10, 40, 10);
 
         /* tryMergingWithKnownStrictURLs - put in delta-static */
-        parser.syncFunction(responseParams);
+        parser.syncFunction(responseParams, false);
         assertTrue(parser.getSyncCount() == 0);
 
         /* processKnownStaticURLs */
-        parser.syncFunction(responseParams);
+        parser.syncFunction(responseParams, false);
 
         /* tryMergingWithKnownStrictURLs - merge with delta-static */
-        responseParams.add(TestDump2.createSampleParams("user"+2, url+2));
-        responseParams.add(TestDump2.createSampleParams("user"+3, url+3));
+        responseParams.add(TestDump2.createSampleParams("user" + 2, url + 2));
+        responseParams.add(TestDump2.createSampleParams("user" + 3, url + 3));
 
         /* tryMergingWithKnownStrictURLs - merge with delta-template */
         responseParams.add(TestDump2.createSampleParams("user"+4, url+4));
-        parser.syncFunction(responseParams);
+        parser.syncFunction(responseParams, false);
         assertTrue(parser.getSyncCount() == 0);
 
         /* tryMergingWithKnownTemplates */
-        parser.syncFunction(responseParams);
+        parser.syncFunction(responseParams, false);
         assertTrue(parser.getSyncCount() == 0);
 
         /* tryMergingWithKnownStrictURLs - merge with Db url */
         url = "payment/";
         responseParams = new ArrayList<>();
-        responseParams.add(TestDump2.createSampleParams("user"+2, url+2));
+        responseParams.add(TestDump2.createSampleParams("user" + 2, url + 2));
         responseParams.get(0).setSource(HttpResponseParams.Source.HAR);
-        parser.syncFunction(responseParams);
+        parser.syncFunction(responseParams, false);
         responseParams = new ArrayList<>();
-        responseParams.add(TestDump2.createSampleParams("user"+3, url+3));
+        responseParams.add(TestDump2.createSampleParams("user" + 3, url + 3));
 
         /* tryMergingWithKnownStrictURLs - merge with Db url - template already exists in delta */
-        responseParams.add(TestDump2.createSampleParams("user"+4, url+4));
+        responseParams.add(TestDump2.createSampleParams("user" + 4, url + 4));
         responseParams.get(0).setSource(HttpResponseParams.Source.HAR);
-        parser.syncFunction(responseParams);
+        parser.syncFunction(responseParams, false);
+    }
+
+    @Test
+    public void testUrlParamSingleTypeInfoAndValues() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+        HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1);
+        String url = "api/";
+        List<HttpResponseParams> responseParams = new ArrayList<>();
+        List<String> urls = new ArrayList<>();
+        for (int i=0; i< 100; i++) {
+            urls.add(url + i + "/books/" + (i+1) + "/cars/" + (i+3));
+        }
+        for (String c: urls) {
+            BasicDBObject ret = new BasicDBObject();
+            ret.put("name", c);
+            HttpRequestParams httpRequestParams = new HttpRequestParams("GET", c, "", new HashMap<>(), ret.toJson(), 123);
+            HttpResponseParams resp = new HttpResponseParams("", 200,"", new HashMap<>(), ret.toJson(),httpRequestParams, 0,"0",false, HttpResponseParams.Source.MIRRORING,"", "");
+            responseParams.add(resp);
+        }
+
+        parser.syncFunction(responseParams.subList(0,10), false);
+        parser.apiCatalogSync.syncWithDB(false);
+
+        // dbState doesn't have any template URLs initially so no urlParams are considered
+        testSampleSizeAndDomainOfSti(parser,0, 10, SingleTypeInfo.Domain.ENUM, SingleTypeInfo.Domain.ENUM);
+
+        parser.syncFunction(responseParams.subList(10,55), false);
+        parser.apiCatalogSync.syncWithDB(false);
+
+        // Now dbState has template URLs so urlParam values are now stored
+        assertEquals(0,getStaticURLsSize(parser));
+        testSampleSizeAndDomainOfSti(parser, 45, 55, SingleTypeInfo.Domain.ENUM, SingleTypeInfo.Domain.ENUM);
+
+        parser.apiCatalogSync.syncWithDB(false);
+        parser.apiCatalogSync.syncWithDB(false);
+
+        testSampleSizeAndDomainOfSti(parser, 45, 0, SingleTypeInfo.Domain.ENUM, SingleTypeInfo.Domain.ANY);
+
+        // changing the parser symbolizes instance restart
+        // using the new or old parser shouldn't change the result
+        HttpCallParser parserNew = new HttpCallParser("userIdentifier", 1, 1, 1);
+        parserNew.syncFunction(responseParams.subList(55,70), false);
+        parserNew.apiCatalogSync.syncWithDB(false);
+        parserNew.syncFunction(responseParams.subList(70,100), false);
+        parserNew.apiCatalogSync.syncWithDB(false);
+        parserNew.apiCatalogSync.syncWithDB(false);
+
+        // both now range
+        testSampleSizeAndDomainOfSti(parserNew, 0, 0, SingleTypeInfo.Domain.RANGE, SingleTypeInfo.Domain.ANY);
+
 
     }
+
+    private void testSampleSizeAndDomainOfSti(HttpCallParser parser, int urlParamValuesSize, int nonUrlParamValuesSize,
+                                              SingleTypeInfo.Domain urlParamDomain, SingleTypeInfo.Domain nonUrlParamDomain)  {
+        Map<URLTemplate, RequestTemplate> templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
+        for (RequestTemplate requestTemplate: templateURLToMethods.values()) {
+            for (SingleTypeInfo singleTypeInfo: requestTemplate.getAllTypeInfo()) {
+                if (singleTypeInfo.getIsUrlParam()) {
+                    assertEquals(urlParamValuesSize, singleTypeInfo.getValues().getElements().size());
+                    assertEquals(urlParamDomain,singleTypeInfo.getDomain());
+                } else {
+                    assertEquals(nonUrlParamValuesSize, singleTypeInfo.getValues().getElements().size());
+                    assertEquals(nonUrlParamDomain, singleTypeInfo.getDomain());
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testMinMaxAndLastSeenNew() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+        HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1);
+        String url = "api/";
+
+        // test for 1 url
+        HttpResponseParams httpResponseParams1 = createHttpResponseForMinMax(url+"books1", 23.4F,-98F );
+        HttpResponseParams httpResponseParams2 = createHttpResponseForMinMax(url+"books1", 2.3F,-200.5F );
+        HttpResponseParams httpResponseParams3 = createHttpResponseForMinMax(url+"books1", 2500.9F,-200F );
+        parser.syncFunction(Arrays.asList(httpResponseParams1, httpResponseParams2, httpResponseParams3), false);
+
+        parser.apiCatalogSync.syncWithDB(false);
+        Collection<RequestTemplate> requestTemplates = parser.apiCatalogSync.getDbState(123).getStrictURLToMethods().values();
+        validateMinMax(requestTemplates, 2500, 2, -98, -200);
+
+        // merge the urls
+        float reqMax = 2500.9f;
+        float reqMin = 2.3f;
+        float respMax = -98f;
+        float respMin = -200.5f;
+        for (int i=0; i< APICatalogSync.STRING_MERGING_THRESHOLD; i++) {
+            reqMax += 1;
+            reqMin -= 1;
+            respMax += 1;
+            respMin -= 1;
+            HttpResponseParams httpResponseParams = createHttpResponseForMinMax(url+"books"+i, reqMax, respMax);
+            parser.syncFunction(Collections.singletonList(httpResponseParams), false);
+
+            httpResponseParams = createHttpResponseForMinMax(url+"books"+i, reqMin, respMin);
+            parser.syncFunction(Collections.singletonList(httpResponseParams), false);
+        }
+        parser.apiCatalogSync.syncWithDB(false);
+
+        HttpResponseParams httpResponseParams = createHttpResponseForMinMax(url+"books99", 190f, -190f);
+        parser.syncFunction(Collections.singletonList(httpResponseParams), false);
+        parser.apiCatalogSync.syncWithDB(false);
+
+        httpResponseParams = createHttpResponseForMinMax(url+"books100", 190f, -190f);
+        parser.syncFunction(Collections.singletonList(httpResponseParams), false);
+        parser.apiCatalogSync.syncWithDB(false);
+
+        // changing the parser symbolizes instance restart
+        // using the new or old parser shouldn't change the result
+        HttpCallParser parserNew = new HttpCallParser("userIdentifier", 1, 1, 1);
+
+        assertEquals(0,parserNew.apiCatalogSync.getDbState(123).getStrictURLToMethods().size());
+        assertEquals(1,parserNew.apiCatalogSync.getDbState(123).getTemplateURLToMethods().size());
+
+        requestTemplates = parserNew.apiCatalogSync.getDbState(123).getTemplateURLToMethods().values();
+        validateMinMax(requestTemplates, Double.valueOf(reqMax+"").longValue(), Double.valueOf(reqMin+"").longValue(), Double.valueOf(respMax+"").longValue(), Double.valueOf(respMin+"").longValue());
+
+        httpResponseParams = createHttpResponseForMinMax(url+"books10", 19000f, -190f);
+        parserNew.syncFunction(Collections.singletonList(httpResponseParams), false);
+        httpResponseParams = createHttpResponseForMinMax(url+"books15", 19f, -19000f);
+        parserNew.syncFunction(Collections.singletonList(httpResponseParams), false);
+        parserNew.apiCatalogSync.syncWithDB(false);
+        requestTemplates = parserNew.apiCatalogSync.getDbState(123).getTemplateURLToMethods().values();
+        validateMinMax(requestTemplates, 19000, Double.valueOf(reqMin+"").longValue(), Double.valueOf(respMax+"").longValue(), -19000);
+
+    }
+
+    private HttpResponseParams createHttpResponseForMinMax(String url, float reqPayload, float respPayload)  {
+        BasicDBObject reqRet = new BasicDBObject();
+        reqRet.put("value", reqPayload);
+        BasicDBObject respRet = new BasicDBObject();
+        respRet.put("value", respPayload);
+
+        HttpRequestParams httpRequestParams = new HttpRequestParams("GET", url, "", new HashMap<>(), reqRet.toJson(), 123);
+        return new HttpResponseParams("", 200,"", new HashMap<>(), respRet.toJson(),httpRequestParams, 0,"0",false, HttpResponseParams.Source.MIRRORING,"", "");
+    }
+
+    private void validateMinMax(Collection<RequestTemplate> requestTemplateCollections, long reqMaxValue, long reqMinValue,
+                                long respMaxValue, long respMinValue) {
+        for (RequestTemplate requestTemplate: requestTemplateCollections) {
+            for (SingleTypeInfo singleTypeInfo: requestTemplate.getAllTypeInfo()) {
+                if (singleTypeInfo.isIsHeader() || singleTypeInfo.getIsUrlParam()) continue;
+                if (singleTypeInfo.getResponseCode() == -1) {
+                    assertEquals(reqMaxValue, singleTypeInfo.getMaxValue());
+                    assertEquals(reqMinValue, singleTypeInfo.getMinValue());
+                } else {
+                    assertEquals(respMaxValue, singleTypeInfo.getMaxValue());
+                    assertEquals(respMinValue, singleTypeInfo.getMinValue());
+                }
+            }
+        }
+    }
+
+    // Test to check if param dbUpdates are made only when certain conditions are true
+    // Case when update shouldn't be made:
+    // delta doesn't have the strict url but db has it and no change in min, max and last seen not older than 30 mins
+    @Test
+    public void testDbUpdateParams() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+        HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1);
+        int collectionId = 123;
+        String url = "api/";
+
+        HttpResponseParams httpResponseParams1 = createHttpResponseForMinMax(url+"books1", 23.4F,-98F );
+        parser.syncFunction(Collections.singletonList(httpResponseParams1),true);
+        assertEquals(1, parser.apiCatalogSync.getDbState(collectionId).getStrictURLToMethods().size());
+
+        APICatalogSync.DbUpdateReturn dbUpdateReturn1 = cleanSync(httpResponseParams1, collectionId);
+        assertEquals(0, dbUpdateReturn1.bulkUpdatesForSingleTypeInfo.size()); // because no change in minMax
+
+        HttpResponseParams httpResponseParams2 = createHttpResponseForMinMax(url+"books1", 230.4F,-98F );
+        APICatalogSync.DbUpdateReturn dbUpdateReturn2 = cleanSync(httpResponseParams2, collectionId);
+        assertEquals(1, dbUpdateReturn2.bulkUpdatesForSingleTypeInfo.size()); // because reqPayload Max changed
+
+        HttpResponseParams httpResponseParams3 = createHttpResponseForMinMax(url+"books1", 100,-98F );
+        APICatalogSync.DbUpdateReturn dbUpdateReturn3 = cleanSync(httpResponseParams3, collectionId);
+        assertEquals(1, dbUpdateReturn3.bulkUpdatesForSingleTypeInfo.size()); // even though minMax didn't change new values were added
+    }
+
+    // this function takes httpResponseParam and does runtime thingy in a clean environment (equivalent to server restart)
+    private APICatalogSync.DbUpdateReturn cleanSync(HttpResponseParams httpResponseParams, int collectionId) {
+        // new httpCallParser to make sure delta is clean
+        HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1000, Context.now() + 1000);
+        parser.numberOfSyncs = 1000; // to make sure it doesn't sync before
+
+        parser.syncFunction(Collections.singletonList(httpResponseParams),false);
+        APICatalogSync apiCatalogSync = parser.apiCatalogSync;
+        return apiCatalogSync.getDBUpdatesForParams(
+                apiCatalogSync.getDelta(collectionId), apiCatalogSync.getDbState(collectionId), false
+        );
+
+    }
+
 }

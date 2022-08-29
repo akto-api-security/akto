@@ -79,6 +79,23 @@
                     <template #item.type="{item}">
                         <sensitive-chip-group :sensitiveTags="[item.type]" />
                     </template>
+
+                    <template #item.domain="{item}">
+                        <v-tooltip bottom max-width="300px">
+                            <template v-slot:activator='{ on, attrs }'>
+                                <div
+                                    v-bind="attrs"
+                                    v-on="on"
+                                    class="fs-12"
+                                >
+                                  {{item.domain}}
+                                </div>
+                            </template>
+                            <div>
+                                {{item.valuesString}}
+                            </div>
+                        </v-tooltip>
+                    </template>
                     
                     <!-- <template #add-new-row-btn="{filters, filterOperators, sortKey, sortDesc, total}">
                         <div class="ma-1 d-flex">
@@ -186,7 +203,6 @@ export default {
         ServerTable,
         SensitiveChipGroup,
         TagChipGroup,
-        LineChart,
         BatchOperation,
         Spinner,
         DateRange
@@ -289,6 +305,10 @@ export default {
                     text: constants.DISCOVERED,
                     value: 'added',
                     sortKey: 'timestamp'
+                },
+                {
+                  text: 'Values',
+                  value: 'domain',
                 }
             ]
         }
@@ -408,12 +428,14 @@ export default {
                 url: x.url,
                 method: x.method,
                 added: func.prettifyEpoch(x.timestamp),
-                location: (x.responseCode == -1 ? 'Request' : 'Response') + ' ' + (x.isHeader ? 'headers' : 'payload'),
+                location: (x.responseCode === -1 ? 'Request' : 'Response') + ' ' + (x.isHeader ? 'headers' : 'payload'),
                 type: x.subType.name,
                 detectedTs: x.timestamp,
                 apiCollectionId: x.apiCollectionId,
                 apiCollectionName: idToNameMap[x.apiCollectionId] || '-',
-                x: x
+                x: x,
+                domain: func.prepareDomain(x),
+                valuesString: func.prepareValuesTooltip(x)
             }
         },
         async fetchRecentParams(sortKey, sortOrder, skip, limit, filters, filterOperators) {
@@ -519,5 +541,6 @@ export default {
 </script>
 
 <style lang="sass" scoped>
-
+    .v-tooltip__content
+        font-size: 15px !important
 </style>

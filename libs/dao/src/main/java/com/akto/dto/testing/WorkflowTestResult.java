@@ -23,7 +23,7 @@ public class WorkflowTestResult {
 
     public void addNodeResult(String nodeId, String message, List<TestResult.TestError> testErrors) {
         if (this.testResultMap == null) this.testResultMap = new HashMap<>();
-        TestResult testResult = new TestResult(message, false, testErrors);
+        TestResult testResult = new TestResult(message, false, testErrors, new ArrayList<>());
         this.testResultMap.put(nodeId, testResult);
     }
 

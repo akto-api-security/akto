@@ -5,16 +5,14 @@ import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestingEndpoints;
-import com.akto.dto.type.RequestTemplate;
 import com.akto.rules.BOLATest;
 import com.akto.rules.NoAuthTest;
+import com.akto.store.SampleMessageStore;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class TestExecutor {
 
@@ -26,7 +24,7 @@ public class TestExecutor {
 
     private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
 
-    public static void init(TestingRun testingRun) {
+    public void init(TestingRun testingRun) {
         if (testingRun.getTestIdConfig() == 0)     {
             apiWiseInit(testingRun);
         } else {
@@ -34,7 +32,7 @@ public class TestExecutor {
         }
     }
 
-    public static void workflowInit (TestingRun testingRun) {
+    public void workflowInit (TestingRun testingRun) {
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
         if (!testingEndpoints.getType().equals(TestingEndpoints.Type.WORKFLOW)) {
             logger.error("Invalid workflow type");
@@ -48,8 +46,11 @@ public class TestExecutor {
         apiWorkflowExecutor.init(workflowTest, testingRun.getId());
     }
 
-    public static void  apiWiseInit(TestingRun testingRun) {
+    public void  apiWiseInit(TestingRun testingRun) {
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
+
+        SampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
+
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         System.out.println("APIs: " + apiInfoKeyList.size());
@@ -68,13 +69,20 @@ public class TestExecutor {
         }
     }
 
-    public static void start(ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId) {
-        if (testIdConfig != 0) return;
+    private final BOLATest bolaTest = new BOLATest();
+    private final NoAuthTest noAuthTest = new NoAuthTest();
 
-        boolean noAuthResult = new NoAuthTest().start(apiInfoKey, testRunId);
+    public void start(ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId) {
+        if (testIdConfig != 0) {
+            logger.error("Test id config is not 0 but " + testIdConfig);
+            return;
+        }
+
+        boolean noAuthResult = noAuthTest.start(apiInfoKey, testRunId);
         if (!noAuthResult) {
-            new BOLATest().start(apiInfoKey, testRunId);
+            bolaTest.start(apiInfoKey, testRunId);
         }
 
     }
+
 }

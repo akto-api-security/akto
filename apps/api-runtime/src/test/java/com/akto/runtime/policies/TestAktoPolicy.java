@@ -82,8 +82,8 @@ public class TestAktoPolicy extends MongoBasedTest {
 
         HttpCallParser httpCallParser = new HttpCallParser("user", 1, 1,1);
         AktoPolicy aktoPolicy = new AktoPolicy(httpCallParser.apiCatalogSync);
-        httpCallParser.syncFunction(responseParams);
-        httpCallParser.apiCatalogSync.syncWithDB();
+        httpCallParser.syncFunction(responseParams, false);
+        httpCallParser.apiCatalogSync.syncWithDB(false);
         aktoPolicy.main(responseParams, httpCallParser.apiCatalogSync);
         // sending random url to trigger moving api info from reserves to main
         aktoPolicy.main(Collections.singletonList(hrp1), httpCallParser.apiCatalogSync);
@@ -98,17 +98,17 @@ public class TestAktoPolicy extends MongoBasedTest {
         apiInfoList = ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId", 0));
         Assertions.assertEquals(4,apiInfoList.size());
 
-        httpCallParser1.syncFunction(responseParams.subList(0,1));
-        httpCallParser1.apiCatalogSync.syncWithDB();
+        httpCallParser1.syncFunction(responseParams.subList(0,1), false);
+        httpCallParser1.apiCatalogSync.syncWithDB(false);
         aktoPolicy1.main(responseParams.subList(0,1), httpCallParser1.apiCatalogSync);
 
         apiInfoList = ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId", 0));
         Assertions.assertEquals(4,apiInfoList.size());
 
         HttpResponseParams hrp4 = generateHttpResponseParams("url4", URLMethods.Method.GET, 0,new ArrayList<>(),false) ;
-        httpCallParser1.syncFunction(Collections.singletonList(hrp4));
+        httpCallParser1.syncFunction(Collections.singletonList(hrp4), false);
         aktoPolicy1.main(Collections.singletonList(hrp4),null);
-        httpCallParser1.apiCatalogSync.syncWithDB();
+        httpCallParser1.apiCatalogSync.syncWithDB(false);
         aktoPolicy1.main(Collections.singletonList(hrp1), httpCallParser1.apiCatalogSync);
         aktoPolicy1.main(Collections.singletonList(hrp1), httpCallParser1.apiCatalogSync);
 
@@ -129,8 +129,8 @@ public class TestAktoPolicy extends MongoBasedTest {
         HttpCallParser parser = new HttpCallParser("access-token", 1,40,10);
 
         HttpResponseParams hrp1 = generateHttpResponseParams("api/toys/1", URLMethods.Method.GET,0, Collections.singletonList(ApiInfo.AuthType.JWT), true) ;
-        parser.syncFunction(Collections.singletonList(hrp1));
-        parser.apiCatalogSync.syncWithDB();
+        parser.syncFunction(Collections.singletonList(hrp1), false);
+        parser.apiCatalogSync.syncWithDB(false);
 
         AktoPolicy aktoPolicy = new AktoPolicy(parser.apiCatalogSync);
         URLStatic urlStatic = new URLStatic(hrp1.requestParams.url, URLMethods.Method.fromString(hrp1.requestParams.method));

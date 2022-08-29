@@ -18,6 +18,35 @@
                         <v-btn icon :disabled=showNewRow :color="$vuetify.theme.themes.dark.themeColor"  @click="showNewRow = true">
                             <v-icon>$fas_plus</v-icon>
                         </v-btn>
+
+                        <v-dialog
+                            :model="showDeleteDialog"
+                            width="600px"
+                        >
+                        <template v-slot:activator="{ on, attrs }">
+                            <v-btn
+                                color="#47466A"
+                                icon
+                                dark
+                                v-bind="attrs"
+                                v-on="on"
+                                @click="showDeleteDialog = !showDeleteDialog"
+                            >
+                            <v-tooltip bottom>
+                                <template v-slot:activator='{ on, attrs }'>
+                                    <v-icon color="#6200EA" size="16" v-bind="attrs" v-on="on" >$fas_trash</v-icon>
+                                </template>
+                                Delete multiple collections
+                            </v-tooltip>
+                            </v-btn>
+                        </template>
+                            <batch-operation 
+                                title="Parameters" 
+                                :items="apiCollectionsForTable"
+                                operation-name="Delete"
+                                @btnClicked="deleteMultipleCollections"
+                            />
+                        </v-dialog>
                     </div>            
                 </template>
                 <template v-slot:add-new-row="{}">
@@ -67,19 +96,23 @@
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import { mapState } from 'vuex'
 import func from '@/util/func'
+import api from './api'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
 import SimpleTextField from '@/apps/dashboard/shared/components/SimpleTextField'
+import BatchOperation from '../changes/components/BatchOperation'
 
 export default {
     name: "ApiCollections",
     components: { 
         SimpleTable,
         Spinner,
-        SimpleTextField
+        SimpleTextField,
+        BatchOperation
     },
     
     data() {
         return { 
+            showDeleteDialog: false,
             headers: [
                 {
                     text: "",
@@ -132,6 +165,16 @@ export default {
         }
     },
     methods: {
+        async deleteMultipleCollections({items}) {
+            let noOfItems = Object.keys(items).length
+            if (noOfItems > 0) {
+                items.forEach(x => x.id = x.value)
+                let resp = await api.deleteMultipleCollections(items);
+                this.deletedCollection = ""+noOfItems+" collections";
+                this.successfullyDeleted();
+                this.$store.dispatch('collections/loadAllApiCollections')
+            }
+        },
         rowClicked(item) {
             this.$emit("selectedItem", {type: 1, collectionName: item.name, apiCollectionId: item.id})
         },

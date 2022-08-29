@@ -4,20 +4,23 @@ import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.*;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.type.*;
+import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.RelationshipSync;
+import com.akto.store.SampleMessageStore;
+import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
-import java.io.IOException;
 import java.util.*;
 
-import static com.akto.runtime.RelationshipSync.extractAllValuesFromPayload;
 
 
 public abstract class TestPlugin {
@@ -72,7 +75,7 @@ public abstract class TestPlugin {
 
     public void addWithoutRequestError(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestResult.TestError testError) {
         Bson filter = TestingRunResultDao.generateFilter(testRunId, apiInfoKey.getApiCollectionId(), apiInfoKey.url, apiInfoKey.method.name());
-        Bson update = Updates.set("resultMap." + testName(), new TestResult(null,false, Collections.singletonList(testError)));
+        Bson update = Updates.set("resultMap." + testName(), new TestResult(null,false, Collections.singletonList(testError), new ArrayList<>()));
         TestingRunResultDao.instance.updateOne(filter, update);
     }
 
@@ -86,7 +89,7 @@ public abstract class TestPlugin {
             e.printStackTrace();
         }
 
-        Bson update = Updates.set("resultMap." + testName(), new TestResult(message,false, Collections.singletonList(testError)));
+        Bson update = Updates.set("resultMap." + testName(), new TestResult(message,false, Collections.singletonList(testError), new ArrayList<>()));
         TestingRunResultDao.instance.updateOne(filter, update);
     }
 
@@ -102,25 +105,69 @@ public abstract class TestPlugin {
         }
 
         Bson filter = TestingRunResultDao.generateFilter(testRunId, apiInfoKey);
-        Bson update = Updates.set("resultMap." + testName(), new TestResult(message, vulnerable, new ArrayList<>()));
+        Bson update = Updates.set("resultMap." + testName(), new TestResult(message, vulnerable, new ArrayList<>(), new ArrayList<>()));
         TestingRunResultDao.instance.updateOne(filter, update);
     }
 
-    public HttpResponseParams generateEmptyResponsePayload(HttpRequestParams httpRequestParams) {
-        return new HttpResponseParams(
-                "", 0,"", new HashMap<>(), null, httpRequestParams, Context.now(),
-                1_000_000+"",false, HttpResponseParams.Source.OTHER, "",""
-        );
+    public static class ContainsPrivateResourceResult {
+        boolean isPrivate;
+        List<SingleTypeInfo> singleTypeInfos;
+
+        public ContainsPrivateResourceResult(boolean isPrivate, List<SingleTypeInfo> singleTypeInfos) {
+            this.isPrivate = isPrivate;
+            this.singleTypeInfos = singleTypeInfos;
+        }
+
+        public List<SingleTypeInfo> findPrivateOnes() {
+            List<SingleTypeInfo> res = new ArrayList<>();
+            for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
+                if (singleTypeInfo.isPrivate()) res.add(singleTypeInfo);
+            }
+            return res;
+        }
     }
 
-    public boolean containsRequestPayload(OriginalHttpRequest originalHttpRequest) {
-        String url = originalHttpRequest.getFullUrlWithParams();
-        if (url.contains("INTEGER") || url.contains("STRING") || url.contains("?")) return true;
+    public ContainsPrivateResourceResult containsPrivateResource(OriginalHttpRequest originalHttpRequest, ApiInfo.ApiInfoKey apiInfoKey) {
+        String urlWithParams = originalHttpRequest.getFullUrlWithParams();
+        String url = apiInfoKey.url;
+        URLMethods.Method method = apiInfoKey.getMethod();
+        List<SingleTypeInfo> singleTypeInfoList = new ArrayList<>();
 
-        String payload = originalHttpRequest.getBody();
-        if (payload == null || payload.equals("{}") || payload.isEmpty()) return false;
+        boolean isPrivate = true;
+        boolean atLeastOneValueInRequest = false;
+        // check private resource in
+        // 1. url
+        if (APICatalog.isTemplateUrl(url)) {
+            URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, method);
+            String[] tokens = urlTemplate.getTokens();
+            for (int i = 0;i < tokens.length; i++) {
+                if (tokens[i] == null) {
+                    atLeastOneValueInRequest = true;
+                    SingleTypeInfo singleTypeInfo = SampleMessageStore.findSti(i+"", true,apiInfoKey, false, -1);
+                    if (singleTypeInfo != null) {
+                        singleTypeInfoList.add(singleTypeInfo);
+                        isPrivate = isPrivate && singleTypeInfo.isPrivate();
+                    }
+                }
+            }
+        }
 
-        return true;
+        // 2. payload
+        BasicDBObject payload = RequestTemplate.parseRequestPayload(originalHttpRequest.getBody(), urlWithParams);
+        Map<String, Set<Object>> flattened = JSONUtils.flatten(payload);
+        for (String param: flattened.keySet()) {
+            atLeastOneValueInRequest = true;
+            SingleTypeInfo singleTypeInfo = SampleMessageStore.findSti(param,false,apiInfoKey, false, -1);
+            if (singleTypeInfo != null) {
+                singleTypeInfoList.add(singleTypeInfo);
+                isPrivate = isPrivate && singleTypeInfo.isPrivate();
+            }
+        }
+
+        // For private at least one value in request
+        boolean finalPrivateResult = isPrivate && atLeastOneValueInRequest;
+
+        return new ContainsPrivateResourceResult(finalPrivateResult, singleTypeInfoList);
     }
 
 }

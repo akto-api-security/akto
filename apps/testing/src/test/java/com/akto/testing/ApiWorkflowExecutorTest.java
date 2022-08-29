@@ -1,5 +1,6 @@
 package com.akto.testing;
 
+import com.akto.dto.type.RequestTemplate;
 import com.akto.runtime.URLAggregator;
 import com.mongodb.BasicDBObject;
 import org.junit.Test;
@@ -19,7 +20,7 @@ public class ApiWorkflowExecutorTest {
         String combinedQuery = new ApiWorkflowExecutor().combineQueryParams(query1, query2);
         assertTrue(combinedQuery.contains("status=blah%20blah"));
 
-        BasicDBObject combinedQueryObject = URLAggregator.getQueryJSON("google.com?"+combinedQuery);
+        BasicDBObject combinedQueryObject = RequestTemplate.getQueryJSON("google.com?"+combinedQuery);
 
         assertEquals("avneesh", combinedQueryObject.get("user"));
         assertEquals("101", combinedQueryObject.get("age"));

@@ -10,6 +10,7 @@ import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.api_workflow.Node;
 import com.akto.dto.testing.*;
+import com.akto.dto.type.RequestTemplate;
 import com.akto.runtime.URLAggregator;
 import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
@@ -60,7 +61,7 @@ public class ApiWorkflowExecutor {
                 e.printStackTrace();
                 List<TestResult.TestError> testErrors = new ArrayList<>();
                 testErrors.add(TestResult.TestError.SOMETHING_WENT_WRONG);
-                testResult = new TestResult("{}", false, testErrors);
+                testResult = new TestResult("{}", false, testErrors, new ArrayList<>());
             }
 
             testResultMap.put(node.getId(), testResult);
@@ -84,7 +85,7 @@ public class ApiWorkflowExecutor {
             if (request == null) throw new Exception();
         } catch (Exception e) {
             e.printStackTrace();
-            return new TestResult(null, false, Collections.singletonList(TestResult.TestError.FAILED_BUILDING_REQUEST_BODY));
+            return new TestResult(null, false, Collections.singletonList(TestResult.TestError.FAILED_BUILDING_REQUEST_BODY), new ArrayList<>());
         }
 
         populateValuesMap(valuesMap, request.getBody(), node.getId(), request.getHeaders(),
@@ -120,7 +121,7 @@ public class ApiWorkflowExecutor {
             e.printStackTrace();
         }
 
-        return new TestResult(message, false, testErrors);
+        return new TestResult(message, false, testErrors, new ArrayList<>());
     }
 
     public void populateValuesMap(Map<String, Object> valuesMap, String payloadStr, String nodeId, Map<String,
@@ -139,7 +140,7 @@ public class ApiWorkflowExecutor {
             boolean isPostFormData = payloadStr.contains("&") && payloadStr.contains("=");
             if (isPostFormData) {
                 String mockUrl = "url?"+ payloadStr; // because getQueryJSON function needs complete url
-                payloadObj = URLAggregator.getQueryJSON(mockUrl);
+                payloadObj = RequestTemplate.getQueryJSON(mockUrl);
             } else {
                 payloadObj = BasicDBObject.parse("{}");
             }
@@ -149,7 +150,7 @@ public class ApiWorkflowExecutor {
         if (queryParams != null) {
             try {
                 String mockUrl = "url?"+ queryParams; // because getQueryJSON function needs complete url
-                queryParamsObject = URLAggregator.getQueryJSON(mockUrl);
+                queryParamsObject = RequestTemplate.getQueryJSON(mockUrl);
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -246,8 +247,8 @@ public class ApiWorkflowExecutor {
         String mockUrl1 = "url?" + queryString1;
         String mockUrl2 = "url?" + queryString2;
 
-        BasicDBObject queryParamsObject1 = URLAggregator.getQueryJSON(mockUrl1);
-        BasicDBObject queryParamsObject2 = URLAggregator.getQueryJSON(mockUrl2);
+        BasicDBObject queryParamsObject1 = RequestTemplate.getQueryJSON(mockUrl1);
+        BasicDBObject queryParamsObject2 = RequestTemplate.getQueryJSON(mockUrl2);
 
         for (String key: queryParamsObject2.keySet()) {
             queryParamsObject1.put(key, queryParamsObject2.get(key));

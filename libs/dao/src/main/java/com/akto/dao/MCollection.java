@@ -55,12 +55,24 @@ public abstract class MCollection<T> {
         return ret;
     }
     public List<T> findAll(Bson q) {
-        return findAll(q, 0, 1_000_000, null);
+        return findAll(q, null);
+    }
+
+    public List<T> findAll(Bson q, Bson projection) {
+        return findAll(q, 0, 1_000_000, null, projection);
     }
 
     public List<T> findAll(Bson q, int skip, int limit, Bson sort) {
+        return findAll(q, skip, limit, sort, null);
+    }
+
+    public List<T> findAll(Bson q, int skip, int limit, Bson sort, Bson projection) {
         
         FindIterable<T> commands = this.getMCollection().find(q).skip(skip).limit(limit);
+
+        if (projection != null) {
+            commands.projection(projection);
+        }
 
         if (sort != null) {
             commands = commands.sort(sort);

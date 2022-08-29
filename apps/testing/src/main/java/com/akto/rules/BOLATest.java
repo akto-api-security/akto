@@ -9,7 +9,11 @@ import com.akto.testing.ApiExecutor;
 import com.akto.testing.StatusCodeAnalyser;
 import org.bson.types.ObjectId;
 
+import java.util.HashMap;
+
 public class BOLATest extends TestPlugin {
+
+    public BOLATest() { }
 
     @Override
     public boolean start(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId) {
@@ -31,9 +35,10 @@ public class BOLATest extends TestPlugin {
         boolean result = authMechanism.addAuthToRequest(originalHttpRequest);
         if (!result) return false; // this means that auth token was not there in original request so exit
 
-        boolean containsReqPayload = containsRequestPayload(originalHttpRequest);
-        if (!containsReqPayload) {
-            addTestSuccessResult(apiInfoKey, originalHttpRequest, null, testRunId, false);
+        ContainsPrivateResourceResult containsPrivateResourceResult = containsPrivateResource(originalHttpRequest, apiInfoKey);
+        if (!containsPrivateResourceResult.isPrivate) { // contains 1 or more public parameters... so don't test
+            OriginalHttpResponse newOriginalHttpResponse= new OriginalHttpResponse(null, new HashMap<>(), 0);
+            addTestSuccessResult(apiInfoKey, originalHttpRequest,  newOriginalHttpResponse, testRunId, false);
             return false;
         }
 
@@ -61,4 +66,7 @@ public class BOLATest extends TestPlugin {
     public String testName() {
         return "BOLA";
     }
+
+
+
 }

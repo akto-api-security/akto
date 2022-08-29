@@ -88,6 +88,10 @@ public class APICatalog {
         return this;
     }
 
+    public static boolean isTemplateUrl(String url) {
+        return url.contains("STRING") || url.contains("INTEGER");
+    }
+
     @Override
     public String toString() {
         return "{" +

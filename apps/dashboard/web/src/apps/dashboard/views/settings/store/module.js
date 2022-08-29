@@ -48,11 +48,11 @@ const team = {
                 state.redactPayload = false
                 state.apiRuntimeVersion = "-"
                 state.dashboardVersion = "-"
+                state.setupType = "PROD"
             } else {
                 state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
                 state.apiRuntimeVersion = resp.accountSettings.apiRuntimeVersion ? resp.accountSettings.apiRuntimeVersion : "-"
                 state.dashboardVersion = resp.accountSettings.dashboardVersion ? resp.accountSettings.dashboardVersion : "-"
-                state.setupType = "STAGING"
                 state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
                 state.setupType = resp.accountSettings.setupType
             }

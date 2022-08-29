@@ -5,21 +5,24 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import com.akto.DaoInit;
 import com.akto.dao.CustomDataTypeDao;
-import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.CustomDataType;
+import com.akto.types.CappedSet;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import io.swagger.v3.oas.models.media.*;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.codecs.pojo.annotations.BsonProperty;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static com.google.common.primitives.Longs.min;
+import static java.lang.Long.max;
 
 public class SingleTypeInfo {
 
+    private static final Logger logger = LoggerFactory.getLogger(SingleTypeInfo.class);
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     public static void init() {
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -224,8 +227,9 @@ public class SingleTypeInfo {
         int apiCollectionId;
         @BsonProperty("subType")
         String subTypeString;
-
-        public ParamId(String url, String method, int responseCode, boolean isHeader, String param, SubType subType, int apiCollectionId) {
+        boolean isUrlParam;
+        public ParamId(String url, String method, int responseCode, boolean isHeader, String param, SubType subType,
+                       int apiCollectionId, boolean isUrlParam) {
             this.url = url;
             this.method = method;
             this.responseCode = responseCode;
@@ -233,6 +237,7 @@ public class SingleTypeInfo {
             this.param = param;
             this.subType = subType;
             this.apiCollectionId = apiCollectionId;
+            this.isUrlParam = isUrlParam;
         }
 
         public ParamId() {
@@ -305,23 +310,62 @@ public class SingleTypeInfo {
         }
     }
 
+    public static final String _URL = "url";
     String url;
+    public static final String _METHOD = "method";
     String method;
+    public static final String _RESPONSE_CODE = "responseCode";
     int responseCode;
+    public static final String _IS_HEADER = "isHeader";
     boolean isHeader;
+    public static final String _PARAM = "param";
     String param;
+    public static final String SUB_TYPE = "subType";
     @BsonIgnore
     SubType subType;
+    public static final String SUBTYPE_STRING = "subTypeString";
     @BsonProperty("subType")
     String subTypeString;
+    public static final String _EXAMPLES  = "examples";
     Set<Object> examples = new HashSet<>();
+    public static final String _USER_IDS = "userIds";
     Set<String> userIds = new HashSet<>();
+    public static final String _COUNT = "count";
     int count;
+    public static final String _TIMESTAMP = "timestamp";
     int timestamp;
+    public static final String _DURATION = "duration";
     int duration;
+    public static final String _API_COLLECTION_ID = "apiCollectionId";
     int apiCollectionId;
+    public static final String _SENSITIVE = "sensitive";
     @BsonIgnore
     boolean sensitive;
+    public static final String _IS_URL_PARAM = "isUrlParam";
+    boolean isUrlParam;
+    public static final String _VALUES = "values";
+    public static final int VALUES_LIMIT = 50;
+    CappedSet<String> values = new CappedSet<>();
+    public static final String _DOMAIN = "domain";
+    Domain domain = Domain.ENUM;
+    public static final String MIN_VALUE = "minValue";
+    public static final long ACCEPTED_MAX_VALUE =  Long.MAX_VALUE - 100_000;
+    long minValue = ACCEPTED_MAX_VALUE; // this value will be used when field doesn't exist in db
+    public static final String MAX_VALUE = "maxValue";
+    public static final long ACCEPTED_MIN_VALUE =  Long.MIN_VALUE + 100_000;
+    long maxValue = ACCEPTED_MIN_VALUE;  // this value will be used when field doesn't exist in db
+    public static final String LAST_SEEN = "lastSeen";
+    long lastSeen;
+
+    public static final String _UNIQUE_COUNT = "uniqueCount";
+    public long uniqueCount = 0L;
+    public static final String _PUBLIC_COUNT = "publicCount";
+    public long publicCount = 0L;
+    public static final double THRESHOLD = 0.1;
+
+    public enum Domain {
+        ENUM, RANGE, ANY
+    }
 
     public static final Map<String, SubType> subTypeMap = new HashMap<>();
     public static Map<String, CustomDataType> customDataTypeMap = new HashMap<>();
@@ -350,7 +394,8 @@ public class SingleTypeInfo {
     public SingleTypeInfo() {
     }
 
-    public SingleTypeInfo(ParamId paramId, Set<Object> examples, Set<String> userIds, int count, int timestamp, int duration) {
+    public SingleTypeInfo(ParamId paramId, Set<Object> examples, Set<String> userIds, int count, int timestamp,
+                          int duration, CappedSet<String> values, Domain domain, long minValue, long maxValue) {
         this.url = paramId.url;
         this.method = paramId.method;
         this.responseCode = paramId.responseCode;
@@ -358,19 +403,33 @@ public class SingleTypeInfo {
         this.param = paramId.param;
         this.subType = paramId.subType;
         this.apiCollectionId = paramId.apiCollectionId;
+        this.isUrlParam = paramId.isUrlParam;
         this.examples = examples;
         this.userIds = userIds;
         this.count = count;
         this.timestamp = timestamp;
         this.duration = duration;
-        
+        this.lastSeen = Context.now();
+        this.values = values;
+        this.domain = domain;
+        this.minValue = minValue;
+        this.maxValue = maxValue;
     }
 
     public String composeKey() {
-        return StringUtils.joinWith("@", url, method, responseCode, isHeader, param, subType, apiCollectionId);
+        return composeKey(url, method, responseCode, isHeader, param, subType, apiCollectionId, isUrlParam);
     }
 
-    public void incr(Object object) {
+    public String composeKeyWithCustomSubType(SubType s) {
+        return composeKey(url, method, responseCode, isHeader, param, s, apiCollectionId, isUrlParam);
+    }
+
+    public static String composeKey(String url, String method, int responseCode, boolean isHeader, String param, SubType subType, int apiCollectionId, boolean isUrlParam) {
+        return StringUtils.joinWith("@", url, method, responseCode, isHeader, param, subType, apiCollectionId, isUrlParam);
+    }
+
+
+    public void incr() {
         this.count++;
     }
     
@@ -381,6 +440,8 @@ public class SingleTypeInfo {
         Set<String> copyUserIds = new HashSet<>();
         copyUserIds.addAll(this.userIds);
 
+        CappedSet<String> copyValues = new CappedSet<>(new HashSet<>(this.values.getElements()));
+
         ParamId paramId = new ParamId();
         paramId.url = url;
         paramId.method = method;
@@ -389,8 +450,17 @@ public class SingleTypeInfo {
         paramId.param = param;
         paramId.subType = new SubType(subType.name, subType.sensitiveAlways, subType.superType, subType.swaggerSchemaClass, subType.sensitivePosition);
         paramId.apiCollectionId = apiCollectionId;
+        paramId.isUrlParam = isUrlParam;
 
-        return new SingleTypeInfo(paramId, copyExamples, copyUserIds, this.count, this.timestamp, this.duration);
+        SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, copyExamples, copyUserIds, this.count,
+                this.timestamp, this.duration, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
+        singleTypeInfo.setValues(copyValues);
+        singleTypeInfo.minValue = this.minValue;
+        singleTypeInfo.maxValue = this.maxValue;
+        singleTypeInfo.domain = this.domain;
+        singleTypeInfo.uniqueCount = this.uniqueCount;
+        singleTypeInfo.publicCount = this.publicCount;
+        return singleTypeInfo;
     }
 
     public String getUrl() {
@@ -502,17 +572,18 @@ public class SingleTypeInfo {
         }
         SingleTypeInfo singleTypeInfo = (SingleTypeInfo) o;
         return url.equals(singleTypeInfo.url) &&
-                method.equals(singleTypeInfo.method) &&
-                responseCode == singleTypeInfo.responseCode &&
-                isHeader == singleTypeInfo.isHeader &&
-                param.equals(singleTypeInfo.param) &&
-                subType.equals(singleTypeInfo.subType) &&
-                apiCollectionId == singleTypeInfo.apiCollectionId;
-    }
+                    method.equals(singleTypeInfo.method) &&
+                    responseCode == singleTypeInfo.responseCode &&
+                    isHeader == singleTypeInfo.isHeader &&
+                    param.equals(singleTypeInfo.param) &&
+                    subType.equals(singleTypeInfo.subType) &&
+                    apiCollectionId == singleTypeInfo.apiCollectionId &&
+                    isUrlParam == singleTypeInfo.isUrlParam;
+        }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(url, method, responseCode, isHeader, param, subType, apiCollectionId);
+        @Override
+        public int hashCode() {
+            return Objects.hash(url, method, responseCode, isHeader, param, subType, apiCollectionId, isUrlParam);
     }
 
     @Override
@@ -548,8 +619,119 @@ public class SingleTypeInfo {
     }
 
     public boolean getSensitive() {
+        if (this.subType == null) return false; // this was done for paramStateAction because it uses projections and doesn't return subType
         return this.subType.isSensitive(this.findPosition());
     }
 
 
+    public CappedSet<String> getValues() {
+        return values;
+    }
+
+    public void setValues(CappedSet<String> values) {
+        this.values = values;
+    }
+
+    public Domain getDomain() {
+        return domain;
+    }
+
+    public void setDomain(Domain domain) {
+        this.domain = domain;
+    }
+
+    public boolean getIsUrlParam() {
+        return isUrlParam;
+    }
+
+    public void setIsUrlParam(boolean urlParam) {
+        isUrlParam = urlParam;
+    }
+
+    public void setMinMaxValues(Object o) {
+        if (subType.getSuperType() == SingleTypeInfo.SuperType.INTEGER || subType.getSuperType() == SingleTypeInfo.SuperType.FLOAT) {
+            try {
+                // this is done so that both integer and decimal values can be parsed
+                // But while storing double we omit the decimal part
+                double d = Double.parseDouble(o.toString());
+                long l = (long) d;
+                this.minValue = min(this.minValue, l);
+                this.minValue = max(this.minValue, ACCEPTED_MIN_VALUE);
+
+                this.maxValue = max(this.maxValue, l);
+                this.maxValue = min(this.maxValue, ACCEPTED_MAX_VALUE);
+                if (this.maxValue > ACCEPTED_MAX_VALUE) {
+                    this.maxValue = ACCEPTED_MAX_VALUE;
+                }
+            } catch (Exception e) {
+                logger.error("ERROR: while parsing long for min max in sti " + o.toString());
+            }
+        }
+    }
+
+    public void incPublicCount(int c) {
+        this.publicCount += c;
+    }
+
+    public void incUniqueCount(int c) {
+        this.uniqueCount += c;
+    }
+
+    public void merge(SingleTypeInfo that) {
+        if (that != null) {
+            this.count += that.getCount();
+            this.values.getElements().addAll(that.values.getElements());
+            this.minValue = min(this.minValue, that.minValue);
+            this.maxValue = max(this.maxValue, that.maxValue);
+            this.lastSeen = max(this.lastSeen, that.lastSeen);
+            this.publicCount += that.publicCount;
+            this.uniqueCount += that.uniqueCount;
+        }
+    }
+
+    public boolean isPrivate() {
+        if (uniqueCount == 0) return true;
+        double v = (1.0*publicCount) / uniqueCount;
+        return v <= SingleTypeInfo.THRESHOLD;
+    }
+
+    public long getMinValue() {
+        return minValue;
+    }
+
+    public void setMinValue(long minValue) {
+        this.minValue = minValue;
+    }
+
+    public long getMaxValue() {
+        return maxValue;
+    }
+
+    public void setMaxValue(long maxValue) {
+        this.maxValue = maxValue;
+    }
+
+    public long getLastSeen() {
+        return lastSeen;
+    }
+
+    public void setLastSeen(long lastSeen) {
+        this.lastSeen = lastSeen;
+    }
+
+    public long getUniqueCount() {
+        return uniqueCount;
+    }
+
+    public void setUniqueCount(long uniqueCount) {
+        this.uniqueCount = uniqueCount;
+    }
+
+    public long getPublicCount() {
+        return publicCount;
+    }
+
+    public void setPublicCount(long publicCount) {
+        this.publicCount = publicCount;
+    }
 }

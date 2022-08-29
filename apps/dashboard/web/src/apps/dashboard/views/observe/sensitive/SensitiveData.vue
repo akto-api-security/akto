@@ -129,7 +129,7 @@ export default {
                 location: x.isHeader ? 'Headers' : 'Payload',
                 type: x.subType.name || "OTHER",
                 apiCollectionId: x.apiCollectionId,
-                apiCollectionName: this.mapCollectionIdToName[x.apiCollectionId] || '-'
+                apiCollectionName: this.mapCollectionIdToName[x.apiCollectionId] || '-',
             }
         },
         prettifyDate(ts) {

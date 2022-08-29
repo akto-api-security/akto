@@ -635,6 +635,16 @@
            </result>
        </action>
 
+        <action name="api/deleteMultipleCollections" class="com.akto.action.ApiCollectionsAction" method="deleteMultipleCollections">
+           <interceptor-ref name="json"/>
+           <interceptor-ref name="defaultStack" />
+           <result name="SUCCESS"  type="json">
+           </result>
+           <result name="ERROR" type="httpheader">
+               <param name="status">401</param>
+           </result>
+       </action>
+
         <action name="api/fetchApiInfoList" class="com.akto.action.ApiInfoAction" method="fetchApiInfoList">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -913,6 +923,17 @@
             </result>
         </action>
         <action name="api/updateSetupType" class="com.akto.action.AdminSettingsAction" method="updateSetupType">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchParamsStatus" class="com.akto.action.ParamStateAction" method="fetchParamsStatus">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>

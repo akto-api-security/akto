@@ -506,5 +506,65 @@ export default {
             case "SLACK":
                 return {name: '$slack', color: '#fe7b5b'}
         }
+    },
+
+    prepareDomain(x) {
+        let NO_VALUES_RECORDED = "-";
+        if (x.domain === "RANGE") {
+            return x.minValue + " - " + x.maxValue
+        } else if (x.domain === "ANY") {
+            return "ANY"
+        } else {
+            let values = x["values"]
+            if (!values) return NO_VALUES_RECORDED
+
+            let elements = values["elements"]
+            if (!elements) return NO_VALUES_RECORDED
+
+            let size = elements.length
+
+            if (size === 0) {
+                return NO_VALUES_RECORDED
+            } 
+
+            let count = 0
+            let result = ""
+            const limit = 2
+            for (var elem of elements) {
+                if (count >= limit) {
+                    result += " and " + (size - limit) + " more"
+                    return result
+                }
+
+                if (count !== 0) {
+                    result +=  ", "
+                }
+
+                result += elem
+                count += 1
+
+            }
+
+            return result;
+            
+        }
+    },
+
+    prepareValuesTooltip(x) {
+        let result = "";
+        let values = x["values"]
+        if (!values) return "No values recorded"
+        let elements = values["elements"] ? values["elements"] : []
+        let count = 0;
+        for (var elem of elements) {
+            if (count > 50) return result
+            if (count !== 0) {
+                result +=  ", "
+            }
+            result += elem
+            count += 1
+        }
+
+        return (count == 0 ? "No values recorded" : result)
     }
 }

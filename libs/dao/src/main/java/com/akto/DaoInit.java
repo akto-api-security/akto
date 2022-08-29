@@ -14,6 +14,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.type.URLTemplate;
 import com.akto.types.CappedList;
+import com.akto.types.CappedSet;
 import com.akto.util.EnumCodec;
 import com.akto.dto.Attempt.AttemptResult;
 import com.akto.dto.auth.APIAuth;
@@ -74,6 +75,7 @@ public class DaoInit {
         ClassModel<CollectionWiseTestingEndpoints> collectionWiseTestingEndpointsClassModel = ClassModel.builder(CollectionWiseTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<WorkflowTestingEndpoints>  workflowTestingEndpointsClassModel = ClassModel.builder(WorkflowTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<WorkflowTestResult>  workflowTestResultClassModel = ClassModel.builder(WorkflowTestResult.class).enableDiscriminator(true).build();
+        ClassModel<CappedSet> cappedSetClassModel = ClassModel.builder(CappedSet.class).enableDiscriminator(true).build();
 
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(queueEntryClassModel, configClassModel, 
@@ -86,7 +88,8 @@ public class DaoInit {
                 equalsToPredicateClassModel, isNumberPredicateClassModel, testingRunClassModel, testingRunResultClassModel, testResultClassModel,
                 authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel,
                 testingEndpointsClassModel, customTestingEndpointsClassModel, collectionWiseTestingEndpointsClassModel,
-                workflowTestingEndpointsClassModel, workflowTestResultClassModel
+                workflowTestingEndpointsClassModel, workflowTestResultClassModel,
+                cappedSetClassModel
         ).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
@@ -103,7 +106,8 @@ public class DaoInit {
             new EnumCodec<>(TestingEndpoints.Type.class),
             new EnumCodec<>(TestingRun.State.class),
             new EnumCodec<>(AccountSettings.SetupType.class),
-            new EnumCodec<>(WorkflowNodeDetails.Type.class)
+            new EnumCodec<>(WorkflowNodeDetails.Type.class),
+            new EnumCodec<>(SingleTypeInfo.Domain.class)
         );
 
         CodecRegistry codecRegistry = fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry, customEnumCodecs);

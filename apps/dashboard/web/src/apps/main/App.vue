@@ -171,7 +171,7 @@
     display: flex
 
 .no-border
-    border: unset! important    
+    border: unset !important
 
 .float-right
     float: right
@@ -181,4 +181,6 @@
 
 .white-background
     background-color: #FFFFFF    
+.fs-12
+    font-size: 12px
 </style>
