@@ -106,6 +106,8 @@ public class RedactSampleData {
         BasicDBObject req = new BasicDBObject();
         if (request != null) {
             req.put("url", request.getUrl());
+            req.put("method", request.getMethod());
+            req.put("type", request.getType());
             req.put("queryParams", request.getQueryParams());
             req.put("body", request.getBody());
             req.put("headers", convertHeaders(request.getHeaders()));

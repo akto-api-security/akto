@@ -40,10 +40,10 @@ const WorkflowResultsDrawer = (props) => {
     const navBarContent = () => {
         return  (
             <Grid container spacing={2} style={{ height: "75px", lineHeight: "60px" }}>
-                <Grid item xs={10} style={{textAlign: "center", fontWeight: "bold", fontSize: "20px"}} >
+                <Grid item xs={12} style={{textAlign: "center", fontWeight: "bold", fontSize: "20px"}} >
                     Test Results
                 </Grid>
-                <Grid item xs={2} style={{fontSize: "14px", fontStyle: "italic"}}>
+                <Grid item xs={12} style={{fontSize: "14px", fontStyle: "italic", position: "absolute", top: "0px", right: "8px"}}>
                     {testStatus()}
                 </Grid>
                 <Grid item xs={12} style={{padding: 0, margin:0}}>

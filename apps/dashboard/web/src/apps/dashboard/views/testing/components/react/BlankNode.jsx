@@ -18,8 +18,22 @@ const BlankNode = (nodeData) => {
 
     let [endpointDetails, setEndpointDetails] = React.useState(nodeEndpointMap[nodeData.id])
 
-    const onEndpointChange = (event, endpointData) => {
-        let newEndpointData = {...endpointData, updatedSampleData: {}}
+    const fetchAndUpdateSampleData = async (endpointData) => {
+        const json = await fetchSampleDataFunc(endpointData.endpoint, endpointData.apiCollectionId, endpointData.method)
+                 
+        return json && 
+            json.sampleDataList && 
+            json.sampleDataList[0] && 
+            json.sampleDataList[0].samples && 
+            json.sampleDataList[0].samples[0] && JSON.parse(json.sampleDataList[0].samples[0]) || {}
+
+    }
+
+    const onEndpointChange = async (event, endpointData) => {
+        let s = await fetchAndUpdateSampleData(endpointData)
+        let updatedSampleData = {orig: JSON.stringify(s)}
+        let newEndpointData = {...endpointData, updatedSampleData: updatedSampleData}
+
         addNodeEndpoint(nodeData.id, newEndpointData)
         setEndpointDetails(newEndpointData)
     }
@@ -103,7 +117,7 @@ const BlankNode = (nodeData) => {
                         
                     ></Autocomplete>
                 </FormControl>}
-                {endpointDetails && <InputArgumentsDialog nodeId={nodeData.id} endpointDetails={endpointDetails} fetchSampleDataFunc={fetchSampleDataFunc} />}
+                {endpointDetails && <InputArgumentsDialog nodeId={nodeData.id} endpointDetails={endpointDetails} />}
             </div>      
             <Handle
                 type="source"

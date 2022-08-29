@@ -85,31 +85,22 @@ const RequestEditor = ({sampleApiCall, updatedSampleData, onChangeApiRequest}) =
   )
 }
 
-export default function InputArgumentsDialog({nodeId, endpointDetails, fetchSampleDataFunc}) {
+export default function InputArgumentsDialog({nodeId, endpointDetails}) {
 
   const [open, setOpen] = React.useState(false);
-  const [newSampleData, setNewSampleData] = React.useState({})
-  const [sampleData, updateSampleData] = React.useState({});
-  React.useEffect(() => {
-      const getSampleData = async () => {
-        const json = await fetchSampleDataFunc(endpointDetails.endpoint, endpointDetails.apiCollectionId, endpointDetails.method)
-               
-        updateSampleData(json && 
-          json.sampleDataList && 
-          json.sampleDataList[0] && 
-          json.sampleDataList[0].samples && 
-          json.sampleDataList[0].samples[0] && JSON.parse(json.sampleDataList[0].samples[0]) || {});
-      }
-      getSampleData();
-    }, 
-    [endpointDetails]
-  );
 
   const addNodeEndpoint = useStore(state => state.addNodeEndpoint)
   const nodeEndpointMap = useStore(state => state.nodeEndpointMap)
   const setApiType = useStore(state => state.setApiType)
   const setRedirect = useStore(state => state.setRedirect)
-  const getApiType = useStore(state => state.getApiType)
+  const [sampleData, updateSampleData] = React.useState({})
+
+  React.useEffect(() => {
+      if (!endpointDetails) return;
+      let updatedSampleData = endpointDetails["updatedSampleData"]
+      if (!updatedSampleData) return;
+      updateSampleData(JSON.parse(updatedSampleData["orig"]) || {})
+  }, [endpointDetails])
 
   const onChangeApiRequest = (key, newData) => {
     let currNewSampleData = {orig: JSON.stringify(sampleData)}
