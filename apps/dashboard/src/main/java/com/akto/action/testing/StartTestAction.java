@@ -23,14 +23,14 @@ public class StartTestAction extends UserAction {
     private int apiCollectionId;
     private List<ApiInfo.ApiInfoKey> apiInfoKeyList;
 
-    public String startTest() {
+    private TestingRun createTestingRun(int scheduleTimestamp) {
         User user = getSUser();
         int testIdConfig = 0;
 
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
         if (authMechanism == null) {
             addActionError("Please set authentication mechanism before you test any APIs");
-            return ERROR.toUpperCase();
+            return null;
         }
 
         TestingEndpoints testingEndpoints;
@@ -38,7 +38,7 @@ public class StartTestAction extends UserAction {
             case CUSTOM:
                 if (this.apiInfoKeyList == null || this.apiInfoKeyList.isEmpty())  {
                     addActionError("APIs list can't be empty");
-                    return ERROR.toUpperCase();
+                    return null;
                 }
                 testingEndpoints = new CustomTestingEndpoints(apiInfoKeyList);
                 break;
@@ -47,15 +47,26 @@ public class StartTestAction extends UserAction {
                 break;
             default:
                 addActionError("Invalid APIs type");
-                return ERROR.toUpperCase();
+                return null;
         }
 
-        // 65 seconds added to give testing module time to get the latest sample messages (which runs every 60 secs)
         TestingRun testingRun = new TestingRun(
-                Context.now()+65, user.getLogin(), testingEndpoints, testIdConfig, TestingRun.State.SCHEDULED
+            scheduleTimestamp, user.getLogin(), testingEndpoints, testIdConfig, TestingRun.State.SCHEDULED
         );
 
-        TestingRunDao.instance.insertOne(testingRun);
+        return testingRun;   
+    }
+
+    public String startTest() {
+        // 65 seconds added to give testing module time to get the latest sample messages (which runs every 60 secs)
+        TestingRun testingRun = createTestingRun(Context.now() + 65);
+
+        if (testingRun == null) {
+            return ERROR.toUpperCase();
+        } else {
+            TestingRunDao.instance.insertOne(testingRun);
+        }
+        
         this.retrieveAllCollectionTests();
         return SUCCESS.toUpperCase();
     }
@@ -126,9 +137,13 @@ public class StartTestAction extends UserAction {
     List<TestingSchedule> testingSchedules = null;
     public String scheduleTest() {
         String author = getSUser().getLogin();
+        TestingRun testingRun = createTestingRun(-1);
+        if (testingRun == null) {
+            return ERROR.toUpperCase();
+        }
+        
         int now = Context.now();
-        TestingRun sampleTestingRun = new TestingRun(-1, author, new CollectionWiseTestingEndpoints(apiCollectionId), 0, TestingRun.State.SCHEDULED);
-        TestingSchedule ts = new TestingSchedule(author, now, author, now, now, startTimestamp, recurringDaily, sampleTestingRun);
+        TestingSchedule ts = new TestingSchedule(author, now, author, now, now, startTimestamp, recurringDaily, testingRun);
         TestingSchedulesDao.instance.insertOne(ts);
         this.testingSchedules = TestingSchedulesDao.instance.findAll(new BasicDBObject());
         return SUCCESS.toUpperCase();
