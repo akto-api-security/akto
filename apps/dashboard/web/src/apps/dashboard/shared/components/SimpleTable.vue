@@ -435,6 +435,8 @@ export default {
 
 .table-sub-header
     position: relative
+    color: #47466A90
+    font-weight: 500
 
 .filter-icon
     color: #6200EA !important
