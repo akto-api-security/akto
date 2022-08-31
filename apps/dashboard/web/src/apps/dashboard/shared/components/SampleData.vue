@@ -134,7 +134,7 @@ export default {
                 responsePayloadString = message["response"]["body"] || "{}"
             } else {
                 responseHeadersString = message["responseHeaders"] || "{}"
-                responsePayloadString = message["responseHeaders"] || "{}"
+                responsePayloadString = message["responsePayload"] || "{}"
             }
 
             let responseHeaders = {};
