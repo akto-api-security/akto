@@ -1,27 +1,30 @@
 package com.akto.testing;
 
-import com.akto.dao.context.Context;
-import com.akto.dto.HttpRequestParams;
-import com.akto.dto.HttpResponseParams;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.type.URLMethods;
-import com.akto.parsers.HttpCallParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mongodb.BasicDBObject;
 import kotlin.Pair;
 import okhttp3.*;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 public class ApiExecutor {
 
     private static final ObjectMapper mapper = new ObjectMapper();
-    private static final OkHttpClient client = new OkHttpClient().newBuilder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .build();
 
-    public static HttpResponseParams common(Request request) throws Exception {
+    public static OriginalHttpResponse common(Request request, boolean followRedirects) throws Exception {
+
+        OkHttpClient client = new OkHttpClient().newBuilder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .followRedirects(followRedirects)
+                .build();
+
         Call call = client.newCall(request);
         Response response = null;
         String body;
@@ -48,7 +51,6 @@ public class ApiExecutor {
 
 
         int statusCode = response.code();
-        String status = response.message();
         Headers headers = response.headers();
         Iterator<Pair<String, String>> headersIterator = headers.iterator();
         Map<String, List<String>> responseHeaders = new HashMap<>();
@@ -62,54 +64,25 @@ public class ApiExecutor {
             responseHeaders.get(headerKey).add(headerValue);
         }
 
-        return new HttpResponseParams("", statusCode, status, responseHeaders, body, null, Context.now(), 1_000_000+"", false, HttpResponseParams.Source.OTHER, "", "");
+        return new OriginalHttpResponse(body, responseHeaders, statusCode);
     }
 
-    public static String makeUrlAbsolute(String url, Map<String, List<String>> reqHeaders) throws Exception {
-        // get host from header
-        List<String> hostHeaderValue = reqHeaders.get("host");
-        if (hostHeaderValue == null || hostHeaderValue.size() == 0) throw new Exception("Host not found");
-        String host = hostHeaderValue.get(0);
-        if (host == null) throw new Exception("Host not found");
-        if (!url.startsWith("/")) url = "/" + url;
-        if (host.endsWith("/")) host = host.substring(0, host.length()-1);
 
-        host = host.toLowerCase();
-        if (!host.startsWith("http")) {
-            List<String> protocolValues = reqHeaders.get("x-forwarded-proto");
-            if (protocolValues != null && protocolValues.size() > 0) {
-                String protocol = protocolValues.get(0);
-                host = protocol + "://" + host;
-            } else {
-                String firstChar = host.split("")[0];
-                try {
-                    Integer.parseInt(firstChar);
-                    host = "http://" + host;
-                } catch (Exception e) {
-                    host = "https://" + host;
-                }
-            }
-        }
-
-        url = host + url;
-
-        return url;
-    }
-
-    public static HttpResponseParams sendRequest(HttpRequestParams httpRequestParams) throws Exception {
+    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects) throws Exception {
         // don't lowercase url because query params will change and will result in incorrect request
-        String url = httpRequestParams.url;
+        String url = request.getUrl();
         url = url.trim();
         if (!url.startsWith("http")) {
-            url = makeUrlAbsolute(url, httpRequestParams.getHeaders());
+            url = OriginalHttpRequest.makeUrlAbsolute(url, request.findHostFromHeader(), request.findProtocolFromHeader());
         }
-        httpRequestParams.url = url;
+
+        request.setUrl(url);
 
         Request.Builder builder = new Request.Builder();
 
         // add headers
         List<String> forbiddenHeaders = Arrays.asList("content-length", "accept-encoding");
-        Map<String, List<String>> headersMap = httpRequestParams.getHeaders();
+        Map<String, List<String>> headersMap = request.getHeaders();
         if (headersMap == null) headersMap = new HashMap<>();
         for (String headerName: headersMap.keySet()) {
             if (forbiddenHeaders.contains(headerName)) continue;
@@ -121,14 +94,14 @@ public class ApiExecutor {
             }
         }
 
-        URLMethods.Method method = URLMethods.Method.fromString(httpRequestParams.getMethod());
+        URLMethods.Method method = URLMethods.Method.fromString(request.getMethod());
 
-        builder = builder.url(url);
+        builder = builder.url(request.getFullUrlWithParams());
 
-        HttpResponseParams httpResponseParams = null;
+        OriginalHttpResponse response = null;
         switch (method) {
             case GET:
-                httpResponseParams = getRequest(httpRequestParams, builder);
+                response = getRequest(request, builder, followRedirects);
                 break;
             case POST:
             case PUT:
@@ -137,27 +110,62 @@ public class ApiExecutor {
             case OPTIONS:
             case PATCH:
             case TRACE:
-                httpResponseParams = sendWithRequestBody(httpRequestParams, builder);
+                response = sendWithRequestBody(request, builder, followRedirects);
                 break;
             case OTHER:
                 throw new Exception("Invalid method name");
         }
 
-        httpResponseParams.requestParams = httpRequestParams;
-        return httpResponseParams;
-    }
-
-    public static HttpResponseParams getRequest(HttpRequestParams httpRequestParams, Request.Builder builder)  throws Exception{
-        Request request = builder.build();
-        return common(request);
+        return response;
     }
 
 
-    public static HttpResponseParams sendWithRequestBody(HttpRequestParams httpRequestParams, Request.Builder builder) throws Exception {
-        RequestBody body = RequestBody.create(httpRequestParams.getPayload(), MediaType.parse("application/json; charset=utf-8"));
-        builder = builder.method(httpRequestParams.getMethod(), body);
-        Request request = builder.build();
-        return common(request);
+    public static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects)  throws Exception{
+        Request okHttpRequest = builder.build();
+        return common(okHttpRequest, followRedirects);
+    }
+
+    public static String getRawQueryFromJson(String requestPayload) {
+        HttpUrl.Builder builder = new HttpUrl.Builder()
+                .scheme("https")
+                .host("www.google.com");
+
+        BasicDBObject obj = BasicDBObject.parse(requestPayload);
+        Set<String> keySet = obj.keySet();
+        if (keySet.isEmpty()) return null;
+
+        for(String key: keySet) {
+            Object val = obj.get(key);
+            builder.addQueryParameter(key, val.toString());
+        }
+
+        URI uri = builder.build().uri();
+
+        return uri.getRawQuery();
+    }
+
+
+    public static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects) throws Exception {
+        Map<String,List<String>> headers = request.getHeaders();
+        if (headers == null) {
+            headers = new HashMap<>();
+            request.setHeaders(headers);
+        }
+
+        String contentType = request.findContentType();
+        String payload = request.getBody();
+        if (contentType == null ) {
+            contentType = "application/json; charset=utf-8";
+            if (payload == null) payload = "{}";
+            payload = payload.trim();
+            if (!payload.startsWith("[") && !payload.startsWith("{")) payload = "{}";
+        }
+
+        if (payload == null) payload = "";
+        RequestBody body = RequestBody.create(payload, MediaType.parse(contentType));
+        builder = builder.method(request.getMethod(), body);
+        Request okHttpRequest = builder.build();
+        return common(okHttpRequest, followRedirects);
     }
 
 }

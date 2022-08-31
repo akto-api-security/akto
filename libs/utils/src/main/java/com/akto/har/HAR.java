@@ -54,10 +54,6 @@ public class HAR {
         List<HarHeader> requestHarHeaders = request.getHeaders();
         List<HarHeader> responseHarHeaders = response.getHeaders();
 
-        if (!isApiRequest(responseHarHeaders)) {
-            return null;
-        }
-
         Map<String,String> requestHeaderMap = convertHarHeadersToMap(requestHarHeaders);
         Map<String,String> responseHeaderMap = convertHarHeadersToMap(responseHarHeaders);
 
@@ -67,7 +63,6 @@ public class HAR {
         if (requestContentType == null) {
             // get request data from querystring
             Map<String,Object> paramMap = new HashMap<>();
-            addQueryStringToMap(request.getQueryString(), paramMap);
             requestPayload = mapper.writeValueAsString(paramMap);
         } else if (requestContentType.contains(JSON_CONTENT_TYPE)) {
             String postData = request.getPostData().getText();
@@ -79,7 +74,6 @@ public class HAR {
                 requestPayload = postData;
             } else {
                 Map<String,Object> paramMap = mapper.readValue(postData, new TypeReference<HashMap<String,Object>>() {});
-                addQueryStringToMap(request.getQueryString(), paramMap);
                 requestPayload = mapper.writeValueAsString(paramMap);
             }
         } else if (requestContentType.contains(FORM_URL_ENCODED_CONTENT_TYPE)) {
@@ -165,10 +159,6 @@ public class HAR {
     public static String getPath(HarRequest request) throws Exception {
         String path = request.getUrl();
         if (path == null) throw new Exception("url path is null in har");
-        String[] pathSplit = path.split("\\?");
-        if (pathSplit.length != 0) {
-            path = pathSplit[0];
-        }
         return path;
     }
 

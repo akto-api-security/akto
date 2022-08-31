@@ -83,7 +83,13 @@ public class APICatalogSync {
         if (!responseParams.getIsPending()) {
             requestTemplate.processTraffic(responseParams.getTime());
         }
-        if (statusCode >= 200 && statusCode < 300) {
+        if (HttpResponseParams.validHttpResponseCode(statusCode)) {
+            String reqPayload = requestParams.getPayload();
+
+            if (reqPayload == null || reqPayload.isEmpty()) {
+                reqPayload = "{}";
+            }
+
             requestTemplate.processHeaders(requestParams.getHeaders(), baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap);
             BasicDBObject payload = RequestTemplate.parseRequestPayload(requestParams, urlWithParams);
             if (payload != null) {

@@ -20,6 +20,7 @@ import javax.servlet.http.HttpServletRequest;
 
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -33,7 +34,7 @@ public class ApiTokenAction extends UserAction implements ServletRequestAware {
         if (apiKey == null || apiKey.length() != keyLength) return ERROR.toUpperCase();
 
         ApiToken apiToken = new ApiToken(Context.now(),Context.accountId.get(),"burp_key",apiKey, Context.now(), username, ApiToken.Utility.BURP,
-                Collections.singletonList("/api/uploadHar"));
+                Arrays.asList("/api/uploadHar", "/api/importInBurp"));
         ApiTokensDao.instance.insertOne(apiToken);
         apiTokenList = new ArrayList<>();
         apiTokenList.add(apiToken);

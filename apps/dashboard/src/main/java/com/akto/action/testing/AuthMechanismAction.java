@@ -1,15 +1,19 @@
 package com.akto.action.testing;
 
+import com.akto.DaoInit;
 import com.akto.action.UserAction;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.SampleDataDao;
+import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dto.testing.*;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -45,44 +49,7 @@ public class AuthMechanismAction extends UserAction {
 
     List<TestingRunResult> testingRunResults;
     public String fetchTestingRunResults() {
-        BasicDBObject query = new BasicDBObject("testingEndpoints.type", "COLLECTION_WISE");
-        List<TestingRun> testingRuns = TestingRunDao.instance.findAll(query);
-        Map<Integer, TestingRun> tests = new HashMap<>();
-        Set<ObjectId> testRunIdSet = new HashSet<>();
-
-        for(TestingRun test : testingRuns) {
-            TestingEndpoints testingEndpoints = test.getTestingEndpoints();
-            if (testingEndpoints instanceof CollectionWiseTestingEndpoints) {
-                CollectionWiseTestingEndpoints collectionWiseEndpoints = (CollectionWiseTestingEndpoints) testingEndpoints;
-                
-                int key = collectionWiseEndpoints.getApiCollectionId();
-                TestingRun testingRunForCollection = tests.get(key);
-                if (testingRunForCollection == null) {
-                    tests.put(key, test);
-                    testRunIdSet.add(test.getId());
-                } else if (testingRunForCollection.getScheduleTimestamp() < test.getScheduleTimestamp()) {
-                    tests.put(key, test);
-                    testRunIdSet.add(test.getId());
-                    testRunIdSet.remove(testingRunForCollection.getId());
-                }
-            }
-        }
-
-
-        Bson filter = Filters.in("testRunId", testRunIdSet);
-
-        this.testingRunResults = TestingRunResultDao.instance.findAll(filter);
-
-        for(TestingRunResult testingRunResult: this.testingRunResults) {
-            testingRunResult.setHexId(testingRunResult.getId().toString());
-            Map<String, TestResult> testResultMap = testingRunResult.getResultMap();
-            if (testResultMap != null) {
-                for(TestResult testResult: testResultMap.values()) {
-                    testResult.setMessage("");
-                }
-            }
-        }
-
+        testingRunResults = TestingRunResultDao.instance.fetchLatestTestingRunResult();
         return SUCCESS.toUpperCase();
     }
 
@@ -96,6 +63,26 @@ public class AuthMechanismAction extends UserAction {
 
         this.testingRunResults = TestingRunResultDao.instance.findAll(Filters.in("_id", testRunResultIds));
 
+
+        return SUCCESS.toUpperCase();
+    }
+
+
+    private int workflowTestId;
+    private WorkflowTestResult workflowTestResult;
+    private TestingRun workflowTestingRun;
+    public String fetchWorkflowResult() {
+        workflowTestingRun = TestingRunDao.instance.findLatestOne(
+                Filters.eq(TestingRun._TESTING_ENDPOINTS+"."+WorkflowTestingEndpoints._WORK_FLOW_TEST+"._id", workflowTestId)
+        );
+
+        if (workflowTestingRun == null) {
+            return SUCCESS.toUpperCase();
+        }
+
+        workflowTestResult  = WorkflowTestResultsDao.instance.findOne(
+                Filters.eq(WorkflowTestResult._TEST_RUN_ID, workflowTestingRun.getId())
+        );
 
         return SUCCESS.toUpperCase();
     }
@@ -131,4 +118,17 @@ public class AuthMechanismAction extends UserAction {
     public void setValue(String value) {
         this.value = value;
     }
+
+    public void setWorkflowTestId(int workflowTestId) {
+        this.workflowTestId = workflowTestId;
+    }
+
+    public WorkflowTestResult getWorkflowTestResult() {
+        return workflowTestResult;
+    }
+
+    public TestingRun getWorkflowTestingRun() {
+        return workflowTestingRun;
+    }
+
 }

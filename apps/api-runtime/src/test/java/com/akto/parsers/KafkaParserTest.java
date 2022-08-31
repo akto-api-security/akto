@@ -6,8 +6,7 @@ import org.junit.Test;
 
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class KafkaParserTest {
     private final static Gson gson = new Gson();
@@ -23,6 +22,8 @@ public class KafkaParserTest {
             e.printStackTrace();
         }
         assertNotNull(httpResponseParams);
+        assertEquals(1, httpResponseParams.getHeaders().size());
+        assertEquals(12, httpResponseParams.requestParams.getHeaders().size());
 
     }
 

@@ -73,6 +73,8 @@ public class DaoInit {
         ClassModel<TestingEndpoints> testingEndpointsClassModel = ClassModel.builder(TestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<CustomTestingEndpoints> customTestingEndpointsClassModel = ClassModel.builder(CustomTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<CollectionWiseTestingEndpoints> collectionWiseTestingEndpointsClassModel = ClassModel.builder(CollectionWiseTestingEndpoints.class).enableDiscriminator(true).build();
+        ClassModel<WorkflowTestingEndpoints>  workflowTestingEndpointsClassModel = ClassModel.builder(WorkflowTestingEndpoints.class).enableDiscriminator(true).build();
+        ClassModel<WorkflowTestResult>  workflowTestResultClassModel = ClassModel.builder(WorkflowTestResult.class).enableDiscriminator(true).build();
         ClassModel<CappedSet> cappedSetClassModel = ClassModel.builder(CappedSet.class).enableDiscriminator(true).build();
 
 
@@ -86,6 +88,7 @@ public class DaoInit {
                 equalsToPredicateClassModel, isNumberPredicateClassModel, testingRunClassModel, testingRunResultClassModel, testResultClassModel,
                 authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel,
                 testingEndpointsClassModel, customTestingEndpointsClassModel, collectionWiseTestingEndpointsClassModel,
+                workflowTestingEndpointsClassModel, workflowTestResultClassModel,
                 cappedSetClassModel
         ).automatic(true).build());
 
@@ -103,6 +106,7 @@ public class DaoInit {
             new EnumCodec<>(TestingEndpoints.Type.class),
             new EnumCodec<>(TestingRun.State.class),
             new EnumCodec<>(AccountSettings.SetupType.class),
+            new EnumCodec<>(WorkflowNodeDetails.Type.class),
             new EnumCodec<>(SingleTypeInfo.Domain.class)
         );
 

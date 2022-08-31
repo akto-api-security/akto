@@ -3,6 +3,8 @@ package com.akto.testing;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.TestingRun;
+import com.akto.dto.testing.WorkflowTest;
+import com.akto.dto.testing.WorkflowTestingEndpoints;
 import com.akto.rules.BOLATest;
 import com.akto.rules.NoAuthTest;
 import com.akto.store.SampleMessageStore;
@@ -21,7 +23,30 @@ public class TestExecutor {
     }
 
     private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
+
     public void init(TestingRun testingRun) {
+        if (testingRun.getTestIdConfig() == 0)     {
+            apiWiseInit(testingRun);
+        } else {
+            workflowInit(testingRun);
+        }
+    }
+
+    public void workflowInit (TestingRun testingRun) {
+        TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
+        if (!testingEndpoints.getType().equals(TestingEndpoints.Type.WORKFLOW)) {
+            logger.error("Invalid workflow type");
+            return;
+        }
+
+        WorkflowTestingEndpoints workflowTestingEndpoints = (WorkflowTestingEndpoints) testingEndpoints;
+        WorkflowTest workflowTest = workflowTestingEndpoints.getWorkflowTest();
+
+        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
+        apiWorkflowExecutor.init(workflowTest, testingRun.getId());
+    }
+
+    public void  apiWiseInit(TestingRun testingRun) {
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
         SampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);

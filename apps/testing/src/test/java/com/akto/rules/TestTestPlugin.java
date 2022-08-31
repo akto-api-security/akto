@@ -6,6 +6,7 @@ import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.type.SingleTypeInfo;
@@ -108,8 +109,8 @@ public class TestTestPlugin extends MongoBasedTest {
         insertIntoStiMap(apiInfoKey1,"param3", SingleTypeInfo.GENERIC, false, true);
 
         String payload1 = "{\"param1\": \"avneesh@akto.io\", \"param2\": \"ankush\"}";
-        HttpRequestParams httpRequestParams1 = buildHttpReq("/api/books?param3=ankita", apiInfoKey1.getMethod().name(), apiInfoKey1.getApiCollectionId(), payload1);
-        TestPlugin.ContainsPrivateResourceResult result1 = bolaTest.containsPrivateResource(httpRequestParams1, apiInfoKey1);
+        OriginalHttpRequest originalHttpRequest1 = new OriginalHttpRequest("/api/books", "param3=ankita", apiInfoKey1.getMethod().name(), payload1, new HashMap<>(), "");
+        TestPlugin.ContainsPrivateResourceResult result1 = bolaTest.containsPrivateResource(originalHttpRequest1, apiInfoKey1);
         assertEquals(3, result1.singleTypeInfos.size());
         assertEquals(3, result1.findPrivateOnes().size());
         assertTrue(result1.isPrivate);
@@ -122,8 +123,8 @@ public class TestTestPlugin extends MongoBasedTest {
         insertIntoStiMap(apiInfoKey2,"param1", SingleTypeInfo.GENERIC, false, true);
         insertIntoStiMap(apiInfoKey2,"param2", SingleTypeInfo.GENERIC, false,false);
         String payload2 = "{\"param1\": \"Ronaldo\", \"param2\": \"Messi\"}";
-        HttpRequestParams httpRequestParams2 = buildHttpReq("/api/INTEGER/cars/STRING", apiInfoKey2.getMethod().name(), apiInfoKey2.getApiCollectionId(), payload2);
-        TestPlugin.ContainsPrivateResourceResult result2 = bolaTest.containsPrivateResource(httpRequestParams2, apiInfoKey2);
+        OriginalHttpRequest originalHttpRequest2 = new OriginalHttpRequest("/api/INTEGER/cars/STRING", null ,apiInfoKey2.getMethod().name(), payload2, new HashMap<>(), "");
+        TestPlugin.ContainsPrivateResourceResult result2 = bolaTest.containsPrivateResource(originalHttpRequest2, apiInfoKey2);
         assertEquals(4, result2.singleTypeInfos.size());
         assertFalse(result2.isPrivate);
         assertEquals(2, result2.findPrivateOnes().size());
@@ -132,9 +133,8 @@ public class TestTestPlugin extends MongoBasedTest {
         ApiInfo.ApiInfoKey apiInfoKey3 = new ApiInfo.ApiInfoKey(123, "/api/bus", URLMethods.Method.GET);
 
         String payload3 = "{\"param1\": \"Ronaldo\", \"param2\": \"Messi\"}";
-        HttpRequestParams httpRequestParams3 = buildHttpReq("/api/bus", apiInfoKey3.getMethod().name(), apiInfoKey3.getApiCollectionId(), payload3);
-
-        TestPlugin.ContainsPrivateResourceResult result3 = bolaTest.containsPrivateResource(httpRequestParams3, apiInfoKey3);
+        OriginalHttpRequest originalHttpRequest3 = new OriginalHttpRequest("/api/bus", null, apiInfoKey3.method.name(), payload3, new HashMap<>(), "");
+        TestPlugin.ContainsPrivateResourceResult result3 = bolaTest.containsPrivateResource(originalHttpRequest3, apiInfoKey3);
         assertEquals(0, result3.singleTypeInfos.size());
         assertTrue(result3.isPrivate);
         assertEquals(0, result3.findPrivateOnes().size());
@@ -143,9 +143,8 @@ public class TestTestPlugin extends MongoBasedTest {
         ApiInfo.ApiInfoKey apiInfoKey4 = new ApiInfo.ApiInfoKey(123, "/api/toys", URLMethods.Method.GET);
 
         String payload4 = "{}";
-        HttpRequestParams httpRequestParams4 = buildHttpReq("/api/toys", apiInfoKey4.getMethod().name(), apiInfoKey4.getApiCollectionId(), payload4);
-
-        TestPlugin.ContainsPrivateResourceResult result4 = bolaTest.containsPrivateResource(httpRequestParams4, apiInfoKey4);
+        OriginalHttpRequest originalHttpRequest4 = new OriginalHttpRequest("/api/toys",null, apiInfoKey4.getMethod().name(), payload4, new HashMap<>(), "");
+        TestPlugin.ContainsPrivateResourceResult result4 = bolaTest.containsPrivateResource(originalHttpRequest4, apiInfoKey4);
         assertEquals(0, result4.singleTypeInfos.size());
         assertFalse(result4.isPrivate);
         assertEquals(0, result4.findPrivateOnes().size());

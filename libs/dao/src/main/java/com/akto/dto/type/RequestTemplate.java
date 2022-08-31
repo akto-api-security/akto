@@ -12,6 +12,7 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.HttpResponseParams;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.traffic.Key;
@@ -562,7 +563,7 @@ public class RequestTemplate {
         }
 
         for (int aStatus: a.getResponseTemplates().keySet()) {
-            if (aStatus >= 200 && aStatus < 300) {
+            if (HttpResponseParams.validHttpResponseCode(aStatus)) {
                 if (!b.getResponseTemplates().containsKey(aStatus)) {
                     return false;
                 }
@@ -570,7 +571,7 @@ public class RequestTemplate {
         }
 
         for (int bStatus: b.getResponseTemplates().keySet()) {
-            if (bStatus >= 200 && bStatus < 300) {
+            if (HttpResponseParams.validHttpResponseCode(bStatus)) {
                 if (!a.getResponseTemplates().containsKey(bStatus)) {
                     return false;
                 }
@@ -579,7 +580,7 @@ public class RequestTemplate {
 
         boolean has2XXStatus = false;
         for (int aStatus: a.getResponseTemplates().keySet()) {
-            if (aStatus >= 200 && aStatus < 300) {
+            if (HttpResponseParams.validHttpResponseCode(aStatus)) {
                 has2XXStatus = true;
                 RequestTemplate aResp = a.getResponseTemplates().get(aStatus);
                 RequestTemplate bResp = b.getResponseTemplates().get(aStatus);
@@ -602,8 +603,14 @@ public class RequestTemplate {
     }
 
     public static BasicDBObject parseRequestPayload(HttpRequestParams requestParams, String urlWithParams) {
-
         String reqPayload = requestParams.getPayload();
+
+        return parseRequestPayload(reqPayload, urlWithParams);
+    }
+
+    public static BasicDBObject parseRequestPayload(String reqPayload, String urlWithParams) {
+
+        BasicDBObject queryParams = getQueryJSON(urlWithParams);
 
         if (reqPayload == null || reqPayload.isEmpty()) {
             reqPayload = "{}";
@@ -613,7 +620,6 @@ public class RequestTemplate {
             reqPayload = "{\"json\": "+reqPayload+"}";
         }
 
-        BasicDBObject queryParams = getQueryJSON(urlWithParams);
 
         BasicDBObject payload = null;
         try {

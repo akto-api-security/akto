@@ -5,9 +5,11 @@ import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingSchedulesDao;
+import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.TestingEndpoints.Type;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -22,15 +24,16 @@ public class StartTestAction extends UserAction {
     private TestingEndpoints.Type type;
     private int apiCollectionId;
     private List<ApiInfo.ApiInfoKey> apiInfoKeyList;
+    private int testIdConfig;
+    private int workflowTestId;
 
-    public String startTest() {
+    private TestingRun createTestingRun(int scheduleTimestamp) {
         User user = getSUser();
-        int testIdConfig = 0;
 
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
-        if (authMechanism == null) {
+        if (authMechanism == null && testIdConfig == 0) {
             addActionError("Please set authentication mechanism before you test any APIs");
-            return ERROR.toUpperCase();
+            return null;
         }
 
         TestingEndpoints testingEndpoints;
@@ -38,24 +41,48 @@ public class StartTestAction extends UserAction {
             case CUSTOM:
                 if (this.apiInfoKeyList == null || this.apiInfoKeyList.isEmpty())  {
                     addActionError("APIs list can't be empty");
-                    return ERROR.toUpperCase();
+                    return null;
                 }
                 testingEndpoints = new CustomTestingEndpoints(apiInfoKeyList);
                 break;
             case COLLECTION_WISE:
                 testingEndpoints = new CollectionWiseTestingEndpoints(apiCollectionId);
                 break;
+            case WORKFLOW:
+                WorkflowTest workflowTest = WorkflowTestsDao.instance.findOne(Filters.eq("_id", this.workflowTestId));
+                if (workflowTest == null) {
+                    addActionError("Couldn't find workflow test");
+                    return null;
+                }
+                testingEndpoints = new WorkflowTestingEndpoints(workflowTest);
+                testIdConfig = 1;
+                break;
             default:
                 addActionError("Invalid APIs type");
-                return ERROR.toUpperCase();
+                return null;
         }
 
-        // 65 seconds added to give testing module time to get the latest sample messages (which runs every 60 secs)
         TestingRun testingRun = new TestingRun(
-                Context.now()+65, user.getLogin(), testingEndpoints, testIdConfig, TestingRun.State.SCHEDULED
+            scheduleTimestamp, user.getLogin(), testingEndpoints, testIdConfig, TestingRun.State.SCHEDULED
         );
 
-        TestingRunDao.instance.insertOne(testingRun);
+        return testingRun;   
+    }
+
+    public String startTest() {
+        // 65 seconds added to give testing module time to get the latest sample messages (which runs every 60 secs)
+        int scheduleTimestamp = Context.now() + 65;
+        // But if workflow test then run immediately
+        if (type.equals(Type.WORKFLOW)) scheduleTimestamp = Context.now();
+        
+        TestingRun testingRun = createTestingRun(scheduleTimestamp);
+
+        if (testingRun == null) {
+            return ERROR.toUpperCase();
+        } else {
+            TestingRunDao.instance.insertOne(testingRun);
+        }
+        
         this.retrieveAllCollectionTests();
         return SUCCESS.toUpperCase();
     }
@@ -126,9 +153,13 @@ public class StartTestAction extends UserAction {
     List<TestingSchedule> testingSchedules = null;
     public String scheduleTest() {
         String author = getSUser().getLogin();
+        TestingRun testingRun = createTestingRun(-1);
+        if (testingRun == null) {
+            return ERROR.toUpperCase();
+        }
+        
         int now = Context.now();
-        TestingRun sampleTestingRun = new TestingRun(-1, author, new CollectionWiseTestingEndpoints(apiCollectionId), 0, TestingRun.State.SCHEDULED);
-        TestingSchedule ts = new TestingSchedule(author, now, author, now, now, startTimestamp, recurringDaily, sampleTestingRun);
+        TestingSchedule ts = new TestingSchedule(author, now, author, now, now, startTimestamp, recurringDaily, testingRun);
         TestingSchedulesDao.instance.insertOne(ts);
         this.testingSchedules = TestingSchedulesDao.instance.findAll(new BasicDBObject());
         return SUCCESS.toUpperCase();
@@ -188,5 +219,11 @@ public class StartTestAction extends UserAction {
         return this.testingSchedules;
     }
 
+    public void setTestIdConfig(int testIdConfig) {
+        this.testIdConfig = testIdConfig;
+    }
 
+    public void setWorkflowTestId(int workflowTestId) {
+        this.workflowTestId = workflowTestId;
+    }
 }

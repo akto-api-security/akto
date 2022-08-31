@@ -23,7 +23,7 @@
                 <div class="d-flex jc-sb">
                     <div v-if="showName" class="table-name">
                       {{name}}
-                    </div>
+                    </div>                 
                     <div>
                         <slot name="massActions"/>
                     </div>
@@ -81,7 +81,6 @@
                                 :style="index == 0 ? {'padding': '2px !important'} : {}"
                         >
                             <div v-if="index > 0">
-                                
                                     <span class="table-sub-header">
                                         <span class="clickable"  @click="setSortOrInvertOrder(header)">
                                             {{header.text}} 
@@ -109,7 +108,7 @@
                                                     @selectedAll="selectedAll(header.value, $event)"
                                                 />
                                             </v-menu>
-                                        </span>
+                                        </span>                                        
                                     </span>
                                 
                             </div>
@@ -437,6 +436,16 @@ export default {
     position: absolute
     right: -35px
     top: -5px
+
+.list-header
+    border: 1px solid #47466A    
+    font-weight: 500
+    padding: 4px 6px
+    color: #47466A
+    background: white
+    opacity: 1
+    font-size: 14px
+
 </style>
 
 <style scoped>

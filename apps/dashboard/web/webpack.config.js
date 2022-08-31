@@ -87,7 +87,7 @@ module.exports = {
         }
       },
       {
-        test: /\.js$/,
+        test: /\.(js|jsx)$/,
         exclude: /node_modules\/(?!(tiptap|tiptap-utils|are-you-es5|tiptap-extensions)\/)/,
         use: {
           loader: 'babel-loader',
