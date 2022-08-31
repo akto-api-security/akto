@@ -41,23 +41,18 @@ public class StatusCodeAnalyserTest {
         StatusCodeAnalyser.result = new ArrayList<>();
         StatusCodeAnalyser.result.add(new StatusCodeAnalyser.StatusCodeIdentifier(new HashSet<>(Arrays.asList("status#code", "status#reason", "status#message", "status#type", "status#title")), "status#code"));
 
-        HttpResponseParams httpResponseParams = new HttpResponseParams();
-        httpResponseParams.statusCode = 199;
-        int statusCode = StatusCodeAnalyser.getStatusCode(httpResponseParams);
+        int statusCode = StatusCodeAnalyser.getStatusCode(null, 199);
         assertEquals(statusCode, 199);
 
-        httpResponseParams.statusCode = 300;
-        statusCode = StatusCodeAnalyser.getStatusCode(httpResponseParams);
+        statusCode = StatusCodeAnalyser.getStatusCode(null, 300);
         assertEquals(statusCode, 300);
 
-        httpResponseParams.statusCode = 204;
-        httpResponseParams.setPayload("{\"status\":{\"code\":401,\"message\":\"UNAUTHORIZED\",\"reason\":\"\",\"type\":\"\",\"title\":\"\"}}");
-        statusCode = StatusCodeAnalyser.getStatusCode(httpResponseParams);
+        String payload = "{\"status\":{\"code\":401,\"message\":\"UNAUTHORIZED\",\"reason\":\"\",\"type\":\"\",\"title\":\"\"}}";
+        statusCode = StatusCodeAnalyser.getStatusCode(payload, 204);
         assertEquals(statusCode,401);
 
-        httpResponseParams.statusCode = 204;
-        httpResponseParams.setPayload("{\"status\":{\"code\":200,\"message\":\"OK\",\"reason\":\"\",\"type\":\"\",\"title\":\"\"},\"payload\":{\"kycIdType\":\"NONE\",\"kycStatus\":\"NOT_FOUND\",\"kycUploadedTime\":\"\",\"kycRejectionReason\":\"\",\"kycRemainingAttemptCount\":60,\"kycRequired\":false}}");
-        statusCode = StatusCodeAnalyser.getStatusCode(httpResponseParams);
+        payload = "{\"status\":{\"code\":200,\"message\":\"OK\",\"reason\":\"\",\"type\":\"\",\"title\":\"\"},\"payload\":{\"kycIdType\":\"NONE\",\"kycStatus\":\"NOT_FOUND\",\"kycUploadedTime\":\"\",\"kycRejectionReason\":\"\",\"kycRemainingAttemptCount\":60,\"kycRequired\":false}}";
+        statusCode = StatusCodeAnalyser.getStatusCode(payload, 204);
         assertEquals(statusCode,200);
     }
 }

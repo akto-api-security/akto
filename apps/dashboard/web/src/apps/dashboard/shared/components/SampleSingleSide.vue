@@ -2,21 +2,32 @@
     <div class="sample-data-container">
       <div class="d-flex" style="justify-content: space-between">
         <div class="sample-data-title">{{title}}</div>
-        <v-btn plain @click="copyRequest">
-          <v-tooltip bottom>
+        <div class="copy-icon">
+          <simple-menu v-if="!simpleCopy" :items="copyMenuItems">
+            <template v-slot:activator2>
+              <v-icon
+                  size=16
+                  class="tray-button"
+              >
+                $fas_copy
+              </v-icon>
+            </template>
+          </simple-menu>
+          <v-tooltip bottom v-else>
             <template v-slot:activator='{ on, attrs }'>
               <v-icon
                   size=16
                   class="tray-button"
                   v-bind="attrs"
                   v-on="on"
+                  @click="copyRequest"
               >
                 $fas_copy
               </v-icon>
             </template>
             <span>{{tooltipValue}}</span>
           </v-tooltip>
-        </v-btn>
+        </div>
       </div>
       <div class="sample-data-line">{{firstLine}}</div>
       <!-- <div
@@ -42,11 +53,13 @@
 import obj from "@/util/obj"
 import api from "@/apps/dashboard/views/observe/inventory/api";
 import JsonViewer from "@/apps/dashboard/shared/components/JSONViewer"
+import SimpleMenu from "@/apps/dashboard/shared/components/SimpleMenu"
 
 export default {
     name: "SampleSingleSide",
     components: {
-        JsonViewer
+        JsonViewer,
+        SimpleMenu
     },
     props: {
         title: obj.strR,
@@ -55,6 +68,20 @@ export default {
         data: obj.objR,
         completeData: obj.objR,
         simpleCopy: obj.boolR
+    },
+    data() {
+      return {
+        copyMenuItems: [
+          {
+            label: "Copy as curl",
+            click: () => this.copyRequest("CURL")
+          },
+          {
+            label: "Copy as burp request",
+            click: () => this.copyRequest("BURP")
+          }
+        ]
+      }
     },
     methods: {
       copyToClipboard(text) {
@@ -86,26 +113,33 @@ export default {
           }
       },
 
-      async copyRequest() {
-        let d = "";
+      async copyRequest(type) {
+        let copyString = "";
         let snackBarMessage = ""
         if (this.simpleCopy) {
           let b = {}
           b["responsePayload"] = this.completeData ? this.completeData["responsePayload"]: {}
           b["responseHeaders"] = this.completeData ? this.completeData["responseHeaders"]: {}
           b["statusCode"] = this.completeData.statusCode
-          d = JSON.stringify(b)
+          copyString = JSON.stringify(b)
           snackBarMessage = "Response data copied to clipboard"
         } else {
-          let resp = await api.convertSampleDataToCurl(JSON.stringify(this.completeData))
-          d = resp.curlString
-          snackBarMessage = "Curl request copied to clipboard"
+          if (type === "CURL") { 
+            snackBarMessage = "Curl request copied to clipboard"
+            let resp = await api.convertSampleDataToCurl(JSON.stringify(this.completeData))
+            copyString = resp.curlString
+          } else {
+            snackBarMessage = "Burp request copied to clipboard"
+            let resp = await api.convertSampleDataToBurpRequest(JSON.stringify(this.completeData))
+            copyString = resp.burpRequest
+          }
+
           console.log("Here is your curl request")
-          console.log(d);
+          console.log(copyString);
         }
 
-        if (d) {
-          this.copyToClipboard(d)
+        if (copyString) {
+          this.copyToClipboard(copyString)
           window._AKTO.$emit('SHOW_SNACKBAR', {
             show: true,
             text: snackBarMessage,
@@ -117,7 +151,7 @@ export default {
 
     computed: {
         tooltipValue: function() {
-          return this.simpleCopy ? "Copy response values": "Copy as curl"
+          return this.simpleCopy ? "Copy response": "Copy as curl"
            
         },
         dd : function() {
@@ -174,5 +208,10 @@ export default {
 }
 .wrapper .json-view-item:not(.root-item) {
   border-left: 1px dashed lightgrey;
+}
+
+.copy-icon {
+  padding-right: 16px;
+  padding-top: 2px;
 }
 </style>

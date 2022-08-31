@@ -1,6 +1,7 @@
 package com.akto.store;
 
 import com.akto.dao.SampleDataDao;
+import com.akto.dto.*;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpRequestParams;
@@ -12,8 +13,6 @@ import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.parsers.HttpCallParser;
-import com.akto.testing.ApiExecutor;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import org.slf4j.Logger;
@@ -99,58 +98,21 @@ public class SampleMessageStore {
     }
 
 
-    public static HttpResponseParams fetchOriginalMessage(ApiInfo.ApiInfoKey apiInfoKey) {
+    public static RawApi fetchOriginalMessage(ApiInfo.ApiInfoKey apiInfoKey) {
         List<String> samples = sampleDataMap.get(apiInfoKey);
         if (samples == null || samples.isEmpty()) return null;
         String message = samples.get(0);
         try {
-            return HttpCallParser.parseKafkaMessage(message);
+            OriginalHttpRequest request = new OriginalHttpRequest();
+            request.buildFromSampleMessage(message);
+
+            OriginalHttpResponse response = new OriginalHttpResponse();
+            response.buildFromSampleMessage(message);
+
+            return new RawApi(request, response);
         } catch(Exception e) {
             return null;
         }
-    }
-
-    public static HttpRequestParams fetchPath(ApiInfo.ApiInfoKey apiInfoKey) {
-        HttpResponseParams httpResponseParams = fetchOriginalMessage(apiInfoKey);
-        if (httpResponseParams == null) return null;
-        return httpResponseParams.getRequestParams();
-    }
-
-    // TODO: if being used then make sure to add unit tests
-    public static HttpRequestParams fetchHappyPath(ApiInfo.ApiInfoKey apiInfoKey) {
-        List<String> samples = sampleDataMap.get(apiInfoKey);
-        if (samples == null || samples.isEmpty()) return null;
-
-        ListIterator<String> iter = samples.listIterator();
-        while(iter.hasNext()){
-            String message = iter.next();
-
-            int statusCode = 0;
-            HttpRequestParams httpRequestParams;
-            try {
-                HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(message);
-                httpRequestParams = httpResponseParams.getRequestParams();
-                HttpResponseParams result = ApiExecutor.sendRequest(httpRequestParams);
-                statusCode = result.getStatusCode();
-            } catch (Exception e) {
-                e.printStackTrace();
-                iter.remove();
-                continue;
-            }
-
-            // not happy path remove from list
-            if (statusCode < 200 || statusCode >= 300) {
-                iter.remove();
-            } else {
-                return httpRequestParams;
-            }
-        }
-
-        return null;
-    }
-
-    public enum State {
-        PUBLIC, PRIVATE, NA
     }
 
 }

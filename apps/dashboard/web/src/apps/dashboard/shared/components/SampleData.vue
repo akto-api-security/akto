@@ -12,7 +12,7 @@
                 <sample-single-side
                     class="flex-equal"
                     title="Request" 
-                    :firstLine='json["message"].method + " " + json["message"].path + " " + json["message"].type'
+                    :firstLine='requestFirstLine'
                     :headers="{}" 
                     :data="requestJson"
                     :complete-data="json['message']"
@@ -21,7 +21,7 @@
                 <sample-single-side 
                     class="flex-equal"                
                     title="Response" 
-                    :firstLine='json["message"].statusCode + " " + json["message"].status' 
+                    :firstLine='responseFirstLine' 
                     :headers="{}" 
                     :data="responseJson"
                     :simpleCopy="true"
@@ -54,21 +54,56 @@ export default {
         }
     },
     computed: {
+        requestFirstLine: function() {
+            let message = this.json["message"]
+            if (message["request"]) {
+                let url = message["request"]["url"]
+                let queryParams = message["request"]['queryParams']
+                if (queryParams) {
+                    url += "?" + queryParams
+                }
+                return message["request"]["method"] + " " + url + " " + message["request"]["type"]
+            } else {
+                return message.method + " " + message.path + " " + message.type
+            }
+        },
+        responseFirstLine: function() {
+            let message = this.json["message"]
+            if (message["response"]) {
+                return message["response"]["statusCode"] + ""
+            } else {
+                return message.statusCode + " " + message.status
+            }
+        },
         requestJson: function() {
             let result = {}
             let requestHeaders = {}
+            let message = this.json["message"]
+
+            let requestHeadersString = "{}"
+            let requestPayloadString = "{}"
+            if (message["request"]) {
+                requestHeadersString = message["request"]["headers"] || "{}"
+                requestPayloadString = message["request"]["body"] || "{}"
+            } else {
+                requestHeadersString = message["requestHeaders"] || "{}"
+                requestPayloadString = message["requestPayload"] || "{}"
+            }
+
             try {
-              requestHeaders = JSON.parse(this.json["message"]["requestHeaders"] || "{}")
+              requestHeaders = JSON.parse(requestHeadersString)
             } catch (e) {
               // eat it
             }
+
             let requestPayload = {}
-          try {
-            requestPayload = JSON.parse(this.json["message"]["requestPayload"] || "{}")
-          } catch (e) {
-            // eat it
-          }
-          result["json"] = {"requestHeaders": requestHeaders, "requestPayload": requestPayload}
+            try {
+                requestPayload = JSON.parse(requestPayloadString)
+            } catch (e) {
+                // eat it
+            }
+
+            result["json"] = {"requestHeaders": requestHeaders, "requestPayload": requestPayload}
             result["highlightPaths"] = {}
             for (const x of this.json["highlightPaths"]) {
               if (x["responseCode"] === -1) {
@@ -87,15 +122,27 @@ export default {
         },
         responseJson: function() {
             let result = {}
+            let message = this.json["message"]
+
+            let responseHeadersString = "{}"
+            let responsePayloadString = "{}"
+            if (message["request"]) {
+                responseHeadersString = message["response"]["headers"] || "{}"
+                responsePayloadString = message["response"]["body"] || "{}"
+            } else {
+                responseHeadersString = message["responseHeaders"] || "{}"
+                responsePayloadString = message["responseHeaders"] || "{}"
+            }
+
             let responseHeaders = {};
             try {
-              responseHeaders = JSON.parse(this.json["message"]["responseHeaders"] || "{}")
+              responseHeaders = JSON.parse(responseHeadersString)
             } catch (e) {
               // eat it
             }
             let responsePayload = {}
             try {
-              responsePayload = JSON.parse(this.json["message"]["responsePayload"] || "{}")
+              responsePayload = JSON.parse(responsePayloadString)
             } catch (e) {
               // eat it
             }

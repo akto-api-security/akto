@@ -1,19 +1,15 @@
 package com.akto.rules;
 
-import com.akto.dto.ApiInfo;
-import com.akto.dto.HttpRequestParams;
-import com.akto.dto.HttpResponseParams;
+import com.akto.dto.*;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
-import com.akto.dto.type.SingleTypeInfo;
 import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.StatusCodeAnalyser;
 import org.bson.types.ObjectId;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
 
 public class BOLATest extends TestPlugin {
 
@@ -21,11 +17,14 @@ public class BOLATest extends TestPlugin {
 
     @Override
     public boolean start(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId) {
-        HttpResponseParams originalHttpResponseParams = SampleMessageStore.fetchOriginalMessage(apiInfoKey);
-        if (originalHttpResponseParams == null) {
+        RawApi rawApi = SampleMessageStore.fetchOriginalMessage(apiInfoKey);
+        if (rawApi == null) {
             addWithoutRequestError(apiInfoKey, testRunId, TestResult.TestError.NO_PATH);
             return false;
         }
+
+        OriginalHttpRequest originalHttpRequest = rawApi.getRequest();
+        OriginalHttpResponse originalHttpResponse = rawApi.getResponse();
 
         AuthMechanism authMechanism = AuthMechanismStore.getAuthMechanism();
         if (authMechanism == null) {
@@ -33,34 +32,32 @@ public class BOLATest extends TestPlugin {
             return false;
         }
 
-        HttpRequestParams httpRequestParams = originalHttpResponseParams.getRequestParams();
-        boolean result = authMechanism.addAuthToRequest(httpRequestParams);
+        boolean result = authMechanism.addAuthToRequest(originalHttpRequest);
         if (!result) return false; // this means that auth token was not there in original request so exit
 
-        ContainsPrivateResourceResult containsPrivateResourceResult = containsPrivateResource(httpRequestParams, apiInfoKey);
+        ContainsPrivateResourceResult containsPrivateResourceResult = containsPrivateResource(originalHttpRequest, apiInfoKey);
         if (!containsPrivateResourceResult.isPrivate) { // contains 1 or more public parameters... so don't test
-            HttpResponseParams newHttpResponseParams = generateEmptyResponsePayload(httpRequestParams);
-            addTestSuccessResult(apiInfoKey, newHttpResponseParams, testRunId, false, new ArrayList<>());
+            OriginalHttpResponse newOriginalHttpResponse= new OriginalHttpResponse(null, new HashMap<>(), 0);
+            addTestSuccessResult(apiInfoKey, originalHttpRequest,  newOriginalHttpResponse, testRunId, false);
             return false;
         }
 
-        HttpResponseParams httpResponseParams = null;
+        OriginalHttpResponse response = null;
         try {
-            httpResponseParams = ApiExecutor.sendRequest(httpRequestParams);
+            response = ApiExecutor.sendRequest(originalHttpRequest, true);
         } catch (Exception e) {
-            HttpResponseParams newHttpResponseParams = generateEmptyResponsePayload(httpRequestParams);
-            addWithRequestError(apiInfoKey, testRunId, TestResult.TestError.API_REQUEST_FAILED, newHttpResponseParams);
+            addWithRequestError(apiInfoKey, testRunId, TestResult.TestError.API_REQUEST_FAILED, originalHttpRequest);
             return false;
         }
 
-        int statusCode = StatusCodeAnalyser.getStatusCode(httpResponseParams);
+        int statusCode = StatusCodeAnalyser.getStatusCode(response.getBody(), response.getStatusCode());
         boolean vulnerable = isStatusGood(statusCode);
         if (vulnerable) {
-            double val = compareWithOriginalResponse(originalHttpResponseParams.getPayload(), httpResponseParams.getPayload());
+            double val = compareWithOriginalResponse(originalHttpResponse.getBody(), response.getBody());
             vulnerable = val > 90;
         }
 
-        addTestSuccessResult(apiInfoKey,httpResponseParams, testRunId, vulnerable, containsPrivateResourceResult.findPrivateOnes());
+        addTestSuccessResult(apiInfoKey,originalHttpRequest, response, testRunId, vulnerable);
 
         return vulnerable;
     }

@@ -1,6 +1,7 @@
 package com.akto.dto.testing;
 
 import com.akto.dto.HttpRequestParams;
+import com.akto.dto.OriginalHttpRequest;
 import org.bson.types.ObjectId;
 
 import java.util.List;
@@ -16,17 +17,17 @@ public class AuthMechanism {
         this.authParams = authParams;
     }
 
-    public boolean addAuthToRequest(HttpRequestParams httpRequestParams) {
+    public boolean addAuthToRequest(OriginalHttpRequest request) {
         for (AuthParam authParamPair : authParams) {
-            boolean result = authParamPair.addAuthTokens(httpRequestParams);
+            boolean result = authParamPair.addAuthTokens(request);
             if (!result) return false;
         }
         return true;
     }
 
-    public boolean removeAuthFromRequest(HttpRequestParams httpRequestParams) {
+    public boolean removeAuthFromRequest(OriginalHttpRequest request) {
         for (AuthParam authParamPair : authParams) {
-            boolean result = authParamPair.removeAuthTokens(httpRequestParams);
+            boolean result = authParamPair.removeAuthTokens(request);
             if (!result) return false;
         }
         return true;

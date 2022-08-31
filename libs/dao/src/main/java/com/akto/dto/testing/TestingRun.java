@@ -16,6 +16,7 @@ public class TestingRun {
     public static final String STATE = "state";
     private State state;
     private String userEmail;
+    public static final String _TESTING_ENDPOINTS = "testingEndpoints";
     private TestingEndpoints testingEndpoints;
     private int testIdConfig;
 

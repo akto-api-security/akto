@@ -15,7 +15,8 @@ public class TestResult {
     private List<SingleTypeInfo> privateSingleTypeInfos = new ArrayList<>();
 
     public enum TestError {
-        NO_PATH, NO_HAPPY_PATH, NO_AUTH_MECHANISM, API_REQUEST_FAILED
+        NO_PATH, NO_HAPPY_PATH, NO_AUTH_MECHANISM, API_REQUEST_FAILED, SOMETHING_WENT_WRONG, MISSING_REQUEST_BODY,
+        FAILED_BUILDING_REQUEST_BODY
     }
 
     public TestResult(String message, boolean vulnerable, List<TestError> errors, List<SingleTypeInfo> privateSingleTypeInfos) {
