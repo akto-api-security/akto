@@ -9,6 +9,7 @@ import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.TestingEndpoints.Type;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -70,7 +71,11 @@ public class StartTestAction extends UserAction {
 
     public String startTest() {
         // 65 seconds added to give testing module time to get the latest sample messages (which runs every 60 secs)
-        TestingRun testingRun = createTestingRun(Context.now() + 65);
+        int scheduleTimestamp = Context.now() + 65;
+        // But if workflow test then run immediately
+        if (type.equals(Type.WORKFLOW)) scheduleTimestamp = Context.now();
+        
+        TestingRun testingRun = createTestingRun(scheduleTimestamp);
 
         if (testingRun == null) {
             return ERROR.toUpperCase();
