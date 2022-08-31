@@ -17,7 +17,7 @@
             <dependency>
                 <groupId>com.amazonaws</groupId>
                 <artifactId>aws-java-sdk-bom</artifactId>
-                <version>1.11.627</version>
+                <version>1.11.678</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -28,12 +28,12 @@
        <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-lambda</artifactId>
-            <version>1.11.627</version>
+            <version>1.11.678</version>
         </dependency>
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-logs</artifactId>
-            <version>1.11.627</version>
+            <version>1.11.678</version>
         </dependency>
         <dependency>
             <groupId>org.apache.struts</groupId>
