@@ -49,44 +49,7 @@ public class AuthMechanismAction extends UserAction {
 
     List<TestingRunResult> testingRunResults;
     public String fetchTestingRunResults() {
-        BasicDBObject query = new BasicDBObject("testingEndpoints.type", "COLLECTION_WISE");
-        List<TestingRun> testingRuns = TestingRunDao.instance.findAll(query);
-        Map<Integer, TestingRun> tests = new HashMap<>();
-        Set<ObjectId> testRunIdSet = new HashSet<>();
-
-        for(TestingRun test : testingRuns) {
-            TestingEndpoints testingEndpoints = test.getTestingEndpoints();
-            if (testingEndpoints instanceof CollectionWiseTestingEndpoints) {
-                CollectionWiseTestingEndpoints collectionWiseEndpoints = (CollectionWiseTestingEndpoints) testingEndpoints;
-                
-                int key = collectionWiseEndpoints.getApiCollectionId();
-                TestingRun testingRunForCollection = tests.get(key);
-                if (testingRunForCollection == null) {
-                    tests.put(key, test);
-                    testRunIdSet.add(test.getId());
-                } else if (testingRunForCollection.getScheduleTimestamp() < test.getScheduleTimestamp()) {
-                    tests.put(key, test);
-                    testRunIdSet.add(test.getId());
-                    testRunIdSet.remove(testingRunForCollection.getId());
-                }
-            }
-        }
-
-
-        Bson filter = Filters.in("testRunId", testRunIdSet);
-
-        this.testingRunResults = TestingRunResultDao.instance.findAll(filter);
-
-        for(TestingRunResult testingRunResult: this.testingRunResults) {
-            testingRunResult.setHexId(testingRunResult.getId().toString());
-            Map<String, TestResult> testResultMap = testingRunResult.getResultMap();
-            if (testResultMap != null) {
-                for(TestResult testResult: testResultMap.values()) {
-                    testResult.setMessage("");
-                }
-            }
-        }
-
+        testingRunResults = TestingRunResultDao.instance.fetchLatestTestingRunResult();
         return SUCCESS.toUpperCase();
     }
 

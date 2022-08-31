@@ -4,7 +4,11 @@ import com.akto.dao.SampleDataDao;
 import com.akto.dto.*;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.HttpRequestParams;
+import com.akto.dto.HttpResponseParams;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.CollectionWiseTestingEndpoints;
+import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
@@ -39,7 +43,21 @@ public class SampleMessageStore {
                         )
                 );
             } else {
-                logger.error("ONLY COLLECTION TYPE TESTING ENDPOINTS ALLOWED");
+                CustomTestingEndpoints customTestingEndpoints = (CustomTestingEndpoints) testingEndpoints;
+                List<ApiInfoKey> apiInfoKeys = customTestingEndpoints.getApisList();
+
+                if (apiInfoKeys.size() == 0) {
+                    return;
+                } else {
+                    int apiCollectionId = apiInfoKeys.get(0).getApiCollectionId();
+                    singleTypeInfoList = SingleTypeInfoDao.instance.findAll(
+                            Filters.and(
+                                    Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
+                                    Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1),
+                                    Filters.eq(SingleTypeInfo._IS_HEADER, false)
+                            )
+                    );
+                }
             }
 
             for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {

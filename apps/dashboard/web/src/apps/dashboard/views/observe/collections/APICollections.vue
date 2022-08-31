@@ -64,29 +64,7 @@
                 v-model="showScheduleTestBox"
                 width="400px"
             >
-                <div class="show-schedule-box">
-                    <v-time-picker
-                        v-model="timePicker"
-                        ampm-in-title
-                        color="#6200EA"
-                        header-color="#6200EA"
-                        full-width	
-                    />
-
-                    <v-checkbox
-                        v-model="recurringDaily"
-                        label="Run daily"
-                        on-icon="$far_check-square"
-                        off-icon="$far_square"
-                        class="ml-2"
-                        :ripple="false"
-                    />
-
-
-                    <v-btn primary dark color="#6200EA" @click="scheduleTest" class="ma-2">
-                        Schedule {{recurringDaily ? "daily" : "today"}} at {{timePicker}}
-                    </v-btn>
-                </div>
+                <schedule-box @schedule="scheduleTest"/>
             </v-dialog>
         </div>
     </div>        
@@ -100,6 +78,7 @@ import api from './api'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
 import SimpleTextField from '@/apps/dashboard/shared/components/SimpleTextField'
 import BatchOperation from '../changes/components/BatchOperation'
+import ScheduleBox from '@/apps/dashboard/shared/components/ScheduleBox'
 
 export default {
     name: "ApiCollections",
@@ -107,7 +86,8 @@ export default {
         SimpleTable,
         Spinner,
         SimpleTextField,
-        BatchOperation
+        BatchOperation,
+        ScheduleBox
     },
     
     data() {
@@ -159,9 +139,7 @@ export default {
             ],
             showNewRow: false,
             deletedCollection: null,
-            showScheduleTestBox: false,
-            timePicker: "10:00",
-            recurringDaily: false
+            showScheduleTestBox: false
         }
     },
     methods: {
@@ -264,11 +242,8 @@ export default {
                 this.scheduleTestCollectionId = item.id
             }
         },
-        async scheduleTest() {
-            let hours = this.timePicker.split(":")[0]
-            let minutes = this.timePicker.split(":")[1]
-            let startTimestamp = parseInt(+func.dayStart()/1000) + hours * 60 * 60 + minutes * 60
-            await this.$store.dispatch('testing/scheduleTestForCollection', {apiCollectionId: this.scheduleTestCollectionId, startTimestamp, recurringDaily: this.recurringDaily})
+        async scheduleTest({recurringDaily, startTimestamp}) {
+            await this.$store.dispatch('testing/scheduleTestForCollection', {apiCollectionId: this.scheduleTestCollectionId, startTimestamp, recurringDaily})
             this.showScheduleTestBox = false
         }
     },
@@ -299,8 +274,6 @@ export default {
     font-size: 12px
     margin-top: 16px
 
-.show-schedule-box
-    background: #FFFFFF        
 </style>
 
 <style lang="sass">

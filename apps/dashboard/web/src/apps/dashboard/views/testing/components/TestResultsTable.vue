@@ -71,7 +71,8 @@ export default {
       endpointHeaders: [
         {
           text: "color",
-          value: ""
+          value: "",
+          hideFilter: true
         },
         {
           text: "Endpoint",

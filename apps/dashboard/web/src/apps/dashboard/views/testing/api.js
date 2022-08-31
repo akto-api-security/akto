@@ -11,11 +11,31 @@ export default {
         })
     },
 
+    startTestForCustomEndpoints(apiInfoKeyList) {
+        return request({
+            url: '/api/startTest',
+            method: 'post',
+            data: {apiInfoKeyList, type: "CUSTOM"}
+        }).then((resp) => {
+            return resp
+        })
+    },
+
     startTestForCollection(apiCollectionId) {
         return request({
             url: '/api/startTest',
             method: 'post',
             data: {apiCollectionId, type: "COLLECTION_WISE"}
+        }).then((resp) => {
+            return resp
+        })        
+    },
+
+    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily) {
+        return request({
+            url: '/api/scheduleTest',
+            method: 'post',
+            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily}
         }).then((resp) => {
             return resp
         })        
