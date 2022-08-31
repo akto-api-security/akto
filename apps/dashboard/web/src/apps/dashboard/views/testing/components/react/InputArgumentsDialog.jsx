@@ -56,19 +56,19 @@ const RequestEditor = ({sampleApiCall, updatedSampleData, onChangeApiRequest}) =
       <div style={{width: "400px"}}>
         <div className="request-title">[Request] URL</div>
         <div className="request-editor request-editor-path">
-          <TemplateStringEditor defaultText={updatedSampleData[REQUEST_URL] || oldUrl} onChange={onChangeRequestUrl}/>
+          <TemplateStringEditor defaultText={updatedSampleData[REQUEST_URL] != null ? updatedSampleData[REQUEST_URL] : oldUrl} onChange={onChangeRequestUrl}/>
         </div>
         <div className="request-title">[Request] Query params</div>
         <div className="request-editor request-editor-path">
-          <TemplateStringEditor defaultText={updatedSampleData[QUERY_PARAMS] || oldParams} onChange={onChangeQueryParams}/>
+          <TemplateStringEditor defaultText={updatedSampleData[QUERY_PARAMS] != null ?  updatedSampleData[QUERY_PARAMS] : oldParams} onChange={onChangeQueryParams}/>
         </div>
         <div className="request-title">[Request] Headers</div>
         <div className="request-editor request-editor-headers">
-          {<TemplateStringEditor defaultText={updatedSampleData[REQUEST_HEADERS] || oldHeaders} onChange={onChangeRequestHeaders}/>}
+          {<TemplateStringEditor defaultText={updatedSampleData[REQUEST_HEADERS] != null ? updatedSampleData[REQUEST_HEADERS] : oldHeaders} onChange={onChangeRequestHeaders}/>}
         </div>
         <div className="request-title">[Request] Payload</div>
         <div className="request-editor request-editor-payload">
-          <TemplateStringEditor defaultText={updatedSampleData[REQUEST_PAYLOAD] || oldPayload} onChange={onChangeRequestPayload}/>
+          <TemplateStringEditor defaultText={updatedSampleData[REQUEST_PAYLOAD] != null ? updatedSampleData[REQUEST_PAYLOAD] : oldPayload} onChange={onChangeRequestPayload}/>
         </div>
       </div>
       <div style={{width: "400px", opacity: "0.5"}}>

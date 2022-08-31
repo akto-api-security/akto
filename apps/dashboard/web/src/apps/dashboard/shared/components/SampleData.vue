@@ -8,7 +8,7 @@
                     <v-icon>$fas_angle-double-right</v-icon>
                 </v-btn>
             </div>
-            <div class="d-flex">
+            <div class="d-flex" v-if="json['message']">
                 <sample-single-side
                     class="flex-equal"
                     title="Request" 
@@ -27,6 +27,9 @@
                     :simpleCopy="true"
                     :complete-data="json['message']"
                 />
+            </div>
+            <div v-else style="font-size: 13px; margin: auto 8px; color: #47466A">
+                {{testResultErrors}}
             </div>
         </div>
     </div>
@@ -164,11 +167,20 @@ export default {
         },
 
         json: function() {
+            let currentMessage = this.messages[this.currentIndex]
             return {
-                "message": JSON.parse(this.messages[this.currentIndex]["message"]),
-                title: this.messages[this.currentIndex]["title"],
-                "highlightPaths": this.messages[this.currentIndex]["highlightPaths"]
-                }
+                "message": JSON.parse(currentMessage["message"]),
+                title: currentMessage["title"],
+                "highlightPaths": currentMessage["highlightPaths"],
+            }
+        },
+
+        testResultErrors: function() {
+            let currentMessage = this.messages[this.currentIndex]
+            let errors = currentMessage["errors"]
+            if (!errors) return ""
+
+            return "Error while executing the test: " + errors.join(" ")
         }
     }
 }
