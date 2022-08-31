@@ -105,7 +105,7 @@ export default {
         return val
       }
       let r = await api.fetchRequestAndResponseForTest(row.x)
-      this.requestAndResponse = r.testingRunResults && r.testingRunResults[0] ? Object.entries(r.testingRunResults[0].resultMap).filter(x => filterVulnerable(x[1].vulnerable, this.showVulnerableOnly)).map(x => {return {message: x[1].message, title: x[0], highlightPaths:[]}}) : []
+      this.requestAndResponse = r.testingRunResults && r.testingRunResults[0] ? Object.entries(r.testingRunResults[0].resultMap).filter(x => filterVulnerable(x[1].vulnerable, this.showVulnerableOnly)).map(x => {return {message: x[1].message, title: x[0], highlightPaths:[], errors: x[1].errors}}) : []
       this.openDetailsDialog = true
       console.log(r.testingRunResults[0])
     },
