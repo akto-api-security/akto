@@ -1,7 +1,10 @@
 package com.akto.dao;
 
 import com.akto.dto.ApiCollection;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+
+import java.util.List;
 
 public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
 
@@ -20,6 +23,13 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
     }
 
     public ApiCollection findByName(String name) {
-        return ApiCollectionsDao.instance.findOne(Filters.eq("name", name));
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        for (ApiCollection apiCollection: apiCollections) {
+            if (apiCollection.getDisplayName() == null) continue;
+            if (apiCollection.getDisplayName().equalsIgnoreCase(name)) {
+                return apiCollection;
+            }
+        }
+        return null;
     }
 }
