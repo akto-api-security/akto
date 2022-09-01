@@ -93,7 +93,11 @@ public class ExportSampleDataAction extends UserAction {
 
     private Map<String, String> generateBurpRequestFromSampleData(String sampleData) {
         OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest();
-        originalHttpRequest.buildFromSampleMessage(sampleData);
+        try {
+            originalHttpRequest.buildFromSampleMessage(sampleData);
+        } catch (Exception e) {
+            originalHttpRequest.buildFromApiSampleMessage(sampleData);
+        }
 
         StringBuilder builder = new StringBuilder("");
 
@@ -185,19 +189,8 @@ public class ExportSampleDataAction extends UserAction {
             httpResponseParams = HttpCallParser.parseKafkaMessage(sampleData);
         } catch (Exception e) {
             try {
-                Gson gson = new Gson();
-                BasicDBObject ob = BasicDBObject.parse(sampleData);
-                BasicDBObject reqObj = (BasicDBObject) ob.get("request");
-                Map<String, String> headersOg = new HashMap<>();
-                headersOg = gson.fromJson(reqObj.getString("headers"), headersOg.getClass());
-                Map<String, List<String>> headers = new HashMap<>();
-                for (String key: headersOg.keySet()) {
-                    headers.put(key, Collections.singletonList(headersOg.get(key)));
-                }
-
-                OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest(
-                        reqObj.getString("url"), reqObj.getString("queryParams"), reqObj.getString("method"), reqObj.getString("body"), headers, reqObj.getString("type")
-                );
+                OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest();
+                originalHttpRequest.buildFromApiSampleMessage(sampleData);
 
                 HttpRequestParams httpRequestParams = new HttpRequestParams(
                         originalHttpRequest.getMethod(), originalHttpRequest.getUrl(), originalHttpRequest.getType(),
