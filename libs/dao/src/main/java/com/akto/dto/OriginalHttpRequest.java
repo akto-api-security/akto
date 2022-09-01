@@ -1,6 +1,7 @@
 package com.akto.dto;
 
 import com.google.gson.Gson;
+import com.mongodb.BasicDBObject;
 
 import java.util.*;
 
@@ -43,6 +44,24 @@ public class OriginalHttpRequest {
         this.body = requestPayload.trim();
 
         this.headers = buildHeadersMap(json, "requestHeaders");
+    }
+
+    public void buildFromApiSampleMessage(String message) {
+        BasicDBObject ob = BasicDBObject.parse(message);
+        BasicDBObject reqObj = (BasicDBObject) ob.get("request");
+        Map<String, String> headersOg = new HashMap<>();
+        headersOg = gson.fromJson(reqObj.getString("headers"), headersOg.getClass());
+        this.headers = new HashMap<>();
+        for (String key: headersOg.keySet()) {
+            this.headers.put(key, Collections.singletonList(headersOg.get(key)));
+        }
+
+        this.url = reqObj.getString("url");
+        this.queryParams = reqObj.getString("queryParams");
+        this.method = reqObj.getString("method");
+        this.body = reqObj.getString("body");
+        this.type = reqObj.getString("type");
+
     }
 
     public String findHeaderValue(String headerName) {
