@@ -10,6 +10,7 @@ public class WorkflowNodeDetails {
 
     Type type = Type.API;
     boolean overrideRedirect;
+    String testValidatorCode;
 
     public enum Type {
         POLL, API
@@ -18,13 +19,15 @@ public class WorkflowNodeDetails {
     public WorkflowNodeDetails() {
     }
 
-    public WorkflowNodeDetails(int apiCollectionId, String endpoint, Method method, WorkflowUpdatedSampleData updatedSampleData, Type type, boolean overrideRedirect) {
+    public WorkflowNodeDetails(int apiCollectionId, String endpoint, Method method, String testValidatorCode,
+                               WorkflowUpdatedSampleData updatedSampleData, Type type, boolean overrideRedirect) {
         this.apiCollectionId = apiCollectionId;
         this.endpoint = endpoint;
         this.method = method;
         this.updatedSampleData = updatedSampleData;
         this.type = type;
         this.overrideRedirect = overrideRedirect;
+        this.testValidatorCode = testValidatorCode;
     }
 
     public int getApiCollectionId() {
@@ -74,6 +77,18 @@ public class WorkflowNodeDetails {
 
     public void setOverrideRedirect(boolean overrideRedirect) {
         this.overrideRedirect = overrideRedirect;
+    }
+
+    public boolean isOverrideRedirect() {
+        return overrideRedirect;
+    }
+
+    public String getTestValidatorCode() {
+        return testValidatorCode;
+    }
+
+    public void setTestValidatorCode(String testValidatorCode) {
+        this.testValidatorCode = testValidatorCode;
     }
 
     @Override

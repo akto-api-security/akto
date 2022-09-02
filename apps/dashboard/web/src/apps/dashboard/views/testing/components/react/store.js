@@ -82,6 +82,16 @@ const useStore = create((set, get) => ({
     })
   },
 
+  setValidatorCode: (nodeId, testValidatorCode) => {
+    let ret = get().nodeEndpointMap
+    let endpointData = ret[nodeId]
+    if (!endpointData) return
+    endpointData["testValidatorCode"] = testValidatorCode
+    set({
+      nodeEndpointMap: {...ret}
+    })
+  },
+
   setEndpointsList: (newList, newFetchSampleDataFunc) => {
     set({
       endpointsList: newList,
