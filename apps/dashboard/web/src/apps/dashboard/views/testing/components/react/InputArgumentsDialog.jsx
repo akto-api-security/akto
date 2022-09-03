@@ -110,6 +110,7 @@ export default function InputArgumentsDialog({nodeId, endpointDetails}) {
   const setRedirect = useStore(state => state.setRedirect)
   const [sampleData, updateSampleData] = React.useState({})
   const setValidatorCode = useStore(state => state.setValidatorCode)
+  const setSleep = useStore(state => state.setSleep)
 
   React.useEffect(() => {
       if (!endpointDetails) return;
@@ -152,8 +153,17 @@ export default function InputArgumentsDialog({nodeId, endpointDetails}) {
     setRedirect(nodeId, !redirect)
   };
 
+  const handleSleep = (event) => {
+    let waitInSeconds = event.target.checked ? 60 : 0
+    setSleep(nodeId, waitInSeconds)
+  };
+
   const checkedRedirect = () => {
     return !endpointDetails["overrideRedirect"]
+  }
+
+  const checkedSleep = () => {
+    return endpointDetails["waitInSeconds"] > 0
   }
 
   const [anchorEl, setAnchorEl] = React.useState(null);
@@ -199,7 +209,7 @@ export default function InputArgumentsDialog({nodeId, endpointDetails}) {
                 }}
               >
                 <FormGroup sx={{paddingLeft: 2}}>
-                  <FormControlLabel control={<Checkbox checked={checkedPoll()} onChange={handleChangePoll}/>} label="Poll" />
+                  <FormControlLabel control={<Checkbox checked={checkedSleep()} onChange={handleSleep}/>} label="Sleep" />
                   <FormControlLabel control={<Checkbox checked={checkedRedirect()} onChange={handleChangeRedirect}/>} label="Auto Redirect" />
                 </FormGroup>
               </Menu>

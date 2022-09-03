@@ -82,6 +82,16 @@ const useStore = create((set, get) => ({
     })
   },
 
+  setSleep: (nodeId, waitInSeconds) => {
+    let ret = get().nodeEndpointMap
+    let endpointData = ret[nodeId]
+    if (!endpointData) return
+    endpointData["waitInSeconds"] = waitInSeconds
+    set({
+      nodeEndpointMap: {...ret}
+    })
+  },
+
   setValidatorCode: (nodeId, testValidatorCode) => {
     let ret = get().nodeEndpointMap
     let endpointData = ret[nodeId]

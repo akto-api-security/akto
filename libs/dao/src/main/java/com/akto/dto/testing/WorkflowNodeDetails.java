@@ -12,15 +12,28 @@ public class WorkflowNodeDetails {
     boolean overrideRedirect;
     String testValidatorCode;
 
+    int waitInSeconds;
+
     public enum Type {
         POLL, API
+    }
+
+    // call this function to see if data being passed is legit or not
+    public String validate() {
+        if (this.type == null ) return "Type can't be null";
+        if (this.endpoint == null ) return "URL can't be null";
+        if (this.method == null ) return "Method can't be null";
+        int waitThreshold = 60;
+        if (waitInSeconds > waitThreshold) return "Wait time should be <= " + waitThreshold;
+
+        return null;
     }
 
     public WorkflowNodeDetails() {
     }
 
     public WorkflowNodeDetails(int apiCollectionId, String endpoint, Method method, String testValidatorCode,
-                               WorkflowUpdatedSampleData updatedSampleData, Type type, boolean overrideRedirect) {
+                               WorkflowUpdatedSampleData updatedSampleData, Type type, boolean overrideRedirect, int waitInSeconds) {
         this.apiCollectionId = apiCollectionId;
         this.endpoint = endpoint;
         this.method = method;
@@ -28,6 +41,7 @@ public class WorkflowNodeDetails {
         this.type = type;
         this.overrideRedirect = overrideRedirect;
         this.testValidatorCode = testValidatorCode;
+        this.waitInSeconds = waitInSeconds;
     }
 
     public int getApiCollectionId() {
@@ -89,6 +103,14 @@ public class WorkflowNodeDetails {
 
     public void setTestValidatorCode(String testValidatorCode) {
         this.testValidatorCode = testValidatorCode;
+    }
+
+    public int getWaitInSeconds() {
+        return waitInSeconds;
+    }
+
+    public void setWaitInSeconds(int waitInSeconds) {
+        this.waitInSeconds = waitInSeconds;
     }
 
     @Override

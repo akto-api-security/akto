@@ -38,7 +38,21 @@ public class WorkflowTestAction extends UserAction {
         int createdTimestamp = id;
         String editor = author;
         int lastEdited = createdTimestamp;
-        WorkflowTest workflowTest = new WorkflowTest(id, apiCollectionId, author, createdTimestamp, editor, 
+
+        if (mapNodeIdToWorkflowNodeDetails == null) {
+            addActionError("nodes can't be null");
+            return ERROR.toUpperCase();
+        }
+
+        for (WorkflowNodeDetails workflowNodeDetails: mapNodeIdToWorkflowNodeDetails.values()) {
+            String err = workflowNodeDetails.validate();
+            if (err != null) {
+                addActionError(err);
+                return ERROR.toUpperCase();
+            }
+        }
+
+        WorkflowTest workflowTest = new WorkflowTest(id, apiCollectionId, author, createdTimestamp, editor,
             lastEdited, nodes, edges, mapNodeIdToWorkflowNodeDetails, state);
 
         InsertOneResult result = WorkflowTestsDao.instance.insertOne(workflowTest);

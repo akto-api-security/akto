@@ -93,6 +93,18 @@ public class ApiWorkflowExecutor {
 
         OriginalHttpResponse response = null;
         int maxRetries = type.equals(WorkflowNodeDetails.Type.POLL) ? 20 : 1;
+
+        try {
+            int waitInSeconds = Math.min(workflowNodeDetails.getWaitInSeconds(),60);
+            if (waitInSeconds > 0) {
+                System.out.println("WAITING: " + waitInSeconds + " seconds");
+                Thread.sleep(waitInSeconds*1000);
+                System.out.println("DONE WAITING!!!!");
+            }
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
         for (int i = 0; i < maxRetries; i++) {
             try {
                 if (i > 0) {
@@ -142,8 +154,12 @@ public class ApiWorkflowExecutor {
         ScriptEngine engine = factory.getEngineByName("nashorn");
         try {
             String code = replaceVariables(testValidatorCode, valuesMap);
+            System.out.println("*******************************************************************");
+            System.out.println("TEST VALIDATOR CODE:");
+            System.out.println(code);
             Object o = engine.eval(code);
             System.out.println("TEST VALIDATOR RESULT: " + o.toString());
+            System.out.println("*******************************************************************");
             vulnerable = ! (boolean) o;
         } catch (Exception e) {
             e.printStackTrace();
