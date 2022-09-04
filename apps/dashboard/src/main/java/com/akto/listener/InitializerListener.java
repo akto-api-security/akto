@@ -37,6 +37,8 @@ import java.util.concurrent.TimeUnit;
 
 import javax.servlet.ServletContextListener;
 
+import static com.mongodb.client.model.Filters.eq;
+
 public class InitializerListener implements ServletContextListener {
     private static final Logger logger = LoggerFactory.getLogger(InitializerListener.class);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
@@ -109,17 +111,37 @@ public class InitializerListener implements ServletContextListener {
                     }
 
                     Slack slack = Slack.getInstance();
-
+        
                     for(SlackWebhook slackWebhook: listWebhooks) {
-                        System.out.println(slackWebhook); 
+                        int now =Context.now();
+                        // System.out.println("debugSlack: " + slackWebhook.getLastSentTimestamp() + " " + slackWebhook.getFrequencyInSeconds() + " " +now );
 
-                        ChangesInfo ci = getChangesInfo(slackWebhook.getLargerDuration(), slackWebhook.getSmallerDuration());
-                        if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams) == 0) {
+                        if(slackWebhook.getFrequencyInSeconds()==0)
+                        slackWebhook.setFrequencyInSeconds(24*60*60);
+
+                        boolean shouldSend = ( slackWebhook.getLastSentTimestamp() + slackWebhook.getFrequencyInSeconds() ) <= now ;
+                        
+                        if(!shouldSend){
+                            continue;
+                        }
+
+                        System.out.println(slackWebhook);
+
+                        ChangesInfo ci = getChangesInfo(now - slackWebhook.getLastSentTimestamp(), now - slackWebhook.getLastSentTimestamp());
+                        if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0) {
                             return;
                         }
     
-                        DailyUpdate dailyUpdate = new DailyUpdate(0, 0, ci.newSensitiveParams.size(), ci.newEndpointsLast7Days.size(), ci.recentSentiiveParams, ci.newSensitiveParams, slackWebhook.getDashboardUrl());
-    
+                        DailyUpdate dailyUpdate = new DailyUpdate(
+                            0, 0, 
+                            ci.newSensitiveParams.size(), ci.newEndpointsLast7Days.size(),
+                            ci.recentSentiiveParams, ci.newParamsInExistingEndpoints,
+                            slackWebhook.getLastSentTimestamp(), now ,
+                            ci.newSensitiveParams, slackWebhook.getDashboardUrl());
+                        
+                        slackWebhook.setLastSentTimestamp(now);
+                        SlackWebhooksDao.instance.updateOne(eq("webhook",slackWebhook.getWebhook()), Updates.set("lastSentTimestamp", now)); 
+
                         String webhookUrl = slackWebhook.getWebhook();
                         String payload = dailyUpdate.toJSON();
                         System.out.println(payload);
@@ -131,7 +153,7 @@ public class InitializerListener implements ServletContextListener {
                     ex.printStackTrace(); // or loggger would be better
                 }
             }
-        }, 0, 24, TimeUnit.HOURS);
+        }, 0, 5, TimeUnit.MINUTES);
 
     }
 
@@ -141,17 +163,21 @@ public class InitializerListener implements ServletContextListener {
         public List<String> newEndpointsLast31Days = new ArrayList<>();
         public int totalSensitiveParams = 0;
         public int recentSentiiveParams = 0;
+        public int newParamsInExistingEndpoints = 0;
     }
 
-    protected ChangesInfo getChangesInfo(int newEndpointsDays, int newSensitiveParamsDays) {
+    protected ChangesInfo getChangesInfo(int newEndpointsFrequency, int newSensitiveParamsFrequency) {
         try {
             
             ChangesInfo ret = new ChangesInfo();
             int now = Context.now();
-            List<BasicDBObject> newEndpointsSmallerDuration = new InventoryAction().fetchRecentEndpoints(now - newSensitiveParamsDays * 24 * 60 * 60, now);
-            List<BasicDBObject> newEndpointsBiggerDuration = new InventoryAction().fetchRecentEndpoints(now - newEndpointsDays * 24 * 60 * 60, now);
+            List<BasicDBObject> newEndpointsSmallerDuration = new InventoryAction().fetchRecentEndpoints(now - newSensitiveParamsFrequency, now);
+            List<BasicDBObject> newEndpointsBiggerDuration = new InventoryAction().fetchRecentEndpoints(now - newEndpointsFrequency, now);
+
+            int newParamInNewEndpoint=0;
 
             for (BasicDBObject singleTypeInfo: newEndpointsSmallerDuration) {
+                newParamInNewEndpoint += (int) singleTypeInfo.getOrDefault("countTs", 0);
                 singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
                 ret.newEndpointsLast7Days.add(singleTypeInfo.getString("method") + singleTypeInfo.getString("url"));
             }
@@ -164,7 +190,7 @@ public class InitializerListener implements ServletContextListener {
             List<SingleTypeInfo> sensitiveParamsList = new InventoryAction().fetchSensitiveParams();
             ret.totalSensitiveParams = sensitiveParamsList.size();
             ret.recentSentiiveParams = 0;
-            int delta = newSensitiveParamsDays * 24 * 60 * 60;
+            int delta = newSensitiveParamsFrequency;
             Map<Pair<String, String>, Set<String>> endpointToSubTypes = new HashMap<>();
             for(SingleTypeInfo sti: sensitiveParamsList) {
                 String encoded = Base64.getEncoder().encodeToString((sti.getUrl() + " " + sti.getMethod()).getBytes());
@@ -186,6 +212,10 @@ public class InitializerListener implements ServletContextListener {
                 ret.newSensitiveParams.put(key.getFirst() + ": " + StringUtils.join(endpointToSubTypes.get(key), ","), key.getSecond());
             }
 
+            List<SingleTypeInfo> allNewParameters = new InventoryAction().fetchAllNewParams(now - newEndpointsFrequency, now);
+            int totalNewParameters=allNewParameters.size();
+            ret.newParamsInExistingEndpoints = totalNewParameters - newParamInNewEndpoint;    
+            
             return ret;
         } catch (Exception e) {
             logger.error("get new endpoints", e);

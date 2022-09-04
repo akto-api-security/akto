@@ -71,7 +71,7 @@ public class InventoryAction extends UserAction {
             new BasicDBObject("apiCollectionId", "$apiCollectionId")
             .append("url", "$url")
             .append("method", "$method");
-        pipeline.add(Aggregates.group(groupedId, Accumulators.min("startTs", "$timestamp")));
+        pipeline.add(Aggregates.group(groupedId, Accumulators.min("startTs", "$timestamp"),Accumulators.sum("countTs",1)));
         pipeline.add(Aggregates.match(Filters.gte("startTs", startTimestamp)));
         pipeline.add(Aggregates.match(Filters.lte("startTs", endTimestamp)));
         pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
@@ -396,6 +396,13 @@ public class InventoryAction extends UserAction {
 
     }
 
+    public List<SingleTypeInfo> fetchAllNewParams(int startTimestamp,int endTimestamp){
+        Bson filterNewParams = SingleTypeInfoDao.instance.filterForAllNewParams(startTimestamp,endTimestamp);
+
+        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(filterNewParams);
+
+        return list;
+    }
 
     public String fetchAllUrlsAndMethods() {
         response = new BasicDBObject();
