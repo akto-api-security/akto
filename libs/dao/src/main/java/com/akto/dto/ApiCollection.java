@@ -102,7 +102,7 @@ public class ApiCollection {
         }
 
         if (this.hostName == null || this.name == null) {
-            result = result.replace(" - ", " ");
+            result = result.replace(" - ", "");
         }
 
         result = result.replace("null", "");
