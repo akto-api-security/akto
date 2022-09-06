@@ -32,6 +32,7 @@ public class TestingRun {
         this.state = state;
     }
 
+    // if u r adding anything here make sure to add to stopAllTests() method too
     public enum State {
         SCHEDULED, RUNNING, STOPPED, COMPLETED
     }
