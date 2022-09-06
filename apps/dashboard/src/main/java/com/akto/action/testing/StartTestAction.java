@@ -10,6 +10,7 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingEndpoints.Type;
+import com.akto.dto.testing.TestingRun.State;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -168,6 +169,24 @@ public class StartTestAction extends UserAction {
     public String stopSchedule() {
         TestingSchedulesDao.instance.deleteAll(Filters.eq("sampleTestingRun.testingEndpoints.apiCollectionId", apiCollectionId));
         this.testingSchedules = TestingSchedulesDao.instance.findAll(new BasicDBObject());
+        return SUCCESS.toUpperCase();
+    }
+
+    public String stopAllTests() {
+        // stop all the scheduled and running tests
+        Bson filter = Filters.or(
+            Filters.eq(TestingRun.STATE, State.SCHEDULED),
+            Filters.eq(TestingRun.STATE, State.RUNNING)
+        );
+
+        TestingRunDao.instance.getMCollection().updateMany(filter,Updates.set(TestingRun.STATE, State.STOPPED));
+
+        // delete scheduled tests
+        TestingSchedulesDao.instance.deleteAll(new BasicDBObject());
+
+        testingSchedules = TestingSchedulesDao.instance.findAll(new BasicDBObject());
+        testingRuns = TestingRunDao.instance.findAll(filter);
+
         return SUCCESS.toUpperCase();
     }
 
