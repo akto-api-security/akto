@@ -1,6 +1,9 @@
 <template>
     <simple-layout title="API Testing" class="page-testing">
         <div class="pa-8">
+            <v-btn primary dark color="#6200EA" @click="stopAllTests" :loading="stopAllTestsLoading" style="float:right">
+                Stop all tests
+            </v-btn>
             <div>
                 <span class="heading">Auth tokens</span>
             </div>
@@ -24,10 +27,6 @@
 
             <v-btn primary dark color="#6200EA" @click="saveAuthMechanism" v-if="someAuthChanged">
                 Save changes
-            </v-btn>
-
-            <v-btn primary dark color="#6200EA" @click="stopAllTests" :loading="stopAllTestsLoading">
-                Stop all tests
             </v-btn>
 
             <div class="pt-12">
