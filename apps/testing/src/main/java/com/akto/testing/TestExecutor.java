@@ -1,5 +1,6 @@
 package com.akto.testing;
 
+import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.TestingRun;
@@ -8,6 +9,7 @@ import com.akto.dto.testing.WorkflowTestingEndpoints;
 import com.akto.rules.BOLATest;
 import com.akto.rules.NoAuthTest;
 import com.akto.store.SampleMessageStore;
+import com.mongodb.client.model.Filters;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,7 +42,16 @@ public class TestExecutor {
         }
 
         WorkflowTestingEndpoints workflowTestingEndpoints = (WorkflowTestingEndpoints) testingEndpoints;
-        WorkflowTest workflowTest = workflowTestingEndpoints.getWorkflowTest();
+        WorkflowTest workflowTestOld = workflowTestingEndpoints.getWorkflowTest();
+
+        WorkflowTest workflowTest = WorkflowTestsDao.instance.findOne(
+                Filters.eq("_id", workflowTestOld.getId())
+        );
+
+        if (workflowTest == null) {
+            logger.error("Workflow test has been deleted");
+            return ;
+        }
 
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         apiWorkflowExecutor.init(workflowTest, testingRun.getId());

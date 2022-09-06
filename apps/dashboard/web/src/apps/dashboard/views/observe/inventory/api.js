@@ -279,6 +279,40 @@ export default {
         })
     },
 
+    scheduleWorkflowTest(id, recurringDaily, startTimestamp) {
+        return request({
+            url: '/api/scheduleTest',
+            method: 'post',
+            data: {
+                "testIdConfig" : 1,
+                "workflowTestId": id,
+                "type": "WORKFLOW",
+                "recurringDaily": recurringDaily,
+                "startTimestamp": startTimestamp
+            }
+        })
+    },
+
+    fetchWorkflowTestingSchedule(workflowId) {
+        return request({
+            url: '/api/fetchWorkflowTestingSchedule',
+            method: 'post',
+            data: {
+                "workflowTestId" : workflowId
+            }
+        })
+    },
+
+    deleteWorkflowTests(workflowId) {
+        return request({
+            url: '/api/deleteWorkflowTests',
+            method: 'post',
+            data: {
+                "workflowTestId" : workflowId
+            }
+        })
+    },
+
     fetchWorkflowResult(id) {
         return request({
             url: '/api/fetchWorkflowResult',

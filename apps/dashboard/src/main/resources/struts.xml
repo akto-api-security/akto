@@ -1090,6 +1090,28 @@
             </result>
         </action>
 
+        <action name="api/deleteWorkflowTests" class="com.akto.action.testing.StartTestAction" method="deleteWorkflowTests">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchWorkflowTestingSchedule" class="com.akto.action.testing.StartTestAction" method="fetchWorkflowTestingSchedule">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
     </package>
 
 </struts>

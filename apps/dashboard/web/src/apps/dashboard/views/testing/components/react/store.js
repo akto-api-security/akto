@@ -4,6 +4,7 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
 } from 'react-flow-renderer';
+import api from '../../../observe/inventory/api';
 
 const useStore = create((set, get) => ({
   endpointsList: [],
@@ -21,6 +22,7 @@ const useStore = create((set, get) => ({
   originalState: null,
   runWorkflowTest: null,
   fetchWorkflowResult: null,
+  testingSchedule: null,
   setUtilityFuncs: (newCreateWorkflowTest, newEditWorkflowTest, newEditWorkflowNodeDetails, runWorkflowTest, fetchWorkflowResult) => {
     set({
       createWorkflowTest: newCreateWorkflowTest, 
@@ -153,6 +155,35 @@ const useStore = create((set, get) => ({
       edges: addEdge(connection, get().edges)
     });
   },
+
+  fetchWorkflowTestingSchedule: (workflowId) => {
+    api.fetchWorkflowTestingSchedule(workflowId).then((resp) => {
+      if (resp && resp.testingSchedules) {
+        set({
+          testingSchedule: resp.testingSchedules[0]
+        })
+      }
+    })
+  },
+
+  scheduleWorkflowTest: (id, recurringDaily, startTimestamp) => {
+    api.scheduleWorkflowTest(id, recurringDaily, startTimestamp).then((resp) => {
+      if (resp && resp.testingSchedules) {
+        set({
+          testingSchedule: resp.testingSchedules[0]
+        })
+      }
+    })
+  },
+
+  deleteWorkflowTests: (id) => {
+    api.deleteWorkflowTests(id).then((resp) => {
+      set({
+        testingSchedule: null
+      })
+    })
+  }
+
 }));
 
 

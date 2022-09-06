@@ -171,6 +171,16 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String fetchWorkflowTestingSchedule() {
+        this.testingSchedules = TestingSchedulesDao.instance.findAll(Filters.eq("sampleTestingRun.testingEndpoints.workflowTest._id", workflowTestId));
+        return SUCCESS.toUpperCase();
+    }
+
+    public String deleteWorkflowTests() {
+        TestingSchedulesDao.instance.deleteAll(Filters.eq("sampleTestingRun.testingEndpoints.workflowTest._id", workflowTestId));
+        return SUCCESS.toUpperCase();
+    }
+
     public void setType(TestingEndpoints.Type type) {
         this.type = type;
     }

@@ -4,7 +4,7 @@ import ReactFlow, {
   getRectOfNodes
 } from 'react-flow-renderer';
 import { faEye, faEyeSlash, faSave } from '@fortawesome/free-regular-svg-icons';
-import { faPlayCircle } from '@fortawesome/free-regular-svg-icons';
+import { faPlayCircle, faCalendarPlus} from '@fortawesome/free-regular-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import IconButton from "@mui/material/IconButton"
 
@@ -17,6 +17,9 @@ import Drawer from '@mui/material/Drawer';
 import { AppBar } from '@material-ui/core';
 import { makeStyles } from "@material-ui/core/styles";
 import WorkflowResultsDrawer from './WorkflowResultsDrawer.jsx';
+import ScheduleBox from './ScheduleBox.jsx';
+import Menu from '@mui/material/Menu';
+
 
 
 const onInit = (reactFlowInstance) => console.log('flow loaded:', reactFlowInstance);
@@ -54,6 +57,11 @@ const Workflow = ({apiCollectionId}) => {
   const enteredNode = useStore(state => state.enteredNode)
   const setEnteredNode = useStore(state => state.setEnteredNode)
 
+  const testingSchedule = useStore(state => state.testingSchedule)
+  const fetchWorkflowTestingSchedule = useStore(state => state.fetchWorkflowTestingSchedule)
+  const deleteWorkflowTests = useStore(state => state.deleteWorkflowTests)
+  const scheduleWorkflowTest = useStore(state => state.scheduleWorkflowTest)
+
   const onConnectStart = (event, {nodeId, handleType}) => {
     setCurrentSource({x: event.screenX, y: event.screenY, nodeId, handleType})
   }
@@ -68,6 +76,8 @@ const Workflow = ({apiCollectionId}) => {
   const [workflowTestingRun, setWorkflowTestingRun] = useState(null);
   const [testRunning, setTestRunning] = useState(false);
   const containerRef = useRef();
+  const [scheduleBoxOpenFlag, setScheduleBoxOpenFlag] = useState(false)
+  const [anchorEl, setAnchorEl] = React.useState(null);
 
   const classes = useStyles({ height: height });
 
@@ -168,6 +178,22 @@ const Workflow = ({apiCollectionId}) => {
     }
   }
 
+  const saveWorkflowFn = (recurring, startTimestamp) => {
+      if (!originalState.id) {
+          console.log("Please save test first")
+          return;
+      }
+      scheduleWorkflowTest(originalState.id, recurring, startTimestamp)
+  }
+
+  const deleteWorkflowScheduleFn = () => {
+      if (!originalState.id) {
+          console.log("Please save test first")
+          return;
+      }
+      deleteWorkflowTests(originalState.id)
+  }
+
   const fetchResult = () => {
     if (!originalState.id) return
     return fetchWorkflowResult(originalState.id).then((resp) => {
@@ -217,11 +243,27 @@ const Workflow = ({apiCollectionId}) => {
 
   }
 
+  const openScheduleBox= (event) => {
+    let v = scheduleBoxOpenFlag ? null : event.currentTarget
+    setAnchorEl(v);
+    setScheduleBoxOpenFlag(!scheduleBoxOpenFlag)
+  }
+
   const showResult = () => setOpen(!open);
-  React.useEffect(() => {fetchResult()}, []);
+
+  React.useEffect(() => {
+    if (originalState.id) {
+      fetchResult()
+      fetchWorkflowTestingSchedule(originalState.id)
+    }
+  }, []);
 
   return (
     <div style={{height: "800px"}} ref={containerRef}>
+      <IconButton onClick={openScheduleBox} style={{float : "right"}}>
+        <FontAwesomeIcon icon={ faCalendarPlus } className="workflow-button" size="sm"/>
+      </IconButton>
+
       <IconButton onClick={onSave} style={{float : "right"}}>
         <FontAwesomeIcon icon={faSave} className="workflow-button"  size="sm"/>
       </IconButton>
@@ -233,6 +275,22 @@ const Workflow = ({apiCollectionId}) => {
       <IconButton onClick={showResult} style={{float : "right"}}>
         <FontAwesomeIcon icon={open ? faEyeSlash : faEye} className="workflow-button"  size="sm"/>
       </IconButton>
+
+      <Menu
+        id="basic-menu"
+        anchorEl={anchorEl}
+        open={scheduleBoxOpenFlag}
+        onClose={openScheduleBox}
+        MenuListProps={{
+          'aria-labelledby': 'basic-button',
+        }}
+      >
+        <ScheduleBox 
+          saveFn={saveWorkflowFn}
+          testingSchedule={testingSchedule}
+          deleteFn={deleteWorkflowScheduleFn}
+        />
+      </Menu>
 
       <AppBar position="static">
       </AppBar>
