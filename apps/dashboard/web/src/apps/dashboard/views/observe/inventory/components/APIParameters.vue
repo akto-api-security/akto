@@ -84,11 +84,11 @@
                 </simple-table>
             </template>
             <template slot="Values">
-                <sample-data :messages="sampleData" v-if="sampleData"/>
+                <sample-data-list :messages="sampleData" v-if="sampleData"/>
                 <spinner v-else/>
             </template>
             <template slot="Sensitive Values">
-                <sample-data :messages="sensitiveSampleData" v-if="sensitiveSampleData"/>
+                <sample-data-list :messages="sensitiveSampleData" v-if="sensitiveSampleData"/>
                 <spinner v-else/>
             </template>
         </layout-with-tabs>
@@ -109,19 +109,21 @@ import SampleData from '@/apps/dashboard/shared/components/SampleData'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
 
 import api from '../api'
+import SampleDataList from '@/apps/dashboard/shared/components/SampleDataList'
 
 export default {
     name: "ApiParameters",
     components: {
-        SimpleTable,
-        ACard,
-        LayoutWithTabs,
-        DonutChart,
-        SensitiveParamsCard,
-        LineChart,
-        Spinner,
-        SampleData,
-    },
+    SimpleTable,
+    ACard,
+    LayoutWithTabs,
+    DonutChart,
+    SensitiveParamsCard,
+    LineChart,
+    Spinner,
+    SampleData,
+    SampleDataList
+},
     props: {
         urlAndMethod: obj.strR,
         apiCollectionId: obj.numR

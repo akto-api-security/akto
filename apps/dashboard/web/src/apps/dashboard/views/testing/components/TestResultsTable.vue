@@ -32,7 +32,7 @@
             </v-btn>
           </template>
           <div class="pa-4">
-            <sample-data :messages='requestAndResponse'/>
+            <sample-data-list :messages='requestAndResponse'/>
           </div>
         </a-card>
       </div>
@@ -49,6 +49,7 @@ import SensitiveChipGroup from "@/apps/dashboard/shared/components/SensitiveChip
 import SampleData from '@/apps/dashboard/shared/components/SampleData'
 import ACard from '@/apps/dashboard/shared/components/ACard'
 import SimpleTable from "@/apps/dashboard/shared/components/SimpleTable";
+import SampleDataList from '@/apps/dashboard/shared/components/SampleDataList'
 
 export default {
   name: "TestResultsTable",
@@ -57,7 +58,8 @@ export default {
     ACard,
     SampleData,
     SimpleTable,
-  },
+    SampleDataList
+},
   props: {
     testingRunResults: obj.arrR,
     showVulnerableOnly: obj.boolR
