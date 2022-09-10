@@ -36,7 +36,7 @@ public class ApiWorkflowExecutor {
         DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
         Context.accountId.set(1_000_000);
 
-        TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq("_id", new ObjectId("6311c58b29a04c2c368511e7")));
+        TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq("_id", new ObjectId("631cac6b09119467be6a1640")));
         WorkflowTestingEndpoints workflowTestingEndpoints = (WorkflowTestingEndpoints) testingRun.getTestingEndpoints();
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         apiWorkflowExecutor.init(workflowTestingEndpoints.getWorkflowTest(), testingRun.getId());
@@ -119,10 +119,7 @@ public class ApiWorkflowExecutor {
                 String statusKey =   nodeId + "." + "response" + "." + "status_code";
                 valuesMap.put(statusKey, statusCode);
 
-                if (HttpResponseParams.validHttpResponseCode(statusCode)) {
-                    populateValuesMap(valuesMap, response.getBody(), nodeId, response.getHeaders(), false, null);
-                    break;
-                }
+                populateValuesMap(valuesMap, response.getBody(), nodeId, response.getHeaders(), false, null);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } catch (Exception e) {
