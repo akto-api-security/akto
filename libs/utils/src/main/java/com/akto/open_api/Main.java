@@ -44,27 +44,22 @@ public class Main {
 
     }
 
-    public static OpenAPI init(int apiCollectionId, List<String> uniqueUrls) throws Exception {
+
+    public static OpenAPI init(String info,Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList) throws Exception {
         OpenAPI openAPI = new OpenAPI();
-        addPaths(openAPI, apiCollectionId, uniqueUrls);
-        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("_id", apiCollectionId);
-        if (apiCollection == null) {
-            addInfo(openAPI,"Invalid apiCollectionId");
-            return openAPI;
-        }
+        addPaths(openAPI, stiList);
         addServer(null, openAPI);
         Paths paths = PathBuilder.parameterizePath(openAPI.getPaths());
         openAPI.setPaths(paths);
-        addInfo(openAPI, apiCollection.getName());
+        addInfo(openAPI,info);
         return openAPI;
     }
 
 
-    public static void addPaths(OpenAPI openAPI, int apiCollectionId, List<String> uniqueUrls) {
+    public static void addPaths(OpenAPI openAPI, Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList) {
         Paths paths = new Paths();
-        for (String url: uniqueUrls) {
-            Map<String, Map<Integer, List<SingleTypeInfo>>> stiMap = getCorrespondingSingleTypeInfo(url,apiCollectionId);
-            buildPathsFromSingleTypeInfosPerUrl(stiMap, url, paths);
+        for(String url : stiList.keySet()){
+            buildPathsFromSingleTypeInfosPerUrl(stiList.get(url), url,paths);
         }
         openAPI.setPaths(paths);
     }
@@ -97,33 +92,6 @@ public class Main {
         PathBuilder.addPathItem(paths, url, method, responseCode, schema);
     }
 
-    public static Map<String, Map<Integer, List<SingleTypeInfo>>> getCorrespondingSingleTypeInfo(String url,
-                                                                                                 int apiCollectionId) {
-        List<SingleTypeInfo> singleTypeInfoList = SingleTypeInfoDao.instance.findAll(
-                Filters.and(
-                        Filters.eq("isHeader", false),
-                        Filters.eq("url", url),
-                        Filters.eq("apiCollectionId", apiCollectionId)
-                )
-        );
-
-        Map<String, Map< Integer, List<SingleTypeInfo>>> stiMap = new HashMap<>();
-
-        for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
-            String method = singleTypeInfo.getMethod();
-            Integer responseCode = singleTypeInfo.getResponseCode();
-
-            if (!stiMap.containsKey(method)) {
-                stiMap.put(method, new HashMap<>());
-            }
-            if (!stiMap.get(method).containsKey(responseCode)) {
-                stiMap.get(method).put(responseCode, new ArrayList<>());
-            }
-
-            stiMap.get(method).get(responseCode).add(singleTypeInfo);
-        }
-        return stiMap;
-    }
 
     public static Schema<?> buildSchema(List<SingleTypeInfo> singleTypeInfoList) throws Exception {
         ObjectSchema schema =new ObjectSchema();
