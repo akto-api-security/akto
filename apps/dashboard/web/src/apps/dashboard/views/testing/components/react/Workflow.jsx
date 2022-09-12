@@ -4,7 +4,7 @@ import ReactFlow, {
   getRectOfNodes
 } from 'react-flow-renderer';
 import { faEye, faEyeSlash, faSave } from '@fortawesome/free-regular-svg-icons';
-import { faPlayCircle, faCalendarPlus} from '@fortawesome/free-regular-svg-icons';
+import { faPlayCircle, faCalendarPlus, faArrowAltCircleDown} from '@fortawesome/free-regular-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import IconButton from "@mui/material/IconButton"
 
@@ -19,6 +19,7 @@ import { makeStyles } from "@material-ui/core/styles";
 import WorkflowResultsDrawer from './WorkflowResultsDrawer.jsx';
 import ScheduleBox from './ScheduleBox.jsx';
 import Menu from '@mui/material/Menu';
+import { saveAs } from 'file-saver'
 
 
 
@@ -61,6 +62,7 @@ const Workflow = ({apiCollectionId}) => {
   const fetchWorkflowTestingSchedule = useStore(state => state.fetchWorkflowTestingSchedule)
   const deleteWorkflowTests = useStore(state => state.deleteWorkflowTests)
   const scheduleWorkflowTest = useStore(state => state.scheduleWorkflowTest)
+  const downloadWorkflowAsJsonFn = useStore(state => state.downloadWorkflowAsJson)
 
   const onConnectStart = (event, {nodeId, handleType}) => {
     setCurrentSource({x: event.screenX, y: event.screenY, nodeId, handleType})
@@ -170,17 +172,28 @@ const Workflow = ({apiCollectionId}) => {
   const fetchWorkflowResult = useStore(state => state.fetchWorkflowResult)
   const onSave = () => {
     if (originalState.id) {
-      editWorkflowTest(originalState.id, nodes.map(JSON.stringify), edges.map(JSON.stringify), nodeEndpointMap)
+      editWorkflowTest(originalState.id, nodes.map(JSON.stringify), edges.map(JSON.stringify), nodeEndpointMap).then((resp) => {
+          window._AKTO.$emit('SHOW_SNACKBAR', {
+              show: true,
+              text: "Workflow saved",
+              color: 'green'
+          })
+      })
     } else {
       createWorkflowTest(nodes.map(JSON.stringify), edges.map(JSON.stringify), nodeEndpointMap, "DRAFT", apiCollectionId).then(resp => {
         setOriginalState(resp.workflowTests[0])
+        window._AKTO.$emit('SHOW_SNACKBAR', {
+            show: true,
+            text: "Workflow saved",
+            color: 'green'
+        })
       })
     }
   }
 
   const saveWorkflowFn = (recurring, startTimestamp) => {
       if (!originalState.id) {
-          console.log("Please save test first")
+          saveWorkflowEmitSnackbar()
           return;
       }
       scheduleWorkflowTest(originalState.id, recurring, startTimestamp)
@@ -188,15 +201,18 @@ const Workflow = ({apiCollectionId}) => {
 
   const deleteWorkflowScheduleFn = () => {
       if (!originalState.id) {
-          console.log("Please save test first")
+          saveWorkflowEmitSnackbar()
           return;
       }
       deleteWorkflowTests(originalState.id)
   }
 
   const fetchResult = () => {
-    if (!originalState.id) return
-    return fetchWorkflowResult(originalState.id).then((resp) => {
+      if (!originalState.id) {
+          saveWorkflowEmitSnackbar()
+          return;
+      }
+      return fetchWorkflowResult(originalState.id).then((resp) => {
       if (!resp) return false
 
       setWorkflowTestingRun(resp["workflowTestingRun"])
@@ -221,13 +237,19 @@ const Workflow = ({apiCollectionId}) => {
 
   const runTest = () => {
       if (!originalState.id) {
-          console.log("Please save test first")
+          saveWorkflowEmitSnackbar()
           return;
       }
 
       setTestRunning(true)
 
-      runWorkflowTest(originalState.id)
+      runWorkflowTest(originalState.id).then((resp) => {
+          window._AKTO.$emit('SHOW_SNACKBAR', {
+              show: true,
+              text: "Running test",
+              color: 'green'
+          })
+      })
 
       setWorkflowTestingRun(null)
       setWorkflowTestResult(null)
@@ -235,6 +257,11 @@ const Workflow = ({apiCollectionId}) => {
       let interval = setInterval(() => {
         fetchResult().then((result) => {
           if (result) {
+              window._AKTO.$emit('SHOW_SNACKBAR', {
+                  show: true,
+                  text: "Test completed",
+                  color: 'green'
+              })
             setTestRunning(false)
             clearInterval(interval)
           }
@@ -251,7 +278,36 @@ const Workflow = ({apiCollectionId}) => {
 
   const showResult = () => setOpen(!open);
 
-  React.useEffect(() => {
+  const downloadWorkflowAsJson = () => {
+      let workflowId = originalState.id
+      if (!workflowId) {
+          saveWorkflowEmitSnackbar()
+          return;
+      }
+      downloadWorkflowAsJsonFn(workflowId).then((resp) => {
+          let workflowTestJson = resp["workflowTestJson"]
+          var blob = new Blob([workflowTestJson], {
+              type: "application/json",
+          });
+          const fileName = "workflow_"+workflowId+".json";
+          saveAs(blob, fileName);
+          window._AKTO.$emit('SHOW_SNACKBAR', {
+              show: true,
+              text: fileName + " downloaded !",
+              color: 'green'
+          })
+      })
+  }
+
+  const saveWorkflowEmitSnackbar = () => {
+      window._AKTO.$emit('SHOW_SNACKBAR', {
+          show: true,
+          text: "Please save the workflow first",
+          color: 'red'
+      })
+  }
+
+    React.useEffect(() => {
     if (originalState.id) {
       fetchResult()
       fetchWorkflowTestingSchedule(originalState.id)
@@ -274,6 +330,10 @@ const Workflow = ({apiCollectionId}) => {
 
       <IconButton onClick={showResult} style={{float : "right"}}>
         <FontAwesomeIcon icon={open ? faEyeSlash : faEye} className="workflow-button"  size="sm"/>
+      </IconButton>
+
+      <IconButton onClick={downloadWorkflowAsJson} style={{float : "right"}}>
+        <FontAwesomeIcon icon={faArrowAltCircleDown} className="workflow-button"  size="sm"/>
       </IconButton>
 
       <Menu

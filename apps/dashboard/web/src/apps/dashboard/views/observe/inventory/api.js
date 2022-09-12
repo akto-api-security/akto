@@ -321,6 +321,24 @@ export default {
                 "workflowTestId": id,
             }
         })
+    },
+
+    downloadWorkflowAsJson(id) {
+        return request({
+            url: '/api/downloadWorkflowAsJson',
+            method: 'post',
+            data: {
+                "id": id,
+            }
+        })
+    },
+
+    uploadWorkflowJson(workflowTestJson, apiCollectionId) {
+        return request({
+            url: '/api/uploadWorkflowJson',
+            method: 'post',
+            data: { workflowTestJson, apiCollectionId }
+        })
     }
 
 }

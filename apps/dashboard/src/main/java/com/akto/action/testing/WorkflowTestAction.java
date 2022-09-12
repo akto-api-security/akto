@@ -11,6 +11,7 @@ import com.akto.dto.testing.WorkflowNodeDetails;
 import com.akto.dto.testing.WorkflowTest;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.InsertOneResult;
@@ -143,6 +144,48 @@ public class WorkflowTestAction extends UserAction {
         workflowTests.add(WorkflowTestsDao.instance.findOne("_id", id));
     }
 
+    private String workflowTestJson;
+    public String downloadWorkflowAsJson() {
+        WorkflowTest workflowTest = findWorkflowTest(id);
+        if (workflowTest == null) {
+            addActionError("Invalid workflow test");
+            return ERROR.toUpperCase();
+        }
+
+        workflowTestJson = new Gson().toJson(workflowTest);
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String uploadWorkflowJson() {
+        WorkflowTest workflowTest = new Gson().fromJson(workflowTestJson,WorkflowTest.class);
+
+        if (workflowTest == null) {
+            addActionError("Invalid workflow test json");
+            return ERROR.toUpperCase();
+        }
+
+        int id = Context.now();
+        String author = getSUser().getLogin();
+        int createdTimestamp = id;
+        String editor = author;
+        int lastEdited = createdTimestamp;
+
+        workflowTest.setId(id);
+        workflowTest.setAuthor(author);
+        workflowTest.setCreatedTimestamp(createdTimestamp);
+        workflowTest.setEditor(author);
+        workflowTest.setLastEdited(lastEdited);
+        workflowTest.setApiCollectionId(apiCollectionId);
+
+        WorkflowTestsDao.instance.insertOne(workflowTest);
+
+        workflowTests = new ArrayList<>();
+        workflowTests.add(workflowTest);
+
+        return SUCCESS.toUpperCase();
+    }
+
     public int getApiCollectionId() {
         return this.apiCollectionId;
     }
@@ -205,5 +248,13 @@ public class WorkflowTestAction extends UserAction {
 
     public void setStr(String str) {
         this.str = str;
-    }    
+    }
+
+    public String getWorkflowTestJson() {
+        return workflowTestJson;
+    }
+
+    public void setWorkflowTestJson(String workflowTestJson) {
+        this.workflowTestJson = workflowTestJson;
+    }
 }

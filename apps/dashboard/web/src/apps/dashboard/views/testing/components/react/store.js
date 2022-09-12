@@ -182,6 +182,10 @@ const useStore = create((set, get) => ({
         testingSchedule: null
       })
     })
+  },
+
+  downloadWorkflowAsJson: (id) => {
+    return api.downloadWorkflowAsJson(id)
   }
 
 }));
