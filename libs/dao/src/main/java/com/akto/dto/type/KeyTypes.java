@@ -78,7 +78,8 @@ public class KeyTypes {
 
         SingleTypeInfo.Domain domain = singleTypeInfo.getDomain();
         if (domain == null || domain == SingleTypeInfo.Domain.ENUM) {
-            singleTypeInfo.getValues().add(object.toString());
+            String value  = object == null ? "null" : object.toString();
+            singleTypeInfo.getValues().add(value);
         }
 
         SensitiveParamInfo sensitiveParamInfo = new SensitiveParamInfo(

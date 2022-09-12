@@ -30,7 +30,7 @@ public class SampleDataToSTITest extends MongoBasedTest{
         List<SampleData> sampleDataDB = SampleDataDao.instance.findAll(new BasicDBObject());
         sampleDataToSTI.setSampleDataToSTI(sampleDataDB);
 
-        assertEquals(sampleDataToSTI.getSingleTypeList().size(), 21);
+        assertEquals(sampleDataToSTI.getSingleTypeList().size(), 38);
         assertEquals(sampleDataToSTI.getSingleTypeInfoMap().size(), 1);
 
     }
