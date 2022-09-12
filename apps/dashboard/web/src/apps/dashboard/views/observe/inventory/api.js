@@ -303,9 +303,9 @@ export default {
         })
     },
 
-    deleteWorkflowTests(workflowId) {
+    deleteScheduledWorkflowTests(workflowId) {
         return request({
-            url: '/api/deleteWorkflowTests',
+            url: '/api/deleteScheduledWorkflowTests',
             method: 'post',
             data: {
                 "workflowTestId" : workflowId

@@ -1090,7 +1090,7 @@
             </result>
         </action>
 
-        <action name="api/deleteWorkflowTests" class="com.akto.action.testing.StartTestAction" method="deleteWorkflowTests">
+        <action name="api/deleteScheduledWorkflowTests" class="com.akto.action.testing.StartTestAction" method="deleteScheduledWorkflowTests">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>

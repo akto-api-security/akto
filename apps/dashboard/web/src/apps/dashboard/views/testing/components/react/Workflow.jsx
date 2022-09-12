@@ -60,7 +60,7 @@ const Workflow = ({apiCollectionId}) => {
 
   const testingSchedule = useStore(state => state.testingSchedule)
   const fetchWorkflowTestingSchedule = useStore(state => state.fetchWorkflowTestingSchedule)
-  const deleteWorkflowTests = useStore(state => state.deleteWorkflowTests)
+  const deleteScheduledWorkflowTests = useStore(state => state.deleteScheduledWorkflowTests)
   const scheduleWorkflowTest = useStore(state => state.scheduleWorkflowTest)
   const downloadWorkflowAsJsonFn = useStore(state => state.downloadWorkflowAsJson)
 
@@ -204,7 +204,7 @@ const Workflow = ({apiCollectionId}) => {
           saveWorkflowEmitSnackbar()
           return;
       }
-      deleteWorkflowTests(originalState.id)
+      deleteScheduledWorkflowTests(originalState.id)
   }
 
   const fetchResult = () => {

@@ -176,8 +176,8 @@ const useStore = create((set, get) => ({
     })
   },
 
-  deleteWorkflowTests: (id) => {
-    api.deleteWorkflowTests(id).then((resp) => {
+  deleteScheduledWorkflowTests: (id) => {
+    api.deleteScheduledWorkflowTests(id).then((resp) => {
       set({
         testingSchedule: null
       })
