@@ -7,6 +7,7 @@ import java.util.List;
 
 import org.junit.Test;
 
+import com.akto.MongoBasedTest;
 import com.akto.dao.SampleDataDao;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
