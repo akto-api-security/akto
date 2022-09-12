@@ -17,6 +17,7 @@ import com.akto.runtime.URLAggregator;
 
 public class SampleDataToSTI {
 
+    // url -> method -> response code -> list(singleTypeInfo)
     private Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList = new HashMap<>();
     private List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
 
@@ -26,17 +27,26 @@ public class SampleDataToSTI {
 
     public void setSampleDataToSTI(List<SampleData> allData) {
 
+        HttpCallParser parse = new HttpCallParser("", 0, 0, 0);
         for (SampleData sampleData : allData) {
 
             Method method = sampleData.getId().getMethod();
             String url = sampleData.getId().getUrl();
-            Integer responseCode = sampleData.getId().getResponseCode();
             List<SingleTypeInfo> singleTypeInfoPerURL = new ArrayList<>();
             for (String dataString : sampleData.getSamples()) {
-                singleTypeInfoPerURL.addAll(getSampleDataToSTIUtil(dataString, url));
+                singleTypeInfoPerURL.addAll(getSampleDataToSTIUtil(dataString, url, parse));
             }
             Map<Integer, List<SingleTypeInfo>> responseCodeToSTI = new HashMap<>();
-            responseCodeToSTI.put(responseCode, singleTypeInfoPerURL);
+            for(SingleTypeInfo singleTypeInfo:singleTypeInfoPerURL){
+                if(responseCodeToSTI.containsKey(singleTypeInfo.getResponseCode())){
+                    responseCodeToSTI.get(singleTypeInfo.getResponseCode()).add(singleTypeInfo);
+                }
+                else{
+                    List<SingleTypeInfo> temp = new ArrayList<>();
+                    temp.add(singleTypeInfo);
+                    responseCodeToSTI.put(singleTypeInfo.getResponseCode(),temp);
+                }
+            }
             Map<String, Map<Integer, List<SingleTypeInfo>>> stiMap = new HashMap<>();
             stiMap.put(method.toString(), responseCodeToSTI);
             stiList.put(url,stiMap);
@@ -45,17 +55,27 @@ public class SampleDataToSTI {
     }
 
     public void setSensitiveSampleDataToSTI(List<SensitiveSampleData> allData){
+
+        HttpCallParser parse = new HttpCallParser("", 0, 0, 0);
         for (SensitiveSampleData sensitiveSampleData : allData) {
 
             String method = sensitiveSampleData.getId().getMethod();
             String url = sensitiveSampleData.getId().getUrl();
-            Integer responseCode = sensitiveSampleData.getId().getResponseCode();
             List<SingleTypeInfo> singleTypeInfoPerURL = new ArrayList<>();
             for (String dataString : sensitiveSampleData.getSampleData()) {
-                singleTypeInfoPerURL.addAll(getSampleDataToSTIUtil(dataString, url));
+                singleTypeInfoPerURL.addAll(getSampleDataToSTIUtil(dataString, url, parse));
             }
             Map<Integer, List<SingleTypeInfo>> responseCodeToSTI = new HashMap<>();
-            responseCodeToSTI.put(responseCode, singleTypeInfoPerURL);
+            for(SingleTypeInfo singleTypeInfo:singleTypeInfoPerURL){
+                if(responseCodeToSTI.containsKey(singleTypeInfo.getResponseCode())){
+                    responseCodeToSTI.get(singleTypeInfo.getResponseCode()).add(singleTypeInfo);
+                }
+                else{
+                    List<SingleTypeInfo> temp = new ArrayList<>();
+                    temp.add(singleTypeInfo);
+                    responseCodeToSTI.put(singleTypeInfo.getResponseCode(),temp);
+                }
+            }
             Map<String, Map<Integer, List<SingleTypeInfo>>> stiMap = new HashMap<>();
             stiMap.put(method.toString(), responseCodeToSTI);
             stiList.put(url,stiMap);
@@ -71,11 +91,10 @@ public class SampleDataToSTI {
         return this.singleTypeInfos;
     }
 
-    private List<SingleTypeInfo> getSampleDataToSTIUtil(String dataString, String url) {
+    private List<SingleTypeInfo> getSampleDataToSTIUtil(String dataString, String url, HttpCallParser parse) {
 
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
 
-        HttpCallParser parse = new HttpCallParser("", 0, 0, 0);
         HttpResponseParams httpResponseParams = new HttpResponseParams();
         boolean flag = false;
 
