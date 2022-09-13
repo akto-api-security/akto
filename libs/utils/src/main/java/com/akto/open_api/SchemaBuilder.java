@@ -1,6 +1,8 @@
 package com.akto.open_api;
 
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.types.CappedSet;
+
 import io.swagger.v3.oas.models.media.*;
 
 import java.util.*;
@@ -16,6 +18,7 @@ public class SchemaBuilder {
 
 
         if (params.size() == 0) {
+            schema1.setExample(curr.example);
             properties.put(curr.name, schema1);
             if (schema instanceof ObjectSchema) {
                 schema.setProperties(properties);
@@ -67,15 +70,17 @@ public class SchemaBuilder {
     public static class CustomSchema {
         public Class<? extends Schema> type;
         public String name;
+        public String example;
 
-        public CustomSchema(Class<? extends Schema> type, String name) {
+        public CustomSchema(Class<? extends Schema> type, String name, String example) {
             this.type = type;
             this.name = name;
+            this.example = example;
         }
 
         @Override
         public String toString() {
-            return name + "-" + type;
+            return name + "-" + type + "-" + example;
         }
     }
 
@@ -94,17 +99,19 @@ public class SchemaBuilder {
                 if (Objects.equals(name, "$")) {
                     name = null;
                 }
-                customSchemas.add(customSchemaFromSubType(singleTypeInfo.getSubType(),name));
+                CappedSet<String> values = singleTypeInfo.getValues();
+                String example = values != null && values.count() > 0 ? (String) values.getElements().toArray()[0] : null;
+                customSchemas.add(customSchemaFromSubType(singleTypeInfo.getSubType(), name, example));
                 break;
             }
             if (!Objects.equals(x, "$")) {
                 if (Objects.equals(paramList[idx + 1], "$")) {
-                    customSchemas.add(new CustomSchema(ArraySchema.class, x));
+                    customSchemas.add(new CustomSchema(ArraySchema.class, x, null));
                     if (idx != paramList.length -2) {
-                        customSchemas.add(new CustomSchema(ObjectSchema.class, null));
+                        customSchemas.add(new CustomSchema(ObjectSchema.class, null, null));
                     }
                 } else {
-                    customSchemas.add(new CustomSchema(ObjectSchema.class, x));
+                    customSchemas.add(new CustomSchema(ObjectSchema.class, x, null));
                 }
             }
 
@@ -115,10 +122,10 @@ public class SchemaBuilder {
         return customSchemas;
     }
 
-    public static CustomSchema customSchemaFromSubType(SingleTypeInfo.SubType subType, String name) {
+    public static CustomSchema customSchemaFromSubType(SingleTypeInfo.SubType subType, String name, String example) {
         Class<? extends Schema> type = subType.getSwaggerSchemaClass();
 
-        return new CustomSchema(type,name);
+        return new CustomSchema(type,name, example);
     }
 
 }
