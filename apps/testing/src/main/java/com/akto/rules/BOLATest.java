@@ -19,7 +19,7 @@ public class BOLATest extends TestPlugin {
     public boolean start(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId) {
         RawApi rawApi = SampleMessageStore.fetchOriginalMessage(apiInfoKey);
         if (rawApi == null) {
-            addWithoutRequestError(apiInfoKey, testRunId, TestResult.TestError.NO_PATH);
+            addWithoutRequestError(apiInfoKey, testRunId, null, TestResult.TestError.NO_PATH);
             return false;
         }
 
@@ -28,7 +28,7 @@ public class BOLATest extends TestPlugin {
 
         AuthMechanism authMechanism = AuthMechanismStore.getAuthMechanism();
         if (authMechanism == null) {
-            addWithoutRequestError(apiInfoKey, testRunId, TestResult.TestError.NO_AUTH_MECHANISM);
+            addWithoutRequestError(apiInfoKey, testRunId, rawApi.getOriginalMessage(), TestResult.TestError.NO_AUTH_MECHANISM);
             return false;
         }
 
@@ -36,28 +36,23 @@ public class BOLATest extends TestPlugin {
         if (!result) return false; // this means that auth token was not there in original request so exit
 
         ContainsPrivateResourceResult containsPrivateResourceResult = containsPrivateResource(originalHttpRequest, apiInfoKey);
-        if (!containsPrivateResourceResult.isPrivate) { // contains 1 or more public parameters... so don't test
-            OriginalHttpResponse newOriginalHttpResponse= new OriginalHttpResponse(null, new HashMap<>(), 0);
-            addTestSuccessResult(apiInfoKey, originalHttpRequest,  newOriginalHttpResponse, testRunId, false);
-            return false;
-        }
 
         OriginalHttpResponse response = null;
         try {
             response = ApiExecutor.sendRequest(originalHttpRequest, true);
         } catch (Exception e) {
-            addWithRequestError(apiInfoKey, testRunId, TestResult.TestError.API_REQUEST_FAILED, originalHttpRequest);
+            addWithRequestError(apiInfoKey, rawApi.getOriginalMessage(), testRunId, TestResult.TestError.API_REQUEST_FAILED, originalHttpRequest);
             return false;
         }
 
         int statusCode = StatusCodeAnalyser.getStatusCode(response.getBody(), response.getStatusCode());
-        boolean vulnerable = isStatusGood(statusCode);
+        boolean vulnerable = isStatusGood(statusCode) && !containsPrivateResourceResult.isPrivate;
+        double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), response.getBody());
         if (vulnerable) {
-            double val = compareWithOriginalResponse(originalHttpResponse.getBody(), response.getBody());
-            vulnerable = val > 90;
+            vulnerable = percentageMatch > 90;
         }
 
-        addTestSuccessResult(apiInfoKey,originalHttpRequest, response, testRunId, vulnerable);
+        addTestSuccessResult(apiInfoKey,originalHttpRequest, response, rawApi.getOriginalMessage(), testRunId, vulnerable, percentageMatch);
 
         return vulnerable;
     }

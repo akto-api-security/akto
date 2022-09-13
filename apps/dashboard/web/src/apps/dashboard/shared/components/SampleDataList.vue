@@ -9,7 +9,7 @@
                 </v-btn>
             </div>
             <div v-if="json['message']">
-                <sample-data :json="json"/>
+                <sample-data :json="json" requestTitle="Request" responseTitle="Response"/>
             </div>
         </div>
     </div>

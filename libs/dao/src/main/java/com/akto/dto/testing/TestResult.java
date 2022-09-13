@@ -12,6 +12,9 @@ public class TestResult {
     private boolean vulnerable;
     private List<TestError> errors;
 
+    private String originalMessage;
+    private double percentageMatch;
+
     private List<SingleTypeInfo> privateSingleTypeInfos = new ArrayList<>();
 
     public enum TestError {
@@ -19,11 +22,14 @@ public class TestResult {
         FAILED_BUILDING_REQUEST_BODY
     }
 
-    public TestResult(String message, boolean vulnerable, List<TestError> errors, List<SingleTypeInfo> privateSingleTypeInfos) {
+    public TestResult(String message, String originalMessage, boolean vulnerable,
+                      List<TestError> errors, List<SingleTypeInfo> privateSingleTypeInfos, double percentageMatch) {
         this.message = message;
         this.vulnerable = vulnerable;
         this.errors = errors;
         this.privateSingleTypeInfos = privateSingleTypeInfos;
+        this.originalMessage = originalMessage;
+        this.percentageMatch = percentageMatch;
     }
 
     public TestResult() {
@@ -59,5 +65,21 @@ public class TestResult {
 
     public void setPrivateSingleTypeInfos(List<SingleTypeInfo> privateSingleTypeInfos) {
         this.privateSingleTypeInfos = privateSingleTypeInfos;
+    }
+
+    public String getOriginalMessage() {
+        return originalMessage;
+    }
+
+    public void setOriginalMessage(String originalMessage) {
+        this.originalMessage = originalMessage;
+    }
+
+    public double getPercentageMatch() {
+        return percentageMatch;
+    }
+
+    public void setPercentageMatch(double percentageMatch) {
+        this.percentageMatch = percentageMatch;
     }
 }

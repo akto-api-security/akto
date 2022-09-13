@@ -2,7 +2,7 @@
     <div class="d-flex" style="margin: 24px">
         <div class="flex-equal" >
             <sample-single-side
-                title="Request" 
+                :title="requestTitle" 
                 :firstLine='requestFirstLine'
                 :headers="{}" 
                 :data="requestJson"
@@ -13,7 +13,7 @@
         </div>
         <div class="flex-equal" >
             <sample-single-side               
-                title="Response" 
+                :title="responseTitle" 
                 :firstLine='responseFirstLine' 
                 :headers="{}" 
                 :data="responseJson"
@@ -36,7 +36,9 @@ export default {
         SampleSingleSide
     },
     props: {
-        json: obj.objR
+        json: obj.objR,
+        requestTitle: obj.ObjR,
+        responseTitle: obj.ObjR
     },
     data () {
         return {

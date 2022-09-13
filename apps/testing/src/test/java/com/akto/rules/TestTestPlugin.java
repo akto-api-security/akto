@@ -66,15 +66,15 @@ public class TestTestPlugin extends MongoBasedTest {
 
         ApiInfo.ApiInfoKey apiInfoKey1 = new ApiInfo.ApiInfoKey(0,"url1", URLMethods.Method.GET);
         ObjectId testRunId1 = new ObjectId();
-        bolaTest.addWithoutRequestError(apiInfoKey1, testRunId1, TestResult.TestError.API_REQUEST_FAILED);
-        noAuthTest.addWithoutRequestError(apiInfoKey1, testRunId1, TestResult.TestError.NO_AUTH_MECHANISM);
+        bolaTest.addWithoutRequestError(apiInfoKey1, testRunId1,"", TestResult.TestError.API_REQUEST_FAILED);
+        noAuthTest.addWithoutRequestError(apiInfoKey1, testRunId1, "",TestResult.TestError.NO_AUTH_MECHANISM);
 
         ApiInfo.ApiInfoKey apiInfoKey2 = new ApiInfo.ApiInfoKey(0,"url1", URLMethods.Method.POST);
         ObjectId testRunId2 = new ObjectId();
-        bolaTest.addWithoutRequestError(apiInfoKey2, testRunId2, TestResult.TestError.NO_PATH);
+        bolaTest.addWithoutRequestError(apiInfoKey2, testRunId2, "",TestResult.TestError.NO_PATH);
 
         ObjectId testRunId3 = new ObjectId();
-        noAuthTest.addWithoutRequestError(apiInfoKey1, testRunId3, TestResult.TestError.NO_PATH);
+        noAuthTest.addWithoutRequestError(apiInfoKey1, testRunId3, "",TestResult.TestError.NO_PATH);
 
         List<TestingRunResult> testingRunResultList = TestingRunResultDao.instance.findAll(new BasicDBObject());
         assertEquals(testingRunResultList.size(),3);

@@ -109,7 +109,7 @@ public class SampleMessageStore {
             OriginalHttpResponse response = new OriginalHttpResponse();
             response.buildFromSampleMessage(message);
 
-            return new RawApi(request, response);
+            return new RawApi(request, response, message);
         } catch(Exception e) {
             return null;
         }

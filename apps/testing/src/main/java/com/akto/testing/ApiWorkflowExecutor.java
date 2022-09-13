@@ -42,28 +42,28 @@ public class ApiWorkflowExecutor {
 
         int id = Context.now();
         WorkflowTestResult workflowTestResult = new WorkflowTestResult(id, workflowTest.getId(), new HashMap<>(), testingRunId);
-        Map<String, TestResult> testResultMap = workflowTestResult.getTestResultMap();
+        Map<String, WorkflowTestResult.NodeResult> testResultMap = workflowTestResult.getNodeResultMap();
         for (Node node: nodes) {
-            TestResult testResult;
+            WorkflowTestResult.NodeResult nodeResult;
             try {
-                testResult = processNode(node, valuesMap);
+                nodeResult = processNode(node, valuesMap);
             } catch (Exception e) {
                 e.printStackTrace();
-                List<TestResult.TestError> testErrors = new ArrayList<>();
-                testErrors.add(TestResult.TestError.SOMETHING_WENT_WRONG);
-                testResult = new TestResult("{}", false, testErrors, new ArrayList<>());
+                List<String> testErrors = new ArrayList<>();
+                testErrors.add("Something went wrong");
+                nodeResult = new WorkflowTestResult.NodeResult("{}", false, testErrors);
             }
 
-            testResultMap.put(node.getId(), testResult);
+            testResultMap.put(node.getId(), nodeResult);
 
-            if (testResult.getErrors().size() > 0) break;
+            if (nodeResult.getErrors().size() > 0) break;
         }
 
         WorkflowTestResultsDao.instance.insertOne(workflowTestResult);
     }
 
-    public TestResult processNode(Node node, Map<String, Object> valuesMap) {
-        List<TestResult.TestError> testErrors = new ArrayList<>();
+    public WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap) {
+        List<String> testErrors = new ArrayList<>();
         WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
         WorkflowUpdatedSampleData updatedSampleData = workflowNodeDetails.getUpdatedSampleData();
         WorkflowNodeDetails.Type type = workflowNodeDetails.getType();
@@ -75,7 +75,7 @@ public class ApiWorkflowExecutor {
             if (request == null) throw new Exception();
         } catch (Exception e) {
             e.printStackTrace();
-            return new TestResult(null, false, Collections.singletonList(TestResult.TestError.FAILED_BUILDING_REQUEST_BODY), new ArrayList<>());
+            return new WorkflowTestResult.NodeResult(null, false, Collections.singletonList("Failed building request body"));
         }
 
         populateValuesMap(valuesMap, request.getBody(), node.getId(), request.getHeaders(),
@@ -99,7 +99,7 @@ public class ApiWorkflowExecutor {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } catch (Exception e) {
-                testErrors.add(TestResult.TestError.API_REQUEST_FAILED);
+                testErrors.add("API request failed");
                 e.printStackTrace();
             }
         }
@@ -112,7 +112,7 @@ public class ApiWorkflowExecutor {
             e.printStackTrace();
         }
 
-        return new TestResult(message, false, testErrors, new ArrayList<>());
+        return new WorkflowTestResult.NodeResult(message, false, testErrors);
     }
 
     public void populateValuesMap(Map<String, Object> valuesMap, String payloadStr, String nodeId, Map<String,

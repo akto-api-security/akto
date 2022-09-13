@@ -18,15 +18,16 @@ public class NoAuthTest extends TestPlugin {
     public boolean start(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId) {
         RawApi rawApi = SampleMessageStore.fetchOriginalMessage(apiInfoKey);
         if (rawApi == null) {
-            addWithoutRequestError(apiInfoKey, testRunId, TestResult.TestError.NO_PATH);
+            addWithoutRequestError(apiInfoKey, testRunId, null,TestResult.TestError.NO_PATH);
             return false;
         }
 
         OriginalHttpRequest originalHttpRequest = rawApi.getRequest();
+        OriginalHttpResponse originalHttpResponse = rawApi.getResponse();
 
         AuthMechanism authMechanism = AuthMechanismStore.getAuthMechanism();
         if (authMechanism == null) {
-            addWithoutRequestError(apiInfoKey, testRunId, TestResult.TestError.NO_AUTH_MECHANISM);
+            addWithoutRequestError(apiInfoKey, testRunId, rawApi.getOriginalMessage(), TestResult.TestError.NO_AUTH_MECHANISM);
             return false;
         }
 
@@ -37,14 +38,16 @@ public class NoAuthTest extends TestPlugin {
         try {
             response = ApiExecutor.sendRequest(originalHttpRequest, true);
         } catch (Exception e) {
-            addWithRequestError(apiInfoKey, testRunId, TestResult.TestError.API_REQUEST_FAILED, originalHttpRequest);
+            addWithRequestError(apiInfoKey, rawApi.getOriginalMessage(), testRunId, TestResult.TestError.API_REQUEST_FAILED, originalHttpRequest);
             return false;
         }
 
         int statusCode = StatusCodeAnalyser.getStatusCode(response.getBody(), response.getStatusCode());
         boolean vulnerable = isStatusGood(statusCode);
 
-        addTestSuccessResult(apiInfoKey, originalHttpRequest, response, testRunId, vulnerable);
+        double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), response.getBody());
+
+        addTestSuccessResult(apiInfoKey, originalHttpRequest, response, rawApi.getOriginalMessage(), testRunId, vulnerable, percentageMatch);
 
         return vulnerable;
     }
