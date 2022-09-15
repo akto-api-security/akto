@@ -14,7 +14,7 @@
                         <sample-data :json="jsonBasic" requestTitle="Test Request" responseTitle="Test Response"/>
                     </template>
                     <template slot="Details">
-                        <sample-data :json="jsonAdvance" requestTitle="Original Request" responseTitle="Original Response"/>
+                        <test-result-details :jsonAdvance="jsonAdvance" :percentageMatch="percentageMatch"/>
                     </template>
                 </layout-with-tabs>
             </div>
@@ -29,12 +29,15 @@
 import obj from "@/util/obj";
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import SampleData from "../../../shared/components/SampleData";
+import TestResultDetails from "./TestResultDetails";
+import func from "@/util/func";
 
 export default {
   name: "TestResultsDialog",
   components: {
     SampleData,
-    LayoutWithTabs
+    LayoutWithTabs,
+    TestResultDetails
 },
   props: {
     testingRunResult: obj.arrR
@@ -55,7 +58,7 @@ export default {
         return this.testingRunResult.map(x => {return {message: x[1].message, title: x[0], highlightPaths:[], errors: x[1].errors}}) 
     },
     messagesAdvance() {
-        return this.testingRunResult.map(x => {return {message: x[1].originalMessage, title: x[0], highlightPaths:[], errors: x[1].errors}}) 
+        return this.testingRunResult.map(x => {return {message: x[1].originalMessage, title: x[0], highlightPaths:[], errors: x[1].errors, percentageMatch: x[1].percentageMatch}}) 
     },
     jsonBasic: function() {
         if (this.testingRunResult == null) return null
@@ -65,6 +68,11 @@ export default {
             title: currentMessage["title"],
             "highlightPaths": currentMessage["highlightPaths"],
         }
+    },
+    percentageMatch: function() {
+        if (this.testingRunResult == null) return null
+        let currentMessage = this.messagesAdvance[this.currentIndex]
+        return func.prettifyShort(currentMessage["percentageMatch"])
     },
     jsonAdvance: function() {
         if (this.testingRunResult == null) return null
