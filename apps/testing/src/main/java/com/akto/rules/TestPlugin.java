@@ -74,7 +74,8 @@ public abstract class TestPlugin {
 
     public void addWithoutRequestError(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, String originalMessage, TestResult.TestError testError) {
         Bson filter = TestingRunResultDao.generateFilter(testRunId, apiInfoKey.getApiCollectionId(), apiInfoKey.url, apiInfoKey.method.name());
-        Bson update = Updates.set("resultMap." + testName(), new TestResult(null, originalMessage,false, Collections.singletonList(testError), new ArrayList<>(), 0));
+        TestResult testResult = new TestResult(null, originalMessage,false, Collections.singletonList(testError), new ArrayList<>(), 0, TestResult.Confidence.LOW);
+        Bson update = Updates.set("resultMap." + testName(), testResult);
         TestingRunResultDao.instance.updateOne(filter, update);
     }
 
@@ -88,14 +89,16 @@ public abstract class TestPlugin {
             e.printStackTrace();
         }
 
-        Bson update = Updates.set("resultMap." + testName(), new TestResult(message, originalMessage, false, Collections.singletonList(testError), new ArrayList<>(), 0));
+        TestResult testResult = new TestResult(message, originalMessage, false, Collections.singletonList(testError), new ArrayList<>(), 0, TestResult.Confidence.LOW);
+        Bson update = Updates.set("resultMap." + testName(), testResult);
         TestingRunResultDao.instance.updateOne(filter, update);
     }
 
 
     public void addTestSuccessResult(ApiInfo.ApiInfoKey apiInfoKey, OriginalHttpRequest request,
                                      OriginalHttpResponse response, String originalMessage, ObjectId testRunId,
-                                     boolean vulnerable, double percentageMatch, List<SingleTypeInfo> singleTypeInfos) {
+                                     boolean vulnerable, double percentageMatch, List<SingleTypeInfo> singleTypeInfos,
+                                     TestResult.Confidence confidence) {
         String message = null;
         try {
             message = RedactSampleData.convertOriginalReqRespToString(request, response);
@@ -106,7 +109,9 @@ public abstract class TestPlugin {
         }
 
         Bson filter = TestingRunResultDao.generateFilter(testRunId, apiInfoKey);
-        Bson update = Updates.set("resultMap." + testName(), new TestResult(message, originalMessage, vulnerable, new ArrayList<>(), singleTypeInfos, percentageMatch));
+        TestResult testResult = new TestResult(message, originalMessage, vulnerable, new ArrayList<>(), singleTypeInfos,
+                percentageMatch, confidence);
+        Bson update = Updates.set("resultMap." + testName(), testResult);
         TestingRunResultDao.instance.updateOne(filter, update);
     }
 

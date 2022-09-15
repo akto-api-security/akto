@@ -11,25 +11,32 @@ public class TestResult {
     private String message;
     private boolean vulnerable;
     private List<TestError> errors;
+    private Confidence confidence;
 
     private String originalMessage;
     private double percentageMatch;
+
+    public enum Confidence {
+        HIGH, MEDIUM, LOW
+    }
 
     private List<SingleTypeInfo> privateSingleTypeInfos = new ArrayList<>();
 
     public enum TestError {
         NO_PATH, NO_HAPPY_PATH, NO_AUTH_MECHANISM, API_REQUEST_FAILED, SOMETHING_WENT_WRONG, MISSING_REQUEST_BODY,
-        FAILED_BUILDING_REQUEST_BODY
+        FAILED_BUILDING_REQUEST_BODY, NO_AUTH_TOKEN_FOUND
     }
 
     public TestResult(String message, String originalMessage, boolean vulnerable,
-                      List<TestError> errors, List<SingleTypeInfo> privateSingleTypeInfos, double percentageMatch) {
+                      List<TestError> errors, List<SingleTypeInfo> privateSingleTypeInfos, double percentageMatch,
+                      Confidence confidence) {
         this.message = message;
         this.vulnerable = vulnerable;
         this.errors = errors;
         this.privateSingleTypeInfos = privateSingleTypeInfos;
         this.originalMessage = originalMessage;
         this.percentageMatch = percentageMatch;
+        this.confidence = confidence;
     }
 
     public TestResult() {
@@ -81,5 +88,13 @@ public class TestResult {
 
     public void setPercentageMatch(double percentageMatch) {
         this.percentageMatch = percentageMatch;
+    }
+
+    public Confidence getConfidence() {
+        return confidence;
+    }
+
+    public void setConfidence(Confidence confidence) {
+        this.confidence = confidence;
     }
 }

@@ -36,6 +36,7 @@ public class BOLATest extends TestPlugin {
         if (!result) return false; // this means that auth token was not there in original request so exit
 
         ContainsPrivateResourceResult containsPrivateResourceResult = containsPrivateResource(originalHttpRequest, apiInfoKey);
+        TestResult.Confidence confidence = containsPrivateResourceResult.findPrivateOnes().size() > 0 ? TestResult.Confidence.HIGH : TestResult.Confidence.LOW;
 
         OriginalHttpResponse response = null;
         try {
@@ -50,7 +51,7 @@ public class BOLATest extends TestPlugin {
         boolean vulnerable = isStatusGood(statusCode) && !containsPrivateResourceResult.isPrivate && percentageMatch > 90;
 
         addTestSuccessResult(apiInfoKey,originalHttpRequest, response, rawApi.getOriginalMessage(), testRunId,
-                vulnerable, percentageMatch, containsPrivateResourceResult.singleTypeInfos);
+                vulnerable, percentageMatch, containsPrivateResourceResult.singleTypeInfos, confidence);
 
         return vulnerable;
     }

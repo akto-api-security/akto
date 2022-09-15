@@ -31,8 +31,11 @@ public class NoAuthTest extends TestPlugin {
             return false;
         }
 
-        boolean result = authMechanism.removeAuthFromRequest(originalHttpRequest);
-        if (!result) return false;
+        boolean authTokenFound = authMechanism.removeAuthFromRequest(originalHttpRequest);
+        if (authTokenFound) {
+            addWithRequestError(apiInfoKey, rawApi.getOriginalMessage(), testRunId, TestResult.TestError.NO_AUTH_TOKEN_FOUND, originalHttpRequest);
+            return true; // so that BOLA is not executed
+        }
 
         OriginalHttpResponse response = null;
         try {
@@ -48,7 +51,7 @@ public class NoAuthTest extends TestPlugin {
         double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), response.getBody());
 
         addTestSuccessResult(apiInfoKey, originalHttpRequest, response, rawApi.getOriginalMessage(), testRunId,
-                vulnerable, percentageMatch, new ArrayList<>());
+                vulnerable, percentageMatch, new ArrayList<>(), TestResult.Confidence.HIGH);
 
         return vulnerable;
     }

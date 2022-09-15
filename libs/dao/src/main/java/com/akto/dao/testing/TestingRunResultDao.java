@@ -103,7 +103,7 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
             Map<String, TestResult> m = new HashMap<>();
             for (String k: resultMapObj.keySet()) {
                 BasicDBObject b = (BasicDBObject) resultMapObj.get(k);
-                TestResult testResult = new TestResult("", "" ,(boolean)b.get("vulnerable"), null,null, 0);
+                TestResult testResult = new TestResult("", "" ,(boolean)b.get("vulnerable"), null,null, 0, TestResult.Confidence.LOW);
                 m.put(k, testResult);
             }
 
