@@ -9,11 +9,11 @@
                 </v-btn>
             </div>
             <div v-if="jsonBasic['message']">
-                <layout-with-tabs title="" :tabs="['Basic', 'Advance']" ref="layoutWithTabs">
-                    <template slot="Basic">
+                <layout-with-tabs title="" :tabs="['Attempt', 'Details']" ref="layoutWithTabs">
+                    <template slot="Attempt">
                         <sample-data :json="jsonBasic" requestTitle="Test Request" responseTitle="Test Response"/>
                     </template>
-                    <template slot="Advance">
+                    <template slot="Details">
                         <sample-data :json="jsonAdvance" requestTitle="Original Request" responseTitle="Original Response"/>
                     </template>
                 </layout-with-tabs>
