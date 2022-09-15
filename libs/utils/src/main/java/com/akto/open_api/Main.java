@@ -13,6 +13,7 @@ import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.Paths;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.media.*;
+import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.oas.models.servers.Server;
 
 import java.net.URI;
@@ -83,19 +84,47 @@ public class Main {
         try {
             schema = buildSchema(singleTypeInfoList);
         } catch (Exception e) {
-            logger.error("ERROR in addPathItems " + e);
+            logger.error("ERROR in building schema in addPathItems " + e);
         }
         if (schema == null) {
             schema = new ObjectSchema();
             schema.setDescription("AKTO_ERROR while building schema");
         }
-        PathBuilder.addPathItem(paths, url, method, responseCode, schema);
+        List<Parameter> headerParameters = new ArrayList<>();
+        try{
+            headerParameters = buildHeaders(singleTypeInfoList);
+        } catch (Exception e) {
+            logger.error("ERROR in building headers in addPathItems " + e);
+        }
+        
+        PathBuilder.addPathItem(paths, url, method, responseCode, schema, headerParameters);
     }
 
+    public static List<Parameter> buildHeaders(List<SingleTypeInfo> singleTypeInfoList) throws Exception{
+        List<Parameter> headerParameters = new ArrayList<>();
+        ObjectSchema schema =new ObjectSchema();
+        for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
+            if(singleTypeInfo.isIsHeader()){
+                List<SchemaBuilder.CustomSchema> cc = SchemaBuilder.getCustomSchemasFromSingleTypeInfo(singleTypeInfo);
+                SchemaBuilder.build(schema, cc);
+            }
+        }
+        for(String header:schema.getProperties().keySet()){
+            Parameter head = new Parameter();
+            head.setName(header);
+            head.setIn("header");
+            head.setSchema(schema.getProperties().get(header));
+            headerParameters.add(head);
+        }
+        return headerParameters;
+    }
 
     public static Schema<?> buildSchema(List<SingleTypeInfo> singleTypeInfoList) throws Exception {
         ObjectSchema schema =new ObjectSchema();
         for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
+            if(singleTypeInfo.isIsHeader()){
+                continue;
+            }
             List<SchemaBuilder.CustomSchema> cc = SchemaBuilder.getCustomSchemasFromSingleTypeInfo(singleTypeInfo);
             SchemaBuilder.build(schema, cc);
         }
