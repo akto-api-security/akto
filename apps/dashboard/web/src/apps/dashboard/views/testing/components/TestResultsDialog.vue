@@ -51,6 +51,20 @@ export default {
     nextClicked() {
         this.currentIndex = (++this.currentIndex) % this.messagesBasic.length
         this.$refs.layoutWithTabs.reset()
+    },
+    buildHighlightPaths(y) {
+        let paramInfoList = y.privateSingleTypeInfos // .filter(x => x.isPrivate)
+        let highlightPaths = paramInfoList.map((x) => {
+            let asterisk = x.isPrivate
+            x["highlightValue"] = {
+                "value": "unique: " + x.uniqueCount + " public: " + x.publicCount,
+                "asterisk": asterisk,
+                "highlight": false
+            }
+            return x
+        })
+
+        return highlightPaths
     }
   },
   computed: {
@@ -58,7 +72,7 @@ export default {
         return this.testingRunResult.map(x => {return {message: x[1].message, title: x[0], highlightPaths:[], errors: x[1].errors}}) 
     },
     messagesAdvance() {
-        return this.testingRunResult.map(x => {return {message: x[1].originalMessage, title: x[0], highlightPaths:[], errors: x[1].errors, percentageMatch: x[1].percentageMatch}}) 
+        return this.testingRunResult.map(x => {return {message: x[1].originalMessage, title: x[0], highlightPaths: this.buildHighlightPaths(x[1]), errors: x[1].errors, percentageMatch: x[1].percentageMatch}}) 
     },
     jsonBasic: function() {
         if (this.testingRunResult == null) return null

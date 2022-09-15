@@ -321,8 +321,12 @@ export default {
 
             let highlightPaths = paramInfoList.map((x) => {
                 let subType = x["subType"]
+                let val = {}
                 if (subType) {
-                    x["highlightValue"] = subType["name"]
+                    val["value"] = subType["name"]
+                    val["asterisc"] = false
+                    val["highlight"] = true
+                    x["highlightValue"] = val
                     return x
                 }
             })
