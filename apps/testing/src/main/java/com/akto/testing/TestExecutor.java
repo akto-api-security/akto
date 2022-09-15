@@ -78,7 +78,8 @@ public class TestExecutor {
             return;
         }
 
-        boolean noAuthResult = noAuthTest.start(apiInfoKey, testRunId);
+//        boolean noAuthResult = noAuthTest.start(apiInfoKey, testRunId);
+        boolean noAuthResult = false;
         if (!noAuthResult) {
             bolaTest.start(apiInfoKey, testRunId);
         }

@@ -1,6 +1,5 @@
 package com.akto.rules;
 
-import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.*;
 import com.akto.dto.testing.TestResult;
@@ -96,7 +95,7 @@ public abstract class TestPlugin {
 
     public void addTestSuccessResult(ApiInfo.ApiInfoKey apiInfoKey, OriginalHttpRequest request,
                                      OriginalHttpResponse response, String originalMessage, ObjectId testRunId,
-                                     boolean vulnerable, double percentageMatch) {
+                                     boolean vulnerable, double percentageMatch, List<SingleTypeInfo> singleTypeInfos) {
         String message = null;
         try {
             message = RedactSampleData.convertOriginalReqRespToString(request, response);
@@ -107,7 +106,7 @@ public abstract class TestPlugin {
         }
 
         Bson filter = TestingRunResultDao.generateFilter(testRunId, apiInfoKey);
-        Bson update = Updates.set("resultMap." + testName(), new TestResult(message, originalMessage, vulnerable, new ArrayList<>(), new ArrayList<>(), percentageMatch));
+        Bson update = Updates.set("resultMap." + testName(), new TestResult(message, originalMessage, vulnerable, new ArrayList<>(), singleTypeInfos, percentageMatch));
         TestingRunResultDao.instance.updateOne(filter, update);
     }
 
@@ -123,7 +122,7 @@ public abstract class TestPlugin {
         public List<SingleTypeInfo> findPrivateOnes() {
             List<SingleTypeInfo> res = new ArrayList<>();
             for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
-                if (singleTypeInfo.isPrivate()) res.add(singleTypeInfo);
+                if (singleTypeInfo.getIsPrivate()) res.add(singleTypeInfo);
             }
             return res;
         }
@@ -148,7 +147,7 @@ public abstract class TestPlugin {
                     SingleTypeInfo singleTypeInfo = SampleMessageStore.findSti(i+"", true,apiInfoKey, false, -1);
                     if (singleTypeInfo != null) {
                         singleTypeInfoList.add(singleTypeInfo);
-                        isPrivate = isPrivate && singleTypeInfo.isPrivate();
+                        isPrivate = isPrivate && singleTypeInfo.getIsPrivate();
                     }
                 }
             }
@@ -162,7 +161,7 @@ public abstract class TestPlugin {
             SingleTypeInfo singleTypeInfo = SampleMessageStore.findSti(param,false,apiInfoKey, false, -1);
             if (singleTypeInfo != null) {
                 singleTypeInfoList.add(singleTypeInfo);
-                isPrivate = isPrivate && singleTypeInfo.isPrivate();
+                isPrivate = isPrivate && singleTypeInfo.getIsPrivate();
             }
         }
 

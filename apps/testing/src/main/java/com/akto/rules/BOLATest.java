@@ -46,13 +46,11 @@ public class BOLATest extends TestPlugin {
         }
 
         int statusCode = StatusCodeAnalyser.getStatusCode(response.getBody(), response.getStatusCode());
-        boolean vulnerable = isStatusGood(statusCode) && !containsPrivateResourceResult.isPrivate;
         double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), response.getBody());
-        if (vulnerable) {
-            vulnerable = percentageMatch > 90;
-        }
+        boolean vulnerable = isStatusGood(statusCode) && !containsPrivateResourceResult.isPrivate && percentageMatch > 90;
 
-        addTestSuccessResult(apiInfoKey,originalHttpRequest, response, rawApi.getOriginalMessage(), testRunId, vulnerable, percentageMatch);
+        addTestSuccessResult(apiInfoKey,originalHttpRequest, response, rawApi.getOriginalMessage(), testRunId,
+                vulnerable, percentageMatch, containsPrivateResourceResult.singleTypeInfos);
 
         return vulnerable;
     }

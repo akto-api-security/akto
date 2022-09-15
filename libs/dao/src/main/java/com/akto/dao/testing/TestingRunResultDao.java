@@ -51,6 +51,7 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
             TestingRunResult testingRunResult = cursor.next();
             for (TestResult testResult: testingRunResult.getResultMap().values()) {
                 testResult.setMessage("");
+                testResult.setPrivateSingleTypeInfos(new ArrayList<>());
             }
             testingRunResult.setHexId(testingRunResult.getId().toHexString());
             testingRunResults.add(testingRunResult);

@@ -359,6 +359,9 @@ public class SingleTypeInfo {
     public static final String LAST_SEEN = "lastSeen";
     long lastSeen;
 
+    @BsonIgnore
+    private boolean isPrivate; // do not use this field anywhere else. This was added to convey if STI is private or not to frontend
+
     public static final String _UNIQUE_COUNT = "uniqueCount";
     public long uniqueCount = 0L;
     public static final String _PUBLIC_COUNT = "publicCount";
@@ -696,7 +699,7 @@ public class SingleTypeInfo {
         }
     }
 
-    public boolean isPrivate() {
+    public boolean getIsPrivate() {
         if (uniqueCount == 0) return true;
         double v = (1.0*publicCount) / uniqueCount;
         return v <= SingleTypeInfo.THRESHOLD;

@@ -47,7 +47,8 @@ public class NoAuthTest extends TestPlugin {
 
         double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), response.getBody());
 
-        addTestSuccessResult(apiInfoKey, originalHttpRequest, response, rawApi.getOriginalMessage(), testRunId, vulnerable, percentageMatch);
+        addTestSuccessResult(apiInfoKey, originalHttpRequest, response, rawApi.getOriginalMessage(), testRunId,
+                vulnerable, percentageMatch, new ArrayList<>());
 
         return vulnerable;
     }
