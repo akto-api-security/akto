@@ -1,5 +1,6 @@
 package com.akto.dao;
 
+import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomDataType;
@@ -12,6 +13,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.types.CappedSet;
 import com.akto.utils.MongoBasedTest;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.junit.Test;
@@ -311,5 +313,29 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         SingleTypeInfoDao.instance.updateOne(SingleTypeInfoDao.createFilters(info), Updates.set("count",1));
         count = SingleTypeInfoDao.instance.getMCollection().countDocuments();
         assertEquals(2, count);
+    }
+
+    @Test
+    public void testInsert() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+
+        SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(
+                "url", "GET",200, false, "param#key", SingleTypeInfo.EMAIL, 0, false
+        );
+        SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 100,1000,30, new CappedSet<>(), SingleTypeInfo.Domain.RANGE, -1000, 10000);
+        singleTypeInfo.setUniqueCount(1000);
+        singleTypeInfo.setPublicCount(100);
+
+        SingleTypeInfoDao.instance.insertOne(singleTypeInfo);
+
+        SingleTypeInfo singleTypeInfoFromDb = SingleTypeInfoDao.instance.findOne(new BasicDBObject());
+        assertEquals(singleTypeInfo, singleTypeInfoFromDb);
+
+        assertEquals(singleTypeInfo.getMaxValue(), singleTypeInfoFromDb.getMaxValue());
+        assertEquals(singleTypeInfo.getMinValue(), singleTypeInfoFromDb.getMinValue());
+        assertEquals(singleTypeInfo.getUniqueCount(), singleTypeInfoFromDb.getUniqueCount());
+        assertEquals(singleTypeInfo.getPublicCount(), singleTypeInfoFromDb.getPublicCount());
+        assertEquals(singleTypeInfo.getCount(), singleTypeInfoFromDb.getCount());
+        assertEquals(singleTypeInfo.getValues().count(), singleTypeInfoFromDb.getValues().count());
     }
 }

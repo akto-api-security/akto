@@ -74,7 +74,7 @@ public class KeyTypes {
         }
 
         singleTypeInfo.setLastSeen(Context.now());
-        singleTypeInfo.setMinMaxValues(object);
+        singleTypeInfo.updateMinMaxValues(object);
 
         SingleTypeInfo.Domain domain = singleTypeInfo.getDomain();
         if (domain == null || domain == SingleTypeInfo.Domain.ENUM) {
