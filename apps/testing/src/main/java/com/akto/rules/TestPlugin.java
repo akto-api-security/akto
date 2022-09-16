@@ -2,10 +2,12 @@ package com.akto.rules;
 
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.*;
+import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.type.*;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.RelationshipSync;
+import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
@@ -26,12 +28,31 @@ public abstract class TestPlugin {
     static ObjectMapper mapper = new ObjectMapper();
     static JsonFactory factory = mapper.getFactory();
 
-    public abstract boolean start(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId);
+    public abstract boolean start(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, AuthMechanism authMechanism);
 
     public abstract String testName();
 
     public static boolean isStatusGood(int statusCode) {
         return statusCode >= 200 && statusCode<300;
+    }
+
+    public List<RawApi> fetchMessagesWithAuthToken(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, AuthMechanism authMechanism) {
+
+        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey);
+
+        if (messages.isEmpty()) {
+            addWithoutRequestError(apiInfoKey, testRunId, null, TestResult.TestError.NO_PATH);
+            return null;
+        }
+
+        List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, authMechanism);
+        if (filteredMessages.isEmpty()) {
+            RawApi rawApi = messages.get(0);
+            addWithRequestError(apiInfoKey,rawApi.getOriginalMessage(), testRunId, TestResult.TestError.NO_AUTH_TOKEN_FOUND, rawApi.getRequest());
+            return null;
+        }
+
+        return filteredMessages;
     }
 
     public static void extractAllValuesFromPayload(String payload, Map<String,Set<String>> payloadMap) throws Exception{

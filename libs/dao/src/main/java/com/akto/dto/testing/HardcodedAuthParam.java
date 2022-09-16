@@ -42,6 +42,14 @@ public class HardcodedAuthParam extends AuthParam {
         return true;
     }
 
+    @Override
+    public boolean authTokenPresent(OriginalHttpRequest request) {
+        if (this.key == null) return false;
+        String k = this.key.toLowerCase().trim();
+        Map<String, List<String>> headers = request.getHeaders();
+        return headers.containsKey(k);
+    }
+
     public Location getWhere() {
         return where;
     }

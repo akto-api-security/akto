@@ -10,32 +10,22 @@ import com.akto.testing.StatusCodeAnalyser;
 import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
+import java.util.List;
 
 
 public class NoAuthTest extends TestPlugin {
 
     @Override
-    public boolean start(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId) {
-        RawApi rawApi = SampleMessageStore.fetchOriginalMessage(apiInfoKey);
-        if (rawApi == null) {
-            addWithoutRequestError(apiInfoKey, testRunId, null,TestResult.TestError.NO_PATH);
-            return false;
-        }
+    public boolean start(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, AuthMechanism authMechanism) {
+        List<RawApi> filteredMessages = fetchMessagesWithAuthToken(apiInfoKey, testRunId, authMechanism);
+        if (filteredMessages == null) return false;
+
+        RawApi rawApi = filteredMessages.get(0);
 
         OriginalHttpRequest originalHttpRequest = rawApi.getRequest();
         OriginalHttpResponse originalHttpResponse = rawApi.getResponse();
 
-        AuthMechanism authMechanism = AuthMechanismStore.getAuthMechanism();
-        if (authMechanism == null) {
-            addWithoutRequestError(apiInfoKey, testRunId, rawApi.getOriginalMessage(), TestResult.TestError.NO_AUTH_MECHANISM);
-            return false;
-        }
-
-        boolean authTokenFound = authMechanism.removeAuthFromRequest(originalHttpRequest);
-        if (authTokenFound) {
-            addWithRequestError(apiInfoKey, rawApi.getOriginalMessage(), testRunId, TestResult.TestError.NO_AUTH_TOKEN_FOUND, originalHttpRequest);
-            return true; // so that BOLA is not executed
-        }
+        authMechanism.removeAuthFromRequest(originalHttpRequest);
 
         OriginalHttpResponse response = null;
         try {

@@ -1,12 +1,10 @@
 package com.akto.testing;
 
 import com.akto.dto.ApiInfo;
-import com.akto.dto.testing.TestingEndpoints;
-import com.akto.dto.testing.TestingRun;
-import com.akto.dto.testing.WorkflowTest;
-import com.akto.dto.testing.WorkflowTestingEndpoints;
+import com.akto.dto.testing.*;
 import com.akto.rules.BOLATest;
 import com.akto.rules.NoAuthTest;
+import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
@@ -78,9 +76,12 @@ public class TestExecutor {
             return;
         }
 
-        boolean noAuthResult = noAuthTest.start(apiInfoKey, testRunId);
+        AuthMechanism authMechanism = AuthMechanismStore.getAuthMechanism();
+        if (authMechanism == null) return;
+
+        boolean noAuthResult = noAuthTest.start(apiInfoKey, testRunId, authMechanism);
         if (!noAuthResult) {
-            bolaTest.start(apiInfoKey, testRunId);
+            bolaTest.start(apiInfoKey, testRunId, authMechanism);
         }
 
     }
