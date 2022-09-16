@@ -277,6 +277,10 @@ public class HttpCallParser {
 
     private Map<Integer, URLAggregator> aggregatorMap = new HashMap<>();
 
+    public void setAggregatorMap(Map<Integer, URLAggregator> aggregatorMap){
+        this.aggregatorMap=aggregatorMap;
+    }
+
     public Map<Integer, URLAggregator> getAggregatorMap(){
         return this.aggregatorMap;
     }

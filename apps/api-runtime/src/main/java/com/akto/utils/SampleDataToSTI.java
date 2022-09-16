@@ -27,14 +27,13 @@ public class SampleDataToSTI {
 
     public void setSampleDataToSTI(List<SampleData> allData) {
 
-        HttpCallParser parse = new HttpCallParser("", 0, 0, 0);
         for (SampleData sampleData : allData) {
 
             Method method = sampleData.getId().getMethod();
             String url = sampleData.getId().getUrl();
             List<SingleTypeInfo> singleTypeInfoPerURL = new ArrayList<>();
             for (String dataString : sampleData.getSamples()) {
-                singleTypeInfoPerURL.addAll(getSampleDataToSTIUtil(dataString, url, parse));
+                singleTypeInfoPerURL.addAll(getSampleDataToSTIUtil(dataString, url));
             }
             Map<Integer, List<SingleTypeInfo>> responseCodeToSTI = new HashMap<>();
             for(SingleTypeInfo singleTypeInfo:singleTypeInfoPerURL){
@@ -47,23 +46,27 @@ public class SampleDataToSTI {
                     responseCodeToSTI.put(singleTypeInfo.getResponseCode(),temp);
                 }
             }
-            Map<String, Map<Integer, List<SingleTypeInfo>>> stiMap = new HashMap<>();
-            stiMap.put(method.toString(), responseCodeToSTI);
-            stiList.put(url,stiMap);
+            if(stiList.containsKey(url)){
+                stiList.get(url).put(method.toString(),responseCodeToSTI);
+            }
+            else{
+                Map<String, Map<Integer, List<SingleTypeInfo>>> stiMap = new HashMap<>();
+                stiMap.put(method.toString(), responseCodeToSTI);
+                stiList.put(url,stiMap);
+            }
             singleTypeInfos.addAll(singleTypeInfoPerURL);
         }
     }
 
     public void setSensitiveSampleDataToSTI(List<SensitiveSampleData> allData){
 
-        HttpCallParser parse = new HttpCallParser("", 0, 0, 0);
         for (SensitiveSampleData sensitiveSampleData : allData) {
 
             String method = sensitiveSampleData.getId().getMethod();
             String url = sensitiveSampleData.getId().getUrl();
             List<SingleTypeInfo> singleTypeInfoPerURL = new ArrayList<>();
             for (String dataString : sensitiveSampleData.getSampleData()) {
-                singleTypeInfoPerURL.addAll(getSampleDataToSTIUtil(dataString, url, parse));
+                singleTypeInfoPerURL.addAll(getSampleDataToSTIUtil(dataString, url));
             }
             Map<Integer, List<SingleTypeInfo>> responseCodeToSTI = new HashMap<>();
             for(SingleTypeInfo singleTypeInfo:singleTypeInfoPerURL){
@@ -76,9 +79,14 @@ public class SampleDataToSTI {
                     responseCodeToSTI.put(singleTypeInfo.getResponseCode(),temp);
                 }
             }
-            Map<String, Map<Integer, List<SingleTypeInfo>>> stiMap = new HashMap<>();
-            stiMap.put(method.toString(), responseCodeToSTI);
-            stiList.put(url,stiMap);
+            if(stiList.containsKey(url)){
+                stiList.get(url).put(method.toString(),responseCodeToSTI);
+            }
+            else{
+                Map<String, Map<Integer, List<SingleTypeInfo>>> stiMap = new HashMap<>();
+                stiMap.put(method.toString(), responseCodeToSTI);
+                stiList.put(url,stiMap);
+            }
             singleTypeInfos.addAll(singleTypeInfoPerURL);
         }
     }
@@ -91,8 +99,9 @@ public class SampleDataToSTI {
         return this.singleTypeInfos;
     }
 
-    private List<SingleTypeInfo> getSampleDataToSTIUtil(String dataString, String url, HttpCallParser parse) {
+    private List<SingleTypeInfo> getSampleDataToSTIUtil(String dataString, String url) {
 
+        HttpCallParser parse = new HttpCallParser("", 0, 0, 0);
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
 
         HttpResponseParams httpResponseParams = new HttpResponseParams();
