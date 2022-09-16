@@ -8,12 +8,22 @@
                     <v-icon>$fas_angle-double-right</v-icon>
                 </v-btn>
             </div>
-            <div v-if="jsonBasic['message']">
+            <div>
                 <layout-with-tabs title="" :tabs="['Attempt', 'Details']" ref="layoutWithTabs">
                     <template slot="Attempt">
-                        <sample-data :json="jsonBasic" requestTitle="Test Request" responseTitle="Test Response"/>
+                        <div>
+                            <div v-if="jsonBasic['errors']" class="test-errors-class">
+                                {{this.jsonBasic["errors"]}}
+                            </div>
+                            <sample-data 
+                                v-if="jsonBasic['message']"
+                                :json="jsonBasic"
+                                requestTitle="Test Request"
+                                responseTitle="Test Response"
+                            />
+                        </div>
                     </template>
-                    <template slot="Details">
+                    <template slot="Details" v-if="jsonAdvance && jsonAdvance['message']">
                         <test-result-details :jsonAdvance="jsonAdvance" :percentageMatch="percentageMatch"/>
                     </template>
                 </layout-with-tabs>
@@ -81,6 +91,7 @@ export default {
             "message": JSON.parse(currentMessage["message"]),
             title: currentMessage["title"],
             "highlightPaths": currentMessage["highlightPaths"],
+            "errors": currentMessage["errors"].map(x => x.message).join(", ")
         }
     },
     percentageMatch: function() {
@@ -91,6 +102,7 @@ export default {
     jsonAdvance: function() {
         if (this.testingRunResult == null) return null
         let currentMessage = this.messagesAdvance[this.currentIndex]
+        if (!currentMessage) return null
         return {
             "message": JSON.parse(currentMessage["message"]),
             title: currentMessage["title"],
@@ -102,6 +114,8 @@ export default {
 </script>
 
 <style lang="sass" scoped>
+.test-errors-class
+  padding: 24px 0px 0px 24px
 </style>
 
 <style scoped>
