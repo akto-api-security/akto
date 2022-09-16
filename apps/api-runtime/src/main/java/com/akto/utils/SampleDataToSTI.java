@@ -13,6 +13,7 @@ import com.akto.parsers.HttpCallParser;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.type.APICatalog;
+import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
 
 public class SampleDataToSTI {
@@ -27,13 +28,14 @@ public class SampleDataToSTI {
 
     public void setSampleDataToSTI(List<SampleData> allData) {
 
+        HttpCallParser parse = new HttpCallParser("", 0, 0, 0);
         for (SampleData sampleData : allData) {
 
             Method method = sampleData.getId().getMethod();
             String url = sampleData.getId().getUrl();
             List<SingleTypeInfo> singleTypeInfoPerURL = new ArrayList<>();
             for (String dataString : sampleData.getSamples()) {
-                singleTypeInfoPerURL.addAll(getSampleDataToSTIUtil(dataString, url));
+                singleTypeInfoPerURL.addAll(getSampleDataToSTIUtil(dataString, url,parse));
             }
             Map<Integer, List<SingleTypeInfo>> responseCodeToSTI = new HashMap<>();
             for(SingleTypeInfo singleTypeInfo:singleTypeInfoPerURL){
@@ -60,13 +62,14 @@ public class SampleDataToSTI {
 
     public void setSensitiveSampleDataToSTI(List<SensitiveSampleData> allData){
 
+        HttpCallParser parse = new HttpCallParser("", 0, 0, 0);
         for (SensitiveSampleData sensitiveSampleData : allData) {
 
             String method = sensitiveSampleData.getId().getMethod();
             String url = sensitiveSampleData.getId().getUrl();
             List<SingleTypeInfo> singleTypeInfoPerURL = new ArrayList<>();
             for (String dataString : sensitiveSampleData.getSampleData()) {
-                singleTypeInfoPerURL.addAll(getSampleDataToSTIUtil(dataString, url));
+                singleTypeInfoPerURL.addAll(getSampleDataToSTIUtil(dataString, url,parse));
             }
             Map<Integer, List<SingleTypeInfo>> responseCodeToSTI = new HashMap<>();
             for(SingleTypeInfo singleTypeInfo:singleTypeInfoPerURL){
@@ -99,9 +102,8 @@ public class SampleDataToSTI {
         return this.singleTypeInfos;
     }
 
-    private List<SingleTypeInfo> getSampleDataToSTIUtil(String dataString, String url) {
+    private List<SingleTypeInfo> getSampleDataToSTIUtil(String dataString, String url,HttpCallParser parse) {
 
-        HttpCallParser parse = new HttpCallParser("", 0, 0, 0);
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
 
         HttpResponseParams httpResponseParams = new HttpResponseParams();
@@ -121,8 +123,11 @@ public class SampleDataToSTI {
         List<HttpResponseParams> responseParams = new ArrayList<>();
         responseParams.add(httpResponseParams);
         List<HttpResponseParams> filteredResponseParams = parse.filterHttpResponseParams(responseParams);
+        Map<Integer, URLAggregator> aggregatorMap = new HashMap<>();
+        parse.setAggregatorMap(aggregatorMap);
         parse.aggregate(filteredResponseParams);
-        Map<Integer, URLAggregator> aggregatorMap = parse.getAggregatorMap();
+        aggregatorMap = parse.getAggregatorMap();
+        parse.apiCatalogSync = new APICatalogSync("0",0);
         for (int apiCollectionId : aggregatorMap.keySet()) {
             URLAggregator aggregator = aggregatorMap.get(apiCollectionId);
             parse.apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
