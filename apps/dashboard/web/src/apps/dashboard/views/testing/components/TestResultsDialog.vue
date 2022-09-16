@@ -16,7 +16,7 @@
                                 {{this.jsonBasic["errors"]}}
                             </div>
                             <sample-data 
-                                v-if="jsonBasic['message']"
+                                v-if="jsonBasic && jsonBasic['message']"
                                 :json="jsonBasic"
                                 requestTitle="Test Request"
                                 responseTitle="Test Response"
