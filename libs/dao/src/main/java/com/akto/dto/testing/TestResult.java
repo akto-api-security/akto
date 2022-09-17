@@ -11,7 +11,7 @@ public class TestResult {
     private String message;
     private boolean vulnerable;
     private List<TestError> errors;
-    private Confidence confidence;
+    private Confidence confidence = Confidence.HIGH;
 
     private String originalMessage;
     private double percentageMatch;
