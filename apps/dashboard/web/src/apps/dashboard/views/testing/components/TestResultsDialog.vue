@@ -57,13 +57,19 @@ export default {
         currentIndex: 0
     }
   },
+  watch: {
+    testingRunResult(n,o) {
+        this.currentIndex = 0
+    }
+  },
   methods: {
     nextClicked() {
         this.currentIndex = (++this.currentIndex) % this.messagesBasic.length
         this.$refs.layoutWithTabs.reset()
     },
     buildHighlightPaths(y) {
-        let paramInfoList = y.privateSingleTypeInfos // .filter(x => x.isPrivate)
+        let paramInfoList = y.privateSingleTypeInfos
+        if (!paramInfoList) paramInfoList = []
         let highlightPaths = paramInfoList.map((x) => {
             let asterisk = x.isPrivate
             x["highlightValue"] = {
