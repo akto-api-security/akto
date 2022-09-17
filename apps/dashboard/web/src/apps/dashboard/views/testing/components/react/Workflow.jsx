@@ -179,7 +179,7 @@ const Workflow = ({apiCollectionId}) => {
 
       if (!w) return false
 
-      let testResultMap = w["testResultMap"]
+      let testResultMap = w["nodeResultMap"]
       let keys = Object.keys(testResultMap)
 
       let finalResult = keys.map((x) => {
