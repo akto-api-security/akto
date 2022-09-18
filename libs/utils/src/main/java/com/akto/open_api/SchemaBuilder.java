@@ -107,11 +107,14 @@ public class SchemaBuilder {
             if (!Objects.equals(x, "$")) {
                 if (Objects.equals(paramList[idx + 1], "$")) {
                     customSchemas.add(new CustomSchema(ArraySchema.class, x, null));
-                    if (idx != paramList.length -2) {
-                        customSchemas.add(new CustomSchema(ObjectSchema.class, null, null));
-                    }
                 } else {
                     customSchemas.add(new CustomSchema(ObjectSchema.class, x, null));
+                }
+            } else {
+                if (Objects.equals(paramList[idx + 1], "$")) {
+                    customSchemas.add(new CustomSchema(ArraySchema.class, x, null));
+                } else {
+                    customSchemas.add(new CustomSchema(ObjectSchema.class, null, null));
                 }
             }
 
