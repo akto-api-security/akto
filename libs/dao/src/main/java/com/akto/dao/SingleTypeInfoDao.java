@@ -162,7 +162,6 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return Filters.and(filters);
     }
 
-    // fix this.
     public Bson filterForAllNewParams(int startTimestamp,int endTimestamp){
 
         List<Bson> filters = new ArrayList<>();
