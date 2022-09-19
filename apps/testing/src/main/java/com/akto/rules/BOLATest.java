@@ -40,7 +40,7 @@ public class BOLATest extends TestPlugin {
             addWithRequestError(apiInfoKey, result.rawApi.getOriginalMessage(), testRunId, testError, result.rawApi.getRequest());
         } else {
             addTestSuccessResult(
-                    apiInfoKey, result.rawApi.getRequest(), result.rawApi.getResponse(),
+                    apiInfoKey, result.testRequest, result.testResponse,
                     result.rawApi.getOriginalMessage(), testRunId,
                     vulnerable, result.percentageMatch, result.singleTypeInfos, result.confidence
             );
