@@ -516,16 +516,26 @@ public class APICatalogSync {
         return ret;
     }
 
-    public ArrayList<WriteModel<SampleData>> getDBUpdatesForSampleData(int apiCollectionId, APICatalog currentDelta, boolean redactSampleData ) {
+    public ArrayList<WriteModel<SampleData>> getDBUpdatesForSampleData(int apiCollectionId, APICatalog currentDelta, APICatalog dbCatalog ,boolean redactSampleData, boolean forceUpdate ) {
         List<SampleData> sampleData = new ArrayList<>();
-        for(Map.Entry<URLStatic, RequestTemplate> entry: currentDelta.getStrictURLToMethods().entrySet()) {
-            Key key = new Key(apiCollectionId, entry.getKey().getUrl(), entry.getKey().getMethod(), -1, 0, 0);
-            sampleData.add(new SampleData(key, entry.getValue().removeAllSampleMessage()));
+        Map<URLStatic, RequestTemplate> deltaStrictURLToMethods = currentDelta.getStrictURLToMethods();
+        Map<URLStatic, RequestTemplate> dbStrictURLToMethods = dbCatalog.getStrictURLToMethods();
+
+        for(Map.Entry<URLStatic, RequestTemplate> entry: deltaStrictURLToMethods.entrySet()) {
+            if (forceUpdate || !dbStrictURLToMethods.containsKey(entry.getKey())) {
+                Key key = new Key(apiCollectionId, entry.getKey().getUrl(), entry.getKey().getMethod(), -1, 0, 0);
+                sampleData.add(new SampleData(key, entry.getValue().removeAllSampleMessage()));
+            }
         }
 
-        for(Map.Entry<URLTemplate, RequestTemplate> entry: currentDelta.getTemplateURLToMethods().entrySet()) {
-            Key key = new Key(apiCollectionId, entry.getKey().getTemplateString(), entry.getKey().getMethod(), -1, 0, 0);
-            sampleData.add(new SampleData(key, entry.getValue().removeAllSampleMessage()));
+        Map<URLTemplate, RequestTemplate> deltaTemplateURLToMethods = currentDelta.getTemplateURLToMethods();
+        Map<URLTemplate, RequestTemplate> dbTemplateURLToMethods = dbCatalog.getTemplateURLToMethods();
+
+        for(Map.Entry<URLTemplate, RequestTemplate> entry: deltaTemplateURLToMethods.entrySet()) {
+            if (forceUpdate || !dbTemplateURLToMethods.containsKey(entry.getKey())) {
+                Key key = new Key(apiCollectionId, entry.getKey().getTemplateString(), entry.getKey().getMethod(), -1, 0, 0);
+                sampleData.add(new SampleData(key, entry.getValue().removeAllSampleMessage()));
+            }
         }
 
         ArrayList<WriteModel<SampleData>> bulkUpdates = new ArrayList<>();
@@ -922,9 +932,9 @@ public class APICatalogSync {
             writesForSensitiveParamInfo.addAll(dbUpdateReturn.bulkUpdatesForSensitiveParamInfo);
             writesForTraffic.addAll(getDBUpdatesForTraffic(apiCollectionId, deltaCatalog));
             deltaCatalog.setDeletedInfo(new ArrayList<>());
-            if (syncImmediately || counter < 10 || counter % 10 == 0) {
-                writesForSampleData.addAll(getDBUpdatesForSampleData(apiCollectionId, deltaCatalog, redact));
-            }
+
+            boolean forceUpdate = syncImmediately || counter % 10 == 0;
+            writesForSampleData.addAll(getDBUpdatesForSampleData(apiCollectionId, deltaCatalog,dbCatalog, redact, forceUpdate));
         }
 
         logger.info("adding " + writesForParams.size() + " updates for params");
