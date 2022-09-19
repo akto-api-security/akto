@@ -22,25 +22,25 @@ public class NoAuthTest extends TestPlugin {
 
         RawApi rawApi = filteredMessages.get(0);
 
-        OriginalHttpRequest originalHttpRequest = rawApi.getRequest();
-        OriginalHttpResponse originalHttpResponse = rawApi.getResponse();
+        OriginalHttpRequest testRequest = rawApi.getRequest().copy();
+        OriginalHttpResponse originalHttpResponse = rawApi.getResponse().copy();
 
-        authMechanism.removeAuthFromRequest(originalHttpRequest);
+        authMechanism.removeAuthFromRequest(testRequest);
 
-        OriginalHttpResponse response = null;
+        OriginalHttpResponse testResponse = null;
         try {
-            response = ApiExecutor.sendRequest(originalHttpRequest, true);
+            testResponse = ApiExecutor.sendRequest(testRequest, true);
         } catch (Exception e) {
-            addWithRequestError(apiInfoKey, rawApi.getOriginalMessage(), testRunId, TestResult.TestError.API_REQUEST_FAILED, originalHttpRequest);
+            addWithRequestError(apiInfoKey, rawApi.getOriginalMessage(), testRunId, TestResult.TestError.API_REQUEST_FAILED, testRequest);
             return false;
         }
 
-        int statusCode = StatusCodeAnalyser.getStatusCode(response.getBody(), response.getStatusCode());
+        int statusCode = StatusCodeAnalyser.getStatusCode(testResponse.getBody(), testResponse.getStatusCode());
         boolean vulnerable = isStatusGood(statusCode);
 
-        double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), response.getBody());
+        double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), testResponse.getBody());
 
-        addTestSuccessResult(apiInfoKey, originalHttpRequest, response, rawApi.getOriginalMessage(), testRunId,
+        addTestSuccessResult(apiInfoKey, testRequest, testResponse, rawApi.getOriginalMessage(), testRunId,
                 vulnerable, percentageMatch, new ArrayList<>(), TestResult.Confidence.HIGH);
 
         return vulnerable;

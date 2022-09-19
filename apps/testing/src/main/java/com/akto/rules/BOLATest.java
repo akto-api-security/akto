@@ -55,46 +55,55 @@ public class BOLATest extends TestPlugin {
         List<SingleTypeInfo> singleTypeInfos;
         double percentageMatch;
         RawApi rawApi;
+        OriginalHttpResponse testResponse;
+        OriginalHttpRequest testRequest;
+
         TestResult.TestError testError;
 
-        public ExecutorResult(boolean vulnerable, TestResult.Confidence confidence, List<SingleTypeInfo> singleTypeInfos, double percentageMatch, RawApi rawApi, TestResult.TestError testError) {
+        public ExecutorResult(boolean vulnerable, TestResult.Confidence confidence, List<SingleTypeInfo> singleTypeInfos,
+                              double percentageMatch, RawApi rawApi, TestResult.TestError testError,
+                              OriginalHttpRequest testRequest, OriginalHttpResponse testResponse) {
             this.vulnerable = vulnerable;
             this.confidence = confidence;
             this.singleTypeInfos = singleTypeInfos;
             this.percentageMatch = percentageMatch;
             this.rawApi = rawApi;
             this.testError = testError;
+            this.testRequest = testRequest;
+            this.testResponse = testResponse;
         }
     }
 
     public ExecutorResult execute(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism) {
-        OriginalHttpRequest originalHttpRequest = rawApi.getRequest();
-        OriginalHttpResponse originalHttpResponse = rawApi.getResponse();
+        OriginalHttpRequest testRequest = rawApi.getRequest().copy();
+        OriginalHttpResponse originalHttpResponse = rawApi.getResponse().copy();
 
-        authMechanism.addAuthToRequest(originalHttpRequest);
+        authMechanism.addAuthToRequest(testRequest);
 
-        ContainsPrivateResourceResult containsPrivateResourceResult = containsPrivateResource(originalHttpRequest, apiInfoKey);
+        ContainsPrivateResourceResult containsPrivateResourceResult = containsPrivateResource(testRequest, apiInfoKey);
         // We consider API contains private resources if : 
         //      a) Contains 1 or more private resources
-        //      b) We couldn't find uniqueCount or publicCount for some of the request params
+        //      b) We couldn't find uniqueCount or publicCount for some request params
         // When it comes to case b we still say private resource but with low confidence, hence the below line
         TestResult.Confidence confidence = containsPrivateResourceResult.findPrivateOnes().size() > 0 ? TestResult.Confidence.HIGH : TestResult.Confidence.LOW;
 
-        OriginalHttpResponse response;
+        OriginalHttpResponse testResponse;
         try {
-            response = ApiExecutor.sendRequest(originalHttpRequest, true);
+            testResponse = ApiExecutor.sendRequest(testRequest, true);
         } catch (Exception e) {
-            return new ExecutorResult(false, null, new ArrayList<>(), 0, rawApi, TestResult.TestError.API_REQUEST_FAILED);
+            return new ExecutorResult(false, null, new ArrayList<>(), 0, rawApi,
+                    TestResult.TestError.API_REQUEST_FAILED, testRequest, null);
         }
 
-        int statusCode = StatusCodeAnalyser.getStatusCode(response.getBody(), response.getStatusCode());
-        double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), response.getBody());
+        int statusCode = StatusCodeAnalyser.getStatusCode(testResponse.getBody(), testResponse.getStatusCode());
+        double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), testResponse.getBody());
         boolean vulnerable = isStatusGood(statusCode) && !containsPrivateResourceResult.isPrivate && percentageMatch > 90;
 
-        // We can say with high confidence if an api is not vulnerable and we don't need help of private resources for this
+        // We can say with high confidence if an api is not vulnerable, and we don't need help of private resources for this
         if (!vulnerable) confidence = Confidence.HIGH;
 
-        return new ExecutorResult(vulnerable,confidence, containsPrivateResourceResult.singleTypeInfos, percentageMatch, rawApi, null);
+        return new ExecutorResult(vulnerable,confidence, containsPrivateResourceResult.singleTypeInfos, percentageMatch,
+                rawApi, null, testRequest, testResponse);
 
     }
 

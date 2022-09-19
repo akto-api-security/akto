@@ -17,6 +17,7 @@ public class OriginalHttpRequest {
 
     public OriginalHttpRequest() { }
 
+    // before adding any fields make sure to add them to copy function as wel
     public OriginalHttpRequest(String url, String queryParams, String method, String body, Map<String, List<String>> headers, String type) {
         this.url = url;
         this.queryParams = queryParams;
@@ -24,6 +25,12 @@ public class OriginalHttpRequest {
         this.body = body;
         this.headers = headers;
         this.type = type;
+    }
+
+    public OriginalHttpRequest copy() {
+        return new OriginalHttpRequest(
+                this.url, this.queryParams, this.method, this.body, new HashMap<>(this.headers), this.type
+        );
     }
 
     public void buildFromSampleMessage(String message) {
