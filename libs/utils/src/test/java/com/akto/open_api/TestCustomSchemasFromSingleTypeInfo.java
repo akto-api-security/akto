@@ -104,4 +104,31 @@ public class TestCustomSchemasFromSingleTypeInfo {
         assertEquals(NumberSchema.class, customSchemaList.get(2).type);
     }
 
+    @Test
+    public void testArrayInArray() throws Exception {
+        List<SchemaBuilder.CustomSchema> customSchemaList;
+
+        SingleTypeInfo s = generateSingleTypeInfo("data#apiInfoList#$#allAuthTypesFound#$#$", SingleTypeInfo.GENERIC);
+        customSchemaList = SchemaBuilder.getCustomSchemasFromSingleTypeInfo(s);
+
+        assertEquals(6, customSchemaList.size());
+
+        assertEquals("data", customSchemaList.get(0).name);
+        assertEquals(ObjectSchema.class, customSchemaList.get(0).type);
+
+        assertEquals("apiInfoList", customSchemaList.get(1).name);
+        assertEquals(ArraySchema.class, customSchemaList.get(1).type);
+
+        assertEquals(ObjectSchema.class, customSchemaList.get(2).type);
+
+        assertEquals("allAuthTypesFound", customSchemaList.get(3).name);
+        assertEquals(ArraySchema.class, customSchemaList.get(3).type);
+
+        // assertEquals("allAuthTypesFound", customSchemaList.get(2).name);
+        assertEquals(ArraySchema.class, customSchemaList.get(4).type);
+
+        assertEquals(null, customSchemaList.get(5).name);
+        assertEquals(StringSchema.class, customSchemaList.get(5).type);
+    }
+
 }
