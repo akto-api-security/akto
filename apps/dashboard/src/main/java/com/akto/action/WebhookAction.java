@@ -7,13 +7,18 @@ import java.util.Map;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.context.Context;
-import com.akto.dao.notifications.CustomWebhookDao;
+import com.akto.dao.notifications.CustomWebhooksDao;
+import com.akto.dao.notifications.CustomWebhooksResultDao;
 import com.akto.dto.notifications.CustomWebhook;
+import com.akto.dto.notifications.CustomWebhookResult;
+import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
 import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 
@@ -25,11 +30,27 @@ public class WebhookAction extends UserAction {
     String body;
     Method method;
     int frequencyInSeconds;
-    Boolean activeStatus;
+    ActiveStatus activeStatus;
     String error;
-    
-    // TODO: custom webhook result last sent 
-    // TODO: rewrite error handling
+    BasicDBObject response = new BasicDBObject();
+
+    public String getLastSentResult(){
+
+        String userEmail = getSUser().getLogin();
+
+        MongoCursor<CustomWebhookResult> webhookResultCursor = CustomWebhooksResultDao.instance.getMCollection()
+                                                                .find(Filters.eq("userEmail",userEmail))
+                                                                .sort(Sorts.descending("id"))
+                                                                .limit(1).cursor();
+
+        if(webhookResultCursor.hasNext()){
+            CustomWebhookResult customWebhookResult = webhookResultCursor.next();
+            response.put("lastSentResult",customWebhookResult);
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
 
     public String addCustomWebhook(){
 
@@ -39,12 +60,13 @@ public class WebhookAction extends UserAction {
             addActionError("Please enter a valid url");
             return ERROR.toUpperCase();
         } else if (frequencyInSeconds<=0){
-            this.error = "Please enter a valid frequency";
+            addActionError("Please enter a valid frequency");
+            return ERROR.toUpperCase();
         } else {
             int now = Context.now();
             String userEmail = getSUser().getLogin();
             CustomWebhook customWebhook = new CustomWebhook(now,url,headers,body,method,frequencyInSeconds,userEmail,now,now,now,activeStatus);
-            CustomWebhookDao.instance.insertOne(customWebhook);
+            CustomWebhooksDao.instance.insertOne(customWebhook);
         }
 
         return Action.SUCCESS.toUpperCase();
@@ -52,19 +74,23 @@ public class WebhookAction extends UserAction {
 
     public String updateCustomWebhook(){
 
-        CustomWebhook customWebhook = CustomWebhookDao.instance.findOne(
+        CustomWebhook customWebhook = CustomWebhooksDao.instance.findOne(
             Filters.eq("_id",id)
         );
         boolean isUrl = KeyTypes.patternToSubType.get(SingleTypeInfo.URL).matcher(url).matches();
 
         if (customWebhook == null){
-            this.error = "The webhook does not exist";
+            addActionError("The webhook does not exist");
+            return ERROR.toUpperCase();
         } else if (customWebhook.getUserEmail()!=getSUser().getLogin()){
-            this.error = "Unauthorized Request";
+            addActionError("Unauthorized Request");
+            return ERROR.toUpperCase();
         } else if (!isUrl){
-            this.error = "Please enter a valid url";
+            addActionError("Please enter a valid url");
+            return ERROR.toUpperCase();
         } else if (frequencyInSeconds<=0){
-            this.error = "Please enter a valid frequency";
+            addActionError("Please enter a valid frequency");
+            return ERROR.toUpperCase();
         } else {
             int now = Context.now();
 
@@ -78,19 +104,20 @@ public class WebhookAction extends UserAction {
                 Updates.set("lastUpdateTime",now)
             );
 
-            CustomWebhookDao.instance.updateOne(Filters.eq("_id",id), updates);
+            CustomWebhooksDao.instance.updateOne(Filters.eq("_id",id), updates);
         }
 
         return Action.SUCCESS.toUpperCase();
     }
 
     public String changeStatus(){
-        CustomWebhook customWebhook = CustomWebhookDao.instance.findOne(
+        CustomWebhook customWebhook = CustomWebhooksDao.instance.findOne(
             Filters.eq("_id",id)
         );
 
         if (customWebhook == null){
-            this.error = "The webhook does not exist";
+            addActionError("The webhook does not exist");
+            return ERROR.toUpperCase();
         } else{
             int now = Context.now();
             
@@ -100,13 +127,13 @@ public class WebhookAction extends UserAction {
                 Updates.set("lastUpdateTime",now)
             );
 
-            CustomWebhookDao.instance.updateOne(Filters.eq("_id",id), updates);
+            CustomWebhooksDao.instance.updateOne(Filters.eq("_id",id), updates);
         }
         return Action.SUCCESS.toUpperCase();
     }
 
     public String deleteCustomWebhook() {
-        CustomWebhookDao.instance.deleteAll(new BasicDBObject("_id", id));
+        CustomWebhooksDao.instance.deleteAll(new BasicDBObject("_id", id));
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -158,11 +185,11 @@ public class WebhookAction extends UserAction {
         this.frequencyInSeconds = frequencyInSeconds;
     }
 
-    public Boolean getActiveStatus() {
+    public ActiveStatus getActiveStatus() {
         return activeStatus;
     }
 
-    public void setActiveStatus(Boolean activeStatus) {
+    public void setActiveStatus(ActiveStatus activeStatus) {
         this.activeStatus = activeStatus;
     }
 
@@ -174,4 +201,11 @@ public class WebhookAction extends UserAction {
         this.error = error;
     }
 
+    public BasicDBObject getResponse() {
+        return this.response;
+    }
+
+    public void setResponse(BasicDBObject response) {
+        this.response = response;
+    }
 }

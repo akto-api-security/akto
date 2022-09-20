@@ -3,11 +3,11 @@ package com.akto.dao.notifications;
 import com.akto.dao.AccountsContextDao;
 import com.akto.dto.notifications.CustomWebhookResult;
 
-public class CustomWebhookResultDao extends AccountsContextDao<CustomWebhookResult>{
+public class CustomWebhooksResultDao extends AccountsContextDao<CustomWebhookResult>{
 
-    public static final CustomWebhookResultDao instance = new CustomWebhookResultDao();
+    public static final CustomWebhooksResultDao instance = new CustomWebhooksResultDao();
 
-    private CustomWebhookResultDao() {}
+    private CustomWebhooksResultDao() {}
 
     @Override
     public String getCollName() {

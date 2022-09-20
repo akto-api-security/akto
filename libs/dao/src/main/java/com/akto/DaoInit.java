@@ -2,6 +2,8 @@ package com.akto;
 
 import com.akto.dto.*;
 import com.akto.dto.data_types.*;
+import com.akto.dto.notifications.CustomWebhook;
+import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.notifications.content.Content;
 import com.akto.dto.runtime_filters.FieldExistsFilter;
 import com.akto.dto.FilterSampleData;
@@ -76,7 +78,8 @@ public class DaoInit {
         ClassModel<WorkflowTestingEndpoints>  workflowTestingEndpointsClassModel = ClassModel.builder(WorkflowTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<WorkflowTestResult>  workflowTestResultClassModel = ClassModel.builder(WorkflowTestResult.class).enableDiscriminator(true).build();
         ClassModel<CappedSet> cappedSetClassModel = ClassModel.builder(CappedSet.class).enableDiscriminator(true).build();
-        // TODO: register here enum, class to store in db
+        ClassModel<CustomWebhook> CustomWebhookClassModel = ClassModel.builder(CustomWebhook.class).enableDiscriminator(true).build();
+        ClassModel<CustomWebhookResult> CustomWebhookResultClassModel = ClassModel.builder(CustomWebhookResult.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(queueEntryClassModel, configClassModel, 
             signupInfoClassModel, contentClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -89,7 +92,7 @@ public class DaoInit {
                 authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel,
                 testingEndpointsClassModel, customTestingEndpointsClassModel, collectionWiseTestingEndpointsClassModel,
                 workflowTestingEndpointsClassModel, workflowTestResultClassModel,
-                cappedSetClassModel
+                cappedSetClassModel,CustomWebhookClassModel,CustomWebhookResultClassModel
         ).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
@@ -107,7 +110,8 @@ public class DaoInit {
             new EnumCodec<>(TestingRun.State.class),
             new EnumCodec<>(AccountSettings.SetupType.class),
             new EnumCodec<>(WorkflowNodeDetails.Type.class),
-            new EnumCodec<>(SingleTypeInfo.Domain.class)
+            new EnumCodec<>(SingleTypeInfo.Domain.class),
+            new EnumCodec<>(CustomWebhook.ActiveStatus.class)
         );
 
         CodecRegistry codecRegistry = fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry, customEnumCodecs);

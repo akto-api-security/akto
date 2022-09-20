@@ -22,7 +22,10 @@ public class CustomWebhook {
     int createTime;
     int lastUpdateTime;
     int lastSentTimestamp;
-    Boolean activeStatus; // TODO: change enum
+    public enum ActiveStatus{
+        ACTIVE,INACTIVE;
+    }
+    ActiveStatus activeStatus;
 
     public CustomWebhook(){
 
@@ -30,7 +33,7 @@ public class CustomWebhook {
 
     public CustomWebhook(int id, String url, Map<String, List<String>> headers, String body, Method method,
             int frequencyInSeconds, String userEmail, int createTime, int lastUpdateTime, int lastSentTimestamp,
-            Boolean activeStatus) {
+            ActiveStatus activeStatus) {
         this.id = id;
         this.url = url;
         this.headers = headers;
@@ -124,11 +127,11 @@ public class CustomWebhook {
         this.lastSentTimestamp = lastSentTimestamp;
     }
 
-    public Boolean getActiveStatus() {
+    public ActiveStatus getActiveStatus() {
         return activeStatus;
     }
 
-    public void setActiveStatus(Boolean activeStatus) {
+    public void setActiveStatus(ActiveStatus activeStatus) {
         this.activeStatus = activeStatus;
     }
     

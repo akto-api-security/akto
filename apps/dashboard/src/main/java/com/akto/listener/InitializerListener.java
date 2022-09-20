@@ -15,6 +15,7 @@ import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.notifications.SlackWebhook;
+import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.notifications.email.WeeklyEmail;
 import com.akto.notifications.slack.DailyUpdate;
@@ -25,6 +26,7 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.sendgrid.helpers.mail.Mail;
 import com.slack.api.Slack;
+import com.akto.dto.type.URLMethods.Method;
 import com.slack.api.webhook.WebhookResponse;
 
 import org.apache.commons.lang3.StringUtils;
@@ -32,8 +34,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.akto.dao.context.Context;
-import com.akto.dao.notifications.CustomWebhookDao;
-import com.akto.dao.notifications.CustomWebhookResultDao;
+import com.akto.dao.notifications.CustomWebhooksDao;
+import com.akto.dao.notifications.CustomWebhooksResultDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
 
 import com.akto.testing.*;
@@ -169,47 +171,52 @@ public class InitializerListener implements ServletContextListener {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 try {
+                    DaoInit.init(new ConnectionString("mongodb://localhost:27017"));
                     Context.accountId.set(1_000_000);
                     
-                    List<CustomWebhook> listWebhooks = CustomWebhookDao.instance.findAll(new BasicDBObject());
+                    List<CustomWebhook> listWebhooks = CustomWebhooksDao.instance.findAll(new BasicDBObject());
                     if (listWebhooks == null || listWebhooks.isEmpty()) {
                         return;
                     }
-
+        
                     for(CustomWebhook webhook:listWebhooks){
-                        int now =Context.now();
-
+                        int now = Context.now();
+        
                         boolean shouldSend = ( webhook.getLastSentTimestamp() + webhook.getFrequencyInSeconds() ) <= now ;
                         
-                        if(!webhook.getActiveStatus() || !shouldSend){
+                        if(webhook.getActiveStatus()!=ActiveStatus.ACTIVE || !shouldSend){
                             continue;
                         }
-
+        
                         ChangesInfo ci = getChangesInfo(now - webhook.getLastSentTimestamp(), now - webhook.getLastSentTimestamp());
                         if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0) {
                             return;
                         }
-
+        
+                        Map<String,Object> valueMap = new HashMap<>();
+                        valueMap.put("x1.responsebody.newSensitiveEndpoints",ci.newSensitiveParams.size());
+                        valueMap.put("x1.responsebody.newEndpoints",ci.newEndpointsLast7Days.size());
+                        valueMap.put("x1.responsebody.newSensitiveParameters",ci.recentSentiiveParams);
+                        valueMap.put("x1.responsebody.newParameters",ci.newParamsInExistingEndpoints);
+        
+                        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
+                        String payload = apiWorkflowExecutor.replaceVariables(webhook.getBody(),valueMap);
+        
                         webhook.setLastSentTimestamp(now);
-                        CustomWebhookDao.instance.updateOne(Filters.eq("id",webhook.getId()), Updates.set("lastSentTimestamp", now));
-
-                        String payload = webhook.getBody();
-                        // replace values in customwebhook.body to changesInfo values
-                        // TODO: use function replacevariables in apiworkflowexecutor
-                        // x1.responsebody.data
-
+                        CustomWebhooksDao.instance.updateOne(Filters.eq("_id",webhook.getId()), Updates.set("lastSentTimestamp", now));
+        
                         OriginalHttpRequest request = new OriginalHttpRequest(webhook.getUrl(),"",webhook.getMethod().toString(),payload,webhook.getHeaders(),"");
                         OriginalHttpResponse response = ApiExecutor.sendRequest(request,true);
-
-                        CustomWebhookResult webhookResult = new CustomWebhookResult(now,webhook.getId(),response.getStatusCode(),response.getBody(),request.getFullUrlWithParams(),request.getHeaders(),request.getBody());
-                        CustomWebhookResultDao.instance.insertOne(webhookResult);
+        
+                        CustomWebhookResult webhookResult = new CustomWebhookResult(now,webhook.getId(),request,response);
+                        CustomWebhooksResultDao.instance.insertOne(webhookResult);
                     }
 
                 } catch (Exception ex) {
                     ex.printStackTrace();
                 }
             }
-        }, 0, 10, TimeUnit.MINUTES);
+        }, 0, 5, TimeUnit.MINUTES);
     }
 
     static class ChangesInfo {

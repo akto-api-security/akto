@@ -1,9 +1,9 @@
 package com.akto.dto.notifications;
 
-import java.util.List;
-import java.util.Map;
-
 import org.bson.codecs.pojo.annotations.BsonId;
+
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 
 public class CustomWebhookResult {
     
@@ -11,26 +11,18 @@ public class CustomWebhookResult {
     int id;
 
     int webhookId;
-    // TODO: use original req,res
-
-    int responseStatusCode;
-    String responseBody;
-    String requestUrl;
-    Map<String,List<String>> requestHeaders;
-    String requestBody;
+    OriginalHttpRequest originalHttpRequest;
+    OriginalHttpResponse originalHttpResponse;
 
     public CustomWebhookResult() {
     }
 
-    public CustomWebhookResult(int id, int webhookId, int responseStatusCode, String responseBody, String requestUrl,
-            Map<String, List<String>> requestHeaders, String requestBody) {
+    public CustomWebhookResult(int id, int webhookId, OriginalHttpRequest originalHttpRequest,
+            OriginalHttpResponse originalHttpResponse) {
         this.id = id;
         this.webhookId = webhookId;
-        this.responseStatusCode = responseStatusCode;
-        this.responseBody = responseBody;
-        this.requestUrl = requestUrl;
-        this.requestHeaders = requestHeaders;
-        this.requestBody = requestBody;
+        this.originalHttpRequest = originalHttpRequest;
+        this.originalHttpResponse = originalHttpResponse;
     }
 
     public int getId() {
@@ -45,34 +37,16 @@ public class CustomWebhookResult {
     public void setWebhookId(int webhookId) {
         this.webhookId = webhookId;
     }
-    public int getResponseStatusCode() {
-        return responseStatusCode;
+    public OriginalHttpRequest getOriginalHttpRequest() {
+        return originalHttpRequest;
     }
-    public void setResponseStatusCode(int responseStatusCode) {
-        this.responseStatusCode = responseStatusCode;
+    public void setOriginalHttpRequest(OriginalHttpRequest originalHttpRequest) {
+        this.originalHttpRequest = originalHttpRequest;
     }
-    public String getResponseBody() {
-        return responseBody;
+    public OriginalHttpResponse getOriginalHttpResponse() {
+        return originalHttpResponse;
     }
-    public void setResponseBody(String responseBody) {
-        this.responseBody = responseBody;
-    }
-    public String getRequestUrl() {
-        return requestUrl;
-    }
-    public void setRequestUrl(String requestUrl) {
-        this.requestUrl = requestUrl;
-    }
-    public Map<String, List<String>> getRequestHeaders() {
-        return requestHeaders;
-    }
-    public void setRequestHeaders(Map<String, List<String>> requestHeaders) {
-        this.requestHeaders = requestHeaders;
-    }
-    public String getRequestBody() {
-        return requestBody;
-    }
-    public void setRequestBody(String requestBody) {
-        this.requestBody = requestBody;
+    public void setOriginalHttpResponse(OriginalHttpResponse originalHttpResponse) {
+        this.originalHttpResponse = originalHttpResponse;
     }    
 }
