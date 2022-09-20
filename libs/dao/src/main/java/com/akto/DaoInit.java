@@ -76,7 +76,7 @@ public class DaoInit {
         ClassModel<WorkflowTestingEndpoints>  workflowTestingEndpointsClassModel = ClassModel.builder(WorkflowTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<WorkflowTestResult>  workflowTestResultClassModel = ClassModel.builder(WorkflowTestResult.class).enableDiscriminator(true).build();
         ClassModel<CappedSet> cappedSetClassModel = ClassModel.builder(CappedSet.class).enableDiscriminator(true).build();
-
+        // TODO: register here enum, class to store in db
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(queueEntryClassModel, configClassModel, 
             signupInfoClassModel, contentClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
