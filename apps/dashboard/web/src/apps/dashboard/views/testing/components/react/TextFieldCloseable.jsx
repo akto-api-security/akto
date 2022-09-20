@@ -4,10 +4,14 @@ import TextField from "@mui/material/TextField"
 
 import './start-node.css';
 
-const TextFieldCloseable = ({text}) => {
+const TextFieldCloseable = ({text, usePureJs=false}) => {
 
     var r = /\#\[.*?]#/g;
     let m = r.exec(text)
+
+    if (usePureJs) {
+        return <span className="request-editor">{JavaScriptBlock(text)}</span>
+    }
 
     return (
         <span>
