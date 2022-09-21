@@ -22,8 +22,9 @@ import Checkbox from '@mui/material/Checkbox';
 
 
 import './start-node.css'
+import { Divider } from '@mui/material';
 
-const RequestEditor = ({sampleApiCall, updatedSampleData, onChangeApiRequest}) => {
+const RequestEditor = ({sampleApiCall, updatedSampleData, onChangeApiRequest, testValidatorCode, onChangeTestValidatorCode}) => {
   let QUERY_PARAMS = "queryParams"
   let REQUEST_HEADERS = "requestHeaders"
   let REQUEST_PAYLOAD = "requestPayload"
@@ -51,36 +52,50 @@ const RequestEditor = ({sampleApiCall, updatedSampleData, onChangeApiRequest}) =
     onChangeApiRequest(REQUEST_URL, newUrl);
   }
 
+  const onChangeTestValidator = (newCondition) => {
+    onChangeApiRequest(TEST_VALIDATOR, newCondition);
+  }
+
   return (
-    <div style={{display: "flex"}}>
-      <div style={{width: "400px"}}>
-        <div className="request-title">[Request] URL</div>
-        <div className="request-editor request-editor-path">
-          <TemplateStringEditor defaultText={updatedSampleData[REQUEST_URL] != null ? updatedSampleData[REQUEST_URL] : oldUrl} onChange={onChangeRequestUrl}/>
+    <div>
+      <div style={{display: "flex"}}>
+        <div style={{width: "400px"}}>
+          <div className="request-title">[Request] URL</div>
+          <div className="request-editor request-editor-path">
+            <TemplateStringEditor defaultText={updatedSampleData[REQUEST_URL] != null ? updatedSampleData[REQUEST_URL] : oldUrl} onChange={onChangeRequestUrl}/>
+          </div>
+          <div className="request-title">[Request] Query params</div>
+          <div className="request-editor request-editor-path">
+            <TemplateStringEditor defaultText={updatedSampleData[QUERY_PARAMS] != null ?  updatedSampleData[QUERY_PARAMS] : oldParams} onChange={onChangeQueryParams}/>
+          </div>
+          <div className="request-title">[Request] Headers</div>
+          <div className="request-editor request-editor-headers">
+            {<TemplateStringEditor defaultText={updatedSampleData[REQUEST_HEADERS] != null ? updatedSampleData[REQUEST_HEADERS] : oldHeaders} onChange={onChangeRequestHeaders}/>}
+          </div>
+          <div className="request-title">[Request] Payload</div>
+          <div className="request-editor request-editor-payload">
+            <TemplateStringEditor defaultText={updatedSampleData[REQUEST_PAYLOAD] != null ? updatedSampleData[REQUEST_PAYLOAD] : oldPayload} onChange={onChangeRequestPayload}/>
+          </div>
         </div>
-        <div className="request-title">[Request] Query params</div>
-        <div className="request-editor request-editor-path">
-          <TemplateStringEditor defaultText={updatedSampleData[QUERY_PARAMS] != null ?  updatedSampleData[QUERY_PARAMS] : oldParams} onChange={onChangeQueryParams}/>
-        </div>
-        <div className="request-title">[Request] Headers</div>
-        <div className="request-editor request-editor-headers">
-          {<TemplateStringEditor defaultText={updatedSampleData[REQUEST_HEADERS] != null ? updatedSampleData[REQUEST_HEADERS] : oldHeaders} onChange={onChangeRequestHeaders}/>}
-        </div>
-        <div className="request-title">[Request] Payload</div>
-        <div className="request-editor request-editor-payload">
-          <TemplateStringEditor defaultText={updatedSampleData[REQUEST_PAYLOAD] != null ? updatedSampleData[REQUEST_PAYLOAD] : oldPayload} onChange={onChangeRequestPayload}/>
+        <div style={{width: "400px", opacity: "0.5"}}>
+          <div className="request-title">[Response] Headers</div>
+          <div className="request-editor request-editor-headers">
+            {sampleApiCall.responseHeaders}
+          </div>
+          <div className="request-title">[Response] Payload</div>
+          <div className="request-editor request-editor-payload">
+            {sampleApiCall.responsePayload}
+          </div>
         </div>
       </div>
-      <div style={{width: "400px", opacity: "0.5"}}>
-        <div className="request-title">[Response] Headers</div>
-        <div className="request-editor request-editor-headers">
-          {sampleApiCall.responseHeaders}
-        </div>
-        <div className="request-title">[Response] Payload</div>
+      <Divider style={{marginTop: "12px"}}></Divider>
+      <div style={{paddingTop: "12px"}}>
+        <div className="request-title">Test Validator Code</div>
         <div className="request-editor request-editor-payload">
-          {sampleApiCall.responsePayload}
+          <TemplateStringEditor usePureJs={true} defaultText={testValidatorCode} onChange={onChangeTestValidatorCode}/>
         </div>
       </div>
+      <div style={{minHeight: "24px"}}></div>
     </div>
   )
 }
@@ -94,6 +109,8 @@ export default function InputArgumentsDialog({nodeId, endpointDetails}) {
   const setApiType = useStore(state => state.setApiType)
   const setRedirect = useStore(state => state.setRedirect)
   const [sampleData, updateSampleData] = React.useState({})
+  const setValidatorCode = useStore(state => state.setValidatorCode)
+  const setSleep = useStore(state => state.setSleep)
 
   React.useEffect(() => {
       if (!endpointDetails) return;
@@ -107,6 +124,10 @@ export default function InputArgumentsDialog({nodeId, endpointDetails}) {
     currNewSampleData[key] = newData
     let updatedSampleData = {...nodeEndpointMap[nodeId].updatedSampleData, ...currNewSampleData}
     addNodeEndpoint(nodeId, {...endpointDetails, updatedSampleData})
+  }
+
+  const onChangeTestValidatorCode = (val) => {
+    setValidatorCode(nodeId, val)
   }
 
   const handleClickOpen = () => {
@@ -132,8 +153,17 @@ export default function InputArgumentsDialog({nodeId, endpointDetails}) {
     setRedirect(nodeId, !redirect)
   };
 
+  const handleSleep = (event) => {
+    let waitInSeconds = event.target.checked ? 60 : 0
+    setSleep(nodeId, waitInSeconds)
+  };
+
   const checkedRedirect = () => {
     return !endpointDetails["overrideRedirect"]
+  }
+
+  const checkedSleep = () => {
+    return endpointDetails["waitInSeconds"] > 0
   }
 
   const [anchorEl, setAnchorEl] = React.useState(null);
@@ -179,12 +209,18 @@ export default function InputArgumentsDialog({nodeId, endpointDetails}) {
                 }}
               >
                 <FormGroup sx={{paddingLeft: 2}}>
-                  <FormControlLabel control={<Checkbox checked={checkedPoll()} onChange={handleChangePoll}/>} label="Poll" />
+                  <FormControlLabel control={<Checkbox checked={checkedSleep()} onChange={handleSleep}/>} label="Sleep" />
                   <FormControlLabel control={<Checkbox checked={checkedRedirect()} onChange={handleChangeRedirect}/>} label="Auto Redirect" />
                 </FormGroup>
               </Menu>
             </div>
-            <RequestEditor sampleApiCall={sampleData} updatedSampleData={nodeEndpointMap[nodeId].updatedSampleData} onChangeApiRequest={onChangeApiRequest}/>
+            <RequestEditor
+              sampleApiCall={sampleData}
+              updatedSampleData={nodeEndpointMap[nodeId].updatedSampleData}
+              onChangeApiRequest={onChangeApiRequest}
+              testValidatorCode={nodeEndpointMap[nodeId].testValidatorCode}
+              onChangeTestValidatorCode={onChangeTestValidatorCode}
+            />
           </div>
             
         </DialogContent>

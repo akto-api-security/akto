@@ -8,6 +8,7 @@ import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.BackwardCompatibilityDao;
 import com.akto.dao.FilterSampleDataDao;
 import com.akto.dao.UsersDao;
+import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.BackwardCompatibility;
 import com.akto.dto.notifications.SlackWebhook;
@@ -204,6 +205,16 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
+    public void dropWorkflowTestResultCollection(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getDropWorkflowTestResult() == 0) {
+            WorkflowTestResultsDao.instance.getMCollection().drop();
+        }
+        BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.DROP_WORKFLOW_TEST_RESULT, Context.now())
+        );
+    }
+
     public void resetSingleTypeInfoCount(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getResetSingleTypeInfoCount() == 0) {
             SingleTypeInfoDao.instance.resetCount();
@@ -251,6 +262,7 @@ public class InitializerListener implements ServletContextListener {
         try {
             dropFilterSampleDataCollection(backwardCompatibility);
             resetSingleTypeInfoCount(backwardCompatibility);
+            dropWorkflowTestResultCollection(backwardCompatibility);
 
             SingleTypeInfo.init();
 

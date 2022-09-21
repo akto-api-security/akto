@@ -16,9 +16,16 @@ const WorkflowResultsDrawer = (props) => {
     const [idx, setIdx] = useState(0);
     let testRunning = props["testRunning"] || (workflowTestingRun && (workflowTestingRun["state"] === "SCHEDULED" || workflowTestingRun["state"] === "RUNNING"))
 
+    const elemClass = (i, vulnerable) => {
+        let className = "results-node"
+        if (vulnerable) className += " result-node-vulnerable"
+        if (i === idx) className += " results-node-selected"
+        return className
+    }
+
     const elem = (element, i) => {
         return (
-            <Box onClick={()=>{setIdx(i)}} key={i} className={"results-node " + ((i === idx) ? "results-node-selected" : "")}>
+            <Box onClick={()=>{setIdx(i)}} key={i} className={elemClass(i, element["vulnerable"])}>
                 {element["key"]}
             </Box>
         )

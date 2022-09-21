@@ -41,7 +41,7 @@
       v-if="data.type === 'value'"
       @mouseover="upHere = true" @mouseleave="upHere = false"
     >
-      <v-tooltip bottom :disabled="!this.sensitiveHighlightValue">
+      <v-tooltip bottom :disabled="!this.tooltipValue">
         <template v-slot:activator="{on, attrs}">
           <div v-on="on" v-bind="attrs">
             <span class="value-key">{{ data.key }}:</span>
@@ -51,7 +51,7 @@
           </div>
         </template>
         <span>
-          {{this.sensitiveHighlightValue}}
+          {{this.tooltipValue}}
         </span>
       </v-tooltip>
     </div>
@@ -164,14 +164,26 @@ export default Vue.extend({
         opened: this.open
       };
     },
-    sensitiveHighlightValue() {
-      return this.highlightItemMap ? this.highlightItemMap[this.convertAbsoluteToRelative(this.data.path)] : null
+    tooltipValue() {
+      let c = this.highlightItemMap ? this.highlightItemMap[this.convertAbsoluteToRelative(this.data.path)] : null
+      return c ? c["value"] : null
+    },
+    doHighlight() {
+      let c = this.highlightItemMap[this.convertAbsoluteToRelative(this.data.path)]
+      if (c == null) c = {}
+      return  c["highlight"]
+    },
+    useAsterisk() {
+      let c = this.highlightItemMap[this.convertAbsoluteToRelative(this.data.path)]
+      if (c == null) c = {}
+      return  c["asterisk"]
     },
     valueClasses: function() {
       return {
         'value-key': true,
         'can-select': this.canSelect,
-        'sensitive-hightlight-class': this.sensitiveHighlightValue
+        'sensitive-hightlight-class': this.tooltipValue && this.doHighlight,
+        'asterisk-hightlight-class': this.useAsterisk
       };
     },
     keyClass: function () {
@@ -277,6 +289,11 @@ export default Vue.extend({
 
 .sensitive-hightlight-class {
   background-color: #FF000033;
+}
+
+
+.asterisk-hightlight-class .value-key::before {
+    content: "*";
 }
 
 .chevron-arrow {

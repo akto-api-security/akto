@@ -2,6 +2,11 @@ package com.akto.dto;
 
 import org.junit.Test;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import static org.junit.Assert.assertEquals;
 
 public class TestOriginalHttpResponse {
@@ -16,6 +21,25 @@ public class TestOriginalHttpResponse {
         assertEquals(7, originalHttpResponse.getHeaders().size());
         assertEquals("{\"code\":200,\"type\":\"unknown\",\"message\":\"ok\"}", originalHttpResponse.getBody());
 
+
+    }
+
+    @Test
+    public void testCopy() {
+        int statusCode = 201;
+        String body = "{}";
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("something", Collections.singletonList("value"));
+
+        OriginalHttpResponse originalHttpResponse = new OriginalHttpResponse(
+                body, headers, statusCode
+        );
+
+        OriginalHttpResponse copyOriginalHttpResponse= originalHttpResponse.copy();
+
+        assertEquals(body, copyOriginalHttpResponse.getBody());
+        assertEquals(headers, copyOriginalHttpResponse.getHeaders());
+        assertEquals(statusCode, copyOriginalHttpResponse.getStatusCode());
 
     }
 }

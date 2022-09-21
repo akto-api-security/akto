@@ -10,41 +10,38 @@ import com.akto.testing.StatusCodeAnalyser;
 import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
+import java.util.List;
 
 
 public class NoAuthTest extends TestPlugin {
 
     @Override
-    public boolean start(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId) {
-        RawApi rawApi = SampleMessageStore.fetchOriginalMessage(apiInfoKey);
-        if (rawApi == null) {
-            addWithoutRequestError(apiInfoKey, testRunId, TestResult.TestError.NO_PATH);
-            return false;
-        }
+    public boolean start(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, AuthMechanism authMechanism) {
+        List<RawApi> filteredMessages = fetchMessagesWithAuthToken(apiInfoKey, testRunId, authMechanism);
+        if (filteredMessages == null) return false;
 
-        OriginalHttpRequest originalHttpRequest = rawApi.getRequest();
+        RawApi rawApi = filteredMessages.get(0);
 
-        AuthMechanism authMechanism = AuthMechanismStore.getAuthMechanism();
-        if (authMechanism == null) {
-            addWithoutRequestError(apiInfoKey, testRunId, TestResult.TestError.NO_AUTH_MECHANISM);
-            return false;
-        }
+        OriginalHttpRequest testRequest = rawApi.getRequest().copy();
+        OriginalHttpResponse originalHttpResponse = rawApi.getResponse().copy();
 
-        boolean result = authMechanism.removeAuthFromRequest(originalHttpRequest);
-        if (!result) return false;
+        authMechanism.removeAuthFromRequest(testRequest);
 
-        OriginalHttpResponse response = null;
+        OriginalHttpResponse testResponse = null;
         try {
-            response = ApiExecutor.sendRequest(originalHttpRequest, true);
+            testResponse = ApiExecutor.sendRequest(testRequest, true);
         } catch (Exception e) {
-            addWithRequestError(apiInfoKey, testRunId, TestResult.TestError.API_REQUEST_FAILED, originalHttpRequest);
+            addWithRequestError(apiInfoKey, rawApi.getOriginalMessage(), testRunId, TestResult.TestError.API_REQUEST_FAILED, testRequest);
             return false;
         }
 
-        int statusCode = StatusCodeAnalyser.getStatusCode(response.getBody(), response.getStatusCode());
+        int statusCode = StatusCodeAnalyser.getStatusCode(testResponse.getBody(), testResponse.getStatusCode());
         boolean vulnerable = isStatusGood(statusCode);
 
-        addTestSuccessResult(apiInfoKey, originalHttpRequest, response, testRunId, vulnerable);
+        double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), testResponse.getBody());
+
+        addTestSuccessResult(apiInfoKey, testRequest, testResponse, rawApi.getOriginalMessage(), testRunId,
+                vulnerable, percentageMatch, new ArrayList<>(), TestResult.Confidence.HIGH);
 
         return vulnerable;
     }

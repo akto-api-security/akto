@@ -201,6 +201,10 @@
     word-break: break-all;
 }
 
+.result-node-vulnerable {
+    color: red
+}
+
 .results-node-selected {
     font-weight: bold;
 }

@@ -13,6 +13,7 @@ import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.Paths;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.media.*;
+import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.oas.models.servers.Server;
 
 import java.net.URI;
@@ -44,27 +45,22 @@ public class Main {
 
     }
 
-    public static OpenAPI init(int apiCollectionId, List<String> uniqueUrls) throws Exception {
+
+    public static OpenAPI init(String info,Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList) throws Exception {
         OpenAPI openAPI = new OpenAPI();
-        addPaths(openAPI, apiCollectionId, uniqueUrls);
-        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("_id", apiCollectionId);
-        if (apiCollection == null) {
-            addInfo(openAPI,"Invalid apiCollectionId");
-            return openAPI;
-        }
+        addPaths(openAPI, stiList);
         addServer(null, openAPI);
         Paths paths = PathBuilder.parameterizePath(openAPI.getPaths());
         openAPI.setPaths(paths);
-        addInfo(openAPI, apiCollection.getName());
+        addInfo(openAPI,info);
         return openAPI;
     }
 
 
-    public static void addPaths(OpenAPI openAPI, int apiCollectionId, List<String> uniqueUrls) {
+    public static void addPaths(OpenAPI openAPI, Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList) {
         Paths paths = new Paths();
-        for (String url: uniqueUrls) {
-            Map<String, Map<Integer, List<SingleTypeInfo>>> stiMap = getCorrespondingSingleTypeInfo(url,apiCollectionId);
-            buildPathsFromSingleTypeInfosPerUrl(stiMap, url, paths);
+        for(String url : stiList.keySet()){
+            buildPathsFromSingleTypeInfosPerUrl(stiList.get(url), url,paths);
         }
         openAPI.setPaths(paths);
     }
@@ -88,46 +84,47 @@ public class Main {
         try {
             schema = buildSchema(singleTypeInfoList);
         } catch (Exception e) {
-            logger.error("ERROR in addPathItems " + e);
+            logger.error("ERROR in building schema in addPathItems " + e);
         }
         if (schema == null) {
             schema = new ObjectSchema();
             schema.setDescription("AKTO_ERROR while building schema");
         }
-        PathBuilder.addPathItem(paths, url, method, responseCode, schema);
+        List<Parameter> headerParameters = new ArrayList<>();
+        try{
+            headerParameters = buildHeaders(singleTypeInfoList);
+        } catch (Exception e) {
+            logger.error("ERROR in building headers in addPathItems " + e);
+        }
+        
+        PathBuilder.addPathItem(paths, url, method, responseCode, schema, headerParameters);
     }
 
-    public static Map<String, Map<Integer, List<SingleTypeInfo>>> getCorrespondingSingleTypeInfo(String url,
-                                                                                                 int apiCollectionId) {
-        List<SingleTypeInfo> singleTypeInfoList = SingleTypeInfoDao.instance.findAll(
-                Filters.and(
-                        Filters.eq("isHeader", false),
-                        Filters.eq("url", url),
-                        Filters.eq("apiCollectionId", apiCollectionId)
-                )
-        );
-
-        Map<String, Map< Integer, List<SingleTypeInfo>>> stiMap = new HashMap<>();
-
+    public static List<Parameter> buildHeaders(List<SingleTypeInfo> singleTypeInfoList) throws Exception{
+        List<Parameter> headerParameters = new ArrayList<>();
+        ObjectSchema schema =new ObjectSchema();
         for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
-            String method = singleTypeInfo.getMethod();
-            Integer responseCode = singleTypeInfo.getResponseCode();
-
-            if (!stiMap.containsKey(method)) {
-                stiMap.put(method, new HashMap<>());
+            if(singleTypeInfo.isIsHeader()){
+                List<SchemaBuilder.CustomSchema> cc = SchemaBuilder.getCustomSchemasFromSingleTypeInfo(singleTypeInfo);
+                SchemaBuilder.build(schema, cc);
             }
-            if (!stiMap.get(method).containsKey(responseCode)) {
-                stiMap.get(method).put(responseCode, new ArrayList<>());
-            }
-
-            stiMap.get(method).get(responseCode).add(singleTypeInfo);
         }
-        return stiMap;
+        for(String header:schema.getProperties().keySet()){
+            Parameter head = new Parameter();
+            head.setName(header);
+            head.setIn("header");
+            head.setSchema(schema.getProperties().get(header));
+            headerParameters.add(head);
+        }
+        return headerParameters;
     }
 
     public static Schema<?> buildSchema(List<SingleTypeInfo> singleTypeInfoList) throws Exception {
         ObjectSchema schema =new ObjectSchema();
         for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
+            if(singleTypeInfo.isIsHeader()){
+                continue;
+            }
             List<SchemaBuilder.CustomSchema> cc = SchemaBuilder.getCustomSchemasFromSingleTypeInfo(singleTypeInfo);
             SchemaBuilder.build(schema, cc);
         }

@@ -2,6 +2,11 @@ package com.akto.dto;
 
 import org.junit.Test;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
@@ -69,6 +74,31 @@ public class TestOriginalHttpRequest {
         assertEquals("accountId=6304df219a460a36a1edb0e0",originalHttpRequest.getQueryParams());
         assertEquals("PUT", originalHttpRequest.getMethod());
         assertEquals("{\"helpPanelMenu\":{\"releaseNotesNotifications\":0}}", originalHttpRequest.getBody());
+    }
+
+    @Test
+    public void testCopy() {
+        String url = "url";
+        String queryParams = "user=avneesh";
+        String method = "GET";
+        String body = "{}";
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("something", Collections.singletonList("value"));
+        String type = "HTTP 1.1";
+
+        OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest(
+                url, queryParams, method, body, headers, type
+        );
+
+        OriginalHttpRequest copyOriginalHttpRequest = originalHttpRequest.copy();
+
+        assertEquals(url,copyOriginalHttpRequest.getUrl());
+        assertEquals(queryParams,copyOriginalHttpRequest.getQueryParams());
+        assertEquals(method,copyOriginalHttpRequest.getMethod());
+        assertEquals(body,copyOriginalHttpRequest.getBody());
+        assertEquals(headers,copyOriginalHttpRequest.getHeaders());
+        assertEquals(type,copyOriginalHttpRequest.getType());
+
     }
 
 }

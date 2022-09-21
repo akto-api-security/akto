@@ -102,8 +102,11 @@ public class StatusCodeAnalyser {
     public static boolean fillFrequencyMap(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<Set<String>, Map<String,Integer>> frequencyMap) {
 
         // fetch sample message
-        RawApi rawApi = SampleMessageStore.fetchOriginalMessage(apiInfoKey);
-        if (rawApi == null) return false;
+        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey);
+        List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, authMechanism);
+        if (filteredMessages.isEmpty()) return false;
+
+        RawApi rawApi = filteredMessages.get(0);
 
         OriginalHttpRequest request = rawApi.getRequest();
         OriginalHttpResponse response = rawApi.getResponse();

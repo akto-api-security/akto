@@ -172,6 +172,27 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String fetchWorkflowTestingSchedule() {
+        this.testingSchedules = TestingSchedulesDao.instance.findAll(Filters.eq("sampleTestingRun.testingEndpoints.workflowTest._id", workflowTestId));
+        return SUCCESS.toUpperCase();
+    }
+
+    public String deleteScheduledWorkflowTests() {
+        TestingSchedulesDao.instance.deleteAll(Filters.eq("sampleTestingRun.testingEndpoints.workflowTest._id", workflowTestId));
+        Bson filter = Filters.and(
+                Filters.or(
+                        Filters.eq(TestingRun.STATE, State.SCHEDULED),
+                        Filters.eq(TestingRun.STATE, State.RUNNING)
+                ),
+                Filters.eq("testingEndpoints.workflowTest._id", workflowTestId)
+        );
+        Bson update = Updates.set(TestingRun.STATE, State.STOPPED);
+
+        TestingRunDao.instance.getMCollection().updateMany(filter, update);
+
+        return SUCCESS.toUpperCase();
+    }
+
     public String stopAllTests() {
         // stop all the scheduled and running tests
         Bson filter = Filters.or(

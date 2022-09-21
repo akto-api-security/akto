@@ -214,6 +214,9 @@ const inventory = {
                 state.filters[x.customFieldName] = x
               })
             })
+        },
+        uploadWorkflowJson({commit, dispatch, state}, {content}) {
+            return api.uploadWorkflowJson(content, state.apiCollectionId);
         }
     },
     getters: {

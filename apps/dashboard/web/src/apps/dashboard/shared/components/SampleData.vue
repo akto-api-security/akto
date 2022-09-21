@@ -1,40 +1,27 @@
 <template>
-    <div v-if="messages && messages.length > 0">
-        <div>
-            <div v-if="messages.length > 1" class="d-flex jc-sb mr-3">
-                <div v-if="json.title" style="margin: auto 8px; color: #47466A">{{json.title}}</div>
-                
-                <v-btn icon @click="currentIndex = (++currentIndex)%messages.length">
-                    <v-icon>$fas_angle-double-right</v-icon>
-                </v-btn>
-            </div>
-            <div class="d-flex" v-if="json['message']">
-                <sample-single-side
-                    class="flex-equal"
-                    title="Request" 
-                    :firstLine='requestFirstLine'
-                    :headers="{}" 
-                    :data="requestJson"
-                    :complete-data="json['message']"
-                    :simpleCopy="false"
-                />
-                <sample-single-side 
-                    class="flex-equal"                
-                    title="Response" 
-                    :firstLine='responseFirstLine' 
-                    :headers="{}" 
-                    :data="responseJson"
-                    :simpleCopy="true"
-                    :complete-data="json['message']"
-                />
-            </div>
-            <div v-else style="font-size: 13px; margin: auto 8px; color: #47466A">
-                {{testResultErrors}}
-            </div>
+    <div class="d-flex" style="margin: 24px">
+        <div class="flex-equal" >
+            <sample-single-side
+                :title="requestTitle" 
+                :firstLine='requestFirstLine'
+                :headers="{}" 
+                :data="requestJson"
+                :complete-data="json['message']"
+                :simpleCopy="false"
+                style="margin: 8px 4px 0px 0px"
+            />
         </div>
-    </div>
-    <div v-else class="empty-container">
-        No samples values saved yet!
+        <div class="flex-equal" >
+            <sample-single-side               
+                :title="responseTitle" 
+                :firstLine='responseFirstLine' 
+                :headers="{}" 
+                :data="responseJson"
+                :simpleCopy="true"
+                :complete-data="json['message']"
+                style="margin: 8px 0px 0px 4px"
+            />
+        </div>
     </div>
 </template>
 
@@ -49,11 +36,12 @@ export default {
         SampleSingleSide
     },
     props: {
-        messages: obj.arrR
+        json: obj.objR,
+        requestTitle: obj.ObjR,
+        responseTitle: obj.ObjR
     },
     data () {
         return {
-            currentIndex: 0
         }
     },
     computed: {
@@ -166,22 +154,6 @@ export default {
             return result
         },
 
-        json: function() {
-            let currentMessage = this.messages[this.currentIndex]
-            return {
-                "message": JSON.parse(currentMessage["message"]),
-                title: currentMessage["title"],
-                "highlightPaths": currentMessage["highlightPaths"],
-            }
-        },
-
-        testResultErrors: function() {
-            let currentMessage = this.messages[this.currentIndex]
-            let errors = currentMessage["errors"]
-            if (!errors) return ""
-
-            return "Error while executing the test: " + errors.join(" ")
-        }
     }
 }
 </script>
@@ -189,10 +161,5 @@ export default {
 <style lang="sass" scoped>
 .flex-equal
     width: 50%
-
-.empty-container
-    font-size: 13px
-    color: #47466A
-    margin: 8px 8px 0 0 
 
 </style>

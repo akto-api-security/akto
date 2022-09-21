@@ -9,22 +9,60 @@ public class WorkflowTestResult {
     private int workflowTestId;
     public static final String _TEST_RUN_ID = "testRunId";
     private ObjectId testRunId;
-    Map<String, TestResult> testResultMap;
+    Map<String, NodeResult> nodeResultMap;
+
+    public static class NodeResult {
+        private String message;
+        private boolean vulnerable;
+        private List<String> errors;
+
+        public NodeResult() { }
+
+        public NodeResult(String message, boolean vulnerable, List<String> errors) {
+            this.message = message;
+            this.vulnerable = vulnerable;
+            this.errors = errors;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
+        }
+
+        public boolean isVulnerable() {
+            return vulnerable;
+        }
+
+        public void setVulnerable(boolean vulnerable) {
+            this.vulnerable = vulnerable;
+        }
+
+        public List<String> getErrors() {
+            return errors;
+        }
+
+        public void setErrors(List<String> errors) {
+            this.errors = errors;
+        }
+    }
 
     public WorkflowTestResult() {
     }
 
-    public WorkflowTestResult(int id, int workflowTestId, Map<String, TestResult> testResultMap, ObjectId testRunId) {
+    public WorkflowTestResult(int id, int workflowTestId, Map<String, NodeResult> nodeResultMap, ObjectId testRunId) {
         this.id = id;
         this.workflowTestId = workflowTestId;
-        this.testResultMap = testResultMap;
+        this.nodeResultMap = nodeResultMap;
         this.testRunId = testRunId;
     }
 
-    public void addNodeResult(String nodeId, String message, List<TestResult.TestError> testErrors) {
-        if (this.testResultMap == null) this.testResultMap = new HashMap<>();
-        TestResult testResult = new TestResult(message, false, testErrors, new ArrayList<>());
-        this.testResultMap.put(nodeId, testResult);
+    public void addNodeResult(String nodeId, String message, List<String> testErrors) {
+        if (this.nodeResultMap == null) this.nodeResultMap = new HashMap<>();
+        NodeResult nodeResult = new NodeResult(message, false, testErrors);
+        this.nodeResultMap.put(nodeId, nodeResult);
     }
 
     public int getId() {
@@ -43,12 +81,12 @@ public class WorkflowTestResult {
         this.workflowTestId = workflowTestId;
     }
 
-    public Map<String, TestResult> getTestResultMap() {
-        return testResultMap;
+    public Map<String, NodeResult> getNodeResultMap() {
+        return nodeResultMap;
     }
 
-    public void setTestResultMap(Map<String, TestResult> testResultMap) {
-        this.testResultMap = testResultMap;
+    public void setNodeResultMap(Map<String, NodeResult> nodeResultMap) {
+        this.nodeResultMap = nodeResultMap;
     }
 
     public ObjectId getTestRunId() {

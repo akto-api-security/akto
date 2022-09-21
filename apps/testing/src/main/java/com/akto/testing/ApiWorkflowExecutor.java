@@ -11,7 +11,6 @@ import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.api_workflow.Node;
 import com.akto.dto.testing.*;
 import com.akto.dto.type.RequestTemplate;
-import com.akto.runtime.URLAggregator;
 import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBObject;
@@ -33,6 +32,16 @@ public class ApiWorkflowExecutor {
 
     private static final Logger logger = LoggerFactory.getLogger(ApiWorkflowExecutor.class);
 
+    public static void main(String[] args) {
+        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
+        Context.accountId.set(1_000_000);
+
+        TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq("_id", new ObjectId("631cac6b09119467be6a1640")));
+        WorkflowTestingEndpoints workflowTestingEndpoints = (WorkflowTestingEndpoints) testingRun.getTestingEndpoints();
+        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
+        apiWorkflowExecutor.init(workflowTestingEndpoints.getWorkflowTest(), testingRun.getId());
+    }
+
     public void init(WorkflowTest workflowTest, ObjectId testingRunId) {
         Graph graph = new Graph();
         graph.buildGraph(workflowTest);
@@ -42,28 +51,29 @@ public class ApiWorkflowExecutor {
 
         int id = Context.now();
         WorkflowTestResult workflowTestResult = new WorkflowTestResult(id, workflowTest.getId(), new HashMap<>(), testingRunId);
-        Map<String, TestResult> testResultMap = workflowTestResult.getTestResultMap();
+        Map<String, WorkflowTestResult.NodeResult> testResultMap = workflowTestResult.getNodeResultMap();
         for (Node node: nodes) {
-            TestResult testResult;
+            WorkflowTestResult.NodeResult nodeResult;
             try {
-                testResult = processNode(node, valuesMap);
+                nodeResult = processNode(node, valuesMap);
             } catch (Exception e) {
                 e.printStackTrace();
-                List<TestResult.TestError> testErrors = new ArrayList<>();
-                testErrors.add(TestResult.TestError.SOMETHING_WENT_WRONG);
-                testResult = new TestResult("{}", false, testErrors, new ArrayList<>());
+                List<String> testErrors = new ArrayList<>();
+                testErrors.add("Something went wrong");
+                nodeResult = new WorkflowTestResult.NodeResult("{}", false, testErrors);
             }
 
-            testResultMap.put(node.getId(), testResult);
+            testResultMap.put(node.getId(), nodeResult);
 
-            if (testResult.getErrors().size() > 0) break;
+            if (nodeResult.getErrors().size() > 0) break;
         }
 
         WorkflowTestResultsDao.instance.insertOne(workflowTestResult);
     }
 
-    public TestResult processNode(Node node, Map<String, Object> valuesMap) {
-        List<TestResult.TestError> testErrors = new ArrayList<>();
+    public WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap) {
+        List<String> testErrors = new ArrayList<>();
+        String nodeId = node.getId();
         WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
         WorkflowUpdatedSampleData updatedSampleData = workflowNodeDetails.getUpdatedSampleData();
         WorkflowNodeDetails.Type type = workflowNodeDetails.getType();
@@ -75,14 +85,26 @@ public class ApiWorkflowExecutor {
             if (request == null) throw new Exception();
         } catch (Exception e) {
             e.printStackTrace();
-            return new TestResult(null, false, Collections.singletonList(TestResult.TestError.FAILED_BUILDING_REQUEST_BODY), new ArrayList<>());
+            return new WorkflowTestResult.NodeResult(null, false, Collections.singletonList("Failed building request body"));
         }
 
-        populateValuesMap(valuesMap, request.getBody(), node.getId(), request.getHeaders(),
+        populateValuesMap(valuesMap, request.getBody(), nodeId, request.getHeaders(),
                 true, request.getQueryParams());
 
         OriginalHttpResponse response = null;
         int maxRetries = type.equals(WorkflowNodeDetails.Type.POLL) ? 20 : 1;
+
+        try {
+            int waitInSeconds = Math.min(workflowNodeDetails.getWaitInSeconds(),60);
+            if (waitInSeconds > 0) {
+                System.out.println("WAITING: " + waitInSeconds + " seconds");
+                Thread.sleep(waitInSeconds*1000);
+                System.out.println("DONE WAITING!!!!");
+            }
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
         for (int i = 0; i < maxRetries; i++) {
             try {
                 if (i > 0) {
@@ -92,14 +114,16 @@ public class ApiWorkflowExecutor {
                 }
 
                 response = ApiExecutor.sendRequest(request, followRedirects);
-                if (HttpResponseParams.validHttpResponseCode(response.getStatusCode())) {
-                    populateValuesMap(valuesMap, response.getBody(), node.getId(), response.getHeaders(), false, null);
-                    break;
-                }
+
+                int statusCode = response.getStatusCode();
+                String statusKey =   nodeId + "." + "response" + "." + "status_code";
+                valuesMap.put(statusKey, statusCode);
+
+                populateValuesMap(valuesMap, response.getBody(), nodeId, response.getHeaders(), false, null);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } catch (Exception e) {
-                testErrors.add(TestResult.TestError.API_REQUEST_FAILED);
+                testErrors.add("API request failed");
                 e.printStackTrace();
             }
         }
@@ -112,17 +136,49 @@ public class ApiWorkflowExecutor {
             e.printStackTrace();
         }
 
-        return new TestResult(message, false, testErrors, new ArrayList<>());
+        boolean vulnerable = validateTest(workflowNodeDetails.getTestValidatorCode(), valuesMap);
+        return new WorkflowTestResult.NodeResult(message,vulnerable, testErrors);
+
+    }
+
+    public boolean validateTest(String testValidatorCode, Map<String, Object> valuesMap) {
+        if (testValidatorCode == null) return false;
+        testValidatorCode = testValidatorCode.trim();
+
+        boolean vulnerable = false;
+        if (testValidatorCode.length() == 0) return false;
+
+        ScriptEngine engine = factory.getEngineByName("nashorn");
+        try {
+            String code = replaceVariables(testValidatorCode, valuesMap);
+            System.out.println("*******************************************************************");
+            System.out.println("TEST VALIDATOR CODE:");
+            System.out.println(code);
+            Object o = engine.eval(code);
+            System.out.println("TEST VALIDATOR RESULT: " + o.toString());
+            System.out.println("*******************************************************************");
+            vulnerable = ! (boolean) o;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return vulnerable;
     }
 
     public void populateValuesMap(Map<String, Object> valuesMap, String payloadStr, String nodeId, Map<String,
             List<String>> headers, boolean isRequest, String queryParams) {
         boolean isList = false;
+        String reqOrResp = isRequest ? "request"  : "response";
+
         if (payloadStr == null) payloadStr = "{}";
         if (payloadStr.startsWith("[")) {
             payloadStr = "{\"json\": "+payloadStr+"}";
             isList = true;
         }
+
+        String fullBodyKey = nodeId + "." + reqOrResp + "." + "body";
+
+        valuesMap.put(fullBodyKey, payloadStr);
 
         BasicDBObject payloadObj;
         try {
@@ -156,7 +212,6 @@ public class ApiWorkflowExecutor {
 
         BasicDBObject flattened = JSONUtils.flattenWithDots(obj);
 
-        String reqOrResp = isRequest ? "request"  : "response";
 
         for (String param: flattened.keySet()) {
             String key = nodeId + "." + reqOrResp + "." + "body" + "." + param;
@@ -305,8 +360,17 @@ public class ApiWorkflowExecutor {
                 logger.error("couldn't find: " + key);
                 throw new Exception("Couldn't find " + key);
             }
-            String val = obj.toString();
-            matcher.appendReplacement(sb, val);
+            String val = obj.toString()
+                    .replace("\\", "\\\\")
+                    .replace("\t", "\\t")
+                    .replace("\b", "\\b")
+                    .replace("\n", "\\n")
+                    .replace("\r", "\\r")
+                    .replace("\f", "\\f")
+                    .replace("\'", "\\'")
+                    .replace("\"", "\\\"");
+            matcher.appendReplacement(sb, "");
+            sb.append(val);
         }
 
         matcher.appendTail(sb); // todo: check if it needs to be called only after appendReplacement
