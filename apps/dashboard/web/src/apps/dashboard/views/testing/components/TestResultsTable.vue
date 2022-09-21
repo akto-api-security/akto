@@ -32,7 +32,7 @@
             </v-btn>
           </template>
           <div class="pa-4">
-            <sample-data :messages='requestAndResponse'/>
+            <test-results-dialog :testingRunResult="testingRunResult"/>
           </div>
         </a-card>
       </div>
@@ -49,6 +49,7 @@ import SensitiveChipGroup from "@/apps/dashboard/shared/components/SensitiveChip
 import SampleData from '@/apps/dashboard/shared/components/SampleData'
 import ACard from '@/apps/dashboard/shared/components/ACard'
 import SimpleTable from "@/apps/dashboard/shared/components/SimpleTable";
+import TestResultsDialog from "./TestResultsDialog";
 
 export default {
   name: "TestResultsTable",
@@ -57,7 +58,8 @@ export default {
     ACard,
     SampleData,
     SimpleTable,
-  },
+    TestResultsDialog
+},
   props: {
     testingRunResults: obj.arrR,
     showVulnerableOnly: obj.boolR
@@ -67,7 +69,7 @@ export default {
       newKey: this.nonNullAuth ? this.nonNullAuth.key : null,
       newVal: this.nonNullAuth ? this.nonNullAuth.value: null,
       openDetailsDialog: false,
-      requestAndResponse: null,
+      testingRunResult: null,
       endpointHeaders: [
         {
           text: "color",
@@ -105,7 +107,7 @@ export default {
         return val
       }
       let r = await api.fetchRequestAndResponseForTest(row.x)
-      this.requestAndResponse = r.testingRunResults && r.testingRunResults[0] ? Object.entries(r.testingRunResults[0].resultMap).filter(x => filterVulnerable(x[1].vulnerable, this.showVulnerableOnly)).map(x => {return {message: x[1].message, title: x[0], highlightPaths:[], errors: x[1].errors}}) : []
+      this.testingRunResult = r.testingRunResults && r.testingRunResults[0] ? Object.entries(r.testingRunResults[0].resultMap).filter(x => filterVulnerable(x[1].vulnerable, this.showVulnerableOnly)): []
       this.openDetailsDialog = true
       console.log(r.testingRunResults[0])
     },

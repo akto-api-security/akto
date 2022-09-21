@@ -169,7 +169,7 @@ export default {
         font-size: 13px
         padding: 8px
         color: #47466A
-        margin: 8px 8px 0 0 
+        height: 100%
     &-title
         font-weight: 500
         text-transform: uppercase

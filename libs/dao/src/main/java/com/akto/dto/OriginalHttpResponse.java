@@ -2,6 +2,7 @@ package com.akto.dto;
 
 import com.google.gson.Gson;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -14,10 +15,15 @@ public class OriginalHttpResponse {
 
     public OriginalHttpResponse() { }
 
+    // before adding any fields make sure to add them to copy function as wel
     public OriginalHttpResponse(String body, Map<String, List<String>> headers, int statusCode) {
         this.body = body;
         this.headers = headers;
         this.statusCode = statusCode;
+    }
+
+    public OriginalHttpResponse copy() {
+        return new OriginalHttpResponse(this.body, new HashMap<>(this.headers), this.statusCode);
     }
 
     public void buildFromSampleMessage(String message) {

@@ -33,6 +33,14 @@ public class AuthMechanism {
         return true;
     }
 
+    public boolean authTokenPresent(OriginalHttpRequest request) {
+        boolean result = true;
+        for (AuthParam authParamPair : authParams) {
+            result = result && authParamPair.authTokenPresent(request);
+        }
+        return result;
+    }
+
     public ObjectId getId() {
         return id;
     }

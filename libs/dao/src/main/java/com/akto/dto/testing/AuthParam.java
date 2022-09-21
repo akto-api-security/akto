@@ -8,6 +8,8 @@ public abstract class AuthParam {
     public abstract boolean addAuthTokens(OriginalHttpRequest request);
     public abstract boolean removeAuthTokens(OriginalHttpRequest request);
 
+    public abstract boolean authTokenPresent(OriginalHttpRequest request);
+
     public enum Location {
         HEADER
     }

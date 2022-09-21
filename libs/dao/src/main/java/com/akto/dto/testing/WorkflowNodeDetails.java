@@ -10,21 +10,38 @@ public class WorkflowNodeDetails {
 
     Type type = Type.API;
     boolean overrideRedirect;
+    String testValidatorCode;
+
+    int waitInSeconds;
 
     public enum Type {
         POLL, API
     }
 
+    // call this function to see if data being passed is legit or not
+    public String validate() {
+        if (this.type == null ) return "Type can't be null";
+        if (this.endpoint == null ) return "URL can't be null";
+        if (this.method == null ) return "Method can't be null";
+        int waitThreshold = 60;
+        if (waitInSeconds > waitThreshold) return "Wait time should be <= " + waitThreshold;
+
+        return null;
+    }
+
     public WorkflowNodeDetails() {
     }
 
-    public WorkflowNodeDetails(int apiCollectionId, String endpoint, Method method, WorkflowUpdatedSampleData updatedSampleData, Type type, boolean overrideRedirect) {
+    public WorkflowNodeDetails(int apiCollectionId, String endpoint, Method method, String testValidatorCode,
+                               WorkflowUpdatedSampleData updatedSampleData, Type type, boolean overrideRedirect, int waitInSeconds) {
         this.apiCollectionId = apiCollectionId;
         this.endpoint = endpoint;
         this.method = method;
         this.updatedSampleData = updatedSampleData;
         this.type = type;
         this.overrideRedirect = overrideRedirect;
+        this.testValidatorCode = testValidatorCode;
+        this.waitInSeconds = waitInSeconds;
     }
 
     public int getApiCollectionId() {
@@ -74,6 +91,26 @@ public class WorkflowNodeDetails {
 
     public void setOverrideRedirect(boolean overrideRedirect) {
         this.overrideRedirect = overrideRedirect;
+    }
+
+    public boolean isOverrideRedirect() {
+        return overrideRedirect;
+    }
+
+    public String getTestValidatorCode() {
+        return testValidatorCode;
+    }
+
+    public void setTestValidatorCode(String testValidatorCode) {
+        this.testValidatorCode = testValidatorCode;
+    }
+
+    public int getWaitInSeconds() {
+        return waitInSeconds;
+    }
+
+    public void setWaitInSeconds(int waitInSeconds) {
+        this.waitInSeconds = waitInSeconds;
     }
 
     @Override

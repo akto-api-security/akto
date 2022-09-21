@@ -23,7 +23,7 @@
           />
         </div>
       </template>
-      Upload traffic (.har)
+      {{tooltipText}}
   </v-tooltip>
 </template>
 
@@ -35,7 +35,9 @@ export default {
     name: "UploadFile",
     props: {
       fileFormat: obj.strR,
-      label: obj.strN
+      label: obj.strN,
+      tooltipText: obj.strN,
+      type: obj.strR
     },
     methods: {
       onPickFile () {
@@ -44,7 +46,10 @@ export default {
       onFilePicked (event) {
         const files = event.target.files
         
-        this.$emit("fileChanged", {file: files[0], label: this.label})
+        this.$emit("fileChanged", {file: files[0], label: this.label, type: this.type})
+        // If you select the same file twice... the onChange() function doesn't get activated
+        // So by resetting the value it gets tricked :)
+        event.target.value = null
       }
     }
 }

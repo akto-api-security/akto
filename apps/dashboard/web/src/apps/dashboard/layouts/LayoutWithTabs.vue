@@ -55,6 +55,11 @@
             return {
                 tabName: null
             }
+        },
+        methods: {
+            reset() {
+                this.tabName = 0
+            }
         }
     }
 

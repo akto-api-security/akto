@@ -9,7 +9,7 @@ import TextFieldCloseable from './TextFieldCloseable.jsx'
 
 import './start-node.css';
 
-const TemplateStringEditor = ({defaultText, onChange}) => {
+const TemplateStringEditor = ({defaultText, onChange, usePureJs=false}) => {
 
     const [toggle, setToggle] = useState(true);
     const toggleChecked = () => { 
@@ -26,7 +26,7 @@ const TemplateStringEditor = ({defaultText, onChange}) => {
 
     return (
        <div style={{position: "relative"}}>
-          {toggle && <TextFieldCloseable text={text}/> }
+          {toggle && <TextFieldCloseable text={text} usePureJs={usePureJs}/> }
           {!toggle && <InputBase value={text} onChange={onChangeInputBase} fullWidth multiline inputProps={{className: 'request-editor'}} variant="standard"/>}
           <div style={{position: "absolute", top: "4px", right: "10px"}}>
             <IconButton onClick={toggleChecked}>

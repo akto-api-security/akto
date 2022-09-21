@@ -327,8 +327,10 @@ public class SingleTypeInfo {
     @BsonProperty("subType")
     String subTypeString;
     public static final String _EXAMPLES  = "examples";
+    @BsonIgnore
     Set<Object> examples = new HashSet<>();
     public static final String _USER_IDS = "userIds";
+    @BsonIgnore
     Set<String> userIds = new HashSet<>();
     public static final String _COUNT = "count";
     int count;
@@ -356,6 +358,9 @@ public class SingleTypeInfo {
     long maxValue = ACCEPTED_MIN_VALUE;  // this value will be used when field doesn't exist in db
     public static final String LAST_SEEN = "lastSeen";
     long lastSeen;
+
+    @BsonIgnore
+    private boolean isPrivate; // do not use this field anywhere else. This was added to convey if STI is private or not to frontend
 
     public static final String _UNIQUE_COUNT = "uniqueCount";
     public long uniqueCount = 0L;
@@ -563,6 +568,11 @@ public class SingleTypeInfo {
         this.apiCollectionId = apiCollectionId;
     }
 
+    public String getSubTypeString() {
+        if (subType == null) return null;
+        return subType.name;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (o == this)
@@ -579,11 +589,11 @@ public class SingleTypeInfo {
                     subType.equals(singleTypeInfo.subType) &&
                     apiCollectionId == singleTypeInfo.apiCollectionId &&
                     isUrlParam == singleTypeInfo.isUrlParam;
-        }
+    }
 
-        @Override
-        public int hashCode() {
-            return Objects.hash(url, method, responseCode, isHeader, param, subType, apiCollectionId, isUrlParam);
+    @Override
+    public int hashCode() {
+        return Objects.hash(url, method, responseCode, isHeader, param, subType, apiCollectionId, isUrlParam);
     }
 
     @Override
@@ -648,7 +658,7 @@ public class SingleTypeInfo {
         isUrlParam = urlParam;
     }
 
-    public void setMinMaxValues(Object o) {
+    public void updateMinMaxValues(Object o) {
         if (subType.getSuperType() == SingleTypeInfo.SuperType.INTEGER || subType.getSuperType() == SingleTypeInfo.SuperType.FLOAT) {
             try {
                 // this is done so that both integer and decimal values can be parsed
@@ -689,7 +699,7 @@ public class SingleTypeInfo {
         }
     }
 
-    public boolean isPrivate() {
+    public boolean getIsPrivate() {
         if (uniqueCount == 0) return true;
         double v = (1.0*publicCount) / uniqueCount;
         return v <= SingleTypeInfo.THRESHOLD;

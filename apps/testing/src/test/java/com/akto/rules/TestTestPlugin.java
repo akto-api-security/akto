@@ -3,23 +3,18 @@ package com.akto.rules;
 import com.akto.MongoBasedTest;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunResultDao;
-import com.akto.dto.ApiInfo;
-import com.akto.dto.HttpRequestParams;
-import com.akto.dto.HttpResponseParams;
-import com.akto.dto.OriginalHttpRequest;
-import com.akto.dto.testing.TestResult;
-import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.*;
+import com.akto.dto.testing.*;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.store.SampleMessageStore;
 import com.akto.types.CappedSet;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 import org.bson.types.ObjectId;
 import org.junit.Test;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
+import java.util.*;
 
 import static org.junit.Assert.*;
 
@@ -66,15 +61,15 @@ public class TestTestPlugin extends MongoBasedTest {
 
         ApiInfo.ApiInfoKey apiInfoKey1 = new ApiInfo.ApiInfoKey(0,"url1", URLMethods.Method.GET);
         ObjectId testRunId1 = new ObjectId();
-        bolaTest.addWithoutRequestError(apiInfoKey1, testRunId1, TestResult.TestError.API_REQUEST_FAILED);
-        noAuthTest.addWithoutRequestError(apiInfoKey1, testRunId1, TestResult.TestError.NO_AUTH_MECHANISM);
+        bolaTest.addWithoutRequestError(apiInfoKey1, testRunId1,"", TestResult.TestError.API_REQUEST_FAILED);
+        noAuthTest.addWithoutRequestError(apiInfoKey1, testRunId1, "",TestResult.TestError.NO_AUTH_MECHANISM);
 
         ApiInfo.ApiInfoKey apiInfoKey2 = new ApiInfo.ApiInfoKey(0,"url1", URLMethods.Method.POST);
         ObjectId testRunId2 = new ObjectId();
-        bolaTest.addWithoutRequestError(apiInfoKey2, testRunId2, TestResult.TestError.NO_PATH);
+        bolaTest.addWithoutRequestError(apiInfoKey2, testRunId2, "",TestResult.TestError.NO_PATH);
 
         ObjectId testRunId3 = new ObjectId();
-        noAuthTest.addWithoutRequestError(apiInfoKey1, testRunId3, TestResult.TestError.NO_PATH);
+        noAuthTest.addWithoutRequestError(apiInfoKey1, testRunId3, "",TestResult.TestError.NO_PATH);
 
         List<TestingRunResult> testingRunResultList = TestingRunResultDao.instance.findAll(new BasicDBObject());
         assertEquals(testingRunResultList.size(),3);
@@ -178,5 +173,85 @@ public class TestTestPlugin extends MongoBasedTest {
         }
 
         SampleMessageStore.singleTypeInfos.put(singleTypeInfo.composeKeyWithCustomSubType(SingleTypeInfo.GENERIC), singleTypeInfo);
+    }
+
+    @Test
+    public void testFetchMessagesWithAuthToken() {
+        SampleMessageStore.sampleDataMap = new HashMap<>();
+        TestingRunResultDao.instance.getMCollection().drop();
+
+        AuthMechanism authMechanism = new AuthMechanism(
+                Collections.singletonList(new HardcodedAuthParam(AuthParam.Location.HEADER, "akto", "something"))
+        );
+
+        ApiInfo.ApiInfoKey apiInfoKey1 = new ApiInfo.ApiInfoKey(0, "https://petstore.swagger.io/v2/pet/2", URLMethods.Method.GET);
+        List<String> values = new ArrayList<>();
+        // both values don't contain auth token
+        values.add("{ \"method\": \"GET\", \"requestPayload\": \"{}\", \"responsePayload\": \"{\\\"id\\\":2,\\\"category\\\":{\\\"id\\\":0},\\\"name\\\":\\\"teste\\\",\\\"photoUrls\\\":[],\\\"tags\\\":[]}\", \"ip\": \"null\", \"source\": \"HAR\", \"type\": \"HTTP/2\", \"akto_vxlan_id\": \"1661807253\", \"path\": \"https://petstore.swagger.io/v2/pet/2\", \"requestHeaders\": \"{\\\"TE\\\":\\\"trailers\\\",\\\"Accept\\\":\\\"application/json\\\",\\\"User-Agent\\\":\\\"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:95.0) Gecko/20100101 Firefox/95.0\\\",\\\"Referer\\\":\\\"https://petstore.swagger.io/\\\",\\\"Connection\\\":\\\"keep-alive\\\",\\\"Sec-Fetch-Dest\\\":\\\"empty\\\",\\\"Sec-Fetch-Site\\\":\\\"same-origin\\\",\\\"Host\\\":\\\"petstore.swagger.io\\\",\\\"Accept-Language\\\":\\\"en-US,en;q=0.5\\\",\\\"Accept-Encoding\\\":\\\"gzip, deflate, br\\\",\\\"Sec-Fetch-Mode\\\":\\\"cors\\\", \\\"Origin\\\" : \\\"dddd\\\"}\", \"responseHeaders\": \"{\\\"date\\\":\\\"Tue, 04 Jan 2022 20:12:27 GMT\\\",\\\"access-control-allow-origin\\\":\\\"*\\\",\\\"server\\\":\\\"Jetty(9.2.9.v20150224)\\\",\\\"access-control-allow-headers\\\":\\\"Content-Type, api_key, Authorization\\\",\\\"X-Firefox-Spdy\\\":\\\"h2\\\",\\\"content-type\\\":\\\"application/json\\\",\\\"access-control-allow-methods\\\":\\\"GET, POST, DELETE, PUT\\\"}\", \"time\": \"1641327147\", \"contentType\": \"application/json\", \"akto_account_id\": \"1000000\", \"statusCode\": \"200\", \"status\": \"OK\" }");
+        values.add("{ \"method\": \"GET\", \"requestPayload\": \"{}\", \"responsePayload\": \"{\\\"id\\\":2,\\\"category\\\":{\\\"id\\\":0},\\\"name\\\":\\\"teste\\\",\\\"photoUrls\\\":[],\\\"tags\\\":[]}\", \"ip\": \"null\", \"source\": \"HAR\", \"type\": \"HTTP/2\", \"akto_vxlan_id\": \"1661807253\", \"path\": \"https://petstore.swagger.io/v2/pet/2\", \"requestHeaders\": \"{\\\"TE\\\":\\\"trailers\\\",\\\"Accept\\\":\\\"application/json\\\",\\\"User-Agent\\\":\\\"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:95.0) Gecko/20100101 Firefox/95.0\\\",\\\"Referer\\\":\\\"https://petstore.swagger.io/\\\",\\\"Connection\\\":\\\"keep-alive\\\",\\\"Sec-Fetch-Dest\\\":\\\"empty\\\",\\\"Sec-Fetch-Site\\\":\\\"same-origin\\\",\\\"Host\\\":\\\"petstore.swagger.io\\\",\\\"Accept-Language\\\":\\\"en-US,en;q=0.5\\\",\\\"Accept-Encoding\\\":\\\"gzip, deflate, br\\\",\\\"Sec-Fetch-Mode\\\":\\\"cors\\\", \\\"Origin\\\" : \\\"dddd\\\"}\", \"responseHeaders\": \"{\\\"date\\\":\\\"Tue, 04 Jan 2022 20:12:27 GMT\\\",\\\"access-control-allow-origin\\\":\\\"*\\\",\\\"server\\\":\\\"Jetty(9.2.9.v20150224)\\\",\\\"access-control-allow-headers\\\":\\\"Content-Type, api_key, Authorization\\\",\\\"X-Firefox-Spdy\\\":\\\"h2\\\",\\\"content-type\\\":\\\"application/json\\\",\\\"access-control-allow-methods\\\":\\\"GET, POST, DELETE, PUT\\\"}\", \"time\": \"1641327147\", \"contentType\": \"application/json\", \"akto_account_id\": \"1000000\", \"statusCode\": \"200\", \"status\": \"OK\" }");
+
+        BOLATest bolaTest = new BOLATest();
+
+        ObjectId testRunId1 = new ObjectId();
+        bolaTest.fetchMessagesWithAuthToken(apiInfoKey1, testRunId1 , authMechanism);
+        TestingRunResult testingRunResult1 = TestingRunResultDao.instance.findOne(Filters.eq("testRunId", testRunId1));
+        assertEquals(TestResult.TestError.NO_PATH, testingRunResult1.getResultMap().get("BOLA").getErrors().get(0));
+
+        SampleMessageStore.sampleDataMap.put(apiInfoKey1, values);
+
+        ObjectId testRunId2 = new ObjectId();
+        bolaTest.fetchMessagesWithAuthToken(apiInfoKey1, testRunId2 , authMechanism);
+        TestingRunResult testingRunResult2 = TestingRunResultDao.instance.findOne(Filters.eq("testRunId", testRunId2));
+        assertEquals(TestResult.TestError.NO_AUTH_TOKEN_FOUND, testingRunResult2.getResultMap().get("BOLA").getErrors().get(0));
+
+        // this value contains auth token so no errors
+        values.add("{ \"method\": \"GET\", \"requestPayload\": \"{}\", \"responsePayload\": \"{\\\"id\\\":2,\\\"category\\\":{\\\"id\\\":0},\\\"name\\\":\\\"teste\\\",\\\"photoUrls\\\":[],\\\"tags\\\":[]}\", \"ip\": \"null\", \"source\": \"HAR\", \"type\": \"HTTP/2\", \"akto_vxlan_id\": \"1661807253\", \"path\": \"https://petstore.swagger.io/v2/pet/2\", \"requestHeaders\": \"{\\\"TE\\\":\\\"trailers\\\",\\\"Accept\\\":\\\"application/json\\\",\\\"User-Agent\\\":\\\"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:95.0) Gecko/20100101 Firefox/95.0\\\",\\\"Referer\\\":\\\"https://petstore.swagger.io/\\\",\\\"Connection\\\":\\\"keep-alive\\\",\\\"Sec-Fetch-Dest\\\":\\\"empty\\\",\\\"Sec-Fetch-Site\\\":\\\"same-origin\\\",\\\"Host\\\":\\\"petstore.swagger.io\\\",\\\"Accept-Language\\\":\\\"en-US,en;q=0.5\\\",\\\"Accept-Encoding\\\":\\\"gzip, deflate, br\\\",\\\"Sec-Fetch-Mode\\\":\\\"cors\\\", \\\"Origin\\\" : \\\"dddd\\\", \\\"akto\\\" : \\\"blah\\\"}\", \"responseHeaders\": \"{\\\"date\\\":\\\"Tue, 04 Jan 2022 20:12:27 GMT\\\",\\\"access-control-allow-origin\\\":\\\"*\\\",\\\"server\\\":\\\"Jetty(9.2.9.v20150224)\\\",\\\"access-control-allow-headers\\\":\\\"Content-Type, api_key, Authorization\\\",\\\"X-Firefox-Spdy\\\":\\\"h2\\\",\\\"content-type\\\":\\\"application/json\\\",\\\"access-control-allow-methods\\\":\\\"GET, POST, DELETE, PUT\\\"}\", \"time\": \"1641327147\", \"contentType\": \"application/json\", \"akto_account_id\": \"1000000\", \"statusCode\": \"200\", \"status\": \"OK\" }");
+        SampleMessageStore.sampleDataMap.put(apiInfoKey1, values);
+
+        ObjectId testRunId3 = new ObjectId();
+        bolaTest.fetchMessagesWithAuthToken(apiInfoKey1, testRunId3 , authMechanism);
+        TestingRunResult testingRunResult3 = TestingRunResultDao.instance.findOne(Filters.eq("testRunId", testRunId3));
+        assertNull(testingRunResult3);
+
+    }
+
+    @Test
+    public void testAddTestSuccessResult() {
+        TestingRunResultDao.instance.getMCollection().drop();
+
+        BOLATest bolaTest = new BOLATest();
+
+        ApiInfo.ApiInfoKey apiInfoKey1 = new ApiInfo.ApiInfoKey(0, "https://petstore.swagger.io/v2/pet/2", URLMethods.Method.GET);
+
+        String originalMessage = "{\"method\":\"POST\",\"requestPayload\":\"{\\\"firstName\\\":\\\"string\\\",\\\"lastName\\\":\\\"string\\\",\\\"password\\\":\\\"string\\\",\\\"userStatus\\\":0,\\\"phone\\\":\\\"string\\\",\\\"id\\\":0,\\\"email\\\":\\\"string\\\",\\\"username\\\":\\\"string\\\"}\",\"responsePayload\":\"{\\\"code\\\":200,\\\"type\\\":\\\"unknown\\\",\\\"message\\\":\\\"9223372036854775807\\\"}\",\"ip\":\"null\",\"source\":\"HAR\",\"type\":\"HTTP/2\",\"akto_vxlan_id\":\"1661807253\",\"path\":\"https://petstore.swagger.io/v2/user\",\"requestHeaders\":\"{\\\"Origin\\\":\\\"https://petstore.swagger.io\\\",\\\"Accept\\\":\\\"application/json\\\",\\\"User-Agent\\\":\\\"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:95.0) Gecko/20100101 Firefox/95.0\\\",\\\"Referer\\\":\\\"https://petstore.swagger.io/\\\",\\\"Connection\\\":\\\"keep-alive\\\",\\\"Sec-Fetch-Dest\\\":\\\"empty\\\",\\\"Sec-Fetch-Site\\\":\\\"same-origin\\\",\\\"Host\\\":\\\"petstore.swagger.io\\\",\\\"Accept-Encoding\\\":\\\"gzip, deflate, br\\\",\\\"Sec-Fetch-Mode\\\":\\\"cors\\\",\\\"TE\\\":\\\"trailers\\\",\\\"Accept-Language\\\":\\\"en-US,en;q=0.5\\\",\\\"Content-Length\\\":\\\"171\\\",\\\"Content-Type\\\":\\\"application/json\\\"}\",\"responseHeaders\":\"{\\\"date\\\":\\\"Tue, 04 Jan 2022 20:14:55 GMT\\\",\\\"access-control-allow-origin\\\":\\\"*\\\",\\\"server\\\":\\\"Jetty(9.2.9.v20150224)\\\",\\\"access-control-allow-headers\\\":\\\"Content-Type, api_key, Authorization\\\",\\\"X-Firefox-Spdy\\\":\\\"h2\\\",\\\"content-type\\\":\\\"application/json\\\",\\\"access-control-allow-methods\\\":\\\"GET, POST, DELETE, PUT\\\"}\",\"time\":\"1641327295\",\"contentType\":\"application/json\",\"akto_account_id\":\"1000000\",\"statusCode\":\"200\",\"status\":\"OK\"}";
+
+        OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest();
+        originalHttpRequest.buildFromSampleMessage(originalMessage);
+        OriginalHttpResponse originalHttpResponse = new OriginalHttpResponse();
+        originalHttpResponse.buildFromSampleMessage(originalMessage);
+
+        ObjectId testRunId = new ObjectId();
+        boolean vulnerable = true;
+        double percentageMatch = 20.9d;
+
+        List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
+        singleTypeInfos.add(new SingleTypeInfo());
+
+        TestResult.Confidence confidence = TestResult.Confidence.HIGH;
+
+        bolaTest.addTestSuccessResult(
+                apiInfoKey1, originalHttpRequest, originalHttpResponse, originalMessage, testRunId,
+                vulnerable, percentageMatch, singleTypeInfos, confidence
+        );
+
+        TestingRunResult testingRunResult = TestingRunResultDao.instance.findOne(Filters.eq("testRunId", testRunId));
+
+        TestResult testResult = testingRunResult.getResultMap().get("BOLA");
+        assertEquals(0, testResult.getErrors().size());
+        assertTrue(testResult.getMessage().length() > 100);
+        assertTrue(testResult.getOriginalMessage().length() > 100);
+        assertEquals(vulnerable, testResult.isVulnerable());
+        assertEquals(percentageMatch, testResult.getPercentageMatch(), 0.0d);
+        assertEquals(confidence, testResult.getConfidence());
     }
 }

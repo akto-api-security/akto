@@ -6,11 +6,15 @@ import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.APISpec;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.User;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
+import com.akto.dto.traffic.SampleData;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.postman.Main;
+import com.akto.utils.SampleDataToSTI;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
@@ -74,16 +78,27 @@ public class PostmanAction extends UserAction {
 
 
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq("_id", apiCollectionId));
-        String apiName = "AKTO " + apiCollection.getName();
+        if (apiCollection == null) {
+            return ERROR.toUpperCase();
+        }
+        String apiName = "AKTO " + apiCollection.getDisplayName();
 
-        Set<String> allEndpoints = SingleTypeInfoDao.instance.getUniqueEndpoints(apiCollectionId);
-        OpenAPI openAPI = com.akto.open_api.Main.init(apiCollectionId, new ArrayList<>(allEndpoints));
+        List<SampleData> sampleData = SampleDataDao.instance.findAll(
+                Filters.eq("_id.apiCollectionId", apiCollectionId)
+            );
+        SampleDataToSTI sampleDataToSTI = new SampleDataToSTI();    
+        sampleDataToSTI.setSampleDataToSTI(sampleData);
+        Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList = sampleDataToSTI.getSingleTypeInfoMap();
+        OpenAPI openAPI = com.akto.open_api.Main.init(apiCollection.getDisplayName(),stiList);
         String openAPIStringAll = com.akto.open_api.Main.convertOpenApiToJSON(openAPI);
 
-        Set<String> sensitiveEndpoints = SingleTypeInfoDao.instance.getSensitiveEndpoints(apiCollectionId, null,null);
-        Set<String> customSensitiveEndpoints = SensitiveParamInfoDao.instance.getUniqueEndpoints(apiCollectionId);
-        sensitiveEndpoints.addAll(customSensitiveEndpoints);
-        openAPI = com.akto.open_api.Main.init(apiCollectionId, new ArrayList<>(sensitiveEndpoints));
+        List<SensitiveSampleData> SensitiveSampleData = SensitiveSampleDataDao.instance.findAll(
+            Filters.eq("_id.apiCollectionId", apiCollectionId)
+        );
+        SampleDataToSTI sensitiveSampleDataToSTI = new SampleDataToSTI();
+        sensitiveSampleDataToSTI.setSensitiveSampleDataToSTI(SensitiveSampleData);
+        Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> sensitiveStiList = sensitiveSampleDataToSTI.getSingleTypeInfoMap();
+        openAPI = com.akto.open_api.Main.init(apiCollection.getDisplayName(), sensitiveStiList);
         String openAPIStringSensitive = com.akto.open_api.Main.convertOpenApiToJSON(openAPI);
 
         Main main = new Main(postmanCredential.getApiKey());
