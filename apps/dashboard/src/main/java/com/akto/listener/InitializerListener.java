@@ -27,7 +27,6 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.sendgrid.helpers.mail.Mail;
 import com.slack.api.Slack;
-import com.akto.dto.type.URLMethods.Method;
 import com.slack.api.webhook.WebhookResponse;
 
 import org.apache.commons.lang3.StringUtils;
@@ -213,8 +212,9 @@ public class InitializerListener implements ServletContextListener {
         
                         webhook.setLastSentTimestamp(now);
                         CustomWebhooksDao.instance.updateOne(Filters.eq("_id",webhook.getId()), Updates.set("lastSentTimestamp", now));
-        
-                        OriginalHttpRequest request = new OriginalHttpRequest(webhook.getUrl(),webhook.getQueryParams(),webhook.getMethod().toString(),payload,webhook.getHeaders(),"");
+
+                        Map<String,List<String>> headers = OriginalHttpRequest.buildHeadersMap(webhook.getHeaderString());
+                        OriginalHttpRequest request = new OriginalHttpRequest(webhook.getUrl(),webhook.getQueryParams(),webhook.getMethod().toString(),payload,headers,"");
                         OriginalHttpResponse response = new OriginalHttpResponse();
                         
                         try{

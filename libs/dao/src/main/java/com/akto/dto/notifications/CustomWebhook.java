@@ -1,9 +1,5 @@
 package com.akto.dto.notifications;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import org.bson.codecs.pojo.annotations.BsonId;
 
 import com.akto.dto.type.URLMethods.Method;
@@ -15,7 +11,7 @@ public class CustomWebhook {
 
     String webhookName;
     String url;
-    Map<String, List<String>> headers = new HashMap<>();
+    String headerString;
     String queryParams;
     String body;
     Method method;
@@ -33,13 +29,13 @@ public class CustomWebhook {
 
     }
 
-    public CustomWebhook(int id, String webhookName, String url, Map<String, List<String>> headers, String queryParams,
-            String body, Method method, int frequencyInSeconds, String userEmail, int createTime, int lastUpdateTime,
+    public CustomWebhook(int id, String webhookName, String url, String headerString, String queryParams, String body,
+            Method method, int frequencyInSeconds, String userEmail, int createTime, int lastUpdateTime,
             int lastSentTimestamp, ActiveStatus activeStatus) {
         this.id = id;
         this.webhookName = webhookName;
         this.url = url;
-        this.headers = headers;
+        this.headerString = headerString;
         this.queryParams = queryParams;
         this.body = body;
         this.method = method;
@@ -75,12 +71,12 @@ public class CustomWebhook {
         this.url = url;
     }
 
-    public Map<String, List<String>> getHeaders() {
-        return headers;
+    public String getHeaderString() {
+        return headerString;
     }
 
-    public void setHeaders(Map<String, List<String>> headers) {
-        this.headers = headers;
+    public void setHeaderString(String headerString) {
+        this.headerString = headerString;
     }
 
     public String getQueryParams() {

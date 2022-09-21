@@ -1,9 +1,5 @@
 package com.akto.action;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import org.bson.conversions.Bson;
 
 import com.akto.dao.context.Context;
@@ -27,7 +23,7 @@ public class WebhookAction extends UserAction {
     private int id;
     private String webhookName;
     private String url;
-    private Map<String, List<String>> headers = new HashMap<>();
+    private String headerString;
     private String queryParams;
     private String body;
     private Method method;
@@ -75,7 +71,7 @@ public class WebhookAction extends UserAction {
             } catch(Exception e){
                 e.printStackTrace();
             }
-            CustomWebhook customWebhook = new CustomWebhook(now,webhookName,url,headers,queryParams,body,method,frequencyInSeconds,userEmail,now,now,now,activeStatus);
+            CustomWebhook customWebhook = new CustomWebhook(now,webhookName,url,headerString,queryParams,body,method,frequencyInSeconds,userEmail,now,now,now,activeStatus);
             CustomWebhooksDao.instance.insertOne(customWebhook);
         }
 
@@ -114,7 +110,7 @@ public class WebhookAction extends UserAction {
             Bson updates = 
             Updates.combine(
                 Updates.set("url", url),
-                Updates.set("headers", headers),
+                Updates.set("headers", headerString),
                 Updates.set("body", body),
                 Updates.set("queryParams",queryParams),
                 Updates.set("method", method),
@@ -206,12 +202,12 @@ public class WebhookAction extends UserAction {
         this.url = url;
     }
 
-    public Map<String, List<String>> getHeaders() {
-        return headers;
+    public String getHeaderString() {
+        return headerString;
     }
 
-    public void setHeaders(Map<String, List<String>> headers) {
-        this.headers = headers;
+    public void setHeaderString(String headerString) {
+        this.headerString = headerString;
     }
 
     public String getQueryParams() {
