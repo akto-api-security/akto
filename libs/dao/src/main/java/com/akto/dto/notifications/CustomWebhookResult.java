@@ -1,9 +1,8 @@
 package com.akto.dto.notifications;
 
-import org.bson.codecs.pojo.annotations.BsonId;
+import java.util.List;
 
-import com.akto.dto.OriginalHttpRequest;
-import com.akto.dto.OriginalHttpResponse;
+import org.bson.codecs.pojo.annotations.BsonId;
 
 public class CustomWebhookResult {
     
@@ -11,18 +10,23 @@ public class CustomWebhookResult {
     int id;
 
     int webhookId;
-    OriginalHttpRequest originalHttpRequest;
-    OriginalHttpResponse originalHttpResponse;
+    String userEmail;
+    // redundant because id also stores the timestamp at which it was created
+    int timestamp;
+    String message;
+    List<String> errors;
 
     public CustomWebhookResult() {
     }
 
-    public CustomWebhookResult(int id, int webhookId, OriginalHttpRequest originalHttpRequest,
-            OriginalHttpResponse originalHttpResponse) {
+    public CustomWebhookResult(int id, int webhookId, String userEmail, int timestamp, String message,
+            List<String> errors) {
         this.id = id;
         this.webhookId = webhookId;
-        this.originalHttpRequest = originalHttpRequest;
-        this.originalHttpResponse = originalHttpResponse;
+        this.userEmail = userEmail;
+        this.timestamp = timestamp;
+        this.message = message;
+        this.errors = errors;
     }
 
     public int getId() {
@@ -37,16 +41,28 @@ public class CustomWebhookResult {
     public void setWebhookId(int webhookId) {
         this.webhookId = webhookId;
     }
-    public OriginalHttpRequest getOriginalHttpRequest() {
-        return originalHttpRequest;
+    public String getUserEmail() {
+        return userEmail;
     }
-    public void setOriginalHttpRequest(OriginalHttpRequest originalHttpRequest) {
-        this.originalHttpRequest = originalHttpRequest;
+    public void setUserEmail(String userEmail) {
+        this.userEmail = userEmail;
     }
-    public OriginalHttpResponse getOriginalHttpResponse() {
-        return originalHttpResponse;
+    public int getTimestamp() {
+        return timestamp;
     }
-    public void setOriginalHttpResponse(OriginalHttpResponse originalHttpResponse) {
-        this.originalHttpResponse = originalHttpResponse;
-    }    
+    public void setTimestamp(int timestamp) {
+        this.timestamp = timestamp;
+    }
+    public String getMessage() {
+        return message;
+    }
+    public void setMessage(String message) {
+        this.message = message;
+    }
+    public List<String> getErrors() {
+        return errors;
+    }
+    public void setErrors(List<String> errors) {
+        this.errors = errors;
+    }
 }

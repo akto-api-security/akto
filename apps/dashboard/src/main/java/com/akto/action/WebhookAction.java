@@ -25,23 +25,29 @@ import com.opensymphony.xwork2.Action;
 public class WebhookAction extends UserAction {
     
     private int id;
-    String url;
-    Map<String, List<String>> headers = new HashMap<>();
-    String body;
-    Method method;
-    int frequencyInSeconds;
-    ActiveStatus activeStatus;
-    String error;
+    private String webhookName;
+    private String url;
+    private Map<String, List<String>> headers = new HashMap<>();
+    private String queryParams;
+    private String body;
+    private Method method;
+    private int frequencyInSeconds;
+    private ActiveStatus activeStatus;
     BasicDBObject response = new BasicDBObject();
 
     public String getLastSentResult(){
 
-        String userEmail = getSUser().getLogin();
+        String userEmail = null;
+        try{
+            userEmail = getSUser().getLogin();
+        } catch(Exception e){
+            e.printStackTrace();
+        }
 
         MongoCursor<CustomWebhookResult> webhookResultCursor = CustomWebhooksResultDao.instance.getMCollection()
-                                                                .find(Filters.eq("userEmail",userEmail))
-                                                                .sort(Sorts.descending("id"))
-                                                                .limit(1).cursor();
+                .find(Filters.eq("userEmail", userEmail))
+                .sort(Sorts.descending("timestamp"))
+                .limit(1).cursor();
 
         if(webhookResultCursor.hasNext()){
             CustomWebhookResult customWebhookResult = webhookResultCursor.next();
@@ -50,7 +56,6 @@ public class WebhookAction extends UserAction {
 
         return Action.SUCCESS.toUpperCase();
     }
-
 
     public String addCustomWebhook(){
 
@@ -64,8 +69,13 @@ public class WebhookAction extends UserAction {
             return ERROR.toUpperCase();
         } else {
             int now = Context.now();
-            String userEmail = getSUser().getLogin();
-            CustomWebhook customWebhook = new CustomWebhook(now,url,headers,body,method,frequencyInSeconds,userEmail,now,now,now,activeStatus);
+            String userEmail = null;
+            try{
+                userEmail = getSUser().getLogin();
+            } catch(Exception e){
+                e.printStackTrace();
+            }
+            CustomWebhook customWebhook = new CustomWebhook(now,webhookName,url,headers,queryParams,body,method,frequencyInSeconds,userEmail,now,now,now,activeStatus);
             CustomWebhooksDao.instance.insertOne(customWebhook);
         }
 
@@ -79,10 +89,17 @@ public class WebhookAction extends UserAction {
         );
         boolean isUrl = KeyTypes.patternToSubType.get(SingleTypeInfo.URL).matcher(url).matches();
 
+        String userEmail = null;
+        try{
+            userEmail = getSUser().getLogin();
+        } catch(Exception e){
+            e.printStackTrace();
+        }
+
         if (customWebhook == null){
             addActionError("The webhook does not exist");
             return ERROR.toUpperCase();
-        } else if (customWebhook.getUserEmail()!=getSUser().getLogin()){
+        } else if (customWebhook.getUserEmail()!=userEmail){
             addActionError("Unauthorized Request");
             return ERROR.toUpperCase();
         } else if (!isUrl){
@@ -99,6 +116,7 @@ public class WebhookAction extends UserAction {
                 Updates.set("url", url),
                 Updates.set("headers", headers),
                 Updates.set("body", body),
+                Updates.set("queryParams",queryParams),
                 Updates.set("method", method),
                 Updates.set("frequencyInSeconds", frequencyInSeconds),
                 Updates.set("lastUpdateTime",now)
@@ -115,8 +133,18 @@ public class WebhookAction extends UserAction {
             Filters.eq("_id",id)
         );
 
+        String userEmail = null;
+        try{
+            userEmail = getSUser().getLogin();
+        } catch(Exception e){
+            e.printStackTrace();
+        }
+
         if (customWebhook == null){
             addActionError("The webhook does not exist");
+            return ERROR.toUpperCase();
+        } else if (customWebhook.getUserEmail()!=userEmail){
+            addActionError("Unauthorized Request");
             return ERROR.toUpperCase();
         } else{
             int now = Context.now();
@@ -133,7 +161,24 @@ public class WebhookAction extends UserAction {
     }
 
     public String deleteCustomWebhook() {
-        CustomWebhooksDao.instance.deleteAll(new BasicDBObject("_id", id));
+
+        CustomWebhook customWebhook = CustomWebhooksDao.instance.findOne(
+            Filters.eq("_id",id)
+        );
+
+        String userEmail = null;
+        try{
+            userEmail = getSUser().getLogin();
+        } catch(Exception e){
+            e.printStackTrace();
+        }
+
+        if (customWebhook.getUserEmail()!=userEmail){
+            addActionError("Unauthorized Request");
+            return ERROR.toUpperCase();
+        } else {
+            CustomWebhooksDao.instance.deleteAll(new BasicDBObject("_id", id));
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -143,6 +188,14 @@ public class WebhookAction extends UserAction {
 
     public void setId(int id) {
         this.id = id;
+    }
+
+    public String getWebhookName() {
+        return webhookName;
+    }
+
+    public void setWebhookName(String webhookName) {
+        this.webhookName = webhookName;
     }
 
     public String getUrl() {
@@ -159,6 +212,14 @@ public class WebhookAction extends UserAction {
 
     public void setHeaders(Map<String, List<String>> headers) {
         this.headers = headers;
+    }
+
+    public String getQueryParams() {
+        return queryParams;
+    }
+
+    public void setQueryParams(String queryParams) {
+        this.queryParams = queryParams;
     }
 
     public String getBody() {
@@ -193,16 +254,8 @@ public class WebhookAction extends UserAction {
         this.activeStatus = activeStatus;
     }
 
-    public String getError() {
-        return error;
-    }
-
-    public void setError(String error) {
-        this.error = error;
-    }
-
     public BasicDBObject getResponse() {
-        return this.response;
+        return response;
     }
 
     public void setResponse(BasicDBObject response) {

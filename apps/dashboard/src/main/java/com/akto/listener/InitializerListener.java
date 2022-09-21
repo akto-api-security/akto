@@ -20,6 +20,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.notifications.email.WeeklyEmail;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.util.Pair;
+import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -192,7 +193,9 @@ public class InitializerListener implements ServletContextListener {
                         if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0) {
                             return;
                         }
-        
+
+                        List<String> errors = new ArrayList<>();
+
                         Map<String,Object> valueMap = new HashMap<>();
                         valueMap.put("x1.responsebody.newSensitiveEndpoints",ci.newSensitiveParams.size());
                         valueMap.put("x1.responsebody.newEndpoints",ci.newEndpointsLast7Days.size());
@@ -200,15 +203,34 @@ public class InitializerListener implements ServletContextListener {
                         valueMap.put("x1.responsebody.newParameters",ci.newParamsInExistingEndpoints);
         
                         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
-                        String payload = apiWorkflowExecutor.replaceVariables(webhook.getBody(),valueMap);
+                        String payload = null;
+                        
+                        try{
+                            payload = apiWorkflowExecutor.replaceVariables(webhook.getBody(),valueMap);
+                        } catch(Exception e){
+                            errors.add(e.toString());
+                        }
         
                         webhook.setLastSentTimestamp(now);
                         CustomWebhooksDao.instance.updateOne(Filters.eq("_id",webhook.getId()), Updates.set("lastSentTimestamp", now));
         
-                        OriginalHttpRequest request = new OriginalHttpRequest(webhook.getUrl(),"",webhook.getMethod().toString(),payload,webhook.getHeaders(),"");
-                        OriginalHttpResponse response = ApiExecutor.sendRequest(request,true);
+                        OriginalHttpRequest request = new OriginalHttpRequest(webhook.getUrl(),webhook.getQueryParams(),webhook.getMethod().toString(),payload,webhook.getHeaders(),"");
+                        OriginalHttpResponse response = new OriginalHttpResponse();
+                        
+                        try{
+                            response = ApiExecutor.sendRequest(request,true);
+                        } catch(Exception e){
+                            errors.add(e.toString());
+                        }
         
-                        CustomWebhookResult webhookResult = new CustomWebhookResult(now,webhook.getId(),request,response);
+                        String message = null;
+                        try{
+                            message = RedactSampleData.convertOriginalReqRespToString(request, response);
+                        } catch(Exception e){
+                            errors.add(e.toString());
+                        }
+
+                        CustomWebhookResult webhookResult = new CustomWebhookResult(now,webhook.getId(),webhook.getUserEmail(),now,message,errors);
                         CustomWebhooksResultDao.instance.insertOne(webhookResult);
                     }
 

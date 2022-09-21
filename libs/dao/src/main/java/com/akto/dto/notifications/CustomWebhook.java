@@ -13,8 +13,10 @@ public class CustomWebhook {
     @BsonId
     int id;
 
+    String webhookName;
     String url;
     Map<String, List<String>> headers = new HashMap<>();
+    String queryParams;
     String body;
     Method method;
     int frequencyInSeconds;
@@ -31,12 +33,14 @@ public class CustomWebhook {
 
     }
 
-    public CustomWebhook(int id, String url, Map<String, List<String>> headers, String body, Method method,
-            int frequencyInSeconds, String userEmail, int createTime, int lastUpdateTime, int lastSentTimestamp,
-            ActiveStatus activeStatus) {
+    public CustomWebhook(int id, String webhookName, String url, Map<String, List<String>> headers, String queryParams,
+            String body, Method method, int frequencyInSeconds, String userEmail, int createTime, int lastUpdateTime,
+            int lastSentTimestamp, ActiveStatus activeStatus) {
         this.id = id;
+        this.webhookName = webhookName;
         this.url = url;
         this.headers = headers;
+        this.queryParams = queryParams;
         this.body = body;
         this.method = method;
         this.frequencyInSeconds = frequencyInSeconds;
@@ -55,6 +59,14 @@ public class CustomWebhook {
         this.id = id;
     }
 
+    public String getWebhookName() {
+        return webhookName;
+    }
+
+    public void setWebhookName(String webhookName) {
+        this.webhookName = webhookName;
+    }
+
     public String getUrl() {
         return url;
     }
@@ -69,6 +81,14 @@ public class CustomWebhook {
 
     public void setHeaders(Map<String, List<String>> headers) {
         this.headers = headers;
+    }
+
+    public String getQueryParams() {
+        return queryParams;
+    }
+
+    public void setQueryParams(String queryParams) {
+        this.queryParams = queryParams;
     }
 
     public String getBody() {
