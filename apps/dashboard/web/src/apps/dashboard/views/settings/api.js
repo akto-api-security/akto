@@ -197,5 +197,12 @@ export default {
             data: {}
         })
     },
+    changeStatus(id, activeStatus) {
+        return request({
+            url: '/api/changeStatus',
+            method: 'post',
+            data: {id, activeStatus}
+        })
+    },
 
 }

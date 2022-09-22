@@ -569,5 +569,12 @@ export default {
         }
 
         return (count == 0 ? "No values recorded" : result)
-    }
+    },
+
+    showErrorSnackBar(val){
+        window._AKTO.$emit('SHOW_SNACKBAR', {show: true, text: val, color: 'red'})
+    },
+    showSuccessSnackBar(val){
+        window._AKTO.$emit('SHOW_SNACKBAR', {show: true, text: val, color: 'green'})
+    },
 }

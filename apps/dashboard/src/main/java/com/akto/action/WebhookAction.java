@@ -78,6 +78,7 @@ public class WebhookAction extends UserAction {
             if (userEmail == null) return ERROR.toUpperCase();
             CustomWebhook customWebhook = new CustomWebhook(now,webhookName,url,headerString,queryParams,body,method,frequencyInSeconds,userEmail,now,now,now,activeStatus);
             CustomWebhooksDao.instance.insertOne(customWebhook);
+            fetchCustomWebhooks();
         }
 
         return Action.SUCCESS.toUpperCase();
@@ -117,10 +118,12 @@ public class WebhookAction extends UserAction {
                 Updates.set("queryParams",queryParams),
                 Updates.set("method", method),
                 Updates.set("frequencyInSeconds", frequencyInSeconds),
-                Updates.set("lastUpdateTime",now)
+                Updates.set("lastUpdateTime",now),
+                Updates.set("webhookName", webhookName)
             );
 
             CustomWebhooksDao.instance.updateOne(Filters.eq("_id",id), updates);
+            fetchCustomWebhooks();
         }
 
         return Action.SUCCESS.toUpperCase();

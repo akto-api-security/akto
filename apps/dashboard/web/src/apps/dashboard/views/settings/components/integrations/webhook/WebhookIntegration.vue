@@ -13,6 +13,7 @@
         :sortDescDefault="true" 
         @rowClicked="openWebhookBuilder"
         :showName="true"
+        :actions="actions"
     />
     <v-dialog
         v-model="showWebhookBuilder"
@@ -36,6 +37,7 @@
 import SimpleTable from "../../../../../shared/components/SimpleTable";
 import WebhookBuilder from "./WebhookBuilder";
 import api from "../../../api";
+import func from "../../../../../../../util/func";
 
 export default {
     name: "WebhookIntegration",
@@ -59,14 +61,25 @@ export default {
           },
           {
               text: 'Create time',
-              value: 'createTime'
+              value: 'createTimePrettify'
           },
           {
               text: 'Status',
               value: 'activeStatus'
           }
         ],
-        webhooks:[]
+        webhooks:[],
+
+        actions: [ 
+          {
+              isValid: item => true,
+              icon: item => item.activeStatus === "ACTIVE" ? '$fas_stop' :'$fas_play' ,
+              text: item => item.activeStatus === "ACTIVE" ? 'Deactivate' : 'Activate',
+              func: item => this.changeStatus(item),
+              success: (resp, item) => func.showSuccessSnackBar("Success!"),
+              failure: (err, item) => func.showErrorSnackBar("Failed!"),
+          },
+        ],
       }
     },
     methods: {
@@ -77,41 +90,85 @@ export default {
       openWebhookResult() {
         this.showWebhookResult = true
       },
+      prettifyWebhooks(x) {
+            x["createTimePrettify"] = func.prettifyEpoch(x["createTime"])
+            return x
+      },
+      changeStatus(item) {
+        let newStatus = item.activeStatus === "ACTIVE" ? "INACTIVE" : "ACTIVE"
+        let result = api.changeStatus(item.id, newStatus)
+
+        result.then((resp) => {
+          this.webhooks.forEach((x) => {
+            if (x.id === item.id) {
+              x["activeStatus"] = newStatus
+            }
+          })
+        })
+
+        return result
+      },
       fetchWebhooks() {
         api.fetchCustomWebhooks().then((resp) => {
           let customWebhooks = resp.customWebhooks;
-          this.webhooks = customWebhooks.map((x) => {
-            x["createTime"] = "2 mins ago"
-            return x
-          })
+          this.webhooks = customWebhooks.map(this.prettifyWebhooks)
         })
       },
-      saveWebhook(data) {
-          this.loading=true
+      saveWebhookMain(data) {
           let updatedData = data["updatedData"]
 
           let webhookName = updatedData["webhookName"]
+          if (!webhookName) {
+              func.showErrorSnackBar("Invalid name")
+              return
+          }
+
           let url = updatedData["url"]
+          if (!url) {
+              func.showErrorSnackBar("Invalid URL")
+              return
+          }
+
           let queryParams = updatedData["queryParams"]
 
           let method = updatedData["method"]
           method = this.validateMethod(method)
-          if (!method) return // todo: throw banner error
+          if (!method) {
+              func.showErrorSnackBar("Invalid HTTP method")
+              return
+          }
 
-          let headerString =  updatedData["headerString"] // todo:
+          let headerString =  updatedData["headerString"]
           let frequencyInSeconds = updatedData["frequencyInSeconds"]
 
           let body = updatedData["body"]
 
           let createNew = data["createNew"]
           if (createNew) {
-            api.addCustomWebhook(webhookName, url, queryParams, method, headerString, body, frequencyInSeconds)
+            return api.addCustomWebhook(webhookName, url, queryParams, method, headerString, body, frequencyInSeconds)
           } else {
             let id = this.originalStateFromDb["id"]
-            console.log(id);
-            api.updateCustomWebhook(id, webhookName, url, queryParams, method, headerString, body, frequencyInSeconds)
+            return api.updateCustomWebhook(id, webhookName, url, queryParams, method, headerString, body, frequencyInSeconds)
           }
-          this.loading=false
+      },
+      saveWebhook(data) {
+          this.loading= true
+          let result = this.saveWebhookMain(data)
+          if (!result) {
+              this.loading = false
+              return
+          }
+
+          result.then((resp) => {
+              let customWebhooks = resp.customWebhooks;
+              this.webhooks = [].concat(customWebhooks.map(this.prettifyWebhooks))
+              this.loading = false
+              func.showSuccessSnackBar("Webhook saved successfully!")
+          }).catch((err) => {
+              console.log(err);
+              this.loading = false
+          })
+          
       },
       validateMethod(methodName) {
           let m = methodName.toUpperCase()
