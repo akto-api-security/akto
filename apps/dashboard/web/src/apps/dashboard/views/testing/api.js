@@ -99,5 +99,15 @@ export default {
         }).then((resp) => {
             return resp
         })        
+    },
+
+    stopAllTests() {
+        return request({
+            url: '/api/stopAllTests',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })        
     }
 }

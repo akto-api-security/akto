@@ -18,7 +18,7 @@
                         Refresh
                     </v-tooltip>
 
-                <upload-file fileFormat=".har" @fileChanged="handleFileChange" label=""/>
+                <upload-file fileFormat=".har" @fileChanged="handleFileChange" tooltipText="Upload traffic (.har)" label="" type="uploadTraffic"/>
                 <icon-menu icon="$fas_download" :items="downloadFileItems"/>
             </div>
         </div>
@@ -138,6 +138,9 @@
                         <v-btn v-if="!showWorkflowTestBuilder" primary dark color="#6200EA" @click="() => {originalStateFromDb = null; showWorkflowTestBuilder = true}">
                             Create new workflow
                         </v-btn>
+                        <div style="align-items: center; display: flex; padding-right: 12px ">
+                          <upload-file fileFormat=".json" @fileChanged="handleFileChange" tooltipText="Upload workflow" label="" type="uploadWorkflow"/>
+                        </div>
                     </div>
                     <simple-table 
                         v-if="!showWorkflowTestBuilder"
@@ -341,7 +344,7 @@ export default {
             else
                 return '-'
         },
-        handleFileChange({file}) {
+        handleFileChange({file, type}) {
             if (!file) {
                 this.content = null
             } else {
@@ -351,8 +354,9 @@ export default {
                 // of the file in the v-model prop
                 
                 let isHar = file.name.endsWith(".har")
+                let isJson = file.name.endsWith(".json")
                 let isPcap = file.name.endsWith(".pcap")
-                if (isHar) {
+                if (isHar || isJson) {
                     reader.readAsText(file)
                 } else if (isPcap) {
                     reader.readAsArrayBuffer(new Blob([file]))
@@ -366,6 +370,11 @@ export default {
                         var bytes = new Uint8Array(arrayBuffer);
 
                         await api.uploadTcpFile([...bytes], this.apiCollectionId, skipKafka)
+                    } else if (type === "uploadWorkflow") {
+                        let resp = await this.$store.dispatch('inventory/uploadWorkflowJson', { content: reader.result, filename: file.name})
+                        resp.workflowTests.forEach((x) => {
+                          this.workflowTests.push({...x, color: "#FFFFFF"})
+                        })
                     }
                 }
             }
@@ -404,6 +413,7 @@ export default {
         },
         async refreshPage(shouldLoad) {
             // if (!this.apiCollection || this.apiCollection.length === 0 || this.$store.state.inventory.apiCollectionId !== this.apiCollectionId) {
+            this.showWorkflowTestBuilder = false
             let collectionIdChanged = this.$store.state.inventory.apiCollectionId !== this.apiCollectionId
             if (collectionIdChanged || !shouldLoad || ((new Date() / 1000) - this.lastFetched > 60*5)) {
                 this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId, shouldLoad: shouldLoad})

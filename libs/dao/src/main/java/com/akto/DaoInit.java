@@ -80,6 +80,8 @@ public class DaoInit {
         ClassModel<CappedSet> cappedSetClassModel = ClassModel.builder(CappedSet.class).enableDiscriminator(true).build();
         ClassModel<CustomWebhook> CustomWebhookClassModel = ClassModel.builder(CustomWebhook.class).enableDiscriminator(true).build();
         ClassModel<CustomWebhookResult> CustomWebhookResultClassModel = ClassModel.builder(CustomWebhookResult.class).enableDiscriminator(true).build();
+        ClassModel<WorkflowTestResult.NodeResult> nodeResultClassModel = ClassModel.builder(WorkflowTestResult.NodeResult.class).enableDiscriminator(true).build();
+
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(queueEntryClassModel, configClassModel, 
             signupInfoClassModel, contentClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -92,7 +94,8 @@ public class DaoInit {
                 authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel,
                 testingEndpointsClassModel, customTestingEndpointsClassModel, collectionWiseTestingEndpointsClassModel,
                 workflowTestingEndpointsClassModel, workflowTestResultClassModel,
-                cappedSetClassModel,CustomWebhookClassModel,CustomWebhookResultClassModel
+                cappedSetClassModel,CustomWebhookClassModel,CustomWebhookResultClassModel,
+                cappedSetClassModel, nodeResultClassModel
         ).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
@@ -111,7 +114,8 @@ public class DaoInit {
             new EnumCodec<>(AccountSettings.SetupType.class),
             new EnumCodec<>(WorkflowNodeDetails.Type.class),
             new EnumCodec<>(SingleTypeInfo.Domain.class),
-            new EnumCodec<>(CustomWebhook.ActiveStatus.class)
+            new EnumCodec<>(CustomWebhook.ActiveStatus.class),
+            new EnumCodec<>(TestResult.Confidence.class)
         );
 
         CodecRegistry codecRegistry = fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry, customEnumCodecs);

@@ -7,9 +7,7 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.testing.CollectionWiseTestingEndpoints;
-import com.akto.dto.testing.CustomTestingEndpoints;
-import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.testing.*;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
@@ -98,21 +96,39 @@ public class SampleMessageStore {
     }
 
 
-    public static RawApi fetchOriginalMessage(ApiInfo.ApiInfoKey apiInfoKey) {
+
+    public static List<RawApi> fetchAllOriginalMessages(ApiInfoKey apiInfoKey) {
+        List<RawApi> messages = new ArrayList<>();
+
         List<String> samples = sampleDataMap.get(apiInfoKey);
-        if (samples == null || samples.isEmpty()) return null;
-        String message = samples.get(0);
-        try {
-            OriginalHttpRequest request = new OriginalHttpRequest();
-            request.buildFromSampleMessage(message);
+        if (samples == null || samples.isEmpty()) return messages;
 
-            OriginalHttpResponse response = new OriginalHttpResponse();
-            response.buildFromSampleMessage(message);
+        for (String message: samples) {
+            try {
+                OriginalHttpRequest request = new OriginalHttpRequest();
+                request.buildFromSampleMessage(message);
 
-            return new RawApi(request, response);
-        } catch(Exception e) {
-            return null;
+                OriginalHttpResponse response = new OriginalHttpResponse();
+                response.buildFromSampleMessage(message);
+
+                messages.add(new RawApi(request, response, message));
+
+            } catch(Exception ignored) { }
+
         }
+
+        return messages;
+    }
+
+    public static List<RawApi> filterMessagesWithAuthToken(List<RawApi> messages, AuthMechanism authMechanism) {
+        List<RawApi> filteredMessages = new ArrayList<>();
+        for (RawApi rawApi: messages) {
+            OriginalHttpRequest request = rawApi.getRequest();
+            boolean containsAuthToken = authMechanism.authTokenPresent(request);
+            if (containsAuthToken) filteredMessages.add(rawApi);
+        }
+
+        return filteredMessages;
     }
 
 }

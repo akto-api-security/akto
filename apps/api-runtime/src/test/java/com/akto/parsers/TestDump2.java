@@ -111,7 +111,7 @@ public class TestDump2 {
         APICatalogSync.DbUpdateReturn dbUpdateReturn = sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0), false);
         assertEquals(15, dbUpdateReturn.bulkUpdatesForSingleTypeInfo.size());
         assertEquals(2, sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size());        
-        assertEquals(1, sync.getDBUpdatesForSampleData(0, sync.getDelta(0), false).size());
+        assertEquals(1, sync.getDBUpdatesForSampleData(0, sync.getDelta(0), sync.getDbState(0),false,true).size());
     }
 
 

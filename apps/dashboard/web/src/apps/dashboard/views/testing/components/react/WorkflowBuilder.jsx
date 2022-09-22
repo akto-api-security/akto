@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect} from 'react';
 import { createTheme } from '@mui/material/styles';
 
 import Workflow from './Workflow.jsx';
@@ -29,17 +29,31 @@ const WorkflowBuilder = ({endpointsList, originalStateFromDb, fetchSampleDataFun
   const setOriginalState = useStore((state) => state.setOriginalState);
   const setEndpointsList = useStore((state) => state.setEndpointsList);
   const setUtilityFuncs = useStore((state) => state.setUtilityFuncs);
+  const originalState = useStore((state) => state.originalState)
 
-  setOriginalState(originalStateFromDb);
-  setUtilityFuncs(createWorkflowTest, editWorkflowTest, editWorkflowNodeDetails, runWorkflowTest, fetchWorkflowResult);
+  useEffect(() => {
+    setOriginalState(originalStateFromDb);
+    setUtilityFuncs(createWorkflowTest, editWorkflowTest, editWorkflowNodeDetails, runWorkflowTest, fetchWorkflowResult);
+  }, [originalStateFromDb]);
 
-  endpointsList.forEach(x => {
-    x.method = x.method.toUpperCase()
-  })
-  setEndpointsList(endpointsList, fetchSampleDataFunc);
 
-  return (
-    <Workflow theme={theme} apiCollectionId={apiCollectionId}/>
-  )
+  useEffect(() => {
+    endpointsList.forEach(x => {
+      x.method = x.method.toUpperCase()
+    })
+    setEndpointsList(endpointsList, fetchSampleDataFunc);
+  }, [endpointsList]);
+
+
+  if (originalState) {
+    return (
+      <Workflow theme={theme} apiCollectionId={apiCollectionId}/>
+    )
+  } else {
+    return (
+      <div>Loading....</div>
+    )
+  }
+
 }
 export default WorkflowBuilder

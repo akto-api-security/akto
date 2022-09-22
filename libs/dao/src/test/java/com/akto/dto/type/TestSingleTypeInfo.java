@@ -1,6 +1,5 @@
 package com.akto.dto.type;
 
-import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.types.CappedSet;
 import org.junit.Test;
@@ -101,8 +100,8 @@ public class TestSingleTypeInfo {
         SingleTypeInfo singleTypeInfo = generateSTI(SingleTypeInfo.EMAIL);
         assertEquals(SingleTypeInfo.ACCEPTED_MIN_VALUE, singleTypeInfo.getMaxValue());
 
-        singleTypeInfo.setMinMaxValues(10000000);
-        singleTypeInfo.setMinMaxValues(-1000000);
+        singleTypeInfo.updateMinMaxValues(10000000);
+        singleTypeInfo.updateMinMaxValues(-1000000);
         assertEquals(SingleTypeInfo.ACCEPTED_MIN_VALUE, singleTypeInfo.getMaxValue());
         assertEquals(SingleTypeInfo.ACCEPTED_MAX_VALUE, singleTypeInfo.getMinValue());
     }
@@ -113,30 +112,30 @@ public class TestSingleTypeInfo {
         assertEquals(SingleTypeInfo.ACCEPTED_MIN_VALUE, singleTypeInfo.getMaxValue());
         assertEquals(SingleTypeInfo.ACCEPTED_MAX_VALUE, singleTypeInfo.getMinValue());
 
-        singleTypeInfo.setMinMaxValues(Long.MAX_VALUE);
-        singleTypeInfo.setMinMaxValues(Long.MIN_VALUE);
+        singleTypeInfo.updateMinMaxValues(Long.MAX_VALUE);
+        singleTypeInfo.updateMinMaxValues(Long.MIN_VALUE);
         assertEquals(SingleTypeInfo.ACCEPTED_MAX_VALUE, singleTypeInfo.getMaxValue());
         assertEquals(SingleTypeInfo.ACCEPTED_MIN_VALUE, singleTypeInfo.getMinValue());
 
-        singleTypeInfo.setMinMaxValues(10000000);
-        singleTypeInfo.setMinMaxValues(-1000000);
+        singleTypeInfo.updateMinMaxValues(10000000);
+        singleTypeInfo.updateMinMaxValues(-1000000);
         assertEquals(SingleTypeInfo.ACCEPTED_MAX_VALUE, singleTypeInfo.getMaxValue());
         assertEquals(SingleTypeInfo.ACCEPTED_MIN_VALUE, singleTypeInfo.getMinValue());
 
         singleTypeInfo = generateSTI(SingleTypeInfo.INTEGER_32);
 
-        singleTypeInfo.setMinMaxValues(10000000);
-        singleTypeInfo.setMinMaxValues(-10000000);
+        singleTypeInfo.updateMinMaxValues(10000000);
+        singleTypeInfo.updateMinMaxValues(-10000000);
         assertEquals(10000000, singleTypeInfo.getMaxValue());
         assertEquals(-10000000, singleTypeInfo.getMinValue());
 
-        singleTypeInfo.setMinMaxValues(20000000);
-        singleTypeInfo.setMinMaxValues(-20000000);
+        singleTypeInfo.updateMinMaxValues(20000000);
+        singleTypeInfo.updateMinMaxValues(-20000000);
         assertEquals(20000000, singleTypeInfo.getMaxValue());
         assertEquals(-20000000, singleTypeInfo.getMinValue());
 
-        singleTypeInfo.setMinMaxValues(20000);
-        singleTypeInfo.setMinMaxValues(-2000);
+        singleTypeInfo.updateMinMaxValues(20000);
+        singleTypeInfo.updateMinMaxValues(-2000);
         assertEquals(20000000, singleTypeInfo.getMaxValue());
         assertEquals(-20000000, singleTypeInfo.getMinValue());
     }

@@ -1,6 +1,9 @@
 <template>
     <simple-layout title="API Testing" class="page-testing">
         <div class="pa-8">
+            <v-btn primary dark color="#6200EA" @click="stopAllTests" :loading="stopAllTestsLoading" style="float:right">
+                Stop all tests
+            </v-btn>
             <div>
                 <span class="heading">Auth tokens</span>
             </div>
@@ -60,6 +63,7 @@ import TestResultsTable from './components/TestResultsTable'
 
 import func from '@/util/func'
 import { mapState } from 'vuex'
+import api from './api'
 
 export default {
     name: "PageTesting",
@@ -79,6 +83,7 @@ export default {
         return  {
             newKey: this.nonNullAuth ? this.nonNullAuth.key : null,
             newVal: this.nonNullAuth ? this.nonNullAuth.value: null,
+            stopAllTestsLoading: false
         }
     },
     methods: {
@@ -102,6 +107,20 @@ export default {
                 timestamp: func.prettifyEpoch(x.id.timestamp),
                 x: x
             }
+        },
+        stopAllTests() {
+            this.stopAllTestsLoading = true
+            api.stopAllTests().then((resp) => {
+                this.stopAllTestsLoading = false
+                console.log(resp);
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: "All tests stopped!",
+                    color: 'green'
+                })
+            }).catch((e) => {
+                this.stopAllTestsLoading = false
+            })
         }
     },
     computed: {

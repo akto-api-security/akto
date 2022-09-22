@@ -275,7 +275,16 @@ public class HttpCallParser {
         return filteredResponseParams;
     }
 
-    Map<Integer, URLAggregator> aggregatorMap = new HashMap<>();
+    private Map<Integer, URLAggregator> aggregatorMap = new HashMap<>();
+
+    public void setAggregatorMap(Map<Integer, URLAggregator> aggregatorMap){
+        this.aggregatorMap=aggregatorMap;
+    }
+
+    public Map<Integer, URLAggregator> getAggregatorMap(){
+        return this.aggregatorMap;
+    }
+
     public boolean aggregate(List<HttpResponseParams> responses) {
         int count = 0;
         boolean ret = false;
