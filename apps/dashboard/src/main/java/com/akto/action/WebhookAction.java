@@ -1,5 +1,7 @@
 package com.akto.action;
 
+import java.util.List;
+
 import org.bson.conversions.Bson;
 
 import com.akto.dao.context.Context;
@@ -31,6 +33,12 @@ public class WebhookAction extends UserAction {
     private ActiveStatus activeStatus;
     BasicDBObject response = new BasicDBObject();
 
+    private List<CustomWebhook> customWebhooks;
+    public String fetchCustomWebhooks() {
+        customWebhooks = CustomWebhooksDao.instance.findAll(new BasicDBObject());
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String getLastSentResult(){
 
         String userEmail = null;
@@ -54,6 +62,7 @@ public class WebhookAction extends UserAction {
     }
 
     public String addCustomWebhook(){
+        activeStatus = ActiveStatus.ACTIVE;
 
         boolean isUrl = KeyTypes.patternToSubType.get(SingleTypeInfo.URL).matcher(url).matches();
 
@@ -65,12 +74,8 @@ public class WebhookAction extends UserAction {
             return ERROR.toUpperCase();
         } else {
             int now = Context.now();
-            String userEmail = null;
-            try{
-                userEmail = getSUser().getLogin();
-            } catch(Exception e){
-                e.printStackTrace();
-            }
+            String userEmail = getSUser().getLogin();
+            if (userEmail == null) return ERROR.toUpperCase();
             CustomWebhook customWebhook = new CustomWebhook(now,webhookName,url,headerString,queryParams,body,method,frequencyInSeconds,userEmail,now,now,now,activeStatus);
             CustomWebhooksDao.instance.insertOne(customWebhook);
         }
@@ -79,23 +84,20 @@ public class WebhookAction extends UserAction {
     }
 
     public String updateCustomWebhook(){
+        activeStatus = ActiveStatus.ACTIVE;
 
         CustomWebhook customWebhook = CustomWebhooksDao.instance.findOne(
             Filters.eq("_id",id)
         );
         boolean isUrl = KeyTypes.patternToSubType.get(SingleTypeInfo.URL).matcher(url).matches();
 
-        String userEmail = null;
-        try{
-            userEmail = getSUser().getLogin();
-        } catch(Exception e){
-            e.printStackTrace();
-        }
+        String userEmail = getSUser().getLogin();
+        if (userEmail == null) return ERROR.toUpperCase();
 
         if (customWebhook == null){
             addActionError("The webhook does not exist");
             return ERROR.toUpperCase();
-        } else if (customWebhook.getUserEmail()!=userEmail){
+        } else if ( !userEmail.equals(customWebhook.getUserEmail())){
             addActionError("Unauthorized Request");
             return ERROR.toUpperCase();
         } else if (!isUrl){
@@ -110,7 +112,7 @@ public class WebhookAction extends UserAction {
             Bson updates = 
             Updates.combine(
                 Updates.set("url", url),
-                Updates.set("headers", headerString),
+                Updates.set("headerString", headerString),
                 Updates.set("body", body),
                 Updates.set("queryParams",queryParams),
                 Updates.set("method", method),
@@ -129,17 +131,13 @@ public class WebhookAction extends UserAction {
             Filters.eq("_id",id)
         );
 
-        String userEmail = null;
-        try{
-            userEmail = getSUser().getLogin();
-        } catch(Exception e){
-            e.printStackTrace();
-        }
+        String userEmail = getSUser().getLogin();
+        if (userEmail == null) return ERROR.toUpperCase();
 
         if (customWebhook == null){
             addActionError("The webhook does not exist");
             return ERROR.toUpperCase();
-        } else if (customWebhook.getUserEmail()!=userEmail){
+        } else if ( !userEmail.equals(customWebhook.getUserEmail() )){
             addActionError("Unauthorized Request");
             return ERROR.toUpperCase();
         } else{
@@ -162,14 +160,10 @@ public class WebhookAction extends UserAction {
             Filters.eq("_id",id)
         );
 
-        String userEmail = null;
-        try{
-            userEmail = getSUser().getLogin();
-        } catch(Exception e){
-            e.printStackTrace();
-        }
+        String userEmail = getSUser().getLogin();
+        if (userEmail == null) return ERROR.toUpperCase();
 
-        if (customWebhook.getUserEmail()!=userEmail){
+        if (!userEmail.equals(customWebhook.getUserEmail())){
             addActionError("Unauthorized Request");
             return ERROR.toUpperCase();
         } else {
@@ -256,5 +250,9 @@ public class WebhookAction extends UserAction {
 
     public void setResponse(BasicDBObject response) {
         this.response = response;
+    }
+
+    public List<CustomWebhook> getCustomWebhooks() {
+        return this.customWebhooks;
     }
 }

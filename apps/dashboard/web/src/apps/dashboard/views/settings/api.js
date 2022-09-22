@@ -171,5 +171,31 @@ export default {
                 filterPattern
             }
         })
-    }
+    },
+    addCustomWebhook(webhookName, url, queryParams, method, headerString, body, frequencyInSeconds) {
+        return request({
+            url: '/api/addCustomWebhook',
+            method: 'post',
+            data: {
+                webhookName, url, queryParams, method, headerString, body, frequencyInSeconds
+            }
+        })
+    },
+    updateCustomWebhook(id, webhookName, url, queryParams, method, headerString, body, frequencyInSeconds) {
+        return request({
+            url: '/api/updateCustomWebhook',
+            method: 'post',
+            data: {
+                id, webhookName, url, queryParams, method, headerString, body, frequencyInSeconds
+            }
+        })
+    },
+    fetchCustomWebhooks() {
+        return request({
+            url: '/api/fetchCustomWebhooks',
+            method: 'post',
+            data: {}
+        })
+    },
+
 }
