@@ -1,5 +1,5 @@
 <template>
-    <div class="d-flex" style="margin: 24px">
+    <div class="d-flex">
         <div class="flex-equal" >
             <sample-single-side
                 :title="requestTitle" 

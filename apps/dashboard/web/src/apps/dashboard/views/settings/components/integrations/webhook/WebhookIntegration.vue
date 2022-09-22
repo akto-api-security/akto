@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="d-flex jc-end ma-2">
-        <v-btn v-if="!showWebhookBuilder" primary dark color="#6200EA" @click="() => {originalStateFromDb = null; showWebhookBuilder = true}">
+        <v-btn v-if="!showWebhookBuilder" primary dark color="#6200EA" @click="createNewWebhookFn">
             Create new webhook
         </v-btn>
     </div>
@@ -17,7 +17,7 @@
     />
     <v-dialog
         v-model="showWebhookBuilder"
-        width="60%"
+        width="80%"
     >
         <div style="padding: 12px 24px 12px 24px; background: white">
           <div style="margin-bottom: 24px">
@@ -25,7 +25,21 @@
                 <v-icon>$fas_times</v-icon>
             </v-btn>
           </div>
-          <webhook-builder v-if="showWebhookBuilder" :originalStateFromDb="originalStateFromDb" @saveWebhook="saveWebhook" :loading="loading"/>
+
+          <layout-with-tabs title="" :tabs="['Info', 'Result']" ref="layoutWithTabs">
+              <template slot="Info">
+                <div style="margin-top: 12px">
+                  <webhook-builder v-if="showWebhookBuilder" :originalStateFromDb="originalStateFromDb" @saveWebhook="saveWebhook" :loading="loading"/>
+                </div>
+              </template>
+              <template slot="Result">
+                <div style="margin-top: 12px;">
+                  <sample-data v-if="this.customWebhookResult && this.customWebhookResult['message']" requestTitle="Webhook Request" responseTitle="Webhook Response" :json="json"></sample-data>
+                  <div v-else>No results saved</div>
+                </div>
+              </template>
+          </layout-with-tabs>
+
         </div>
     </v-dialog>
 
@@ -38,12 +52,16 @@ import SimpleTable from "../../../../../shared/components/SimpleTable";
 import WebhookBuilder from "./WebhookBuilder";
 import api from "../../../api";
 import func from "../../../../../../../util/func";
+import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
+import SampleData from "../../../../../shared/components/SampleData";
 
 export default {
     name: "WebhookIntegration",
     components: {
       SimpleTable,
-      WebhookBuilder
+      WebhookBuilder,
+      LayoutWithTabs,
+      SampleData
     },
     data () {
       return {
@@ -69,7 +87,7 @@ export default {
           }
         ],
         webhooks:[],
-
+        customWebhookResult: null,
         actions: [ 
           {
               isValid: item => true,
@@ -83,9 +101,22 @@ export default {
       }
     },
     methods: {
+      createNewWebhookFn() {
+        this.originalStateFromDb = null;
+        this.showWebhookBuilder = true
+        this.customWebhookResult = {}
+      },
       openWebhookBuilder(item) {
         this.showWebhookBuilder = true
         this.originalStateFromDb = item
+        this.customWebhookResult = {}
+        api.fetchLatestWebhookResult(item.id).then((resp) => {
+          if (!resp.customWebhookResult) {
+            this.customWebhookResult = {}
+          } else {
+            this.customWebhookResult = {...resp.customWebhookResult}
+          }
+        })
       },
       openWebhookResult() {
         this.showWebhookResult = true
@@ -178,8 +209,20 @@ export default {
           return allowedMethods[idx]
       }
     },
-    async mounted() {
+    mounted() {
       this.fetchWebhooks()
+    },
+    computed : {
+      json: function() {
+        if (!this.customWebhookResult) return null
+        let message = this.customWebhookResult["message"]
+        if (!message) message = "{}"
+        return {
+            "message": JSON.parse(message),
+            title: "Sample data",
+            "highlightPaths": []
+        }
+      }
     }
 }
 </script>

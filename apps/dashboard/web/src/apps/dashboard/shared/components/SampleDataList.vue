@@ -8,7 +8,7 @@
                     <v-icon>$fas_angle-double-right</v-icon>
                 </v-btn>
             </div>
-            <div v-if="json['message']">
+            <div v-if="json['message']" style="margin: 24px">
                 <sample-data :json="json" requestTitle="Request" responseTitle="Response"/>
             </div>
         </div>

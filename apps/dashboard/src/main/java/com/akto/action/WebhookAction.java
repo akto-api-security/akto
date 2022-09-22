@@ -31,7 +31,7 @@ public class WebhookAction extends UserAction {
     private Method method;
     private int frequencyInSeconds;
     private ActiveStatus activeStatus;
-    BasicDBObject response = new BasicDBObject();
+    private CustomWebhookResult customWebhookResult;
 
     private List<CustomWebhook> customWebhooks;
     public String fetchCustomWebhooks() {
@@ -39,25 +39,9 @@ public class WebhookAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String getLastSentResult(){
 
-        String userEmail = null;
-        try{
-            userEmail = getSUser().getLogin();
-        } catch(Exception e){
-            e.printStackTrace();
-        }
-
-        MongoCursor<CustomWebhookResult> webhookResultCursor = CustomWebhooksResultDao.instance.getMCollection()
-                .find(Filters.eq("userEmail", userEmail))
-                .sort(Sorts.descending("timestamp"))
-                .limit(1).cursor();
-
-        if(webhookResultCursor.hasNext()){
-            CustomWebhookResult customWebhookResult = webhookResultCursor.next();
-            response.put("lastSentResult",customWebhookResult);
-        }
-
+    public String fetchLatestWebhookResult(){
+        customWebhookResult = CustomWebhooksResultDao.instance.findLatestOne(Filters.eq("webhookId", id));
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -247,12 +231,8 @@ public class WebhookAction extends UserAction {
         this.activeStatus = activeStatus;
     }
 
-    public BasicDBObject getResponse() {
-        return response;
-    }
-
-    public void setResponse(BasicDBObject response) {
-        this.response = response;
+    public CustomWebhookResult getCustomWebhookResult() {
+        return customWebhookResult;
     }
 
     public List<CustomWebhook> getCustomWebhooks() {

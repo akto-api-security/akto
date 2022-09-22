@@ -204,5 +204,12 @@ export default {
             data: {id, activeStatus}
         })
     },
+    fetchLatestWebhookResult(id) {
+        return request({
+            url: '/api/fetchLatestWebhookResult',
+            method: 'post',
+            data: {id}
+        })
+    },
 
 }

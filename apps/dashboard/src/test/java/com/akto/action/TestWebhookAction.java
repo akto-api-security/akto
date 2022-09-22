@@ -30,7 +30,7 @@ public class TestWebhookAction extends MongoBasedTest{
         CustomWebhooksResultDao.instance.insertMany(customWebhookResults);
 
         WebhookAction webhookAction = new WebhookAction();
-        String result = webhookAction.getLastSentResult();
+        String result = webhookAction.fetchLatestWebhookResult();
         assertEquals("SUCCESS", result);
     }
 
