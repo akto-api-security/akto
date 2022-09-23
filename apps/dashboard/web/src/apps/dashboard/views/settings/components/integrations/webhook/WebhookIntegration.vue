@@ -82,9 +82,13 @@ export default {
               value: 'createTimePrettify'
           },
           {
-              text: 'Status',
-              value: 'activeStatus'
-          }
+              text: 'status',
+              value: 'activestatus'
+          },
+          {
+            text: 'Last sent',
+            value: 'lastSentTimestampPrettify'
+          },
         ],
         webhooks:[],
         customWebhookResult: null,
@@ -123,7 +127,9 @@ export default {
       },
       prettifyWebhooks(x) {
             x["createTimePrettify"] = func.prettifyEpoch(x["createTime"])
-            return x
+            let lastSentTimestamp = x["lastSentTimestamp"]
+            x["lastSentTimestampPrettify"] = lastSentTimestamp === 0 ? "-" :  func.prettifyEpoch(lastSentTimestamp);
+        return x
       },
       changeStatus(item) {
         let newStatus = item.activeStatus === "ACTIVE" ? "INACTIVE" : "ACTIVE"

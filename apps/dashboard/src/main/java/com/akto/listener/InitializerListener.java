@@ -49,6 +49,7 @@ import java.util.concurrent.TimeUnit;
 import javax.servlet.ServletContextListener;
 
 import static com.mongodb.client.model.Filters.eq;
+import static com.mongodb.client.model.Filters.in;
 
 public class InitializerListener implements ServletContextListener {
     private static final Logger logger = LoggerFactory.getLogger(InitializerListener.class);
@@ -127,8 +128,9 @@ public class InitializerListener implements ServletContextListener {
                         int now =Context.now();
                         // System.out.println("debugSlack: " + slackWebhook.getLastSentTimestamp() + " " + slackWebhook.getFrequencyInSeconds() + " " +now );
 
-                        if(slackWebhook.getFrequencyInSeconds()==0)
-                        slackWebhook.setFrequencyInSeconds(24*60*60);
+                        if(slackWebhook.getFrequencyInSeconds()==0) {
+                            slackWebhook.setFrequencyInSeconds(24*60*60);
+                        }
 
                         boolean shouldSend = ( slackWebhook.getLastSentTimestamp() + slackWebhook.getFrequencyInSeconds() ) <= now ;
                         
@@ -168,76 +170,81 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
+    public void webhookSender() {
+        try {
+            List<CustomWebhook> listWebhooks = CustomWebhooksDao.instance.findAll(new BasicDBObject());
+            if (listWebhooks == null || listWebhooks.isEmpty()) {
+                return;
+            }
+
+            for(CustomWebhook webhook:listWebhooks) {
+                int now = Context.now();
+
+                boolean shouldSend = ( webhook.getLastSentTimestamp() + webhook.getFrequencyInSeconds() ) <= now ;
+
+                if(webhook.getActiveStatus()!=ActiveStatus.ACTIVE || !shouldSend){
+                    continue;
+                }
+
+                ChangesInfo ci = getChangesInfo(now - webhook.getLastSentTimestamp(), now - webhook.getLastSentTimestamp());
+                if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0) {
+                    return;
+                }
+
+                List<String> errors = new ArrayList<>();
+
+                Map<String,Object> valueMap = new HashMap<>();
+                valueMap.put("AKTO.changes_info.newSensitiveEndpoints",ci.newSensitiveParams.size());
+                valueMap.put("AKTO.changes_info.newEndpoints",ci.newEndpointsLast7Days.size());
+                valueMap.put("AKTO.changes_info.newSensitiveParameters",ci.recentSentiiveParams);
+                valueMap.put("AKTO.changes_info.newParameters",ci.newParamsInExistingEndpoints);
+
+                ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
+                String payload = null;
+
+                try{
+                    payload = apiWorkflowExecutor.replaceVariables(webhook.getBody(),valueMap);
+                } catch(Exception e){
+                    errors.add("Failed to replace variables");
+                }
+
+                webhook.setLastSentTimestamp(now);
+                CustomWebhooksDao.instance.updateOne(Filters.eq("_id",webhook.getId()), Updates.set("lastSentTimestamp", now));
+
+                Map<String,List<String>> headers = OriginalHttpRequest.buildHeadersMap(webhook.getHeaderString());
+                OriginalHttpRequest request = new OriginalHttpRequest(webhook.getUrl(),webhook.getQueryParams(),webhook.getMethod().toString(),payload,headers,"");
+                OriginalHttpResponse response = new OriginalHttpResponse();
+
+                try {
+                    response = ApiExecutor.sendRequest(request,true);
+                } catch(Exception e){
+                    errors.add("API execution failed");
+                }
+
+                String message = null;
+                try{
+                    message = RedactSampleData.convertOriginalReqRespToString(request, response);
+                } catch(Exception e){
+                    errors.add("Failed converting sample data");
+                }
+
+                CustomWebhookResult webhookResult = new CustomWebhookResult(now,webhook.getId(),webhook.getUserEmail(),now,message,errors);
+                CustomWebhooksResultDao.instance.insertOne(webhookResult);
+            }
+
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
     public void setUpWebhookScheduler(){
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                try {
-                    DaoInit.init(new ConnectionString("mongodb://localhost:27017"));
-                    Context.accountId.set(1_000_000);
-                    
-                    List<CustomWebhook> listWebhooks = CustomWebhooksDao.instance.findAll(new BasicDBObject());
-                    if (listWebhooks == null || listWebhooks.isEmpty()) {
-                        return;
-                    }
-        
-                    for(CustomWebhook webhook:listWebhooks){
-                        int now = Context.now();
-        
-                        boolean shouldSend = ( webhook.getLastSentTimestamp() + webhook.getFrequencyInSeconds() ) <= now ;
-                        
-                        if(webhook.getActiveStatus()!=ActiveStatus.ACTIVE || !shouldSend){
-                            continue;
-                        }
-        
-                        ChangesInfo ci = getChangesInfo(now - webhook.getLastSentTimestamp(), now - webhook.getLastSentTimestamp());
-                        if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0) {
-                            return;
-                        }
+                String mongoURI = System.getenv("AKTO_MONGO_CONN");
+                DaoInit.init(new ConnectionString(mongoURI));
+                Context.accountId.set(1_000_000);
 
-                        List<String> errors = new ArrayList<>();
-
-                        Map<String,Object> valueMap = new HashMap<>();
-                        valueMap.put("x1.responsebody.newSensitiveEndpoints",ci.newSensitiveParams.size());
-                        valueMap.put("x1.responsebody.newEndpoints",ci.newEndpointsLast7Days.size());
-                        valueMap.put("x1.responsebody.newSensitiveParameters",ci.recentSentiiveParams);
-                        valueMap.put("x1.responsebody.newParameters",ci.newParamsInExistingEndpoints);
-        
-                        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
-                        String payload = null;
-                        
-                        try{
-                            payload = apiWorkflowExecutor.replaceVariables(webhook.getBody(),valueMap);
-                        } catch(Exception e){
-                            errors.add(e.toString());
-                        }
-        
-                        webhook.setLastSentTimestamp(now);
-                        CustomWebhooksDao.instance.updateOne(Filters.eq("_id",webhook.getId()), Updates.set("lastSentTimestamp", now));
-
-                        Map<String,List<String>> headers = OriginalHttpRequest.buildHeadersMap(webhook.getHeaderString());
-                        OriginalHttpRequest request = new OriginalHttpRequest(webhook.getUrl(),webhook.getQueryParams(),webhook.getMethod().toString(),payload,headers,"");
-                        OriginalHttpResponse response = new OriginalHttpResponse();
-                        
-                        try{
-                            response = ApiExecutor.sendRequest(request,true);
-                        } catch(Exception e){
-                            errors.add(e.toString());
-                        }
-        
-                        String message = null;
-                        try{
-                            message = RedactSampleData.convertOriginalReqRespToString(request, response);
-                        } catch(Exception e){
-                            errors.add(e.toString());
-                        }
-
-                        CustomWebhookResult webhookResult = new CustomWebhookResult(now,webhook.getId(),webhook.getUserEmail(),now,message,errors);
-                        CustomWebhooksResultDao.instance.insertOne(webhookResult);
-                    }
-
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                }
+                webhookSender();
             }
         }, 0, 5, TimeUnit.MINUTES);
     }

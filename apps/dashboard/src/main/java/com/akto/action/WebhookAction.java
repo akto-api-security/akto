@@ -60,7 +60,7 @@ public class WebhookAction extends UserAction {
             int now = Context.now();
             String userEmail = getSUser().getLogin();
             if (userEmail == null) return ERROR.toUpperCase();
-            CustomWebhook customWebhook = new CustomWebhook(now,webhookName,url,headerString,queryParams,body,method,frequencyInSeconds,userEmail,now,now,now,activeStatus);
+            CustomWebhook customWebhook = new CustomWebhook(now,webhookName,url,headerString,queryParams,body,method,frequencyInSeconds,userEmail,now,now,0,activeStatus);
             CustomWebhooksDao.instance.insertOne(customWebhook);
             fetchCustomWebhooks();
         }

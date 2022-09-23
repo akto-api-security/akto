@@ -146,4 +146,28 @@ public class ApiWorkflowExecutorTest {
         vulnerable = apiWorkflowExecutor.validateTest(testValidatorCode, valuesMap);
         assertTrue(vulnerable);
     }
+
+    @Test
+    public void testReplaceVariables() throws Exception {
+        Map<String, Object> valuesMap = new HashMap<>();
+
+        valuesMap.put("AKTO.changes_info.newSensitiveEndpoints", 123);
+        valuesMap.put("AKTO.changes_info.newEndpoints", 234);
+        valuesMap.put("AKTO.changes_info.newSensitiveParameters",345);
+        valuesMap.put("AKTO.changes_info.newParameters",456);
+
+        valuesMap.put("x1.response.body.name","Avneesh");
+
+        String body = "{\"newSensitiveEndpoints\" : ${AKTO.changes_info.newSensitiveEndpoints}, \"name\" : \"${x1.response.body.name}\"}";
+        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
+        String payload = apiWorkflowExecutor.replaceVariables(body, valuesMap);
+
+        assertEquals("{\"newSensitiveEndpoints\" : 123, \"name\" : \"Avneesh\"}", payload );
+
+
+        body = "There are {${AKTO.changes_info.newParameters}} new $parameters and ${x}";
+        payload = apiWorkflowExecutor.replaceVariables(body, valuesMap);
+        assertEquals("There are {456} new $parameters and ${x}", payload );
+
+    }
 }

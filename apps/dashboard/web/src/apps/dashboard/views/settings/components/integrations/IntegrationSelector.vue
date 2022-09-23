@@ -114,12 +114,12 @@ export default {
     }
   },
   mounted() {
-    this.addConnector(
-      {
-          name: 'Custom Webhooks',
-          component: WebhookIntegration
-        }
-    )
+    // this.addConnector(
+    //   {
+    //       name: 'Custom Webhooks',
+    //       component: WebhookIntegration
+    //     }
+    // )
   },
   methods: {
     setOffsets() {

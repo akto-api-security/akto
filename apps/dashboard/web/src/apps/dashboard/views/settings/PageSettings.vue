@@ -1,5 +1,5 @@
 <template>
-    <layout-with-tabs title="Settings" :tabs="['Integrations', 'Data types', 'Tags', 'Account', 'Users', 'Health']">
+    <layout-with-tabs title="Settings" :tabs="['Data types', 'Tags', 'Account', 'Users', 'Health', 'Integrations']">
         <template slot="Data types">
             <data-types 
                 title="Data types"
