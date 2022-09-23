@@ -14,9 +14,7 @@ import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 
