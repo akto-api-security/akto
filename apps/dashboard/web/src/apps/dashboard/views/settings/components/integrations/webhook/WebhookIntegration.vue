@@ -83,7 +83,7 @@ export default {
           },
           {
               text: 'status',
-              value: 'activestatus'
+              value: 'activeStatus'
           },
           {
             text: 'Last sent',
@@ -182,6 +182,7 @@ export default {
 
           let createNew = data["createNew"]
           if (createNew) {
+            this.showWebhookBuilder = false
             return api.addCustomWebhook(webhookName, url, queryParams, method, headerString, body, frequencyInSeconds)
           } else {
             let id = this.originalStateFromDb["id"]

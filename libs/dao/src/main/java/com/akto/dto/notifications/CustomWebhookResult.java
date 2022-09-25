@@ -11,7 +11,6 @@ public class CustomWebhookResult {
 
     int webhookId;
     String userEmail;
-    // redundant because id also stores the timestamp at which it was created
     int timestamp;
     String message;
     List<String> errors;

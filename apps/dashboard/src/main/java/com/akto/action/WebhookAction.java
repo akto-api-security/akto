@@ -1,12 +1,14 @@
 package com.akto.action;
 
 import java.util.List;
+import java.util.Map;
 
 import org.bson.conversions.Bson;
 
 import com.akto.dao.context.Context;
 import com.akto.dao.notifications.CustomWebhooksDao;
 import com.akto.dao.notifications.CustomWebhooksResultDao;
+import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
@@ -14,7 +16,9 @@ import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 
@@ -39,7 +43,13 @@ public class WebhookAction extends UserAction {
 
 
     public String fetchLatestWebhookResult(){
-        customWebhookResult = CustomWebhooksResultDao.instance.findLatestOne(Filters.eq("webhookId", id));
+        // customWebhookResult = CustomWebhooksResultDao.instance.findLatestOne(Filters.eq("webhookId", id));
+        MongoCursor<CustomWebhookResult> cursor = CustomWebhooksResultDao.instance.getMCollection().find(Filters.eq("webhookId", id)).limit(1).sort(Sorts.descending("timestamp")).cursor();
+        customWebhookResult = new CustomWebhookResult();
+        if(cursor.hasNext()) {
+            customWebhookResult = cursor.next();
+        }
+
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -47,6 +57,14 @@ public class WebhookAction extends UserAction {
         activeStatus = ActiveStatus.ACTIVE;
 
         boolean isUrl = KeyTypes.patternToSubType.get(SingleTypeInfo.URL).matcher(url).matches();
+        
+        try{
+            Map<String,List<String>> headers = OriginalHttpRequest.buildHeadersMap(headerString);
+        }
+        catch(Exception e){
+            addActionError("Please enter valid headers");
+            return ERROR.toUpperCase();
+        }
 
         if (!isUrl) {
             addActionError("Please enter a valid url");
@@ -76,6 +94,14 @@ public class WebhookAction extends UserAction {
 
         String userEmail = getSUser().getLogin();
         if (userEmail == null) return ERROR.toUpperCase();
+
+        try{
+            Map<String,List<String>> headers = OriginalHttpRequest.buildHeadersMap(headerString);
+        }
+        catch(Exception e){
+            addActionError("Please enter valid headers");
+            return ERROR.toUpperCase();
+        }
 
         if (customWebhook == null){
             addActionError("The webhook does not exist");

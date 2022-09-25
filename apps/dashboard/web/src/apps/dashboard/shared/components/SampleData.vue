@@ -89,7 +89,12 @@ export default {
 
             let requestPayload = {}
             try {
-                requestPayload = JSON.parse(requestPayloadString)
+                if(requestHeaders["Content-Type"] == "application/json" || requestHeaders["content-type"] == "application/json" ) {
+                    requestPayload = JSON.parse(requestPayloadString)
+                }
+                else {
+                    requestPayload = requestPayloadString
+                }
             } catch (e) {
                 // eat it
             }
@@ -133,7 +138,12 @@ export default {
             }
             let responsePayload = {}
             try {
-              responsePayload = JSON.parse(responsePayloadString)
+                if(responseHeaders["Content-Type"] == "application/json" || responseHeaders["content-type"] == "application/json"  ){
+                    responsePayload = JSON.parse(responsePayloadString)
+                }
+                else {
+                    responsePayload = responsePayloadString
+                }
             } catch (e) {
               // eat it
             }
