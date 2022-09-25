@@ -89,14 +89,9 @@ export default {
 
             let requestPayload = {}
             try {
-                if(requestHeaders["Content-Type"] == "application/json" || requestHeaders["content-type"] == "application/json" ) {
-                    requestPayload = JSON.parse(requestPayloadString)
-                }
-                else {
-                    requestPayload = requestPayloadString
-                }
+                requestPayload = JSON.parse(requestPayloadString)
             } catch (e) {
-                // eat it
+                requestPayload = requestPayloadString
             }
 
             result["json"] = {"requestHeaders": requestHeaders, "requestPayload": requestPayload}
@@ -138,14 +133,9 @@ export default {
             }
             let responsePayload = {}
             try {
-                if(responseHeaders["Content-Type"] == "application/json" || responseHeaders["content-type"] == "application/json"  ){
-                    responsePayload = JSON.parse(responsePayloadString)
-                }
-                else {
-                    responsePayload = responsePayloadString
-                }
+                responsePayload = JSON.parse(responsePayloadString)
             } catch (e) {
-              // eat it
+                responsePayload = responsePayloadString
             }
             result["json"] = {"responseHeaders": responseHeaders, "responsePayload": responsePayload}
             result["highlightPaths"] = {}

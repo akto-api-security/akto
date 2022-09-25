@@ -49,9 +49,9 @@ public class TestWebhookAction extends MongoBasedTest{
     public void testFetchLatestWebhookResult(){
         CustomWebhooksResultDao.instance.getMCollection().drop();
         List<CustomWebhookResult> customWebhookResults = new ArrayList<>();
-        customWebhookResults.add (new CustomWebhookResult(1,1000,"test@akto.io",1,"message",new ArrayList<>()));
-        customWebhookResults.add (new CustomWebhookResult(2,1000,"test@akto.io",2,"message",new ArrayList<>()));
-        customWebhookResults.add (new CustomWebhookResult(3,100,"test@akto.io",3,"message",new ArrayList<>()));
+        customWebhookResults.add (new CustomWebhookResult(1000,"test@akto.io",1,"message",new ArrayList<>()));
+        customWebhookResults.add (new CustomWebhookResult(1000,"test@akto.io",2,"message",new ArrayList<>()));
+        customWebhookResults.add (new CustomWebhookResult(100,"test@akto.io",3,"message",new ArrayList<>()));
         CustomWebhooksResultDao.instance.insertMany(customWebhookResults);
 
         WebhookAction webhookAction = new WebhookAction();

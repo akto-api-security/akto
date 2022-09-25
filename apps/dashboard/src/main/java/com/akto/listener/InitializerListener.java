@@ -176,8 +176,7 @@ public class InitializerListener implements ServletContextListener {
             if (listWebhooks == null || listWebhooks.isEmpty()) {
                 return;
             }
-            int idx=0;
-            int inow = Context.now();
+            
             for(CustomWebhook webhook:listWebhooks) {
                 int now = Context.now();
 
@@ -230,9 +229,7 @@ public class InitializerListener implements ServletContextListener {
                     errors.add("Failed converting sample data");
                 }
 
-                // the assumption here is that number of webhooks would be less than 5*60
-                CustomWebhookResult webhookResult = new CustomWebhookResult(inow+idx,webhook.getId(),webhook.getUserEmail(),now,message,errors);
-                idx++;
+                CustomWebhookResult webhookResult = new CustomWebhookResult(webhook.getId(),webhook.getUserEmail(),now,message,errors);
                 CustomWebhooksResultDao.instance.insertOne(webhookResult);
             }
 
@@ -250,7 +247,7 @@ public class InitializerListener implements ServletContextListener {
 
                 webhookSender();
             }
-        }, 0, 15, TimeUnit.MINUTES);
+        }, 0, 1, TimeUnit.MINUTES);
     }
 
     static class ChangesInfo {

@@ -2,12 +2,11 @@ package com.akto.dto.notifications;
 
 import java.util.List;
 
-import org.bson.codecs.pojo.annotations.BsonId;
+import org.bson.types.ObjectId;
 
 public class CustomWebhookResult {
     
-    @BsonId
-    int id;
+    ObjectId id;
 
     int webhookId;
     String userEmail;
@@ -18,9 +17,8 @@ public class CustomWebhookResult {
     public CustomWebhookResult() {
     }
 
-    public CustomWebhookResult(int id, int webhookId, String userEmail, int timestamp, String message,
+    public CustomWebhookResult(int webhookId, String userEmail, int timestamp, String message,
             List<String> errors) {
-        this.id = id;
         this.webhookId = webhookId;
         this.userEmail = userEmail;
         this.timestamp = timestamp;
@@ -28,10 +26,10 @@ public class CustomWebhookResult {
         this.errors = errors;
     }
 
-    public int getId() {
+    public ObjectId getId() {
         return id;
     }
-    public void setId(int id) {
+    public void setId(ObjectId id) {
         this.id = id;
     }
     public int getWebhookId() {

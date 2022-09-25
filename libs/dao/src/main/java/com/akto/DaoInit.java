@@ -78,6 +78,8 @@ public class DaoInit {
         ClassModel<WorkflowTestingEndpoints>  workflowTestingEndpointsClassModel = ClassModel.builder(WorkflowTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<WorkflowTestResult>  workflowTestResultClassModel = ClassModel.builder(WorkflowTestResult.class).enableDiscriminator(true).build();
         ClassModel<CappedSet> cappedSetClassModel = ClassModel.builder(CappedSet.class).enableDiscriminator(true).build();
+        ClassModel<CustomWebhook> CustomWebhookClassModel = ClassModel.builder(CustomWebhook.class).enableDiscriminator(true).build();
+        ClassModel<CustomWebhookResult> CustomWebhookResultClassModel = ClassModel.builder(CustomWebhookResult.class).enableDiscriminator(true).build();
         ClassModel<WorkflowTestResult.NodeResult> nodeResultClassModel = ClassModel.builder(WorkflowTestResult.NodeResult.class).enableDiscriminator(true).build();
 
 
@@ -92,7 +94,7 @@ public class DaoInit {
                 authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel,
                 testingEndpointsClassModel, customTestingEndpointsClassModel, collectionWiseTestingEndpointsClassModel,
                 workflowTestingEndpointsClassModel, workflowTestResultClassModel,
-                cappedSetClassModel,
+                cappedSetClassModel,CustomWebhookClassModel,CustomWebhookResultClassModel,
                 nodeResultClassModel
         ).automatic(true).build());
 
