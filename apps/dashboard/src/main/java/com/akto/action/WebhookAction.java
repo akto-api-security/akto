@@ -1,9 +1,12 @@
 package com.akto.action;
 
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 import org.bson.conversions.Bson;
 
+import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dao.notifications.CustomWebhooksDao;
 import com.akto.dao.notifications.CustomWebhooksResultDao;
@@ -16,9 +19,13 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.listener.InitializerListener;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
+
+import com.akto.runtime.Main;
+import java.util.concurrent.TimeUnit;
 
 public class WebhookAction extends UserAction {
     
@@ -32,13 +39,14 @@ public class WebhookAction extends UserAction {
     private int frequencyInSeconds;
     private ActiveStatus activeStatus;
     private CustomWebhookResult customWebhookResult;
-
     private List<CustomWebhook> customWebhooks;
+
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
     public String fetchCustomWebhooks() {
         customWebhooks = CustomWebhooksDao.instance.findAll(new BasicDBObject());
         return Action.SUCCESS.toUpperCase();
     }
-
 
     public String fetchLatestWebhookResult(){
         customWebhookResult = CustomWebhooksResultDao.instance.findLatestOne(Filters.eq("webhookId", id));
@@ -173,11 +181,21 @@ public class WebhookAction extends UserAction {
             return ERROR.toUpperCase();
         } else{
 
-            customWebhook.setFrequencyInSeconds(0);
-            customWebhook.setLastSentTimestamp(0);
-            customWebhook.setActiveStatus(ActiveStatus.ACTIVE);
-            InitializerListener.webhookSenderUtil(customWebhook);
+            int accountId = Context.accountId.get();
+            
+            executorService.schedule( new Runnable() {
+                public void run() {
+                    String mongoURI = System.getenv("AKTO_MONGO_CONN");
+                    DaoInit.init(new ConnectionString(mongoURI));
+                    Context.accountId.set(accountId);
+                    customWebhook.setFrequencyInSeconds(0);
+                    customWebhook.setLastSentTimestamp(0);
+                    customWebhook.setActiveStatus(ActiveStatus.ACTIVE);
+                    InitializerListener.webhookSenderUtil(customWebhook);
+                }
+            }, 1 , TimeUnit.SECONDS);
         }
+
         return Action.SUCCESS.toUpperCase();
     }
 

@@ -252,7 +252,7 @@ public class InitializerListener implements ServletContextListener {
 
                 webhookSender();
             }
-        }, 0, 1, TimeUnit.MINUTES);
+        }, 0, 15, TimeUnit.MINUTES);
     }
 
     static class ChangesInfo {
