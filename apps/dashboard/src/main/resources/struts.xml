@@ -1169,6 +1169,17 @@
             </result>
         </action>
 
+        <action name="api/runOnce" class="com.akto.action.WebhookAction" method="runOnce">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/uploadWorkflowJson" class="com.akto.action.testing.WorkflowTestAction" method="uploadWorkflowJson">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

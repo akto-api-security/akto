@@ -29,7 +29,7 @@
           <layout-with-tabs title="" :tabs="['Info', 'Result']" ref="layoutWithTabs">
               <template slot="Info">
                 <div style="margin-top: 12px">
-                  <webhook-builder v-if="showWebhookBuilder" :originalStateFromDb="originalStateFromDb" @saveWebhook="saveWebhook" :loading="loading"/>
+                  <webhook-builder v-if="showWebhookBuilder" :originalStateFromDb="originalStateFromDb" @saveWebhook="saveWebhook" @saveWebhookAndRun="saveWebhookAndRun" :loading="loading"/>
                 </div>
               </template>
               <template slot="Result">
@@ -182,7 +182,6 @@ export default {
 
           let createNew = data["createNew"]
           if (createNew) {
-            this.showWebhookBuilder = false
             return api.addCustomWebhook(webhookName, url, queryParams, method, headerString, body, frequencyInSeconds)
           } else {
             let id = this.originalStateFromDb["id"]
@@ -191,6 +190,7 @@ export default {
       },
       saveWebhook(data) {
           this.loading= true
+          let createNew = data["createNew"]
           let result = this.saveWebhookMain(data)
           if (!result) {
               this.loading = false
@@ -206,7 +206,42 @@ export default {
               console.log(err);
               this.loading = false
           })
-          
+
+          if(createNew){
+            this.showWebhookBuilder = false
+          }
+      },
+      saveWebhookAndRun(data){
+        this.loading= true
+          let createNew = data["createNew"]
+          let result = this.saveWebhookMain(data)
+          if (!result) {
+              this.loading = false
+              return
+          }
+
+          result.then((resp) => {
+              let customWebhooks = resp.customWebhooks;
+              this.webhooks = [].concat(customWebhooks.map(this.prettifyWebhooks))
+              this.loading = false
+              func.showSuccessSnackBar("Webhook saved successfully!")
+          }).catch((err) => {
+              console.log(err);
+              this.loading = false
+          })
+          let id = this.originalStateFromDb["id"]
+          let runResult = api.runOnce(id);
+
+          runResult.then((resp) => {
+            func.showSuccessSnackBar("Webhook ran successfully!")
+          }).catch((err) => {
+              console.log(err);
+              this.loading = false
+          })
+
+          if(createNew){
+            this.showWebhookBuilder = false
+          }
       },
       validateMethod(methodName) {
           let m = methodName.toUpperCase()

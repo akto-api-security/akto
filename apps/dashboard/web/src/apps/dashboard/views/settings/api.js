@@ -204,6 +204,13 @@ export default {
             data: {id, activeStatus}
         })
     },
+    runOnce(id) {
+        return request({
+            url: '/api/runOnce',
+            method: 'post',
+            data: {id}
+        })
+    },
     fetchLatestWebhookResult(id) {
         return request({
             url: '/api/fetchLatestWebhookResult',

@@ -14,6 +14,7 @@ import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
 import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.listener.InitializerListener;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -152,6 +153,30 @@ public class WebhookAction extends UserAction {
             );
 
             CustomWebhooksDao.instance.updateOne(Filters.eq("_id",id), updates);
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String runOnce(){
+        CustomWebhook customWebhook = CustomWebhooksDao.instance.findOne(
+            Filters.eq("_id",id)
+        );
+
+        String userEmail = getSUser().getLogin();
+        if (userEmail == null) return ERROR.toUpperCase();
+
+        if (customWebhook == null){
+            addActionError("The webhook does not exist");
+            return ERROR.toUpperCase();
+        } else if ( !userEmail.equals(customWebhook.getUserEmail() )){
+            addActionError("Unauthorized Request");
+            return ERROR.toUpperCase();
+        } else{
+
+            customWebhook.setFrequencyInSeconds(0);
+            customWebhook.setLastSentTimestamp(0);
+            customWebhook.setActiveStatus(ActiveStatus.ACTIVE);
+            InitializerListener.webhookSenderUtil(customWebhook);
         }
         return Action.SUCCESS.toUpperCase();
     }

@@ -170,6 +170,63 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
+    public static void webhookSenderUtil(CustomWebhook webhook){
+
+        int now = Context.now();
+
+        boolean shouldSend = ( webhook.getLastSentTimestamp() + webhook.getFrequencyInSeconds() ) <= now ;
+
+        if(webhook.getActiveStatus()!=ActiveStatus.ACTIVE || !shouldSend){
+            return;
+        }
+
+        ChangesInfo ci = getChangesInfo(now - webhook.getLastSentTimestamp(), now - webhook.getLastSentTimestamp());
+        if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0) {
+            return;
+        }
+
+        List<String> errors = new ArrayList<>();
+
+        Map<String,Object> valueMap = new HashMap<>();
+        valueMap.put("AKTO.changes_info.newSensitiveEndpoints",ci.newSensitiveParams.size());
+        valueMap.put("AKTO.changes_info.newEndpoints",ci.newEndpointsLast7Days.size());
+        valueMap.put("AKTO.changes_info.newSensitiveParameters",ci.recentSentiiveParams);
+        valueMap.put("AKTO.changes_info.newParameters",ci.newParamsInExistingEndpoints);
+
+        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
+        String payload = null;
+
+        try{
+            payload = apiWorkflowExecutor.replaceVariables(webhook.getBody(),valueMap);
+        } catch(Exception e){
+            errors.add("Failed to replace variables");
+        }
+
+        webhook.setLastSentTimestamp(now);
+        CustomWebhooksDao.instance.updateOne(Filters.eq("_id",webhook.getId()), Updates.set("lastSentTimestamp", now));
+
+        Map<String,List<String>> headers = OriginalHttpRequest.buildHeadersMap(webhook.getHeaderString());
+        OriginalHttpRequest request = new OriginalHttpRequest(webhook.getUrl(),webhook.getQueryParams(),webhook.getMethod().toString(),payload,headers,"");
+        OriginalHttpResponse response = new OriginalHttpResponse();
+
+        try {
+            response = ApiExecutor.sendRequest(request,true);
+            System.out.println("webhook request sent");
+        } catch(Exception e){
+            errors.add("API execution failed");
+        }
+
+        String message = null;
+        try{
+            message = RedactSampleData.convertOriginalReqRespToString(request, response);
+        } catch(Exception e){
+            errors.add("Failed converting sample data");
+        }
+
+        CustomWebhookResult webhookResult = new CustomWebhookResult(webhook.getId(),webhook.getUserEmail(),now,message,errors);
+        CustomWebhooksResultDao.instance.insertOne(webhookResult);
+    }
+
     public void webhookSender() {
         try {
             List<CustomWebhook> listWebhooks = CustomWebhooksDao.instance.findAll(new BasicDBObject());
@@ -178,59 +235,7 @@ public class InitializerListener implements ServletContextListener {
             }
             
             for(CustomWebhook webhook:listWebhooks) {
-                int now = Context.now();
-
-                boolean shouldSend = ( webhook.getLastSentTimestamp() + webhook.getFrequencyInSeconds() ) <= now ;
-
-                if(webhook.getActiveStatus()!=ActiveStatus.ACTIVE || !shouldSend){
-                    continue;
-                }
-
-                ChangesInfo ci = getChangesInfo(now - webhook.getLastSentTimestamp(), now - webhook.getLastSentTimestamp());
-                if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0) {
-                    return;
-                }
-
-                List<String> errors = new ArrayList<>();
-
-                Map<String,Object> valueMap = new HashMap<>();
-                valueMap.put("AKTO.changes_info.newSensitiveEndpoints",ci.newSensitiveParams.size());
-                valueMap.put("AKTO.changes_info.newEndpoints",ci.newEndpointsLast7Days.size());
-                valueMap.put("AKTO.changes_info.newSensitiveParameters",ci.recentSentiiveParams);
-                valueMap.put("AKTO.changes_info.newParameters",ci.newParamsInExistingEndpoints);
-
-                ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
-                String payload = null;
-
-                try{
-                    payload = apiWorkflowExecutor.replaceVariables(webhook.getBody(),valueMap);
-                } catch(Exception e){
-                    errors.add("Failed to replace variables");
-                }
-
-                webhook.setLastSentTimestamp(now);
-                CustomWebhooksDao.instance.updateOne(Filters.eq("_id",webhook.getId()), Updates.set("lastSentTimestamp", now));
-
-                Map<String,List<String>> headers = OriginalHttpRequest.buildHeadersMap(webhook.getHeaderString());
-                OriginalHttpRequest request = new OriginalHttpRequest(webhook.getUrl(),webhook.getQueryParams(),webhook.getMethod().toString(),payload,headers,"");
-                OriginalHttpResponse response = new OriginalHttpResponse();
-
-                try {
-                    response = ApiExecutor.sendRequest(request,true);
-                    System.out.println("webhook request sent");
-                } catch(Exception e){
-                    errors.add("API execution failed");
-                }
-
-                String message = null;
-                try{
-                    message = RedactSampleData.convertOriginalReqRespToString(request, response);
-                } catch(Exception e){
-                    errors.add("Failed converting sample data");
-                }
-
-                CustomWebhookResult webhookResult = new CustomWebhookResult(webhook.getId(),webhook.getUserEmail(),now,message,errors);
-                CustomWebhooksResultDao.instance.insertOne(webhookResult);
+                webhookSenderUtil(webhook);
             }
 
         } catch (Exception ex) {
@@ -259,7 +264,7 @@ public class InitializerListener implements ServletContextListener {
         public int newParamsInExistingEndpoints = 0;
     }
 
-    protected ChangesInfo getChangesInfo(int newEndpointsFrequency, int newSensitiveParamsFrequency) {
+    protected static ChangesInfo getChangesInfo(int newEndpointsFrequency, int newSensitiveParamsFrequency) {
         try {
             
             ChangesInfo ret = new ChangesInfo();

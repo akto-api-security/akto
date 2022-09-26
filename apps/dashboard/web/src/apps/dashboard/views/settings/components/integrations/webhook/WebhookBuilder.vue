@@ -57,8 +57,11 @@
     </div>
 
     <div class="d-flex jc-end ma-2">
-        <v-btn primary dark color="#6200EA" @click="saveWebhook" :disabled="!updatedData" :loading="loading">
+        <v-btn class = "mx-2" primary dark color="#6200EA" @click="saveWebhook" :disabled="!updatedData" :loading="loading">
             Save
+        </v-btn>
+        <v-btn primary dark color="#6200EA" @click="saveWebhookAndRun" :disabled="!updatedData" :loading="loading">
+            Save and run once
         </v-btn>
     </div>
   </div>
@@ -99,6 +102,9 @@ export default {
     methods: {
         saveWebhook() {
             this.$emit("saveWebhook", {"updatedData": this.updatedData, "createNew": this.originalStateFromDb == null})
+        },
+        saveWebhookAndRun(){
+            this.$emit("saveWebhookAndRun", {"updatedData": this.updatedData, "createNew": this.originalStateFromDb == null})
         },
         onChangeName(newData) {
             this.onChange("webhookName", newData)
