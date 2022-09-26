@@ -224,16 +224,15 @@ export default {
               let customWebhooks = resp.customWebhooks;
               this.webhooks = [].concat(customWebhooks.map(this.prettifyWebhooks))
               this.loading = false
-              func.showSuccessSnackBar("Webhook saved successfully!")
-          }).catch((err) => {
-              console.log(err);
-              this.loading = false
-          })
-          let id = this.originalStateFromDb["id"]
-          let runResult = api.runOnce(id);
 
-          runResult.then((resp) => {
-            func.showSuccessSnackBar("Webhook ran successfully!")
+              let id = this.originalStateFromDb["id"]
+              let runResult = api.runOnce(id);
+              runResult.then((resp) => {
+                func.showSuccessSnackBar("Webhook saved and ran successfully!")
+              }).catch((err) => {
+                console.log(err);
+                this.loading = false
+              })
           }).catch((err) => {
               console.log(err);
               this.loading = false
