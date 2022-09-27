@@ -117,10 +117,22 @@ export default {
         let copyString = "";
         let snackBarMessage = ""
         if (this.simpleCopy) {
-          let b = {}
-          b["responsePayload"] = this.completeData ? this.completeData["response"]["body"]: {}
-          b["responseHeaders"] = this.completeData ? this.completeData["response"]["headers"]: {}
-          b["statusCode"] = this.completeData["response"].statusCode
+          let responsePayload = {}
+          let responseHeaders = {}
+          let statusCode = 0
+
+          if (this.completeData) {
+            responsePayload = this.completeData["response"] ?  this.completeData["response"]["body"] : this.completeData["responsePayload"]
+            responseHeaders = this.completeData["response"] ?  this.completeData["response"]["headers"] : this.completeData["responseHeaders"]
+            statusCode = this.completeData["response"] ?  this.completeData["response"]["statusCode"] : this.completeData["statusCode"]
+          }
+
+          let b = {
+            "responsePayload": responsePayload,
+            "responseHeaders": responseHeaders,
+            "statusCode": statusCode
+          }
+
           copyString = JSON.stringify(b)
           snackBarMessage = "Response data copied to clipboard"
         } else {
