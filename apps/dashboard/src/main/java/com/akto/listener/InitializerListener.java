@@ -312,7 +312,7 @@ public class InitializerListener implements ServletContextListener {
 
             List<SingleTypeInfo> allNewParameters = new InventoryAction().fetchAllNewParams(now - newEndpointsFrequency, now);
             int totalNewParameters=allNewParameters.size();
-            ret.newParamsInExistingEndpoints = totalNewParameters - newParamInNewEndpoint;    
+            ret.newParamsInExistingEndpoints = Math.max(0, totalNewParameters - newParamInNewEndpoint);
             
             return ret;
         } catch (Exception e) {
