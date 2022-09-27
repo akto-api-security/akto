@@ -45,14 +45,23 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
     }
 
     public List<TestingRunResult> fetchLatestTestingRunResult() {
-        MongoCursor<TestingRunResult> cursor = instance.getMCollection().find().sort(Sorts.descending("_id")).limit(1000).cursor();
+        MongoCursor<TestingRunResult> cursor = instance.getMCollection().find()
+                .projection(
+                        Projections.exclude(
+                                "resultMap.BOLA.message",
+                                "resultMap.BOLA.originalMessage",
+                                "resultMap.BOLA.privateSingleTypeInfos",
+                                "resultMap.NO_AUTH.message",
+                                "resultMap.NO_AUTH.originalMessage",
+                                "resultMap.NO_AUTH.privateSingleTypeInfos"
+                        )
+                )
+                .sort(Sorts.descending("_id"))
+                .limit(1000)
+                .cursor();
         List<TestingRunResult> testingRunResults = new ArrayList<>();
         while (cursor.hasNext()) {
             TestingRunResult testingRunResult = cursor.next();
-            for (TestResult testResult: testingRunResult.getResultMap().values()) {
-                testResult.setMessage("");
-                testResult.setPrivateSingleTypeInfos(new ArrayList<>());
-            }
             testingRunResult.setHexId(testingRunResult.getId().toHexString());
             testingRunResults.add(testingRunResult);
         }

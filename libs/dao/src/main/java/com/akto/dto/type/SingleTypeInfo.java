@@ -699,6 +699,10 @@ public class SingleTypeInfo {
         }
     }
 
+    public void clearValues() {
+        this.values = new CappedSet<>();
+    }
+
     public boolean getIsPrivate() {
         if (uniqueCount == 0) return true;
         double v = (1.0*publicCount) / uniqueCount;
