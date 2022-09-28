@@ -22,6 +22,7 @@ import com.akto.notifications.email.WeeklyEmail;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.util.Pair;
 import com.akto.utils.RedactSampleData;
+import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -171,7 +172,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void webhookSenderUtil(CustomWebhook webhook){
-
+        Gson gson = new Gson();
         int now = Context.now();
 
         boolean shouldSend = ( webhook.getLastSentTimestamp() + webhook.getFrequencyInSeconds() ) <= now ;
@@ -188,10 +189,15 @@ public class InitializerListener implements ServletContextListener {
         List<String> errors = new ArrayList<>();
 
         Map<String,Object> valueMap = new HashMap<>();
-        valueMap.put("AKTO.changes_info.newSensitiveEndpoints",ci.newSensitiveParams.size());
-        valueMap.put("AKTO.changes_info.newEndpoints",ci.newEndpointsLast7Days.size());
-        valueMap.put("AKTO.changes_info.newSensitiveParameters",ci.recentSentiiveParams);
-        valueMap.put("AKTO.changes_info.newParameters",ci.newParamsInExistingEndpoints);
+
+        valueMap.put("AKTO.changes_info.newSensitiveEndpoints", gson.toJson(ci.newSensitiveParams));
+        valueMap.put("AKTO.changes_info.newSensitiveEndpointsCount",ci.newSensitiveParams.size());
+
+        valueMap.put("AKTO.changes_info.newEndpoints",gson.toJson(ci.newEndpointsLast7Days));
+        valueMap.put("AKTO.changes_info.newEndpointsCount",ci.newEndpointsLast7Days.size());
+
+        valueMap.put("AKTO.changes_info.newSensitiveParametersCount",ci.recentSentiiveParams);
+        valueMap.put("AKTO.changes_info.newParametersCount",ci.newParamsInExistingEndpoints);
 
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         String payload = null;
@@ -207,7 +213,7 @@ public class InitializerListener implements ServletContextListener {
 
         Map<String,List<String>> headers = OriginalHttpRequest.buildHeadersMap(webhook.getHeaderString());
         OriginalHttpRequest request = new OriginalHttpRequest(webhook.getUrl(),webhook.getQueryParams(),webhook.getMethod().toString(),payload,headers,"");
-        OriginalHttpResponse response = new OriginalHttpResponse();
+        OriginalHttpResponse response = null; // null response means api request failed. Do not use new OriginalHttpResponse() in such cases else the string parsing fails.
 
         try {
             response = ApiExecutor.sendRequest(request,true);
@@ -277,12 +283,12 @@ public class InitializerListener implements ServletContextListener {
             for (BasicDBObject singleTypeInfo: newEndpointsSmallerDuration) {
                 newParamInNewEndpoint += (int) singleTypeInfo.getOrDefault("countTs", 0);
                 singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
-                ret.newEndpointsLast7Days.add(singleTypeInfo.getString("method") + singleTypeInfo.getString("url"));
+                ret.newEndpointsLast7Days.add(singleTypeInfo.getString("method") + " " + singleTypeInfo.getString("url"));
             }
     
             for (BasicDBObject singleTypeInfo: newEndpointsBiggerDuration) {
                 singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
-                ret.newEndpointsLast31Days.add(singleTypeInfo.getString("method") + singleTypeInfo.getString("url"));
+                ret.newEndpointsLast31Days.add(singleTypeInfo.getString("method") + " " + singleTypeInfo.getString("url"));
             }
     
             List<SingleTypeInfo> sensitiveParamsList = new InventoryAction().fetchSensitiveParams();

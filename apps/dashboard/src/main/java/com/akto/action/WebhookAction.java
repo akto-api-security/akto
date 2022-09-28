@@ -185,8 +185,6 @@ public class WebhookAction extends UserAction {
             
             executorService.schedule( new Runnable() {
                 public void run() {
-                    String mongoURI = System.getenv("AKTO_MONGO_CONN");
-                    DaoInit.init(new ConnectionString(mongoURI));
                     Context.accountId.set(accountId);
                     customWebhook.setFrequencyInSeconds(0);
                     customWebhook.setLastSentTimestamp(0);
