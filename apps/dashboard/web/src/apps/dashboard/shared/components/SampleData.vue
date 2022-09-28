@@ -1,5 +1,5 @@
 <template>
-    <div class="d-flex" style="margin: 24px">
+    <div class="d-flex">
         <div class="flex-equal" >
             <sample-single-side
                 :title="requestTitle" 
@@ -91,7 +91,7 @@ export default {
             try {
                 requestPayload = JSON.parse(requestPayloadString)
             } catch (e) {
-                // eat it
+                requestPayload = requestPayloadString
             }
 
             result["json"] = {"requestHeaders": requestHeaders, "requestPayload": requestPayload}
@@ -133,9 +133,9 @@ export default {
             }
             let responsePayload = {}
             try {
-              responsePayload = JSON.parse(responsePayloadString)
+                responsePayload = JSON.parse(responsePayloadString)
             } catch (e) {
-              // eat it
+                responsePayload = responsePayloadString
             }
             result["json"] = {"responseHeaders": responseHeaders, "responsePayload": responsePayload}
             result["highlightPaths"] = {}
