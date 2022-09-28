@@ -52,6 +52,7 @@ import BurpSuiteIntegration from "./BurpSuiteIntegration"
 import SlackIntegration from "./SlackIntegration"
 import Postman from "./Postman"
 import AktoAPIIntegration from "./AktoApiIntegration"
+import WebhookIntegration from "./webhook/WebhookIntegration";
 
 export default {
   name: "IntegrationSelector",
@@ -60,7 +61,8 @@ export default {
     BurpSuiteIntegration,
     SlackIntegration,
     Postman,
-    AktoAPIIntegration
+    AktoAPIIntegration,
+    WebhookIntegration
   },
   data () {
     let integrationsList = [
@@ -90,6 +92,9 @@ export default {
         connectors: [{
           name: 'Slack',
           component: SlackIntegration
+        },{
+          name: 'Custom Webhooks',
+          component: WebhookIntegration
         }]
       }
     ]
@@ -107,6 +112,14 @@ export default {
       timeout: null,
       tabName: null
     }
+  },
+  mounted() {
+    // this.addConnector(
+    //   {
+    //       name: 'Custom Webhooks',
+    //       component: WebhookIntegration
+    //     }
+    // )
   },
   methods: {
     setOffsets() {
@@ -138,6 +151,7 @@ export default {
       setTimeout(() => this.scrolling = false, 500);
     },
     addConnector(type) {
+      console.log(type);
       this.$emit('connectorSelected', type)
     }
   }

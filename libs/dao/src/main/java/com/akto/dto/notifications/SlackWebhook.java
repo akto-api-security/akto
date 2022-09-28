@@ -13,11 +13,13 @@ public class SlackWebhook {
     int timestamp;
     String userEmail;
     String dashboardUrl;
+    int lastSentTimestamp;
+    int frequencyInSeconds;
 
     public SlackWebhook() {
     }
 
-    public SlackWebhook(int id, String webhook, int smallerDuration, int largerDuration, int timestamp, String userEmail, String dashboardUrl) {
+    public SlackWebhook(int id, String webhook, int smallerDuration, int largerDuration, int timestamp, String userEmail, String dashboardUrl, int lastSentTimestamp, int frequencyInSeconds) {
         this.id = id;
         this.webhook = webhook;
         this.smallerDuration = smallerDuration;
@@ -25,6 +27,8 @@ public class SlackWebhook {
         this.timestamp = timestamp;
         this.userEmail = userEmail;
         this.dashboardUrl = dashboardUrl;
+        this.lastSentTimestamp = lastSentTimestamp;
+        this.frequencyInSeconds = frequencyInSeconds;
     }
 
     public int getId() {
@@ -83,6 +87,22 @@ public class SlackWebhook {
         this.dashboardUrl = dashboardUrl;
     }
 
+    public int getLastSentTimestamp() {
+        return this.lastSentTimestamp;
+    }
+
+    public void setLastSentTimestamp(int lastSentTimestamp) {
+        this.lastSentTimestamp = lastSentTimestamp;
+    }
+
+    public int getFrequencyInSeconds() {
+        return this.frequencyInSeconds;
+    }
+
+    public void setFrequencyInSeconds(int frequencyInSeconds) {
+        this.frequencyInSeconds = frequencyInSeconds;
+    }
+
     @Override
     public String toString() {
         return "{" +
@@ -93,6 +113,8 @@ public class SlackWebhook {
             ", timestamp='" + getTimestamp() + "'" +
             ", userEmail='" + getUserEmail() + "'" +
             ", dashboardUrl='" + getDashboardUrl() + "'" +
+            ", LastSentTimestamp='" + getLastSentTimestamp() + "'" +
+            ", FrequencyInSeconds='" + getFrequencyInSeconds() + "'" +
             "}";
     }
 }

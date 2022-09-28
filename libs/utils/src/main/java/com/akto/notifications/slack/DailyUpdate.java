@@ -64,20 +64,27 @@ public class DailyUpdate {
     private int newSensitiveEndpoints;
     private int newEndpoints;
     private int newSensitiveParams;
+    private int newParams;
     private Map<String, String> mapEndpointToSubtypes;
     private String dashboardLink;
-    
-
+    private int startTimestamp;
+    private int endTimestamp;
 
     public DailyUpdate(
-        int totalSensitiveEndpoints, int totalEndpoints, int newSensitiveEndpoints, 
-        int newEndpoints, int newSensitiveParams, Map<String, String> mapEndpointToSubtypes, String dashboardLink
+        int totalSensitiveEndpoints, int totalEndpoints, 
+        int newSensitiveEndpoints, int newEndpoints, 
+        int newSensitiveParams, int newParams,
+        int startTimestamp,int endTimestamp,
+        Map<String, String> mapEndpointToSubtypes, String dashboardLink
     ) {
         this.totalSensitiveEndpoints = totalSensitiveEndpoints;
         this.totalEndpoints = totalEndpoints;
         this.newSensitiveEndpoints = newSensitiveEndpoints;
         this.newEndpoints = newEndpoints;
         this.newSensitiveParams = newSensitiveParams;
+        this.newParams=newParams;
+        this.startTimestamp=startTimestamp;
+        this.endTimestamp=endTimestamp;
         this.mapEndpointToSubtypes = mapEndpointToSubtypes;
         this.dashboardLink = dashboardLink;
     }
@@ -90,10 +97,10 @@ public class DailyUpdate {
         sectionsList.add(createHeader("Summary for today: "));        
         // sectionsList.add(createNumberSection("Total Sensitive Endpoints", totalSensitiveEndpoints, "Total Endpoints", totalEndpoints));
 
-        int end = Context.now();
-        int start = end - 24 * 60 * 60;
+        // int end = Context.now();
+        // int start = end - 24 * 60 * 60;
 
-        String linkNewEndpoints = dashboardLink + "/dashboard/observe/changes?tab=endpoints&start="+start+"&end="+end;
+        String linkNewEndpoints = dashboardLink + "/dashboard/observe/changes?tab=endpoints&start="+startTimestamp+"&end="+endTimestamp;
         BasicDBObject topNumberSection = createNumberSection(
             "New Sensitive Endpoints", 
             newSensitiveEndpoints, 
@@ -104,8 +111,16 @@ public class DailyUpdate {
         );
         sectionsList.add(topNumberSection);
 
-        String linkSensitiveParams = dashboardLink + "/dashboard/observe/changes?tab=parameters&start="+start+"&end="+end;
-        sectionsList.add(createNumberSection("New Sensitive Parameters", newSensitiveParams, linkSensitiveParams));
+        String linkSensitiveParams = dashboardLink + "/dashboard/observe/changes?tab=parameters&start="+startTimestamp+"&end="+endTimestamp;
+        BasicDBObject bottomNumberSection = createNumberSection(
+            "New Sensitive Parameters",
+            newSensitiveParams, 
+            linkSensitiveParams,
+            "New Parameters",
+            newParams,
+            linkSensitiveParams
+        );
+        sectionsList.add(bottomNumberSection);
 
         if (mapEndpointToSubtypes.size() > 0) {
             sectionsList.addAll(createApiListSection(mapEndpointToSubtypes, dashboardLink));

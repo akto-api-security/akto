@@ -27,7 +27,7 @@ const TextFieldCloseable = ({text, usePureJs=false}) => {
 
 const VariableOutside = (text) => {
 
-    var r = /\$\{x(\d+)\.([\w\[\]\.]+)\}/g;
+    var r = /\$\{((x(\d+)\.([\w\[\]\.]+))|(AKTO.changes_info\..*?))}/g;
     let m = r.exec(text)
     return (
         <span>

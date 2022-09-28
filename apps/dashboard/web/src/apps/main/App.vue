@@ -176,6 +176,9 @@
 .float-right
     float: right
 
+.float-left
+    float: right
+
 .grey-text
     color: #949597
 
