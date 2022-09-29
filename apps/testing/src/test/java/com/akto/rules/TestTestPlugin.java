@@ -51,6 +51,11 @@ public class TestTestPlugin extends MongoBasedTest {
         currentPayload = "[{\"name\": \"B\", \"age\": 10},{\"name\": \"B\", \"age\": 10},{\"name\": \"C\", \"age\": 10}]";
         val = TestPlugin.compareWithOriginalResponse(originalPayload, currentPayload);
         assertEquals(val,50.0, 0.0);
+
+        originalPayload = "{}";
+        currentPayload = "{}";
+        val = TestPlugin.compareWithOriginalResponse(originalPayload, currentPayload);
+        assertEquals(val,0.0, 0.0);
     }
 
     @Test
