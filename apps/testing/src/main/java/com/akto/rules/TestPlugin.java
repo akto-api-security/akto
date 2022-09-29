@@ -89,7 +89,16 @@ public abstract class TestPlugin {
             if (Objects.equals(v1, v2)) matched +=1;
         }
 
-        return (100.0*matched)/visited.size();
+        int visitedSize = visited.size();
+        if (visitedSize == 0) return 0.0;
+
+        double result = (100.0*matched)/visitedSize;
+
+        if (Double.isFinite(result)) {
+            return result;
+        } else {
+            return 0.0;
+        }
 
     }
 
