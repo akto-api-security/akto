@@ -85,6 +85,7 @@ public class TestResult {
     }
 
     public void setPrivateSingleTypeInfos(List<SingleTypeInfo> privateSingleTypeInfos) {
+        if (privateSingleTypeInfos == null) privateSingleTypeInfos = new ArrayList<>();
         this.privateSingleTypeInfos = privateSingleTypeInfos;
     }
 
@@ -101,7 +102,7 @@ public class TestResult {
     }
 
     public void setPercentageMatch(double percentageMatch) {
-        this.percentageMatch = percentageMatch;
+        this.percentageMatch = !Double.isFinite(percentageMatch) ? 0 :  percentageMatch;
     }
 
     public Confidence getConfidence() {
