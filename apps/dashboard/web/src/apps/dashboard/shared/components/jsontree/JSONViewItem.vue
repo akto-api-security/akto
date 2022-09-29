@@ -234,6 +234,9 @@ export default Vue.extend({
     cursor: pointer;
     &:hover {
       background-color: rgba(0, 0, 0, 0.08);
+      text-overflow: clip;
+      white-space: normal;
+      word-break: break-all
     }
 
     &:focus {
