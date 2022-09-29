@@ -27,6 +27,7 @@
                     </template>
                     <template slot="Details" v-if="jsonAdvance && jsonAdvance['message']">
                         <div style="margin: 24px">
+                            <span>Test response matches {{percentageMatch}}% with original API response</span>
                             <sample-data :json="jsonAdvance" requestTitle="Original Request" responseTitle="Original Response"/>
                         </div>
                     </template>
@@ -107,7 +108,12 @@ export default {
     percentageMatch: function() {
         if (this.testingRunResult == null) return null
         let currentMessage = this.messagesAdvance[this.currentIndex]
-        return func.prettifyShort(currentMessage["percentageMatch"])
+        try {
+            return func.prettifyShort(currentMessage["percentageMatch"])
+        } catch (e) {
+            console.log(e);
+            return null
+        }
     },
     jsonAdvance: function() {
         if (this.testingRunResult == null) return null
