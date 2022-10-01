@@ -27,6 +27,7 @@ public class TestResult {
         NO_AUTH_MECHANISM("No authentication mechanism saved"),
         API_REQUEST_FAILED("API request failed"),
         SOMETHING_WENT_WRONG("OOPS! Something went wrong"),
+        FAILED_TO_CONVERT_TEST_REQUEST_TO_STRING("Failed to store test"),
         NO_AUTH_TOKEN_FOUND("No authentication token found");
 
         private String message;

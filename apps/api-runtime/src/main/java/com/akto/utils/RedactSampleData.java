@@ -154,6 +154,7 @@ public class RedactSampleData {
 
     public static String convertHeaders(Map<String, List<String>> headers) {
         Map<String, String> headerMap = new HashMap<>();
+        if (headers == null) return "{}";
 
         for (String h: headers.keySet()) {
             List<String> values = headers.get(h);

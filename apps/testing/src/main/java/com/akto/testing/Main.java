@@ -6,7 +6,6 @@ import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.testing.*;
 import com.akto.dao.testing.*;
-import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
@@ -52,20 +51,9 @@ public class Main {
         DaoInit.init(new ConnectionString(mongoURI));
         Context.accountId.set(1_000_000);
 
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            public void run() {
-                Context.accountId.set(1_000_000);
-                SampleMessageStore.fetchSampleMessages();
-                AuthMechanismStore.fetchAuthMechanism();
-            }
-        }, 1, 1, TimeUnit.MINUTES);
-
         invokeScheduledTests();
 
         int delta = Context.now() - 20*60;
-
-        SampleMessageStore.fetchSampleMessages();
-        AuthMechanismStore.fetchAuthMechanism();
 
         logger.info("Starting.......");
 
