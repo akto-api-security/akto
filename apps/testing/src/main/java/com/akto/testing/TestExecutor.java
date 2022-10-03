@@ -100,9 +100,10 @@ public class TestExecutor {
 
         List<Bson> updates = new ArrayList<>();
 
-        // todo: test bola only if !noAuth
-        runTest(noAuthTest, apiInfoKey, authMechanism, messages, updates, singleTypeInfoMap);
-        runTest(bolaTest, apiInfoKey, authMechanism, messages, updates,  singleTypeInfoMap);
+        TestResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, authMechanism, messages, updates, singleTypeInfoMap);
+        if (!noAuthTestResult.isVulnerable()) {
+            runTest(bolaTest, apiInfoKey, authMechanism, messages, updates,  singleTypeInfoMap);
+        }
 
         Bson filter = TestingRunResultDao.generateFilter(testRunId, apiInfoKey.getApiCollectionId(), apiInfoKey.url, apiInfoKey.method.name());
         Bson update = Updates.combine(updates);
@@ -110,7 +111,7 @@ public class TestExecutor {
         TestingRunResultDao.instance.updateOne(filter, update);
     }
 
-    public void runTest(TestPlugin testPlugin, ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, List<RawApi> messages,
+    public TestResult runTest(TestPlugin testPlugin, ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, List<RawApi> messages,
                         List<Bson> updates, Map<String, SingleTypeInfo> singleTypeInfos) {
         TestResult testResult = testPlugin.start(apiInfoKey, authMechanism, messages, singleTypeInfos);
         if (testResult != null) {
@@ -118,6 +119,7 @@ public class TestExecutor {
                     Updates.set("resultMap." + testPlugin.testName(), testResult)
             );
         }
+        return testResult;
     }
 
 }
