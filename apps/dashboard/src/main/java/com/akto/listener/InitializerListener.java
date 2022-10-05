@@ -30,6 +30,7 @@ import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.common.protocol.types.Field;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -321,9 +322,16 @@ public class InitializerListener implements ServletContextListener {
             int delta = newSensitiveParamsFrequency;
             Map<Pair<String, String>, Set<String>> endpointToSubTypes = new HashMap<>();
             for(SingleTypeInfo sti: sensitiveParamsList) {
+                ApiCollection apiCollection = apiCollectionMap.get(sti.getApiCollectionId());
+                String url = sti.getUrl();
+                if (apiCollection != null && apiCollection.getHostName() != null) {
+                    String hostName = apiCollection.getHostName();
+                    url = url.startsWith("/") ? hostName + url : hostName + "/" + url;
+                }
+
                 String encoded = Base64.getEncoder().encodeToString((sti.getUrl() + " " + sti.getMethod()).getBytes());
                 String link = "/dashboard/observe/inventory/"+sti.getApiCollectionId()+"/"+encoded;
-                Pair<String, String> key = new Pair<>(sti.getMethod() + " " + sti.getUrl(), link);
+                Pair<String, String> key = new Pair<>(sti.getMethod() + " " + url, link);
                 String value = sti.getSubType().getName();
                 if (sti.getTimestamp() >= now - delta) {
                     ret.recentSentiiveParams ++;

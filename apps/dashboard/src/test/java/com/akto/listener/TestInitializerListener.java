@@ -9,10 +9,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.types.CappedSet;
 import org.junit.Test;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
+import java.util.*;
 
 import static org.junit.Assert.*;
 
@@ -43,6 +40,7 @@ public class TestInitializerListener extends MongoBasedTest {
         InitializerListener.ChangesInfo changesInfo = InitializerListener.getChangesInfo(Context.now(), Context.now());
         assertNotNull(changesInfo);
         List<String> newEndpointsLast7Days = changesInfo.newEndpointsLast7Days;
+        Map<String, String> newSensitiveParams = changesInfo.newSensitiveParams;
 
         assertEquals(5,newEndpointsLast7Days.size());
 
@@ -51,6 +49,12 @@ public class TestInitializerListener extends MongoBasedTest {
         assertTrue(newEndpointsLast7Days.contains("GET app.akto.io/api/cars"));
         assertTrue(newEndpointsLast7Days.contains("GET /api/toys"));
         assertTrue(newEndpointsLast7Days.contains("GET /api/bus"));
+
+        assertTrue(newSensitiveParams.containsKey("GET akto.io/api/books: EMAIL"));
+        assertTrue(newSensitiveParams.containsKey("GET akto.io/api/books/INTEGER: EMAIL"));
+        assertTrue(newSensitiveParams.containsKey("GET app.akto.io/api/cars: EMAIL"));
+        assertTrue(newSensitiveParams.containsKey("GET /api/toys: EMAIL"));
+        assertTrue(newSensitiveParams.containsKey("GET /api/bus: EMAIL"));
     }
 
 }
