@@ -9,10 +9,7 @@ import com.akto.dao.BackwardCompatibilityDao;
 import com.akto.dao.FilterSampleDataDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
-import com.akto.dto.AccountSettings;
-import com.akto.dto.BackwardCompatibility;
-import com.akto.dto.OriginalHttpRequest;
-import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.*;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.notifications.SlackWebhook;
@@ -20,6 +17,7 @@ import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.notifications.email.WeeklyEmail;
 import com.akto.notifications.slack.DailyUpdate;
+import com.akto.types.CappedSet;
 import com.akto.util.Pair;
 import com.akto.utils.RedactSampleData;
 import com.google.gson.Gson;
@@ -270,6 +268,32 @@ public class InitializerListener implements ServletContextListener {
         public int newParamsInExistingEndpoints = 0;
     }
 
+    public static void main(String[] args) {
+        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
+        Context.accountId.set(2_000_000);
+    }
+
+    public static String extractUrlFromBasicDbObject(BasicDBObject singleTypeInfo, Map<Integer, ApiCollection> apiCollectionMap)  {
+        String method = singleTypeInfo.getString("method");
+        String path = singleTypeInfo.getString("url");
+
+        Object apiCollectionIdObj = singleTypeInfo.get("apiCollectionId");
+        if (apiCollectionIdObj == null) return method + " " + path;
+
+        int apiCollectionId = (int) apiCollectionIdObj;
+        ApiCollection apiCollection = apiCollectionMap.get(apiCollectionId);
+
+        String hostName = apiCollection != null ? apiCollection.getHostName() : "";
+        String url;
+        if (hostName != null) {
+            url = path.startsWith("/") ? hostName + path : hostName + "/" + path;
+        } else {
+            url = path;
+        }
+
+        return  method + " " + url;
+    }
+
     protected static ChangesInfo getChangesInfo(int newEndpointsFrequency, int newSensitiveParamsFrequency) {
         try {
             
@@ -278,17 +302,21 @@ public class InitializerListener implements ServletContextListener {
             List<BasicDBObject> newEndpointsSmallerDuration = new InventoryAction().fetchRecentEndpoints(now - newSensitiveParamsFrequency, now);
             List<BasicDBObject> newEndpointsBiggerDuration = new InventoryAction().fetchRecentEndpoints(now - newEndpointsFrequency, now);
 
+            Map<Integer, ApiCollection> apiCollectionMap = ApiCollectionsDao.instance.generateApiCollectionMap();
+
             int newParamInNewEndpoint=0;
 
             for (BasicDBObject singleTypeInfo: newEndpointsSmallerDuration) {
                 newParamInNewEndpoint += (int) singleTypeInfo.getOrDefault("countTs", 0);
                 singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
-                ret.newEndpointsLast7Days.add(singleTypeInfo.getString("method") + " " + singleTypeInfo.getString("url"));
+                String url = extractUrlFromBasicDbObject(singleTypeInfo, apiCollectionMap);
+                ret.newEndpointsLast7Days.add(url);
             }
     
             for (BasicDBObject singleTypeInfo: newEndpointsBiggerDuration) {
                 singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
-                ret.newEndpointsLast31Days.add(singleTypeInfo.getString("method") + " " + singleTypeInfo.getString("url"));
+                String url = extractUrlFromBasicDbObject(singleTypeInfo, apiCollectionMap);
+                ret.newEndpointsLast31Days.add(url);
             }
     
             List<SingleTypeInfo> sensitiveParamsList = new InventoryAction().fetchSensitiveParams();
