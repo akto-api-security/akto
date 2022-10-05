@@ -268,10 +268,6 @@ public class InitializerListener implements ServletContextListener {
         public int newParamsInExistingEndpoints = 0;
     }
 
-    public static void main(String[] args) {
-        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
-        Context.accountId.set(2_000_000);
-    }
 
     public static String extractUrlFromBasicDbObject(BasicDBObject singleTypeInfo, Map<Integer, ApiCollection> apiCollectionMap)  {
         String method = singleTypeInfo.getString("method");
