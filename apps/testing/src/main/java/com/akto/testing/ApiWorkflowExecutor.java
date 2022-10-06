@@ -287,8 +287,12 @@ public class ApiWorkflowExecutor {
 
     // queryString2 overrides queryString1 use accordingly
     public String combineQueryParams(String queryString1, String queryString2) {
-        if (queryString1 == null) return queryString2;
-        if (queryString2 == null) return queryString1;
+        if (queryString1 == null || queryString1.isEmpty()) return queryString2;
+        if (queryString2 == null || queryString2.isEmpty()) return queryString1;
+
+        // www.example.com/foo?bar is valid
+        if (!queryString2.contains("=")) return queryString2;
+        if (!queryString1.contains("=")) return queryString1;
 
         String mockUrl1 = "url?" + queryString1;
         String mockUrl2 = "url?" + queryString2;
