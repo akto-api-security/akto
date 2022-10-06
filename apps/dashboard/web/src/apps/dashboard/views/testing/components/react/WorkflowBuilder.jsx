@@ -1,4 +1,4 @@
-import React, {useEffect} from 'react';
+import React, {useState, useEffect} from 'react';
 import { createTheme } from '@mui/material/styles';
 
 import Workflow from './Workflow.jsx';
@@ -30,10 +30,12 @@ const WorkflowBuilder = ({endpointsList, originalStateFromDb, fetchSampleDataFun
   const setEndpointsList = useStore((state) => state.setEndpointsList);
   const setUtilityFuncs = useStore((state) => state.setUtilityFuncs);
   const originalState = useStore((state) => state.originalState)
+  const [renderNow, setRenderNow ]= useState(false)
 
   useEffect(() => {
     setOriginalState(originalStateFromDb);
     setUtilityFuncs(createWorkflowTest, editWorkflowTest, editWorkflowNodeDetails, runWorkflowTest, fetchWorkflowResult);
+    setRenderNow(true) // this was done because useEffect function inside workflow.jsx was called before this one's useEffect. This way it only loads after this.
   }, [originalStateFromDb]);
 
 
@@ -45,7 +47,7 @@ const WorkflowBuilder = ({endpointsList, originalStateFromDb, fetchSampleDataFun
   }, [endpointsList]);
 
 
-  if (originalState) {
+  if (renderNow) {
     return (
       <Workflow theme={theme} apiCollectionId={apiCollectionId}/>
     )
