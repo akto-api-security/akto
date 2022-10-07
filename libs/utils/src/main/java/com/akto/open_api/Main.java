@@ -46,10 +46,11 @@ public class Main {
     }
 
 
-    public static OpenAPI init(String info,Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList, boolean includeHeaders) throws Exception {
+    public static OpenAPI init(String info,Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList, boolean includeHeaders, String serverUrl) throws Exception {
         OpenAPI openAPI = new OpenAPI();
         addPaths(openAPI, stiList, includeHeaders);
-        addServer(null, openAPI);
+        if (serverUrl !=null && !serverUrl.startsWith("http")) serverUrl = "https://" + serverUrl;
+        addServer(serverUrl, openAPI);
         Paths paths = PathBuilder.parameterizePath(openAPI.getPaths());
         openAPI.setPaths(paths);
         addInfo(openAPI,info);
@@ -60,6 +61,9 @@ public class Main {
     public static void addPaths(OpenAPI openAPI, Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList, boolean includeHeaders) {
         Paths paths = new Paths();
         for(String url : stiList.keySet()){
+            if (url.endsWith(".js") || url.endsWith(".css") || url.endsWith(".svg")) {
+                continue;
+            }
             buildPathsFromSingleTypeInfosPerUrl(stiList.get(url), url,paths, includeHeaders);
         }
         openAPI.setPaths(paths);

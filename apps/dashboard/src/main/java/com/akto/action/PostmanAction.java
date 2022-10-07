@@ -86,10 +86,11 @@ public class PostmanAction extends UserAction {
         List<SampleData> sampleData = SampleDataDao.instance.findAll(
                 Filters.eq("_id.apiCollectionId", apiCollectionId)
             );
+        String host =  apiCollection.getHostName();
         SampleDataToSTI sampleDataToSTI = new SampleDataToSTI();    
         sampleDataToSTI.setSampleDataToSTI(sampleData);
         Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList = sampleDataToSTI.getSingleTypeInfoMap();
-        OpenAPI openAPI = com.akto.open_api.Main.init(apiCollection.getDisplayName(),stiList, true);
+        OpenAPI openAPI = com.akto.open_api.Main.init(apiCollection.getDisplayName(),stiList, true, host);
         String openAPIStringAll = com.akto.open_api.Main.convertOpenApiToJSON(openAPI);
 
         List<SensitiveSampleData> SensitiveSampleData = SensitiveSampleDataDao.instance.findAll(
@@ -98,7 +99,7 @@ public class PostmanAction extends UserAction {
         SampleDataToSTI sensitiveSampleDataToSTI = new SampleDataToSTI();
         sensitiveSampleDataToSTI.setSensitiveSampleDataToSTI(SensitiveSampleData);
         Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> sensitiveStiList = sensitiveSampleDataToSTI.getSingleTypeInfoMap();
-        openAPI = com.akto.open_api.Main.init(apiCollection.getDisplayName(), sensitiveStiList, true);
+        openAPI = com.akto.open_api.Main.init(apiCollection.getDisplayName(), sensitiveStiList, true, host);
         String openAPIStringSensitive = com.akto.open_api.Main.convertOpenApiToJSON(openAPI);
 
         Main main = new Main(postmanCredential.getApiKey());
