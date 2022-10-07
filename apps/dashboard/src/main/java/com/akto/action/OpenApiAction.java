@@ -36,10 +36,11 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
             if (apiCollection == null) {
                 return ERROR.toUpperCase();
             }
+            String host =  apiCollection.getHostName();
             SampleDataToSTI sampleDataToSTI = new SampleDataToSTI();
             sampleDataToSTI.setSampleDataToSTI(sampleData);
             Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList = sampleDataToSTI.getSingleTypeInfoMap();
-            OpenAPI openAPI = Main.init(apiCollection.getDisplayName(),stiList, includeHeaders);
+            OpenAPI openAPI = Main.init(apiCollection.getDisplayName(),stiList, includeHeaders, host);
             openAPIString = Main.convertOpenApiToJSON(openAPI);
         } catch (Exception e) {
             logger.error("ERROR while downloading openApi file " + e);
