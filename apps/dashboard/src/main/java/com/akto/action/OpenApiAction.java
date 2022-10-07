@@ -53,9 +53,9 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
         setIncludeHeaders(false);
         execute();
 
+        servletResponse.setHeader("Content-Type", "application/json");
         try (PrintWriter writer = servletResponse.getWriter()) {
             writer.write(openAPIString);
-            servletResponse.setHeader("Content-Type", "application/json");
             servletResponse.setStatus(200);
         } catch (Exception e) {
             servletResponse.sendError(500);
