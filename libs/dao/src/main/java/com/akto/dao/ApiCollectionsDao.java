@@ -4,7 +4,9 @@ import com.akto.dto.ApiCollection;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
 
@@ -20,6 +22,16 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
     @Override
     public Class<ApiCollection> getClassT() {
         return ApiCollection.class;
+    }
+
+    public Map<Integer, ApiCollection> generateApiCollectionMap() {
+        Map<Integer, ApiCollection> apiCollectionMap = new HashMap<>();
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        for (ApiCollection apiCollection: apiCollections) {
+            apiCollectionMap.put(apiCollection.getId(), apiCollection);
+        }
+
+        return apiCollectionMap;
     }
 
     public ApiCollection findByName(String name) {
