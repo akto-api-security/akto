@@ -9,17 +9,25 @@ import com.akto.open_api.Main;
 import com.akto.utils.SampleDataToSTI;
 import com.mongodb.client.model.Filters;
 import io.swagger.v3.oas.models.OpenAPI;
+import org.apache.struts2.interceptor.ServletResponseAware;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 
-public class OpenApiAction extends UserAction{
+public class OpenApiAction extends UserAction implements ServletResponseAware {
 
     private static final Logger logger = LoggerFactory.getLogger(OpenApiAction.class);
     private int apiCollectionId;
     private String openAPIString = null;
+    private boolean includeHeaders = true;
     @Override
     public String execute() {
         try {
@@ -34,7 +42,7 @@ public class OpenApiAction extends UserAction{
             SampleDataToSTI sampleDataToSTI = new SampleDataToSTI();
             sampleDataToSTI.setSampleDataToSTI(sampleData);
             Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList = sampleDataToSTI.getSingleTypeInfoMap();
-            OpenAPI openAPI = Main.init(apiCollection.getDisplayName(),stiList);
+            OpenAPI openAPI = Main.init(apiCollection.getDisplayName(),stiList, includeHeaders);
             openAPIString = Main.convertOpenApiToJSON(openAPI);
         } catch (Exception e) {
             logger.error("ERROR while downloading openApi file " + e);
@@ -44,11 +52,36 @@ public class OpenApiAction extends UserAction{
         return SUCCESS.toUpperCase();
     }
 
+    public String burpSwagger() throws IOException {
+        setIncludeHeaders(false);
+        execute();
+
+        try (PrintWriter writer = servletResponse.getWriter()) {
+            writer.write(openAPIString);
+            servletResponse.setHeader("Content-Type", "application/json");
+            servletResponse.setStatus(200);
+        } catch (Exception e) {
+            servletResponse.sendError(500);
+        }
+
+        return null;
+    }
+
     public void setApiCollectionId(int apiCollectionId) {
         this.apiCollectionId = apiCollectionId;
     }
 
     public String getOpenAPIString() {
         return openAPIString;
+    }
+
+    protected HttpServletResponse servletResponse;
+    @Override
+    public void setServletResponse(HttpServletResponse response) {
+        this.servletResponse = response;
+    }
+
+    public void setIncludeHeaders(boolean includeHeaders) {
+        this.includeHeaders = includeHeaders;
     }
 }

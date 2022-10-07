@@ -10,6 +10,8 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Enumeration;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,6 +33,13 @@ public class InfraMetricsFilter implements Filter {
         try {
             HttpServletResponse httpServletResponse = (HttpServletResponse) response;
             HttpServletRequest  httpServletRequest = (HttpServletRequest) request;
+
+            Enumeration<String> headers = httpServletRequest.getHeaderNames();
+            System.out.println("\n***********");
+            while (headers.hasMoreElements()) {
+                System.out.println(headers.nextElement());
+            }
+            System.out.println("*************");
 
             int statusCode = httpServletResponse.getStatus();
             String uri = httpServletRequest.getRequestURI();

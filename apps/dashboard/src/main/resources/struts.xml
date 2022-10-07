@@ -18,6 +18,10 @@
         <action name="metrics" class="com.akto.action.InfraMetricsAction">
         </action>
 
+        <action name="api/burp_openapi/*" class="com.akto.action.OpenApiAction" method="burpSwagger">
+            <param name="apiCollectionId">{1}</param>
+        </action>
+
         <action name="api/health" class="com.akto.action.InfraMetricsAction" method="health">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

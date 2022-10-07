@@ -4,6 +4,8 @@ import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class HttpMethodFilter implements Filter {
     @Override
@@ -20,7 +22,7 @@ public class HttpMethodFilter implements Filter {
             return ;
         }
 
-        if (!method.equalsIgnoreCase("POST")) {
+        if (!method.equalsIgnoreCase("POST") && !method.equalsIgnoreCase("GET")) {
             httpServletResponse.sendError(404);
             return ;
         }
