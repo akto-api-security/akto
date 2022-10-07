@@ -88,6 +88,9 @@ public class ApiWorkflowExecutor {
             return new WorkflowTestResult.NodeResult(null, false, Collections.singletonList("Failed building request body"));
         }
 
+        String url = request.getUrl();
+        valuesMap.put(nodeId + ".request.url", url);
+
         populateValuesMap(valuesMap, request.getBody(), nodeId, request.getHeaders(),
                 true, request.getQueryParams());
 
