@@ -61,7 +61,7 @@ public class Main {
     public static void addPaths(OpenAPI openAPI, Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList, boolean includeHeaders) {
         Paths paths = new Paths();
         for(String url : stiList.keySet()){
-            if (url.endsWith(".js") || url.endsWith(".css") || url.endsWith(".svg")) {
+            if (url.endsWith(".js") || url.endsWith(".css") || url.endsWith(".svg") || url.endsWith(".jpg")  || url.endsWith(".png")) {
                 continue;
             }
             buildPathsFromSingleTypeInfosPerUrl(stiList.get(url), url,paths, includeHeaders);
