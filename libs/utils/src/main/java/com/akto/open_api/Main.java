@@ -109,6 +109,7 @@ public class Main {
                 SchemaBuilder.build(schema, cc);
             }
         }
+        if (schema.getProperties() == null) return headerParameters;
         for(String header:schema.getProperties().keySet()){
             Parameter head = new Parameter();
             head.setName(header);
