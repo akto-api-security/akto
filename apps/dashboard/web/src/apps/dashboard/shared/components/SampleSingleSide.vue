@@ -29,7 +29,20 @@
           </v-tooltip>
         </div>
       </div>
-      <div class="sample-data-line">{{firstLine}}</div>
+
+      <div class="sample-data-line">
+        <v-tooltip bottom :disabled="!this.firstLineToolTipValue">
+          <template v-slot:activator="{on, attrs}">
+            <div v-on="on" v-bind="attrs">
+              {{firstLine}}
+            </div>
+          </template>
+          <span>
+            {{this.firstLineToolTipValue}}
+          </span>
+        </v-tooltip>
+      </div>
+
       <!-- <div
           v-for="value, header, index in headers" :key="index"
             class="sample-data-headers" 
@@ -64,6 +77,7 @@ export default {
     props: {
         title: obj.strR,
         firstLine: obj.strR,
+        firstLineToolTipValue: obj.strN,
         headers: obj.objR,
         data: obj.objR,
         completeData: obj.objR,

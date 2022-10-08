@@ -4,6 +4,7 @@
             <sample-single-side
                 :title="requestTitle" 
                 :firstLine='requestFirstLine'
+                :firstLineToolTipValue="requestFirstLineToolTipValue"
                 :headers="{}" 
                 :data="requestJson"
                 :complete-data="json['message']"
@@ -49,14 +50,20 @@ export default {
             let message = this.json["message"]
             if (message["request"]) {
                 let url = message["request"]["url"]
-                let queryParams = message["request"]['queryParams']
-                if (queryParams) {
-                    url += "?" + queryParams
-                }
                 return message["request"]["method"] + " " + url + " " + message["request"]["type"]
             } else {
-                return message.method + " " + message.path + " " + message.type
+                return message.method + " " + message.path.split("?")[0] + " " + message.type
             }
+        },
+        requestFirstLineToolTipValue: function() {
+            let result = ""
+            for (const x of this.json["highlightPaths"]) {
+              if (x["isUrlParam"]) {
+                if (result) result += ", "
+                result += "position " + x["param"] + ": " + x["highlightValue"]["value"]
+              }
+            }
+            return result
         },
         responseFirstLine: function() {
             let message = this.json["message"]
@@ -73,12 +80,24 @@ export default {
 
             let requestHeadersString = "{}"
             let requestPayloadString = "{}"
+            let queryParamsString = ""
             if (message["request"]) {
+                queryParamsString = message["request"]["queryParams"]
                 requestHeadersString = message["request"]["headers"] || "{}"
                 requestPayloadString = message["request"]["body"] || "{}"
             } else {
+                let url = message["path"]
+                let urlSplit = url.split("?")
+                queryParamsString = urlSplit.length > 1 ? urlSplit[1] : ""
+
                 requestHeadersString = message["requestHeaders"] || "{}"
                 requestPayloadString = message["requestPayload"] || "{}"
+            }
+
+            let urlSearchParams = new URLSearchParams(queryParamsString)
+            const queryParams = {}
+            for(const [key, value] of urlSearchParams) { 
+                queryParams[key] = value;
             }
 
             try {
@@ -94,19 +113,22 @@ export default {
                 requestPayload = requestPayloadString
             }
 
-            result["json"] = {"requestHeaders": requestHeaders, "requestPayload": requestPayload}
+            result["json"] = {"queryParams": queryParams, "requestHeaders": requestHeaders, "requestPayload": requestPayload}
             result["highlightPaths"] = {}
             for (const x of this.json["highlightPaths"]) {
               if (x["responseCode"] === -1) {
-                    let key = ""
+                    let keys = []
                     if (x["header"]) {
-                        key = "root#"+"requestheaders#"+x["param"]
+                        keys.push("root#"+"requestheaders#"+x["param"])
                     } else {
-                        key = "root#"+"requestpayload#"+x["param"]
+                        keys.push("root#"+"requestpayload#"+x["param"])
+                        keys.push("root#"+"queryParams#"+x["param"])
                     }
 
-                    key = key.toLowerCase()
-                    result["highlightPaths"][key] = x["highlightValue"]
+                    keys.forEach((key) => {
+                        key = key.toLowerCase()
+                        result["highlightPaths"][key] = x["highlightValue"]
+                    })
               }
             }
             return result
