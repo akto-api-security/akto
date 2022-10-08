@@ -17,7 +17,7 @@ import java.util.Map;
 
 public class PathBuilder {
 
-    public static void addPathItem(Paths paths, String url, String method , int responseCode, Schema<?> schema,List<Parameter> headerParameters) throws Exception {
+    public static void addPathItem(Paths paths, String url, String method , int responseCode, Schema<?> schema,List<Parameter> headerParameters, boolean includeHeaders) throws Exception {
         PathItem pathItem = paths.getOrDefault(url, new PathItem());
         pathItem.setDescription("description");
         Operation operation = getOperation(pathItem,method);
@@ -38,7 +38,9 @@ public class PathBuilder {
 
             requestBody.setContent(requestBodyContent);
             operation.setRequestBody(requestBody);
-            operation.setParameters(headerParameters);
+            if (includeHeaders) {
+                operation.setParameters(headerParameters);
+            }
             setOperation(pathItem, method, operation);
             paths.addPathItem(url, pathItem);
             return ;
@@ -54,8 +56,10 @@ public class PathBuilder {
         content.put("application/json", mediaType);
         apiResponse.setContent(content);
         apiResponse.setDescription("description");
-        Map<String,Header> headers = paramListToHeader(headerParameters);
-        apiResponse.setHeaders(headers);
+        if (includeHeaders) {
+            Map<String,Header> headers = paramListToHeader(headerParameters);
+            apiResponse.setHeaders(headers);
+        }
         apiResponses.put(responseCode+"", apiResponse);
 
         operation.setResponses(apiResponses);
