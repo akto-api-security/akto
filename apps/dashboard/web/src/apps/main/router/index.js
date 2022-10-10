@@ -4,6 +4,8 @@ const PageLogin  = () => import( '@/apps/login/App')
 const PageDashboard  = () => import( '@/apps/dashboard/App')
 const PageToday  = () => import( "@/apps/dashboard/views/today/Today")
 const PageTesting  = () => import( "@/apps/dashboard/views/testing/PageTesting")
+const TestingRunResults  = () => import( "@/apps/dashboard/views/testing/components/TestingRunResults")
+const CreateTestingRun  = () => import( "@/apps/dashboard/views/testing/components/CreateTestingRun")
 import store from '@/apps/main/store/module'
 const PageSignup = () => import("@/apps/signup/PageSignup")
 const PageOnboard = () => import("@/apps/signup/PageOnboard")
@@ -62,7 +64,24 @@ const router =  new Router({
                     name: 'testing',
                     components: {
                         default: PageTesting
-                    }
+                    },
+                    children: [
+                        {
+                            path: ':testId/results',
+                            name: 'testResults',
+                            component: TestingRunResults,
+                            props: route => ({
+                                testId: +route.params.testId
+                            })
+                        },
+                        {
+                            path: 'create/:apiCollectionId',
+                            name: 'createFromApiCollection',
+                            component: CreateTestingRun
+
+                            
+                        }                        
+                    ]
                 },
                 {
                     path: 'settings',

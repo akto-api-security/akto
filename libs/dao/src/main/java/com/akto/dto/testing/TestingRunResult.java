@@ -17,12 +17,26 @@ public class TestingRunResult {
     private ApiInfo.ApiInfoKey apiInfoKey;
     private Map<String, TestResult> resultMap;
 
+    // remove Map. Use "String" as test-supertype. 
+    // introduce testSubtype
+    // List<TestResult>
+    // boolean isVulnerable
+    // List<SingleTypeInfo>
+    // int confidencePercentage
+    private int startTimestamp;
+    private int endTimestamp;
+    private ObjectId testRunResultSummaryId;
+
+    @BsonIgnore
+    private ObjectId testRunResultSummaryHexId;
+
     public TestingRunResult() { }
 
-    public TestingRunResult(ObjectId testRunId, ApiInfo.ApiInfoKey apiInfoKey, Map<String, TestResult> resultMap) {
+    public TestingRunResult(ObjectId testRunId, ApiInfo.ApiInfoKey apiInfoKey, Map<String, TestResult> resultMap, ObjectId testRunResultSummaryId) {
         this.testRunId = testRunId;
         this.apiInfoKey = apiInfoKey;
         this.resultMap = resultMap;
+        this.testRunResultSummaryId = testRunResultSummaryId;
     }
 
     public ObjectId getId() {
@@ -66,6 +80,37 @@ public class TestingRunResult {
         this.hexId = hexId;
     }
 
+    public int getStartTimestamp() {
+        return this.startTimestamp;
+    }
+
+    public void setStartTimestamp(int startTimestamp) {
+        this.startTimestamp = startTimestamp;
+    }
+
+    public int getEndTimestamp() {
+        return this.endTimestamp;
+    }
+
+    public void setEndTimestamp(int endTimestamp) {
+        this.endTimestamp = endTimestamp;
+    }
+
+    public ObjectId getTestRunResultSummaryId() {
+        return this.testRunResultSummaryId;
+    }
+
+    public void setTestRunResultSummaryId(ObjectId testRunResultSummaryId) {
+        this.testRunResultSummaryId = testRunResultSummaryId;
+    }
+
+    public ObjectId getTestRunResultSummaryHexId() {
+        return this.testRunResultSummaryHexId;
+    }
+
+    public void setTestRunResultSummaryHexId(ObjectId testRunResultSummaryHexId) {
+        this.testRunResultSummaryHexId = testRunResultSummaryHexId;
+    }
 
     @Override
     public String toString() {
@@ -74,6 +119,9 @@ public class TestingRunResult {
             ", testRunId='" + getTestRunId() + "'" +
             ", apiInfoKey='" + getApiInfoKey() + "'" +
             ", resultMap='" + getResultMap() + "'" +
+            ", startTimestamp='" + getStartTimestamp() + "'" +
+            ", endTimestamp='" + getEndTimestamp() + "'" +
+            ", testRunResultSummaryId='" + getTestRunResultSummaryId() + "'" +
             "}";
     }
 

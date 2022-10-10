@@ -22,7 +22,7 @@ const useStore = create((set, get) => ({
   originalState: null,
   runWorkflowTest: null,
   fetchWorkflowResult: null,
-  testingSchedule: null,
+  testingRun: null,
   setUtilityFuncs: (newCreateWorkflowTest, newEditWorkflowTest, newEditWorkflowNodeDetails, runWorkflowTest, fetchWorkflowResult) => {
     set({
       createWorkflowTest: newCreateWorkflowTest, 
@@ -156,11 +156,11 @@ const useStore = create((set, get) => ({
     });
   },
 
-  fetchWorkflowTestingSchedule: (workflowId) => {
-    api.fetchWorkflowTestingSchedule(workflowId).then((resp) => {
-      if (resp && resp.testingSchedules) {
+  fetchWorkflowTestingRun: (workflowId) => {
+    api.fetchWorkflowTestingRun(workflowId).then((resp) => {
+      if (resp && resp.testingRuns) {
         set({
-          testingSchedule: resp.testingSchedules[0]
+          testingRun: resp.testingRuns[0]
         })
       }
     })
@@ -168,9 +168,9 @@ const useStore = create((set, get) => ({
 
   scheduleWorkflowTest: (id, recurringDaily, startTimestamp) => {
     api.scheduleWorkflowTest(id, recurringDaily, startTimestamp).then((resp) => {
-      if (resp && resp.testingSchedules) {
+      if (resp && resp.testingRuns) {
         set({
-          testingSchedule: resp.testingSchedules[0]
+          testingRun: resp.testingRuns[0]
         })
       }
     })
@@ -179,7 +179,7 @@ const useStore = create((set, get) => ({
   deleteScheduledWorkflowTests: (id) => {
     api.deleteScheduledWorkflowTests(id).then((resp) => {
       set({
-        testingSchedule: null
+        testingRun: null
       })
     })
   },

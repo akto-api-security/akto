@@ -1,11 +1,9 @@
 package com.akto.dto.testing;
 
-import com.akto.dto.ApiInfo;
 import org.bson.types.ObjectId;
 
-import java.util.List;
-
 public class TestingRun {
+
     private ObjectId id;
     public static final String SCHEDULE_TIMESTAMP = "scheduleTimestamp";
     private int scheduleTimestamp;
@@ -19,10 +17,11 @@ public class TestingRun {
     public static final String _TESTING_ENDPOINTS = "testingEndpoints";
     private TestingEndpoints testingEndpoints;
     private int testIdConfig;
+    private int periodInSeconds;
 
     public TestingRun() { }
 
-    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state) {
+    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds) {
         this.scheduleTimestamp = scheduleTimestamp;
         this.endTimestamp = -1;
         this.pickedUpTimestamp = -1;
@@ -30,6 +29,7 @@ public class TestingRun {
         this.testingEndpoints = testingEndpoints;
         this.testIdConfig = testIdConfig;
         this.state = state;
+        this.periodInSeconds = periodInSeconds;
     }
 
     // if u r adding anything here make sure to add to stopAllTests() method too
@@ -93,6 +93,13 @@ public class TestingRun {
         this.pickedUpTimestamp = pickedUpTimestamp;
     }
 
+    public int getPeriodInSeconds() {
+        return this.periodInSeconds;
+    }
+
+    public void setPeriodInSeconds(int periodInSeconds) {
+        this.periodInSeconds = periodInSeconds;
+    }
 
     public State getState() {
         return this.state;
@@ -113,6 +120,7 @@ public class TestingRun {
             ", userEmail='" + getUserEmail() + "'" +
             ", testingEndpoints='" + getTestingEndpoints() + "'" +
             ", testIdConfig='" + getTestIdConfig() + "'" +
+            ", periodInSeconds='" + getPeriodInSeconds() + "'" +
             "}";
     }
 

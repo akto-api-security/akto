@@ -1,17 +1,11 @@
 package com.akto.dto.testing;
 
-
-import com.akto.dto.type.SingleTypeInfo;
-
-import java.util.ArrayList;
 import java.util.List;
 
-public class TestResult {
+public class TestResult extends GenericTestResult {
 
     private String message;
-    private boolean vulnerable;
     private List<TestError> errors;
-    private Confidence confidence = Confidence.HIGH;
 
     private String originalMessage;
     private double percentageMatch;
@@ -20,7 +14,9 @@ public class TestResult {
         HIGH, MEDIUM, LOW
     }
 
-    private List<SingleTypeInfo> privateSingleTypeInfos = new ArrayList<>();
+    public enum Severity {
+        CRITICAL, HIGH, MEDIUM, LOW, INFO
+    }
 
     public enum TestError {
         NO_PATH("No sample data found for the API"),
@@ -38,19 +34,14 @@ public class TestResult {
         public String getMessage() {
             return message;
         }
-
     }
 
-    public TestResult(String message, String originalMessage, boolean vulnerable,
-                      List<TestError> errors, List<SingleTypeInfo> privateSingleTypeInfos, double percentageMatch,
-                      Confidence confidence) {
+    public TestResult(String message, String originalMessage, List<TestError> errors, double percentageMatch, boolean isVulnerable, Confidence confidence) {
+        super(isVulnerable, confidence);
         this.message = message;
-        this.vulnerable = vulnerable;
         this.errors = errors;
-        this.privateSingleTypeInfos = privateSingleTypeInfos;
         this.originalMessage = originalMessage;
         this.percentageMatch = percentageMatch;
-        this.confidence = confidence;
     }
 
     public TestResult() {
@@ -64,28 +55,12 @@ public class TestResult {
         this.message = message;
     }
 
-    public boolean isVulnerable() {
-        return vulnerable;
-    }
-
-    public void setVulnerable(boolean vulnerable) {
-        this.vulnerable = vulnerable;
-    }
-
     public List<TestError> getErrors() {
         return errors;
     }
 
     public void setErrors(List<TestError> errors) {
         this.errors = errors;
-    }
-
-    public List<SingleTypeInfo> getPrivateSingleTypeInfos() {
-        return privateSingleTypeInfos;
-    }
-
-    public void setPrivateSingleTypeInfos(List<SingleTypeInfo> privateSingleTypeInfos) {
-        this.privateSingleTypeInfos = privateSingleTypeInfos;
     }
 
     public String getOriginalMessage() {
@@ -102,13 +77,5 @@ public class TestResult {
 
     public void setPercentageMatch(double percentageMatch) {
         this.percentageMatch = percentageMatch;
-    }
-
-    public Confidence getConfidence() {
-        return confidence;
-    }
-
-    public void setConfidence(Confidence confidence) {
-        this.confidence = confidence;
     }
 }

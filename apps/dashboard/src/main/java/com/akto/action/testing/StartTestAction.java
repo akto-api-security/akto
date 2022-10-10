@@ -4,7 +4,8 @@ import com.akto.action.UserAction;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunDao;
-import com.akto.dao.testing.TestingSchedulesDao;
+import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
@@ -16,7 +17,6 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import com.mongodb.client.model.Sorts;
 
 import java.util.List;
 
@@ -27,8 +27,13 @@ public class StartTestAction extends UserAction {
     private List<ApiInfo.ApiInfoKey> apiInfoKeyList;
     private int testIdConfig;
     private int workflowTestId;
+    int startTimestamp;
+    boolean recurringDaily;
+    private List<TestingRun> testingRuns;
+    private AuthMechanism authMechanism;
+    private int endTimestamp;
 
-    private TestingRun createTestingRun(int scheduleTimestamp) {
+    private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds) {
         User user = getSUser();
 
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
@@ -64,7 +69,7 @@ public class StartTestAction extends UserAction {
         }
 
         TestingRun testingRun = new TestingRun(
-            scheduleTimestamp, user.getLogin(), testingEndpoints, testIdConfig, TestingRun.State.SCHEDULED
+            scheduleTimestamp, user.getLogin(), testingEndpoints, testIdConfig, TestingRun.State.SCHEDULED, periodInSeconds
         );
 
         return testingRun;   
@@ -72,11 +77,11 @@ public class StartTestAction extends UserAction {
 
     public String startTest() {
         // 65 seconds added to give testing module time to get the latest sample messages (which runs every 60 secs)
-        int scheduleTimestamp = Context.now() + 65;
         // But if workflow test then run immediately
-        if (type.equals(Type.WORKFLOW)) scheduleTimestamp = Context.now();
+        int adder = type.equals(Type.WORKFLOW) ? 0 : 65;
+        int scheduleTimestamp = this.startTimestamp == 0 ? (Context.now() + adder) : this.startTimestamp;
         
-        TestingRun testingRun = createTestingRun(scheduleTimestamp);
+        TestingRun testingRun = createTestingRun(scheduleTimestamp, this.recurringDaily ? 86400 : 0);
 
         if (testingRun == null) {
             return ERROR.toUpperCase();
@@ -84,101 +89,69 @@ public class StartTestAction extends UserAction {
             TestingRunDao.instance.insertOne(testingRun);
         }
         
+        this.startTimestamp = 0;
+        this.endTimestamp = 0;
         this.retrieveAllCollectionTests();
         return SUCCESS.toUpperCase();
     }
 
-    private List<TestingRun> testingRuns;
-    private AuthMechanism authMechanism;
-
     public String retrieveAllCollectionTests() {
+        if (this.startTimestamp == 0) {
+            this.startTimestamp = Context.now();
+        }
+
+        if (this.endTimestamp == 0) {
+            this.endTimestamp = Context.now() + 86400;
+        }
+
         this.authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
-        BasicDBObject query = new BasicDBObject("testingEndpoints.type", "COLLECTION_WISE");
-        testingRuns = TestingRunDao.instance.findAll(query);
-        testingRuns.sort((o1, o2) -> o2.getScheduleTimestamp() - o1.getScheduleTimestamp());
-        this.testingSchedules = TestingSchedulesDao.instance.findAll(new BasicDBObject());
-        return SUCCESS.toUpperCase();
-    }
 
-    public String stopTest() {
-        BasicDBObject query = 
-            new BasicDBObject("testingEndpoints.type", "COLLECTION_WISE")
-            .append("testingEndpoints.apiCollectionId", apiCollectionId);
-
-        List<TestingRun> testingRunsForCollection = TestingRunDao.instance.findAll(query, 0, 1, Sorts.descending("scheduleTimestamp"));
-
-        if (!testingRunsForCollection.isEmpty()) {
-            TestingRun testingRun = testingRunsForCollection.get(0);
-            if(testingRun.getState() == TestingRun.State.RUNNING || testingRun.getState() == TestingRun.State.SCHEDULED) {
-                ObjectId testRunObjectId = testingRun.getId();        
-                Bson filter = Filters.eq("_id", testRunObjectId);
-                Bson update = Updates.set(TestingRun.STATE, TestingRun.State.STOPPED);
-                TestingRunDao.instance.updateOne(filter, update);
-                this.retrieveAllCollectionTests();
-                return SUCCESS.toUpperCase();        
-            }
-        }
-        return ERROR.toUpperCase();
-    }
-
-    private String testRunId;
-    public String replayTest() {
-        User user = getSUser();
-        ObjectId testRunObjectId;
-        try {
-            testRunObjectId = new ObjectId(testRunId);
-        } catch (Exception e) {
-            addActionError("Test doesn't exist");
-            return ERROR.toUpperCase();
-        }
-
-        Bson filter = Filters.eq("_id", testRunObjectId);
-        TestingRun testingRun = TestingRunDao.instance.findOne(filter);
-        if (testingRun == null) {
-            addActionError("Test doesn't exist");
-            return ERROR.toUpperCase();
-        }
-
-        // 65 seconds added to give testing module time to get the latest sample messages (which runs every 60 secs)
-        TestingRun newTestingRun = new TestingRun(
-                Context.now()+65, user.getLogin(), testingRun.getTestingEndpoints(), testingRun.getTestIdConfig(), TestingRun.State.SCHEDULED
+        Bson filterQ = Filters.and(
+            Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, this.endTimestamp),
+            Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, this.startTimestamp)
         );
 
-        TestingRunDao.instance.insertOne(newTestingRun);
+        testingRuns = TestingRunDao.instance.findAll(filterQ);
+        testingRuns.sort((o1, o2) -> o2.getScheduleTimestamp() - o1.getScheduleTimestamp());
+        return SUCCESS.toUpperCase();
+    }
+
+    String testingRunHexId;
+    List<TestingRunResultSummary> testingRunResultSummaries;
+    public String fetchTestingRunResultSummaries() {
+        ObjectId testingRunId = new ObjectId(testingRunHexId);
+
+        Bson filterQ = Filters.and(
+            Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRunId),
+            Filters.gte(TestingRunResultSummary.START_TIMESTAMP, startTimestamp),
+            Filters.lte(TestingRunResultSummary.END_TIMESTAMP, endTimestamp)
+        );
+
+        this.testingRunResultSummaries = TestingRunResultSummariesDao.instance.findAll(filterQ);
 
         return SUCCESS.toUpperCase();
     }
 
-    int startTimestamp;
-    boolean recurringDaily;
-    List<TestingSchedule> testingSchedules = null;
-    public String scheduleTest() {
-        String author = getSUser().getLogin();
-        TestingRun testingRun = createTestingRun(-1);
-        if (testingRun == null) {
-            return ERROR.toUpperCase();
-        }
+    String testingRunResultSummaryHexId;
+    List<TestingRunResult> testingRunResults;
+    public String fetchTestingRunResults() {
+        ObjectId testingRunResultSummaryId = new ObjectId(testingRunResultSummaryHexId);
         
-        int now = Context.now();
-        TestingSchedule ts = new TestingSchedule(author, now, author, now, now, startTimestamp, recurringDaily, testingRun);
-        TestingSchedulesDao.instance.insertOne(ts);
-        this.testingSchedules = TestingSchedulesDao.instance.findAll(new BasicDBObject());
+        this.testingRunResults = TestingRunResultDao.instance.findAll(TestingRunResultSummary.TESTING_RUN_ID, testingRunResultSummaryId);
+
         return SUCCESS.toUpperCase();
     }
 
-    public String stopSchedule() {
-        TestingSchedulesDao.instance.deleteAll(Filters.eq("sampleTestingRun.testingEndpoints.apiCollectionId", apiCollectionId));
-        this.testingSchedules = TestingSchedulesDao.instance.findAll(new BasicDBObject());
-        return SUCCESS.toUpperCase();
-    }
-
-    public String fetchWorkflowTestingSchedule() {
-        this.testingSchedules = TestingSchedulesDao.instance.findAll(Filters.eq("sampleTestingRun.testingEndpoints.workflowTest._id", workflowTestId));
+    public String fetchWorkflowTestingRun() {
+        Bson filterQ = Filters.and(
+            Filters.eq("testingEndpoints.workflowTest._id", workflowTestId),
+            Filters.eq("state", TestingRun.State.SCHEDULED)
+        );
+        this.testingRuns = TestingRunDao.instance.findAll(filterQ);
         return SUCCESS.toUpperCase();
     }
 
     public String deleteScheduledWorkflowTests() {
-        TestingSchedulesDao.instance.deleteAll(Filters.eq("sampleTestingRun.testingEndpoints.workflowTest._id", workflowTestId));
         Bson filter = Filters.and(
                 Filters.or(
                         Filters.eq(TestingRun.STATE, State.SCHEDULED),
@@ -201,11 +174,6 @@ public class StartTestAction extends UserAction {
         );
 
         TestingRunDao.instance.getMCollection().updateMany(filter,Updates.set(TestingRun.STATE, State.STOPPED));
-
-        // delete scheduled tests
-        TestingSchedulesDao.instance.deleteAll(new BasicDBObject());
-
-        testingSchedules = TestingSchedulesDao.instance.findAll(new BasicDBObject());
         testingRuns = TestingRunDao.instance.findAll(filter);
 
         return SUCCESS.toUpperCase();
@@ -221,10 +189,6 @@ public class StartTestAction extends UserAction {
 
     public void setApiInfoKeyList(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
         this.apiInfoKeyList = apiInfoKeyList;
-    }
-
-    public void setTestRunId(String testRunId) {
-        this.testRunId = testRunId;
     }
 
     public List<TestingRun> getTestingRuns() {
@@ -247,16 +211,20 @@ public class StartTestAction extends UserAction {
         this.startTimestamp = startTimestamp;
     }
 
+    public int getEndTimestamp() {
+        return this.endTimestamp;
+    }
+
+    public void setEndTimestamp(int endTimestamp) {
+        this.endTimestamp = endTimestamp;
+    }
+
     public boolean getRecurringDaily() {
         return this.recurringDaily;
     }
 
     public void setRecurringDaily(boolean recurringDaily) {
         this.recurringDaily = recurringDaily;
-    }
-
-    public List<TestingSchedule> getTestingSchedules() {
-        return this.testingSchedules;
     }
 
     public void setTestIdConfig(int testIdConfig) {

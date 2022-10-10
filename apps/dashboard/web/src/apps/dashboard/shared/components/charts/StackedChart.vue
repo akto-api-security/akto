@@ -3,7 +3,7 @@
       :options="chartOptions"
       :updateArgs="[true, false]"
       ref='highcharts'
-      v-if="(data && data.length > 0) || (inputMetrics && inputMetrics.length > 0)"
+      v-if="(data && data.length > 0)"
   />
   <div v-else class="no-data-chart">
     No trend data!
@@ -17,7 +17,7 @@ import {Chart} from "highcharts-vue"
 import func from "@/util/func";
 
 export default {
-  name: "LineChart",
+  name: "StackedChart",
   props: {
     type: obj.strR,
     color: obj.strR,
@@ -30,13 +30,7 @@ export default {
       type: String,
       default: "#FFFFFF"
     },
-    text: obj.boolR,
-    inputMetrics: {
-      type: Array,
-      default: function () {
-        return []
-      }
-    }
+    text: obj.boolR
   },
   components: {
     Chart
@@ -69,36 +63,37 @@ export default {
           tooltip: {
             shared: true
           },
-          series: [
-            {
-              data: this.data,
-              color: this.color,
-              name: this.title,
-              fillColor: this.areaFillHex ? fillColor : {},
-              marker: {
-                enabled: this.data.length <= 2
-              },
-              yAxis: 0
+          plotOptions: {
+            column: {
+                stacking: 'normal',
+                dataLabels: {
+                    enabled: false
+                }
             },
-            ...this.inputMetrics.map((x, i) => {
-              return {
-                data: x.data,
-                color: "#FF4DCA",
-                name: x.name,
-                marker: {
-                  enabled: false,
-                  symbol: 'circle'
-                },
-                fillColor: {
-                  linearGradient: {x1:0, y1:0, x2:0, y2:1},
-                  stops: [
-                    [0, "#FFFFFF"],
-                    [1, "#FFFFFF"]
-                  ]
-                },
-                yAxis: (i+1)
+            series: {
+              cursor: 'pointer',
+              point: {
+                events: {
+                  click: ({point}) => {
+                    this.$emit('dateClicked', point.options.x);
+                  }
+                }
               }
-            })
+            }
+          },
+          series: [
+            ...Object.keys(this.data).map(key => {
+              return {
+                data: this.data[key].data,
+                color: this.data[key].color,
+                name: this.data[key].name,
+                fillColor: this.areaFillHex ? fillColor : {},
+                marker: {
+                  enabled: this.data.length <= 2
+                },
+                yAxis: 0
+              }
+            }),
           ],
           xAxis: [
             {
@@ -110,6 +105,7 @@ export default {
               title: 'Date',
               visible: this.text,
               gridLineWidth: '0px'
+
             }
           ],
           yAxis: [
@@ -119,14 +115,6 @@ export default {
                 gridLineWidth: '0px',
                 min : 0
               },
-              ...this.inputMetrics.map((x,i) => {
-                return {
-                  title: '',
-                  visible: true,
-                  opposite: true,
-                  min : 0
-                }
-              })
           ],
           legend: {
             enabled: false

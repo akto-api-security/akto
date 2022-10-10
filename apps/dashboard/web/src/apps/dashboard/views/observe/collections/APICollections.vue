@@ -194,14 +194,14 @@ export default {
             return !this.isRunning(item)
         },
         isValidForSchedule (item) {
-            return true
+            return !this.isScheduled(item)
         },
         isRunning(item) {
             let latestRun = this.testingRuns.find(x => x.testingEndpoints.apiCollectionId === item.id)
             return (latestRun != null && (latestRun.state == "RUNNING" || latestRun.state == "SCHEDULED"))
         },
         isScheduled(item) {
-            return this.testingSchedules.find(x => {return x.sampleTestingRun.testingEndpoints.apiCollectionId === item.id}) != null
+            return this.testingRuns.find(x => {return x.state === "SCHEDULED" && x.testingEndpoints.apiCollectionId === item.id}) != null
         },
         getIconForTest(item) {
             return this.isRunning(item) ? "$fas_stop" : "$fas_play"
@@ -221,23 +221,17 @@ export default {
             }
         },
         getTextForSchedule(item) {
-            if (this.isScheduled(item)) {
-                return "Stop schedule"
-            } else {
+            if (!this.isScheduled(item)) {
                 return "Schedule test"
             }
         },
         async executeOperationForTest (item) {
-            if (this.isRunning(item)){
-                await this.$store.dispatch('testing/stopTestForCollection', item.id)
-            } else {
+            if (!this.isRunning(item)){
                 await this.$store.dispatch('testing/startTestForCollection', item.id)
             }
         },
         async executeOperationForSchedule(item) {
-            if (this.isScheduled(item)) {
-                await this.$store.dispatch('testing/stopScheduleForCollection', item.id)
-            } else {
+            if (!this.isScheduled(item)) {
                 this.showScheduleTestBox = true
                 this.scheduleTestCollectionId = item.id
             }
@@ -249,7 +243,7 @@ export default {
     },
     computed: {
         ...mapState('collections', ['apiCollections', 'loading', 'testingRuns']),
-        ...mapState('testing', ['testingRuns', 'authMechanism', 'testingSchedules']),
+        ...mapState('testing', ['testingRuns', 'authMechanism']),
         apiCollectionsForTable() {
             return this.apiCollections.map(c => {
                 return {

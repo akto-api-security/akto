@@ -293,9 +293,9 @@ export default {
         })
     },
 
-    fetchWorkflowTestingSchedule(workflowId) {
+    fetchWorkflowTestingRun(workflowId) {
         return request({
-            url: '/api/fetchWorkflowTestingSchedule',
+            url: '/api/fetchWorkflowTestingRun',
             method: 'post',
             data: {
                 "workflowTestId" : workflowId

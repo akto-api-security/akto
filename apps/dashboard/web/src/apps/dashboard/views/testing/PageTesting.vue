@@ -1,6 +1,35 @@
 <template>
     <simple-layout title="API Testing" class="page-testing">
         <div class="pa-8">
+            <div>
+                <layout-with-left-pane title="Run test">
+                    <div>
+                        <router-view/>
+                    </div>
+                    <template #leftPane>
+                        <v-navigation-drawer
+                            v-model="drawer"
+                            floating
+                            width="200px"
+                        >
+                            <div class="nav-section">
+                                <api-collection-group
+                                    :items=leftNavItems
+                                >
+                                    <template #prependItem>
+                                        <v-btn primary dark color="#6200EA" tile style="width: -webkit-fill-available" class="mt-8 mb-8">
+                                            <div style="width: 100%">
+                                                <v-icon>$fas_plus</v-icon> 
+                                                New test
+                                            </div>
+                                        </v-btn>
+                                    </template>
+                                </api-collection-group>
+                            </div>
+                        </v-navigation-drawer>
+                    </template>
+                </layout-with-left-pane>
+            </div>
             <v-btn primary dark color="#6200EA" @click="stopAllTests" :loading="stopAllTestsLoading" style="float:right">
                 Stop all tests
             </v-btn>
@@ -64,6 +93,8 @@ import TestResultsTable from './components/TestResultsTable'
 import func from '@/util/func'
 import { mapState } from 'vuex'
 import api from './api'
+import LayoutWithLeftPane from '@/apps/dashboard/layouts/LayoutWithLeftPane'
+import ApiCollectionGroup from '@/apps/dashboard/shared/components/menus/ApiCollectionGroup'
 
 export default {
     name: "PageTesting",
@@ -74,7 +105,9 @@ export default {
         ACard,
         SampleData,
         LayoutWithTabs,
-        TestResultsTable
+        TestResultsTable,
+        LayoutWithLeftPane,
+        ApiCollectionGroup
     },
     props: {
 
@@ -83,7 +116,53 @@ export default {
         return  {
             newKey: this.nonNullAuth ? this.nonNullAuth.key : null,
             newVal: this.nonNullAuth ? this.nonNullAuth.value: null,
-            stopAllTestsLoading: false
+            stopAllTestsLoading: false,
+            drawer: null,
+            leftNavItems: [
+                {
+                    icon: "$fas_search",
+                    active: true,
+                    title: "Active tests",
+                    group: "/dashboard/testing/",
+                    items: [
+                        {
+                            title: "L1",
+                            link: "/dashboard/testing/123/results",
+                            icon: "$fas_search",
+                            active: true
+                        },
+                        {
+                            title: "L2",
+                            link: "/dashboard/testing/124/results",
+                            link: "l2",
+                            icon: "$fas_search"
+                        }
+                    ]
+                },
+                {
+                    icon: "$fas_plus",
+                    title: "Other tests",
+                    group: "/dashboard/testing/m",
+                    color: "rgba(246, 190, 79)",
+                    active: true,
+                    items: [
+                        {
+                            title: "m1",
+                            link: "m1",
+                            icon: "$fas_plus",
+                            class: "alert",
+                            active: true
+                        },
+                        {
+                            title: "m2",
+                            link: "m2",
+                            icon: "$fas_plus",
+                            class: "bold",
+                            red: true
+                        }
+                    ]
+                }
+            ]
         }
     },
     methods: {

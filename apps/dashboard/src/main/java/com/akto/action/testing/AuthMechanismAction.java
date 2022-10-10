@@ -48,11 +48,6 @@ public class AuthMechanismAction extends UserAction {
     }
 
     List<TestingRunResult> testingRunResults;
-    public String fetchTestingRunResults() {
-        testingRunResults = TestingRunResultDao.instance.fetchLatestTestingRunResult();
-        return SUCCESS.toUpperCase();
-    }
-
     public String fetchRequestAndResponseForTest() {
 
         Set<ObjectId> testRunResultIds = new HashSet<>();
@@ -62,7 +57,6 @@ public class AuthMechanismAction extends UserAction {
         }
 
         this.testingRunResults = TestingRunResultDao.instance.findAll(Filters.in("_id", testRunResultIds));
-
 
         return SUCCESS.toUpperCase();
     }
