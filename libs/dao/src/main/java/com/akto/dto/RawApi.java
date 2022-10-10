@@ -12,6 +12,16 @@ public class RawApi {
         this.originalMessage = originalMessage;
     }
 
+    public static RawApi buildFromMessage(String message) {
+        OriginalHttpRequest request = new OriginalHttpRequest();
+        request.buildFromSampleMessage(message);
+
+        OriginalHttpResponse response = new OriginalHttpResponse();
+        response.buildFromSampleMessage(message);
+
+        return new RawApi(request, response, message);
+    }
+
     public RawApi() { }
 
     public OriginalHttpRequest getRequest() {

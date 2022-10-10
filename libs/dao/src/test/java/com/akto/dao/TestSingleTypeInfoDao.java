@@ -99,7 +99,7 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 100,0,0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
-        return new UpdateOneModel<>(SingleTypeInfoDao.createFilters(singleTypeInfo), Updates.set("count",1),updateOptions);
+        return new UpdateOneModel<>(SingleTypeInfoDao.createFilters(singleTypeInfo), Updates.combine(Updates.set("count",1),Updates.set("timestamp",singleTypeInfo.getTimestamp())),updateOptions);
     }
 
     @Test
@@ -147,6 +147,22 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         sensitiveEndpoints = SingleTypeInfoDao.instance.getSensitiveEndpoints(0, null, null);
         assertEquals(sensitiveEndpoints.size(), 5);
     }
+
+    @Test
+    public void testFilterForAllNewParams(){
+        SingleTypeInfoDao.instance.getMCollection().drop();
+
+        List<WriteModel<SingleTypeInfo>> bulkWrites = new ArrayList<>();
+        bulkWrites.add(createSingleTypeInfoUpdate("A", "GET", SingleTypeInfo.EMAIL, 0,200));
+        bulkWrites.add(createSingleTypeInfoUpdate("B", "GET", SingleTypeInfo.EMAIL, 0,200));
+        SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkWrites);
+
+        Bson filterNewParams = SingleTypeInfoDao.instance.filterForAllNewParams(0,0);
+
+        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(filterNewParams);
+        assertEquals(list.size(),2);
+    }
+
     @Test
     public void testResetCount() {
         SingleTypeInfoDao.instance.getMCollection().drop();

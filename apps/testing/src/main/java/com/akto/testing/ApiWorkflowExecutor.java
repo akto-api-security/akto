@@ -343,17 +343,15 @@ public class ApiWorkflowExecutor {
 
     // todo: test invalid cases
     public String replaceVariables(String payload, Map<String, Object> valuesMap) throws Exception {
-        String regex = "\\$\\{x(\\d+)\\.([\\w\\[\\].]+)\\}"; // todo: integer inside brackets
+        String regex = "\\$\\{(x\\d+\\.[\\w\\[\\].]+|AKTO\\.changes_info\\..*?)\\}"; // todo: integer inside brackets
         Pattern p = Pattern.compile(regex);
 
         // replace with values
         Matcher matcher = p.matcher(payload);
         StringBuffer sb = new StringBuffer();
         while (matcher.find()) {
-            String nodeId = "x"+matcher.group(1);
-            String param = matcher.group(2);
-            if (param == null || param.isEmpty()) continue;
-            String key = nodeId+"."+param;
+            String key = matcher.group(1);
+            if (key == null) continue;
             Object obj = valuesMap.get(key);
             if (obj == null) {
                 // todo: check for nested objects

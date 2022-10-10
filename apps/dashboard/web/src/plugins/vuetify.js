@@ -8,6 +8,7 @@ import Burpsuite from "../apps/dashboard/shared/icons/Burpsuite"
 import Slack from "../apps/dashboard/shared/icons/Slack"
 import Postman from "../apps/dashboard/shared/icons/Postman"
 import Restapi from "../apps/dashboard/shared/icons/Restapi"
+import CustomWebhooks from "../apps/dashboard/shared/icons/CustomWebhooks"
 
 Vue.component('font-awesome-icon', FontAwesomeIcon)
 
@@ -165,6 +166,10 @@ faIconsOpts.slack = {
 
 faIconsOpts.restapi = {
   component: Restapi
+}
+
+faIconsOpts.customwebhooks = {
+  component: CustomWebhooks
 }
 
 faIcons.forEach(x => faIconsOpts[x.prefix+"_"+x.iconName] = {

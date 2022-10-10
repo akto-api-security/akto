@@ -4,7 +4,9 @@
         <div class="details">
             <span>Response body match: {{percentageMatch}} %</span>
         </div>
-        <sample-data :json="jsonAdvance" requestTitle="Original Request" responseTitle="Original Response"/>
+        <div style="margin: 24px">
+            <sample-data :json="jsonAdvance" requestTitle="Original Request" responseTitle="Original Response"/>
+        </div>
     </div>
 
 </template>

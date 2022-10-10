@@ -1,13 +1,20 @@
 package com.akto.testing;
 
+import com.akto.dao.AuthMechanismsDao;
+import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.RawApi;
 import com.akto.dto.testing.*;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.rules.BOLATest;
 import com.akto.rules.NoAuthTest;
-import com.akto.store.AuthMechanismStore;
+import com.akto.rules.TestPlugin;
 import com.akto.store.SampleMessageStore;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,7 +65,9 @@ public class TestExecutor {
     public void  apiWiseInit(TestingRun testingRun) {
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
-        SampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
+        Map<String, SingleTypeInfo> singleTypeInfoMap = SampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
+        Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = SampleMessageStore.fetchSampleMessages();
+        AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
 
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
@@ -71,30 +80,46 @@ public class TestExecutor {
                 ApiInfo.ApiInfoKey modifiedKey = new ApiInfo.ApiInfoKey(apiInfoKey.getApiCollectionId(), url, apiInfoKey.method);
                 if (store.contains(modifiedKey)) continue;
                 store.add(modifiedKey);
-                start(apiInfoKey, testingRun.getTestIdConfig(), testingRun.getId());
+                List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleMessages);
+                start(apiInfoKey, testingRun.getTestIdConfig(), testingRun.getId(), singleTypeInfoMap, messages, authMechanism);
             } catch (Exception e) {
                 logger.error(e.getMessage());
             }
         }
     }
 
-    private final BOLATest bolaTest = new BOLATest();
-    private final NoAuthTest noAuthTest = new NoAuthTest();
-
-    public void start(ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId) {
+    public void start(ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId,
+                      Map<String, SingleTypeInfo> singleTypeInfoMap, List<RawApi> messages, AuthMechanism authMechanism) {
         if (testIdConfig != 0) {
             logger.error("Test id config is not 0 but " + testIdConfig);
             return;
         }
 
-        AuthMechanism authMechanism = AuthMechanismStore.getAuthMechanism();
-        if (authMechanism == null) return;
+        BOLATest bolaTest = new BOLATest();
+        NoAuthTest noAuthTest = new NoAuthTest();
 
-        boolean noAuthResult = noAuthTest.start(apiInfoKey, testRunId, authMechanism);
-        if (!noAuthResult) {
-            bolaTest.start(apiInfoKey, testRunId, authMechanism);
+        List<Bson> updates = new ArrayList<>();
+
+        TestResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, authMechanism, messages, updates, singleTypeInfoMap);
+        if (!noAuthTestResult.isVulnerable()) {
+            runTest(bolaTest, apiInfoKey, authMechanism, messages, updates,  singleTypeInfoMap);
         }
 
+        Bson filter = TestingRunResultDao.generateFilter(testRunId, apiInfoKey.getApiCollectionId(), apiInfoKey.url, apiInfoKey.method.name());
+        Bson update = Updates.combine(updates);
+
+        TestingRunResultDao.instance.updateOne(filter, update);
+    }
+
+    public TestResult runTest(TestPlugin testPlugin, ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, List<RawApi> messages,
+                        List<Bson> updates, Map<String, SingleTypeInfo> singleTypeInfos) {
+        TestResult testResult = testPlugin.start(apiInfoKey, authMechanism, messages, singleTypeInfos);
+        if (testResult != null) {
+            updates.add(
+                    Updates.set("resultMap." + testPlugin.testName(), testResult)
+            );
+        }
+        return testResult;
     }
 
 }

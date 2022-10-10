@@ -15,16 +15,21 @@
                             <div v-if="jsonBasic['errors']" class="test-errors-class">
                                 {{this.jsonBasic["errors"]}}
                             </div>
-                            <sample-data 
-                                v-if="jsonBasic && jsonBasic['message']"
-                                :json="jsonBasic"
-                                requestTitle="Test Request"
-                                responseTitle="Test Response"
-                            />
+                            <div style="margin: 24px">
+                                <sample-data 
+                                    v-if="jsonBasic && jsonBasic['message']"
+                                    :json="jsonBasic"
+                                    requestTitle="Test Request"
+                                    responseTitle="Test Response"
+                                />
+                            </div>
                         </div>
                     </template>
                     <template slot="Details" v-if="jsonAdvance && jsonAdvance['message']">
-                        <test-result-details :jsonAdvance="jsonAdvance" :percentageMatch="percentageMatch"/>
+                        <div style="margin: 24px">
+                            <span>Test response matches {{percentageMatch}}% with original API response</span>
+                            <sample-data :json="jsonAdvance" requestTitle="Original Request" responseTitle="Original Response"/>
+                        </div>
                     </template>
                 </layout-with-tabs>
             </div>
@@ -103,7 +108,12 @@ export default {
     percentageMatch: function() {
         if (this.testingRunResult == null) return null
         let currentMessage = this.messagesAdvance[this.currentIndex]
-        return func.prettifyShort(currentMessage["percentageMatch"])
+        try {
+            return func.prettifyShort(currentMessage["percentageMatch"])
+        } catch (e) {
+            console.log(e);
+            return null
+        }
     },
     jsonAdvance: function() {
         if (this.testingRunResult == null) return null

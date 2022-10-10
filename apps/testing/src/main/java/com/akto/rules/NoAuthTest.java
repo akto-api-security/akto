@@ -3,7 +3,7 @@ package com.akto.rules;
 
 import com.akto.dto.*;
 import com.akto.dto.testing.*;
-import com.akto.store.AuthMechanismStore;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.store.SampleMessageStore;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.StatusCodeAnalyser;
@@ -11,14 +11,15 @@ import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 
 public class NoAuthTest extends TestPlugin {
 
     @Override
-    public boolean start(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, AuthMechanism authMechanism) {
-        List<RawApi> filteredMessages = fetchMessagesWithAuthToken(apiInfoKey, testRunId, authMechanism);
-        if (filteredMessages == null) return false;
+    public TestResult start(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, List<RawApi> messages, Map<String, SingleTypeInfo> singleTypeInfoMap) {
+        List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, authMechanism);
+        if (filteredMessages.isEmpty()) return addWithoutRequestError(null, TestResult.TestError.NO_PATH);
 
         RawApi rawApi = filteredMessages.get(0);
 
@@ -31,8 +32,7 @@ public class NoAuthTest extends TestPlugin {
         try {
             testResponse = ApiExecutor.sendRequest(testRequest, true);
         } catch (Exception e) {
-            addWithRequestError(apiInfoKey, rawApi.getOriginalMessage(), testRunId, TestResult.TestError.API_REQUEST_FAILED, testRequest);
-            return false;
+            return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest);
         }
 
         int statusCode = StatusCodeAnalyser.getStatusCode(testResponse.getBody(), testResponse.getStatusCode());
@@ -40,10 +40,9 @@ public class NoAuthTest extends TestPlugin {
 
         double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), testResponse.getBody());
 
-        addTestSuccessResult(apiInfoKey, testRequest, testResponse, rawApi.getOriginalMessage(), testRunId,
+        return addTestSuccessResult(testRequest, testResponse, rawApi.getOriginalMessage(),
                 vulnerable, percentageMatch, new ArrayList<>(), TestResult.Confidence.HIGH);
 
-        return vulnerable;
     }
 
     @Override

@@ -1,6 +1,7 @@
 package com.akto.action;
 
 import com.akto.DaoInit;
+import com.akto.analyser.ResourceAnalyser;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.RuntimeFilterDao;
 import com.akto.dao.context.Context;
@@ -97,6 +98,13 @@ public class HarAction extends UserAction {
                 APICatalogSync apiCatalogSync = parser.syncFunction(responses, true);
                 AktoPolicy aktoPolicy = new AktoPolicy(parser.apiCatalogSync); // keep inside if condition statement because db call when initialised
                 aktoPolicy.main(responses, apiCatalogSync);
+
+                ResourceAnalyser resourceAnalyser = new ResourceAnalyser(300_000, 0.01, 100_000, 0.01);
+                for (HttpResponseParams responseParams: responses)  {
+                    responseParams.requestParams.getHeaders().put("x-forwarded-for", Collections.singletonList("127.0.0.1"));
+                    resourceAnalyser.analyse(responseParams);
+                }
+                resourceAnalyser.syncWithDb();
             }
         } catch (Exception e) {
             e.printStackTrace();

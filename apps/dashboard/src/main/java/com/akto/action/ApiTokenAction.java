@@ -99,6 +99,15 @@ public class ApiTokenAction extends UserAction implements ServletRequestAware {
     private String error;
     private String webhookUrl;
     private String dashboardUrl;
+    private int frequencyInSeconds; 
+    public int getFrequencyInSeconds() {
+        return frequencyInSeconds;
+    }
+
+    public void setFrequencyInSeconds(int frequencyInSeconds) {
+        this.frequencyInSeconds = frequencyInSeconds;
+    }
+
     public String addSlackWebhook() {
 
         boolean isUrl = KeyTypes.patternToSubType.get(SingleTypeInfo.URL).matcher(webhookUrl).matches();
@@ -111,7 +120,10 @@ public class ApiTokenAction extends UserAction implements ServletRequestAware {
             this.error = "This webhook url already exists";
         } else {
             int now = Context.now();
-            SlackWebhook newWebhook = new SlackWebhook(now, webhookUrl, 1, 1, now, getSUser().getLogin(), dashboardUrl);
+
+            setFrequencyInSeconds(24*60*60); // set initially to one day
+
+            SlackWebhook newWebhook = new SlackWebhook(now, webhookUrl, 1, 1, now, getSUser().getLogin(), dashboardUrl,now,frequencyInSeconds);
             this.apiTokenId = SlackWebhooksDao.instance.insertOne(newWebhook).getInsertedId().asInt32().getValue();
         }
 

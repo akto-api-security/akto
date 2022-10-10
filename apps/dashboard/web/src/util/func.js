@@ -519,6 +519,9 @@ export default {
 
             case "SLACK":
                 return {name: '$slack', color: '#fe7b5b'}
+            
+            case "CUSTOMWEBHOOKS":
+                return {name: '$customwebhooks', color: '#fe7b5b'}
         }
     },
 
@@ -580,5 +583,12 @@ export default {
         }
 
         return (count == 0 ? "No values recorded" : result)
-    }
+    },
+
+    showErrorSnackBar(val){
+        window._AKTO.$emit('SHOW_SNACKBAR', {show: true, text: val, color: 'red'})
+    },
+    showSuccessSnackBar(val){
+        window._AKTO.$emit('SHOW_SNACKBAR', {show: true, text: val, color: 'green'})
+    },
 }

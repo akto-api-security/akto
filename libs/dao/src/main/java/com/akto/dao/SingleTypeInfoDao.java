@@ -162,6 +162,16 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return Filters.and(filters);
     }
 
+    public Bson filterForAllNewParams(int startTimestamp,int endTimestamp){
+
+        List<Bson> filters = new ArrayList<>();
+
+        filters.add(Filters.gte("timestamp",startTimestamp));
+        filters.add(Filters.lte("timestamp",endTimestamp));
+
+        return Filters.and(filters);
+    }
+
     public Set<String> getSensitiveEndpoints(int apiCollectionId, String url, String method) {
         Set<String> urls = new HashSet<>();
 

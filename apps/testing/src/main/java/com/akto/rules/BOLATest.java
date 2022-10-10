@@ -5,6 +5,7 @@ import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.store.SampleMessageStore;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.StatusCodeAnalyser;
 
@@ -12,23 +13,24 @@ import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class BOLATest extends TestPlugin {
 
     public BOLATest() { }
 
     @Override
-    public boolean start(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, AuthMechanism authMechanism) {
+    public TestResult start(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, List<RawApi> messages, Map<String, SingleTypeInfo> singleTypeInfoMap) {
 
-        List<RawApi> filteredMessages = fetchMessagesWithAuthToken(apiInfoKey, testRunId, authMechanism);
-        if (filteredMessages == null) return false;
+        List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, authMechanism);
+        if (filteredMessages.isEmpty()) return addWithoutRequestError(null, TestResult.TestError.NO_PATH);
 
         boolean vulnerable = false;
         ExecutorResult result = null;
         TestResult.TestError testError = null;
 
         for (RawApi rawApi: filteredMessages) {
-            result = execute(rawApi, apiInfoKey, authMechanism);
+            result = execute(rawApi, apiInfoKey, authMechanism, singleTypeInfoMap);
             testError = result.testError;
             if (result.vulnerable) {
                 vulnerable = true;
@@ -37,16 +39,15 @@ public class BOLATest extends TestPlugin {
         }
 
         if (testError != null) {
-            addWithRequestError(apiInfoKey, result.rawApi.getOriginalMessage(), testRunId, testError, result.rawApi.getRequest());
+            return addWithRequestError( result.rawApi.getOriginalMessage(), testError, result.rawApi.getRequest());
         } else {
-            addTestSuccessResult(
-                    apiInfoKey, result.testRequest, result.testResponse,
-                    result.rawApi.getOriginalMessage(), testRunId,
+            return addTestSuccessResult(
+                    result.testRequest, result.testResponse,
+                    result.rawApi.getOriginalMessage(),
                     vulnerable, result.percentageMatch, result.singleTypeInfos, result.confidence
             );
         }
 
-        return vulnerable;
     }
 
     public static class ExecutorResult {
@@ -74,13 +75,13 @@ public class BOLATest extends TestPlugin {
         }
     }
 
-    public ExecutorResult execute(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism) {
+    public ExecutorResult execute(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<String, SingleTypeInfo> singleTypeInfoMap) {
         OriginalHttpRequest testRequest = rawApi.getRequest().copy();
         OriginalHttpResponse originalHttpResponse = rawApi.getResponse().copy();
 
         authMechanism.addAuthToRequest(testRequest);
 
-        ContainsPrivateResourceResult containsPrivateResourceResult = containsPrivateResource(testRequest, apiInfoKey);
+        ContainsPrivateResourceResult containsPrivateResourceResult = containsPrivateResource(testRequest, apiInfoKey, singleTypeInfoMap);
         // We consider API contains private resources if : 
         //      a) Contains 1 or more private resources
         //      b) We couldn't find uniqueCount or publicCount for some request params

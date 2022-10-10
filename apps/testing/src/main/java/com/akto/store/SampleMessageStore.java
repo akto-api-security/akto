@@ -20,15 +20,13 @@ import java.util.*;
 
 public class SampleMessageStore {
 
-    public static Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
-    public static Map<String, SingleTypeInfo> singleTypeInfos = new HashMap<>();
 
     private static final Logger logger = LoggerFactory.getLogger(SampleMessageStore.class);
-    public static void buildSingleTypeInfoMap(TestingEndpoints testingEndpoints) {
-        if (testingEndpoints == null) return;
+    public static Map<String, SingleTypeInfo> buildSingleTypeInfoMap(TestingEndpoints testingEndpoints) {
+        Map<String, SingleTypeInfo> singleTypeInfoMap = new HashMap<>();
+        if (testingEndpoints == null) return singleTypeInfoMap;
         TestingEndpoints.Type type = testingEndpoints.getType();
         List<SingleTypeInfo> singleTypeInfoList = new ArrayList<>();
-        singleTypeInfos = new HashMap<>();
         try {
             if (type.equals(TestingEndpoints.Type.COLLECTION_WISE)) {
                 CollectionWiseTestingEndpoints collectionWiseTestingEndpoints = (CollectionWiseTestingEndpoints) testingEndpoints;
@@ -45,7 +43,7 @@ public class SampleMessageStore {
                 List<ApiInfoKey> apiInfoKeys = customTestingEndpoints.getApisList();
 
                 if (apiInfoKeys.size() == 0) {
-                    return;
+                    return singleTypeInfoMap;
                 } else {
                     int apiCollectionId = apiInfoKeys.get(0).getApiCollectionId();
                     singleTypeInfoList = SingleTypeInfoDao.instance.findAll(
@@ -60,25 +58,17 @@ public class SampleMessageStore {
 
             for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
                 singleTypeInfo.clearValues();
-                singleTypeInfos.put(singleTypeInfo.composeKeyWithCustomSubType(SingleTypeInfo.GENERIC), singleTypeInfo);
+                singleTypeInfoMap.put(singleTypeInfo.composeKeyWithCustomSubType(SingleTypeInfo.GENERIC), singleTypeInfo);
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+        return singleTypeInfoMap;
     }
 
-    public static SingleTypeInfo findSti(String param, boolean isUrlParam,
-                                         ApiInfo.ApiInfoKey apiInfoKey, boolean isHeader, int responseCode) {
 
-        String key = SingleTypeInfo.composeKey(
-                apiInfoKey.url, apiInfoKey.method.name(), responseCode, isHeader,
-                param,SingleTypeInfo.GENERIC, apiInfoKey.getApiCollectionId(), isUrlParam
-        );
-
-        return singleTypeInfos.get(key);
-    }
-
-    public static void fetchSampleMessages() {
+    public static Map<ApiInfo.ApiInfoKey, List<String>> fetchSampleMessages() {
         List<SampleData> sampleDataList = SampleDataDao.instance.findAll(new BasicDBObject());
         System.out.println("SampleDataSize " + sampleDataList.size());
         Map<ApiInfo.ApiInfoKey, List<String>> tempSampleDataMap = new HashMap<>();
@@ -93,27 +83,20 @@ public class SampleMessageStore {
             }
         }
 
-        sampleDataMap = new HashMap<>(tempSampleDataMap);
+        return new HashMap<>(tempSampleDataMap);
     }
 
 
 
-    public static List<RawApi> fetchAllOriginalMessages(ApiInfoKey apiInfoKey) {
+    public static List<RawApi> fetchAllOriginalMessages(ApiInfoKey apiInfoKey, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages) {
         List<RawApi> messages = new ArrayList<>();
 
-        List<String> samples = sampleDataMap.get(apiInfoKey);
+        List<String> samples = sampleMessages.get(apiInfoKey);
         if (samples == null || samples.isEmpty()) return messages;
 
         for (String message: samples) {
             try {
-                OriginalHttpRequest request = new OriginalHttpRequest();
-                request.buildFromSampleMessage(message);
-
-                OriginalHttpResponse response = new OriginalHttpResponse();
-                response.buildFromSampleMessage(message);
-
-                messages.add(new RawApi(request, response, message));
-
+                messages.add(RawApi.buildFromMessage(message));
             } catch(Exception ignored) { }
 
         }

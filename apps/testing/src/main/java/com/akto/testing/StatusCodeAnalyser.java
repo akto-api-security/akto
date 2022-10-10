@@ -1,16 +1,14 @@
 package com.akto.testing;
 
-import com.akto.DaoInit;
-import com.akto.dao.context.Context;
+import com.akto.dao.AuthMechanismsDao;
 import com.akto.dto.*;
 import com.akto.dto.testing.AuthMechanism;
-import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mongodb.ConnectionString;
+import com.mongodb.BasicDBObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,11 +22,6 @@ public class StatusCodeAnalyser {
     static JsonFactory factory = mapper.getFactory();
 
     static List<StatusCodeIdentifier> result = new ArrayList<>();
-
-//    static {
-//        // TODO: remove this
-//        result.add(new StatusCodeIdentifier(new HashSet<>(Arrays.asList("status#code", "status#reason", "status#message", "status#type", "status#title")), "status#code"));
-//    }
 
     public static class StatusCodeIdentifier {
         public Set<String> keySet;
@@ -50,12 +43,9 @@ public class StatusCodeAnalyser {
     public static int MAX_COUNT = 30;
     public static void run() {
         logger.info("Running status analyser");
-        Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = SampleMessageStore.sampleDataMap;
-        if (sampleDataMap == null) {
-            logger.error("No sample data");
-            return;
-        }
-        AuthMechanism authMechanism = AuthMechanismStore.getAuthMechanism();
+        Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = SampleMessageStore.fetchSampleMessages();
+
+        AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
         if (authMechanism == null) {
             logger.error("No auth mechanism");
             return;
@@ -67,7 +57,8 @@ public class StatusCodeAnalyser {
         for (ApiInfo.ApiInfoKey apiInfoKey: sampleDataMap.keySet()) {
             if (count > MAX_COUNT) break;
             try {
-                boolean success = fillFrequencyMap(apiInfoKey, authMechanism, frequencyMap);
+                List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleDataMap);
+                boolean success = fillFrequencyMap(messages, authMechanism, frequencyMap);
                 if (success)  {
                     count += 1;
                     logger.info("count: " + count);
@@ -99,10 +90,9 @@ public class StatusCodeAnalyser {
         }
     }
 
-    public static boolean fillFrequencyMap(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<Set<String>, Map<String,Integer>> frequencyMap) {
+    public static boolean fillFrequencyMap(List<RawApi> messages, AuthMechanism authMechanism, Map<Set<String>, Map<String,Integer>> frequencyMap) {
 
         // fetch sample message
-        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey);
         List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, authMechanism);
         if (filteredMessages.isEmpty()) return false;
 

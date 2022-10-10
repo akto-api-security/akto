@@ -11,11 +11,18 @@ import com.akto.dao.UsersDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.BackwardCompatibility;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.notifications.CustomWebhook;
+import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.notifications.SlackWebhook;
+import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.notifications.email.WeeklyEmail;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.util.Pair;
+import com.akto.utils.RedactSampleData;
+import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -29,7 +36,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.akto.dao.context.Context;
+import com.akto.dao.notifications.CustomWebhooksDao;
+import com.akto.dao.notifications.CustomWebhooksResultDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
+
+import com.akto.testing.*;
 
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -37,6 +48,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import javax.servlet.ServletContextListener;
+
+import static com.mongodb.client.model.Filters.eq;
+import static com.mongodb.client.model.Filters.in;
 
 public class InitializerListener implements ServletContextListener {
     private static final Logger logger = LoggerFactory.getLogger(InitializerListener.class);
@@ -110,17 +124,38 @@ public class InitializerListener implements ServletContextListener {
                     }
 
                     Slack slack = Slack.getInstance();
-
+        
                     for(SlackWebhook slackWebhook: listWebhooks) {
-                        System.out.println(slackWebhook); 
+                        int now =Context.now();
+                        // System.out.println("debugSlack: " + slackWebhook.getLastSentTimestamp() + " " + slackWebhook.getFrequencyInSeconds() + " " +now );
 
-                        ChangesInfo ci = getChangesInfo(slackWebhook.getLargerDuration(), slackWebhook.getSmallerDuration());
-                        if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams) == 0) {
+                        if(slackWebhook.getFrequencyInSeconds()==0) {
+                            slackWebhook.setFrequencyInSeconds(24*60*60);
+                        }
+
+                        boolean shouldSend = ( slackWebhook.getLastSentTimestamp() + slackWebhook.getFrequencyInSeconds() ) <= now ;
+                        
+                        if(!shouldSend){
+                            continue;
+                        }
+
+                        System.out.println(slackWebhook);
+
+                        ChangesInfo ci = getChangesInfo(now - slackWebhook.getLastSentTimestamp(), now - slackWebhook.getLastSentTimestamp());
+                        if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0) {
                             return;
                         }
     
-                        DailyUpdate dailyUpdate = new DailyUpdate(0, 0, ci.newSensitiveParams.size(), ci.newEndpointsLast7Days.size(), ci.recentSentiiveParams, ci.newSensitiveParams, slackWebhook.getDashboardUrl());
-    
+                        DailyUpdate dailyUpdate = new DailyUpdate(
+                            0, 0, 
+                            ci.newSensitiveParams.size(), ci.newEndpointsLast7Days.size(),
+                            ci.recentSentiiveParams, ci.newParamsInExistingEndpoints,
+                            slackWebhook.getLastSentTimestamp(), now ,
+                            ci.newSensitiveParams, slackWebhook.getDashboardUrl());
+                        
+                        slackWebhook.setLastSentTimestamp(now);
+                        SlackWebhooksDao.instance.updateOne(eq("webhook",slackWebhook.getWebhook()), Updates.set("lastSentTimestamp", now)); 
+
                         String webhookUrl = slackWebhook.getWebhook();
                         String payload = dailyUpdate.toJSON();
                         System.out.println(payload);
@@ -132,8 +167,98 @@ public class InitializerListener implements ServletContextListener {
                     ex.printStackTrace(); // or loggger would be better
                 }
             }
-        }, 0, 24, TimeUnit.HOURS);
+        }, 0, 5, TimeUnit.MINUTES);
 
+    }
+
+    public static void webhookSenderUtil(CustomWebhook webhook){
+        Gson gson = new Gson();
+        int now = Context.now();
+
+        boolean shouldSend = ( webhook.getLastSentTimestamp() + webhook.getFrequencyInSeconds() ) <= now ;
+
+        if(webhook.getActiveStatus()!=ActiveStatus.ACTIVE || !shouldSend){
+            return;
+        }
+
+        ChangesInfo ci = getChangesInfo(now - webhook.getLastSentTimestamp(), now - webhook.getLastSentTimestamp());
+        if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0) {
+            return;
+        }
+
+        List<String> errors = new ArrayList<>();
+
+        Map<String,Object> valueMap = new HashMap<>();
+
+        valueMap.put("AKTO.changes_info.newSensitiveEndpoints", gson.toJson(ci.newSensitiveParams));
+        valueMap.put("AKTO.changes_info.newSensitiveEndpointsCount",ci.newSensitiveParams.size());
+
+        valueMap.put("AKTO.changes_info.newEndpoints",gson.toJson(ci.newEndpointsLast7Days));
+        valueMap.put("AKTO.changes_info.newEndpointsCount",ci.newEndpointsLast7Days.size());
+
+        valueMap.put("AKTO.changes_info.newSensitiveParametersCount",ci.recentSentiiveParams);
+        valueMap.put("AKTO.changes_info.newParametersCount",ci.newParamsInExistingEndpoints);
+
+        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
+        String payload = null;
+
+        try{
+            payload = apiWorkflowExecutor.replaceVariables(webhook.getBody(),valueMap);
+        } catch(Exception e){
+            errors.add("Failed to replace variables");
+        }
+
+        webhook.setLastSentTimestamp(now);
+        CustomWebhooksDao.instance.updateOne(Filters.eq("_id",webhook.getId()), Updates.set("lastSentTimestamp", now));
+
+        Map<String,List<String>> headers = OriginalHttpRequest.buildHeadersMap(webhook.getHeaderString());
+        OriginalHttpRequest request = new OriginalHttpRequest(webhook.getUrl(),webhook.getQueryParams(),webhook.getMethod().toString(),payload,headers,"");
+        OriginalHttpResponse response = null; // null response means api request failed. Do not use new OriginalHttpResponse() in such cases else the string parsing fails.
+
+        try {
+            response = ApiExecutor.sendRequest(request,true);
+            System.out.println("webhook request sent");
+        } catch(Exception e){
+            errors.add("API execution failed");
+        }
+
+        String message = null;
+        try{
+            message = RedactSampleData.convertOriginalReqRespToString(request, response);
+        } catch(Exception e){
+            errors.add("Failed converting sample data");
+        }
+
+        CustomWebhookResult webhookResult = new CustomWebhookResult(webhook.getId(),webhook.getUserEmail(),now,message,errors);
+        CustomWebhooksResultDao.instance.insertOne(webhookResult);
+    }
+
+    public void webhookSender() {
+        try {
+            List<CustomWebhook> listWebhooks = CustomWebhooksDao.instance.findAll(new BasicDBObject());
+            if (listWebhooks == null || listWebhooks.isEmpty()) {
+                return;
+            }
+            
+            for(CustomWebhook webhook:listWebhooks) {
+                webhookSenderUtil(webhook);
+            }
+
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    public void setUpWebhookScheduler(){
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                String mongoURI = System.getenv("AKTO_MONGO_CONN");
+                DaoInit.init(new ConnectionString(mongoURI));
+                Context.accountId.set(1_000_000);
+
+                webhookSender();
+            }
+        }, 0, 15, TimeUnit.MINUTES);
     }
 
     static class ChangesInfo {
@@ -142,30 +267,34 @@ public class InitializerListener implements ServletContextListener {
         public List<String> newEndpointsLast31Days = new ArrayList<>();
         public int totalSensitiveParams = 0;
         public int recentSentiiveParams = 0;
+        public int newParamsInExistingEndpoints = 0;
     }
 
-    protected ChangesInfo getChangesInfo(int newEndpointsDays, int newSensitiveParamsDays) {
+    protected static ChangesInfo getChangesInfo(int newEndpointsFrequency, int newSensitiveParamsFrequency) {
         try {
             
             ChangesInfo ret = new ChangesInfo();
             int now = Context.now();
-            List<BasicDBObject> newEndpointsSmallerDuration = new InventoryAction().fetchRecentEndpoints(now - newSensitiveParamsDays * 24 * 60 * 60, now);
-            List<BasicDBObject> newEndpointsBiggerDuration = new InventoryAction().fetchRecentEndpoints(now - newEndpointsDays * 24 * 60 * 60, now);
+            List<BasicDBObject> newEndpointsSmallerDuration = new InventoryAction().fetchRecentEndpoints(now - newSensitiveParamsFrequency, now);
+            List<BasicDBObject> newEndpointsBiggerDuration = new InventoryAction().fetchRecentEndpoints(now - newEndpointsFrequency, now);
+
+            int newParamInNewEndpoint=0;
 
             for (BasicDBObject singleTypeInfo: newEndpointsSmallerDuration) {
+                newParamInNewEndpoint += (int) singleTypeInfo.getOrDefault("countTs", 0);
                 singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
-                ret.newEndpointsLast7Days.add(singleTypeInfo.getString("method") + singleTypeInfo.getString("url"));
+                ret.newEndpointsLast7Days.add(singleTypeInfo.getString("method") + " " + singleTypeInfo.getString("url"));
             }
     
             for (BasicDBObject singleTypeInfo: newEndpointsBiggerDuration) {
                 singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
-                ret.newEndpointsLast31Days.add(singleTypeInfo.getString("method") + singleTypeInfo.getString("url"));
+                ret.newEndpointsLast31Days.add(singleTypeInfo.getString("method") + " " + singleTypeInfo.getString("url"));
             }
     
             List<SingleTypeInfo> sensitiveParamsList = new InventoryAction().fetchSensitiveParams();
             ret.totalSensitiveParams = sensitiveParamsList.size();
             ret.recentSentiiveParams = 0;
-            int delta = newSensitiveParamsDays * 24 * 60 * 60;
+            int delta = newSensitiveParamsFrequency;
             Map<Pair<String, String>, Set<String>> endpointToSubTypes = new HashMap<>();
             for(SingleTypeInfo sti: sensitiveParamsList) {
                 String encoded = Base64.getEncoder().encodeToString((sti.getUrl() + " " + sti.getMethod()).getBytes());
@@ -187,6 +316,10 @@ public class InitializerListener implements ServletContextListener {
                 ret.newSensitiveParams.put(key.getFirst() + ": " + StringUtils.join(endpointToSubTypes.get(key), ","), key.getSecond());
             }
 
+            List<SingleTypeInfo> allNewParameters = new InventoryAction().fetchAllNewParams(now - newEndpointsFrequency, now);
+            int totalNewParameters=allNewParameters.size();
+            ret.newParamsInExistingEndpoints = Math.max(0, totalNewParameters - newParamInNewEndpoint);
+            
             return ret;
         } catch (Exception e) {
             logger.error("get new endpoints", e);
@@ -268,6 +401,7 @@ public class InitializerListener implements ServletContextListener {
 
             setUpWeeklyScheduler();
             setUpDailyScheduler();
+            setUpWebhookScheduler();
 
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             dropSampleDataIfEarlierNotDroped(accountSettings);
