@@ -94,10 +94,12 @@ export default {
                 requestPayloadString = message["requestPayload"] || "{}"
             }
 
-            let urlSearchParams = new URLSearchParams(queryParamsString)
             const queryParams = {}
-            for(const [key, value] of urlSearchParams) { 
-                queryParams[key] = value;
+            if (queryParamsString) {
+                let urlSearchParams = new URLSearchParams(queryParamsString)
+                for(const [key, value] of urlSearchParams) { 
+                    queryParams[key] = value;
+                }
             }
 
             try {
