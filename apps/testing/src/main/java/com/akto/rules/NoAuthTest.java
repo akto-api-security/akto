@@ -10,6 +10,7 @@ import com.akto.testing.StatusCodeAnalyser;
 import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -17,7 +18,7 @@ import java.util.Map;
 public class NoAuthTest extends TestPlugin {
 
     @Override
-    public TestResult start(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, List<RawApi> messages, Map<String, SingleTypeInfo> singleTypeInfoMap) {
+    public Result start(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, List<RawApi> messages, Map<String, SingleTypeInfo> singleTypeInfoMap) {
         List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, authMechanism);
         if (filteredMessages.isEmpty()) return addWithoutRequestError(null, TestResult.TestError.NO_PATH);
 
@@ -40,13 +41,23 @@ public class NoAuthTest extends TestPlugin {
 
         double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), testResponse.getBody());
 
-        return addTestSuccessResult(testRequest, testResponse, rawApi.getOriginalMessage(),
-                vulnerable, percentageMatch, new ArrayList<>(), TestResult.Confidence.HIGH);
+        TestResult testResult = buildTestResult(
+                testRequest, testResponse, rawApi.getOriginalMessage(), percentageMatch, vulnerable
+        );
+        return addTestSuccessResult(
+                vulnerable, Collections.singletonList(testResult), new ArrayList<>(), TestResult.Confidence.HIGH
+        );
 
     }
 
     @Override
-    public String testName() {
+    public String superTestName() {
         return "NO_AUTH";
     }
+
+    @Override
+    public String subTestName() {
+        return "REMOVE_TOKENS";
+    }
+
 }

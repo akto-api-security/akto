@@ -2,9 +2,11 @@ package com.akto.dto.testing;
 
 import com.akto.dto.ApiInfo;
 
+import com.akto.dto.type.SingleTypeInfo;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
+import java.util.List;
 import java.util.Map;
 
 public class TestingRunResult {
@@ -15,14 +17,13 @@ public class TestingRunResult {
     private ObjectId testRunId;
     public static final String API_INFO_KEY = "apiInfoKey";
     private ApiInfo.ApiInfoKey apiInfoKey;
-    private Map<String, TestResult> resultMap;
+    private String testSuperType;
+    private String testSubType;
+    private List<TestResult> testResults;
+    private boolean isVulnerable;
+    private List<SingleTypeInfo> singleTypeInfos;
+    private int confidencePercentage;
 
-    // remove Map. Use "String" as test-supertype. 
-    // introduce testSubtype
-    // List<TestResult>
-    // boolean isVulnerable
-    // List<SingleTypeInfo>
-    // int confidencePercentage
     private int startTimestamp;
     private int endTimestamp;
     private ObjectId testRunResultSummaryId;
@@ -32,10 +33,19 @@ public class TestingRunResult {
 
     public TestingRunResult() { }
 
-    public TestingRunResult(ObjectId testRunId, ApiInfo.ApiInfoKey apiInfoKey, Map<String, TestResult> resultMap, ObjectId testRunResultSummaryId) {
+    public TestingRunResult(ObjectId testRunId, ApiInfo.ApiInfoKey apiInfoKey, String testSuperType, String testSubType,
+                            List<TestResult> testResults, boolean isVulnerable, List<SingleTypeInfo> singleTypeInfos,
+                            int confidencePercentage, int startTimestamp, int endTimestamp, ObjectId testRunResultSummaryId) {
         this.testRunId = testRunId;
         this.apiInfoKey = apiInfoKey;
-        this.resultMap = resultMap;
+        this.testSuperType = testSuperType;
+        this.testSubType = testSubType;
+        this.testResults = testResults;
+        this.isVulnerable = isVulnerable;
+        this.singleTypeInfos = singleTypeInfos;
+        this.confidencePercentage = confidencePercentage;
+        this.startTimestamp = startTimestamp;
+        this.endTimestamp = endTimestamp;
         this.testRunResultSummaryId = testRunResultSummaryId;
     }
 
@@ -61,14 +71,6 @@ public class TestingRunResult {
 
     public void setTestRunId(ObjectId testRunId) {
         this.testRunId = testRunId;
-    }
-
-    public Map<String, TestResult> getResultMap() {
-        return resultMap;
-    }
-
-    public void setResultMap(Map<String, TestResult> resultMap) {
-        this.resultMap = resultMap;
     }
 
 
@@ -112,17 +114,67 @@ public class TestingRunResult {
         this.testRunResultSummaryHexId = testRunResultSummaryHexId;
     }
 
-    @Override
-    public String toString() {
-        return "{" +
-            " id='" + getId() + "'" +
-            ", testRunId='" + getTestRunId() + "'" +
-            ", apiInfoKey='" + getApiInfoKey() + "'" +
-            ", resultMap='" + getResultMap() + "'" +
-            ", startTimestamp='" + getStartTimestamp() + "'" +
-            ", endTimestamp='" + getEndTimestamp() + "'" +
-            ", testRunResultSummaryId='" + getTestRunResultSummaryId() + "'" +
-            "}";
+    public String getTestSuperType() {
+        return testSuperType;
     }
 
+    public void setTestSuperType(String testSuperType) {
+        this.testSuperType = testSuperType;
+    }
+
+    public String getTestSubType() {
+        return testSubType;
+    }
+
+    public void setTestSubType(String testSubType) {
+        this.testSubType = testSubType;
+    }
+
+    public List<TestResult> getTestResults() {
+        return testResults;
+    }
+
+    public void setTestResults(List<TestResult> testResults) {
+        this.testResults = testResults;
+    }
+
+    public boolean isVulnerable() {
+        return isVulnerable;
+    }
+
+    public void setVulnerable(boolean vulnerable) {
+        isVulnerable = vulnerable;
+    }
+
+    public List<SingleTypeInfo> getSingleTypeInfos() {
+        return singleTypeInfos;
+    }
+
+    public void setSingleTypeInfos(List<SingleTypeInfo> singleTypeInfos) {
+        this.singleTypeInfos = singleTypeInfos;
+    }
+
+    public int getConfidencePercentage() {
+        return confidencePercentage;
+    }
+
+    public void setConfidencePercentage(int confidencePercentage) {
+        this.confidencePercentage = confidencePercentage;
+    }
+
+    @Override
+    public String toString() {
+        return "TestingRunResult{" +
+                "id=" + id +
+                ", testRunId=" + testRunId +
+                ", apiInfoKey=" + apiInfoKey +
+                ", testSuperType='" + testSuperType + '\'' +
+                ", testSubType='" + testSubType + '\'' +
+                ", isVulnerable=" + isVulnerable +
+                ", confidencePercentage=" + confidencePercentage +
+                ", startTimestamp=" + startTimestamp +
+                ", endTimestamp=" + endTimestamp +
+                ", testRunResultSummaryId=" + testRunResultSummaryId +
+                '}';
+    }
 }

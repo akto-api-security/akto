@@ -1,6 +1,7 @@
 package com.akto.testing;
 
 import com.akto.dao.AuthMechanismsDao;
+import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.ApiInfo;
@@ -13,8 +14,6 @@ import com.akto.rules.TestPlugin;
 import com.akto.store.SampleMessageStore;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
-import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,6 +68,9 @@ public class TestExecutor {
         Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = SampleMessageStore.fetchSampleMessages();
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
 
+        // todo: ???
+        ObjectId testRunResultSummaryId = new ObjectId();
+
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         System.out.println("APIs: " + apiInfoKeyList.size());
@@ -81,7 +83,7 @@ public class TestExecutor {
                 if (store.contains(modifiedKey)) continue;
                 store.add(modifiedKey);
                 List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleMessages);
-                start(apiInfoKey, testingRun.getTestIdConfig(), testingRun.getId(), singleTypeInfoMap, messages, authMechanism);
+                start(apiInfoKey, testingRun.getTestIdConfig(), testingRun.getId(), singleTypeInfoMap, messages, authMechanism, testRunResultSummaryId);
             } catch (Exception e) {
                 logger.error(e.getMessage());
             }
@@ -89,7 +91,8 @@ public class TestExecutor {
     }
 
     public void start(ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId,
-                      Map<String, SingleTypeInfo> singleTypeInfoMap, List<RawApi> messages, AuthMechanism authMechanism) {
+                      Map<String, SingleTypeInfo> singleTypeInfoMap, List<RawApi> messages, AuthMechanism authMechanism,
+                      ObjectId testRunResultSummaryId) {
         if (testIdConfig != 0) {
             logger.error("Test id config is not 0 but " + testIdConfig);
             return;
@@ -98,28 +101,29 @@ public class TestExecutor {
         BOLATest bolaTest = new BOLATest();
         NoAuthTest noAuthTest = new NoAuthTest();
 
-        List<Bson> updates = new ArrayList<>();
-
-        TestResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, authMechanism, messages, updates, singleTypeInfoMap);
+        List<TestingRunResult> testingRunResults = new ArrayList<>();
+        TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, authMechanism, messages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+        testingRunResults.add(noAuthTestResult);
         if (!noAuthTestResult.isVulnerable()) {
-            runTest(bolaTest, apiInfoKey, authMechanism, messages, updates,  singleTypeInfoMap);
+            TestingRunResult bolaTestResult = runTest(bolaTest, apiInfoKey, authMechanism, messages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+            testingRunResults.add(bolaTestResult);
         }
 
-        Bson filter = TestingRunResultDao.generateFilter(testRunId, apiInfoKey.getApiCollectionId(), apiInfoKey.url, apiInfoKey.method.name());
-        Bson update = Updates.combine(updates);
-
-        TestingRunResultDao.instance.updateOne(filter, update);
+        TestingRunResultDao.instance.insertMany(testingRunResults);
     }
 
-    public TestResult runTest(TestPlugin testPlugin, ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, List<RawApi> messages,
-                        List<Bson> updates, Map<String, SingleTypeInfo> singleTypeInfos) {
-        TestResult testResult = testPlugin.start(apiInfoKey, authMechanism, messages, singleTypeInfos);
-        if (testResult != null) {
-            updates.add(
-                    Updates.set("resultMap." + testPlugin.testName(), testResult)
-            );
-        }
-        return testResult;
+    public TestingRunResult runTest(TestPlugin testPlugin, ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, List<RawApi> messages,
+                        Map<String, SingleTypeInfo> singleTypeInfos, ObjectId testRunId, ObjectId testRunResultSummaryId) {
+
+        int startTime = Context.now();
+        TestPlugin.Result result = testPlugin.start(apiInfoKey, authMechanism, messages, singleTypeInfos);
+        int endTime = Context.now();
+
+        return new TestingRunResult(
+                testRunId, apiInfoKey, testPlugin.superTestName(), testPlugin.subTestName(), result.testResults,
+                result.isVulnerable,result.singleTypeInfos, result.confidencePercentage,
+                startTime, endTime, testRunResultSummaryId
+        );
     }
 
 }

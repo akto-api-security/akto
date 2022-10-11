@@ -9,9 +9,8 @@ import com.akto.store.SampleMessageStore;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.StatusCodeAnalyser;
 
-import org.bson.types.ObjectId;
-
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -20,7 +19,7 @@ public class BOLATest extends TestPlugin {
     public BOLATest() { }
 
     @Override
-    public TestResult start(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, List<RawApi> messages, Map<String, SingleTypeInfo> singleTypeInfoMap) {
+    public Result start(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, List<RawApi> messages, Map<String, SingleTypeInfo> singleTypeInfoMap) {
 
         List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, authMechanism);
         if (filteredMessages.isEmpty()) return addWithoutRequestError(null, TestResult.TestError.NO_PATH);
@@ -41,13 +40,25 @@ public class BOLATest extends TestPlugin {
         if (testError != null) {
             return addWithRequestError( result.rawApi.getOriginalMessage(), testError, result.rawApi.getRequest());
         } else {
+            TestResult testResult = buildTestResult(
+                    result.testRequest, result.testResponse, result.rawApi.getOriginalMessage(),
+                    result.percentageMatch, result.vulnerable
+            );
             return addTestSuccessResult(
-                    result.testRequest, result.testResponse,
-                    result.rawApi.getOriginalMessage(),
-                    vulnerable, result.percentageMatch, result.singleTypeInfos, result.confidence
+                    vulnerable,Collections.singletonList(testResult), result.singleTypeInfos, result.confidence
             );
         }
 
+    }
+
+    @Override
+    public String superTestName() {
+        return "BOLA";
+    }
+
+    @Override
+    public String subTestName() {
+        return "REPLACE_AUTH_TOKEN";
     }
 
     public static class ExecutorResult {
@@ -107,12 +118,6 @@ public class BOLATest extends TestPlugin {
                 rawApi, null, testRequest, testResponse);
 
     }
-
-    @Override
-    public String testName() {
-        return "BOLA";
-    }
-
 
 
 }

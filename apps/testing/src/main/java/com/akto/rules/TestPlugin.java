@@ -3,10 +3,10 @@ package com.akto.rules;
 import com.akto.dto.*;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.type.*;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.RelationshipSync;
-import com.akto.store.SampleMessageStore;
 import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -27,10 +27,11 @@ public abstract class TestPlugin {
 
     private static final Logger logger = LoggerFactory.getLogger(TestPlugin.class);
 
-    public abstract TestResult start(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, List<RawApi> messages,
-                                     Map<String, SingleTypeInfo> singleTypeInfos);
+    public abstract Result start(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, List<RawApi> messages,
+                                           Map<String, SingleTypeInfo> singleTypeInfos);
 
-    public abstract String testName();
+    public abstract String superTestName();
+    public abstract String subTestName();
 
     public static boolean isStatusGood(int statusCode) {
         return statusCode >= 200 && statusCode<300;
@@ -83,11 +84,13 @@ public abstract class TestPlugin {
 
     }
 
-    public TestResult addWithoutRequestError(String originalMessage, TestResult.TestError testError) {
-        return new TestResult(null, originalMessage,false, Collections.singletonList(testError), new ArrayList<>(), 0, TestResult.Confidence.LOW);
+    public Result addWithoutRequestError(String originalMessage, TestResult.TestError testError) {
+        List<TestResult> testResults = new ArrayList<>();
+        testResults.add(new TestResult(null, originalMessage, Collections.singletonList(testError), 0, false, TestResult.Confidence.HIGH));
+        return new Result(testResults, false,new ArrayList<>(), 0);
     }
 
-    public TestResult addWithRequestError(String originalMessage, TestResult.TestError testError, OriginalHttpRequest request) {
+    public Result addWithRequestError(String originalMessage, TestResult.TestError testError, OriginalHttpRequest request) {
         String message = null;
         try {
             message = RedactSampleData.convertOriginalReqRespToString(request, null);
@@ -95,14 +98,15 @@ public abstract class TestPlugin {
             e.printStackTrace();
         }
 
-        return new TestResult(message, originalMessage, false, Collections.singletonList(testError), new ArrayList<>(), 0, TestResult.Confidence.LOW);
+        List<TestResult> testResults = new ArrayList<>();
+        testResults.add(new TestResult(message, originalMessage, Collections.singletonList(testError), 0, false, TestResult.Confidence.HIGH));
+
+        return new Result(testResults, false,new ArrayList<>(), 0);
     }
 
+    public TestResult buildTestResult(OriginalHttpRequest request,
+                                      OriginalHttpResponse response, String originalMessage,double percentageMatch, boolean isVulnerable) {
 
-    public TestResult addTestSuccessResult( OriginalHttpRequest request,
-                                     OriginalHttpResponse response, String originalMessage,
-                                     boolean vulnerable, double percentageMatch, List<SingleTypeInfo> singleTypeInfos,
-                                     TestResult.Confidence confidence) {
         List<TestResult.TestError> errors = new ArrayList<>();
         String message = null;
         try {
@@ -114,8 +118,13 @@ public abstract class TestPlugin {
             errors.add(TestResult.TestError.FAILED_TO_CONVERT_TEST_REQUEST_TO_STRING);
         }
 
-        return new TestResult(message, originalMessage, vulnerable, errors, singleTypeInfos,
-                percentageMatch, confidence);
+        return new TestResult(message, originalMessage, errors, percentageMatch, isVulnerable, TestResult.Confidence.HIGH);
+
+    }
+
+    public Result addTestSuccessResult(boolean vulnerable, List<TestResult> testResults , List<SingleTypeInfo> singleTypeInfos, TestResult.Confidence confidence) {
+        int confidencePercentage = confidence.equals(TestResult.Confidence.HIGH) ? 100 : 50;
+        return new Result(testResults, vulnerable,singleTypeInfos, confidencePercentage);
     }
 
     public static class ContainsPrivateResourceResult {
@@ -189,6 +198,20 @@ public abstract class TestPlugin {
         boolean finalPrivateResult = isPrivate && atLeastOneValueInRequest;
 
         return new ContainsPrivateResourceResult(finalPrivateResult, singleTypeInfoList);
+    }
+
+    public static class Result {
+        public List<TestResult> testResults;
+        public boolean isVulnerable;
+        public List<SingleTypeInfo> singleTypeInfos;
+        public int confidencePercentage;
+
+        public Result(List<TestResult> testResults, boolean isVulnerable, List<SingleTypeInfo> singleTypeInfos, int confidencePercentage) {
+            this.testResults = testResults;
+            this.isVulnerable = isVulnerable;
+            this.singleTypeInfos = singleTypeInfos;
+            this.confidencePercentage = confidencePercentage;
+        }
     }
 
 }
