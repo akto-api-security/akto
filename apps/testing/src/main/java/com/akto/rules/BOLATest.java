@@ -97,7 +97,7 @@ public class BOLATest extends TestPlugin {
 
         int statusCode = StatusCodeAnalyser.getStatusCode(testResponse.getBody(), testResponse.getStatusCode());
         double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), testResponse.getBody());
-        boolean vulnerable = isStatusGood(statusCode) && !containsPrivateResourceResult.isPrivate && percentageMatch > 90;
+        boolean vulnerable = isStatusGood(statusCode) && containsPrivateResourceResult.isPrivate && percentageMatch > 90;
 
         // We can say with high confidence if an api is not vulnerable, and we don't need help of private resources for this
         if (!vulnerable) confidence = Confidence.HIGH;
