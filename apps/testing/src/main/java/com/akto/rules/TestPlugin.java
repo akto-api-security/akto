@@ -95,7 +95,7 @@ public abstract class TestPlugin {
 
     public void addWithoutRequestError(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, String originalMessage, TestResult.TestError testError) {
         Bson filter = TestingRunResultDao.generateFilter(testRunId, apiInfoKey.getApiCollectionId(), apiInfoKey.url, apiInfoKey.method.name());
-        TestResult testResult = new TestResult(null, originalMessage,false, Collections.singletonList(testError), new ArrayList<>(), 0, TestResult.Confidence.LOW);
+        TestResult testResult = new TestResult(null, originalMessage, Collections.singletonList(testError), 0, false, TestResult.Confidence.LOW);
         Bson update = Updates.set("resultMap." + testName(), testResult);
         TestingRunResultDao.instance.updateOne(filter, update);
     }
@@ -110,7 +110,7 @@ public abstract class TestPlugin {
             e.printStackTrace();
         }
 
-        TestResult testResult = new TestResult(message, originalMessage, false, Collections.singletonList(testError), new ArrayList<>(), 0, TestResult.Confidence.LOW);
+        TestResult testResult = new TestResult(message, originalMessage, Collections.singletonList(testError), 0, false, TestResult.Confidence.LOW);
         Bson update = Updates.set("resultMap." + testName(), testResult);
         TestingRunResultDao.instance.updateOne(filter, update);
     }
@@ -130,8 +130,8 @@ public abstract class TestPlugin {
         }
 
         Bson filter = TestingRunResultDao.generateFilter(testRunId, apiInfoKey);
-        TestResult testResult = new TestResult(message, originalMessage, vulnerable, new ArrayList<>(), singleTypeInfos,
-                percentageMatch, confidence);
+        TestResult testResult = new TestResult(message, originalMessage, new ArrayList<>(),
+                percentageMatch, vulnerable, confidence);
         Bson update = Updates.set("resultMap." + testName(), testResult);
         TestingRunResultDao.instance.updateOne(filter, update);
     }
