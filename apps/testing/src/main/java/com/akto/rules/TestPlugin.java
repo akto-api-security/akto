@@ -3,10 +3,11 @@ package com.akto.rules;
 import com.akto.dto.*;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
-import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.type.*;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.RelationshipSync;
+import com.akto.testing.ApiExecutor;
+import com.akto.testing.StatusCodeAnalyser;
 import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -27,8 +28,8 @@ public abstract class TestPlugin {
 
     private static final Logger logger = LoggerFactory.getLogger(TestPlugin.class);
 
-    public abstract Result start(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, List<RawApi> messages,
-                                           Map<String, SingleTypeInfo> singleTypeInfos);
+    public abstract Result  start(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages,
+                                     Map<String, SingleTypeInfo> singleTypeInfos);
 
     public abstract String superTestName();
     public abstract String subTestName();
@@ -198,6 +199,40 @@ public abstract class TestPlugin {
         boolean finalPrivateResult = isPrivate && atLeastOneValueInRequest;
 
         return new ContainsPrivateResourceResult(finalPrivateResult, singleTypeInfoList);
+    }
+
+    public static List<URLMethods.Method> findUndocumentedMethods(Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages, ApiInfo.ApiInfoKey apiInfoKey) {
+        // We will hit only those methods whose traffic doesn't exist. For that we see if corresponding method exists or not in sample messages
+        List<URLMethods.Method> undocumentedMethods = new ArrayList<>();
+        for (URLMethods.Method method: URLMethods.Method.values()) {
+            if (method.equals(URLMethods.Method.OTHER)) continue;
+            ApiInfo.ApiInfoKey methodApiInfoKey = new ApiInfo.ApiInfoKey(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), method);
+            if (sampleMessages.containsKey(methodApiInfoKey)) continue;
+            undocumentedMethods.add(method);
+        }
+
+        return undocumentedMethods;
+    }
+
+    public ApiExecutionDetails executeApiAndReturnDetails(OriginalHttpRequest testRequest, boolean followRedirects, OriginalHttpResponse originalHttpResponse) throws Exception {
+        OriginalHttpResponse testResponse = ApiExecutor.sendRequest(testRequest, followRedirects);;
+
+        int statusCode = StatusCodeAnalyser.getStatusCode(testResponse.getBody(), testResponse.getStatusCode());
+        double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), testResponse.getBody());
+
+        return new ApiExecutionDetails(statusCode, percentageMatch, testResponse);
+    }
+
+    public static class ApiExecutionDetails {
+        public int statusCode;
+        public double percentageMatch;
+        public OriginalHttpResponse testResponse;
+
+        public ApiExecutionDetails(int statusCode, double percentageMatch, OriginalHttpResponse testResponse) {
+            this.statusCode = statusCode;
+            this.percentageMatch = percentageMatch;
+            this.testResponse = testResponse;
+        }
     }
 
     public static class Result {

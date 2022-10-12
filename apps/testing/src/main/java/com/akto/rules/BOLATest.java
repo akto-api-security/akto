@@ -19,8 +19,9 @@ public class BOLATest extends TestPlugin {
     public BOLATest() { }
 
     @Override
-    public Result start(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, List<RawApi> messages, Map<String, SingleTypeInfo> singleTypeInfoMap) {
+    public Result start(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages, Map<String, SingleTypeInfo> singleTypeInfoMap) {
 
+        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleMessages);
         List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, authMechanism);
         if (filteredMessages.isEmpty()) return addWithoutRequestError(null, TestResult.TestError.NO_PATH);
 
@@ -99,23 +100,21 @@ public class BOLATest extends TestPlugin {
         // When it comes to case b we still say private resource but with low confidence, hence the below line
         TestResult.Confidence confidence = containsPrivateResourceResult.findPrivateOnes().size() > 0 ? TestResult.Confidence.HIGH : TestResult.Confidence.LOW;
 
-        OriginalHttpResponse testResponse;
+        ApiExecutionDetails apiExecutionDetails;
         try {
-            testResponse = ApiExecutor.sendRequest(testRequest, true);
+            apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, originalHttpResponse);
         } catch (Exception e) {
             return new ExecutorResult(false, null, new ArrayList<>(), 0, rawApi,
                     TestResult.TestError.API_REQUEST_FAILED, testRequest, null);
         }
 
-        int statusCode = StatusCodeAnalyser.getStatusCode(testResponse.getBody(), testResponse.getStatusCode());
-        double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), testResponse.getBody());
-        boolean vulnerable = isStatusGood(statusCode) && !containsPrivateResourceResult.isPrivate && percentageMatch > 90;
+        boolean vulnerable = isStatusGood(apiExecutionDetails.statusCode) && containsPrivateResourceResult.isPrivate && apiExecutionDetails.percentageMatch > 90;
 
         // We can say with high confidence if an api is not vulnerable, and we don't need help of private resources for this
         if (!vulnerable) confidence = Confidence.HIGH;
 
-        return new ExecutorResult(vulnerable,confidence, containsPrivateResourceResult.singleTypeInfos, percentageMatch,
-                rawApi, null, testRequest, testResponse);
+        return new ExecutorResult(vulnerable,confidence, containsPrivateResourceResult.singleTypeInfos, apiExecutionDetails.percentageMatch,
+                rawApi, null, testRequest, apiExecutionDetails.testResponse);
 
     }
 

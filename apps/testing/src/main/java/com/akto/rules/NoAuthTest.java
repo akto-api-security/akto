@@ -5,9 +5,6 @@ import com.akto.dto.*;
 import com.akto.dto.testing.*;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.store.SampleMessageStore;
-import com.akto.testing.ApiExecutor;
-import com.akto.testing.StatusCodeAnalyser;
-import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -18,7 +15,8 @@ import java.util.Map;
 public class NoAuthTest extends TestPlugin {
 
     @Override
-    public Result start(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, List<RawApi> messages, Map<String, SingleTypeInfo> singleTypeInfoMap) {
+    public Result  start(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages, Map<String, SingleTypeInfo> singleTypeInfoMap) {
+        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleMessages);
         List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, authMechanism);
         if (filteredMessages.isEmpty()) return addWithoutRequestError(null, TestResult.TestError.NO_PATH);
 
@@ -29,20 +27,17 @@ public class NoAuthTest extends TestPlugin {
 
         authMechanism.removeAuthFromRequest(testRequest);
 
-        OriginalHttpResponse testResponse = null;
+        ApiExecutionDetails apiExecutionDetails;
         try {
-            testResponse = ApiExecutor.sendRequest(testRequest, true);
+             apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, originalHttpResponse);
         } catch (Exception e) {
             return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest);
         }
 
-        int statusCode = StatusCodeAnalyser.getStatusCode(testResponse.getBody(), testResponse.getStatusCode());
-        boolean vulnerable = isStatusGood(statusCode);
-
-        double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), testResponse.getBody());
+        boolean vulnerable = isStatusGood(apiExecutionDetails.statusCode);
 
         TestResult testResult = buildTestResult(
-                testRequest, testResponse, rawApi.getOriginalMessage(), percentageMatch, vulnerable
+                testRequest, apiExecutionDetails.testResponse, rawApi.getOriginalMessage(), apiExecutionDetails.percentageMatch, vulnerable
         );
         return addTestSuccessResult(
                 vulnerable, Collections.singletonList(testResult), new ArrayList<>(), TestResult.Confidence.HIGH
