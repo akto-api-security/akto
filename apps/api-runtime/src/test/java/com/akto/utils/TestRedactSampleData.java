@@ -5,6 +5,7 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.parsers.HttpCallParser;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -14,6 +15,8 @@ import org.junit.jupiter.api.Assertions;
 
 import java.io.IOException;
 import java.util.*;
+
+import static org.junit.Assert.assertEquals;
 
 public class TestRedactSampleData {
 
@@ -180,6 +183,39 @@ public class TestRedactSampleData {
         }
 
         return true;
+    }
+
+    @Test
+    public void redactNonJsonPayload() throws Exception {
+        Map<String, List<String>> reqHeaders = new HashMap<>();
+        reqHeaders.put("header1", Arrays.asList("valueA1","valueB1","valueC1"));
+        reqHeaders.put("header2", Arrays.asList("valueA1","valueB1","valueC1"));
+
+        Map<String, List<String>> respHeaders = new HashMap<>();
+        respHeaders.put("header3", Arrays.asList("valueA1","valueB1","valueC1"));
+
+        String reqPayload = "something random";
+
+        HttpRequestParams httpRequestParams = new HttpRequestParams(
+                "GET", "/api/books", "type",reqHeaders, reqPayload, 0
+        );
+
+        String respPayload = "random response payload";
+
+        HttpResponseParams httpResponseParams = new HttpResponseParams(
+                "type", 200, "OK", respHeaders, respPayload, httpRequestParams, 0, "1000000", false, HttpResponseParams.Source.MIRRORING, "orig","172.0.0.1"
+        );
+
+        String redactedValue = RedactSampleData.redact(httpResponseParams);
+
+        HttpResponseParams redactedHttpResponseParams = HttpCallParser.parseKafkaMessage(redactedValue);
+
+        assertEquals(2, redactedHttpResponseParams.requestParams.getHeaders().size());
+        assertEquals(1, redactedHttpResponseParams.getHeaders().size());
+        assertEquals("{}", redactedHttpResponseParams.requestParams.getPayload());
+        assertEquals("{}", redactedHttpResponseParams.getPayload());
+        assertEquals(200, redactedHttpResponseParams.statusCode);
+
     }
 
     @Test
