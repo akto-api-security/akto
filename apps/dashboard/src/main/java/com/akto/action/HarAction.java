@@ -6,18 +6,15 @@ import com.akto.dao.RuntimeFilterDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.har.HAR;
-import com.akto.kafka.Kafka;
 import com.akto.listener.KafkaListener;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.policies.AktoPolicy;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
+import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 import com.sun.jna.*;
 
@@ -48,19 +45,22 @@ public class HarAction extends UserAction {
 
     @Override
     public String execute() throws IOException {
+        ApiCollection apiCollection = null;
         if (apiCollectionName != null) {
-            ApiCollection apiCollection =  ApiCollectionsDao.instance.findByName(apiCollectionName);
-            if (apiCollection == null) {
-                addActionError("Invalid collection name");
-                return ERROR.toUpperCase();
-            }
-
-            if (apiCollection.getVxlanId() != 0)  {
-                addActionError("Traffic mirroring collection can't be used");
-                return ERROR.toUpperCase();
-            }
-
+            apiCollection =  ApiCollectionsDao.instance.findByName(apiCollectionName);
             apiCollectionId = apiCollection.getId();
+        } else {
+            apiCollection =  ApiCollectionsDao.instance.findOne(Filters.eq("_id", apiCollectionId));
+        }
+
+        if (apiCollection == null) {
+            addActionError("Invalid collection name");
+            return ERROR.toUpperCase();
+        }
+
+        if (apiCollection.getVxlanId() != 0)  {
+            addActionError("Traffic mirroring collection can't be used");
+            return ERROR.toUpperCase();
         }
 
         if (KafkaListener.kafka == null) {
