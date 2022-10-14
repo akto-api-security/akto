@@ -70,6 +70,24 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(new String[]{"param", "apiCollectionId"}));
             counter++;
         }
+
+        if (counter == 4) {
+            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(new String[]{SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID}));
+            counter++;
+        }
+    }
+
+
+    public static Bson filterForHostHeader(int apiCollectionId, boolean useApiCollectionId) {
+        List<Bson> filters = new ArrayList<>();
+        filters.add(Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1));
+        filters.add(Filters.eq(SingleTypeInfo._IS_HEADER, true));
+        filters.add(Filters.eq(SingleTypeInfo._PARAM, "host"));
+        filters.add(Filters.eq(SingleTypeInfo.SUB_TYPE, SingleTypeInfo.GENERIC.getName()));
+
+        if (useApiCollectionId) filters.add(Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId));
+
+        return Filters.and(filters);
     }
 
     public List<SingleTypeInfo> fetchAll() {

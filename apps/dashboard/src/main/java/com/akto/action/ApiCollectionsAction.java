@@ -22,6 +22,19 @@ public class ApiCollectionsAction extends UserAction {
 
     public String fetchAllCollections() {
         this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+
+        Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap();
+
+        for (ApiCollection apiCollection: apiCollections) {
+            int apiCollectionId = apiCollection.getId();
+            Integer count = countMap.get(apiCollectionId);
+            if (count != null && apiCollection.getVxlanId() != 0) {
+                apiCollection.setUrlsCount(count);
+            } else {
+                apiCollection.setUrlsCount(apiCollection.getUrls().size());
+            }
+        }
+
         return Action.SUCCESS.toUpperCase();
     }
 
