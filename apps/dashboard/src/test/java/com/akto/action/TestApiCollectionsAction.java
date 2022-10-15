@@ -82,13 +82,17 @@ public class TestApiCollectionsAction extends MongoBasedTest {
         ApiCollectionsDao.instance.getMCollection().drop();
         List<ApiCollection> apiCollectionList = new ArrayList<>();
 
-        // mirroring collection
+        // mirroring collection with host
         Set<String> urls1 = new HashSet<>(Arrays.asList("1", "2", "3", "4", "5", "6"));
         apiCollectionList.add(new ApiCollection(1000, "one", 1000, urls1, "one.com", 1000));
 
-        // non mirroring collection
+        // mirroring collections without hosts
         Set<String> urls2 = new HashSet<>(Arrays.asList("1", "2", "3"));
-        apiCollectionList.add(new ApiCollection(2000, "two", 2000, urls2, "two.com",0));
+        apiCollectionList.add(new ApiCollection(2000, "two", 2000, urls2, null,2000));
+
+        // manually created collections
+        Set<String> urls3 = new HashSet<>(Arrays.asList("1", "2", "3", "4"));
+        apiCollectionList.add(new ApiCollection(3000, "three", 3000, urls3, null,0));
 
         ApiCollectionsDao.instance.insertMany(apiCollectionList);
 
@@ -114,7 +118,7 @@ public class TestApiCollectionsAction extends MongoBasedTest {
         apiCollectionsAction.fetchAllCollections();
         List<ApiCollection> apiCollections = apiCollectionsAction.apiCollections;
 
-        assertEquals(2,apiCollections.size());
+        assertEquals(3,apiCollections.size());
 
         Map<Integer, ApiCollection> apiCollectionMap = new HashMap<>();
         for (ApiCollection apiCollection: apiCollections)  {
@@ -123,6 +127,7 @@ public class TestApiCollectionsAction extends MongoBasedTest {
 
         assertEquals(100, apiCollectionMap.get(1000).getUrlsCount());
         assertEquals(3, apiCollectionMap.get(2000).getUrlsCount()); // because burp collection we use count from urls stored in set
+        assertEquals(4, apiCollectionMap.get(3000).getUrlsCount()); // because burp collection we use count from urls stored in set
 
     }
 }
