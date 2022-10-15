@@ -28,7 +28,7 @@ public class ApiCollectionsAction extends UserAction {
         for (ApiCollection apiCollection: apiCollections) {
             int apiCollectionId = apiCollection.getId();
             Integer count = countMap.get(apiCollectionId);
-            if (count != null && apiCollection.getVxlanId() != 0) {
+            if (count != null && apiCollection.getHostName() != null) {
                 apiCollection.setUrlsCount(count);
             } else {
                 apiCollection.setUrlsCount(apiCollection.getUrls().size());
@@ -69,6 +69,7 @@ public class ApiCollectionsAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        // do not change hostName or vxlanId here
         ApiCollection apiCollection = new ApiCollection(Context.now(), collectionName,Context.now(),new HashSet<>(), null, 0);
         ApiCollectionsDao.instance.insertOne(apiCollection);
         this.apiCollections = new ArrayList<>();
