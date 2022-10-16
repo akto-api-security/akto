@@ -125,24 +125,6 @@ public class ApiExecutor {
         return common(okHttpRequest, followRedirects);
     }
 
-    public static String getRawQueryFromJson(String requestPayload) {
-        HttpUrl.Builder builder = new HttpUrl.Builder()
-                .scheme("https")
-                .host("www.google.com");
-
-        BasicDBObject obj = BasicDBObject.parse(requestPayload);
-        Set<String> keySet = obj.keySet();
-        if (keySet.isEmpty()) return null;
-
-        for(String key: keySet) {
-            Object val = obj.get(key);
-            builder.addQueryParameter(key, val.toString());
-        }
-
-        URI uri = builder.build().uri();
-
-        return uri.getRawQuery();
-    }
 
 
     public static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects) throws Exception {

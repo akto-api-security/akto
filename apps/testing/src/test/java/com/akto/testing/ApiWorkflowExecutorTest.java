@@ -13,20 +13,6 @@ import static org.junit.Assert.*;
 
 public class ApiWorkflowExecutorTest {
 
-    @Test
-    public void testCombineQueryParams() {
-        String query1 = "user=avneesh&age=99&favColour=blue&status=all_is_well";
-        String query2 = "status=blah%20blah&age=101";
-        String combinedQuery = new ApiWorkflowExecutor().combineQueryParams(query1, query2);
-        assertTrue(combinedQuery.contains("status=blah%20blah"));
-
-        BasicDBObject combinedQueryObject = RequestTemplate.getQueryJSON("google.com?"+combinedQuery);
-
-        assertEquals("avneesh", combinedQueryObject.get("user"));
-        assertEquals("101", combinedQueryObject.get("age"));
-        assertEquals("blue", combinedQueryObject.get("favColour"));
-        assertEquals("blah blah", combinedQueryObject.get("status"));
-    }
 
     @Test
     public void testExecuteCode() throws Exception {

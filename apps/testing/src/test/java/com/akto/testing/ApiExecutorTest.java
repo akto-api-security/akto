@@ -35,11 +35,4 @@ public class ApiExecutorTest {
         assertEquals(url, "http://127.0.0.1/dashboard");
     }
 
-    @Test
-    public void testGetRawQueryFromJson() {
-        String normalReq = "{\"name\": \"avneesh\", \"cities\": [{\"name\": \"Mumbai\"}, {\"name\": \"Bangalore\"}], \"age\": 99}";
-        String resultNormalReq = ApiExecutor.getRawQueryFromJson(normalReq);
-        BasicDBObject queryParams = RequestTemplate.getQueryJSON("?"+ resultNormalReq);
-        assertEquals(3, queryParams.size());
-    }
 }
