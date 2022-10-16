@@ -22,6 +22,19 @@ public class ApiCollectionsAction extends UserAction {
 
     public String fetchAllCollections() {
         this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+
+        Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap();
+
+        for (ApiCollection apiCollection: apiCollections) {
+            int apiCollectionId = apiCollection.getId();
+            Integer count = countMap.get(apiCollectionId);
+            if (count != null && apiCollection.getHostName() != null) {
+                apiCollection.setUrlsCount(count);
+            } else {
+                apiCollection.setUrlsCount(apiCollection.getUrls().size());
+            }
+        }
+
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -56,6 +69,7 @@ public class ApiCollectionsAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        // do not change hostName or vxlanId here
         ApiCollection apiCollection = new ApiCollection(Context.now(), collectionName,Context.now(),new HashSet<>(), null, 0);
         ApiCollectionsDao.instance.insertOne(apiCollection);
         this.apiCollections = new ArrayList<>();

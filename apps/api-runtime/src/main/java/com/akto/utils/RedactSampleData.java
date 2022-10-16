@@ -39,14 +39,19 @@ public class RedactSampleData {
         // response payload
         String responsePayload = httpResponseParams.getPayload();
         if (responsePayload == null) responsePayload = "{}";
-        JsonParser jp = factory.createParser(responsePayload);
-        JsonNode node = mapper.readTree(jp);
-        change(node, redactValue);
-        if (node != null) {
-            responsePayload = node.toString();
-        } else {
+        try {
+            JsonParser jp = factory.createParser(responsePayload);
+            JsonNode node = mapper.readTree(jp);
+            change(node, redactValue);
+            if (node != null) {
+                responsePayload = node.toString();
+            } else {
+                responsePayload = "{}";
+            }
+        } catch (Exception e) {
             responsePayload = "{}";
         }
+
         httpResponseParams.setPayload(responsePayload);
 
         // request headers
@@ -57,14 +62,19 @@ public class RedactSampleData {
         // request payload
         String requestPayload = httpResponseParams.requestParams.getPayload();
         if (requestPayload == null) requestPayload = "{}";
-        jp = factory.createParser(requestPayload);
-        node = mapper.readTree(jp);
-        change(node, redactValue);
-        if (node != null) {
-            requestPayload= node.toString();
-        } else {
+        try {
+            JsonParser jp = factory.createParser(requestPayload);
+            JsonNode node = mapper.readTree(jp);
+            change(node, redactValue);
+            if (node != null) {
+                requestPayload= node.toString();
+            } else {
+                requestPayload = "{}";
+            }
+        } catch (Exception e) {
             requestPayload = "{}";
         }
+
         httpResponseParams.requestParams.setPayload(requestPayload);
 
         // ip

@@ -119,16 +119,15 @@ public class InventoryAction extends UserAction {
         return endpoints;
     }
 
-    private boolean useHost;
     public List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId) {
 
         ApiCollection apiCollection = ApiCollectionsDao.instance.findAll(Filters.eq("_id", apiCollectionId), Projections.exclude("urls")).get(0);
 
-        if (apiCollection.getHostName() == null || apiCollection.getHostName().length() == 0 || !useHost) {
+        if (apiCollection.getHostName() == null || apiCollection.getHostName().length() == 0 ) {
             return fetchEndpointsInCollection(apiCollectionId);
         } else {
-            Bson filterQ = Filters.and(Filters.eq("param", "host"), Filters.eq("apiCollectionId", apiCollectionId));
-            List<SingleTypeInfo> allUrlsInCollection = SingleTypeInfoDao.instance.findAll(filterQ, skip, LIMIT, null);
+            Bson filterQ = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, true);
+            List<SingleTypeInfo> allUrlsInCollection = SingleTypeInfoDao.instance.findAll(filterQ, skip,10_000, null);
 
             List<BasicDBObject> endpoints = new ArrayList<>();
             for(SingleTypeInfo singleTypeInfo: allUrlsInCollection) {
@@ -607,7 +606,4 @@ public class InventoryAction extends UserAction {
         this.endTimestamp = endTimestamp;
     }
 
-    public void setUseHost(boolean useHost) {
-        this.useHost = useHost;
-    }
 }
