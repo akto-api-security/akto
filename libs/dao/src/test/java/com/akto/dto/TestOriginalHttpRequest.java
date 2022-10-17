@@ -1,5 +1,7 @@
 package com.akto.dto;
 
+import com.akto.dto.type.RequestTemplate;
+import com.mongodb.BasicDBObject;
 import org.junit.Test;
 
 import java.util.Collections;
@@ -7,8 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
+import static org.junit.Assert.*;
 
 public class TestOriginalHttpRequest {
 
@@ -99,6 +100,29 @@ public class TestOriginalHttpRequest {
         assertEquals(headers,copyOriginalHttpRequest.getHeaders());
         assertEquals(type,copyOriginalHttpRequest.getType());
 
+    }
+
+    @Test
+    public void testCombineQueryParams() {
+        String query1 = "user=avneesh&age=99&favColour=blue&status=all_is_well";
+        String query2 = "status=blah%20blah&age=101";
+        String combinedQuery = OriginalHttpRequest.combineQueryParams(query1, query2);
+        assertTrue(combinedQuery.contains("status=blah%20blah"));
+
+        BasicDBObject combinedQueryObject = RequestTemplate.getQueryJSON("google.com?"+combinedQuery);
+
+        assertEquals("avneesh", combinedQueryObject.get("user"));
+        assertEquals("101", combinedQueryObject.get("age"));
+        assertEquals("blue", combinedQueryObject.get("favColour"));
+        assertEquals("blah blah", combinedQueryObject.get("status"));
+    }
+
+    @Test
+    public void testGetRawQueryFromJson() {
+        String normalReq = "{\"name\": \"avneesh\", \"cities\": [{\"name\": \"Mumbai\"}, {\"name\": \"Bangalore\"}], \"age\": 99}";
+        String resultNormalReq = OriginalHttpRequest.getRawQueryFromJson(normalReq);
+        BasicDBObject queryParams = RequestTemplate.getQueryJSON("?"+ resultNormalReq);
+        assertEquals(3, queryParams.size());
     }
 
 }

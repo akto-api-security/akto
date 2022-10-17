@@ -1,8 +1,11 @@
 package com.akto.dto;
 
+import com.akto.dto.type.RequestTemplate;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+import okhttp3.HttpUrl;
 
+import java.net.URI;
 import java.util.*;
 
 public class OriginalHttpRequest {
@@ -76,6 +79,45 @@ public class OriginalHttpRequest {
         List<String> values = this.headers.get(headerName.trim().toLowerCase());
         if (values == null || values.size() == 0) return null;
         return values.get(0);
+    }
+
+    // queryString2 overrides queryString1 use accordingly
+    public static String combineQueryParams(String queryString1, String queryString2) {
+        if (queryString1 == null) return queryString2;
+        if (queryString2 == null) return queryString1;
+
+        String mockUrl1 = "url?" + queryString1;
+        String mockUrl2 = "url?" + queryString2;
+
+        BasicDBObject queryParamsObject1 = RequestTemplate.getQueryJSON(mockUrl1);
+        BasicDBObject queryParamsObject2 = RequestTemplate.getQueryJSON(mockUrl2);
+
+        for (String key: queryParamsObject2.keySet()) {
+            queryParamsObject1.put(key, queryParamsObject2.get(key));
+        }
+
+        String json = queryParamsObject1.toJson();
+
+        return getRawQueryFromJson(json);
+    }
+
+    public static String getRawQueryFromJson(String requestPayload) {
+        HttpUrl.Builder builder = new HttpUrl.Builder()
+                .scheme("https")
+                .host("www.google.com");
+
+        BasicDBObject obj = BasicDBObject.parse(requestPayload);
+        Set<String> keySet = obj.keySet();
+        if (keySet.isEmpty()) return null;
+
+        for(String key: keySet) {
+            Object val = obj.get(key);
+            builder.addQueryParameter(key, val.toString());
+        }
+
+        URI uri = builder.build().uri();
+
+        return uri.getRawQuery();
     }
 
 

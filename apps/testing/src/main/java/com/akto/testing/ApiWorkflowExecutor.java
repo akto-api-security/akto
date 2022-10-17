@@ -277,7 +277,7 @@ public class ApiWorkflowExecutor {
                 request.setQueryParams(finalQueryParams);
             } else {
                 // combine original query params and user defined query params and latter overriding former
-                String combinedQueryParams = combineQueryParams(ogQuery, finalQueryParams);
+                String combinedQueryParams = OriginalHttpRequest.combineQueryParams(ogQuery, finalQueryParams);
                 request.setQueryParams(combinedQueryParams);
             }
         }
@@ -285,25 +285,6 @@ public class ApiWorkflowExecutor {
         return request;
     }
 
-    // queryString2 overrides queryString1 use accordingly
-    public String combineQueryParams(String queryString1, String queryString2) {
-        if (queryString1 == null) return queryString2;
-        if (queryString2 == null) return queryString1;
-
-        String mockUrl1 = "url?" + queryString1;
-        String mockUrl2 = "url?" + queryString2;
-
-        BasicDBObject queryParamsObject1 = RequestTemplate.getQueryJSON(mockUrl1);
-        BasicDBObject queryParamsObject2 = RequestTemplate.getQueryJSON(mockUrl2);
-
-        for (String key: queryParamsObject2.keySet()) {
-            queryParamsObject1.put(key, queryParamsObject2.get(key));
-        }
-
-        String json = queryParamsObject1.toJson();
-
-        return ApiExecutor.getRawQueryFromJson(json);
-    }
 
     private final ScriptEngineManager factory = new ScriptEngineManager();
 
