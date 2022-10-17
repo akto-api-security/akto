@@ -12,9 +12,11 @@ import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -76,8 +78,12 @@ public class Main {
 
             logger.info("Found one + " + testingRun.getId().toHexString());
 
+            TestingRunResultSummary summary = new TestingRunResultSummary(start, 0, new HashMap<>(), 0, testingRun.getId(), testingRun.getId().toHexString());
+
+            ObjectId summaryId = TestingRunResultSummariesDao.instance.insertOne(summary).getInsertedId().asObjectId().getValue();
+
             try {
-                testExecutor.init(testingRun);
+                testExecutor.init(testingRun, summaryId);
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -98,6 +104,8 @@ public class Main {
             TestingRunDao.instance.getMCollection().findOneAndUpdate(
                     Filters.eq("_id", testingRun.getId()),  completedUpdate
             );
+
+            TestingRunResultSummariesDao.instance.updateOne("id", summaryId, Updates.set("endTimestamp", Context.now()));
 
             logger.info("Tests completed in " + (Context.now() - start) + " seconds");
         }

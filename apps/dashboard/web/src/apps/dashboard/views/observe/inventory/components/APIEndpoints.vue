@@ -164,7 +164,7 @@
             </template>
         </layout-with-tabs>
         <v-dialog v-model="showScheduleTestBox" width="400px">
-            <schedule-box @schedule="scheduleTest"/>
+            <schedule-box @schedule="startTest"/>
         </v-dialog>
     </div>
 </template>
@@ -467,7 +467,7 @@ export default {
                 }
             }
         },
-        async scheduleTest({recurringDaily, startTimestamp}) {
+        async startTest({recurringDaily, startTimestamp}) {
             let apiInfoKeyList = this.toApiInfoKeyList(this.filteredItemsForScheduleTest)
             let filtersSelected = this.filteredItemsForScheduleTest.length === this.allEndpoints.length
             let store = this.$store

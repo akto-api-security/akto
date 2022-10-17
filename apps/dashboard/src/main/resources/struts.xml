@@ -824,7 +824,7 @@
             </result>
         </action>
 
-        <action name="api/scheduleTest" class="com.akto.action.testing.StartTestAction" method="scheduleTest">
+        <action name="api/retrieveAllCollectionTests" class="com.akto.action.testing.StartTestAction" method="retrieveAllCollectionTests">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
@@ -835,7 +835,7 @@
             </result>
         </action>
 
-        <action name="api/retrieveAllCollectionTests" class="com.akto.action.testing.StartTestAction" method="retrieveAllCollectionTests">
+        <action name="api/fetchTestingRunResultSummaries" class="com.akto.action.testing.StartTestAction" method="fetchTestingRunResultSummaries">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
@@ -868,7 +868,7 @@
             </result>
         </action>
 
-        <action name="api/fetchTestingRunResults" class="com.akto.action.testing.AuthMechanismAction" method="fetchTestingRunResults">
+        <action name="api/fetchTestingRunResults" class="com.akto.action.testing.StartTestAction" method="fetchTestingRunResults">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>

@@ -20,8 +20,8 @@
             </template>
 
             <v-list-item
-                v-for="child in item.items"
-                :key="child.title"
+                v-for="(child, index) in item.items"
+                :key="child.hexId+'_'+index"
                 :to="child.link"
                 :class="['menu-item', child.class || '']"
                 active-class="menu-item-active"

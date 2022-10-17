@@ -109,6 +109,10 @@ public class TestingRun {
         this.state = state;
     }
 
+    public String getHexId() {
+        return this.id.toHexString();
+    }
+
     @Override
     public String toString() {
         return "{" +

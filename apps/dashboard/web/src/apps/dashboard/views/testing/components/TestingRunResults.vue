@@ -36,62 +36,105 @@
                 class="pa-5"
                 @dateClicked=dateClicked
             />     
-            <div class="testing-results-header">
+            <div class="testing-results-header" v-if="currentTest">
                 <span>Test results: </span>    
                 <span>{{selectedDateStr()}}</span>
-                <span
-                    v-for="(data, index) in testResultsChartData()"
-                    :key="'chip_'+index"            
-                >
-                    <v-chip
-                        :color="data.color.substr(0, 7)+'30'"
-                        class="mx-2"
-                        small
-                    >
-                        <span :style="{'color': data.color.substr(0, 7)+'ff'}">{{data.data}} {{selectedDate}}{{data.name.toLowerCase()}}</span>
-                    </v-chip>
-                </span>
-                
-            </div>  
+            </div>                  
+            <simple-table
+                :headers="testingRunResultsHeaders" 
+                :items="testingRunResultsItems" 
+                name="" 
+                sortKeyDefault="isVulnerable" 
+                :sortDescDefault="true"
+            >
+                <template #item.severity="{item}">
+                    <sensitive-chip-group 
+                        :sensitiveTags="Array.from([item.severity] || new Set())" 
+                        :chipColor="getColor(item.severity)"
+                        :hideTag="true"
+                    />
+                </template>
+            
+            </simple-table>
+            
         </div>
     </div>
 </template>
 
 <script>
-
-import obj from "@/util/obj"
-import func from "@/util/func"
 import DateRange from '@/apps/dashboard/shared/components/DateRange'
 import ACard from '@/apps/dashboard/shared/components/ACard'
 import StackedChart from '@/apps/dashboard/shared/components/charts/StackedChart'
+import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
+import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
+
+import api from '../api'
+
+import obj from "@/util/obj"
+import func from "@/util/func"
+import testing from "@/util/testing"
+
+import {mapState} from "vuex"
 
 export default {
     name: "TestingRunResults",
     props: {
-        testId: obj.numR,
+        testingRunHexId: obj.strR,
         defaultStartTimestamp: obj.numN,
         defaultEndTimestamp: obj.numN
     },
     components: {
         DateRange,
         ACard,
-        StackedChart
+        StackedChart,
+        SimpleTable,
+        SensitiveChipGroup
     },
     data () {
+        let endTimestamp = this.defaultEndTimestamp || func.timeNow()
         return {
             title: "Unauthenticated",
-            endpoints: 100,
-            isDaily: true,
             testTypes: ["Bola", "Workflow", "Bua"],
-            testingRuns: [],
             startTimestamp: this.defaultStartTimestamp || (func.timeNow() - func.recencyPeriod/9),
-            endTimestamp: this.defaultEndTimestamp || func.timeNow(),
-            selectedDate: +func.dayStart(Math.min(...this.testingRuns.map(x => x.timestamp))*1000)
+            endTimestamp: endTimestamp,
+            selectedDate: +func.dayStart(endTimestamp * 1000),
+            testingRunResultSummaries: [],
+            testingRunResults: [],
+            testingRunResultsHeaders: [
+                {
+                    text: "",
+                    value: "color"
+                },
+                {
+                    text: "Endpoint",
+                    value: "endpoint"
+                },
+                {
+                    text: "Issue category",
+                    value: "testSuperType"
+                },
+                {
+                    text: "Test",
+                    value: "testSubType"
+                },
+                {
+                    text: "Severity",
+                    value: "severity"
+                }
+            ]
         }
     },
     methods: {
+        getColor(severity) {
+            switch (severity) {
+                case "HIGH": return "#FF000080"
+                case "MEDIUM":  return "#FF5C0080"
+                case "LOW": return "#F9B30080"
+            }
+            
+        },
         selectedDateStr() {
-            return func.toTimeStr(new Date(this.selectedDate), true)
+            return func.toTimeStr(new Date(this.currentTest.startTimestamp * 1000), true)
         },
         getScheduleStr() {
             return this.isDaily ? "Running daily" : "Run once"
@@ -130,10 +173,38 @@ export default {
         },
         dateClicked(point) {
             this.selectedDate = point
-            console.log(this.selectedDate)            
+            console.log(this.selectedDate)
+        },
+        refreshSummaries() {
+            api.fetchTestingRunResultSummaries(this.startTimestamp, this.endTimestamp, this.testingRunHexId).then(resp => {
+                this.testingRunResultSummaries = resp.testingRunResultSummaries
+            })
+        },
+        prepareForTable(runResult) {
+            return {
+                ...runResult,
+                endpoint: runResult.apiInfoKey.method + " " + runResult.apiInfoKey.url,
+                severity: (runResult.testResults || []).reduce((z, e) => {
+                    if (z === "HIGH" || e === "HIGH") return z
+
+                    if (z === "MEDIUM" || e === "MEDIUM") return "MEDIUM"
+
+                    return "LOW"
+                }, "LOW")
+            }
         }
     },
+    mounted() {
+        this.refreshSummaries()
+    },
     computed: {
+        ...mapState('testing', ['testingRuns', 'pastTestingRuns']),
+        testingRun() {
+            return [...this.testingRuns, ...this.pastTestingRuns].filter(x => x.hexId === this.testingRunHexId)[0]
+        },
+        endpoints() {
+            return this.testingRun ? testing.getEndpoints(this.testingRun.testingEndpoints) : "-"
+        },
         dateRange: {
             get () {
                 return [this.toHyphenatedDate(this.startTimestamp * 1000), this.toHyphenatedDate(this.endTimestamp * 1000)]
@@ -142,10 +213,20 @@ export default {
                 this.startTimestamp = parseInt(this.toEpochInMs(newDateRange[0]) / 1000)
                 this.endTimestamp = parseInt(this.toEpochInMs(newDateRange[1]) / 1000)
                 this.selectedDate = this.endTimestamp*1000
+                this.refreshSummaries()
             }
         },
         currentTest() {
-            return this.testingRuns.filter(x => +func.dayStart(x.timestamp*1000) === this.selectedDate)
+            let currentSummary = this.testingRunResultSummaries.filter(x => +func.dayStart(x.startTimestamp*1000) === this.selectedDate)[0]
+            if (currentSummary) {
+                api.fetchTestingRunResults(currentSummary.hexId).then(resp => {
+                    this.testingRunResults = resp.testingRunResults
+                })
+            }
+            return currentSummary
+        },
+        testingRunResultsItems() {
+            return (this.testingRunResults || []).map(x => this.prepareForTable(x))
         }
     }
 }

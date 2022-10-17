@@ -27,7 +27,7 @@ public class StartTestAction extends UserAction {
     private List<ApiInfo.ApiInfoKey> apiInfoKeyList;
     private int testIdConfig;
     private int workflowTestId;
-    int startTimestamp;
+    private int startTimestamp;
     boolean recurringDaily;
     private List<TestingRun> testingRuns;
     private AuthMechanism authMechanism;
@@ -137,7 +137,7 @@ public class StartTestAction extends UserAction {
     public String fetchTestingRunResults() {
         ObjectId testingRunResultSummaryId = new ObjectId(testingRunResultSummaryHexId);
         
-        this.testingRunResults = TestingRunResultDao.instance.findAll(TestingRunResultSummary.TESTING_RUN_ID, testingRunResultSummaryId);
+        this.testingRunResults = TestingRunResultDao.instance.findAll("testRunResultSummaryId", testingRunResultSummaryId);
 
         return SUCCESS.toUpperCase();
     }
@@ -233,5 +233,21 @@ public class StartTestAction extends UserAction {
 
     public void setWorkflowTestId(int workflowTestId) {
         this.workflowTestId = workflowTestId;
+    }
+
+    public void setTestingRunHexId(String testingRunHexId) {
+        this.testingRunHexId = testingRunHexId;
+    }
+
+    public List<TestingRunResultSummary> getTestingRunResultSummaries() {
+        return this.testingRunResultSummaries;
+    }
+
+    public void setTestingRunResultSummaryHexId(String testingRunResultSummaryHexId) {
+        this.testingRunResultSummaryHexId = testingRunResultSummaryHexId;
+    }
+
+    public List<TestingRunResult> getTestingRunResults() {
+        return this.testingRunResults;
     }
 }

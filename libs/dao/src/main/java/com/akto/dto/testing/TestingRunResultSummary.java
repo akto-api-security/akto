@@ -13,9 +13,10 @@ public class TestingRunResultSummary {
     public static final String TOTAL_APIS = "totalApis";    
     public static final String TESTING_RUN_ID = "testingRunId";    
 
+    private ObjectId id;
     private int startTimestamp;
     private int endTimestamp;
-    private Map<TestResult.Severity, Integer> countIssues;
+    private Map<String, Integer> countIssues;
     private int totalApis;
     private ObjectId testingRunId;
     @BsonIgnore
@@ -23,10 +24,14 @@ public class TestingRunResultSummary {
 
     private TestingRun.State state; 
 
+    @BsonIgnore
+    private String hexId;
+
+
     public TestingRunResultSummary() {
     }
 
-    public TestingRunResultSummary(int startTimestamp, int endTimestamp, Map<TestResult.Severity,Integer> countIssues, int totalApis, ObjectId testingRunId, String testingRunHexId) {
+    public TestingRunResultSummary(int startTimestamp, int endTimestamp, Map<String,Integer> countIssues, int totalApis, ObjectId testingRunId, String testingRunHexId) {
         this.startTimestamp = startTimestamp;
         this.endTimestamp = endTimestamp;
         this.countIssues = countIssues;
@@ -34,6 +39,14 @@ public class TestingRunResultSummary {
         this.testingRunId = testingRunId;
         this.testingRunHexId = testingRunHexId;
         this.state = TestingRun.State.RUNNING;
+    }
+
+    public ObjectId getId() {
+        return id;
+    }
+
+    public void setId(ObjectId id) {
+        this.id = id;
     }
 
     public int getStartTimestamp() {
@@ -52,11 +65,11 @@ public class TestingRunResultSummary {
         this.endTimestamp = endTimestamp;
     }
 
-    public Map<TestResult.Severity,Integer> getCountIssues() {
+    public Map<String,Integer> getCountIssues() {
         return this.countIssues;
     }
 
-    public void setCountIssues(Map<TestResult.Severity,Integer> countIssues) {
+    public void setCountIssues(Map<String,Integer> countIssues) {
         this.countIssues = countIssues;
     }
 
@@ -90,6 +103,10 @@ public class TestingRunResultSummary {
 
     public void setState(TestingRun.State state) {
         this.state = state;
+    }
+
+    public String getHexId() {
+        return this.id.toHexString();
     }
 
     @Override

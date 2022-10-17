@@ -28,15 +28,15 @@ public class TestExecutor {
 
     private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
 
-    public void init(TestingRun testingRun) {
+    public void init(TestingRun testingRun, ObjectId summaryId) {
         if (testingRun.getTestIdConfig() == 0)     {
-            apiWiseInit(testingRun);
+            apiWiseInit(testingRun, summaryId);
         } else {
-            workflowInit(testingRun);
+            workflowInit(testingRun, summaryId);
         }
     }
 
-    public void workflowInit (TestingRun testingRun) {
+    public void workflowInit (TestingRun testingRun, ObjectId summaryId) {
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
         if (!testingEndpoints.getType().equals(TestingEndpoints.Type.WORKFLOW)) {
             logger.error("Invalid workflow type");
@@ -59,7 +59,7 @@ public class TestExecutor {
         apiWorkflowExecutor.init(workflowTest, testingRun.getId());
     }
 
-    public void  apiWiseInit(TestingRun testingRun) {
+    public void  apiWiseInit(TestingRun testingRun, ObjectId summaryId) {
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
         Map<String, SingleTypeInfo> singleTypeInfoMap = SampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
@@ -67,7 +67,7 @@ public class TestExecutor {
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
 
         // todo: ???
-        ObjectId testRunResultSummaryId = new ObjectId();
+        ObjectId testRunResultSummaryId = summaryId;
 
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;

@@ -8,6 +8,7 @@ Vue.use(Vuex)
 var state = {
     loading: false,
     testingRuns: [],
+    pastTestingRuns: [],
     authMechanism: null,
     testingRunResults: []
 }
@@ -21,16 +22,20 @@ const testing = {
             state.testingRuns = []
             state.authMechanism = null
             state.testingRunResults = []
+            state.pastTestingRuns = []
         },
         SAVE_DETAILS (state, {authMechanism, testingRuns}) {
             state.authMechanism = authMechanism
             state.testingRuns = testingRuns
         },
+        SAVE_PAST_DETAILS (state, {testingRuns}) {
+            state.pastTestingRuns = testingRuns
+        },
         SAVE_TESTING_RUNS (state, {testingRuns}) {
             state.testingRuns = testingRuns
         },
-        SAVE_AUTH_MECHANISM (state, {authMechanism}) {
-            state.authMechanism = authMechanism
+        SAVE_AUTH_MECHANISM (state, {key, value, location}) {
+            state.authMechanism.authParams[0] = {key, value, where: location}
         },
         SAVE_TESTING_RUN_RESULTS(state, {testingRunResults}) {
             state.testingRunResults = testingRunResults
@@ -40,11 +45,18 @@ const testing = {
         emptyState({commit}, payload, options) {
             commit('EMPTY_STATE', payload, options)
         },
-        loadTestingDetails({commit}, options) {
+        loadTestingDetails({commit}, {startTimestamp, endTimestamp}) {
             commit('EMPTY_STATE')
             state.loading = true
-            return api.fetchTestingDetails().then((resp) => {
+            return api.fetchActiveTestingDetails().then((resp) => {
                 commit('SAVE_DETAILS', resp)
+
+                api.fetchPastTestingDetails({startTimestamp, endTimestamp}).then(resp2 => {
+                    commit('SAVE_PAST_DETAILS', resp2)
+                }).catch(() => {
+
+                })
+
                 state.loading = false
             }).catch(() => {
                 state.loading = false
@@ -57,7 +69,7 @@ const testing = {
         },
         scheduleTestForCollection({commit}, {apiCollectionId, startTimestamp, recurringDaily} ) {
             return api.scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily).then((resp) => {
-                commit('SAVE_TESTING_SCHEDULES', resp)
+                commit('SAVE_TESTING_RUNS', resp)
             })
         },
         startTestForCustomEndpoints({commit}, apiInfoKeyList) {
@@ -67,7 +79,7 @@ const testing = {
         },
         scheduleTestForCustomEndpoints({commit}, {apiInfoKeyList, startTimestamp, recurringDaily} ) {
             return api.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily).then((resp) => {
-                commit('SAVE_TESTING_SCHEDULES', resp)
+                commit('SAVE_TESTING_RUNS', resp)
             })
         },
         addAuthMechanism({commit}, {key, value, location}) {

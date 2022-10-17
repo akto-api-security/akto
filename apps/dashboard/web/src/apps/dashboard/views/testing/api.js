@@ -1,7 +1,7 @@
 import request from '@/util/request'
 
 export default {
-    fetchTestingDetails() {
+    fetchActiveTestingDetails() {
         return request({
             url: '/api/retrieveAllCollectionTests',
             method: 'post',
@@ -11,6 +11,30 @@ export default {
         })
     },
 
+    fetchPastTestingDetails({startTimestamp, endTimestamp}) {
+        return request({
+            url: '/api/retrieveAllCollectionTests',
+            method: 'post',
+            data: {
+                startTimestamp, 
+                endTimestamp
+            }
+        }).then((resp) => {
+            return resp
+        })
+    },
+
+    fetchTestingRunResultSummaries(startTimestamp, endTimestamp, testingRunHexId) {
+        return request({
+            url: '/api/fetchTestingRunResultSummaries',
+            method: 'post',
+            data: {
+                startTimestamp, 
+                endTimestamp,
+                testingRunHexId
+            }
+        })
+    },
     startTestForCustomEndpoints(apiInfoKeyList) {
         return request({
             url: '/api/startTest',
@@ -33,7 +57,7 @@ export default {
 
     scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily) {
         return request({
-            url: '/api/scheduleTest',
+            url: '/api/startTest',
             method: 'post',
             data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily}
         }).then((resp) => {
@@ -43,7 +67,7 @@ export default {
 
     scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily) {
         return request({
-            url: '/api/scheduleTest',
+            url: '/api/startTest',
             method: 'post',
             data: {apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily}
         }).then((resp) => {
@@ -61,11 +85,13 @@ export default {
         })        
     },
 
-    fetchTestingRunResults() {
+    fetchTestingRunResults(testingRunResultSummaryHexId) {
         return request({
             url: '/api/fetchTestingRunResults',
             method: 'post',
-            data: {}
+            data: {
+                testingRunResultSummaryHexId
+            }
         }).then((resp) => {
             return resp
         })        

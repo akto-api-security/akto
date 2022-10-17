@@ -64,7 +64,7 @@
                 v-model="showScheduleTestBox"
                 width="400px"
             >
-                <schedule-box @schedule="scheduleTest"/>
+                <schedule-box @schedule="startTest"/>
             </v-dialog>
         </div>
     </div>        
@@ -236,7 +236,7 @@ export default {
                 this.scheduleTestCollectionId = item.id
             }
         },
-        async scheduleTest({recurringDaily, startTimestamp}) {
+        async startTest({recurringDaily, startTimestamp}) {
             await this.$store.dispatch('testing/scheduleTestForCollection', {apiCollectionId: this.scheduleTestCollectionId, startTimestamp, recurringDaily})
             this.showScheduleTestBox = false
         }
@@ -256,7 +256,8 @@ export default {
         }
     },
     mounted () {
-        this.$store.dispatch('testing/loadTestingDetails')
+        let now = func.timeNow()
+        this.$store.dispatch('testing/loadTestingDetails', {startTimestamp: now - func.recencyPeriod, endTimestamp: now})
         this.$emit('mountedView', {type: 0})
     }
 }
