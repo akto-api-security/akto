@@ -65,6 +65,7 @@ export default {
     font-weight: 400
     font-size: 13px
     margin-top: 16px
+    line-height: 1.5
 
 .panel-icon
     color: #6200EA
