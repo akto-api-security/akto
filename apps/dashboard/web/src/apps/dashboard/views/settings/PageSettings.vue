@@ -1,77 +1,62 @@
 <template>
-    <layout-with-tabs title="Settings" :tabs="['Data types', 'Tags', 'Account', 'Users', 'Health', 'Integrations']">
+    <layout-with-tabs title="Settings"
+        :tabs="['Data types', 'Tags', 'Account', 'Users', 'Health', 'Sources', 'Integrations']">
         <template slot="Data types">
-            <data-types 
-                title="Data types"
-                :data_types="data_types"
-                :toggleActivateFieldFunc='toggleActivateDataTypes'
-                :createNewDataType="createNewDataType"
-                @selectedEntry="selectedDataType"
-            >
+            <data-types title="Data types" :data_types="data_types" :toggleActivateFieldFunc='toggleActivateDataTypes'
+                :createNewDataType="createNewDataType" @selectedEntry="selectedDataType">
                 <template #details-container="{}">
                     <a-card title="Details" color="rgba(33, 150, 243)" style="min-height: 600px">
-                        <data-type-details :data_type="data_type"/>
-                    </a-card>                    
+                        <data-type-details :data_type="data_type" />
+                    </a-card>
                 </template>
             </data-types>
         </template>
         <template slot="Tags">
-            <data-types 
-                title="Tags"
-                :data_types="tag_configs"
-                :toggleActivateFieldFunc='toggleActivateTagConfig'
-                :createNewDataType="createNewTagConfig"
-                @selectedEntry="selectedTagConfig"
-            >
+            <data-types title="Tags" :data_types="tag_configs" :toggleActivateFieldFunc='toggleActivateTagConfig'
+                :createNewDataType="createNewTagConfig" @selectedEntry="selectedTagConfig">
                 <template #details-container="{}">
                     <a-card title="Details" color="rgba(33, 150, 243)" style="min-height: 600px">
-                        <tag-config-details :tag_config_copy="tag_config"/>
-                    </a-card>                    
+                        <tag-config-details :tag_config_copy="tag_config" />
+                    </a-card>
                 </template>
             </data-types>
         </template>
-      <template slot="Integrations">
-        <integration-center/>
-      </template>
-      <template slot="Account">
-        <div>
-          <account/>
-            <div class="px-8">
-                <div class="py-4">
-                    <v-dialog
-                        v-model="showDialog"
-                        width="500"
-                    >
-                        <template v-slot:activator="{ on, attrs }">
-                            <v-btn 
-                                primary 
-                                dark 
-                                color="#6200EA" 
-                                @click="showDialog = true"
-                                v-bind="attrs"
-                                v-on="on"
-                            >
-                                Update Akto
-                            </v-btn>
-                        </template>
-                        <div class="dialog-box">
-                            <div class="entry-text"> Please note that this will incur a downtime of 10 mins to update the system. </div>
-                            <div class="d-flex jc-end">
-                                <v-btn primary dark color="#6200EA" @click="takeUpdate">
-                                    Proceed
+        <template slot="Integrations">
+            <integration-center />
+        </template>
+        <template slot="Sources">
+            <load-balancers />
+        </template>
+        <template slot="Account">
+            <div>
+                <account />
+                <div class="px-8">
+                    <div class="py-4">
+                        <v-dialog v-model="showDialog" width="500">
+                            <template v-slot:activator="{ on, attrs }">
+                                <v-btn primary dark color="#6200EA" @click="showDialog = true" v-bind="attrs" v-on="on">
+                                    Update Akto
                                 </v-btn>
+                            </template>
+                            <div class="dialog-box">
+                                <div class="entry-text"> Please note that this will incur a downtime of 10 mins to
+                                    update the system. </div>
+                                <div class="d-flex jc-end">
+                                    <v-btn primary dark color="#6200EA" @click="takeUpdate">
+                                        Proceed
+                                    </v-btn>
+                                </div>
                             </div>
-                        </div>
-                    </v-dialog>
+                        </v-dialog>
+                    </div>
                 </div>
             </div>
-          </div>
         </template>
         <template slot="Users">
-            <team-overview/>
+            <team-overview />
         </template>
         <template slot="Health">
-            <health/>
+            <health />
         </template>
     </layout-with-tabs>
 </template>
@@ -88,11 +73,12 @@ import TagSettings from './components/tag_configs/TagSettings.vue'
 import TagConfigDetails from './components/tag_configs/TagConfigDetails.vue'
 import ACard from '@/apps/dashboard/shared/components/ACard'
 import IntegrationCenter from './components/integrations/IntegrationCenter'
+import LoadBalancers from '../quick_start/components/LoadBalancers'
 
-import {mapState} from 'vuex'
+import { mapState } from 'vuex'
 export default {
     name: "PageSettings",
-    components: { 
+    components: {
         LayoutWithTabs,
         TeamOverview,
         Health,
@@ -103,7 +89,8 @@ export default {
         TagSettings,
         TagConfigDetails,
         DataTypeDetails,
-        ACard
+        ACard,
+        LoadBalancers
     },
     mounted() {
         this.$store.dispatch("data_types/fetchDataTypes")
