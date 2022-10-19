@@ -14,7 +14,5 @@ public interface Stack {
         FAILED_TO_FETCH_STACK_STATUS;
     }
 
-    public Map<String, String> fetchAktoStackParameters() throws Exception;
-
     public String fetchResourcePhysicalIdByLogicalId(String logicalId) throws Exception;
 }
