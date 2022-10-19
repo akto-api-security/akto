@@ -3,6 +3,7 @@ import Router from 'vue-router'
 const PageLogin  = () => import( '@/apps/login/App')
 const PageDashboard  = () => import( '@/apps/dashboard/App')
 const PageToday  = () => import( "@/apps/dashboard/views/today/Today")
+const PageQuickStart  = () => import( "@/apps/dashboard/views/quickstart/PageQuickStart")
 const PageTesting  = () => import( "@/apps/dashboard/views/testing/PageTesting")
 import store from '@/apps/main/store/module'
 const PageSignup = () => import("@/apps/signup/PageSignup")
@@ -57,6 +58,11 @@ const router =  new Router({
                 store.dispatch('collections/loadAllApiCollections').then(() => next()).catch(() => next())
             },
             children: [
+                {
+                    path: 'quick',
+                    name: 'quick',
+                    component: PageQuickStart
+                },        
                 {
                     path: 'testing',
                     name: 'testing',

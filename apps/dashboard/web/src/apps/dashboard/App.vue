@@ -138,6 +138,11 @@
     data () {
       const myItems = [
         {
+          title: 'Quick Start',
+          icon: '$fas_thumbs-up',
+          link: '/dashboard/quick'
+        }, 
+        {
           title: 'Testing',
           icon: '$fas_home',
           link: '/dashboard/testing'
