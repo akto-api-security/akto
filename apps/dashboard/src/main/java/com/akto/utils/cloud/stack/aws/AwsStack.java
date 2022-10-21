@@ -47,7 +47,8 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
             createRequest.setParameters(fetchParamters(parameters));
             createRequest.setCapabilities(STACK_CREATION_CAPABILITIES);
             createRequest.setTemplateBody(
-                    convertStreamToString(AwsStack.class.getResourceAsStream("cft.template")));
+                    convertStreamToString(AwsStack.class
+                            .getResourceAsStream("/cloud_formation_templates/akto_aws_mirroring.template")));
             Future<CreateStackResult> future = CLOUD_FORMATION_ASYNC.createStackAsync(createRequest);
             while (!future.isDone()) {
 
