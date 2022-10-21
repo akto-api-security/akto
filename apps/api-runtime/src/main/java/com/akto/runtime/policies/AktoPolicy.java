@@ -43,11 +43,11 @@ public class AktoPolicy {
         this.filters = RuntimeFilterDao.instance.findAll(new BasicDBObject());
     }
 
-    public AktoPolicy(APICatalogSync apiCatalogSync) {
-        buildFromDb(apiCatalogSync.dbState);
+    public AktoPolicy(APICatalogSync apiCatalogSync, boolean fetchAllSTI) {
+        buildFromDb(apiCatalogSync.dbState, fetchAllSTI);
     }
 
-    public void buildFromDb(Map<Integer, APICatalog> delta) {
+    public void buildFromDb(Map<Integer, APICatalog> delta, boolean fetchAllSTI) {
         fetchFilters();
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(new BasicDBObject());
@@ -93,8 +93,13 @@ public class AktoPolicy {
                 }
             }
         }
-
-        List<ApiInfo> apiInfoList =  ApiInfoDao.instance.findAll(new BasicDBObject());
+        List<ApiInfo> apiInfoList;
+        if (fetchAllSTI) {
+            apiInfoList = ApiInfoDao.instance.findAll(new BasicDBObject());
+        } else {
+            List<Integer> apiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
+            apiInfoList =  ApiInfoDao.instance.findAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
+        }
         for (ApiInfo apiInfo: apiInfoList) {
             try {
                 fillApiInfoInCatalog(apiInfo, true);
@@ -132,7 +137,7 @@ public class AktoPolicy {
         reserveFilterSampleDataMap = new HashMap<>();
     }
 
-    public void syncWithDb(boolean initialising, Map<Integer, APICatalog> delta) {
+    public void syncWithDb(boolean initialising, Map<Integer, APICatalog> delta, boolean fetchAllSTI) {
         // logger.info("Syncing with db");
         if (!initialising) {
             UpdateReturn updateReturn = AktoPolicy.getUpdates(apiInfoCatalogMap);
@@ -147,7 +152,7 @@ public class AktoPolicy {
             }
         }
 
-        buildFromDb(delta);
+        buildFromDb(delta,fetchAllSTI);
     }
 
     public void fillFilterSampleDataInCatalog(FilterSampleData filterSampleData) {
@@ -280,7 +285,7 @@ public class AktoPolicy {
 
     }
 
-    public void main(List<HttpResponseParams> httpResponseParamsList, APICatalogSync apiCatalogSync) throws Exception {
+    public void main(List<HttpResponseParams> httpResponseParamsList, APICatalogSync apiCatalogSync, boolean fetchAllSTI) throws Exception {
         if (httpResponseParamsList == null) httpResponseParamsList = new ArrayList<>();
         for (HttpResponseParams httpResponseParams: httpResponseParamsList) {
             try {
@@ -295,7 +300,7 @@ public class AktoPolicy {
         if (apiCatalogSync != null) {
             this.currentBatchSize = 0;
             this.timeSinceLastSync = Context.now();
-            syncWithDb(false, apiCatalogSync.dbState);
+            syncWithDb(false, apiCatalogSync.dbState, fetchAllSTI);
         }
     }
 

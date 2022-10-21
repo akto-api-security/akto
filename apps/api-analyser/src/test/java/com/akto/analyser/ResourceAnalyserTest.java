@@ -74,11 +74,11 @@ public class ResourceAnalyserTest extends MongoBasedTest {
 
         Collections.shuffle(responseParams);
 
-        HttpCallParser httpCallParser = new HttpCallParser("", 0, 0, 0);
-        httpCallParser.syncFunction(responseParams, true);
+        HttpCallParser httpCallParser = new HttpCallParser("", 0, 0, 0, true);
+        httpCallParser.syncFunction(responseParams, true, true);
 
         // to add new single type info of urlParams
-        httpCallParser.syncFunction(responseParams, true);
+        httpCallParser.syncFunction(responseParams, true, true);
 
         List<SingleTypeInfo> singleTypeInfoList = SingleTypeInfoDao.instance.fetchAll();
         assertEquals(13, singleTypeInfoList.size()); // 3 per api (url3 and url4 merged) and 1 url param

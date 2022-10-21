@@ -261,6 +261,11 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return endpoints;
     }
 
+    public List<SingleTypeInfo> fetchStiOfCollections(List<Integer> apiCollectionIds) {
+        Bson filters = Filters.in(SingleTypeInfo._API_COLLECTION_ID, apiCollectionIds);
+        return instance.findAll(filters);
+    }
+
     public void deleteValues() {
         instance.getMCollection().updateMany(
                 Filters.exists(SingleTypeInfo._VALUES),

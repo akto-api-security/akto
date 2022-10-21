@@ -755,8 +755,14 @@ public class APICatalogSync {
     }
 
 
-    public void buildFromDB(boolean calcDiff) {
-        List<SingleTypeInfo> allParams = SingleTypeInfoDao.instance.fetchAll();
+    public void buildFromDB(boolean calcDiff, boolean fetchAllSTI) {
+        List<SingleTypeInfo> allParams;
+        if (fetchAllSTI) {
+            allParams = SingleTypeInfoDao.instance.fetchAll();
+        } else {
+            List<Integer> apiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
+            allParams = SingleTypeInfoDao.instance.fetchStiOfCollections(apiCollectionIds);
+        }
         this.dbState = build(allParams);
         this.sensitiveParamInfoBooleanMap = new HashMap<>();
         List<SensitiveParamInfo> sensitiveParamInfos = SensitiveParamInfoDao.instance.getUnsavedSensitiveParamInfos();
@@ -908,7 +914,7 @@ public class APICatalogSync {
 
     int counter = 0;
 
-    public void syncWithDB(boolean syncImmediately) {
+    public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI) {
         List<WriteModel<SingleTypeInfo>> writesForParams = new ArrayList<>();
         List<WriteModel<SensitiveSampleData>> writesForSensitiveSampleData = new ArrayList<>();
         List<WriteModel<TrafficInfo>> writesForTraffic = new ArrayList<>();
@@ -976,7 +982,7 @@ public class APICatalogSync {
             SensitiveParamInfoDao.instance.getMCollection().bulkWrite(writesForSensitiveParamInfo);
         }
 
-        buildFromDB(true);
+        buildFromDB(true, fetchAllSTI);
     }
 
     public void printNewURLsInDelta(APICatalog deltaCatalog) {
