@@ -80,7 +80,7 @@ public class QuickStartAction extends UserAction {
             try {
                 Map<String, String> parameters = new HashMap<String, String>() {
                     {
-                        put("MongoIp", System.getenv("AKTO_MONGO_CONN_CFT")); // TODO update this before checking in
+                        put("MongoIp", System.getenv("AKTO_MONGO_CONN")); // TODO update this before checking in
                         put("KeyPair", System.getenv("EC2_KEY_PAIR"));
                         put("SourceLBs", extractLBs());
                         put("SubnetId", System.getenv("EC2_SUBNET_ID"));
