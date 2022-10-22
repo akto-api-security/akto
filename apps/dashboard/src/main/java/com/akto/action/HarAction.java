@@ -58,7 +58,7 @@ public class HarAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        if (apiCollection.getVxlanId() != 0)  {
+        if (apiCollection.getHostName() != null)  {
             addActionError("Traffic mirroring collection can't be used");
             return ERROR.toUpperCase();
         }
