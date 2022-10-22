@@ -186,4 +186,7 @@
     background-color: #FFFFFF    
 .fs-12
     font-size: 12px
+
+.text-primary    
+    color: #47466A
 </style>
