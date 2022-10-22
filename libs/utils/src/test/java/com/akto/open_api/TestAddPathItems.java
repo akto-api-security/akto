@@ -15,11 +15,11 @@ public class TestAddPathItems {
     public void happy() {
         Paths paths = new Paths();
         try {
-            Main.addPathItems(200,paths, "/api/1", "GET", new ArrayList<>());
-            Main.addPathItems(404,paths, "/api/1", "GET", new ArrayList<>());
-            Main.addPathItems(200,paths, "/api/1", "POST", new ArrayList<>());
-            Main.addPathItems(200,paths, "/api/1", "PUT", new ArrayList<>());
-            Main.addPathItems(200,paths, "/api/2", "GET", new ArrayList<>());
+            Main.addPathItems(200,paths, "/api/1", "GET", new ArrayList<>(), true);
+            Main.addPathItems(404,paths, "/api/1", "GET", new ArrayList<>(), true);
+            Main.addPathItems(200,paths, "/api/1", "POST", new ArrayList<>(), true);
+            Main.addPathItems(200,paths, "/api/1", "PUT", new ArrayList<>(), true);
+            Main.addPathItems(200,paths, "/api/2", "GET", new ArrayList<>(), true);
         } catch (Exception e) {
             e.printStackTrace();
         }

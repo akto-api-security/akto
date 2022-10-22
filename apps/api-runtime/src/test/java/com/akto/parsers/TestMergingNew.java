@@ -10,6 +10,7 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
 import com.akto.runtime.APICatalogSync;
+import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -163,6 +164,9 @@ public class TestMergingNew extends MongoBasedTest {
 
         parser.syncFunction(responseParams.subList(0,10), false);
         parser.apiCatalogSync.syncWithDB(false);
+
+        parser = new HttpCallParser("userIdentifier", 1, 1, 1);
+
         parser.syncFunction(responseParams.subList(10,25), false);
         parser.apiCatalogSync.syncWithDB(false);
         parser.syncFunction(responseParams.subList(25,30), false);
