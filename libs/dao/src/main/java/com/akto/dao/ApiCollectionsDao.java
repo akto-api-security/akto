@@ -50,8 +50,15 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         return null;
     }
 
+    // this is flawed. Because we were in a hurry we allowed this
+    // traffic collection with internal api... do not have hosts and will also be included
     public List<ApiCollection> fetchNonTrafficApiCollections() {
-        return instance.findAll(Filters.eq(ApiCollection.VXLAN_ID, 0));
+        return instance.findAll(
+            Filters.or(
+                Filters.eq(ApiCollection.HOST_NAME, null),
+                Filters.exists(ApiCollection.HOST_NAME, false)
+            )       
+        );
     }
 
     public List<Integer> fetchNonTrafficApiCollectionsIds() {
