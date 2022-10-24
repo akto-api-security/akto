@@ -58,7 +58,7 @@ public class HarAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        if (apiCollection.getVxlanId() != 0)  {
+        if (apiCollection.getHostName() != null)  {
             addActionError("Traffic mirroring collection can't be used");
             return ERROR.toUpperCase();
         }
@@ -77,7 +77,6 @@ public class HarAction extends UserAction {
             addActionError("Empty content");
             return ERROR.toUpperCase();
         }
-        HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1);
 
         try {
             HAR har = new HAR();
@@ -99,10 +98,11 @@ public class HarAction extends UserAction {
             }
             
             if(skipKafka) {
+                HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
                 SingleTypeInfo.fetchCustomDataTypes();
-                APICatalogSync apiCatalogSync = parser.syncFunction(responses, true);
-                AktoPolicy aktoPolicy = new AktoPolicy(parser.apiCatalogSync); // keep inside if condition statement because db call when initialised
-                aktoPolicy.main(responses, apiCatalogSync);
+                APICatalogSync apiCatalogSync = parser.syncFunction(responses, true, false);
+                AktoPolicy aktoPolicy = new AktoPolicy(parser.apiCatalogSync, false); // keep inside if condition statement because db call when initialised
+                aktoPolicy.main(responses, apiCatalogSync, false);
             }
         } catch (Exception e) {
             e.printStackTrace();
