@@ -79,7 +79,7 @@ public class SampleMessageStore {
     }
 
     public static void fetchSampleMessages() {
-        List<SampleData> sampleDataList = SampleDataDao.instance.findAll(new BasicDBObject());
+        List<SampleData> sampleDataList = SampleDataDao.instance.findAll(new BasicDBObject(), 0, 10_000, null);
         System.out.println("SampleDataSize " + sampleDataList.size());
         Map<ApiInfo.ApiInfoKey, List<String>> tempSampleDataMap = new HashMap<>();
         for (SampleData sampleData: sampleDataList) {

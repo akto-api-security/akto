@@ -74,7 +74,7 @@ public class TestDBSync extends MongoBasedTest {
             aggr.addURL(TestDump2.createSampleParams("user"+i, url+i));
         }
         sync.computeDelta(aggr, true, 0);
-        sync.syncWithDB(false);
+        sync.syncWithDB(false, true);
 
         assertEquals(0, sync.getDelta(0).getStrictURLToMethods().size());
         assertEquals(1, sync.getDelta(0).getTemplateURLToMethods().size());
@@ -108,16 +108,16 @@ public class TestDBSync extends MongoBasedTest {
             responseParams.add(TestDump2.createSampleParams("user"+i, url+i));
         }
 
-        HttpCallParser parser = new HttpCallParser("access-token", 1,40,10);
+        HttpCallParser parser = new HttpCallParser("access-token", 1,40,10, true);
 
-        parser.syncFunction(responseParams, false);
+        parser.syncFunction(responseParams, false, true);
         assertTrue(parser.getSyncCount() == 0);
         
-        parser.syncFunction(responseParams, false);
+        parser.syncFunction(responseParams, false, true);
         assertFalse(parser.getSyncCount() == 0);
 
         responseParams.get(0).setSource(Source.HAR);
-        parser.syncFunction(responseParams, false);
+        parser.syncFunction(responseParams, false, true);
         assertTrue(parser.getSyncCount() == 0);
 
         SampleData sd = SampleDataDao.instance.findOne(Filters.eq("_id.url", "immediate/INTEGER"));
@@ -137,14 +137,14 @@ public class TestDBSync extends MongoBasedTest {
         resp.getHeaders().put("new header", newHeader);
         responseParams.add(resp);
         resp.setSource(Source.HAR);
-        HttpCallParser parser = new HttpCallParser("access-token", 10,40,10);
+        HttpCallParser parser = new HttpCallParser("access-token", 10,40,10, true);
 
         /* tryMergingWithKnownStrictURLs - put in delta-static */
-        parser.syncFunction(responseParams, false);
+        parser.syncFunction(responseParams, false, true);
         assertTrue(parser.getSyncCount() == 0);
 
         /* processKnownStaticURLs */
-        parser.syncFunction(responseParams, false);
+        parser.syncFunction(responseParams, false, true);
 
         /* tryMergingWithKnownStrictURLs - merge with delta-static */        
         responseParams.add(TestDump2.createSampleParams("user"+2, url+2));
@@ -152,11 +152,11 @@ public class TestDBSync extends MongoBasedTest {
 
         /* tryMergingWithKnownStrictURLs - merge with delta-template */  
         responseParams.add(TestDump2.createSampleParams("user"+4, url+4));
-        parser.syncFunction(responseParams, false);
+        parser.syncFunction(responseParams, false, true);
         assertTrue(parser.getSyncCount() == 0);
         
         /* tryMergingWithKnownTemplates */
-        parser.syncFunction(responseParams, false);
+        parser.syncFunction(responseParams, false, true);
         assertTrue(parser.getSyncCount() == 0);
 
         /* tryMergingWithKnownStrictURLs - merge with Db url */
@@ -164,14 +164,14 @@ public class TestDBSync extends MongoBasedTest {
         responseParams = new ArrayList<>();
         responseParams.add(TestDump2.createSampleParams("user"+2, url+2));
         responseParams.get(0).setSource(Source.HAR);
-        parser.syncFunction(responseParams, false);
+        parser.syncFunction(responseParams, false, true);
         responseParams = new ArrayList<>();
         responseParams.add(TestDump2.createSampleParams("user"+3, url+3));
 
         /* tryMergingWithKnownStrictURLs - merge with Db url - template already exists in delta */
         responseParams.add(TestDump2.createSampleParams("user"+4, url+4));
         responseParams.get(0).setSource(Source.HAR);
-        parser.syncFunction(responseParams, false);
+        parser.syncFunction(responseParams, false, true);
 
     }  
 
@@ -184,7 +184,7 @@ public class TestDBSync extends MongoBasedTest {
             aggr.addURL(TestDump2.createSampleParams("user"+i, "payment/id"+i));
         }
         sync.computeDelta(aggr, true, 123);
-        sync.syncWithDB(false);
+        sync.syncWithDB(false, true);
 
 
         assertEquals(30, sync.getDelta(123).getStrictURLToMethods().size());
@@ -198,7 +198,7 @@ public class TestDBSync extends MongoBasedTest {
         aggr2.addURL(resp2);
         
         sync.computeDelta(aggr2, true, 123);
-        sync.syncWithDB(false);
+        sync.syncWithDB(false, true);
 
         assertEquals(0, sync.getDelta(123).getStrictURLToMethods().size());
         assertEquals(1, sync.getDelta(123).getTemplateURLToMethods().size());
@@ -223,7 +223,7 @@ public class TestDBSync extends MongoBasedTest {
 
     @Test
     public void testFilterHttpResponseParamsEmpty() {
-        HttpCallParser httpCallParser = new HttpCallParser("",0,0,0);
+        HttpCallParser httpCallParser = new HttpCallParser("",0,0,0, true);
         List<HttpResponseParams> ss = httpCallParser.filterHttpResponseParams(new ArrayList<>());
         assertEquals(ss.size(),0);
     }
@@ -231,7 +231,7 @@ public class TestDBSync extends MongoBasedTest {
     @Test
     public void testFilterHttpResponseParamsIpHost() {
         ApiCollection.useHost = true;
-        HttpCallParser httpCallParser = new HttpCallParser("",0,0,0);
+        HttpCallParser httpCallParser = new HttpCallParser("",0,0,0, true);
         HttpResponseParams h1 = new HttpResponseParams();
         h1.requestParams = new HttpRequestParams();
         h1.requestParams.setHeaders(new HashMap<>());
@@ -257,7 +257,7 @@ public class TestDBSync extends MongoBasedTest {
     @Test
     public void testFilterHttpResponseParamsWithoutHost() {
         ApiCollection.useHost = false;
-        HttpCallParser httpCallParser = new HttpCallParser("",0,0,0);
+        HttpCallParser httpCallParser = new HttpCallParser("",0,0,0, true);
 
         String groupName1 = "groupName1";
         int vxlanId1 = 1;
@@ -318,7 +318,7 @@ public class TestDBSync extends MongoBasedTest {
     @Test
     public void testFilterResponseParamsWithHost() {
         ApiCollection.useHost = true;
-        HttpCallParser httpCallParser = new HttpCallParser("",0,0,0);
+        HttpCallParser httpCallParser = new HttpCallParser("",0,0,0, true);
 
         String groupName1 = "groupName1";
         int vxlanId1 = 1;
@@ -442,7 +442,7 @@ public class TestDBSync extends MongoBasedTest {
         h1.statusCode = 200;
         h1.setSource(Source.MIRRORING);
 
-        HttpCallParser httpCallParser = new HttpCallParser("",0,0,0);
+        HttpCallParser httpCallParser = new HttpCallParser("",0,0,0, true);
         httpCallParser.filterHttpResponseParams(Collections.singletonList(h1));
 
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());

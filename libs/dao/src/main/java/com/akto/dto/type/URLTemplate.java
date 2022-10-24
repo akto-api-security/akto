@@ -182,7 +182,7 @@ public class URLTemplate {
         }
 
         for(int i = 0; i < tokens.length; i ++) {
-            if(that.tokens[i] == null ? this.types[i] != that.types[i] : !this.tokens[i].equals(that.tokens[i])){
+            if(that.tokens[i] == null ? ( this.types[i]==null || this.types[i] != that.types[i] ) : ( this.tokens[i]==null || !this.tokens[i].equals(that.tokens[i]) ) ){
                 return false;
             }
         }
