@@ -101,12 +101,12 @@ public class ApiExecutor {
         OriginalHttpResponse response = null;
         switch (method) {
             case GET:
+            case HEAD:
                 response = getRequest(request, builder, followRedirects);
                 break;
             case POST:
             case PUT:
             case DELETE:
-            case HEAD:
             case OPTIONS:
             case PATCH:
             case TRACE:

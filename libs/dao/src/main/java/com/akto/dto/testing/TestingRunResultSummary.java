@@ -12,6 +12,7 @@ public class TestingRunResultSummary {
     public static final String COUNT_ISSUES = "countIssues";    
     public static final String TOTAL_APIS = "totalApis";    
     public static final String TESTING_RUN_ID = "testingRunId";    
+    public static final String STATE = "state";    
 
     private ObjectId id;
     private int startTimestamp;

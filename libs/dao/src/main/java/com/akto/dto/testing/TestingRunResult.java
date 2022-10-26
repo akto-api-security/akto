@@ -38,8 +38,6 @@ public class TestingRunResult {
     public static final String TEST_RUN_RESULT_SUMMARY_ID = "testRunResultSummaryId";
     private ObjectId testRunResultSummaryId;
 
-    @BsonIgnore
-    private ObjectId testRunResultSummaryHexId;
 
     public TestingRunResult() { }
 
@@ -115,14 +113,6 @@ public class TestingRunResult {
 
     public void setTestRunResultSummaryId(ObjectId testRunResultSummaryId) {
         this.testRunResultSummaryId = testRunResultSummaryId;
-    }
-
-    public ObjectId getTestRunResultSummaryHexId() {
-        return this.testRunResultSummaryHexId;
-    }
-
-    public void setTestRunResultSummaryHexId(ObjectId testRunResultSummaryHexId) {
-        this.testRunResultSummaryHexId = testRunResultSummaryHexId;
     }
 
     public String getTestSuperType() {

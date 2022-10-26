@@ -44,13 +44,13 @@
                 :headers="testingRunResultsHeaders" 
                 :items="testingRunResultsItems" 
                 name="" 
-                sortKeyDefault="isVulnerable" 
+                sortKeyDefault="vulnerable" 
                 :sortDescDefault="true"
                 @rowClicked="openDetails"
             >
                 <template #item.severity="{item}">
                     <sensitive-chip-group 
-                        :sensitiveTags="Array.from([item.severity] || new Set())" 
+                        :sensitiveTags="item.severity ? [item.severity] : []" 
                         :chipColor="getColor(item.severity)"
                         :hideTag="true"
                     />
@@ -147,6 +147,10 @@ export default {
                 {
                     text: "Severity",
                     value: "severity"
+                },
+                {
+                    text: "Vulnerable",
+                    value: "vulnerable"
                 }
             ],
             testingRunResult: null,
@@ -202,7 +206,6 @@ export default {
         },
         dateClicked(point) {
             this.selectedDate = point
-            console.log(this.selectedDate)
         },
         refreshSummaries() {
             api.fetchTestingRunResultSummaries(this.startTimestamp, this.endTimestamp, this.testingRunHexId).then(resp => {
@@ -213,13 +216,7 @@ export default {
             return {
                 ...runResult,
                 endpoint: runResult.apiInfoKey.method + " " + runResult.apiInfoKey.url,
-                severity: (runResult.testResults || []).reduce((z, e) => {
-                    if (z === "HIGH" || e === "HIGH") return z
-
-                    if (z === "MEDIUM" || e === "MEDIUM") return "MEDIUM"
-
-                    return "LOW"
-                }, "LOW")
+                severity: runResult["vulnerable"] ? "HIGH" : null
             }
         },
         async openDetails(row) {

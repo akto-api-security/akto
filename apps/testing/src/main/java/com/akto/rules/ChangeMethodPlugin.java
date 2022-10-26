@@ -42,21 +42,20 @@ public abstract class ChangeMethodPlugin extends TestPlugin {
             modifyRequest(testRequest, method);
 
             ApiExecutionDetails apiExecutionDetails;
-            // todo: if making post -> get (convert to request body to ?)
+            TestResult testResult;
             try {
                 apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, originalHttpResponse);
+                int statusCode = StatusCodeAnalyser.getStatusCode(apiExecutionDetails.testResponse.getBody(), apiExecutionDetails.testResponse.getStatusCode());
+                double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), apiExecutionDetails.testResponse.getBody());
+                boolean vulnerable = isVulnerable(percentageMatch, statusCode);
+                overallVulnerable = overallVulnerable || vulnerable;
+
+                testResult = buildTestResult(testRequest, apiExecutionDetails.testResponse, rawApi.getOriginalMessage(), percentageMatch, vulnerable);
             } catch (Exception e) {
-                return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest);
+                testResult = buildFailedTestResultWithOriginalMessage( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest);
             }
 
-            int statusCode = StatusCodeAnalyser.getStatusCode(apiExecutionDetails.testResponse.getBody(), apiExecutionDetails.testResponse.getStatusCode());
-            double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), apiExecutionDetails.testResponse.getBody());
-            boolean vulnerable = isVulnerable(percentageMatch, statusCode);
-            overallVulnerable = overallVulnerable || vulnerable;
-
-            TestResult testResult = buildTestResult(testRequest, apiExecutionDetails.testResponse, rawApi.getOriginalMessage(), percentageMatch, vulnerable);
             testResults.add(testResult);
-
         }
 
         return addTestSuccessResult(overallVulnerable, testResults, new ArrayList<>(), TestResult.Confidence.HIGH);
@@ -65,6 +64,6 @@ public abstract class ChangeMethodPlugin extends TestPlugin {
 
     @Override
     public String superTestName() {
-        return "CHANGE_METHOD";
+        return "PRIVILEGE_ESCALATION";
     }
 }

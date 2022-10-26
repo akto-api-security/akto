@@ -6,7 +6,6 @@ import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.testing.*;
 import com.akto.dao.testing.*;
-import com.akto.store.SampleMessageStore;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -19,7 +18,6 @@ import org.slf4j.LoggerFactory;
 import java.util.HashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
@@ -105,7 +103,6 @@ public class Main {
                     Filters.eq("_id", testingRun.getId()),  completedUpdate
             );
 
-            TestingRunResultSummariesDao.instance.updateOne("id", summaryId, Updates.set("endTimestamp", Context.now()));
 
             logger.info("Tests completed in " + (Context.now() - start) + " seconds");
         }

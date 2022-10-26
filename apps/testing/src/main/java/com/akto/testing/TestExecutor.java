@@ -3,15 +3,18 @@ package com.akto.testing;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.RawApi;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.rules.*;
 import com.akto.store.SampleMessageStore;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,9 +69,6 @@ public class TestExecutor {
         Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = SampleMessageStore.fetchSampleMessages();
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
 
-        // todo: ???
-        ObjectId testRunResultSummaryId = summaryId;
-
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         System.out.println("APIs: " + apiInfoKeyList.size());
@@ -80,11 +80,19 @@ public class TestExecutor {
                 ApiInfo.ApiInfoKey modifiedKey = new ApiInfo.ApiInfoKey(apiInfoKey.getApiCollectionId(), url, apiInfoKey.method);
                 if (store.contains(modifiedKey)) continue;
                 store.add(modifiedKey);
-                start(apiInfoKey, testingRun.getTestIdConfig(), testingRun.getId(), singleTypeInfoMap, sampleMessages, authMechanism,  testRunResultSummaryId);
+                start(apiInfoKey, testingRun.getTestIdConfig(), testingRun.getId(), singleTypeInfoMap, sampleMessages, authMechanism, summaryId);
             } catch (Exception e) {
                 logger.error(e.getMessage());
             }
         }
+
+        TestingRunResultSummariesDao.instance.updateOne(
+            Filters.eq("_id", summaryId),
+            Updates.combine(
+                Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
+                Updates.set(TestingRunResultSummary.STATE, State.COMPLETED)
+            )
+        );
     }
 
     public void start(ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId,
@@ -108,14 +116,14 @@ public class TestExecutor {
             testingRunResults.add(bolaTestResult);
         }
 
-        TestingRunResult changeHttpMethodTestResult = runTest(changeHttpMethodTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
-        testingRunResults.add(changeHttpMethodTestResult);
-
         TestingRunResult addMethodInParameterTestResult = runTest(addMethodInParameterTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
         testingRunResults.add(addMethodInParameterTestResult);
 
         TestingRunResult addMethodOverrideHeadersTestResult = runTest(addMethodOverrideHeadersTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
         testingRunResults.add(addMethodOverrideHeadersTestResult);
+
+        TestingRunResult changeHttpMethodTestResult = runTest(changeHttpMethodTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+        testingRunResults.add(changeHttpMethodTestResult);
 
         TestingRunResultDao.instance.insertMany(testingRunResults);
     }

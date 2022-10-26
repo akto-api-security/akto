@@ -32,24 +32,6 @@
                         </template>
                     </layout-with-left-pane>
                 </div>
-                <div class="pt-12">
-                    <span class="heading">API Testing Results</span>
-                </div>
-
-                <layout-with-tabs title="" :tabs="['Vulnerable', 'All']">
-                    <template slot="Vulnerable">
-                        <test-results-table
-                            :testingRunResults="flattenedTestingRunResults"
-                            :showVulnerableOnly="true"
-                        />
-                    </template>
-                    <template slot="All">
-                        <test-results-table
-                            :testingRunResults="allTestingRunResults"
-                            :showVulnerableOnly="false"
-                        />
-                    </template>
-                </layout-with-tabs>
             </div>
         </template>
         <template slot="User config">

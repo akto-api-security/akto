@@ -91,7 +91,7 @@ public abstract class TestPlugin {
         return new Result(testResults, false,new ArrayList<>(), 0);
     }
 
-    public Result addWithRequestError(String originalMessage, TestResult.TestError testError, OriginalHttpRequest request) {
+    public TestResult buildFailedTestResultWithOriginalMessage(String originalMessage, TestResult.TestError testError, OriginalHttpRequest request) {
         String message = null;
         try {
             message = RedactSampleData.convertOriginalReqRespToString(request, null);
@@ -99,9 +99,13 @@ public abstract class TestPlugin {
             e.printStackTrace();
         }
 
-        List<TestResult> testResults = new ArrayList<>();
-        testResults.add(new TestResult(message, originalMessage, Collections.singletonList(testError), 0, false, TestResult.Confidence.HIGH));
+        return new TestResult(message, originalMessage, Collections.singletonList(testError), 0, false, TestResult.Confidence.HIGH);
+    }
 
+    public Result addWithRequestError(String originalMessage, TestResult.TestError testError, OriginalHttpRequest request) {
+        TestResult testResult = buildFailedTestResultWithOriginalMessage(originalMessage,testError,request);
+        List<TestResult> testResults = new ArrayList<>();
+        testResults.add(testResult);
         return new Result(testResults, false,new ArrayList<>(), 0);
     }
 
@@ -124,7 +128,7 @@ public abstract class TestPlugin {
     }
 
     public Result addTestSuccessResult(boolean vulnerable, List<TestResult> testResults , List<SingleTypeInfo> singleTypeInfos, TestResult.Confidence confidence) {
-        int confidencePercentage = confidence.equals(TestResult.Confidence.HIGH) ? 100 : 50;
+        int confidencePercentage = confidence.equals(TestResult.Confidence.HIGH) ? 100 : 10;
         return new Result(testResults, vulnerable,singleTypeInfos, confidencePercentage);
     }
 
@@ -204,8 +208,11 @@ public abstract class TestPlugin {
     public static List<URLMethods.Method> findUndocumentedMethods(Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages, ApiInfo.ApiInfoKey apiInfoKey) {
         // We will hit only those methods whose traffic doesn't exist. For that we see if corresponding method exists or not in sample messages
         List<URLMethods.Method> undocumentedMethods = new ArrayList<>();
-        for (URLMethods.Method method: URLMethods.Method.values()) {
-            if (method.equals(URLMethods.Method.OTHER)) continue;
+        List<URLMethods.Method> methodList = Arrays.asList(
+                URLMethods.Method.GET, URLMethods.Method.POST, URLMethods.Method.PUT, URLMethods.Method.DELETE,
+                URLMethods.Method.PATCH
+        );
+        for (URLMethods.Method method: methodList) {
             ApiInfo.ApiInfoKey methodApiInfoKey = new ApiInfo.ApiInfoKey(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), method);
             if (sampleMessages.containsKey(methodApiInfoKey)) continue;
             undocumentedMethods.add(method);

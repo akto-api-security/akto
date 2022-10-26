@@ -1,5 +1,6 @@
 package com.akto.dto.testing;
 
+import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
 public class TestingRun {
@@ -18,6 +19,9 @@ public class TestingRun {
     private TestingEndpoints testingEndpoints;
     private int testIdConfig;
     private int periodInSeconds;
+
+    @BsonIgnore
+    private String hexId;
 
     public TestingRun() { }
 

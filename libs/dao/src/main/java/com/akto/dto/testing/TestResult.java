@@ -20,6 +20,7 @@ public class TestResult extends GenericTestResult {
 
     public enum TestError {
         NO_PATH("No sample data found for the API"),
+        NO_MESSAGE_WITH_AUTH_TOKEN("No sample data found for the API which contains the auth token"),
         NO_AUTH_MECHANISM("No authentication mechanism saved"),
         API_REQUEST_FAILED("API request failed"),
         SOMETHING_WENT_WRONG("OOPS! Something went wrong"),
