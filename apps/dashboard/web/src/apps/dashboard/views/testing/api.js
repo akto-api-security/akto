@@ -115,5 +115,15 @@ export default {
         }).then((resp) => {
             return resp
         })        
-    }
+    },
+
+    fetchTestRunResultDetails(testingRunResultHexId) {
+        return request({
+            url: '/api/fetchTestRunResultDetails',
+            method: 'post',
+            data: {
+                testingRunResultHexId
+            }
+        })
+    },
 }

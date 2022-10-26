@@ -142,6 +142,14 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private String testingRunResultHexId;
+    private TestingRunResult testingRunResult;
+    public String fetchTestRunResultDetails() {
+        ObjectId testingRunResultId = new ObjectId(testingRunResultHexId);
+        this.testingRunResult = TestingRunResultDao.instance.findOne("_id", testingRunResultId);
+        return SUCCESS.toUpperCase();
+    }
+
     public String fetchWorkflowTestingRun() {
         Bson filterQ = Filters.and(
             Filters.eq("testingEndpoints.workflowTest._id", workflowTestId),
@@ -250,4 +258,13 @@ public class StartTestAction extends UserAction {
     public List<TestingRunResult> getTestingRunResults() {
         return this.testingRunResults;
     }
+
+    public void setTestingRunResultHexId(String testingRunResultHexId) {
+        this.testingRunResultHexId = testingRunResultHexId;
+    }
+
+    public TestingRunResult getTestingRunResult() {
+        return testingRunResult;
+    }
+
 }

@@ -46,6 +46,7 @@
                 name="" 
                 sortKeyDefault="isVulnerable" 
                 :sortDescDefault="true"
+                @rowClicked="openDetails"
             >
                 <template #item.severity="{item}">
                     <sensitive-chip-group 
@@ -56,7 +57,31 @@
                 </template>
             
             </simple-table>
-            
+
+            <v-dialog v-model="openDetailsDialog">
+                <div class="details-dialog">
+                    <a-card
+                        title="Test details"
+                        color="rgba(33, 150, 243)"
+                        subtitle=""
+                        icon="$fas_stethoscope"
+                    >
+                        <template #title-bar>
+                            <v-btn
+                                plain
+                                icon
+                                @click="openDetailsDialog = false"
+                                style="margin-left: auto"
+                            >
+                                <v-icon>$fas_times</v-icon>
+                            </v-btn>
+                        </template>
+                        <div class="pa-4">
+                            <test-results-dialog :testingRunResult="testingRunResult"/>
+                        </div>
+                    </a-card>
+                </div>
+            </v-dialog>
         </div>
     </div>
 </template>
@@ -67,6 +92,7 @@ import ACard from '@/apps/dashboard/shared/components/ACard'
 import StackedChart from '@/apps/dashboard/shared/components/charts/StackedChart'
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
+import TestResultsDialog from "./TestResultsDialog";
 
 import api from '../api'
 
@@ -88,7 +114,8 @@ export default {
         ACard,
         StackedChart,
         SimpleTable,
-        SensitiveChipGroup
+        SensitiveChipGroup,
+        TestResultsDialog
     },
     data () {
         let endTimestamp = this.defaultEndTimestamp || func.timeNow()
@@ -121,7 +148,9 @@ export default {
                     text: "Severity",
                     value: "severity"
                 }
-            ]
+            ],
+            testingRunResult: null,
+            openDetailsDialog: false
         }
     },
     methods: {
@@ -192,7 +221,15 @@ export default {
                     return "LOW"
                 }, "LOW")
             }
-        }
+        },
+        async openDetails(row) {
+            api.fetchTestRunResultDetails(row["hexId"]).then(resp => {
+                this.testingRunResult = resp["testingRunResult"]
+                if (this.testingRunResult) {
+                    this.openDetailsDialog = true
+                }
+            })
+        },
     },
     mounted() {
         this.refreshSummaries()

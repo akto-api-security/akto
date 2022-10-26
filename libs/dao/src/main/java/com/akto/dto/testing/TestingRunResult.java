@@ -13,19 +13,29 @@ public class TestingRunResult {
     private ObjectId id;
     @BsonIgnore
     private String hexId;
+
     public static final String TEST_RUN_ID = "testRunId";
     private ObjectId testRunId;
     public static final String API_INFO_KEY = "apiInfoKey";
     private ApiInfo.ApiInfoKey apiInfoKey;
+    public static final String TEST_SUPER_TYPE = "testSuperType";
     private String testSuperType;
+    public static final String TEST_SUB_TYPE = "testSubType";
     private String testSubType;
+    public static final String TEST_RESULTS = "testResults";
     private List<TestResult> testResults;
+    public static final String IS_VULNERABLE = "isVulnerable";
     private boolean isVulnerable;
+    public static final String SINGLE_TYPE_INFOS = "singleTypeInfos";
     private List<SingleTypeInfo> singleTypeInfos;
+    public static final String CONFIDENCE_PERCENTAGE = "confidencePercentage";
     private int confidencePercentage;
 
+    public static final String START_TIMESTAMP = "startTimestamp";
     private int startTimestamp;
+    public static final String END_TIMESTAMP = "endTimestamp";
     private int endTimestamp;
+    public static final String TEST_RUN_RESULT_SUMMARY_ID = "testRunResultSummaryId";
     private ObjectId testRunResultSummaryId;
 
     @BsonIgnore
@@ -75,6 +85,7 @@ public class TestingRunResult {
 
 
     public String getHexId() {
+        if (hexId == null) return this.id.toHexString();
         return this.hexId;
     }
 

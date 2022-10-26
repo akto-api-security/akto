@@ -2,20 +2,14 @@ package com.akto.dao.testing;
 
 import com.akto.dao.AccountsContextDao;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.HttpRequestParams;
-import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
-import com.google.gson.Gson;
-import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
 
@@ -44,20 +38,23 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
         );
     }
 
-    public List<TestingRunResult> fetchLatestTestingRunResult() {
-        MongoCursor<TestingRunResult> cursor = instance.getMCollection().find()
+    public List<TestingRunResult> fetchLatestTestingRunResult(ObjectId testRunResultSummaryId) {
+        MongoCursor<TestingRunResult> cursor = instance.getMCollection().find(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testRunResultSummaryId))
                 .projection(
-                        Projections.exclude(
-                                "resultMap.BOLA.message",
-                                "resultMap.BOLA.originalMessage",
-                                "resultMap.BOLA.privateSingleTypeInfos",
-                                "resultMap.NO_AUTH.message",
-                                "resultMap.NO_AUTH.originalMessage",
-                                "resultMap.NO_AUTH.privateSingleTypeInfos"
+                        Projections.include(
+                            TestingRunResult.TEST_RUN_ID,
+                            TestingRunResult.API_INFO_KEY,
+                            TestingRunResult.TEST_SUPER_TYPE,
+                            TestingRunResult.TEST_SUB_TYPE,
+                            TestingRunResult.IS_VULNERABLE,
+                            TestingRunResult.CONFIDENCE_PERCENTAGE,
+                            TestingRunResult.START_TIMESTAMP,
+                            TestingRunResult.END_TIMESTAMP,
+                            TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID
                         )
                 )
                 .sort(Sorts.descending("_id"))
-                .limit(1000)
+                .limit(10_000)
                 .cursor();
         List<TestingRunResult> testingRunResults = new ArrayList<>();
         while (cursor.hasNext()) {
