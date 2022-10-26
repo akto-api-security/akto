@@ -354,4 +354,38 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         assertEquals(singleTypeInfo.getCount(), singleTypeInfoFromDb.getCount());
         assertEquals(singleTypeInfo.getValues().count(), singleTypeInfoFromDb.getValues().count());
     }
+
+    @Test
+    public void testFetchStiOfCollections() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+
+        SingleTypeInfo sti1 = generateSTIUsingCollectionId(1000, "url1", "param1");
+        SingleTypeInfo sti2 = generateSTIUsingCollectionId(1000, "url1", "param2");
+        SingleTypeInfo sti3 = generateSTIUsingCollectionId(2000, "url2", "param3");
+        SingleTypeInfo sti4 = generateSTIUsingCollectionId(2000, "url3", "param4");
+        SingleTypeInfo sti5 = generateSTIUsingCollectionId(3000, "url4", "param4");
+
+        SingleTypeInfoDao.instance.insertMany(Arrays.asList(sti1, sti2, sti3, sti4, sti5));
+
+        List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.fetchStiOfCollections(Arrays.asList(1000,3000));
+
+        assertEquals(3, singleTypeInfos.size());
+        Map<Integer, Integer> countMap = new HashMap<>();
+        for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
+            int c = countMap.getOrDefault(singleTypeInfo.getApiCollectionId(), 0);
+            countMap.put(singleTypeInfo.getApiCollectionId(), c+1);
+        }
+
+        assertEquals(2,(int) countMap.get(1000));
+        assertNull(countMap.get(2000));
+        assertEquals(1,(int) countMap.get(3000));
+    }
+
+
+    private SingleTypeInfo generateSTIUsingCollectionId(int apiCollectionId, String url, String param) {
+        SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(
+                url, "GET",200, false, param, SingleTypeInfo.GENERIC, apiCollectionId, false
+        );
+        return new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 100,1000,30, new CappedSet<>(), SingleTypeInfo.Domain.RANGE, -1000, 10000);
+    }
 }

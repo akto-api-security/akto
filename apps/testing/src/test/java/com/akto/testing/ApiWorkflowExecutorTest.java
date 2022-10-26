@@ -15,6 +15,14 @@ public class ApiWorkflowExecutorTest {
 
 
     @Test
+    public void testCombineQueryParams2() {
+        String query1 = "";
+        String query2 = "blah";
+        String combinedQuery = OriginalHttpRequest.combineQueryParams(query1, query2);
+        assertEquals("blah", combinedQuery);
+    }
+
+    @Test
     public void testExecuteCode() throws Exception {
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         Map<String, Object> valuesMap = new HashMap<>();

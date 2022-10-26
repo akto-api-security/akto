@@ -7,18 +7,15 @@ import com.akto.dao.RuntimeFilterDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.har.HAR;
-import com.akto.kafka.Kafka;
 import com.akto.listener.KafkaListener;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.policies.AktoPolicy;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
+import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 import com.sun.jna.*;
 
@@ -40,7 +37,7 @@ public class HarAction extends UserAction {
 
     public static void main(String[] args) {
         // messages.add("{\"method\":\"POST\",\"requestPayload\":\"{\\\"petId\\\":1,\\\"quantity\\\":0,\\\"id\\\":0,\\\"shipDate\\\":\\\"2022-01-04T20:10:16.578Z\\\",\\\"complete\\\":true,\\\"status\\\":\\\"avnebbesh@akto.io\\\"}\",\"responsePayload\":\"{\\\"id\\\":9223372036854772476,\\\"petId\\\":0,\\\"quantity\\\":0,\\\"shipDate\\\":\\\"2022-01-04T20:10:16.578+0000\\\",\\\"status\\\":\\\"av@gmail.com\\\",\\\"complete\\\":true, \\\"avav\\\": \\\"eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoicmVmcmVzaFRva2VuIiwic2lnbmVkVXAiOiJ0cnVlIiwidXNlcm5hbWUiOiJhbmtpdGFAZ21haWwuY29tIiwiaWF0IjoxNjM0OTcxMTMxLCJleHAiOjE2MzUwNTc1MzF9.Ph4Jv-fdggwvnbdVViD9BWUReYL0dVfVGuMRz4d2oZNnYzWV0JCmjpB68p6k0yyPPua_yagIWVZf_oYH9PUgS7EuaPYR-Vg6uxKR1HuXRA6wb8Xf4RPoFjJYkhWoYmv38V9Cz2My9U85wgGHGZXEufu8ubrFmIfOP6-A39M4meNGw48f5oOz8V337SX45uPc6jE0EfmM4l9EbqFFCF0lRXbMMzn-ijsyXxLkI5npWnqtW3PAHC2Rs3FV40tkRqHYF-WM6SzyHLBh6bVeyeOsFRBoEjv-zFh8yrYnT6OvCa6jII2A6uj4MQ2k11-5bDBhfVPVc4hEQz37H_DWwtf23g\\\"}\",\"ip\":\"null\",\"source\":\"HAR\",\"type\":\"HTTP/2\",\"akto_vxlan_id\":\"0\",\"path\":\"https://petstore.swagger.io/v2/store/order/1\",\"requestHeaders\":\"{\\\"Origin\\\":\\\"avneesh@gmail.com\\\",\\\"Accept\\\":\\\"application/json\\\",\\\"User-Agent\\\":\\\"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:95.0) Gecko/20100101 Firefox/95.0\\\",\\\"Referer\\\":\\\"https://petstore.swagger.io/\\\",\\\"Connection\\\":\\\"keep-alive\\\",\\\"Sec-Fetch-Dest\\\":\\\"empty\\\",\\\"Sec-Fetch-Site\\\":\\\"same-origin\\\",\\\"Host\\\":\\\"petstore.swagger.io\\\",\\\"Accept-Encoding\\\":\\\"gzip, deflate, br\\\",\\\"Sec-Fetch-Mode\\\":\\\"cors\\\",\\\"TE\\\":\\\"trailers\\\",\\\"Accept-Language\\\":\\\"en-US,en;q=0.5\\\",\\\"Content-Length\\\":\\\"128\\\",\\\"Content-Type\\\":\\\"application/json\\\"}\",\"responseHeaders\":\"{\\\"date\\\":\\\"+917021916328\\\",\\\"access-control-allow-origin\\\":\\\"*\\\",\\\"server\\\":\\\"Jetty(9.2.9.v20150224)\\\",\\\"access-control-allow-headers\\\":\\\"Content-Type, api_key, Authorization\\\",\\\"X-Firefox-Spdy\\\":\\\"h2\\\",\\\"content-type\\\":\\\"application/json\\\",\\\"access-control-allow-methods\\\":\\\"GET, POST, DELETE, PUT\\\"}\",\"time\":\"1641327021\",\"contentType\":\"application/json\",\"akto_account_id\":\"1000000\",\"statusCode\":\"200\",\"status\":\"OK\"}");
-        DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
+        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
         Context.accountId.set(1_000_000);
         RuntimeFilterDao.instance.initialiseFilters();
         System.out.println(RuntimeFilterDao.instance.findAll(new BasicDBObject()));
@@ -49,13 +46,22 @@ public class HarAction extends UserAction {
 
     @Override
     public String execute() throws IOException {
+        ApiCollection apiCollection = null;
         if (apiCollectionName != null) {
-            ApiCollection apiCollection =  ApiCollectionsDao.instance.findByName(apiCollectionName);
-            if (apiCollection == null) {
-                addActionError("Invalid collection name");
-                return ERROR.toUpperCase();
-            }
+            apiCollection =  ApiCollectionsDao.instance.findByName(apiCollectionName);
             apiCollectionId = apiCollection.getId();
+        } else {
+            apiCollection =  ApiCollectionsDao.instance.findOne(Filters.eq("_id", apiCollectionId));
+        }
+
+        if (apiCollection == null) {
+            addActionError("Invalid collection name");
+            return ERROR.toUpperCase();
+        }
+
+        if (apiCollection.getHostName() != null)  {
+            addActionError("Traffic mirroring collection can't be used");
+            return ERROR.toUpperCase();
         }
 
         if (KafkaListener.kafka == null) {
@@ -72,7 +78,6 @@ public class HarAction extends UserAction {
             addActionError("Empty content");
             return ERROR.toUpperCase();
         }
-        HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1);
 
         try {
             HAR har = new HAR();
@@ -94,11 +99,11 @@ public class HarAction extends UserAction {
             }
             
             if(skipKafka) {
+                HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
                 SingleTypeInfo.fetchCustomDataTypes();
-                APICatalogSync apiCatalogSync = parser.syncFunction(responses, true);
-                AktoPolicy aktoPolicy = new AktoPolicy(parser.apiCatalogSync); // keep inside if condition statement because db call when initialised
-                aktoPolicy.main(responses, apiCatalogSync);
-
+                APICatalogSync apiCatalogSync = parser.syncFunction(responses, true, false);
+                AktoPolicy aktoPolicy = new AktoPolicy(parser.apiCatalogSync, false); // keep inside if condition statement because db call when initialised
+                aktoPolicy.main(responses, apiCatalogSync, false);
                 ResourceAnalyser resourceAnalyser = new ResourceAnalyser(300_000, 0.01, 100_000, 0.01);
                 for (HttpResponseParams responseParams: responses)  {
                     responseParams.requestParams.getHeaders().put("x-forwarded-for", Collections.singletonList("127.0.0.1"));

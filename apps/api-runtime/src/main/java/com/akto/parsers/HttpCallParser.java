@@ -36,12 +36,12 @@ public class HttpCallParser {
     public APICatalogSync apiCatalogSync;
     private Map<String, Integer> hostNameToIdMap = new HashMap<>();
 
-    public HttpCallParser(String userIdentifier, int thresh, int sync_threshold_count, int sync_threshold_time) {
+    public HttpCallParser(String userIdentifier, int thresh, int sync_threshold_count, int sync_threshold_time, boolean fetchAllSTI) {
         last_synced = 0;
         this.sync_threshold_count = sync_threshold_count;
         this.sync_threshold_time = sync_threshold_time;
         apiCatalogSync = new APICatalogSync(userIdentifier,thresh);
-        apiCatalogSync.buildFromDB(false);
+        apiCatalogSync.buildFromDB(false, fetchAllSTI);
     }
     
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
@@ -191,7 +191,7 @@ public class HttpCallParser {
 
     int numberOfSyncs = 0;
 
-    public APICatalogSync syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately)  {
+    public APICatalogSync syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI)  {
         // USE ONLY filteredResponseParams and not responseParams
         List<HttpResponseParams> filteredResponseParams = filterHttpResponseParams(responseParams);
         boolean isHarOrPcap = aggregate(filteredResponseParams);
@@ -205,7 +205,7 @@ public class HttpCallParser {
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
         if (syncImmediately || this.sync_count >= syncThresh || (Context.now() - this.last_synced) > this.sync_threshold_time || isHarOrPcap) {
             numberOfSyncs++;
-            apiCatalogSync.syncWithDB(syncImmediately);
+            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI);
             this.last_synced = Context.now();
             this.sync_count = 0;
             return apiCatalogSync;

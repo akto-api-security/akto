@@ -249,7 +249,7 @@ export default {
                 return {
                     ...c,
                     color: "#FFFFFF",
-                    endpoints: (c.urls || []).length,
+                    endpoints: c["urlsCount"] || 0,
                     detected: func.prettifyEpoch(c.startTs)
                 }
             })

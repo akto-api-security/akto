@@ -46,10 +46,11 @@ public class Main {
     }
 
 
-    public static OpenAPI init(String info,Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList) throws Exception {
+    public static OpenAPI init(String info,Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList, boolean includeHeaders, String serverUrl) throws Exception {
         OpenAPI openAPI = new OpenAPI();
-        addPaths(openAPI, stiList);
-        addServer(null, openAPI);
+        addPaths(openAPI, stiList, includeHeaders);
+        if (serverUrl !=null && !serverUrl.startsWith("http")) serverUrl = "https://" + serverUrl;
+        addServer(serverUrl, openAPI);
         Paths paths = PathBuilder.parameterizePath(openAPI.getPaths());
         openAPI.setPaths(paths);
         addInfo(openAPI,info);
@@ -57,21 +58,24 @@ public class Main {
     }
 
 
-    public static void addPaths(OpenAPI openAPI, Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList) {
+    public static void addPaths(OpenAPI openAPI, Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList, boolean includeHeaders) {
         Paths paths = new Paths();
         for(String url : stiList.keySet()){
-            buildPathsFromSingleTypeInfosPerUrl(stiList.get(url), url,paths);
+            if (url.endsWith(".js") || url.endsWith(".css") || url.endsWith(".svg") || url.endsWith(".jpg")  || url.endsWith(".png")) {
+                continue;
+            }
+            buildPathsFromSingleTypeInfosPerUrl(stiList.get(url), url,paths, includeHeaders);
         }
         openAPI.setPaths(paths);
     }
 
-    public static void buildPathsFromSingleTypeInfosPerUrl(Map<String, Map<Integer, List<SingleTypeInfo>>> stiMap, String url, Paths paths ) {
+    public static void buildPathsFromSingleTypeInfosPerUrl(Map<String, Map<Integer, List<SingleTypeInfo>>> stiMap, String url, Paths paths, boolean includeHeaders) {
         for (String method: stiMap.keySet()) {
             Map<Integer,List<SingleTypeInfo>> responseWiseMap = stiMap.get(method);
             for (Integer responseCode: responseWiseMap.keySet()) {
                 List<SingleTypeInfo> singleTypeInfoList = responseWiseMap.get(responseCode);
                 try {
-                    addPathItems(responseCode, paths, url, method, singleTypeInfoList);
+                    addPathItems(responseCode, paths, url, method, singleTypeInfoList, includeHeaders);
                 } catch (Exception e) {
                     logger.error("ERROR in buildPathsFromSingleTypeInfosPerUrl  " + e);
                 }
@@ -79,7 +83,7 @@ public class Main {
         }
     }
 
-    public static void addPathItems(int responseCode, Paths paths, String url, String method, List<SingleTypeInfo> singleTypeInfoList) throws Exception {
+    public static void addPathItems(int responseCode, Paths paths, String url, String method, List<SingleTypeInfo> singleTypeInfoList, boolean includeHeaders) throws Exception {
         Schema<?> schema = null;
         try {
             schema = buildSchema(singleTypeInfoList);
@@ -97,7 +101,7 @@ public class Main {
             logger.error("ERROR in building headers in addPathItems " + e);
         }
         
-        PathBuilder.addPathItem(paths, url, method, responseCode, schema, headerParameters);
+        PathBuilder.addPathItem(paths, url, method, responseCode, schema, headerParameters, includeHeaders);
     }
 
     public static List<Parameter> buildHeaders(List<SingleTypeInfo> singleTypeInfoList) throws Exception{
@@ -109,6 +113,7 @@ public class Main {
                 SchemaBuilder.build(schema, cc);
             }
         }
+        if (schema.getProperties() == null) return headerParameters;
         for(String header:schema.getProperties().keySet()){
             Parameter head = new Parameter();
             head.setName(header);

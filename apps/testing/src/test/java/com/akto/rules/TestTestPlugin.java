@@ -137,7 +137,7 @@ public class TestTestPlugin extends MongoBasedTest {
         if (isPrivate) {
             singleTypeInfo.setUniqueCount(1000000);
         } else {
-            singleTypeInfo.setUniqueCount(5);
+            singleTypeInfo.setUniqueCount(10);
         }
 
         singleTypeInfoMap.put(singleTypeInfo.composeKeyWithCustomSubType(SingleTypeInfo.GENERIC), singleTypeInfo);
