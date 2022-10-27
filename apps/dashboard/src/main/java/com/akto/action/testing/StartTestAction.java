@@ -76,11 +76,8 @@ public class StartTestAction extends UserAction {
     }
 
     public String startTest() {
-        // 65 seconds added to give testing module time to get the latest sample messages (which runs every 60 secs)
-        // But if workflow test then run immediately
-        int adder = type.equals(Type.WORKFLOW) ? 0 : 65;
-        int scheduleTimestamp = this.startTimestamp == 0 ? (Context.now() + adder) : this.startTimestamp;
-        
+        int scheduleTimestamp = this.startTimestamp == 0 ? Context.now()  : this.startTimestamp;
+
         TestingRun testingRun = createTestingRun(scheduleTimestamp, this.recurringDaily ? 86400 : 0);
 
         if (testingRun == null) {

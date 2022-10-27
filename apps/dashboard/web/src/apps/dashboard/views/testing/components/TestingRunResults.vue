@@ -124,7 +124,7 @@ export default {
             testTypes: ["Bola", "Workflow", "Bua"],
             startTimestamp: this.defaultStartTimestamp || (func.timeNow() - func.recencyPeriod/9),
             endTimestamp: endTimestamp,
-            selectedDate: +func.dayStart(endTimestamp * 1000),
+            selectedDate: +func.dayStart(endTimestamp * 1000) / 1000,
             testingRunResultSummaries: [],
             testingRunResults: [],
             testingRunResultsHeaders: [
@@ -213,11 +213,12 @@ export default {
             ]
         },
         dateClicked(point) {
-            this.selectedDate = point
+            this.selectedDate = point / 1000
         },
         refreshSummaries() {
             api.fetchTestingRunResultSummaries(this.startTimestamp, this.endTimestamp, this.testingRunHexId).then(resp => {
                 this.testingRunResultSummaries = resp.testingRunResultSummaries
+                this.selectedDate = Math.max(...this.testingRunResultSummaries.map(o => o.startTimestamp))
             })
         },
         prepareForTable(runResult) {
@@ -252,14 +253,17 @@ export default {
                 return [this.toHyphenatedDate(this.startTimestamp * 1000), this.toHyphenatedDate(this.endTimestamp * 1000)]
             },
             set(newDateRange) {
-                this.startTimestamp = parseInt(func.toEpochInMs(newDateRange[0]) / 1000)
-                this.endTimestamp = parseInt(func.toEpochInMs(newDateRange[1]) / 1000)
-                this.selectedDate = this.endTimestamp*1000
+                let start = Math.min(func.toEpochInMs(newDateRange[0]), func.toEpochInMs(newDateRange[1]));
+                let end = Math.max(func.toEpochInMs(newDateRange[0]), func.toEpochInMs(newDateRange[1]));
+
+                this.startTimestamp = +func.dayStart(start) / 1000
+                this.endTimestamp = +func.dayEnd(end) / 1000
+                this.selectedDate = this.endTimestamp
                 this.refreshSummaries()
             }
         },
         currentTest() {
-            let currentSummary = this.testingRunResultSummaries.filter(x => +func.dayStart(x.startTimestamp*1000) === this.selectedDate)[0]
+            let currentSummary = this.testingRunResultSummaries.filter(x => x.startTimestamp === this.selectedDate)[0]
             if (currentSummary) {
                 api.fetchTestingRunResults(currentSummary.hexId).then(resp => {
                     this.testingRunResults = resp.testingRunResults

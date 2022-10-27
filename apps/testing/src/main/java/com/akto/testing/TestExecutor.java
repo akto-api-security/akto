@@ -73,6 +73,7 @@ public class TestExecutor {
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         System.out.println("APIs: " + apiInfoKeyList.size());
 
+        Map<String, Integer> totalCountIssues = new HashMap<>();
         Set<ApiInfo.ApiInfoKey> store = new HashSet<>();
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
             try {
@@ -80,7 +81,13 @@ public class TestExecutor {
                 ApiInfo.ApiInfoKey modifiedKey = new ApiInfo.ApiInfoKey(apiInfoKey.getApiCollectionId(), url, apiInfoKey.method);
                 if (store.contains(modifiedKey)) continue;
                 store.add(modifiedKey);
-                start(apiInfoKey, testingRun.getTestIdConfig(), testingRun.getId(), singleTypeInfoMap, sampleMessages, authMechanism, summaryId);
+                Map<String, Integer> countIssues = start(apiInfoKey, testingRun.getTestIdConfig(), testingRun.getId(), singleTypeInfoMap, sampleMessages, authMechanism, summaryId);
+                if (countIssues == null) countIssues = new HashMap<>();
+                for (String key: countIssues.keySet()) {
+                    int c1 = totalCountIssues.getOrDefault(key,0);
+                    int c2 = countIssues.getOrDefault(key,0);
+                    totalCountIssues.put(key, c1+c2);
+                }
             } catch (Exception e) {
                 logger.error(e.getMessage());
             }
@@ -89,17 +96,24 @@ public class TestExecutor {
         TestingRunResultSummariesDao.instance.updateOne(
             Filters.eq("_id", summaryId),
             Updates.combine(
-                Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
-                Updates.set(TestingRunResultSummary.STATE, State.COMPLETED)
+                    Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
+                    Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
+                    Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues),
+                    Updates.set(TestingRunResultSummary.TOTAL_APIS, store.size())
             )
         );
     }
 
-    public void start(ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId,
+    public Map<String, Integer> start(ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId,
                       Map<String, SingleTypeInfo> singleTypeInfoMap, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages, AuthMechanism authMechanism, ObjectId testRunResultSummaryId) {
+        Map<String, Integer> countIssues = new HashMap<>();
+        countIssues.put("HIGH", 0);
+        countIssues.put("MEDIUM", 0);
+        countIssues.put("LOW", 0);
+
         if (testIdConfig != 0) {
             logger.error("Test id config is not 0 but " + testIdConfig);
-            return;
+            return countIssues;
         }
 
         BOLATest bolaTest = new BOLATest();
@@ -125,7 +139,16 @@ public class TestExecutor {
         TestingRunResult changeHttpMethodTestResult = runTest(changeHttpMethodTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
         testingRunResults.add(changeHttpMethodTestResult);
 
+        for (TestingRunResult testingRunResult: testingRunResults) {
+            if (testingRunResult.isVulnerable()) {
+                int c = countIssues.getOrDefault("HIGH", 0);
+                countIssues.put("HIGH", c+1);
+            }
+        }
+
         TestingRunResultDao.instance.insertMany(testingRunResults);
+
+        return countIssues;
     }
 
     public TestingRunResult runTest(TestPlugin testPlugin, ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages,

@@ -71,6 +71,7 @@ export default {
                 }
             },
             series: {
+              minPointLength: 5,
               cursor: 'pointer',
               point: {
                 events: {

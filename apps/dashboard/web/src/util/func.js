@@ -80,6 +80,13 @@ export default {
         date.setSeconds(0)
         return date
     },
+    dayEnd(epochMs) {
+        let date = new Date(epochMs)
+        date.setHours(23)
+        date.setMinutes(59)
+        date.setSeconds(59)
+        return date
+    },
     weekStart (date) {
         let date1 = new Date(date.getTime())
         return new Date(date1.setDate(date1.getDate() - date1.getDay() + (date1.getDay() === 0 ? -6 : 1)))
