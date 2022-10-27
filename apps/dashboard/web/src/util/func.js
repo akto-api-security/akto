@@ -591,4 +591,7 @@ export default {
     showSuccessSnackBar(val){
         window._AKTO.$emit('SHOW_SNACKBAR', {show: true, text: val, color: 'green'})
     },
+    toEpochInMs(hyphenatedDate) {
+        return +this.toDate(hyphenatedDate.replace(/\-/g, ''))
+    },
 }

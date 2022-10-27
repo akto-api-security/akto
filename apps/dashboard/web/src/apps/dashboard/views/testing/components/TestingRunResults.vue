@@ -176,29 +176,37 @@ export default {
             return func.toDateStrShort(new Date(epochInMs))
         },
         testResultsChartData () {
-            let todayDate = new Date(this.endTimestamp * 1000)
-            let twoMonthsAgo = new Date(this.startTimestamp * 1000)
-            
-            let currDate = twoMonthsAgo
-            let ret = []
-            while (currDate <= todayDate) {
-                ret.push([func.toDate(func.toYMD(currDate)), parseInt(Math.random()*100) || 0])
-                currDate = func.incrDays(currDate, 1)
-            }
+            let retH = []
+            let retM = []
+            let retL = []
+
+            this.testingRunResultSummaries.forEach((x) => {
+                let ts = x["startTimestamp"] * 1000
+                let countIssuesMap = x["countIssues"]
+
+                let dt = +func.dayStart(ts)
+                let s = +func.dayStart(this.startTimestamp*1000)
+                let e = +func.dayStart(this.endTimestamp*1000)
+                if (dt < s || dt > e) return
+
+                retH.push([ts, countIssuesMap["HIGH"]])
+                retM.push([ts, countIssuesMap["MEDIUM"]])
+                retL.push([ts, countIssuesMap["LOW"]])
+            })
 
             return [
                 {
-                    data: ret,
+                    data: retH,
                     color: "#FF000080",
                     name: "High"
                 },
                 {
-                    data: ret,
+                    data: retM,
                     color: "#FF5C0080",
                     name: "Medium"
                 },
                 {
-                    data: ret,
+                    data: retL,
                     color: "#F9B30080",
                     name: "Low"
                 }
@@ -244,8 +252,8 @@ export default {
                 return [this.toHyphenatedDate(this.startTimestamp * 1000), this.toHyphenatedDate(this.endTimestamp * 1000)]
             },
             set(newDateRange) {
-                this.startTimestamp = parseInt(this.toEpochInMs(newDateRange[0]) / 1000)
-                this.endTimestamp = parseInt(this.toEpochInMs(newDateRange[1]) / 1000)
+                this.startTimestamp = parseInt(func.toEpochInMs(newDateRange[0]) / 1000)
+                this.endTimestamp = parseInt(func.toEpochInMs(newDateRange[1]) / 1000)
                 this.selectedDate = this.endTimestamp*1000
                 this.refreshSummaries()
             }
