@@ -12,6 +12,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
+
+import com.akto.utils.cloud.stack.dto.StackState;
 import com.amazonaws.services.cloudformation.AmazonCloudFormation;
 import com.amazonaws.services.cloudformation.AmazonCloudFormationAsync;
 import com.amazonaws.services.cloudformation.AmazonCloudFormationAsyncClientBuilder;
@@ -30,7 +32,7 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
 
     private static final String STACK_NAME = "akto-mirroring";
     private static final Set<String> ACCEPTABLE_STACK_STATUSES = new HashSet<String>(
-            Arrays.asList("CREATE_IN_PROGRESS", "CREATE_COMPLETE"));
+            Arrays.asList(StackStatus.CREATE_IN_PROGRESS.toString(), StackStatus.CREATE_COMPLETE.toString()));
     private static final int STACK_CREATION_TIMEOUT_MINS = 15;
     private static final List<String> STACK_CREATION_CAPABILITIES = Arrays.asList("CAPABILITY_IAM");
     private static final AmazonCloudFormationAsync CLOUD_FORMATION_ASYNC = AmazonCloudFormationAsyncClientBuilder
@@ -74,7 +76,7 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
     }
 
     @Override
-    public String fetchStackStatus() {
+    public StackState fetchStackStatus() {
         DescribeStacksRequest describeStackRequest = new DescribeStacksRequest();
         describeStackRequest.setStackName(STACK_NAME);
         try {
@@ -85,17 +87,17 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
 
             if (!ACCEPTABLE_STACK_STATUSES.contains(stackStatus)) {
                 System.out.println("Actual stack status: " + stackStatus);
-                stackStatus = "STACK_CREATION_FAILED";
-                return StackStatus.CREATION_FAILED.toString();
+                return new StackState(StackStatus.CREATION_FAILED.toString(), 0);
             }
-            return stackStatus;
+            return new StackState(stackStatus, stack.getCreationTime().getTime());
         } catch (Exception e) {
-            e.printStackTrace();
             if (e.getMessage().contains("does not exist")) {
-                return StackStatus.DOES_NOT_EXISTS.toString();
+                return new StackState(StackStatus.DOES_NOT_EXISTS.toString(), 0);
             }
-            return StackStatus.FAILED_TO_FETCH_STACK_STATUS.toString(); // TODO: what should we return when we fail to
-                                                                        // fetch
+            e.printStackTrace();
+            return new StackState(StackStatus.FAILED_TO_FETCH_STACK_STATUS.toString(), 0); // TODO: what should we
+                                                                                           // return when we fail to
+            // fetch
             // stack's status.
         }
     }
@@ -131,7 +133,7 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
 
     @Override
     public boolean checkIfStackExists() {
-        String stackStatus = fetchStackStatus();
+        String stackStatus = fetchStackStatus().getStatus();
         return stackStatus.equals("CREATE_COMPLETE");
     }
 }

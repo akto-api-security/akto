@@ -3,27 +3,30 @@ package com.akto.action.quick_start;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
+import com.akto.utils.cloud.stack.dto.StackState;
 import org.bson.conversions.Bson;
 
 import com.akto.action.UserAction;
+import com.akto.dao.ApiTokensDao;
 import com.akto.dao.AwsResourcesDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.AwsResources;
+import com.akto.utils.cloud.CloudType;
+import com.akto.utils.cloud.Utils;
 import com.akto.utils.cloud.serverless.ServerlessFunction;
 import com.akto.utils.cloud.serverless.UpdateFunctionRequest;
 import com.akto.utils.cloud.serverless.aws.Lambda;
 import com.akto.utils.cloud.stack.Stack;
+import com.akto.utils.cloud.stack.Stack.StackStatus;
 import com.akto.utils.cloud.stack.aws.AwsStack;
 import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancing;
 import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancingClientBuilder;
 import com.amazonaws.services.elasticloadbalancingv2.model.DescribeLoadBalancersRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.DescribeLoadBalancersResult;
 import com.amazonaws.services.elasticloadbalancingv2.model.LoadBalancer;
+import com.akto.dto.ApiToken;
 import com.akto.dto.AwsResource;
 
 import com.mongodb.client.model.Filters;
@@ -36,10 +39,27 @@ public class QuickStartAction extends UserAction {
     private List<AwsResource> availableLBs;
     private List<AwsResource> selectedLBs;
     private boolean isFirstSetup;
-    private String stackStatus;
+    private StackState stackState;
+    private List<String> configuredItems;
 
     private final Stack stack = new AwsStack();
     private final ServerlessFunction serverlessFunction = new Lambda();
+
+    public String fetchQuickStartPageState() {
+
+        configuredItems = new ArrayList<>();
+
+        // Fetching cloud integration
+        CloudType type = Utils.getCloudType();
+        configuredItems.add(type.toString());
+
+        // Looking if burp is integrated or not
+        ApiToken burpToken = ApiTokensDao.instance.findOne(Filters.eq(ApiToken.UTILITY, ApiToken.Utility.BURP));
+        if (burpToken != null) {
+            configuredItems.add(ApiToken.Utility.BURP.toString());
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
 
     public String fetchLoadBalancers() {
         try {
@@ -49,10 +69,13 @@ public class QuickStartAction extends UserAction {
                     .describeLoadBalancers(new DescribeLoadBalancersRequest());
             Map<String, AwsResource> lbInfo = new HashMap<>();
             for (LoadBalancer lb : result.getLoadBalancers()) {
+                if (lb.getLoadBalancerName().equals("AktoLBDashboard") || lb.getLoadBalancerName().equals("AktoNLB")) {
+                    continue;
+                }
                 lbInfo.put(lb.getLoadBalancerArn(), new AwsResource(lb.getLoadBalancerName(), lb.getLoadBalancerArn()));
             }
             this.dashboardHasNecessaryRole = true;
-            this.availableLBs = new ArrayList<>(lbInfo.values());// lbInfo.values().stream().collect(Collectors.toList());
+            this.availableLBs = new ArrayList<>(lbInfo.values());
             List<AwsResource> selectedLBs = new ArrayList<>();
             AwsResources resources = AwsResourcesDao.instance.findOne(AwsResourcesDao.generateFilter());
             if (resources != null && resources.getLoadBalancers() != null) {
@@ -74,13 +97,12 @@ public class QuickStartAction extends UserAction {
     public String saveLoadBalancers() {
         Bson updates = Updates.set("loadBalancers", this.selectedLBs);
         AwsResourcesDao.instance.updateOne(Filters.eq("_id", Context.accountId.get()), updates);
-        if (!stack.checkIfStackExists()) { // is this sufficient, better would be compare all the resources, but
-            // this will be complex
+        if (!stack.checkIfStackExists()) {
             this.isFirstSetup = true;
             try {
                 Map<String, String> parameters = new HashMap<String, String>() {
                     {
-                        put("MongoIp", System.getenv("AKTO_MONGO_CONN")); // TODO update this before checking in
+                        put("MongoIp", "10.0.137.76");
                         put("KeyPair", System.getenv("EC2_KEY_PAIR"));
                         put("SourceLBs", extractLBs());
                         put("SubnetId", System.getenv("EC2_SUBNET_ID"));
@@ -109,7 +131,7 @@ public class QuickStartAction extends UserAction {
                 e.printStackTrace();
             }
         }
-
+        this.stackState = stack.fetchStackStatus();
         fetchLoadBalancers();
         return Action.SUCCESS.toUpperCase();
     }
@@ -126,12 +148,7 @@ public class QuickStartAction extends UserAction {
     }
 
     public String checkStackCreationProgress() {
-        try {
-            this.stackStatus = this.stack.fetchStackStatus();
-        } catch (Exception e) {
-            // TODO: handle exception
-            e.printStackTrace();
-        }
+        this.stackState = this.stack.fetchStackStatus();
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -167,12 +184,20 @@ public class QuickStartAction extends UserAction {
         this.selectedLBs = selectedLBs;
     }
 
-    public String getStackStatus() {
-        return stackStatus;
+    public StackState getStackState() {
+        return stackState;
     }
 
-    public void setStackStatus(String stackStatus) {
-        this.stackStatus = stackStatus;
+    public void setStackState(StackState stackState) {
+        this.stackState = stackState;
+    }
+
+    public List<String> getConfiguredItems() {
+        return configuredItems;
+    }
+
+    public void setConfiguredItems(List<String> configuredItems) {
+        this.configuredItems = configuredItems;
     }
 
     // Convert a stream into a single, newline separated string

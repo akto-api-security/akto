@@ -59,8 +59,8 @@ const router =  new Router({
             },
             children: [
                 {
-                    path: 'quick',
-                    name: 'quick',
+                    path: 'quick-start',
+                    name: 'quick-start',
                     component: PageQuickStart
                 },        
                 {

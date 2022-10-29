@@ -1,10 +1,17 @@
 <template>
-    <div>AWS Mirroring details</div>
+    <div>
+        <div>AWS Mirroring details</div>
+        <load-balancers></load-balancers>
+    </div>
 </template>
 
 <script>
+import LoadBalancers from './LoadBalancers.vue'
 export default {
-    name: "AwsTrafficMirroring"
+    name: "AwsTrafficMirroring",
+    components: {
+        LoadBalancers
+    }
 }
 </script>
 

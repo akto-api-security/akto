@@ -1227,6 +1227,20 @@
                 <param name="status">401</param>
             </result>
         </action> -->
+         <action name="api/fetchQuickStartPageState" class="com.akto.action.quick_start.QuickStartAction" method="fetchQuickStartPageState">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                 <param name="excludeProperties">
+                    stackState,availableLBs,dashboardHasNecessaryRole,isFirstSetup,selectedLBs
+                 </param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
         <action name="api/fetchLoadBalancers" class="com.akto.action.quick_start.QuickStartAction" method="fetchLoadBalancers">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -1240,7 +1254,9 @@
         <action name="api/saveLoadBalancers" class="com.akto.action.quick_start.QuickStartAction" method="saveLoadBalancers">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="stackState">stackState</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>

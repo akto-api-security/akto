@@ -1,6 +1,5 @@
 <template>
-    <layout-with-tabs title="Settings"
-        :tabs="['Data types', 'Tags', 'Account', 'Users', 'Health', 'Sources', 'Integrations']">
+    <layout-with-tabs title="Settings" :tabs="['Data types', 'Tags', 'Account', 'Users', 'Health', 'Integrations']">
         <template slot="Data types">
             <data-types title="Data types" :data_types="data_types" :toggleActivateFieldFunc='toggleActivateDataTypes'
                 :createNewDataType="createNewDataType" @selectedEntry="selectedDataType">
@@ -23,9 +22,6 @@
         </template>
         <template slot="Integrations">
             <integration-center />
-        </template>
-        <template slot="Sources">
-            <load-balancers />
         </template>
         <template slot="Account">
             <div>
@@ -73,7 +69,6 @@ import TagSettings from './components/tag_configs/TagSettings.vue'
 import TagConfigDetails from './components/tag_configs/TagConfigDetails.vue'
 import ACard from '@/apps/dashboard/shared/components/ACard'
 import IntegrationCenter from './components/integrations/IntegrationCenter'
-import LoadBalancers from '../quick_start/components/LoadBalancers'
 
 import { mapState } from 'vuex'
 export default {
@@ -89,8 +84,7 @@ export default {
         TagSettings,
         TagConfigDetails,
         DataTypeDetails,
-        ACard,
-        LoadBalancers
+        ACard
     },
     mounted() {
         this.$store.dispatch("data_types/fetchDataTypes")
