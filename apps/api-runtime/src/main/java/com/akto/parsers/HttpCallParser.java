@@ -24,8 +24,6 @@ public class HttpCallParser {
     
     private static final String AKTO_REQUEST = "##AKTO_REQUEST##";
     private static final String AKTO_RESPONSE = "##AKTO_RESPONSE##";
-    public static final String JSON_CONTENT_TYPE = "application/json";
-    public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
     private final static ObjectMapper mapper = new ObjectMapper();
     private final int sync_threshold_count;
     private final int sync_threshold_time;
@@ -54,25 +52,8 @@ public class HttpCallParser {
         String type = (String) json.get("type");
         Map<String,List<String>> requestHeaders = OriginalHttpRequest.buildHeadersMap(json, "requestHeaders");
 
-        String requestPayload = (String) json.get("requestPayload");
-        requestPayload = requestPayload.trim();
-        String acceptableContentType = getAcceptableContentType(requestHeaders);
-        if (acceptableContentType != null && requestPayload.length() > 0) {
-            // only if request payload is of FORM_URL_ENCODED_CONTENT_TYPE we convert it to json
-            if (acceptableContentType.equals(FORM_URL_ENCODED_CONTENT_TYPE)) {
-                String myStringDecoded = URLDecoder.decode((String) json.get("requestPayload"), "UTF-8");
-                String[] parts = myStringDecoded.split("&");
-                Map<String,String> valueMap = new HashMap<>();
-
-                for(String part: parts){
-                    String[] keyVal = part.split("="); // The equal separates key and values
-                    if (keyVal.length == 2) {
-                        valueMap.put(keyVal[0], keyVal[1]);
-                    }
-                }
-                requestPayload = mapper.writeValueAsString(valueMap);
-            }
-        }
+        String rawRequestPayload = (String) json.get("requestPayload");
+        String requestPayload = OriginalHttpRequest.rawToJsonString(rawRequestPayload,requestHeaders);
 
         String apiCollectionIdStr = json.getOrDefault("akto_vxlan_id", "0").toString();
         int apiCollectionId = 0;
@@ -171,23 +152,6 @@ public class HttpCallParser {
         }
     }
 
-    public static String getAcceptableContentType(Map<String,List<String>> headers) {
-        List<String> acceptableContentTypes = Arrays.asList(JSON_CONTENT_TYPE, FORM_URL_ENCODED_CONTENT_TYPE);
-        List<String> contentTypeValues = new ArrayList<>();
-        for (String k: headers.keySet()) {
-            if (k.equalsIgnoreCase("content-type")) {
-                contentTypeValues = headers.get(k);
-                for (String value: contentTypeValues) {
-                    for (String acceptableContentType: acceptableContentTypes) {
-                        if (value.contains(acceptableContentType)) {
-                            return acceptableContentType;
-                        }
-                    }
-                }
-            }
-        }
-        return null;
-    }
 
     int numberOfSyncs = 0;
 
