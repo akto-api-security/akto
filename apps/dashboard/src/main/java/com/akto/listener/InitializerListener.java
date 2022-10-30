@@ -17,14 +17,22 @@ import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
-import com.akto.dto.testing.TestingRun;
+import com.akto.dto.AccountSettings;
+import com.akto.dto.BackwardCompatibility;
+import com.akto.dto.CustomDataType;
+import com.akto.dto.data_types.Conditions;
+import com.akto.dto.data_types.Predicate;
+import com.akto.dto.data_types.RegexPredicate;
+import com.akto.dto.data_types.Conditions.Operator;
+import com.akto.dto.pii.PIISource;
+import com.akto.dto.pii.PIIType;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.notifications.email.WeeklyEmail;
 import com.akto.notifications.slack.DailyUpdate;
-import com.akto.types.CappedSet;
 import com.akto.util.Pair;
 import com.akto.utils.RedactSampleData;
 import com.google.gson.Gson;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -33,8 +41,9 @@ import com.sendgrid.helpers.mail.Mail;
 import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.kafka.common.protocol.types.Field;
+import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,9 +51,13 @@ import com.akto.dao.context.Context;
 import com.akto.dao.notifications.CustomWebhooksDao;
 import com.akto.dao.notifications.CustomWebhooksResultDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
+import com.akto.dao.pii.PIISourceDao;
 
 import com.akto.testing.*;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -114,6 +127,75 @@ public class InitializerListener implements ServletContextListener {
             }
         }, delayInDays, 7, TimeUnit.DAYS);
 
+    }
+
+    static void executePIISourceFetch() {
+        List<PIISource> piiSources = PIISourceDao.instance.findAll("active", true);
+        for (PIISource piiSource: piiSources) {
+            String fileUrl = piiSource.getFileUrl();
+            String id = piiSource.getId();
+            Map<String, PIIType> currTypes = piiSource.getMapNameToPIIType();
+            if (currTypes == null) {
+                currTypes = new HashMap<>();
+            }
+
+            try {
+                String fileContent = FileUtils.readFileToString(new File(fileUrl), StandardCharsets.UTF_8);
+                BasicDBObject fileObj = BasicDBObject.parse(fileContent);
+                BasicDBList dataTypes = (BasicDBList) (fileObj.get("types"));
+                Bson findQ = Filters.eq("_id", id);
+
+                for (Object dtObj: dataTypes) {
+                    BasicDBObject dt = (BasicDBObject) dtObj;
+                    String piiKey = id + "_" + dt.getString("name");
+                    PIIType piiType = new PIIType(
+                        piiKey,
+                        dt.getBoolean("isSensitive"),
+                        dt.getString("regexPattern"),
+                        dt.getBoolean("onKey")
+                    );
+
+                    if (!dt.getBoolean("active")) {
+                        PIISourceDao.instance.updateOne(findQ, Updates.unset("mapNameToPIIType."+piiKey));
+                        CustomDataTypeDao.instance.updateOne("name", piiKey, Updates.set("active", false));
+                    }
+
+                    if (currTypes.containsKey(piiKey) && currTypes.get(piiKey).equals(piiType)) {
+                        continue;
+                    } else {
+                        Bson updateQ = Updates.set("mapNameToPIIType."+piiKey, piiType);
+                        PIISourceDao.instance.updateOne(findQ, updateQ);
+
+                        CustomDataTypeDao.instance.deleteAll(Filters.eq("name", piiKey));
+                        CustomDataTypeDao.instance.insertOne(getCustomDataTypeFromPiiType(piiSource, piiType));
+                    }
+                }
+
+            } catch (IOException e) {
+                continue;
+            }
+        }
+    }
+
+    private static CustomDataType getCustomDataTypeFromPiiType(PIISource piiSource, PIIType piiType) {
+        String piiKey = piiType.getName();
+
+        List<Predicate> predicates = new ArrayList<>(); 
+        Conditions conditions = new Conditions(predicates, Operator.OR);
+        predicates.add(new RegexPredicate(piiType.getRegexPattern()));
+
+        CustomDataType ret = new CustomDataType(
+            piiKey, 
+            piiType.getIsSensitive(), 
+            Collections.emptyList(), 
+            piiSource.getAddedByUser(), 
+            true, 
+            conditions, 
+            (piiType.getOnKey() ? null : conditions), 
+            Operator.OR
+        );
+
+        return ret;
     }
 
     private void setUpDailyScheduler() {
@@ -472,6 +554,16 @@ public class InitializerListener implements ServletContextListener {
             addAktoDataTypes(backwardCompatibility);
 
             SingleTypeInfo.init();
+
+            Context.accountId.set(1000000);
+            
+            if (PIISourceDao.instance.findOne("_id", "A") == null) {
+                String fileUrl = "https://raw.githubusercontent.com/Ankush12389/pii_types/main/pii_source.json";
+                PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
+                piiSource.setId("A");
+        
+                PIISourceDao.instance.insertOne(piiSource);
+            } 
 
             setUpWeeklyScheduler();
             setUpDailyScheduler();

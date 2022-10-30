@@ -52,4 +52,13 @@ public class Conditions {
     public void setOperator(Operator operator) {
         this.operator = operator;
     }
+
+
+    @Override
+    public String toString() {
+        return "{" +
+            " predicates='" + getPredicates() + "'" +
+            ", operator='" + getOperator() + "'" +
+            "}";
+    }
 }

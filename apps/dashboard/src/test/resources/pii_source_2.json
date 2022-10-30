@@ -1,0 +1,25 @@
+{
+    "types": [
+        {
+            "name": "Github token",
+            "isSensitive": true,
+            "regexPattern": ".*GITHUB.*TOKEN.*",
+            "onKey": true,
+            "active" : true
+        },
+        {
+            "name": "AWS Secret",
+            "isSensitive": true,
+            "regexPattern": ".*AWS.*SECRET.*",
+            "onKey": true,
+            "active" : false
+        },
+        {
+            "name": "AWS Access",
+            "isSensitive": true,
+            "regexPattern": ".*AWS.*ACCESS.*",
+            "onKey": true,
+            "active" : true
+        }
+    ]
+}
