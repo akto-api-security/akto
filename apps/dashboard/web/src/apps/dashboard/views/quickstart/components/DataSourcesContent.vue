@@ -3,10 +3,10 @@
     <div class=" no-pointer-events pa-8" v-else>
         <div v-for='title in titles' :key="title">
             <div class="title">
-                {{title}} connections
+                {{ title }} connections
                 <v-icon color="#47466A">$fas_caret-down</v-icon>
             </div>
-            <div v-for="source in sources" :key="source.title+title">
+            <div v-for="source in sources" :key="source.title + title">
                 <single-data-source v-if="source.connected === title" :icon=source.icon :title=source.title
                     :detail=source.detail :subtitle=source.subtitle>
                     <template #detail v-if="source.detailComponent">
@@ -23,7 +23,7 @@ import DetailExpansionPanel from './DetailExpansionPanel'
 import AwsTrafficMirroring from './AwsTrafficMirroring'
 import GcpTrafficMirroring from './GcpTrafficMirroring'
 import BurpsuiteSource from './BurpsuiteSource'
-import SwaggerSource from './SwaggerSource'
+import PostmanSource from './PostmanSource'
 import SingleDataSource from './SingleDataSource'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
 import api from '../api'
@@ -36,7 +36,7 @@ export default {
         SingleDataSource,
         GcpTrafficMirroring,
         BurpsuiteSource,
-        SwaggerSource,
+        PostmanSource,
         Spinner
     },
     data() {
@@ -69,10 +69,11 @@ export default {
                     connected: "More"
                 },
                 {
-                    icon: "$swagger",
+                    icon: "$postman",
                     key: "SWAGGER",
-                    title: "OpenAPI Collection",
-                    detailComponent: 'SwaggerSource',
+                    title: "Postman",
+                    subtitle: "Coming soon",
+                    detailComponent: 'PostmanSource',
                     connected: "More"
                 }
             ]
@@ -84,8 +85,6 @@ export default {
     methods: {
         fetchQuickStartPageState() {
             api.fetchQuickStartPageState().then((resp) => {
-                console.log(resp);
-                //debugger;
                 this.loading = false;
                 if (resp.configuredItems) {
                     resp.configuredItems.forEach(item => {

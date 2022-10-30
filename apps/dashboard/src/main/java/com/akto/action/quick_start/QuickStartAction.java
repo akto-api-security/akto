@@ -41,6 +41,8 @@ public class QuickStartAction extends UserAction {
     private boolean isFirstSetup;
     private StackState stackState;
     private List<String> configuredItems;
+    private String awsRegion;
+    private String awsAccountId;
 
     private final Stack stack = new AwsStack();
     private final ServerlessFunction serverlessFunction = new Lambda();
@@ -86,6 +88,8 @@ public class QuickStartAction extends UserAction {
                 }
             }
             this.selectedLBs = selectedLBs;
+            this.awsRegion = System.getenv("AWS_REGION");
+            this.awsAccountId = System.getenv("AWS_ACCOUNT_ID");
         } catch (Exception e) {
             System.out.println(e.toString());
             e.printStackTrace();
@@ -102,7 +106,7 @@ public class QuickStartAction extends UserAction {
             try {
                 Map<String, String> parameters = new HashMap<String, String>() {
                     {
-                        put("MongoIp", "10.0.137.76");
+                        put("MongoIp", System.getenv("AKTO_MONGO_CONN"));
                         put("KeyPair", System.getenv("EC2_KEY_PAIR"));
                         put("SourceLBs", extractLBs());
                         put("SubnetId", System.getenv("EC2_SUBNET_ID"));
@@ -158,6 +162,22 @@ public class QuickStartAction extends UserAction {
 
     public void setDashboardHasNecessaryRole(boolean dashboardHasNecessaryRole) {
         this.dashboardHasNecessaryRole = dashboardHasNecessaryRole;
+    }
+
+    public String getAwsRegion() {
+        return awsRegion;
+    }
+
+    public void setAwsRegion(String awsRegion) {
+        this.awsRegion = awsRegion;
+    }
+
+    public String getAwsAccountId() {
+        return awsAccountId;
+    }
+
+    public void setAwsAccountId(String awsAccountId) {
+        this.awsAccountId = awsAccountId;
     }
 
     public boolean getIsFirstSetup() {

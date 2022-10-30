@@ -2,24 +2,24 @@
     <div class="all-pointer-events">
         <div class="d-flex">
             <div>
-                <v-icon size="50" class="panel-icon" v-if="icon">{{icon}}</v-icon>
-                <slot name="icon" v-else></slot>  
+                <v-icon size="50" class="panel-icon" v-if="icon">{{ icon }}</v-icon>
+                <slot name="icon" v-else></slot>
             </div>
             <div class="mr-4">
                 <div class="mb-4">
                     <span class="panel-title text-primary">
-                        <span v-if="title">{{title}}</span>
-                        <slot v-else name="title"/>
+                        <span v-if="title">{{ title }}</span>
+                        <slot v-else name="title" />
                     </span>
                     <span class="panel-subtitle text-primary">
                         <span v-if="subtitle">
-                            <v-chip small color="#6200EA19" text-color="#6200EA99">Recommended</v-chip>
+                            <v-chip small color="#6200EA19" text-color="#6200EA99">{{ subtitle }}</v-chip>
                         </span>
                     </span>
                 </div>
                 <div class="panel-detail grey-text">
-                    <span v-if="detail">{{detail}}</span>
-                    <slot v-else name="detail"/>
+                    <span v-if="detail">{{ detail }}</span>
+                    <slot v-else name="detail" />
                 </div>
             </div>
         </div>
