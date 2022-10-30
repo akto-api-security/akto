@@ -57,6 +57,7 @@ import com.akto.testing.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -140,6 +141,11 @@ public class InitializerListener implements ServletContextListener {
             }
 
             try {
+                if (fileUrl.startsWith("http")) {
+                    String tempFileUrl = "temp_"+id;
+                    FileUtils.copyURLToFile(new URL(fileUrl), new File(tempFileUrl));
+                    fileUrl = tempFileUrl;
+                }
                 String fileContent = FileUtils.readFileToString(new File(fileUrl), StandardCharsets.UTF_8);
                 BasicDBObject fileObj = BasicDBObject.parse(fileContent);
                 BasicDBList dataTypes = (BasicDBList) (fileObj.get("types"));
@@ -172,6 +178,7 @@ public class InitializerListener implements ServletContextListener {
                 }
 
             } catch (IOException e) {
+                logger.error("failed to read file", e);
                 continue;
             }
         }
