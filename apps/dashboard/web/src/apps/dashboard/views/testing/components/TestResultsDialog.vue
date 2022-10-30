@@ -71,8 +71,7 @@ export default {
         this.currentIndex = (++this.currentIndex) % this.messagesBasic.length
         this.$refs.layoutWithTabs.reset()
     },
-    buildHighlightPaths(y) {
-        let paramInfoList = y.privateSingleTypeInfos
+    buildHighlightPaths(paramInfoList) {
         if (!paramInfoList) paramInfoList = []
         let highlightPaths = paramInfoList.map((x) => {
             let asterisk = x.isPrivate
@@ -94,7 +93,9 @@ export default {
     },
     messagesAdvance() {
         let testSubType = this.testingRunResult["testSubType"]
-        return this.testingRunResult["testResults"].map(x => {return {message: x.originalMessage, title: testSubType, highlightPaths: [], errors: x.errors, percentageMatch: x.percentageMatch}}) 
+        let singleTypeInfos = this.testingRunResult["singleTypeInfos"]
+        let highlightPaths = this.buildHighlightPaths(singleTypeInfos);
+        return this.testingRunResult["testResults"].map(x => {return {message: x.originalMessage, title: testSubType, highlightPaths: highlightPaths, errors: x.errors, percentageMatch: x.percentageMatch}}) 
     },
     jsonBasic: function() {
         if (this.testingRunResult == null) return null
