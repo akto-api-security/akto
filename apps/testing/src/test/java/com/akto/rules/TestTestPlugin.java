@@ -55,7 +55,12 @@ public class TestTestPlugin extends MongoBasedTest {
         originalPayload = "{}";
         currentPayload = "{}";
         val = TestPlugin.compareWithOriginalResponse(originalPayload, currentPayload);
-        assertEquals(val,0.0, 0.0);
+        assertEquals(val,100.0, 100.0);
+
+        originalPayload = "{\"user\":{}}";
+        currentPayload = "{\"user\":{}}";
+        val = TestPlugin.compareWithOriginalResponse(originalPayload, currentPayload);
+        assertEquals(val,100.0, 100.0);
     }
 
     @Test

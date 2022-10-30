@@ -45,6 +45,13 @@ public abstract class TestPlugin {
     }
 
     public static double compareWithOriginalResponse(String originalPayload, String currentPayload) {
+        if (originalPayload == null && currentPayload == null) return 100;
+        if (originalPayload == null || currentPayload == null) return 0;
+
+        String trimmedOriginalPayload = originalPayload.trim();
+        String trimmedCurrentPayload = currentPayload.trim();
+        if (trimmedCurrentPayload.equals(trimmedOriginalPayload)) return 100;
+
         Map<String, Set<String>> originalResponseParamMap = new HashMap<>();
         Map<String, Set<String>> currentResponseParamMap = new HashMap<>();
         try {
