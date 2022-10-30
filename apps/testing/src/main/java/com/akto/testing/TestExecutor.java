@@ -150,6 +150,7 @@ public class TestExecutor {
         ChangeHttpMethodTest changeHttpMethodTest = new ChangeHttpMethodTest();
         AddMethodInParameterTest addMethodInParameterTest = new AddMethodInParameterTest();
         AddMethodOverrideHeadersTest addMethodOverrideHeadersTest = new AddMethodOverrideHeadersTest();
+        AddUserIdTest addUserIdTest = new AddUserIdTest();
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
         TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
@@ -168,6 +169,9 @@ public class TestExecutor {
         TestingRunResult changeHttpMethodTestResult = runTest(changeHttpMethodTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
         testingRunResults.add(changeHttpMethodTestResult);
 
+        TestingRunResult addUserIdTestResult = runTest(addUserIdTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+        if (addUserIdTestResult != null) testingRunResults.add(addUserIdTestResult);
+
         return testingRunResults;
     }
 
@@ -176,6 +180,7 @@ public class TestExecutor {
 
         int startTime = Context.now();
         TestPlugin.Result result = testPlugin.start(apiInfoKey, authMechanism, sampleMessages, singleTypeInfos);
+        if (result == null) return null;
         int endTime = Context.now();
 
         return new TestingRunResult(

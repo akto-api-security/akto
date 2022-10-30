@@ -57,7 +57,6 @@ public class SampleMessageStore {
             }
 
             for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
-                // singleTypeInfo.clearValues();
                 singleTypeInfoMap.put(singleTypeInfo.composeKeyWithCustomSubType(SingleTypeInfo.GENERIC), singleTypeInfo);
             }
         } catch (Exception e) {
