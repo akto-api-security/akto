@@ -18,7 +18,7 @@ public class AddMethodOverrideHeadersTest extends ChangeMethodPlugin {
 
     @Override
     public boolean isVulnerable(double percentageBodyMatch, int statusCode) {
-        return isStatusGood(statusCode) && percentageBodyMatch < 90;
+        return isStatusGood(statusCode) && percentageBodyMatch < 30;
     }
 
     @Override
