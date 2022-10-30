@@ -20,14 +20,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class TestExecutor {
-
-    public static String slashHandling(String url) {
-        if (!url.startsWith("/")) url = "/"+url;
-        if (!url.endsWith("/")) url = url+"/";
-        return url;
-    }
 
     private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
 
@@ -63,6 +59,7 @@ public class TestExecutor {
     }
 
     public void  apiWiseInit(TestingRun testingRun, ObjectId summaryId) {
+        int accountId = Context.accountId.get();
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
         Map<String, SingleTypeInfo> singleTypeInfoMap = SampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
@@ -73,23 +70,46 @@ public class TestExecutor {
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         System.out.println("APIs: " + apiInfoKeyList.size());
 
-        Map<String, Integer> totalCountIssues = new HashMap<>();
-        Set<ApiInfo.ApiInfoKey> store = new HashSet<>();
+        CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
+        ExecutorService threadPool = Executors.newFixedThreadPool(100);
+
+        List<Future<List<TestingRunResult>>> futureTestingRunResults = new ArrayList<>();
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
             try {
-                String url = slashHandling(apiInfoKey.url+"");
-                ApiInfo.ApiInfoKey modifiedKey = new ApiInfo.ApiInfoKey(apiInfoKey.getApiCollectionId(), url, apiInfoKey.method);
-                if (store.contains(modifiedKey)) continue;
-                store.add(modifiedKey);
-                Map<String, Integer> countIssues = start(apiInfoKey, testingRun.getTestIdConfig(), testingRun.getId(), singleTypeInfoMap, sampleMessages, authMechanism, summaryId);
-                if (countIssues == null) countIssues = new HashMap<>();
-                for (String key: countIssues.keySet()) {
-                    int c1 = totalCountIssues.getOrDefault(key,0);
-                    int c2 = countIssues.getOrDefault(key,0);
-                    totalCountIssues.put(key, c1+c2);
-                }
+                 Future<List<TestingRunResult>> future = threadPool.submit(() -> startWithLatch(apiInfoKey, testingRun.getTestIdConfig(), testingRun.getId(), singleTypeInfoMap, sampleMessages, authMechanism, summaryId, accountId, latch));
+                 futureTestingRunResults.add(future);
             } catch (Exception e) {
                 logger.error(e.getMessage());
+            }
+        }
+
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        List<TestingRunResult> testingRunResults = new ArrayList<>();
+        for (Future<List<TestingRunResult>> future: futureTestingRunResults) {
+            if (!future.isDone()) continue;
+            try {
+                testingRunResults.addAll(future.get());
+            } catch (InterruptedException | ExecutionException e) {
+                e.printStackTrace();
+            }
+        }
+
+        TestingRunResultDao.instance.insertMany(testingRunResults);
+
+        Map<String, Integer> totalCountIssues = new HashMap<>();
+        totalCountIssues.put("HIGH", 0);
+        totalCountIssues.put("MEDIUM", 0);
+        totalCountIssues.put("LOW", 0);
+
+        for (TestingRunResult testingRunResult: testingRunResults) {
+            if (testingRunResult.isVulnerable()) {
+                int initialCount = totalCountIssues.get("HIGH");
+                totalCountIssues.put("HIGH", initialCount + 1);
             }
         }
 
@@ -99,21 +119,30 @@ public class TestExecutor {
                     Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
                     Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
                     Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues),
-                    Updates.set(TestingRunResultSummary.TOTAL_APIS, store.size())
+                    Updates.set(TestingRunResultSummary.TOTAL_APIS, apiInfoKeyList.size())
             )
         );
     }
 
-    public Map<String, Integer> start(ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId,
-                      Map<String, SingleTypeInfo> singleTypeInfoMap, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages, AuthMechanism authMechanism, ObjectId testRunResultSummaryId) {
-        Map<String, Integer> countIssues = new HashMap<>();
-        countIssues.put("HIGH", 0);
-        countIssues.put("MEDIUM", 0);
-        countIssues.put("LOW", 0);
+    public List<TestingRunResult> startWithLatch(
+            ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId,
+            Map<String, SingleTypeInfo> singleTypeInfoMap, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages,
+            AuthMechanism authMechanism, ObjectId testRunResultSummaryId, int accountId,
+            CountDownLatch latch) {
+
+        Context.accountId.set(accountId);
+        List<TestingRunResult> testingRunResults = start(apiInfoKey, testIdConfig, testRunId, singleTypeInfoMap, sampleMessages, authMechanism, testRunResultSummaryId);
+        latch.countDown();
+        return testingRunResults;
+    }
+
+    public List<TestingRunResult> start(ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId,
+                                      Map<String, SingleTypeInfo> singleTypeInfoMap, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages,
+                                      AuthMechanism authMechanism, ObjectId testRunResultSummaryId) {
 
         if (testIdConfig != 0) {
             logger.error("Test id config is not 0 but " + testIdConfig);
-            return countIssues;
+            return new ArrayList<>();
         }
 
         BOLATest bolaTest = new BOLATest();
@@ -139,16 +168,7 @@ public class TestExecutor {
         TestingRunResult changeHttpMethodTestResult = runTest(changeHttpMethodTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
         testingRunResults.add(changeHttpMethodTestResult);
 
-        for (TestingRunResult testingRunResult: testingRunResults) {
-            if (testingRunResult.isVulnerable()) {
-                int c = countIssues.getOrDefault("HIGH", 0);
-                countIssues.put("HIGH", c+1);
-            }
-        }
-
-        TestingRunResultDao.instance.insertMany(testingRunResults);
-
-        return countIssues;
+        return testingRunResults;
     }
 
     public TestingRunResult runTest(TestPlugin testPlugin, ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages,
