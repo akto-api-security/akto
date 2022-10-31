@@ -161,7 +161,7 @@ public class InitializerListener implements ServletContextListener {
                         dt.getBoolean("onKey")
                     );
 
-                    if (!dt.getBoolean("active")) {
+                    if (!dt.getBoolean("active", true)) {
                         PIISourceDao.instance.updateOne(findQ, Updates.unset("mapNameToPIIType."+piiKey));
                         CustomDataTypeDao.instance.updateOne("name", piiKey, Updates.set("active", false));
                     }
