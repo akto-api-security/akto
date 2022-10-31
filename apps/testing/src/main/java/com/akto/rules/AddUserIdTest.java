@@ -16,12 +16,6 @@ public class AddUserIdTest extends TestPlugin {
 
     @Override
     public Result start(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages, Map<String, SingleTypeInfo> singleTypeInfos) {
-
-        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleMessages);
-        if (messages.isEmpty()) return addWithoutRequestError(null, TestResult.TestError.NO_PATH);
-        List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, authMechanism);
-        if (filteredMessages.isEmpty()) return addWithoutRequestError(null, TestResult.TestError.NO_MESSAGE_WITH_AUTH_TOKEN);
-
         List<String> userIdNameList = Arrays.asList(
                 "user", "User", "userId", "UserId", "user_id", "customer_id", "customerId", "CustomerId", "customer",
                 "user_name", "username", "UserName","customer_name"
@@ -41,6 +35,11 @@ public class AddUserIdTest extends TestPlugin {
         }
 
         if (validUserIdNameMap.isEmpty()) return null;
+
+        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleMessages);
+        if (messages.isEmpty()) return addWithoutRequestError(null, TestResult.TestError.NO_PATH);
+        List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, authMechanism);
+        if (filteredMessages.isEmpty()) return addWithoutRequestError(null, TestResult.TestError.NO_MESSAGE_WITH_AUTH_TOKEN);
 
         RawApi rawApi = filteredMessages.get(0);
         List<TestResult> testResults = new ArrayList<>();
