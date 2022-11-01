@@ -131,7 +131,14 @@ public class TestExecutor {
             CountDownLatch latch) {
 
         Context.accountId.set(accountId);
-        List<TestingRunResult> testingRunResults = start(apiInfoKey, testIdConfig, testRunId, singleTypeInfoMap, sampleMessages, authMechanism, testRunResultSummaryId);
+        List<TestingRunResult> testingRunResults = new ArrayList<>();
+
+        try {
+            testingRunResults = start(apiInfoKey, testIdConfig, testRunId, singleTypeInfoMap, sampleMessages, authMechanism, testRunResultSummaryId);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
         latch.countDown();
         return testingRunResults;
     }

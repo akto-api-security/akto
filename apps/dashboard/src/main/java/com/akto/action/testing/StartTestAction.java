@@ -10,7 +10,6 @@ import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
 import com.akto.dto.testing.*;
-import com.akto.dto.testing.TestingEndpoints.Type;
 import com.akto.dto.testing.TestingRun.State;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -116,7 +115,13 @@ public class StartTestAction extends UserAction {
     String testingRunHexId;
     List<TestingRunResultSummary> testingRunResultSummaries;
     public String fetchTestingRunResultSummaries() {
-        ObjectId testingRunId = new ObjectId(testingRunHexId);
+        ObjectId testingRunId;
+        try {
+            testingRunId = new ObjectId(testingRunHexId);
+        } catch (Exception e) {
+            addActionError("Invalid test id");
+            return ERROR.toUpperCase();
+        }
 
         Bson filterQ = Filters.and(
             Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRunId),
@@ -132,7 +137,13 @@ public class StartTestAction extends UserAction {
     String testingRunResultSummaryHexId;
     List<TestingRunResult> testingRunResults;
     public String fetchTestingRunResults() {
-        ObjectId testingRunResultSummaryId = new ObjectId(testingRunResultSummaryHexId);
+        ObjectId testingRunResultSummaryId;
+        try {
+            testingRunResultSummaryId= new ObjectId(testingRunResultSummaryHexId);
+        } catch (Exception e) {
+            addActionError("Invalid test summary id");
+            return ERROR.toUpperCase();
+        }
         
         this.testingRunResults = TestingRunResultDao.instance.findAll("testRunResultSummaryId", testingRunResultSummaryId);
 
