@@ -33,8 +33,10 @@ public class TestStartTestAction extends MongoBasedTest {
         TestingRun testingRun3 = new TestingRun(Context.now(), "",  workflowTestingEndpoints,1, TestingRun.State.SCHEDULED, 0);
 
         TestingRun testingRun4 = new TestingRun(Context.now(), "", collectionWiseTestingEndpoints,0, TestingRun.State.RUNNING, 0);
+        // already completed test
+        TestingRun testingRun5 = new TestingRun(Context.now(), "", collectionWiseTestingEndpoints,0, TestingRun.State.COMPLETED, 0);
 
-        TestingRunDao.instance.insertMany(Arrays.asList(testingRun1, testingRun2, testingRun3, testingRun4 ));
+        TestingRunDao.instance.insertMany(Arrays.asList(testingRun1, testingRun2, testingRun3, testingRun4, testingRun5 ));
 
         Bson filter = Filters.or(
                 Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
@@ -50,5 +52,9 @@ public class TestStartTestAction extends MongoBasedTest {
 
         testingRuns = TestingRunDao.instance.findAll(filter);
         assertEquals(0, testingRuns.size());
+
+        testingRuns = TestingRunDao.instance.findAll(Filters.eq(TestingRun.STATE, TestingRun.State.COMPLETED));
+        assertEquals(1, testingRuns.size());
+        assertEquals(testingRun5.getId(), testingRuns.get(0).getId());
     }
 }
