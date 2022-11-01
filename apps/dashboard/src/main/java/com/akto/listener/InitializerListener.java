@@ -8,12 +8,16 @@ import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.BackwardCompatibilityDao;
 import com.akto.dao.FilterSampleDataDao;
 import com.akto.dao.UsersDao;
+import com.akto.dao.testing.TestingRunDao;
+import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.TestingSchedulesDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dto.*;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
+import com.akto.dto.testing.TestingRun;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.notifications.email.WeeklyEmail;
 import com.akto.notifications.slack.DailyUpdate;
@@ -399,6 +403,19 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
+    public void readyForNewTestingFramework(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getReadyForNewTestingFramework() == 0) {
+            TestingRunDao.instance.getMCollection().drop();
+            TestingRunResultDao.instance.getMCollection().drop();
+            TestingSchedulesDao.instance.getMCollection().drop();
+
+            BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.READY_FOR_NEW_TESTING_FRAMEWORK, Context.now())
+            );
+        }
+    }
+
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
         String https = System.getenv("AKTO_HTTPS_FLAG");
@@ -428,6 +445,7 @@ public class InitializerListener implements ServletContextListener {
             dropFilterSampleDataCollection(backwardCompatibility);
             resetSingleTypeInfoCount(backwardCompatibility);
             dropWorkflowTestResultCollection(backwardCompatibility);
+            readyForNewTestingFramework(backwardCompatibility);
 
             SingleTypeInfo.init();
 
