@@ -1,30 +1,15 @@
 package com.akto.action.testing;
 
-import com.akto.DaoInit;
 import com.akto.action.UserAction;
 import com.akto.dao.AuthMechanismsDao;
-import com.akto.dao.SampleDataDao;
-import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunDao;
-import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dto.testing.*;
-import com.akto.dto.ApiInfo;
-import com.akto.dto.traffic.SampleData;
-import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
-import org.bson.conversions.Bson;
-import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.Set;
-import java.util.HashSet;
-import java.util.Arrays;
 
 
 public class AuthMechanismAction extends UserAction {
@@ -44,20 +29,6 @@ public class AuthMechanismAction extends UserAction {
         AuthMechanism authMechanism = new AuthMechanism(authParams);
 
         AuthMechanismsDao.instance.insertOne(authMechanism);
-        return SUCCESS.toUpperCase();
-    }
-
-    List<TestingRunResult> testingRunResults;
-    public String fetchRequestAndResponseForTest() {
-
-        Set<ObjectId> testRunResultIds = new HashSet<>();
-
-        for(TestingRunResult testingRunResult: this.testingRunResults) {
-            testRunResultIds.add(new ObjectId(testingRunResult.getHexId()));
-        }
-
-        this.testingRunResults = TestingRunResultDao.instance.findAll(Filters.in("_id", testRunResultIds));
-
         return SUCCESS.toUpperCase();
     }
 
@@ -91,14 +62,6 @@ public class AuthMechanismAction extends UserAction {
 
     public String getValue() {
         return this.value;
-    }
-
-    public List<TestingRunResult> getTestingRunResults() {
-        return this.testingRunResults;
-    }
-
-    public void setTestingRunResults(List<TestingRunResult> testingRunResults) {
-        this.testingRunResults = testingRunResults;
     }
 
     public void setLocation(AuthParam.Location location) {
