@@ -5,7 +5,7 @@
                 <v-icon size="50" class="panel-icon" v-if="icon">{{ icon }}</v-icon>
                 <slot name="icon" v-else></slot>
             </div>
-            <div class="mr-4">
+            <div class="mr-4 full-width">
                 <div class="mb-4">
                     <span class="panel-title text-primary">
                         <span v-if="title">{{ title }}</span>
@@ -58,4 +58,7 @@ export default {
     font-weight: 700
     font-size: 16px    
     margin-right: 16px
+
+.full-width
+    width: 100%
 </style>

@@ -1,11 +1,11 @@
 <template>
 
     <spinner v-if="loading" />
-    <div v-else class="d-flex lb_dropdown">
+    <div v-else class="lb_dropdown">
         <div v-if="hasRequiredAccess">
-            <div class="d-flex">
-                <v-select v-model="selectedLBs" :items="availableLBs" item-text="resourceName" item-value="resourceId"
-                    label="Select LB(s)" return-object multiple>
+
+                <v-select v-model="selectedLBs" append-icon="$fas_edit" :items="availableLBs" item-text="resourceName" item-value="resourceId"
+                    label="Select Loadbalancer(s)" return-object multiple>
                     <template v-slot:selection="{ item, index }">
                         <v-chip v-if="index === 0">
                             <span>{{ item.resourceName }}</span>
@@ -14,11 +14,30 @@
                             (+{{ selectedLBs.length - 1 }} others)
                         </span>
                     </template>
+                    <template v-slot:item="{ active, item, attrs, on }">
+                        <v-list-item :class="item.alreadySelected ? 'disabled_lb' : ''" v-on="on" v-bind="attrs" #default="{ active }">
+                            <v-list-item-action>
+                                <v-checkbox :input-value="active" on-icon="$far_check-square" off-icon="$far_square">
+                                </v-checkbox>
+                            </v-list-item-action>
+                            <v-list-item-content>
+                                <v-list-item-title>
+                                    <v-row no-gutters align="center">
+                                        <span>{{ item.resourceName }}</span>
+                                    </v-row>
+                                </v-list-item-title>
+                            </v-list-item-content>
+                        </v-list-item>
+                    </template>
+
+                    <template slot="append-outer" >
+                        <spinner v-if="progressBar.show"></spinner>
+                        <v-btn v-else primary dark color="#6200EA" @click="saveLBs" :disabled="selectedLBs.length === initialLBCount" class="ml-3">
+                            Apply
+                        </v-btn>
+                    </template>
                 </v-select>
-                <v-btn primary dark color="#6200EA" @click="saveLBs" :disabled="progressBar.show" class="mt-3 ml-3">
-                    Update LBs
-                </v-btn>
-            </div>
+               
             <div>{{ text_msg }}</div>
             <div v-if="progressBar.show">
                 <div class="d-flex">
@@ -27,28 +46,24 @@
                     </v-progress-linear>
                     <div class="ml-2">{{ progressBar.value }}%</div>
                 </div>
-                <!-- <div>
-                    We are setting up mirroring for you! Grab a cup of coffee, sit back and relax while we work our
-                    magic!
-                </div> -->
             </div>
         </div>
         <div v-else>
             <div class="steps">Your dashboard's instance needs relevant access to setup traffic mirroring, please
-                execute the
-                following commands:</div>
+                do the
+                following steps:</div>
             <div class="steps">
-                <b>Step 1</b>: Open aws console and navigate to IAM > Roles
+                <b>Step 1</b>: Grab the policy JSON below and navigate to Akto Dashboard's current role by clicking <a target="_blank" class="clickable-docs" href="https://us-east-1.console.aws.amazon.com/iam/home#/roles/AktoDashboardRole$createPolicy?step=edit">here</a>
+                <code-block :lines="quick_start_policy_lines" onCopyBtnClickText="Policy copied to clipboard"></code-block>
             </div>
             <div class="steps">
-                <b>Step 2</b>: Locate and open AktoDashboardRole
+                <b>Step 2</b>: We will create an inline policy, navigate to JSON tab and paste the copied JSON here.
             </div>
             <div class="steps">
-                <b>Step 3</b>: Click on 'Add permissions' and then on 'Create inline policy'
+                <b>Step 3</b>: Click on 'Review policy', now lets name the policy as 'AktoDashboardPolicy' and finally create the policy by clicking on 'Create policy'.
             </div>
             <div class="steps">
-                <b>Step 4</b>: Navigate to 'JSON' tab, paste the following json there
-                <code-block :lines="quick_start_policy_lines"></code-block>
+                <b>Step 4</b>: Navigate back to Akto Dashboard and refresh the page, and you should see a drop down with a list of load balancers from where you can start mirroring data.
             </div>
         </div>
     </div>
@@ -80,6 +95,7 @@ export default {
                 value: 0,
                 max_deployment_time_in_ms: 8 * 60 * 1000,
             },
+            initialLBCount: 0,
             text_msg: null,
             quick_start_policy_lines: [
                 `{`,
@@ -235,6 +251,9 @@ export default {
                 `            "Action": [`,
                 `                "lambda:GetFunction", `,
                 `                "lambda:CreateFunction", `,
+                `                "lambda:DeleteFunction", `,
+                `                "lambda:UpdateFunctionConfiguration", `,
+                `                "lambda:UpdateFunctionCode", `,
                 `                "lambda:GetFunctionCodeSigningConfig", `,
                 `                "lambda:InvokeFunction", `,
                 `                "lambda:AddPermission"`,
@@ -325,15 +344,26 @@ export default {
                 if (!resp.dashboardHasNecessaryRole) {
                     for (let i = 0; i < this.quick_start_policy_lines.length; i++) {
                         let line = this.quick_start_policy_lines[i];
-                        line = line.replace('AWS_REGION', resp.awsRegion);
-                        line = line.replace('AWS_ACCOUNT_ID', resp.awsAccountId);
+                        line = line.replaceAll('AWS_REGION', resp.awsRegion);
+                        line = line.replaceAll('AWS_ACCOUNT_ID', resp.awsAccountId);
                         this.quick_start_policy_lines[i] = line;
                     }
                 }
                 this.hasRequiredAccess = resp.dashboardHasNecessaryRole
-                this.availableLBs = resp.availableLBs;
                 this.selectedLBs = resp.selectedLBs;
+                for(let i=0; i<resp.availableLBs.length; i++){
+                    let lb = resp.availableLBs[i];
+                    let alreadySelected = false;
+                    for(let j=0; j<this.selectedLBs.length; j++){
+                        if(this.selectedLBs[j].resourceName === lb.resourceName){
+                            alreadySelected = true;
+                        }
+                    }
+                    lb['alreadySelected'] = alreadySelected;
+                }
+                this.availableLBs = resp.availableLBs;
                 this.existingSelectedLBs = resp.selectedLBs;
+                this.initialLBCount = this.selectedLBs.length;
                 this.checkStackState()
             })
         },
@@ -411,13 +441,15 @@ export default {
 
 
 <style lang="sass" scoped>
-.lb_dropdown
-    min-width: 500px
-    .v-select__selections
-        padding: 0px !important     
-    .v-input__slot
-        min-height: 32px !important
+.disabled_lb
+    pointer-events: none
+    opacity: 0.5
 
 .steps
     margin-top: 4px
+
+.clickable-docs
+    cursor: pointer
+    color: #6200B0 !important
+    text-decoration: underline 
 </style>

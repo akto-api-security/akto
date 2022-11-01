@@ -18,6 +18,10 @@ export default {
         'lines': {
             type: Array,
             required: true,
+        },
+        'onCopyBtnClickText':{
+            type: String,
+            required: false,
         }
     },
     methods: {
@@ -30,11 +34,11 @@ export default {
                     info += "\n";
                 }
             });
-            if (info.length > 0) {
+            if (info.length > 0 && this.onCopyBtnClickText.length > 0) {
                 this.copyToClipboard(info);
-                this.window._AKTO.$emit('SHOW_SNACKBAR', {
+                window._AKTO.$emit('SHOW_SNACKBAR', {
                     show: true,
-                    text: snackBarMessage,
+                    text: this.onCopyBtnClickText,
                     color: 'green'
                 });
             }

@@ -64,6 +64,8 @@ public class QuickStartAction extends UserAction {
     }
 
     public String fetchLoadBalancers() {
+        List<AwsResource> availableLBs = new ArrayList<>();
+        List<AwsResource> selectedLBs = new ArrayList<>();
         try {
             AmazonElasticLoadBalancing amazonElasticLoadBalancingClient = AmazonElasticLoadBalancingClientBuilder
                     .defaultClient();
@@ -77,8 +79,7 @@ public class QuickStartAction extends UserAction {
                 lbInfo.put(lb.getLoadBalancerArn(), new AwsResource(lb.getLoadBalancerName(), lb.getLoadBalancerArn()));
             }
             this.dashboardHasNecessaryRole = true;
-            this.availableLBs = new ArrayList<>(lbInfo.values());
-            List<AwsResource> selectedLBs = new ArrayList<>();
+            availableLBs = new ArrayList<>(lbInfo.values());
             AwsResources resources = AwsResourcesDao.instance.findOne(AwsResourcesDao.generateFilter());
             if (resources != null && resources.getLoadBalancers() != null) {
                 for (AwsResource selectedLb : resources.getLoadBalancers()) {
@@ -87,14 +88,15 @@ public class QuickStartAction extends UserAction {
                     }
                 }
             }
-            this.selectedLBs = selectedLBs;
-            this.awsRegion = System.getenv("AWS_REGION");
-            this.awsAccountId = System.getenv("AWS_ACCOUNT_ID");
         } catch (Exception e) {
             System.out.println(e.toString());
             e.printStackTrace();
             this.dashboardHasNecessaryRole = false;
         }
+        this.awsRegion = System.getenv("AWS_REGION");
+        this.awsAccountId = System.getenv("AWS_ACCOUNT_ID");
+        this.selectedLBs = selectedLBs;
+        this.availableLBs = availableLBs;
         return Action.SUCCESS.toUpperCase();
     }
 
