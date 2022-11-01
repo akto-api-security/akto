@@ -408,6 +408,7 @@ public class InitializerListener implements ServletContextListener {
             TestingRunDao.instance.getMCollection().drop();
             TestingRunResultDao.instance.getMCollection().drop();
             TestingSchedulesDao.instance.getMCollection().drop();
+            WorkflowTestResultsDao.instance.getMCollection().drop();
 
             BackwardCompatibilityDao.instance.updateOne(
                     Filters.eq("_id", backwardCompatibility.getId()),
