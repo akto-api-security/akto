@@ -76,7 +76,6 @@ import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChip
 import ACard from '@/apps/dashboard/shared/components/ACard'
 import SampleData from '@/apps/dashboard/shared/components/SampleData'
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
-import TestResultsTable from './components/TestResultsTable'
 
 import func from '@/util/func'
 import testing from '@/util/testing'
@@ -93,7 +92,6 @@ export default {
         ACard,
         SampleData,
         LayoutWithTabs,
-        TestResultsTable,
         LayoutWithLeftPane,
         ApiCollectionGroup
     },

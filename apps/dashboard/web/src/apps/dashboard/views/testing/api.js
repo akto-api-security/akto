@@ -97,16 +97,6 @@ export default {
         })        
     },
 
-    fetchRequestAndResponseForTest(x) {
-        return request({
-            url: '/api/fetchRequestAndResponseForTest',
-            method: 'post',
-            data: {testingRunResults:[x]}
-        }).then((resp) => {
-            return resp
-        })        
-    },
-
     stopAllTests() {
         return request({
             url: '/api/stopAllTests',
