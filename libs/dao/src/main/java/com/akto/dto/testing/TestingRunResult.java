@@ -2,6 +2,8 @@ package com.akto.dto.testing;
 
 import com.akto.dto.ApiInfo;
 
+import com.akto.dto.testing.TestResult.Severity;
+import com.akto.dto.testing.TestResult.TestCategory;
 import com.akto.dto.type.SingleTypeInfo;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
@@ -37,6 +39,19 @@ public class TestingRunResult {
     private int endTimestamp;
     public static final String TEST_RUN_RESULT_SUMMARY_ID = "testRunResultSummaryId";
     private ObjectId testRunResultSummaryId;
+
+    /*
+     * Assumption : All tests are BOLA
+     *              If vulnerable --> Severity High
+     *              If not vulnerable --> Confidence Low  --> Severity High
+     * */
+
+    private Severity getSeverity () {
+        if (this.isVulnerable() && TestCategory.getTestCategory(this.testSuperType).getSeverity() == Severity.HIGH) {
+            return Severity.HIGH;
+        }
+        return Severity.LOW;
+    }
 
 
     public TestingRunResult() { }

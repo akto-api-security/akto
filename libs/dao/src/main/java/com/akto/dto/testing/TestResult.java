@@ -14,6 +14,42 @@ public class TestResult extends GenericTestResult {
         HIGH, MEDIUM, LOW
     }
 
+    public enum TestCategory {
+        BOLA ("BOLA",Severity.HIGH),
+        ADD_USER_ID("ADD_USER_ID",Severity.HIGH),
+        PRIVILEGE_ESCALATION("PRIVILEGE_ESCALATION",Severity.HIGH),
+        NO_AUTH("NO_AUTH",Severity.HIGH);
+        private final String name;
+        private final Severity severity;
+        TestCategory(String name, Severity severity) {
+            this.name = name;
+            this.severity = severity;
+        }
+
+        public static TestCategory getTestCategory (String category) {
+            switch (category) {
+                case "BOLA" :
+                    return BOLA;
+                case "ADD_USER_ID" :
+                    return ADD_USER_ID;
+                case "PRIVILEGE_ESCALATION" :
+                    return PRIVILEGE_ESCALATION;
+                case "NO_AUTH" :
+                    return NO_AUTH;
+                default:
+                    throw new IllegalStateException("Unexpected value: " + category);
+            }
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public Severity getSeverity () {
+            return severity;
+        }
+    }
+
     public enum Severity {
         CRITICAL, HIGH, MEDIUM, LOW, INFO
     }
