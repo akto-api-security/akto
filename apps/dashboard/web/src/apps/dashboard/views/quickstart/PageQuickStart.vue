@@ -28,7 +28,7 @@
                 <template #icon>
                     <v-icon size="50" class="invert-sideways" color="#6200EA">$fas_user-plus</v-icon>
                 </template>
-                <template #content>Some content</template>
+                <template #content><team-overview></team-overview></template>
             </detail-expansion-panel>
         </v-expansion-panels>
         
@@ -40,13 +40,15 @@
 import SimpleLayout from '@/apps/dashboard/layouts/SimpleLayout'
 import DetailExpansionPanel from './components/DetailExpansionPanel'
 import DataSourcesContent from './components/DataSourcesContent'
+import TeamOverview from '../settings/components/TeamOverview.vue'
 
 export default {
     name: "QuickStart",
     components: {
         SimpleLayout,
         DetailExpansionPanel,
-        DataSourcesContent
+        DataSourcesContent,
+        TeamOverview
     }
 }
 </script>

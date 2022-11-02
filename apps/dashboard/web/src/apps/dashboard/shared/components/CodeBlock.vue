@@ -82,11 +82,11 @@ export default {
 .codeblock {
     background-color: rgb(242, 242, 242);
     min-width: 500px;
-    max-width: 800px;
+    max-width: 100%;
     max-height: 300px;
-    overflow: auto;
+    overflow: scroll;
     white-space: nowrap;
-    font-size: 14px;
+    font-size: 12px;
     border-radius: 5px;
     padding-bottom: 10px;
     font-family: monospace;

@@ -1,6 +1,6 @@
 <template>
     <div>
-        Need content for this.
+        Use postman to send traffic to Akto and realize quick value. If you like what you see, we highly recommend using AWS or GCP traffic mirroring to get real user data for a smooth, automated and minimum false positive experience.
     </div>
 </template>
 

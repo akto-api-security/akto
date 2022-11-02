@@ -3,7 +3,6 @@
     <spinner v-if="loading" />
     <div v-else class="lb_dropdown">
         <div v-if="hasRequiredAccess">
-
                 <v-select v-model="selectedLBs" append-icon="$fas_edit" :items="availableLBs" item-text="resourceName" item-value="resourceId"
                     label="Select Loadbalancer(s)" return-object multiple>
                     <template v-slot:selection="{ item, index }">
@@ -38,7 +37,7 @@
                     </template>
                 </v-select>
                
-            <div>{{ text_msg }}</div>
+            <div class="text_msg" v-html="text_msg"></div>
             <div v-if="progressBar.show">
                 <div class="d-flex">
                     <v-progress-linear class="mt-2" background-color="rgba(98, 0, 234,0.2)" color="rgb(98, 0, 234)"
@@ -60,10 +59,16 @@
                 <b>Step 2</b>: We will create an inline policy, navigate to JSON tab and paste the copied JSON here.
             </div>
             <div class="steps">
-                <b>Step 3</b>: Click on 'Review policy', now lets name the policy as 'AktoDashboardPolicy' and finally create the policy by clicking on 'Create policy'.
+                <b>Step 3</b>: Click on 'Review policy'.
             </div>
             <div class="steps">
-                <b>Step 4</b>: Navigate back to Akto Dashboard and refresh the page, and you should see a drop down with a list of load balancers from where you can start mirroring data.
+                <b>Step 4</b>: Now lets name the policy as 'AktoDashboardPolicy'.
+            </div>
+            <div class="steps">
+                <b>Step 5</b>: Finally create the policy by clicking on 'Create policy'.
+            </div>
+            <div class="steps">
+                <b>Step 6</b>: Click <a class="clickable-docs" href="/dashboard/quick-start">here</a> to refresh.
             </div>
         </div>
     </div>
@@ -404,12 +409,12 @@ export default {
             else if (stackState.status == 'CREATE_COMPLETE') {
                 console.log("Stack created successfully, stopping further calls to status api");
                 this.removeProgressBarAndStatuschecks(intervalId);
-                this.text_msg = 'Akto is tirelessly processing mirrored traffic to protect your APIs';
+                this.text_msg = 'Akto is tirelessly processing mirrored traffic to protect your APIs. Click <a class="clickable-docs" href="/dashboard/observe/inventory">here</a> to navigate to API Inventory.';
             }
             else if (stackState.status == 'DOES_NOT_EXISTS') {
                 console.log(`Stack doesn't exist, removing calls to status api`);
                 this.removeProgressBarAndStatuschecks(intervalId);
-                this.text_msg = 'Mirroring is not setup currently, choose 1 or more LBs to enable mirroring';
+                this.text_msg = 'Mirroring is not setup currently, choose 1 or more LBs to enable mirroring.';
             } else {
                 console.log('Something went wrong here, removing calls to status api');
                 this.removeProgressBarAndStatuschecks(intervalId);
@@ -440,16 +445,25 @@ export default {
 </script>
 
 
-<style lang="sass" scoped>
-.disabled_lb
-    pointer-events: none
-    opacity: 0.5
+<style scoped>
+.disabled_lb{
+    pointer-events: none;
+    opacity: 0.5;
+}
 
-.steps
-    margin-top: 4px
+.steps{
+    margin-top: 6px;
+}
 
-.clickable-docs
-    cursor: pointer
-    color: #6200B0 !important
-    text-decoration: underline 
+.clickable-docs{
+    cursor: pointer;
+    color: #6200B0 !important;
+    text-decoration: underline;
+}
+
+.text_msg >>> .clickable-docs{
+    cursor: pointer;
+    color: #6200B0 !important;
+    text-decoration: underline;
+} 
 </style>
