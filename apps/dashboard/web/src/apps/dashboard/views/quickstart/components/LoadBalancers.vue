@@ -345,7 +345,6 @@ export default {
     methods: {
         fetchLBs() {
             api.fetchLBs().then((resp) => {
-                console.log(resp)
                 if (!resp.dashboardHasNecessaryRole) {
                     for (let i = 0; i < this.quick_start_policy_lines.length; i++) {
                         let line = this.quick_start_policy_lines[i];
@@ -377,7 +376,6 @@ export default {
                 this.availableLBs = resp.availableLBs;
                 this.selectedLBs = resp.selectedLBs;
                 this.existingSelectedLBs = resp.selectedLBs;
-                console.log(resp);
                 if (resp.isFirstSetup) {
                     this.checkStackState()
                     mixpanel.track("mirroring_stack_creation_initialized");
@@ -389,7 +387,6 @@ export default {
         checkStackState() {
             let intervalId = null;
             intervalId = setInterval(async () => {
-                console.log('Tracking stack creation status....')
                 api.fetchStackCreationStatus().then((resp) => {
                     if (this.initialCall) {
                         this.initialCall = false;
@@ -403,20 +400,16 @@ export default {
         handleStackState(stackState, intervalId) {
             if (stackState.status == 'CREATE_IN_PROGRESS') {
                 this.renderProgressBar(stackState.creationTime)
-                console.log("Stack is being created");
                 this.text_msg = 'We are setting up mirroring for you! Grab a cup of coffee, sit back and relax while we work our magic!';
             }
             else if (stackState.status == 'CREATE_COMPLETE') {
-                console.log("Stack created successfully, stopping further calls to status api");
                 this.removeProgressBarAndStatuschecks(intervalId);
                 this.text_msg = 'Akto is tirelessly processing mirrored traffic to protect your APIs. Click <a class="clickable-docs" href="/dashboard/observe/inventory">here</a> to navigate to API Inventory.';
             }
             else if (stackState.status == 'DOES_NOT_EXISTS') {
-                console.log(`Stack doesn't exist, removing calls to status api`);
                 this.removeProgressBarAndStatuschecks(intervalId);
                 this.text_msg = 'Mirroring is not setup currently, choose 1 or more LBs to enable mirroring.';
             } else {
-                console.log('Something went wrong here, removing calls to status api');
                 this.removeProgressBarAndStatuschecks(intervalId);
                 this.text_msg = 'Something went wrong while setting up mirroring, please write to us at support@akto.io'
             }
@@ -425,14 +418,11 @@ export default {
             this.progressBar.show = true;
             const currTimeInMs = Date.now();
             const maxDeploymentTimeInMs = this.progressBar.max_deployment_time_in_ms;
-            console.log("currTime:" + currTimeInMs + "; creationTime: " + creationTimeInMs + "; maxDeploymentTime:" + maxDeploymentTimeInMs)
             let progressPercent = (currTimeInMs - creationTimeInMs) / maxDeploymentTimeInMs * 100;
-            console.log("Actual pp:" + progressPercent);
             if (progressPercent > 90) {
                 progressPercent = 90;
             }
             // to add more else if blocks to handle cases where deployment is stuck
-            console.log("Updated pp:" + progressPercent);
             this.progressBar.value = Math.round(progressPercent);
         },
         removeProgressBarAndStatuschecks(intervalId) {
