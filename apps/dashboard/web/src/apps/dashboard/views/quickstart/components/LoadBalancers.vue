@@ -1,0 +1,469 @@
+<template>
+
+    <spinner v-if="loading" />
+    <div v-else class="lb_dropdown">
+        <div v-if="hasRequiredAccess">
+                <v-select v-model="selectedLBs" append-icon="$fas_edit" :items="availableLBs" item-text="resourceName" item-value="resourceId"
+                    label="Select Loadbalancer(s)" return-object multiple>
+                    <template v-slot:selection="{ item, index }">
+                        <v-chip v-if="index === 0">
+                            <span>{{ item.resourceName }}</span>
+                        </v-chip>
+                        <span v-if="index === 1" class="grey--text text-caption">
+                            (+{{ selectedLBs.length - 1 }} others)
+                        </span>
+                    </template>
+                    <template v-slot:item="{ active, item, attrs, on }">
+                        <v-list-item :class="item.alreadySelected ? 'disabled_lb' : ''" v-on="on" v-bind="attrs" #default="{ active }">
+                            <v-list-item-action>
+                                <v-checkbox :input-value="active" on-icon="$far_check-square" off-icon="$far_square">
+                                </v-checkbox>
+                            </v-list-item-action>
+                            <v-list-item-content>
+                                <v-list-item-title>
+                                    <v-row no-gutters align="center">
+                                        <span>{{ item.resourceName }}</span>
+                                    </v-row>
+                                </v-list-item-title>
+                            </v-list-item-content>
+                        </v-list-item>
+                    </template>
+
+                    <template slot="append-outer" >
+                        <spinner v-if="progressBar.show"></spinner>
+                        <v-btn v-else primary dark color="#6200EA" @click="saveLBs" :disabled="selectedLBs.length === initialLBCount" class="ml-3">
+                            Apply
+                        </v-btn>
+                    </template>
+                </v-select>
+               
+            <div class="text_msg" v-html="text_msg"></div>
+            <div v-if="progressBar.show">
+                <div class="d-flex">
+                    <v-progress-linear class="mt-2" background-color="rgba(98, 0, 234,0.2)" color="rgb(98, 0, 234)"
+                        :value="progressBar.value">
+                    </v-progress-linear>
+                    <div class="ml-2">{{ progressBar.value }}%</div>
+                </div>
+            </div>
+        </div>
+        <div v-else>
+            <div class="steps">Your dashboard's instance needs relevant access to setup traffic mirroring, please
+                do the
+                following steps:</div>
+            <div class="steps">
+                <b>Step 1</b>: Grab the policy JSON below and navigate to Akto Dashboard's current role by clicking <a target="_blank" class="clickable-docs" href="https://us-east-1.console.aws.amazon.com/iam/home#/roles/AktoDashboardRole$createPolicy?step=edit">here</a>
+                <code-block :lines="quick_start_policy_lines" onCopyBtnClickText="Policy copied to clipboard"></code-block>
+            </div>
+            <div class="steps">
+                <b>Step 2</b>: We will create an inline policy, navigate to JSON tab and paste the copied JSON here.
+            </div>
+            <div class="steps">
+                <b>Step 3</b>: Click on 'Review policy'.
+            </div>
+            <div class="steps">
+                <b>Step 4</b>: Now lets name the policy as 'AktoDashboardPolicy'.
+            </div>
+            <div class="steps">
+                <b>Step 5</b>: Finally create the policy by clicking on 'Create policy'.
+            </div>
+            <div class="steps">
+                <b>Step 6</b>: Click <a class="clickable-docs" href="/dashboard/quick-start">here</a> to refresh.
+            </div>
+        </div>
+    </div>
+
+</template>
+
+
+<script>
+import api from '../api.js'
+import CodeBlock from '@/apps/dashboard/shared/components/CodeBlock'
+import Spinner from '@/apps/dashboard/shared/components/Spinner'
+export default {
+    name: 'LoadBalancers',
+    components: {
+        CodeBlock,
+        Spinner,
+    },
+    data() {
+        return {
+            initialCall: true,
+            loading: true,
+            hasRequiredAccess: false,
+            availableLBs: [],
+            selectedLBs: [],
+            existingSelectedLBs: [],
+            stackCreationStartTime: null,
+            progressBar: {
+                show: false,
+                value: 0,
+                max_deployment_time_in_ms: 8 * 60 * 1000,
+            },
+            initialLBCount: 0,
+            text_msg: null,
+            quick_start_policy_lines: [
+                `{`,
+                `    "Version": "2012-10-17",`,
+                `    "Statement": [`,
+                `        {`,
+                `            "Sid": "1",`,
+                `            "Effect": "Allow",`,
+                `            "Action": [`,
+                `                "autoscaling:DescribePolicies",`,
+                `                "autoscaling:DescribeAutoScalingGroups",`,
+                `                "autoscaling:DescribeScalingActivities",`,
+                `                "autoscaling:DescribeLaunchConfigurations",`,
+                `                "ec2:DescribeSubnets",`,
+                `                "ec2:DescribeKeyPairs",`,
+                `                "ec2:DescribeSecurityGroups"`,
+                `            ],`,
+                `            "Resource": "*"`,
+                `        },`,
+                `        {`,
+                `            "Sid": "2",`,
+                `            "Effect": "Allow",`,
+                `            "Action": [`,
+                `                "autoscaling:PutScalingPolicy",`,
+                `                "autoscaling:UpdateAutoScalingGroup",`,
+                `                "autoscaling:CreateAutoScalingGroup"`,
+                `            ],`,
+                `            "Resource": [`,
+                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/AktoAutoScalingGroup",`,
+                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/AktoTargetTrackingNetworkPolicy",`,
+                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/AktoASGLaunchConfiguration",`,
+                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/AktoContextAnalyzerAutoScalingGroup",`,
+                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/AktoContextAnalyzerASGLaunchConfiguration",`,
+                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/akto-mirroring*"`,
+                `            ]`,
+                `        },`,
+                `        {`,
+                `            "Sid": "3",`,
+                `            "Effect": "Allow",`,
+                `            "Action": [`,
+                `                "autoscaling:CreateLaunchConfiguration"`,
+                `            ],`,
+                `            "Resource": "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:launchConfiguration:*:launchConfigurationName/akto-mirroring*"`,
+                `        },`,
+                `        {`,
+                `            "Sid": "4",`,
+                `            "Effect": "Allow",`,
+                `            "Action": [`,
+                `                "cloudformation:CreateStack",`,
+                `                "cloudformation:DescribeStacks"`,
+                `            ],`,
+                `            "Resource": [`,
+                `                "arn:aws:cloudformation:AWS_REGION:AWS_ACCOUNT_ID:stack/akto-mirroring/*"`,
+                `            ]`,
+                `        },`,
+                `        {`,
+                `            "Sid": "5",`,
+                `            "Effect": "Allow",`,
+                `            "Action": [`,
+                `               "ec2:CreateTags"`,
+                `            ],`,
+                `            "Resource": [`,
+                `                "*"`,
+                `            ]`,
+                `        },`,
+                `        {`,
+                `            "Sid": "6",`,
+                `            "Effect": "Allow",`,
+                `            "Action": [`,
+                `                "ec2:CreateSecurityGroup",`,
+                `                "ec2:CreateTags"`,
+                `            ],`,
+                `            "Resource": [`,
+                `                "arn:aws:ec2:AWS_REGION:AWS_ACCOUNT_ID:security-group/*",`,
+                `                "arn:aws:ec2:AWS_REGION:AWS_ACCOUNT_ID:security-group-rule/*",`,
+                `                "arn:aws:ec2:AWS_REGION:AWS_ACCOUNT_ID:vpc/*"`,
+                `            ]`,
+                `        },`,
+                `        {`,
+                `            "Sid": "7", `,
+                `            "Effect": "Allow", `,
+                `            "Action": [`,
+                `                "ec2:RevokeSecurityGroupEgress", `,
+                `                "ec2:AuthorizeSecurityGroupEgress", `,
+                `                "ec2:RevokeSecurityGroupIngress", `,
+                `                "ec2:AuthorizeSecurityGroupIngress", `,
+                `                "ec2:CreateTags"`,
+                `            ], `,
+                `            "Resource": [`,
+                `                "arn:aws:ec2:AWS_REGION:AWS_ACCOUNT_ID:security-group/*", `,
+                `                "arn:aws:ec2:AWS_REGION:AWS_ACCOUNT_ID:security-group-rule/*"`,
+                `            ]`,
+                `        }, `,
+                `        {`,
+                `            "Sid": "8", `,
+                `            "Effect": "Allow", `,
+                `            "Action": [`,
+                `                "ec2:CreateTrafficMirrorTarget"`,
+                `            ], `,
+                `            "Resource": [`,
+                `                "arn:aws:ec2:AWS_REGION:AWS_ACCOUNT_ID:traffic-mirror-target/*"`,
+                `            ]`,
+                `        }, `,
+                `        {`,
+                `            "Sid": "9", `,
+                `            "Effect": "Allow", `,
+                `            "Action": [`,
+                `                "ec2:ModifyTrafficMirrorFilterNetworkServices", `,
+                `                "ec2:CreateTrafficMirrorFilter"`,
+                `            ], `,
+                `            "Resource": [`,
+                `                "arn:aws:ec2:AWS_REGION:AWS_ACCOUNT_ID:traffic-mirror-filter/*"`,
+                `            ]`,
+                `        }, `,
+                `        {`,
+                `            "Sid": "10", `,
+                `            "Effect": "Allow", `,
+                `            "Action": [`,
+                `                "elasticloadbalancing:DescribeLoadBalancers", `,
+                `                "elasticloadbalancing:DescribeListeners", `,
+                `                "elasticloadbalancing:DescribeTargetGroups", `,
+                `                "ec2:DescribeVpcs"`,
+                `            ], `,
+                `            "Resource": `,
+                `                "*"`,
+                `        }, `,
+                `        {`,
+                `            "Sid": "11", `,
+                `            "Effect": "Allow", `,
+                `            "Action": [`,
+                `                "elasticloadbalancing:CreateListener", `,
+                `                "elasticloadbalancing:ModifyLoadBalancerAttributes", `,
+                `                "elasticloadbalancing:CreateLoadBalancer"`,
+                `            ], `,
+                `            "Resource": [`,
+                `                "arn:aws:elasticloadbalancing:AWS_REGION:AWS_ACCOUNT_ID:loadbalancer/net/AktoNLB/*"`,
+                `            ]`,
+                `        }, `,
+                `        {`,
+                `            "Sid": "12", `,
+                `            "Effect": "Allow", `,
+                `            "Action": [`,
+                `                "elasticloadbalancing:CreateTargetGroup"`,
+                `            ], `,
+                `            "Resource": [`,
+                `                "arn:aws:elasticloadbalancing:AWS_REGION:AWS_ACCOUNT_ID:targetgroup/AktoKafkaTargetGroup/*", `,
+                `                "arn:aws:elasticloadbalancing:AWS_REGION:AWS_ACCOUNT_ID:targetgroup/AktoTrafficMirroringTargetGroup/*"`,
+                `            ]`,
+                `        }, `,
+                `        {`,
+                `            "Sid": "13", `,
+                `            "Effect": "Allow", `,
+                `            "Action": [`,
+                `                "lambda:GetFunction", `,
+                `                "lambda:CreateFunction", `,
+                `                "lambda:DeleteFunction", `,
+                `                "lambda:UpdateFunctionConfiguration", `,
+                `                "lambda:UpdateFunctionCode", `,
+                `                "lambda:GetFunctionCodeSigningConfig", `,
+                `                "lambda:InvokeFunction", `,
+                `                "lambda:AddPermission"`,
+                `            ], `,
+                `            "Resource": [`,
+                `                "arn:aws:lambda:AWS_REGION:AWS_ACCOUNT_ID:function:akto-mirroring*"`,
+                `            ]`,
+                `        }, `,
+                `        {`,
+                `            "Sid": "14", `,
+                `            "Effect": "Allow", `,
+                `            "Action": [`,
+                `                "logs:CreateLogStream", `,
+                `                "logs:PutRetentionPolicy", `,
+                `                "logs:CreateLogGroup"`,
+                `            ], `,
+                `            "Resource": [`,
+                `                "arn:aws:logs:AWS_REGION:AWS_ACCOUNT_ID:log-group:/aws/lambda/akto-mirroring*", `,
+                `                "arn:aws:logs:AWS_REGION:AWS_ACCOUNT_ID:log-group:/aws/lambda/akto-mirroring*:log-stream:"`,
+                `            ]`,
+                `        }, `,
+                `        {`,
+                `            "Sid": "15", `,
+                `            "Effect": "Allow", `,
+                `            "Action": [`,
+                `                "iam:CreateRole", `,
+                `                "iam:PutRolePolicy", `,
+                `                "iam:GetRole", `,
+                `                "iam:GetRolePolicy", `,
+                `                "iam:PassRole"`,
+                `            ], `,
+                `            "Resource": [`,
+                `                "arn:aws:iam::AWS_ACCOUNT_ID:role/service-role/akto-mirroring-*", `,
+                `                "arn:aws:iam::AWS_ACCOUNT_ID:role/akto-mirroring-*"`,
+                `            ]`,
+                `        }, `,
+                `        {`,
+                `            "Sid": "16", `,
+                `            "Effect": "Allow", `,
+                `            "Action": [`,
+                `                "iam:CreateInstanceProfile", `,
+                `                "iam:GetInstanceProfile"`,
+                `            ], `,
+                `            "Resource": "arn:aws:iam::AWS_ACCOUNT_ID:instance-profile/akto-mirroring*"`,
+                `        }, `,
+                `        {`,
+                `            "Sid": "17", `,
+                `            "Effect": "Allow", `,
+                `            "Action": [`,
+                `                "iam:AddRoleToInstanceProfile"`,
+                `            ], `,
+                `            "Resource": ["arn:aws:iam::AWS_ACCOUNT_ID:instance-profile/akto-mirroring*", "arn:aws:iam::AWS_ACCOUNT_ID:role/akto-mirroring-*"]`,
+                `        }, `,
+                `        {`,
+                `            "Sid": "18", `,
+                `            "Effect": "Allow", `,
+                `            "Action": "s3:GetObject", `,
+                `            "Resource": [`,
+                `                "arn:aws:s3:::akto-setup-AWS_REGION/templates/get-akto-setup-details.zip", `,
+                `                "arn:aws:s3:::akto-setup-AWS_REGION/templates/create-mirror-session.zip", `,
+                `                "arn:aws:s3:::akto-setup-AWS_REGION/templates/mirroring-collections-split.zip"`,
+                `            ]`,
+                `        }, `,
+                `        {`,
+                `            "Sid": "19", `,
+                `            "Effect": "Allow", `,
+                `            "Action": [`,
+                `                "events:DescribeRule", `,
+                `                "events:PutRule", `,
+                `                "events:PutTargets"`,
+                `            ], `,
+                `            "Resource": [`,
+                `                "arn:aws:events:AWS_REGION:AWS_ACCOUNT_ID:rule/akto-mirroring-PeriodicRule"`,
+                `            ]`,
+                `        } `,
+                `    ]`,
+                `}`
+            ],
+        }
+    },
+    mounted() {
+        this.fetchLBs();
+    },
+    methods: {
+        fetchLBs() {
+            api.fetchLBs().then((resp) => {
+                console.log(resp)
+                if (!resp.dashboardHasNecessaryRole) {
+                    for (let i = 0; i < this.quick_start_policy_lines.length; i++) {
+                        let line = this.quick_start_policy_lines[i];
+                        line = line.replaceAll('AWS_REGION', resp.awsRegion);
+                        line = line.replaceAll('AWS_ACCOUNT_ID', resp.awsAccountId);
+                        this.quick_start_policy_lines[i] = line;
+                    }
+                }
+                this.hasRequiredAccess = resp.dashboardHasNecessaryRole
+                this.selectedLBs = resp.selectedLBs;
+                for(let i=0; i<resp.availableLBs.length; i++){
+                    let lb = resp.availableLBs[i];
+                    let alreadySelected = false;
+                    for(let j=0; j<this.selectedLBs.length; j++){
+                        if(this.selectedLBs[j].resourceName === lb.resourceName){
+                            alreadySelected = true;
+                        }
+                    }
+                    lb['alreadySelected'] = alreadySelected;
+                }
+                this.availableLBs = resp.availableLBs;
+                this.existingSelectedLBs = resp.selectedLBs;
+                this.initialLBCount = this.selectedLBs.length;
+                this.checkStackState()
+            })
+        },
+        saveLBs() {
+            api.saveLBs(this.selectedLBs).then((resp) => {
+                this.availableLBs = resp.availableLBs;
+                this.selectedLBs = resp.selectedLBs;
+                this.existingSelectedLBs = resp.selectedLBs;
+                console.log(resp);
+                if (resp.isFirstSetup) {
+                    this.checkStackState()
+                    mixpanel.track("mirroring_stack_creation_initialized");
+                } else {
+                    mixpanel.track("loadbalancers_updated");
+                }
+            })
+        },
+        checkStackState() {
+            let intervalId = null;
+            intervalId = setInterval(async () => {
+                console.log('Tracking stack creation status....')
+                api.fetchStackCreationStatus().then((resp) => {
+                    if (this.initialCall) {
+                        this.initialCall = false;
+                        this.loading = false;
+                    }
+                    this.handleStackState(resp.stackState, intervalId)
+                }
+                )
+            }, 5000)
+        },
+        handleStackState(stackState, intervalId) {
+            if (stackState.status == 'CREATE_IN_PROGRESS') {
+                this.renderProgressBar(stackState.creationTime)
+                console.log("Stack is being created");
+                this.text_msg = 'We are setting up mirroring for you! Grab a cup of coffee, sit back and relax while we work our magic!';
+            }
+            else if (stackState.status == 'CREATE_COMPLETE') {
+                console.log("Stack created successfully, stopping further calls to status api");
+                this.removeProgressBarAndStatuschecks(intervalId);
+                this.text_msg = 'Akto is tirelessly processing mirrored traffic to protect your APIs. Click <a class="clickable-docs" href="/dashboard/observe/inventory">here</a> to navigate to API Inventory.';
+            }
+            else if (stackState.status == 'DOES_NOT_EXISTS') {
+                console.log(`Stack doesn't exist, removing calls to status api`);
+                this.removeProgressBarAndStatuschecks(intervalId);
+                this.text_msg = 'Mirroring is not setup currently, choose 1 or more LBs to enable mirroring.';
+            } else {
+                console.log('Something went wrong here, removing calls to status api');
+                this.removeProgressBarAndStatuschecks(intervalId);
+                this.text_msg = 'Something went wrong while setting up mirroring, please write to us at support@akto.io'
+            }
+        },
+        renderProgressBar(creationTimeInMs) {
+            this.progressBar.show = true;
+            const currTimeInMs = Date.now();
+            const maxDeploymentTimeInMs = this.progressBar.max_deployment_time_in_ms;
+            console.log("currTime:" + currTimeInMs + "; creationTime: " + creationTimeInMs + "; maxDeploymentTime:" + maxDeploymentTimeInMs)
+            let progressPercent = (currTimeInMs - creationTimeInMs) / maxDeploymentTimeInMs * 100;
+            console.log("Actual pp:" + progressPercent);
+            if (progressPercent > 90) {
+                progressPercent = 90;
+            }
+            // to add more else if blocks to handle cases where deployment is stuck
+            console.log("Updated pp:" + progressPercent);
+            this.progressBar.value = Math.round(progressPercent);
+        },
+        removeProgressBarAndStatuschecks(intervalId) {
+            this.progressBar.show = false;
+            this.progressBar.value = 0;
+            clearInterval(intervalId);
+        }
+    }
+}
+</script>
+
+
+<style scoped>
+.disabled_lb{
+    pointer-events: none;
+    opacity: 0.5;
+}
+
+.steps{
+    margin-top: 6px;
+}
+
+.clickable-docs{
+    cursor: pointer;
+    color: #6200B0 !important;
+    text-decoration: underline;
+}
+
+.text_msg >>> .clickable-docs{
+    cursor: pointer;
+    color: #6200B0 !important;
+    text-decoration: underline;
+} 
+</style>
