@@ -14,7 +14,7 @@ import func from '@/util/func'
 
 
 const ScheduleBox = (props) => {
-    let testingSchedule = props.testingSchedule;
+    let testingRun = props.testingRun;
     let saveFn = props.saveFn
     let deleteFn = props.deleteFn
 
@@ -22,11 +22,11 @@ const ScheduleBox = (props) => {
     const [startTimestamp, setStartTimestamp] = useState(dayjs())
 
     useEffect(() => {
-        if (testingSchedule) {
-            setRecurring(testingSchedule.recurring)
-            setStartTimestamp(dayjs.unix(testingSchedule.startTimestamp))
+        if (testingRun) {
+            setRecurring(testingRun.periodInSeconds > 0)
+            setStartTimestamp(dayjs.unix(testingRun.scheduleTimestamp))
         }
-    }, [testingSchedule])
+    }, [testingRun])
 
 
     const handleRunDailyChange = (event) => {
@@ -40,7 +40,8 @@ const ScheduleBox = (props) => {
     const save = () => {
         let hours = startTimestamp.$H
         let minutes = startTimestamp.$m
-        let actualTs = parseInt(+func.dayStart()/1000) + hours * 60 * 60 + minutes * 60
+        let dayStart = +func.dayStart(+new Date());
+        let actualTs = parseInt(dayStart/1000) + hours * 60 * 60 + minutes * 60
 
         saveFn(recurring, actualTs)
     }
@@ -50,11 +51,11 @@ const ScheduleBox = (props) => {
     }
 
     const label = () => {
-        return testingSchedule ? "Currently scheduled at" : "Schedule at"
+        return testingRun ? "Currently scheduled at" : "Schedule at"
     }
 
     const finalButton = () => {
-        if (testingSchedule) {
+        if (testingRun) {
             return <Button onClick={deleteSchedule} style={{color: "white"}} size="small">Delete</Button>
         } else {
             return <Button onClick={save} style={{color: "white"}} size="small">Save</Button>
@@ -70,13 +71,13 @@ const ScheduleBox = (props) => {
                         value={startTimestamp}
                         onChange={handleChange}
                         renderInput={(params) => <TextField {...params} />}
-                        disabled={testingSchedule ? true: false}
+                        disabled={testingRun ? true: false}
                     />
                 </LocalizationProvider>
             </Grid>
             <Grid item xs={8}>
                 <FormControlLabel 
-                    control={<Checkbox checked={recurring} disabled={testingSchedule ? true: false} onChange={handleRunDailyChange}/>}
+                    control={<Checkbox checked={recurring} disabled={testingRun ? true: false} onChange={handleRunDailyChange}/>}
                     label="Run daily"
                     />
             </Grid>

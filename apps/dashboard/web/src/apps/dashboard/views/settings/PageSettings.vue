@@ -129,11 +129,6 @@ export default {
     }
 }
 </script>
-
-<style lang="sass">
-.right-pane-tab-item
-    box-shadow: none !important
-</style>
 <style lang="sass" scoped>
 .entry-text
     font-weight: 500

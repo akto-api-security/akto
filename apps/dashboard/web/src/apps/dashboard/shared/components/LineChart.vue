@@ -116,7 +116,6 @@ export default {
               {
                 title: this.title,
                 visible: this.text,
-                height: `${this.height}px`,
                 gridLineWidth: '0px',
                 min : 0
               },

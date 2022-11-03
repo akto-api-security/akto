@@ -1,38 +1,41 @@
 package com.akto.testing;
 
+import com.akto.dao.AuthMechanismsDao;
+import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.*;
-import com.akto.rules.BOLATest;
-import com.akto.rules.NoAuthTest;
-import com.akto.store.AuthMechanismStore;
+import com.akto.dto.testing.TestingRun.State;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.rules.*;
 import com.akto.store.SampleMessageStore;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class TestExecutor {
 
-    public static String slashHandling(String url) {
-        if (!url.startsWith("/")) url = "/"+url;
-        if (!url.endsWith("/")) url = url+"/";
-        return url;
-    }
-
     private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
 
-    public void init(TestingRun testingRun) {
+    public void init(TestingRun testingRun, ObjectId summaryId) {
         if (testingRun.getTestIdConfig() == 0)     {
-            apiWiseInit(testingRun);
+            apiWiseInit(testingRun, summaryId);
         } else {
-            workflowInit(testingRun);
+            workflowInit(testingRun, summaryId);
         }
     }
 
-    public void workflowInit (TestingRun testingRun) {
+    public void workflowInit (TestingRun testingRun, ObjectId summaryId) {
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
         if (!testingEndpoints.getType().equals(TestingEndpoints.Type.WORKFLOW)) {
             logger.error("Invalid workflow type");
@@ -55,46 +58,143 @@ public class TestExecutor {
         apiWorkflowExecutor.init(workflowTest, testingRun.getId());
     }
 
-    public void  apiWiseInit(TestingRun testingRun) {
+    public void  apiWiseInit(TestingRun testingRun, ObjectId summaryId) {
+        int accountId = Context.accountId.get();
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
-        SampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
+        Map<String, SingleTypeInfo> singleTypeInfoMap = SampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
+        Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = SampleMessageStore.fetchSampleMessages();
+        AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
 
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         System.out.println("APIs: " + apiInfoKeyList.size());
 
-        Set<ApiInfo.ApiInfoKey> store = new HashSet<>();
+        CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
+        ExecutorService threadPool = Executors.newFixedThreadPool(100);
+
+        List<Future<List<TestingRunResult>>> futureTestingRunResults = new ArrayList<>();
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
             try {
-                String url = slashHandling(apiInfoKey.url+"");
-                ApiInfo.ApiInfoKey modifiedKey = new ApiInfo.ApiInfoKey(apiInfoKey.getApiCollectionId(), url, apiInfoKey.method);
-                if (store.contains(modifiedKey)) continue;
-                store.add(modifiedKey);
-                start(apiInfoKey, testingRun.getTestIdConfig(), testingRun.getId());
+                 Future<List<TestingRunResult>> future = threadPool.submit(() -> startWithLatch(apiInfoKey, testingRun.getTestIdConfig(), testingRun.getId(), singleTypeInfoMap, sampleMessages, authMechanism, summaryId, accountId, latch));
+                 futureTestingRunResults.add(future);
             } catch (Exception e) {
                 logger.error(e.getMessage());
             }
         }
+
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        List<TestingRunResult> testingRunResults = new ArrayList<>();
+        for (Future<List<TestingRunResult>> future: futureTestingRunResults) {
+            if (!future.isDone()) continue;
+            try {
+                testingRunResults.addAll(future.get());
+            } catch (InterruptedException | ExecutionException e) {
+                e.printStackTrace();
+            }
+        }
+
+        TestingRunResultDao.instance.insertMany(testingRunResults);
+
+        Map<String, Integer> totalCountIssues = new HashMap<>();
+        totalCountIssues.put("HIGH", 0);
+        totalCountIssues.put("MEDIUM", 0);
+        totalCountIssues.put("LOW", 0);
+
+        for (TestingRunResult testingRunResult: testingRunResults) {
+            if (testingRunResult.isVulnerable()) {
+                int initialCount = totalCountIssues.get("HIGH");
+                totalCountIssues.put("HIGH", initialCount + 1);
+            }
+        }
+
+        TestingRunResultSummariesDao.instance.updateOne(
+            Filters.eq("_id", summaryId),
+            Updates.combine(
+                    Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
+                    Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
+                    Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues),
+                    Updates.set(TestingRunResultSummary.TOTAL_APIS, apiInfoKeyList.size())
+            )
+        );
     }
 
-    private final BOLATest bolaTest = new BOLATest();
-    private final NoAuthTest noAuthTest = new NoAuthTest();
+    public List<TestingRunResult> startWithLatch(
+            ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId,
+            Map<String, SingleTypeInfo> singleTypeInfoMap, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages,
+            AuthMechanism authMechanism, ObjectId testRunResultSummaryId, int accountId,
+            CountDownLatch latch) {
 
-    public void start(ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId) {
+        Context.accountId.set(accountId);
+        List<TestingRunResult> testingRunResults = new ArrayList<>();
+
+        try {
+            testingRunResults = start(apiInfoKey, testIdConfig, testRunId, singleTypeInfoMap, sampleMessages, authMechanism, testRunResultSummaryId);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        latch.countDown();
+        return testingRunResults;
+    }
+
+    public List<TestingRunResult> start(ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId,
+                                      Map<String, SingleTypeInfo> singleTypeInfoMap, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages,
+                                      AuthMechanism authMechanism, ObjectId testRunResultSummaryId) {
+
         if (testIdConfig != 0) {
             logger.error("Test id config is not 0 but " + testIdConfig);
-            return;
+            return new ArrayList<>();
         }
 
-        AuthMechanism authMechanism = AuthMechanismStore.getAuthMechanism();
-        if (authMechanism == null) return;
+        BOLATest bolaTest = new BOLATest();
+        NoAuthTest noAuthTest = new NoAuthTest();
+        ChangeHttpMethodTest changeHttpMethodTest = new ChangeHttpMethodTest();
+        AddMethodInParameterTest addMethodInParameterTest = new AddMethodInParameterTest();
+        AddMethodOverrideHeadersTest addMethodOverrideHeadersTest = new AddMethodOverrideHeadersTest();
+        AddUserIdTest addUserIdTest = new AddUserIdTest();
 
-        boolean noAuthResult = noAuthTest.start(apiInfoKey, testRunId, authMechanism);
-        if (!noAuthResult) {
-            bolaTest.start(apiInfoKey, testRunId, authMechanism);
+        List<TestingRunResult> testingRunResults = new ArrayList<>();
+        TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+        testingRunResults.add(noAuthTestResult);
+        if (!noAuthTestResult.isVulnerable()) {
+            TestingRunResult bolaTestResult = runTest(bolaTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+            testingRunResults.add(bolaTestResult);
         }
 
+        TestingRunResult addMethodInParameterTestResult = runTest(addMethodInParameterTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+        testingRunResults.add(addMethodInParameterTestResult);
+
+        TestingRunResult addMethodOverrideHeadersTestResult = runTest(addMethodOverrideHeadersTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+        testingRunResults.add(addMethodOverrideHeadersTestResult);
+
+        TestingRunResult changeHttpMethodTestResult = runTest(changeHttpMethodTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+        testingRunResults.add(changeHttpMethodTestResult);
+
+        TestingRunResult addUserIdTestResult = runTest(addUserIdTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+        if (addUserIdTestResult != null) testingRunResults.add(addUserIdTestResult);
+
+        return testingRunResults;
+    }
+
+    public TestingRunResult runTest(TestPlugin testPlugin, ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages,
+                        Map<String, SingleTypeInfo> singleTypeInfos, ObjectId testRunId, ObjectId testRunResultSummaryId) {
+
+        int startTime = Context.now();
+        TestPlugin.Result result = testPlugin.start(apiInfoKey, authMechanism, sampleMessages, singleTypeInfos);
+        if (result == null) return null;
+        int endTime = Context.now();
+
+        return new TestingRunResult(
+                testRunId, apiInfoKey, testPlugin.superTestName(), testPlugin.subTestName(), result.testResults,
+                result.isVulnerable,result.singleTypeInfos, result.confidencePercentage,
+                startTime, endTime, testRunResultSummaryId
+        );
     }
 
 }

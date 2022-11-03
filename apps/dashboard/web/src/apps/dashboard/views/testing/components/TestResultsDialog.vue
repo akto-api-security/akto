@@ -1,10 +1,9 @@
 <template>
     <div v-if="messagesBasic && messagesBasic.length > 0">
         <div>
-            <div v-if="messagesBasic.length > 1" class="d-flex jc-sb mr-3">
+            <div class="d-flex jc-sb mr-3">
                 <div v-if="jsonBasic.title" style="margin: auto 8px; color: #47466A">{{jsonBasic.title}}</div>
-                
-                <v-btn icon @click="nextClicked">
+                <v-btn v-if="messagesBasic.length > 1" icon @click="nextClicked">
                     <v-icon>$fas_angle-double-right</v-icon>
                 </v-btn>
             </div>
@@ -55,7 +54,7 @@ export default {
     TestResultDetails
 },
   props: {
-    testingRunResult: obj.arrR
+    testingRunResult: obj.objR
   },
   data() {
     return  {
@@ -72,8 +71,7 @@ export default {
         this.currentIndex = (++this.currentIndex) % this.messagesBasic.length
         this.$refs.layoutWithTabs.reset()
     },
-    buildHighlightPaths(y) {
-        let paramInfoList = y.privateSingleTypeInfos
+    buildHighlightPaths(paramInfoList) {
         if (!paramInfoList) paramInfoList = []
         let highlightPaths = paramInfoList.map((x) => {
             let asterisk = x.isPrivate
@@ -90,10 +88,14 @@ export default {
   },
   computed: {
     messagesBasic() {
-        return this.testingRunResult.map(x => {return {message: x[1].message, title: x[0], highlightPaths:[], errors: x[1].errors}}) 
+        let testSubType = this.testingRunResult["testSubType"]
+        return this.testingRunResult["testResults"].map(x => {return {message: x.message, title: testSubType, highlightPaths:[], errors: x.errors}}) 
     },
     messagesAdvance() {
-        return this.testingRunResult.map(x => {return {message: x[1].originalMessage, title: x[0], highlightPaths: this.buildHighlightPaths(x[1]), errors: x[1].errors, percentageMatch: x[1].percentageMatch}}) 
+        let testSubType = this.testingRunResult["testSubType"]
+        let singleTypeInfos = this.testingRunResult["singleTypeInfos"]
+        let highlightPaths = this.buildHighlightPaths(singleTypeInfos);
+        return this.testingRunResult["testResults"].map(x => {return {message: x.originalMessage, title: testSubType, highlightPaths: highlightPaths, errors: x.errors, percentageMatch: x.percentageMatch}}) 
     },
     jsonBasic: function() {
         if (this.testingRunResult == null) return null

@@ -5,6 +5,9 @@ const PageDashboard  = () => import( '@/apps/dashboard/App')
 const PageToday  = () => import( "@/apps/dashboard/views/today/Today")
 const PageQuickStart  = () => import( "@/apps/dashboard/views/quickstart/PageQuickStart")
 const PageTesting  = () => import( "@/apps/dashboard/views/testing/PageTesting")
+const TestingRunsTable  = () => import( "@/apps/dashboard/views/testing/components/TestingRunsTable")
+const TestingRunResults  = () => import( "@/apps/dashboard/views/testing/components/TestingRunResults")
+const CreateTestingRun  = () => import( "@/apps/dashboard/views/testing/components/CreateTestingRun")
 import store from '@/apps/main/store/module'
 const PageSignup = () => import("@/apps/signup/PageSignup")
 const PageOnboard = () => import("@/apps/signup/PageOnboard")
@@ -66,9 +69,52 @@ const router =  new Router({
                 {
                     path: 'testing',
                     name: 'testing',
+                    redirect: 'testing/active',
                     components: {
                         default: PageTesting
-                    }
+                    },
+                    children: [
+                        {
+                            path: 'active',
+                            name: 'testResults',
+                            component: TestingRunsTable,
+                            props: route => ({
+                                active: true
+                            })
+                        },
+                        {
+                            path: 'completed',
+                            name: 'testResults',
+                            component: TestingRunsTable,
+                            props: route => ({
+                                active: false
+                            })
+                        },
+                        {
+                            path: 'inactive',
+                            name: 'inactiveTestResults',
+                            component: TestingRunsTable,
+                            props: route => ({
+                                active: false
+                            })
+                        },
+                        {
+                            path: ':testingRunHexId/results',
+                            name: 'testResults',
+                            component: TestingRunResults,
+                            props: route => ({
+                                testingRunHexId: route.params.testingRunHexId,
+                                key: route.params.testingRunHexId
+                            })
+                        },
+                        {
+                            path: 'create/:apiCollectionId',
+                            name: 'createFromApiCollection',
+                            component: CreateTestingRun
+
+                            
+                        }                        
+                    ]
                 },
                 {
                     path: 'settings',

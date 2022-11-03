@@ -5,30 +5,33 @@ import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.store.SampleMessageStore;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.StatusCodeAnalyser;
 
-import org.bson.types.ObjectId;
-
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 public class BOLATest extends TestPlugin {
 
     public BOLATest() { }
 
     @Override
-    public boolean start(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, AuthMechanism authMechanism) {
+    public Result start(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages, Map<String, SingleTypeInfo> singleTypeInfoMap) {
 
-        List<RawApi> filteredMessages = fetchMessagesWithAuthToken(apiInfoKey, testRunId, authMechanism);
-        if (filteredMessages == null) return false;
+        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleMessages);
+        if (messages.isEmpty()) return addWithoutRequestError(null, TestResult.TestError.NO_PATH);
+        List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, authMechanism);
+        if (filteredMessages.isEmpty()) return addWithoutRequestError(null, TestResult.TestError.NO_MESSAGE_WITH_AUTH_TOKEN);
 
         boolean vulnerable = false;
         ExecutorResult result = null;
         TestResult.TestError testError = null;
 
         for (RawApi rawApi: filteredMessages) {
-            result = execute(rawApi, apiInfoKey, authMechanism);
+            result = execute(rawApi, apiInfoKey, authMechanism, singleTypeInfoMap);
             testError = result.testError;
             if (result.vulnerable) {
                 vulnerable = true;
@@ -37,16 +40,27 @@ public class BOLATest extends TestPlugin {
         }
 
         if (testError != null) {
-            addWithRequestError(apiInfoKey, result.rawApi.getOriginalMessage(), testRunId, testError, result.rawApi.getRequest());
+            return addWithRequestError( result.rawApi.getOriginalMessage(), testError, result.rawApi.getRequest());
         } else {
-            addTestSuccessResult(
-                    apiInfoKey, result.testRequest, result.testResponse,
-                    result.rawApi.getOriginalMessage(), testRunId,
-                    vulnerable, result.percentageMatch, result.singleTypeInfos, result.confidence
+            TestResult testResult = buildTestResult(
+                    result.testRequest, result.testResponse, result.rawApi.getOriginalMessage(),
+                    result.percentageMatch, result.vulnerable
+            );
+            return addTestSuccessResult(
+                    vulnerable,Collections.singletonList(testResult), result.singleTypeInfos, result.confidence
             );
         }
 
-        return vulnerable;
+    }
+
+    @Override
+    public String superTestName() {
+        return "BOLA";
+    }
+
+    @Override
+    public String subTestName() {
+        return "REPLACE_AUTH_TOKEN";
     }
 
     public static class ExecutorResult {
@@ -74,44 +88,36 @@ public class BOLATest extends TestPlugin {
         }
     }
 
-    public ExecutorResult execute(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism) {
+    public ExecutorResult execute(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<String, SingleTypeInfo> singleTypeInfoMap) {
         OriginalHttpRequest testRequest = rawApi.getRequest().copy();
         OriginalHttpResponse originalHttpResponse = rawApi.getResponse().copy();
 
         authMechanism.addAuthToRequest(testRequest);
 
-        ContainsPrivateResourceResult containsPrivateResourceResult = containsPrivateResource(testRequest, apiInfoKey);
+        ContainsPrivateResourceResult containsPrivateResourceResult = containsPrivateResource(testRequest, apiInfoKey, singleTypeInfoMap);
         // We consider API contains private resources if : 
         //      a) Contains 1 or more private resources
         //      b) We couldn't find uniqueCount or publicCount for some request params
         // When it comes to case b we still say private resource but with low confidence, hence the below line
         TestResult.Confidence confidence = containsPrivateResourceResult.findPrivateOnes().size() > 0 ? TestResult.Confidence.HIGH : TestResult.Confidence.LOW;
 
-        OriginalHttpResponse testResponse;
+        ApiExecutionDetails apiExecutionDetails;
         try {
-            testResponse = ApiExecutor.sendRequest(testRequest, true);
+            apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, originalHttpResponse);
         } catch (Exception e) {
             return new ExecutorResult(false, null, new ArrayList<>(), 0, rawApi,
                     TestResult.TestError.API_REQUEST_FAILED, testRequest, null);
         }
 
-        int statusCode = StatusCodeAnalyser.getStatusCode(testResponse.getBody(), testResponse.getStatusCode());
-        double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), testResponse.getBody());
-        boolean vulnerable = isStatusGood(statusCode) && containsPrivateResourceResult.isPrivate && percentageMatch > 90;
+        boolean vulnerable = isStatusGood(apiExecutionDetails.statusCode) && containsPrivateResourceResult.isPrivate && apiExecutionDetails.percentageMatch > 90;
 
         // We can say with high confidence if an api is not vulnerable, and we don't need help of private resources for this
         if (!vulnerable) confidence = Confidence.HIGH;
 
-        return new ExecutorResult(vulnerable,confidence, containsPrivateResourceResult.singleTypeInfos, percentageMatch,
-                rawApi, null, testRequest, testResponse);
+        return new ExecutorResult(vulnerable,confidence, containsPrivateResourceResult.singleTypeInfos, apiExecutionDetails.percentageMatch,
+                rawApi, null, testRequest, apiExecutionDetails.testResponse);
 
     }
-
-    @Override
-    public String testName() {
-        return "BOLA";
-    }
-
 
 
 }

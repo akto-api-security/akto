@@ -66,15 +66,22 @@ export default {
     todayDate: () => {
         return new Date(Date.now())
     },
-    dayStart: () => {
-        let date = new Date(Date.now())
+    dayStart(epochMs) {
+        let date = new Date(epochMs)
         date.setHours(0)
         date.setMinutes(0)
         date.setSeconds(0)
         return date
     },
+    dayEnd(epochMs) {
+        let date = new Date(epochMs)
+        date.setHours(23)
+        date.setMinutes(59)
+        date.setSeconds(59)
+        return date
+    },
     weekStart (date) {
-        let date1 = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+        let date1 = new Date(date.getTime())
         return new Date(date1.setDate(date1.getDate() - date1.getDay() + (date1.getDay() === 0 ? -6 : 1)))
     },
     weekEnd (date) {
@@ -106,7 +113,7 @@ export default {
         return Math.round(Math.abs((firstDate - secondDate) / oneDay)) + 1
     },
     toDate (yyyymmdd) {
-        return Date.UTC(yyyymmdd/10000, (yyyymmdd/100)%100 - 1, yyyymmdd%100)
+        return +new Date(yyyymmdd/10000, (yyyymmdd/100)%100 - 1, yyyymmdd%100)
     },
     toHyphenated (yyyymmdd) {
         let month = parseInt(yyyymmdd/100)%100
@@ -122,6 +129,13 @@ export default {
         var m = strArray[date.getMonth()];
         var y = date.getFullYear();
         return m + ' ' + d + (needYear ? ' ' + y: '' );
+    },
+    toTimeStr (date, needYear) {
+        var strArray=['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        var d = date.getDate();
+        var m = strArray[date.getMonth()];
+        var y = date.getFullYear();
+        return m + ' ' + d + ', ' + (needYear ? y: '' ) + ' ' + date.toISOString().substr(11,5)
     },
     toDateStrShort(date) {
         var d = "" + date.getDate();
@@ -576,5 +590,8 @@ export default {
     },
     showSuccessSnackBar(val){
         window._AKTO.$emit('SHOW_SNACKBAR', {show: true, text: val, color: 'green'})
+    },
+    toEpochInMs(hyphenatedDate) {
+        return +this.toDate(hyphenatedDate.replace(/\-/g, ''))
     },
 }
