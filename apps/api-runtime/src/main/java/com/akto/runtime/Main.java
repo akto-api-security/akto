@@ -122,8 +122,10 @@ public class Main {
         String groupIdConfig =  System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG");
         String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
         boolean syncImmediately = false;
+        boolean fetchAllSTI = true;
         if (instanceType != null && instanceType.equals("DASHBOARD")) {
             syncImmediately = true;
+            fetchAllSTI = false;
         }
         int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
 
@@ -251,7 +253,7 @@ public class Main {
                     if (!httpCallParserMap.containsKey(accountId)) {
                         HttpCallParser parser = new HttpCallParser(
                                 apiConfig.getUserIdentifier(), apiConfig.getThreshold(), apiConfig.getSync_threshold_count(),
-                                apiConfig.getSync_threshold_time()
+                                apiConfig.getSync_threshold_time(), fetchAllSTI
                         );
 
                         httpCallParserMap.put(accountId, parser);
@@ -269,7 +271,7 @@ public class Main {
 
                     if (!aktoPolicyMap.containsKey(accountId)) {
                         APICatalogSync apiCatalogSync = httpCallParserMap.get(accountId).apiCatalogSync;
-                        AktoPolicy aktoPolicy = new AktoPolicy(apiCatalogSync);
+                        AktoPolicy aktoPolicy = new AktoPolicy(apiCatalogSync, fetchAllSTI);
                         aktoPolicyMap.put(accountId, aktoPolicy);
                     }
 
@@ -279,7 +281,7 @@ public class Main {
 
                     try {
                         List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
-                        APICatalogSync apiCatalogSync = parser.syncFunction(accWiseResponse, syncImmediately);
+                        APICatalogSync apiCatalogSync = parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI);
 
                         // send to central kafka
                         if (kafkaProducer != null) {
@@ -295,7 +297,7 @@ public class Main {
                         }
 
                         // flow.init(accWiseResponse);
-                        aktoPolicy.main(accWiseResponse, apiCatalogSync);
+                        aktoPolicy.main(accWiseResponse, apiCatalogSync, fetchAllSTI);
                     } catch (Exception e) {
                         logger.error(e.toString());
                     }

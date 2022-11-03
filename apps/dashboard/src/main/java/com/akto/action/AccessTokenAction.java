@@ -65,7 +65,7 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
         Token token ;
         try {
             token = new Token(refreshToken);
-        } catch (Exception e) {
+        } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
             return null;
         }
 

@@ -28,7 +28,7 @@ public class SampleDataToSTI {
 
     public void setSampleDataToSTI(List<SampleData> allData) {
 
-        HttpCallParser parse = new HttpCallParser("", 0, 0, 0);
+        HttpCallParser parse = new HttpCallParser("", 0, 0, 0, true);
         for (SampleData sampleData : allData) {
 
             Method method = sampleData.getId().getMethod();
@@ -62,7 +62,7 @@ public class SampleDataToSTI {
 
     public void setSensitiveSampleDataToSTI(List<SensitiveSampleData> allData){
 
-        HttpCallParser parse = new HttpCallParser("", 0, 0, 0);
+        HttpCallParser parse = new HttpCallParser("", 0, 0, 0, true);
         for (SensitiveSampleData sensitiveSampleData : allData) {
 
             String method = sensitiveSampleData.getId().getMethod();
