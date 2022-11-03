@@ -56,12 +56,16 @@ export default {
     color: #47466A !important
     padding-left: 24px !important
 
+    .menu-item-text
+        font-weight: 400 !important
+
     &.alert
         border-left: 4px solid var(--v-redMetric-base) !important
         padding-left: 20px !important
 
     &.bold .menu-item-text
         font-weight: 600 !important
+        text-decoration: underline  
 
     &:before
         border-radius: 0px !important

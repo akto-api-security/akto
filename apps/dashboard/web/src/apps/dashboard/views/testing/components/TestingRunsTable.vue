@@ -85,6 +85,7 @@ export default {
             let days = parseInt(Math.round(run.periodInSeconds/86400))
             return {
                 apiCollectionName: this.getCollectionName(run.testingEndpoints),
+                link: run.hexId+'/results',
                 endpoints: testing.getEndpoints(run.testingEndpoints),
                 type: run.testingEndpoints.type,
                 userEmail: run.userEmail,
@@ -94,7 +95,7 @@ export default {
             }
         },
         goToTestingRunSummaries(item){
-
+            this.$router.push(item.link)
         }
     },
     computed: {
