@@ -66,13 +66,6 @@ export default {
     todayDate: () => {
         return new Date(Date.now())
     },
-    dayStart: () => {
-        let date = new Date(Date.now())
-        date.setHours(0)
-        date.setMinutes(0)
-        date.setSeconds(0)
-        return date
-    },
     dayStart(epochMs) {
         let date = new Date(epochMs)
         date.setHours(0)
