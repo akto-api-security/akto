@@ -101,7 +101,7 @@ public class ResourceAnalyser {
 
         // get actual api collection id
         Integer apiCollectionId = requestParams.getApiCollectionId();
-        String hostName = HttpCallParser.getHostName(requestParams.getHeaders());
+        String hostName = HttpCallParser.getHeaderValue(requestParams.getHeaders(), "host");
         apiCollectionId = findTrueApiCollectionId(apiCollectionId, hostName, responseParams.getSource());
 
         if (apiCollectionId == null) return;
