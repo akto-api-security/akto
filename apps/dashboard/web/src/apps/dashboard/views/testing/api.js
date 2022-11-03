@@ -1,7 +1,7 @@
 import request from '@/util/request'
 
 export default {
-    fetchTestingDetails() {
+    fetchActiveTestingDetails() {
         return request({
             url: '/api/retrieveAllCollectionTests',
             method: 'post',
@@ -11,6 +11,30 @@ export default {
         })
     },
 
+    fetchPastTestingDetails({startTimestamp, endTimestamp}) {
+        return request({
+            url: '/api/retrieveAllCollectionTests',
+            method: 'post',
+            data: {
+                startTimestamp, 
+                endTimestamp
+            }
+        }).then((resp) => {
+            return resp
+        })
+    },
+
+    fetchTestingRunResultSummaries(startTimestamp, endTimestamp, testingRunHexId) {
+        return request({
+            url: '/api/fetchTestingRunResultSummaries',
+            method: 'post',
+            data: {
+                startTimestamp, 
+                endTimestamp,
+                testingRunHexId
+            }
+        })
+    },
     startTestForCustomEndpoints(apiInfoKeyList) {
         return request({
             url: '/api/startTest',
@@ -33,7 +57,7 @@ export default {
 
     scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily) {
         return request({
-            url: '/api/scheduleTest',
+            url: '/api/startTest',
             method: 'post',
             data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily}
         }).then((resp) => {
@@ -43,29 +67,9 @@ export default {
 
     scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily) {
         return request({
-            url: '/api/scheduleTest',
+            url: '/api/startTest',
             method: 'post',
             data: {apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily}
-        }).then((resp) => {
-            return resp
-        })        
-    },
-
-    stopTestForCollection(apiCollectionId) {
-        return request({
-            url: '/api/stopTest',
-            method: 'post',
-            data: {apiCollectionId, type: "COLLECTION_WISE"}
-        }).then((resp) => {
-            return resp
-        })        
-    },
-
-    stopScheduleForCollection(apiCollectionId) {
-        return request({
-            url: '/api/stopSchedule',
-            method: 'post',
-            data: {apiCollectionId}
         }).then((resp) => {
             return resp
         })        
@@ -81,21 +85,13 @@ export default {
         })        
     },
 
-    fetchTestingRunResults() {
+    fetchTestingRunResults(testingRunResultSummaryHexId) {
         return request({
             url: '/api/fetchTestingRunResults',
             method: 'post',
-            data: {}
-        }).then((resp) => {
-            return resp
-        })        
-    },
-
-    fetchRequestAndResponseForTest(x) {
-        return request({
-            url: '/api/fetchRequestAndResponseForTest',
-            method: 'post',
-            data: {testingRunResults:[x]}
+            data: {
+                testingRunResultSummaryHexId
+            }
         }).then((resp) => {
             return resp
         })        
@@ -109,5 +105,15 @@ export default {
         }).then((resp) => {
             return resp
         })        
-    }
+    },
+
+    fetchTestRunResultDetails(testingRunResultHexId) {
+        return request({
+            url: '/api/fetchTestRunResultDetails',
+            method: 'post',
+            data: {
+                testingRunResultHexId
+            }
+        })
+    },
 }

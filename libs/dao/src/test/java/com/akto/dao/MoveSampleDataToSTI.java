@@ -70,20 +70,6 @@ public class MoveSampleDataToSTI {
     }
 
 
-    public static void main3(String[] args) {
-        DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
-        Context.accountId.set(1_000_000);
-
-        List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.findAll(new BasicDBObject());
-        int count = 0;
-        for (TestingRunResult testingRunResult: testingRunResults) {
-            TestResult bola = testingRunResult.getResultMap().get("BOLA");
-            if (bola == null) continue;
-            if (bola.isVulnerable()) count += 1;
-        }
-        System.out.println("COUNT:  " + count);
-
-    }
 
     public static void main4(String[] args) {
         DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));

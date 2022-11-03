@@ -3,7 +3,7 @@ package com.akto.dto.testing;
 import org.bson.codecs.pojo.annotations.BsonId;
 
 public class TestingSchedule {
-
+    
     String authorEmail;
     int creationTimestamp;
 
@@ -30,7 +30,7 @@ public class TestingSchedule {
         this.startTimestamp = startTimestamp;
         this.recurring = recurring;
         this.sampleTestingRun = sampleTestingRun;
-    }
+}
 
     public String getAuthorEmail() {
         return this.authorEmail;

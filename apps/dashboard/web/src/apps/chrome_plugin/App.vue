@@ -197,9 +197,6 @@
     letter-spacing: normal
     padding: 0
 
-.right-pane-tab-item
-    box-shadow: inset 0px 2px 4px -1px #e5e4e6
-
 .brdb
   border-bottom: 1px solid rgba(71, 70, 106, 0.2) !important
 

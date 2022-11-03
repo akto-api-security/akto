@@ -3,22 +3,23 @@ package com.akto.rules;
 
 import com.akto.dto.*;
 import com.akto.dto.testing.*;
-import com.akto.store.AuthMechanismStore;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.store.SampleMessageStore;
-import com.akto.testing.ApiExecutor;
-import com.akto.testing.StatusCodeAnalyser;
-import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 
 public class NoAuthTest extends TestPlugin {
 
     @Override
-    public boolean start(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, AuthMechanism authMechanism) {
-        List<RawApi> filteredMessages = fetchMessagesWithAuthToken(apiInfoKey, testRunId, authMechanism);
-        if (filteredMessages == null) return false;
+    public Result  start(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages, Map<String, SingleTypeInfo> singleTypeInfoMap) {
+        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleMessages);
+        if (messages.isEmpty()) return addWithoutRequestError(null, TestResult.TestError.NO_PATH);
+        List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, authMechanism);
+        if (filteredMessages.isEmpty()) return addWithoutRequestError(null, TestResult.TestError.NO_MESSAGE_WITH_AUTH_TOKEN);
 
         RawApi rawApi = filteredMessages.get(0);
 
@@ -27,27 +28,32 @@ public class NoAuthTest extends TestPlugin {
 
         authMechanism.removeAuthFromRequest(testRequest);
 
-        OriginalHttpResponse testResponse = null;
+        ApiExecutionDetails apiExecutionDetails;
         try {
-            testResponse = ApiExecutor.sendRequest(testRequest, true);
+             apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, originalHttpResponse);
         } catch (Exception e) {
-            addWithRequestError(apiInfoKey, rawApi.getOriginalMessage(), testRunId, TestResult.TestError.API_REQUEST_FAILED, testRequest);
-            return false;
+            return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest);
         }
 
-        int statusCode = StatusCodeAnalyser.getStatusCode(testResponse.getBody(), testResponse.getStatusCode());
-        boolean vulnerable = isStatusGood(statusCode);
+        boolean vulnerable = isStatusGood(apiExecutionDetails.statusCode);
 
-        double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), testResponse.getBody());
+        TestResult testResult = buildTestResult(
+                testRequest, apiExecutionDetails.testResponse, rawApi.getOriginalMessage(), apiExecutionDetails.percentageMatch, vulnerable
+        );
+        return addTestSuccessResult(
+                vulnerable, Collections.singletonList(testResult), new ArrayList<>(), TestResult.Confidence.HIGH
+        );
 
-        addTestSuccessResult(apiInfoKey, testRequest, testResponse, rawApi.getOriginalMessage(), testRunId,
-                vulnerable, percentageMatch, new ArrayList<>(), TestResult.Confidence.HIGH);
-
-        return vulnerable;
     }
 
     @Override
-    public String testName() {
+    public String superTestName() {
         return "NO_AUTH";
     }
+
+    @Override
+    public String subTestName() {
+        return "REMOVE_TOKENS";
+    }
+
 }

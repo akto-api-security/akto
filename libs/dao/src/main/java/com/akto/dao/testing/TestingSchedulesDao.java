@@ -11,7 +11,7 @@ public class TestingSchedulesDao extends AccountsContextDao<TestingSchedule> {
     public String getCollName() {
         return "testing_schedules";
     }
-
+    
     @Override
     public Class<TestingSchedule> getClassT() {
         return TestingSchedule.class;

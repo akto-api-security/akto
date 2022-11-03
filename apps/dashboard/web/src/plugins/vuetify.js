@@ -7,6 +7,9 @@ import CurlyBraces from "../apps/dashboard/shared/icons/CurlyBraces"
 import Burpsuite from "../apps/dashboard/shared/icons/Burpsuite"
 import Slack from "../apps/dashboard/shared/icons/Slack"
 import Postman from "../apps/dashboard/shared/icons/Postman"
+import AWS from "../apps/dashboard/shared/icons/AWS"
+import GCP from "../apps/dashboard/shared/icons/GCP"
+import Swagger from "../apps/dashboard/shared/icons/Swagger"
 import Restapi from "../apps/dashboard/shared/icons/Restapi"
 import CustomWebhooks from "../apps/dashboard/shared/icons/CustomWebhooks"
 
@@ -87,7 +90,13 @@ import {
   faStop,
   faPen,
   faCalendarPlus,
-  faCalendarTimes
+  faCalendarTimes,
+  faCaretSquareUp,
+  faThumbsUp,
+  faCaretUp,
+  faCaretDown,
+  faShareAlt,
+  faUserPlus
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -112,7 +121,8 @@ const faIcons = [
   faHome,faBullseye,faBullhorn,faCheckDouble,faSquare,faBolt,faDatabase,faAngleDoubleRight, faAngleDoubleLeft,faClipboardList,
   faUnlockAlt,faStethoscope,faLongArrowAltDown,faLongArrowAltUp,faSyncAlt, faExchangeAlt, faUserLock, faExclamation,faPhoneAlt,
   faCreditCard,faAddressCard,faChalkboard,faFilter,faKey,faAngleDoubleDown,faAngleDoubleUp,faUpload,faRedo,faGlobe,faAngleDown,
-  faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,
+  faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faCaretSquareUp,
+  faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faThumbsUp,faCaretUp,faShareAlt,faUserPlus,faCaretDown,
   
   farComments,farCalendar, farHandPointRight, farBuilding, farStar,farSquare, farCheckSquare,
 
@@ -157,6 +167,18 @@ faIconsOpts.burpsuite = {
 
 faIconsOpts.postman = {
   component: Postman
+}
+
+faIconsOpts.aws = {
+  component: AWS
+}
+
+faIconsOpts.swagger = {
+  component: Swagger
+}
+
+faIconsOpts.gcp = {
+  component: GCP
 }
 
 faIconsOpts.slack = {

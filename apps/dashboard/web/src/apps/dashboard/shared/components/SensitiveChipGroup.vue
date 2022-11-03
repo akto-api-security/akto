@@ -7,13 +7,13 @@
             v-for="tag in sensitiveTags.slice(0,2)"
             :key="tag"
             small
-            color="#47466ACC"
+            :color='chipColor || "#47466ACC"'
             class="sensitive-tag-chip"
         >
-            <v-icon color="#FFFFFF" size ="14">{{getTagIcon(tag)}}</v-icon>
+            <v-icon color="#FFFFFF" size ="14" v-if="!hideTag">{{getTagIcon(tag)}}</v-icon>
             <span style="color: #FFFFFF">{{ toTitleCase(tag) }}</span>
         </v-chip>
-        <span v-if="sensitiveTags.length > 2" color="#6200EA">
+        <span v-if="sensitiveTags.length > 2" :color='chipColor || "#6200EA"'>
             + {{sensitiveTags.length-2}} more
         </span>
     </v-chip-group>
@@ -28,7 +28,9 @@ import obj from "@/util/obj"
 export default {
     name: "SensitiveChipGroup",
     props: {
-        sensitiveTags: obj.arrR
+        sensitiveTags: obj.arrR,
+        chipColor: obj.strN,
+        hideTag: obj.boolN
     },
     methods: {
         getTagIcon(tag) {

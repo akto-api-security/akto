@@ -1,18 +1,18 @@
 <template>
   <div style="min-height:200px; padding-top:20px; margin-bottom:30px">
     <div class="d-flex" style="padding-bottom:10px">
-      <v-icon :size="50" style="width: 50px !important">{{avatar_image}}</v-icon>
-      <div class="title-text fd-column jc-sa">{{this.title}}</div>
+      <v-icon :size="50" style="width: 50px !important">{{                       avatar_image                       }}</v-icon>
+      <div class="title-text fd-column jc-sa">{{                       this.title                       }}</div>
     </div>
     <div style="padding-top: 20px;" v-if="burp_tokens.length > 0">
       <div class="d-flex" v-for="item in burpTokensForTable" :key="item.id" style="padding-bottom: 30px">
         <v-hover v-slot="{ hover }">
           <div class="d-flex" style="height: 34px;   line-height: 34px;">
             <div style="width: 150px">
-              <h4 class="text-detail">{{item.computedTime}}</h4>
+              <h4 class="text-detail">{{                       item.computedTime                       }}</h4>
             </div>
             <div style="width: 350px">
-              <span v-if="openPasswordMap[item.id]" class="text-detail">{{item.key}}</span>
+              <span v-if="openPasswordMap[item.id]" class="text-detail">{{                       item.key                       }}</span>
               <span v-else class="text-detail">********************************************************</span>
             </div>
             <div v-if="hover">
@@ -24,7 +24,7 @@
     </div>
     <slot>
       <div class="pt-2">
-        <v-btn color="#6200EA" style="color:white" @click="addBurpToken">{{addTokenTitle || "Generate Token"}}</v-btn>
+        <v-btn color="#6200EA" style="color:white" @click="addBurpToken">{{                       addTokenTitle || "Generate Token"                       }}</v-btn>
       </div>
     </slot>
 
@@ -39,7 +39,10 @@ import obj from '@/util/obj'
 export default {
   name: "ApiToken",
   props: {
-    title: obj.strR,
+    title: {
+      type: obj.strR,
+      required: false
+    },
     burp_tokens: obj.arrR,
     avatar_image: obj.str,
     addTokenTitle: obj.strN
@@ -56,16 +59,16 @@ export default {
           icon: item => this.openPasswordMap[item.id] ? '$fas_eye' : '$fas_eye-slash',
           text: item => this.openPasswordMap[item.id] ? 'Show' : 'Hide',
           func: item => this.eyeClicked(item),
-          success: (resp, item) => () => {console.log(item)},
-          failure: (err, item) => () => {console.log(item)}
+          success: (resp, item) => () => { console.log(item) },
+          failure: (err, item) => () => { console.log(item) }
         },
         {
           isValid: item => true,
           icon: item => '$fas_trash',
           text: item => 'Delete',
           func: item => this.deleteBurpToken(item),
-          success: (resp, item) => () => {console.log(item)},
-          failure: (err, item) => () => {console.log(item)},
+          success: (resp, item) => () => { console.log(item) },
+          failure: (err, item) => () => { console.log(item) },
         }
       ]
     }
@@ -77,7 +80,7 @@ export default {
         this.$emit("deleteToken", item.id)
       })
     },
-    addBurpToken(){
+    addBurpToken() {
       this.$emit("generateToken")
     },
     eyeClicked(item) {
@@ -99,9 +102,9 @@ export default {
     burp_tokens: {
       handler() {
         this.openPasswordMap = this.burp_tokens.reduce((m, c) => {
-                          m[c.id] = false
-                          return m
-                        }, {})        
+          m[c.id] = false
+          return m
+        }, {})
       }
     }
   }

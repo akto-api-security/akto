@@ -11,11 +11,15 @@ public class BackwardCompatibility {
     public static final String DROP_WORKFLOW_TEST_RESULT = "dropWorkflowTestResult";
     private int dropWorkflowTestResult;
 
-    public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult) {
+    public static final String READY_FOR_NEW_TESTING_FRAMEWORK = "readyForNewTestingFramework";
+    private int readyForNewTestingFramework;
+
+    public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult, int readyForNewTestingFramework) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
         this.dropWorkflowTestResult = dropWorkflowTestResult;
+        this.readyForNewTestingFramework = readyForNewTestingFramework;
     }
 
     public BackwardCompatibility() {
@@ -52,4 +56,13 @@ public class BackwardCompatibility {
     public void setDropWorkflowTestResult(int dropWorkflowTestResult) {
         this.dropWorkflowTestResult = dropWorkflowTestResult;
     }
+
+    public int getReadyForNewTestingFramework() {
+        return this.readyForNewTestingFramework;
+    }
+
+    public void setReadyForNewTestingFramework(int readyForNewTestingFramework) {
+        this.readyForNewTestingFramework = readyForNewTestingFramework;
+    }
+
 }

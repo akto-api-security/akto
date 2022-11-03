@@ -58,8 +58,8 @@ const Workflow = ({apiCollectionId}) => {
   const enteredNode = useStore(state => state.enteredNode)
   const setEnteredNode = useStore(state => state.setEnteredNode)
 
-  const testingSchedule = useStore(state => state.testingSchedule)
-  const fetchWorkflowTestingSchedule = useStore(state => state.fetchWorkflowTestingSchedule)
+  const testingRun = useStore(state => state.testingRun)
+  const fetchWorkflowTestingRun = useStore(state => state.fetchWorkflowTestingRun)
   const deleteScheduledWorkflowTests = useStore(state => state.deleteScheduledWorkflowTests)
   const scheduleWorkflowTest = useStore(state => state.scheduleWorkflowTest)
   const downloadWorkflowAsJsonFn = useStore(state => state.downloadWorkflowAsJson)
@@ -310,7 +310,7 @@ const Workflow = ({apiCollectionId}) => {
     React.useEffect(() => {
     if (originalState.id) {
       fetchResult()
-      fetchWorkflowTestingSchedule(originalState.id)
+      fetchWorkflowTestingRun(originalState.id)
     }
   }, []);
 
@@ -347,7 +347,7 @@ const Workflow = ({apiCollectionId}) => {
       >
         <ScheduleBox 
           saveFn={saveWorkflowFn}
-          testingSchedule={testingSchedule}
+          testingRun={testingRun}
           deleteFn={deleteWorkflowScheduleFn}
         />
       </Menu>

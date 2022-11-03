@@ -317,9 +317,7 @@ export default {
         toHyphenatedDate(epochInMs) {
             return func.toDateStrShort(new Date(epochInMs))
         },
-        toEpochInMs(hyphenatedDate) {
-            return +func.toDate(hyphenatedDate.replace(/\-/g, ''))
-        },
+        
         isSubTypeSensitive(x) {
             return func.isSubTypeSensitive(x)
         },
@@ -527,8 +525,8 @@ export default {
                 return [this.toHyphenatedDate(this.startTimestamp * 1000), this.toHyphenatedDate(this.endTimestamp * 1000)]
             },
             set(newDateRange) {
-                this.startTimestamp = parseInt(this.toEpochInMs(newDateRange[0]) / 1000)
-                this.endTimestamp = parseInt(this.toEpochInMs(newDateRange[1]) / 1000)
+                this.startTimestamp = parseInt(func.toEpochInMs(newDateRange[0]) / 1000)
+                this.endTimestamp = parseInt(func.toEpochInMs(newDateRange[1]) / 1000)
                 this.refreshPage(true)
             }
         }

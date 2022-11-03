@@ -281,7 +281,7 @@ export default {
 
     scheduleWorkflowTest(id, recurringDaily, startTimestamp) {
         return request({
-            url: '/api/scheduleTest',
+            url: '/api/startTest',
             method: 'post',
             data: {
                 "testIdConfig" : 1,
@@ -293,9 +293,9 @@ export default {
         })
     },
 
-    fetchWorkflowTestingSchedule(workflowId) {
+    fetchWorkflowTestingRun(workflowId) {
         return request({
-            url: '/api/fetchWorkflowTestingSchedule',
+            url: '/api/fetchWorkflowTestingRun',
             method: 'post',
             data: {
                 "workflowTestId" : workflowId
