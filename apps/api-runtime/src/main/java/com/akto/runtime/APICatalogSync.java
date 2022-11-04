@@ -548,13 +548,15 @@ public class APICatalogSync {
             List<String> finalSamples = new ArrayList<>();
             for (String s: sample.getSamples()) {
                 boolean finalRedact = redactSampleData;
-                try {
-                    HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(s);
-                    Source source = httpResponseParams.getSource();
-                    if (source.equals(Source.HAR) || source.equals(Source.PCAP)) finalRedact = false;
-                } catch (Exception e1) {
-                    e1.printStackTrace();
-                    continue;
+                if (finalRedact) {
+                    try {
+                        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(s);
+                        Source source = httpResponseParams.getSource();
+                        if (source.equals(Source.HAR) || source.equals(Source.PCAP)) finalRedact = false;
+                    } catch (Exception e1) {
+                        e1.printStackTrace();
+                        continue;
+                    }
                 }
 
                 try {
