@@ -7,6 +7,7 @@ import java.util.regex.Pattern;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
+import com.akto.dto.HttpResponseParams.Source;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic.Key;
@@ -19,6 +20,7 @@ import com.akto.dto.type.URLStatic;
 import com.akto.dto.type.URLTemplate;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.parsers.HttpCallParser;
 import com.akto.types.CappedSet;
 import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBObject;
@@ -545,8 +547,18 @@ public class APICatalogSync {
             }
             List<String> finalSamples = new ArrayList<>();
             for (String s: sample.getSamples()) {
+                boolean finalRedact = redactSampleData;
                 try {
-                    if (redactSampleData) {
+                    HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(s);
+                    Source source = httpResponseParams.getSource();
+                    if (source.equals(Source.HAR) || source.equals(Source.PCAP)) finalRedact = false;
+                } catch (Exception e1) {
+                    e1.printStackTrace();
+                    continue;
+                }
+
+                try {
+                    if (finalRedact) {
                         String redact = RedactSampleData.redact(s);
                         finalSamples.add(redact);
                     } else {
