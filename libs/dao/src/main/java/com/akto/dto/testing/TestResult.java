@@ -21,24 +21,20 @@ public class TestResult extends GenericTestResult {
         NO_AUTH("NO_AUTH",Severity.HIGH);
         private final String name;
         private final Severity severity;
+
+        private static final TestCategory[] values = values();
         TestCategory(String name, Severity severity) {
             this.name = name;
             this.severity = severity;
         }
 
         public static TestCategory getTestCategory (String category) {
-            switch (category) {
-                case "BOLA" :
-                    return BOLA;
-                case "ADD_USER_ID" :
-                    return ADD_USER_ID;
-                case "PRIVILEGE_ESCALATION" :
-                    return PRIVILEGE_ESCALATION;
-                case "NO_AUTH" :
-                    return NO_AUTH;
-                default:
-                    throw new IllegalStateException("Unexpected value: " + category);
+            for (TestCategory testCategory : values) {
+                if (testCategory.name.equals(category)) {
+                    return testCategory;
+                }
             }
+            throw new IllegalStateException("Unknown TestCategory passed :- " + category);
         }
 
         public String getName() {
@@ -63,7 +59,7 @@ public class TestResult extends GenericTestResult {
         FAILED_TO_CONVERT_TEST_REQUEST_TO_STRING("Failed to store test"),
         NO_AUTH_TOKEN_FOUND("No authentication token found");
 
-        private String message;
+        private final String message;
 
         TestError(String message) {
             this.message = message;
