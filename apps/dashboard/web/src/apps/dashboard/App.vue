@@ -1,61 +1,39 @@
 <template>
   <v-app class="akto-app">
-    <v-navigation-drawer
-      v-model="drawer"
-      app
-      width="200px"
-      :mini-variant.sync="mini"
-      class="akto-nav"
-      dark
-      permanent
-    >
+    <v-navigation-drawer v-model="drawer" app width="200px" :mini-variant.sync="mini" class="akto-nav" dark permanent>
 
-    <span class="expand-nav clickable" @click="mini = !mini">
+      <span class="expand-nav clickable" @click="mini = !mini">
         <v-icon v-if="mini" color="#6200ea">$fas_angle-right</v-icon>
         <v-icon v-else color="#6200ea">$fas_angle-left</v-icon>
-    </span>
+      </span>
 
-    <template #prepend>
-      <v-list-item>
-        <v-list-item-icon class="prepend-akto-icon">
-          <img src="@/assets/logo_nav.svg" alt="Akto" class="logo"/>
-        </v-list-item-icon>
-        <v-list-item-title class="akto-title">akto</v-list-item-title>
-      </v-list-item>
-    </template>
+      <template #prepend>
+        <v-list-item>
+          <v-list-item-icon class="prepend-akto-icon">
+            <img src="@/assets/logo_nav.svg" alt="Akto" class="logo" />
+          </v-list-item-icon>
+          <v-list-item-title class="akto-title">akto</v-list-item-title>
+        </v-list-item>
+      </template>
 
       <div class="nav-section">
         <v-list dense nav class="left-nav">
-          <v-list-item
-            v-for="(item, index) in this.myItems"
-            :key="index"
-            :to="item.link || ''"
-            :class="item.children ? 'group-nav-drawer' : 'row-nav-drawer'"
-          >
-          <template v-if="item.children">
-              <v-list-group
-                :value="false"
-                no-action
-                :key="index"
-                class="nav-item-group"
-                active-class="active-team-group"
-              >
+          <v-list-item v-for="(item, index) in this.myItems" :key="index" :to="item.link || ''"
+            :class="item.children ? 'group-nav-drawer' : 'row-nav-drawer'">
+            <template v-if="item.children">
+              <v-list-group :value="false" no-action :key="index" class="nav-item-group"
+                active-class="active-team-group">
                 <template v-slot:prependIcon>
                   <v-icon class="icon-nav-drawer">{{ item.icon }}</v-icon>
                 </template>
                 <template v-slot:activator>
                   <div class="content-nav-drawer">
-                    <v-list-item-title v-text="item.title" class="title-nav-drawer"/>
+                    <v-list-item-title v-text="item.title" class="title-nav-drawer" />
                   </div>
                 </template>
 
-                <v-list-item
-                        v-for="(child, cIndex) in item.children"
-                        :key="cIndex"
-                        :to="child.link"
-                        class="row-dashboard"
-                        active-class="active-team-group"
-                >
+                <v-list-item v-for="(child, cIndex) in item.children" :key="cIndex" :to="child.link"
+                  class="row-dashboard" active-class="active-team-group">
 
                   <v-list-item-icon class="icon-nav-drawer dashboard-icon">
                     <v-icon size="10">{{child.icon}}</v-icon>
@@ -65,153 +43,154 @@
                   </v-list-item-content>
                 </v-list-item>
               </v-list-group>
-          </template>  
-          <template v-else>
-            <v-list-item-icon class="icon-nav-drawer">
-              <v-icon>{{ item.icon }}</v-icon>
-            </v-list-item-icon>
-            <v-list-item-content class="content-nav-drawer">
-              <v-list-item-title v-text="item.title" class="title-nav-drawer"/>
-            </v-list-item-content>
-          </template>
+            </template>
+            <template v-else>
+              <v-list-item-icon class="icon-nav-drawer">
+                <v-icon>{{ item.icon }}</v-icon>
+              </v-list-item-icon>
+              <v-list-item-content class="content-nav-drawer">
+                <v-list-item-title v-text="item.title" class="title-nav-drawer" />
+              </v-list-item-content>
+            </template>
           </v-list-item>
-          <v-spacer/>
+          <v-spacer />
         </v-list>
       </div>
 
-        <v-list dense nav class="left-nav" style="margin-top: auto">
-          <v-list-item class='row-nav-drawer' @click="openDocs">
-            <v-list-item-icon class="icon-nav-drawer">
-              <v-icon>$fas_user-secret</v-icon>
-            </v-list-item-icon>
-              <v-list-item-content class="content-nav-drawer">
-                <v-list-item-title class="title-nav-drawer">Help</v-list-item-title>
-              </v-list-item-content>
-          </v-list-item>
+      <v-list dense nav class="left-nav" style="margin-top: auto">
+        <v-list-item class='row-nav-drawer' @click="openDocs">
+          <v-list-item-icon class="icon-nav-drawer">
+            <v-icon>$fas_user-secret</v-icon>
+          </v-list-item-icon>
+          <v-list-item-content class="content-nav-drawer">
+            <v-list-item-title class="title-nav-drawer">Help</v-list-item-title>
+          </v-list-item-content>
+        </v-list-item>
 
-          <simple-menu :items="myAccountItems">
-            <template v-slot:activator2>
-              <v-list-item class='row-nav-drawer'>
-                <v-list-item-icon class="icon-nav-drawer">
-                  <owner-name
-                    :owner-name="getUsername()"
-                    :owner-id="0"
-                    :show-name="false"
-                  />
-                </v-list-item-icon>
-                  <v-list-item-content class="content-nav-drawer">
-                    <v-list-item-title class="title-nav-drawer">My accounts</v-list-item-title>
-                  </v-list-item-content>
-              </v-list-item>
-            </template>
-          </simple-menu>
-        </v-list>
+        <simple-menu :items="myAccountItems">
+          <template v-slot:activator2>
+            <v-list-item class='row-nav-drawer'>
+              <v-list-item-icon class="icon-nav-drawer">
+                <owner-name :owner-name="getUsername()" :owner-id="0" :show-name="false" />
+              </v-list-item-icon>
+              <v-list-item-content class="content-nav-drawer">
+                <v-list-item-title class="title-nav-drawer">My accounts</v-list-item-title>
+              </v-list-item-content>
+            </v-list-item>
+          </template>
+        </simple-menu>
+      </v-list>
     </v-navigation-drawer>
 
     <v-main class="akto-background" :style="{ 'padding-left': mini ? '56px' : '200px'}">
       <div class="page-wrapper">
-          <router-view>
-            <template slot="universal-ctas">
-            </template>
-          </router-view>
+        <router-view>
+          <template slot="universal-ctas">
+          </template>
+        </router-view>
       </div>
     </v-main>
   </v-app>
 </template>
 
 <script>
-  import {mapGetters} from 'vuex';
-  import CreateAccountDialog from "./shared/components/CreateAccountDialog"
-  import api from "./appbar/api"
-  import OwnerName from "./shared/components/OwnerName";
-  import SimpleTextField from "./shared/components/SimpleTextField";
-  import SimpleMenu from "./shared/components/SimpleMenu"
+import { mapGetters } from 'vuex';
+import CreateAccountDialog from "./shared/components/CreateAccountDialog"
+import api from "./appbar/api"
+import OwnerName from "./shared/components/OwnerName";
+import SimpleTextField from "./shared/components/SimpleTextField";
+import SimpleMenu from "./shared/components/SimpleMenu"
 
-  export default {
-    name: 'PageDashboard',
-    components: {
-      SimpleTextField,
-      OwnerName,
-      'create-account-dialog': CreateAccountDialog,
-      SimpleMenu
-    },
-    data () {
-      const myItems = [
-        {
-          title: 'Testing',
-          icon: '$fas_home',
-          link: '/dashboard/testing'
-        },
-        {
-          title: 'Observe',
-          icon: '$fas_search',
-          children: [
-            {
-              title: 'API Inventory',
-              icon: '$fas_exchange-alt',
-              link: '/dashboard/observe/inventory'
-            }, 
-            {
-              title: 'API Changes',
-              icon: '$fas_sync-alt',
-              link: '/dashboard/observe/changes'
-            },
-            {
-              title: 'Sensitive Data',
-              icon: '$fas_user-lock',
-              link: '/dashboard/observe/sensitive'
-            }
-          ]
-        }
-      ]
-
-      return {
-        msg: '',
-        drawer: null,
-        mini: true,
-        profileMenu: false,
-        myItems,
-        myOrgs: this.getAccounts(),
-        showField: {},
-        showTeamField: false,
-        newName: '',
-        myAccountItems: [
+export default {
+  name: 'PageDashboard',
+  components: {
+    SimpleTextField,
+    OwnerName,
+    'create-account-dialog': CreateAccountDialog,
+    SimpleMenu
+  },
+  data() {
+    const myItems = [
+      {
+        title: 'Quick Start',
+        icon: '$fas_thumbs-up',
+        link: '/dashboard/quick-start'
+      },
+      {
+        title: 'Testing',
+        icon: '$fas_home',
+        link: '/dashboard/testing'
+      },
+      {
+        title: 'Observe',
+        icon: '$fas_search',
+        children: [
           {
-            label: "Settings",
-            click: () => this.$router.push('/dashboard/settings')
+            title: 'API Inventory',
+            icon: '$fas_exchange-alt',
+            link: '/dashboard/observe/inventory'
           },
           {
-            label: "Logout",
-            click: () => {
-              api.logout().then((resp) => {
-                window.location.href = "/login"
-              })
-            }
+            title: 'API Changes',
+            icon: '$fas_sync-alt',
+            link: '/dashboard/observe/changes'
+          },
+          {
+            title: 'Sensitive Data',
+            icon: '$fas_user-lock',
+            link: '/dashboard/observe/sensitive'
           }
         ]
       }
-    },
-    methods: {
-      ...mapGetters('auth', ['getUsername', 'getAvatar', 'getActiveAccount', 'getAccounts']),
-      openDocs() {
-        window.open('https://docs.akto.io/deploy/self-hosted-deployment/aws-deploy', '_blank')
-      },
-      goToAccount (accId) {
-        api.goToAccount(+accId)
-      },
-      saveNewAccount (newAccountName) {
-        api.saveToAccount(newAccountName, this)
-      },
-      saveNewTeam (name) {
-        if (name.length > 0) {
-          this.$store.dispatch('auth/addNewTeam', {name}).then(resp => {
-            this.showTeamField = false
-            this.$router.push('/dashboard/teams/' + resp.id)
-          })
+    ]
+
+    return {
+      msg: '',
+      drawer: null,
+      mini: true,
+      profileMenu: false,
+      myItems,
+      myOrgs: this.getAccounts(),
+      showField: {},
+      showTeamField: false,
+      newName: '',
+      myAccountItems: [
+        {
+          label: "Settings",
+          click: () => this.$router.push('/dashboard/settings')
+        },
+        {
+          label: "Logout",
+          click: () => {
+            api.logout().then((resp) => {
+              window.location.href = "/login"
+            })
+          }
         }
+      ]
+    }
+  },
+  methods: {
+    ...mapGetters('auth', ['getUsername', 'getAvatar', 'getActiveAccount', 'getAccounts']),
+    openDocs() {
+      window.open('https://docs.akto.io/deploy/self-hosted-deployment/aws-deploy', '_blank')
+    },
+    goToAccount(accId) {
+      api.goToAccount(+accId)
+    },
+    saveNewAccount(newAccountName) {
+      api.saveToAccount(newAccountName, this)
+    },
+    saveNewTeam(name) {
+      if (name.length > 0) {
+        this.$store.dispatch('auth/addNewTeam', { name }).then(resp => {
+          this.showTeamField = false
+          this.$router.push('/dashboard/teams/' + resp.id)
+        })
       }
     }
   }
+}
 </script>
 
 <style lang="sass" scoped>

@@ -39,7 +39,8 @@ export default {
         schedule() {
             let hours = this.timePicker.split(":")[0]
             let minutes = this.timePicker.split(":")[1]
-            let startTimestamp = parseInt(+func.dayStart()/1000) + hours * 60 * 60 + minutes * 60
+            let dayStart = +func.dayStart(+new Date());
+            let startTimestamp = parseInt(dayStart/1000) + hours * 60 * 60 + minutes * 60
             return this.$emit("schedule", {recurringDaily: this.recurringDaily, startTimestamp})
         }
     }

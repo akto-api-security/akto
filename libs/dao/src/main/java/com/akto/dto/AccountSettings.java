@@ -20,6 +20,8 @@ public class AccountSettings {
     public static final String CENTRAL_KAFKA_IP = "centralKafkaIp";
     private String centralKafkaIp;
 
+    public static final String AKTO_IGNORE_FLAG = "x-akto-ignore";
+
     public AccountSettings() {
     }
 

@@ -86,10 +86,10 @@ public class HttpCallParser {
 
     private static final Gson gson = new Gson();
 
-    public static String getHostName(Map<String,List<String>> headers) {
+    public static String getHeaderValue(Map<String,List<String>> headers, String headerKey) {
         if (headers == null) return null;
         for (String k: headers.keySet()) {
-            if (k.equalsIgnoreCase("host")) {
+            if (k.equalsIgnoreCase(headerKey)) {
                 List<String> hosts = headers.getOrDefault(k, new ArrayList<>());
                 if (hosts.size() > 0) return hosts.get(0);
                 return null;
@@ -195,8 +195,11 @@ public class HttpCallParser {
         for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
             boolean cond = HttpResponseParams.validHttpResponseCode(httpResponseParam.getStatusCode());
             if (!cond) continue;
+            
+            String ignoreAktoFlag = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), AccountSettings.AKTO_IGNORE_FLAG);
+            if (ignoreAktoFlag != null) continue;
 
-            String hostName = getHostName(httpResponseParam.getRequestParams().getHeaders());
+            String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
             int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
             int apiCollectionId ;
 

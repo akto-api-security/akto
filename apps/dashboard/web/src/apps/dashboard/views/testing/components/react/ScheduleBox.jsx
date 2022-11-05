@@ -40,7 +40,8 @@ const ScheduleBox = (props) => {
     const save = () => {
         let hours = startTimestamp.$H
         let minutes = startTimestamp.$m
-        let actualTs = parseInt(+func.dayStart()/1000) + hours * 60 * 60 + minutes * 60
+        let dayStart = +func.dayStart(+new Date());
+        let actualTs = parseInt(dayStart/1000) + hours * 60 * 60 + minutes * 60
 
         saveFn(recurring, actualTs)
     }

@@ -1,6 +1,5 @@
 <template>
     <layout-with-tabs title="API Testing" class="page-testing" :tabs='["Test results", "User config"]'>
-
         <template slot="Test results">
             <div class="py-8">
                 <div>                
@@ -12,7 +11,7 @@
                             <v-navigation-drawer
                                 v-model="drawer"
                                 floating
-                                width="200px"
+                                width="250px"
                             >
                                 <div class="nav-section">
                                     <api-collection-group
@@ -181,7 +180,7 @@ export default {
                 {
                     icon: "$fas_search",
                     active: true,
-                    title: "Active tests",
+                    title: "Scheduled tests",
                     group: "/dashboard/testing/",
                     items: [
                         {
@@ -194,27 +193,31 @@ export default {
                         ...(this.testingRuns || []).map(x => {
                             return {
                                 title: testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
-                                link: "/dashboard/testing/"+x.hexId+"/results"
+                                link: "/dashboard/testing/"+x.hexId+"/results",
+                                active: true
                             }
                         })
                     ]
                 },
                 {
                     icon: "$fas_plus",
-                    title: "Other tests",
+                    title: "Previous tests",
                     group: "/dashboard/testing/",
                     color: "rgba(246, 190, 79)",
-                    active: false,
+                    active: true,
                     items: [
                         {
-                            title: "inactive",
+                            title: "All previous tests",
                             link: "/dashboard/testing/inactive",
-                            icon: "$fas_plus"
+                            icon: "$fas_plus",
+                            class: "bold",
+                            active: true
                         },
                         ...(this.pastTestingRuns || []).map(x => {
                             return {
                                 title: testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
-                                link: "/dashboard/testing/"+x.hexId+"/results"
+                                link: "/dashboard/testing/"+x.hexId+"/results",
+                                active: true
                             }
                         })
                     ]
