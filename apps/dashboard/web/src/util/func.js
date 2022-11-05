@@ -520,7 +520,7 @@ export default {
             case "SLACK":
                 return {name: '$slack', color: '#fe7b5b'}
             
-            case "CUSTOMWEBHOOKS":
+            case "WEBHOOKS":
                 return {name: '$customwebhooks', color: '#fe7b5b'}
         }
     },
