@@ -1194,16 +1194,6 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
-         <!-- <action name="api/checkDashboardRole" class="com.akto.action.quick_start.QuickStartAction" method="checkDashboardRole">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json">
-                <param name="root">dashboardHasNecessaryRole</param>
-            </result>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
-            </result>
-        </action> -->
          <action name="api/fetchQuickStartPageState" class="com.akto.action.quick_start.QuickStartAction" method="fetchQuickStartPageState">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

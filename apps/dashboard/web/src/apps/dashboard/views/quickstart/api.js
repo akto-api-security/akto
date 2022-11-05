@@ -45,7 +45,6 @@ export default{
         })
     },
     saveLBs(selectedLBs){
-        console.log(selectedLBs);
         return request({
             url: 'api/saveLoadBalancers',
             method: 'post',
