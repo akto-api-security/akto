@@ -93,7 +93,7 @@ export default {
           name: 'Slack',
           component: SlackIntegration
         },{
-          name: 'Custom Webhooks',
+          name: 'Webhooks',
           component: WebhookIntegration
         }]
       }
