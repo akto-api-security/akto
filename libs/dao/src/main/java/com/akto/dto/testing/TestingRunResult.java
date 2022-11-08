@@ -2,14 +2,13 @@ package com.akto.dto.testing;
 
 import com.akto.dto.ApiInfo;
 
-import com.akto.dto.testing.TestResult.Severity;
-import com.akto.dto.testing.TestResult.TestCategory;
+import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.util.enums.GlobalEnums;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
 import java.util.List;
-import java.util.Map;
 
 public class TestingRunResult {
     private ObjectId id;
@@ -47,10 +46,10 @@ public class TestingRunResult {
      * */
 
     private Severity getSeverity () {
-        if (this.isVulnerable() && TestCategory.getTestCategory(this.testSuperType).getSeverity() == Severity.HIGH) {
-            return Severity.HIGH;
+        if (this.isVulnerable() && GlobalEnums.TestCategory.getTestCategory(this.testSuperType).getSeverity() == GlobalEnums.Severity.HIGH) {
+            return GlobalEnums.Severity.HIGH;
         }
-        return Severity.LOW;
+        return GlobalEnums.Severity.LOW;
     }
 
 

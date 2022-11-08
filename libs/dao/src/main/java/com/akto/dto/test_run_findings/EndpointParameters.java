@@ -10,13 +10,31 @@ public class EndpointParameters {
     * */
     public static final String URL = "url";
     @BsonProperty(value = URL)
-    public String url;
+    private final String url;
 
     public static final String METHOD = "method";
     @BsonProperty(value = METHOD)
-    public URLMethods.Method method;
+    private final URLMethods.Method method;
 
     public static final String COLLECTION_ID = "collection_id";
     @BsonProperty(value = COLLECTION_ID)
-    public ObjectId objectId;
+    private final ObjectId objectId;
+
+    EndpointParameters(ObjectId objectId, String url, URLMethods.Method method) {
+        this.objectId = objectId;
+        this.url = url;
+        this.method = method;
+    }
+
+    public String getUrl() {
+        return url;
+    }
+
+    public URLMethods.Method getMethod() {
+        return method;
+    }
+
+    public ObjectId getObjectId() {
+        return objectId;
+    }
 }
