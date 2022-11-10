@@ -217,9 +217,11 @@ public class CustomDataTypeAction extends UserAction{
     public List<SingleTypeInfo.Position> generatePositions(List<String> sensitivePosition){
         
         Set<SingleTypeInfo.Position> sensitivePositionSet = new HashSet<>();
-        for(String s:sensitivePosition){
-            if(EnumUtils.isValidEnumIgnoreCase(SingleTypeInfo.Position.class, s)){
-                sensitivePositionSet.add(SingleTypeInfo.Position.valueOf(s.toUpperCase()));
+        if(sensitivePosition!=null && sensitivePosition.size()>0){
+            for(String s:sensitivePosition){
+                if(EnumUtils.isValidEnumIgnoreCase(SingleTypeInfo.Position.class, s)){
+                    sensitivePositionSet.add(SingleTypeInfo.Position.valueOf(s.toUpperCase()));
+                }
             }
         }
         List<SingleTypeInfo.Position> sensitivePositions = new ArrayList<SingleTypeInfo.Position>(sensitivePositionSet);
