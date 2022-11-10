@@ -32,7 +32,7 @@
                 </div>
             </div>
 
-            <div style="display: flex" v-if="data_type_copy.timestamp">
+            <div style="display: flex" v-if="data_type_copy.timestamp || data_type_copy.timestamp==0">
                 <div class="form-text">
                     Last Updated
                 </div>
@@ -71,17 +71,39 @@
             </div>
             <div style="display: flex">
                 <div class="form-text">
-                    Sensitive
+                    Sensitive in Request
                 </div>
-                <div
-                    :class="data_type_copy.sensitiveAlways || (data_type_copy.sensitivePosition && data_type_copy.sensitivePosition.length > 0)? 'sensitive-text true' : 'sensitive-text'"
-                    @click="toggleSensitive"
-                    style="width: 80px"
-                >
-                    {{computeSensitiveValue}}
-                </div>
+                <v-btn-toggle
+                v-model="reqToggle"
+                mandatory >
+                    <v-btn value="req" :class="data_type_copy.sensitiveAlways || (data_type_copy.sensitivePosition && ( data_type_copy.sensitivePosition.includes('REQUEST_PAYLOAD') || data_type_copy.sensitivePosition.includes('REQUEST_HEADER') ) )? 'sensitive-text true' : 'sensitive-text'"
+                    @click="toggleSensitiveRequest">
+                        true
+                    </v-btn>
+                    <v-btn value="req" :class="data_type_copy.sensitiveAlways || (data_type_copy.sensitivePosition && ( data_type_copy.sensitivePosition.includes('REQUEST_PAYLOAD') || data_type_copy.sensitivePosition.includes('REQUEST_HEADER') ) )? 'sensitive-text' : 'sensitive-text false'"
+                    @click="toggleSensitiveRequest">
+                        false
+                    </v-btn>
+                </v-btn-toggle>
             </div>
-            <v-row v-if="data_type_copy.id || data_type_copy.createNew" style="padding-top: 30px">
+            <div style="display: flex">
+                <div class="form-text">
+                    Sensitive in Response
+                </div>
+                <v-btn-toggle
+                v-model="resToggle"
+                mandatory>
+                    <v-btn value="res" :class="data_type_copy.sensitiveAlways || (data_type_copy.sensitivePosition && ( data_type_copy.sensitivePosition.includes('RESPONSE_PAYLOAD') || data_type_copy.sensitivePosition.includes('RESPONSE_HEADER') ) )? 'sensitive-text true' : 'sensitive-text'"
+                    @click="toggleSensitiveResponse">
+                        true
+                    </v-btn>
+                    <v-btn value="res" :class="data_type_copy.sensitiveAlways || (data_type_copy.sensitivePosition && ( data_type_copy.sensitivePosition.includes('RESPONSE_PAYLOAD') || data_type_copy.sensitivePosition.includes('RESPONSE_HEADER') ) )? 'sensitive-text' : 'sensitive-text false'"
+                    @click="toggleSensitiveResponse">
+                        false
+                    </v-btn>
+                </v-btn-toggle>
+            </div>
+            <v-row style="padding-top: 30px">
                 <div style="padding: 12px">
                   <v-btn
                         @click="save"
@@ -94,7 +116,7 @@
                     Save
                   </v-btn>
                 </div>
-                <div style="padding: 12px">
+                <div v-if="data_type_copy.id || data_type_copy.createNew" style="padding: 12px">
                   <v-btn
                         @click="reviewCustomDataType"
                         color="#white"
@@ -156,9 +178,34 @@ export default {
         }
     },
     methods: {
-        toggleSensitive() {
-            if (this.data_type_copy.id || this.data_type_copy.createNew) {
-                this.data_type_copy.sensitiveAlways = !this.data_type_copy.sensitiveAlways
+        toggleSensitiveRequest() {
+            {
+                let temp = []
+
+                if (!this.data_type_copy.sensitiveAlways && !this.data_type_copy.sensitivePosition.includes("REQUEST_PAYLOAD")) temp.push("REQUEST_PAYLOAD")
+                if (!this.data_type_copy.sensitiveAlways && !this.data_type_copy.sensitivePosition.includes("REQUEST_HEADER")) temp.push("REQUEST_HEADER")
+                if (this.data_type_copy.sensitiveAlways || this.data_type_copy.sensitivePosition.includes("RESPONSE_PAYLOAD")) temp.push("RESPONSE_PAYLOAD")
+                if (this.data_type_copy.sensitiveAlways || this.data_type_copy.sensitivePosition.includes("RESPONSE_HEADER")) temp.push("RESPONSE_HEADER")
+                this.data_type_copy.sensitivePosition = temp
+                console.log(this.data_type_copy.sensitivePosition)
+
+                this.data_type_copy.sensitiveAlways = this.data_type_copy.sensitivePosition.length == 4 ? true : false
+                if(this.data_type_copy.sensitivePosition.length==4) this.data_type_copy.sensitivePosition=[]
+            }
+        },
+        toggleSensitiveResponse() { 
+            {
+                let temp = []
+
+                if (this.data_type_copy.sensitiveAlways || this.data_type_copy.sensitivePosition.includes("REQUEST_PAYLOAD")) temp.push("REQUEST_PAYLOAD")
+                if (this.data_type_copy.sensitiveAlways || this.data_type_copy.sensitivePosition.includes("REQUEST_HEADER")) temp.push("REQUEST_HEADER")
+                if (!this.data_type_copy.sensitiveAlways && !this.data_type_copy.sensitivePosition.includes("RESPONSE_PAYLOAD")) temp.push("RESPONSE_PAYLOAD")
+                if (!this.data_type_copy.sensitiveAlways && !this.data_type_copy.sensitivePosition.includes("RESPONSE_HEADER")) temp.push("RESPONSE_HEADER")
+                this.data_type_copy.sensitivePosition = temp
+                console.log(this.data_type_copy.sensitivePosition)
+
+                this.data_type_copy.sensitiveAlways = this.data_type_copy.sensitivePosition.length == 4 ? true : false
+                if(this.data_type_copy.sensitivePosition.length==4) this.data_type_copy.sensitivePosition=[]
             }
         },
         operatorChanged(value) {
@@ -166,13 +213,22 @@ export default {
         },
         save() {
             this.saveLoading = true
-            this.$store.dispatch("data_types/createCustomDataType", {data_type: this.data_type_copy, save: true})
+            
+            if(this.data_type_copy.id || this.data_type_copy.createNew){
+                this.$store.dispatch("data_types/createCustomDataType", {data_type: this.data_type_copy, save: true})
                 .then((resp) => {
                   this.saveLoading = false
                 }).catch((err) => {
                   this.saveLoading = false
                 })
-
+            } else {
+                this.$store.dispatch("data_types/updateAktoDataType", {data_type: this.data_type_copy})
+                .then((resp) => {
+                  this.saveLoading = false
+                }).catch((err) => {
+                  this.saveLoading = false
+                })
+            }
         },
         reviewCustomDataType() {
           this.reviewLoading = true
@@ -189,9 +245,14 @@ export default {
     },
     computed: {
       ...mapState('data_types', ['data_type', 'usersMap', 'reviewData', 'current_sample_data_count', 'total_sample_data_count']),
-      computeSensitiveValue() {
+        computeSensitiveValueRequest() {
             if (this.data_type_copy) {
-                return this.data_type_copy.sensitiveAlways || this.data_type_copy.sensitivePosition.length > 0
+                return this.data_type_copy.sensitiveAlways || (this.data_type_copy.sensitivePosition.includes("REQUEST_PAYLOAD") || this.data_type_copy.sensitivePosition.includes("REQUEST_HEADER"))
+            }
+        },
+        computeSensitiveValueResponse() {
+            if (this.data_type_copy) {
+                return this.data_type_copy.sensitiveAlways || (this.data_type_copy.sensitivePosition.includes("RESPONSE_PAYLOAD") || this.data_type_copy.sensitivePosition.includes("RESPONSE_HEADER"))
             }
         },
         showMainOperator() {
@@ -210,6 +271,8 @@ export default {
           let t = this.data_type_copy.timestamp
           if (t) {
               return func.prettifyEpoch(t)
+          } else if (t===0) {
+            return func.prettifyEpoch(1667413800)
           }
         },
         computeLoading() {
@@ -233,14 +296,27 @@ export default {
     .sensitive-text
         font-size: 16px
         font-weight: bold
-        width: 210px
         align-items: center
         display: flex
         padding: 0px
         padding-left: 12px
+        vertical-align: middle
+        border-radius: 4px
+        text-transform: none
+        letter-spacing: normal
+        width: 100%
+        height: 38px !important
+        margin-bottom: 10px
+        margin-top: 10px
         color: #47466A
+        &:before
+            background-color:#FFFFFF
         &.true
+            color: #12B76A
+            background-color: #D1E9DC
+        &.false
             color: var(--v-redMetric-base)
+            background-color: #F1CECD
         &:hover
             cursor: pointer
 

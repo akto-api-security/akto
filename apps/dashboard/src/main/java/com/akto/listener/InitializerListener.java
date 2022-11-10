@@ -417,6 +417,28 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public void addAktoDataTypes(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getAddAktoDataTypes()==0){
+            List<AktoDataType> aktoDataTypes = new ArrayList<>();
+            int now = Context.now();
+            aktoDataTypes.add(new AktoDataType("JWT", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER),now));
+            aktoDataTypes.add(new AktoDataType("EMAIL", true, Collections.emptyList(),now));
+            aktoDataTypes.add(new AktoDataType("CREDIT_CARD", true, Collections.emptyList(),now));
+            aktoDataTypes.add(new AktoDataType("SSN", true, Collections.emptyList(),now));
+            aktoDataTypes.add(new AktoDataType("ADDRESS", true, Collections.emptyList(),now));
+            aktoDataTypes.add(new AktoDataType("IP_ADDRESS", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER),now));
+            aktoDataTypes.add(new AktoDataType("PHONE_NUMBER", true, Collections.emptyList(),now));
+            aktoDataTypes.add(new AktoDataType("UUID", true, Collections.emptyList(),now));
+            AktoDataTypeDao.instance.getMCollection().drop();
+            AktoDataTypeDao.instance.insertMany(aktoDataTypes);    
+            
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.ADD_AKTO_DATA_TYPES, Context.now())
+            );
+        }
+    }
+
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
         String https = System.getenv("AKTO_HTTPS_FLAG");
@@ -447,6 +469,7 @@ public class InitializerListener implements ServletContextListener {
             resetSingleTypeInfoCount(backwardCompatibility);
             dropWorkflowTestResultCollection(backwardCompatibility);
             readyForNewTestingFramework(backwardCompatibility);
+            addAktoDataTypes(backwardCompatibility);
 
             SingleTypeInfo.init();
 

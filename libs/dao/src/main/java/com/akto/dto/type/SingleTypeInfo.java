@@ -5,8 +5,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import com.akto.dao.AktoDataTypeDao;
 import com.akto.dao.CustomDataTypeDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.AktoDataType;
 import com.akto.dto.CustomDataType;
 import com.akto.types.CappedSet;
 import com.mongodb.BasicDBObject;
@@ -42,7 +44,7 @@ public class SingleTypeInfo {
             List<CustomDataType> nonSensitiveCustomDataType = new ArrayList<>();
             for (CustomDataType customDataType: customDataTypes) {
                 newMap.put(customDataType.getName(), customDataType);
-                if (customDataType.isSensitiveAlways()) {
+                if (customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().size()>0) {
                     sensitiveCustomDataType.add(customDataType);
                 } else {
                     nonSensitiveCustomDataType.add(customDataType);
@@ -51,6 +53,14 @@ public class SingleTypeInfo {
             customDataTypeMap = newMap;
             sensitiveCustomDataType.addAll(nonSensitiveCustomDataType);
             customDataTypesSortedBySensitivity = new ArrayList<>(sensitiveCustomDataType);
+
+            List<AktoDataType> aktoDataTypes = AktoDataTypeDao.instance.findAll(new BasicDBObject());
+            for(AktoDataType aktoDataType:aktoDataTypes){
+                if(subTypeMap.containsKey(aktoDataType.getName())){
+                    subTypeMap.get(aktoDataType.getName()).setSensitiveAlways(aktoDataType.getSensitiveAlways());
+                    subTypeMap.get(aktoDataType.getName()).setSensitivePosition(aktoDataType.getSensitivePosition());
+                }
+            }
         } catch (Exception ex) {
             ex.printStackTrace(); // or logger would be better
         }
@@ -79,27 +89,27 @@ public class SingleTypeInfo {
             Collections.emptyList());
     public static final SubType OTHER = new SubType("OTHER", false, SuperType.STRING, StringSchema.class,
             Collections.emptyList());
-    public static final SubType EMAIL = new SubType("EMAIL", true, SuperType.STRING, EmailSchema.class,
+    public static SubType EMAIL = new SubType("EMAIL", true, SuperType.STRING, EmailSchema.class,
             Collections.emptyList());
     public static final SubType URL = new SubType("URL", false, SuperType.STRING, StringSchema.class,
             Collections.emptyList());
-    public static final SubType ADDRESS = new SubType("ADDRESS", true, SuperType.STRING, StringSchema.class,
+    public static SubType ADDRESS = new SubType("ADDRESS", true, SuperType.STRING, StringSchema.class,
             Collections.emptyList());
-    public static final SubType SSN = new SubType("SSN", true, SuperType.STRING, StringSchema.class,
+    public static SubType SSN = new SubType("SSN", true, SuperType.STRING, StringSchema.class,
             Collections.emptyList());
-    public static final SubType CREDIT_CARD = new SubType("CREDIT_CARD", true, SuperType.STRING, StringSchema.class,
+    public static SubType CREDIT_CARD = new SubType("CREDIT_CARD", true, SuperType.STRING, StringSchema.class,
             Collections.emptyList());
-    public static final SubType PHONE_NUMBER = new SubType("PHONE_NUMBER", true, SuperType.STRING, StringSchema.class,
+    public static SubType PHONE_NUMBER = new SubType("PHONE_NUMBER", true, SuperType.STRING, StringSchema.class,
             Collections.emptyList());
-    public static final SubType UUID = new SubType("UUID", true, SuperType.STRING, StringSchema.class,
+    public static SubType UUID = new SubType("UUID", true, SuperType.STRING, StringSchema.class,
             Collections.emptyList());
     public static final SubType GENERIC = new SubType("GENERIC", false, SuperType.STRING, StringSchema.class,
             Collections.emptyList());
     public static final SubType DICT = new SubType("DICT", false, SuperType.STRING, MapSchema.class,
             Collections.emptyList());
-    public static final SubType JWT = new SubType("JWT", false, SuperType.STRING, StringSchema.class,
+    public static SubType JWT = new SubType("JWT", false, SuperType.STRING, StringSchema.class,
             Arrays.asList(Position.RESPONSE_PAYLOAD, Position.RESPONSE_HEADER));
-    public static final SubType IP_ADDRESS = new SubType("IP_ADDRESS", false, SuperType.STRING, StringSchema.class,
+    public static SubType IP_ADDRESS = new SubType("IP_ADDRESS", false, SuperType.STRING, StringSchema.class,
             Arrays.asList(Position.RESPONSE_PAYLOAD, Position.RESPONSE_HEADER));
     // make sure to add AKTO subTypes to subTypeMap below
 

@@ -1,10 +1,12 @@
 package com.akto.action;
 
 
+import com.akto.dao.AktoDataTypeDao;
 import com.akto.dao.CustomDataTypeDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.AktoDataType;
 import com.akto.dto.CustomDataType;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.User;
@@ -31,11 +33,14 @@ import com.opensymphony.xwork2.Action;
 import java.io.IOException;
 import java.util.*;
 
+import org.apache.commons.lang3.EnumUtils;
+
 public class CustomDataTypeAction extends UserAction{
 
     private boolean createNew;
     private String name;
     private boolean sensitiveAlways;
+    private List<String> sensitivePosition;
     private String operator;
 
     private String keyOperator;
@@ -93,13 +98,8 @@ public class CustomDataTypeAction extends UserAction{
         dataTypes = new BasicDBObject();
         dataTypes.put("customDataTypes", customDataTypes);
         dataTypes.put("usersMap", usersMap);
-        List<SingleTypeInfo.SubType> subTypes = new ArrayList<>();
-        for (SingleTypeInfo.SubType subType: SingleTypeInfo.subTypeMap.values()) {
-            if (subType.isSensitiveAlways() || subType.getSensitivePosition().size() > 0) {
-                subTypes.add(subType);
-            }
-        }
-        dataTypes.put("aktoDataTypes", subTypes);
+        List<AktoDataType> aktoDataTypes = AktoDataTypeDao.instance.findAll(new BasicDBObject());
+        dataTypes.put("aktoDataTypes", aktoDataTypes);
 
         return Action.SUCCESS.toUpperCase();
     }
@@ -151,6 +151,7 @@ public class CustomDataTypeAction extends UserAction{
                 Filters.eq("name", customDataType.getName()),
                 Updates.combine(
                     Updates.set(CustomDataType.SENSITIVE_ALWAYS,customDataType.isSensitiveAlways()),
+                    Updates.set(CustomDataType.SENSITIVE_POSITION,customDataType.getSensitivePosition()),
                     Updates.set(CustomDataType.KEY_CONDITIONS,customDataType.getKeyConditions()),
                     Updates.set(CustomDataType.VALUE_CONDITIONS,customDataType.getValueConditions()),
                     Updates.set(CustomDataType.OPERATOR,customDataType.getOperator()),
@@ -172,6 +173,58 @@ public class CustomDataTypeAction extends UserAction{
         return Action.SUCCESS.toUpperCase();
     }
 
+    private AktoDataType aktoDataType;
+    
+    public String saveAktoDataType(){
+
+        aktoDataType = AktoDataTypeDao.instance.findOne("name",name);
+        if(aktoDataType==null){
+            addActionError("invalid data type");
+            return ERROR.toUpperCase();
+        }
+        
+        List<SingleTypeInfo.Position> sensitivePositions = new ArrayList<>();
+        try {
+            sensitivePositions = generatePositions(sensitivePosition);
+        } catch (Exception ignored) {
+            addActionError("Invalid positions for sensitive data");
+            return ERROR.toUpperCase();
+        }    
+
+        FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
+        options.returnDocument(ReturnDocument.AFTER);
+        options.upsert(false);
+        aktoDataType = AktoDataTypeDao.instance.getMCollection().findOneAndUpdate(
+            Filters.eq("name", aktoDataType.getName()),
+            Updates.combine(
+                Updates.set("sensitiveAlways",sensitiveAlways),
+                Updates.set("sensitivePosition",sensitivePositions),
+                Updates.set("timestamp",Context.now())
+            ),
+            options
+        );
+
+        if (aktoDataType == null) {
+            addActionError("Failed to update data type");
+            return ERROR.toUpperCase();
+        }
+
+        SingleTypeInfo.fetchCustomDataTypes();
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public List<SingleTypeInfo.Position> generatePositions(List<String> sensitivePosition){
+        
+        Set<SingleTypeInfo.Position> sensitivePositionSet = new HashSet<>();
+        for(String s:sensitivePosition){
+            if(EnumUtils.isValidEnumIgnoreCase(SingleTypeInfo.Position.class, s)){
+                sensitivePositionSet.add(SingleTypeInfo.Position.valueOf(s.toUpperCase()));
+            }
+        }
+        List<SingleTypeInfo.Position> sensitivePositions = new ArrayList<SingleTypeInfo.Position>(sensitivePositionSet);
+        return sensitivePositions;
+    }
 
     public static class CustomSubTypeMatch {
 
@@ -260,10 +313,10 @@ public class CustomDataTypeAction extends UserAction{
                 Key apiKey = sampleData.getId();
                 try {
                     HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
-                    boolean skip1 = forHeaders(httpResponseParams.getHeaders(), customDataType, apiKey);
-                    boolean skip2 = forHeaders(httpResponseParams.requestParams.getHeaders(), customDataType, apiKey);
-                    boolean skip3 = forPayload(httpResponseParams.getPayload(), customDataType, apiKey);
-                    boolean skip4 = forPayload(httpResponseParams.requestParams.getPayload(), customDataType, apiKey);
+                    boolean skip1 = customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_HEADER) ? forHeaders(httpResponseParams.getHeaders(), customDataType, apiKey) : false;
+                    boolean skip2 = customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_HEADER) ? forHeaders(httpResponseParams.requestParams.getHeaders(), customDataType, apiKey) : false;
+                    boolean skip3 = customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_PAYLOAD) ? forPayload(httpResponseParams.getPayload(), customDataType, apiKey) : false;
+                    boolean skip4 = customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_PAYLOAD) ? forPayload(httpResponseParams.requestParams.getPayload(), customDataType, apiKey) : false;
                     skip = skip1 || skip2 || skip3 || skip4;
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -423,7 +476,14 @@ public class CustomDataTypeAction extends UserAction{
             throw new AktoCustomException("Invalid value operator");
         }
 
-        return new CustomDataType(name, sensitiveAlways, Collections.emptyList(), userId,
+        List<SingleTypeInfo.Position> sensitivePositions = new ArrayList<>();
+        try {
+            sensitivePositions = generatePositions(sensitivePosition);
+        } catch (Exception ignored) {
+            throw new AktoCustomException("Invalid positions for sensitive data");
+        }
+
+        return new CustomDataType(name, sensitiveAlways, sensitivePositions, userId,
                 true,keyConditions,valueConditions, mainOperator);
     }
 
@@ -513,6 +573,10 @@ public class CustomDataTypeAction extends UserAction{
         return customDataType;
     }
 
+    public AktoDataType getAktoDataType() {
+        return aktoDataType;
+    }
+
     private boolean active;
     public String toggleDataTypeActiveParam() {
         FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
@@ -551,5 +615,13 @@ public class CustomDataTypeAction extends UserAction{
 
     public List<String> getAllDataTypes() {
         return allDataTypes;
+    }
+
+    public List<String> getSensitivePosition() {
+        return sensitivePosition;
+    }
+
+    public void setSensitivePosition(List<String> sensitivePosition) {
+        this.sensitivePosition = sensitivePosition;
     }
 }
