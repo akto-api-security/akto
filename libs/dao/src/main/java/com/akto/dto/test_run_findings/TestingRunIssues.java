@@ -1,35 +1,41 @@
 package com.akto.dto.test_run_findings;
 
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.util.enums.GlobalEnums;
 
 public class TestingRunIssues {
     //    public static final String TESTING_ISSUES_ID = "testing_issues_id";
     //    @BsonProperty(value = TESTING_ISSUES_ID)
 
-    //    public static final String ISSUE_SEVERITY = "i_s";
     //    @BsonProperty(value = ISSUE_SEVERITY)
 
-    //    public static final String CREATION_TIME = "c_t";
     //    @BsonProperty(value = CREATION_TIME)
 
-    //    public static final String START_TIME = "s_t";
     //    @BsonProperty(value = START_TIME)
 
 
-    //    public static final String TEST_RUN_ISSUES = "t_r_i";
     //    @BsonProperty(value = TEST_RUN_ISSUES)
-    private GlobalEnums.TestRunIssueStatus testRunIssueStatus;
+    public static final String TEST_RUN_ISSUES_STATUS = "testRunIssueStatus";
+    private final GlobalEnums.TestRunIssueStatus testRunIssueStatus;
     private final TestingIssuesId id;
-    private final int startTime;
+
+    public static final String LAST_SEEN = "lastSeen";
+    private final int lastSeen;
+
+    public static final String CREATION_TIME = "creationTime";
     private final int creationTime;
+
+
+    public static final String SEVERITY = "severity";
     private final GlobalEnums.Severity severity;
 
-    public TestingRunIssues(TestingIssuesId id, GlobalEnums.Severity severity,
-                     int creationTime, int startTime) {
+    public TestingRunIssues(TestingIssuesId id, GlobalEnums.Severity severity, GlobalEnums.TestRunIssueStatus status,
+                     int creationTime, int lastSeen) {
         this.creationTime = creationTime;
-        this.startTime = startTime;
+        this.lastSeen = lastSeen;
         this.id = id;
         this.severity = severity;
+        this.testRunIssueStatus = status;
     }
 
     public TestingIssuesId getId() {
@@ -44,8 +50,8 @@ public class TestingRunIssues {
         return testRunIssueStatus;
     }
 
-    public int getStartTime() {
-        return startTime;
+    public int getLastSeen() {
+        return lastSeen;
     }
 
     public GlobalEnums.Severity getSeverity() {

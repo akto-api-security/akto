@@ -9,6 +9,8 @@ import com.akto.dto.runtime_filters.FieldExistsFilter;
 import com.akto.dto.FilterSampleData;
 import com.akto.dto.runtime_filters.ResponseCodeRuntimeFilter;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
@@ -20,6 +22,7 @@ import com.akto.types.CappedSet;
 import com.akto.util.EnumCodec;
 import com.akto.dto.Attempt.AttemptResult;
 import com.akto.dto.auth.APIAuth;
+import com.akto.util.enums.GlobalEnums;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.client.MongoClients;
@@ -121,6 +124,10 @@ public class DaoInit {
                 .enableDiscriminator(true).build();
         ClassModel<WorkflowTestResult.NodeResult> nodeResultClassModel = ClassModel
                 .builder(WorkflowTestResult.NodeResult.class).enableDiscriminator(true).build();
+        ClassModel<TestingRunIssues> testingRunIssuesClassModel = ClassModel
+                .builder(TestingRunIssues.class).enableDiscriminator(true).build();
+        ClassModel<TestingIssuesId> testingIssuesIdClassModel = ClassModel
+                .builder(TestingIssuesId.class).enableDiscriminator(true).build();
         // ClassModel<AwsResource> awsResourceModel =
         // ClassModel.builder(AwsResource.class).enableDiscriminator(true)
         // .build();
@@ -143,7 +150,7 @@ public class DaoInit {
                 testingEndpointsClassModel, customTestingEndpointsClassModel, collectionWiseTestingEndpointsClassModel,
                 workflowTestingEndpointsClassModel, workflowTestResultClassModel,
                 cappedSetClassModel, CustomWebhookClassModel, CustomWebhookResultClassModel,
-                nodeResultClassModel, awsResourcesModel).automatic(true).build());
+                nodeResultClassModel, awsResourcesModel, testingRunIssuesClassModel, testingIssuesIdClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -162,7 +169,9 @@ public class DaoInit {
                 new EnumCodec<>(WorkflowNodeDetails.Type.class),
                 new EnumCodec<>(SingleTypeInfo.Domain.class),
                 new EnumCodec<>(CustomWebhook.ActiveStatus.class),
-                new EnumCodec<>(TestResult.Confidence.class));
+                new EnumCodec<>(TestResult.Confidence.class),
+                new EnumCodec<>(GlobalEnums.TestRunIssueStatus.class),
+                new EnumCodec<>(GlobalEnums.Severity.class));
 
         CodecRegistry codecRegistry = fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
                 customEnumCodecs);

@@ -24,6 +24,18 @@ public class TestingIssuesId {
         this.testCategory = category;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (o == this) {return true;}
+        else if (o instanceof TestingIssuesId) {
+            TestingIssuesId id = (TestingIssuesId) o;
+            return id.apiInfoKey.equals(this.apiInfoKey)
+                    && id.testCategory == this.testCategory
+                    && id.testErrorSource == this.testErrorSource;
+        }
+        return false;
+    }
+
     public ApiInfoKey getApiInfoKey() {
         return apiInfoKey;
     }

@@ -25,7 +25,7 @@ public class GlobalEnums {
 
         public static TestCategory getTestCategory (String category) {
             for (TestCategory testCategory : values) {
-                if (testCategory.name.equals(category)) {
+                if (testCategory.name.equalsIgnoreCase(category)) {
                     return testCategory;
                 }
             }

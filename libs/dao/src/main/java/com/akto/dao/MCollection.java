@@ -4,6 +4,7 @@ import com.mongodb.client.*;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReplaceOptions;
 import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.InsertManyResult;
 import com.mongodb.client.result.InsertOneResult;
@@ -140,6 +141,10 @@ public abstract class MCollection<T> {
         return this.getMCollection().findOneAndUpdate(q, obj, new FindOneAndUpdateOptions().upsert(true));
     }
 
+    public UpdateResult updateMany(Bson filter, Bson update) {
+        return this.getMCollection().updateMany(filter, update, new UpdateOptions().upsert(true));
+    }
+
     public UpdateResult replaceOne(Bson q, T obj) {
         return this.getMCollection().replaceOne(q, obj, new ReplaceOptions().upsert(true));
     }
@@ -149,8 +154,11 @@ public abstract class MCollection<T> {
     }
 
     public InsertManyResult insertMany(List<T> elems) {
+
         return getMCollection().insertMany(elems);
     }
+
+
     
     public DeleteResult deleteAll(Bson q) {
         return this.getMCollection().deleteMany(q);

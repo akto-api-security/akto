@@ -9,9 +9,6 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
     public static final TestingRunIssuesDao instance = new TestingRunIssuesDao();
 
     private TestingRunIssuesDao() {}
-
-
-
     @Override
     public String getCollName() {
         return MongoDBEnums.Collection.TESTING_RUN_ISSUES.getCollectionName();
