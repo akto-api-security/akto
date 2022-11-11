@@ -329,6 +329,8 @@ public class APICatalogSync {
     }
 
     public static boolean areBothUuidUrls(URLStatic newUrl, URLStatic deltaUrl, URLTemplate mergedTemplate) {
+        Pattern pattern = patternToSubType.get(SingleTypeInfo.UUID);
+
         String[] n = tokenize(newUrl.getUrl());
         String[] o = tokenize(deltaUrl.getUrl());
         SuperType[] b = mergedTemplate.getTypes();
@@ -336,14 +338,13 @@ public class APICatalogSync {
             SuperType c = b[idx];
             if (Objects.equals(c, SuperType.STRING) && o.length > idx) {
                 String val = n[idx];
-                Pattern pattern = patternToSubType.get(SingleTypeInfo.UUID);
-                if(pattern.matcher(val).matches() && pattern.matcher(o[idx]).matches()) {
-                    return true;
+                if(!pattern.matcher(val).matches() || !pattern.matcher(o[idx]).matches()) {
+                    return false;
                 }
             }
         }
 
-        return false;
+        return true;
     }
 
 
@@ -358,6 +359,8 @@ public class APICatalogSync {
             return null;
         }
 
+        Pattern pattern = patternToSubType.get(SingleTypeInfo.UUID);
+
         SuperType[] newTypes = new SuperType[newTokens.length];
         int templatizedStrTokens = 0;
         for(int i = 0; i < newTokens.length; i ++) {
@@ -370,6 +373,9 @@ public class APICatalogSync {
             
             if (NumberUtils.isParsable(tempToken) && NumberUtils.isParsable(dbToken)) {
                 newTypes[i] = SuperType.INTEGER;
+                newTokens[i] = null;
+            } else if(pattern.matcher(tempToken).matches() && pattern.matcher(dbToken).matches()){
+                newTypes[i] = SuperType.STRING;
                 newTokens[i] = null;
             } else {
                 newTypes[i] = SuperType.STRING;

@@ -67,6 +67,62 @@ public class TestMergingNew extends MongoBasedTest {
     }
 
     @Test
+    public void testmultipleUUIDForceMerge(){
+        SingleTypeInfoDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+        HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1,true);
+        String url = "api/product/";
+        List<HttpResponseParams> responseParams = new ArrayList<>();
+        List<String> urls = new ArrayList<>();
+        while (urls.size() < 25) {
+            UUID uuid = UUID.randomUUID();
+            UUID uuid2 = UUID.randomUUID();
+            UUID uuid3 = UUID.randomUUID();
+            String finalUrl = url + uuid + "/subproduct/" + uuid2 + "/subitem/" + uuid3 + "/id/" + urls.size();
+            urls.add(finalUrl);
+        }
+
+        int i = 0;
+        for (String c: urls) {
+            HttpResponseParams resp = createDifferentHttpResponseParams(i*100, c);
+            responseParams.add(resp);
+            i +=1;
+        }
+
+        parser.syncFunction(responseParams.subList(0,1), false,true);
+        parser.apiCatalogSync.syncWithDB(false,true);
+        assertEquals(1, getStaticURLsSize(parser));
+
+        parser.syncFunction(responseParams.subList(1,2), false,true);
+        parser.apiCatalogSync.syncWithDB(false,true);
+        assertEquals(0, getStaticURLsSize(parser));
+
+        Map<URLTemplate, RequestTemplate> templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
+        assertEquals(1, templateURLToMethods.size());
+
+        parser.syncFunction(responseParams.subList(3,10), false,true);
+        parser.syncFunction(Collections.singletonList(createDifferentHttpResponseParams(10000, 
+        url + "avneesh@akto.io" + "/subproduct/" + "avneesh@akto.io" + "/subitem/" + "avneesh@akto.io" + "/id/" + "112"
+        )), false,true); // adding this just to see if multiple subTypes of urlParams are recorded or not (not for UUID merging)
+        parser.apiCatalogSync.syncWithDB(false,true);
+        assertEquals(0, getStaticURLsSize(parser));
+
+        templateURLToMethods = parser.apiCatalogSync.getDbState(123).getTemplateURLToMethods();
+        URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(
+        url + "STRING" + "/subproduct/" + "STRING" + "/subitem/" + "STRING" + "/id/" + "INTEGER"
+        , URLMethods.Method.GET);
+        RequestTemplate requestTemplate = templateURLToMethods.get(urlTemplate);
+        Map<Integer, KeyTypes> keyTypesMap = requestTemplate.getUrlParams();
+        KeyTypes keyTypes = keyTypesMap.get(2);
+
+        assertEquals(2, keyTypes.getOccurrences().size());
+        SingleTypeInfo singleTypeInfo1 = keyTypes.getOccurrences().get(SingleTypeInfo.UUID);
+        assertNotNull(singleTypeInfo1);
+        SingleTypeInfo singleTypeInfo2 = keyTypes.getOccurrences().get(SingleTypeInfo.EMAIL);
+        assertNotNull(singleTypeInfo2);
+    }
+
+    @Test
     public void testUUIDForceMerge() {
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
