@@ -33,6 +33,19 @@ public class AdminSettingsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String updateMergeAsyncOutside() {
+        User user = getSUser();
+        if (user == null) return ERROR.toUpperCase();
+
+        AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.MERGE_ASYNC_OUTSIDE, true),
+                new UpdateOptions().upsert(true)
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
     private boolean redactPayload;
     public String toggleRedactFeature() {
         User user = getSUser();
