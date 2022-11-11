@@ -37,6 +37,10 @@ public class URLTemplate {
         if (url.startsWith("/")) url = url.substring(1, url.length());
         if (url.endsWith("/")) url = url.substring(0, url.length()-1);
 
+        String tempUrl = this.getTemplateString();
+        if (tempUrl.startsWith("/")) url = tempUrl.substring(1, url.length());
+        if (tempUrl.endsWith("/")) url = tempUrl.substring(0, url.length()-1);
+
         String a = url + " " + urlMethod.name();
         String b = this.getTemplateString() + " " + urlMethod;
         if (a.equals(b)) {

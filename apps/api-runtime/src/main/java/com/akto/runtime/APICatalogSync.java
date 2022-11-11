@@ -51,6 +51,7 @@ public class APICatalogSync {
     public Map<Integer, APICatalog> dbState;
     public Map<Integer, APICatalog> delta;
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
+    private static boolean mergeAsyncOutside = false;
 
     public APICatalogSync(String userIdentifier,int thresh) {
         this.thresh = thresh;
@@ -58,6 +59,12 @@ public class APICatalogSync {
         this.dbState = new HashMap<>();
         this.delta = new HashMap<>();
         this.sensitiveParamInfoBooleanMap = new HashMap<>();
+        try {
+            mergeAsyncOutside = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()).getMergeAsyncOutside();
+        } catch (Exception e) {
+            
+        }
+        
     }
 
     public static final int STRING_MERGING_THRESHOLD = 20;
@@ -486,7 +493,14 @@ public class APICatalogSync {
     }
 
     public static String trim(String url) {
-        if (url.startsWith("/")) url = url.substring(1, url.length());
+        if (mergeAsyncOutside) {
+            if ( !(url.startsWith("/") ) && !( url.startsWith("http") || url.startsWith("ftp")) ){
+                url = "/" + url;
+            }
+        } else {
+            if (url.startsWith("/")) url = url.substring(1, url.length());
+        }
+        
         if (url.endsWith("/")) url = url.substring(0, url.length()-1);
         return url;
     }
@@ -1084,7 +1098,7 @@ public class APICatalogSync {
     }
 
     int counter = 0;
-
+    
     public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI) {
         List<WriteModel<SingleTypeInfo>> writesForParams = new ArrayList<>();
         List<WriteModel<SensitiveSampleData>> writesForSensitiveSampleData = new ArrayList<>();
