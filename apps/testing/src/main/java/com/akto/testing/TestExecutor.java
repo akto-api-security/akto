@@ -5,33 +5,26 @@ import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.WorkflowTestsDao;
-import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.test_run_findings.TestingIssuesId;
-import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.rules.*;
 import com.akto.store.SampleMessageStore;
-import com.akto.testing_utils.TestingUtils;
-import com.akto.util.Constants;
-import com.akto.util.enums.GlobalEnums;
+import com.akto.testing_issues.TestingIssuesHandler;
 import com.mongodb.BasicDBObject;
+import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
-
-import com.mongodb.client.result.UpdateResult;
-import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import static com.akto.util.Constants.ID;
 
 public class TestExecutor {
 
@@ -109,21 +102,15 @@ public class TestExecutor {
             }
         }
 
-        List<TestingIssuesId> issuesIds = TestingUtils.listOfIssuesIdsFromTestingRunResults(testingRunResults);
 
-        int now = Context.now();
-        Bson query = Filters.in(ID, issuesIds);
-        Bson update = Updates.combine(
-                Updates.set(TestingRunIssues.LAST_SEEN,now),
-                Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
-                Updates.setOnInsert(TestingRunIssues.CREATION_TIME, now),
-                Updates.setOnInsert(TestingRunIssues.SEVERITY, GlobalEnums.Severity.HIGH)
-        );
-
-        UpdateResult result = TestingRunIssuesDao.instance.updateMany(query, update);
-        logger.info("Inserted records : {}", result.getMatchedCount());
-        logger.info("upsert Ids : {}", result.getUpsertedId());
-
+        try {
+            BulkWriteResult result = TestingIssuesHandler.handleIssuesCreationFromTestingRunResults(testingRunResults);
+            logger.info("Matched records : {}", result.getMatchedCount());
+            logger.info("inserted counts : {}", result.getInsertedCount());
+            logger.info("Modified counts : {}", result.getModifiedCount());
+        }catch (Exception e) {
+            e.printStackTrace();
+        }
 
         TestingRunResultDao.instance.insertMany(testingRunResults);
 

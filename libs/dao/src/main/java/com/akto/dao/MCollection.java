@@ -1,10 +1,8 @@
 package com.akto.dao;
 
+import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.*;
-import com.mongodb.client.model.FindOneAndUpdateOptions;
-import com.mongodb.client.model.ReplaceOptions;
-import com.mongodb.client.model.Sorts;
-import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.*;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.InsertManyResult;
 import com.mongodb.client.result.InsertOneResult;
@@ -141,8 +139,8 @@ public abstract class MCollection<T> {
         return this.getMCollection().findOneAndUpdate(q, obj, new FindOneAndUpdateOptions().upsert(true));
     }
 
-    public UpdateResult updateMany(Bson filter, Bson update) {
-        return this.getMCollection().updateMany(filter, update, new UpdateOptions().upsert(true));
+    public BulkWriteResult bulkWrite (List<WriteModel<T>> modelList) {
+        return this.getMCollection().bulkWrite(modelList);
     }
 
     public UpdateResult replaceOne(Bson q, T obj) {

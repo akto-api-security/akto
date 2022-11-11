@@ -16,18 +16,19 @@ public class TestingRunIssues {
 
     //    @BsonProperty(value = TEST_RUN_ISSUES)
     public static final String TEST_RUN_ISSUES_STATUS = "testRunIssueStatus";
-    private final GlobalEnums.TestRunIssueStatus testRunIssueStatus;
-    private final TestingIssuesId id;
+
+    private GlobalEnums.TestRunIssueStatus testRunIssueStatus;
+    private TestingIssuesId id;
 
     public static final String LAST_SEEN = "lastSeen";
-    private final int lastSeen;
+    private int lastSeen;
 
     public static final String CREATION_TIME = "creationTime";
-    private final int creationTime;
+    private int creationTime;
 
 
     public static final String SEVERITY = "severity";
-    private final GlobalEnums.Severity severity;
+    private GlobalEnums.Severity severity;
 
     public TestingRunIssues(TestingIssuesId id, GlobalEnums.Severity severity, GlobalEnums.TestRunIssueStatus status,
                      int creationTime, int lastSeen) {
@@ -36,6 +37,27 @@ public class TestingRunIssues {
         this.id = id;
         this.severity = severity;
         this.testRunIssueStatus = status;
+    }
+
+    public TestingRunIssues(){}
+
+    public void setTestRunIssueStatus(GlobalEnums.TestRunIssueStatus testRunIssueStatus) {
+        this.testRunIssueStatus = testRunIssueStatus;
+    }
+
+    public void setLastSeen(int lastSeen) {
+        this.lastSeen = lastSeen;
+    }
+
+    public void setCreationTime(int creationTime) {
+        this.creationTime = creationTime;
+    }
+
+    public void setSeverity(GlobalEnums.Severity severity) {
+        this.severity = severity;
+    }
+    public void setId(TestingIssuesId id) {
+        this.id = id;
     }
 
     public TestingIssuesId getId() {

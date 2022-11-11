@@ -171,6 +171,8 @@ public class DaoInit {
                 new EnumCodec<>(CustomWebhook.ActiveStatus.class),
                 new EnumCodec<>(TestResult.Confidence.class),
                 new EnumCodec<>(GlobalEnums.TestRunIssueStatus.class),
+                new EnumCodec<>(GlobalEnums.TestErrorSource.class),
+                new EnumCodec<>(GlobalEnums.TestCategory.class),
                 new EnumCodec<>(GlobalEnums.Severity.class));
 
         CodecRegistry codecRegistry = fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,

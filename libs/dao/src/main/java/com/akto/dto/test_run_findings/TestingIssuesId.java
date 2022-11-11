@@ -15,14 +15,16 @@ public class TestingIssuesId {
 //    public static final String TEST_CATEGORY = "test_category";
 //    @BsonProperty(value = TEST_CATEGORY)
 
-    private final ApiInfoKey apiInfoKey;
-    private final TestErrorSource testErrorSource;
-    private final TestCategory testCategory;
+    private ApiInfoKey apiInfoKey;
+    private TestErrorSource testErrorSource;
+    private TestCategory testCategory;
     public TestingIssuesId(ApiInfoKey apiInfoKey, TestErrorSource source, TestCategory category) {
         this.apiInfoKey = apiInfoKey;
         this.testErrorSource = source;
         this.testCategory = category;
     }
+
+    public TestingIssuesId(){}
 
     @Override
     public boolean equals(Object o) {
@@ -34,6 +36,18 @@ public class TestingIssuesId {
                     && id.testErrorSource == this.testErrorSource;
         }
         return false;
+    }
+
+    public void setApiInfoKey(ApiInfoKey apiInfoKey) {
+        this.apiInfoKey = apiInfoKey;
+    }
+
+    public void setTestErrorSource(TestErrorSource testErrorSource) {
+        this.testErrorSource = testErrorSource;
+    }
+
+    public void setTestCategory(TestCategory testCategory) {
+        this.testCategory = testCategory;
     }
 
     public ApiInfoKey getApiInfoKey() {
