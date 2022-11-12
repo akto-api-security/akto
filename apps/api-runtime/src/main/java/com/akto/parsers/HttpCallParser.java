@@ -116,7 +116,7 @@ public class HttpCallParser {
     }
 
 
-    public int createCollectionBasedOnHostName(int id, String host, int vxlanId)  throws Exception {
+    public int createCollectionBasedOnHostName(int id, String host)  throws Exception {
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
         // 3 cases
@@ -128,14 +128,11 @@ public class HttpCallParser {
             id += i;
             try {
                 ApiCollectionsDao.instance.getMCollection().updateOne(
-                        Filters.and(
-                                Filters.eq(ApiCollection.HOST_NAME, host),
-                                Filters.eq(ApiCollection.VXLAN_ID, vxlanId)
-                        ),
+                        Filters.eq(ApiCollection.HOST_NAME, host),
                         Updates.combine(
-                                Updates.setOnInsert("_id", id),
-                                Updates.setOnInsert("startTs", Context.now()),
-                                Updates.setOnInsert("urls", new HashSet<>())
+                            Updates.setOnInsert("_id", id),
+                            Updates.setOnInsert("startTs", Context.now()),
+                            Updates.setOnInsert("urls", new HashSet<>())
                         ),
                         updateOptions
                 );
@@ -207,14 +204,14 @@ public class HttpCallParser {
                 hostName = hostName.toLowerCase();
                 hostName = hostName.trim();
 
-                String key = hostName + " " + vxlanId;
+                String key = hostName;
 
                 if (hostNameToIdMap.containsKey(key)) {
                     apiCollectionId = hostNameToIdMap.get(key);
                 } else {
-                    int id = hostName.hashCode() + vxlanId;
+                    int id = hostName.hashCode();
                     try {
-                        apiCollectionId = createCollectionBasedOnHostName(id, hostName, vxlanId);
+                        apiCollectionId = createCollectionBasedOnHostName(id, hostName);
                         hostNameToIdMap.put(key, apiCollectionId);
                     } catch (Exception e) {
                         logger.error("Failed to create collection for host : " + hostName);

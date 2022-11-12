@@ -339,12 +339,12 @@ public class TestDBSync extends MongoBasedTest {
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(apiCollections.size(),2);
 
-        int id = domain1.hashCode() + vxlanId1;
+        int id = domain1.hashCode();
         ApiCollection apiCollection1 = ApiCollectionsDao.instance.findOne(Filters.eq("_id", id));
-        Assertions.assertEquals(apiCollection1.getVxlanId(), vxlanId1);
+        Assertions.assertEquals(apiCollection1.getVxlanId(), 0);
         Assertions.assertEquals(apiCollection1.getHostName(), domain1);
         Assertions.assertEquals(httpCallParser.getHostNameToIdMap().size(),1);
-        Assertions.assertNotNull(httpCallParser.getHostNameToIdMap().get(domain1 + " " + vxlanId1));
+        Assertions.assertNotNull(httpCallParser.getHostNameToIdMap().get(domain1));
 
         // ***********************************
 
@@ -365,12 +365,12 @@ public class TestDBSync extends MongoBasedTest {
         apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(apiCollections.size(),3);
 
-        id = domain2.hashCode() + vxlanId2;
+        id = domain2.hashCode();
         ApiCollection apiCollection2 = ApiCollectionsDao.instance.findOne(Filters.eq("_id", id));
-        Assertions.assertEquals(apiCollection2.getVxlanId(), vxlanId2);
+        Assertions.assertEquals(apiCollection2.getVxlanId(), 0);
         Assertions.assertEquals(apiCollection2.getHostName(), domain2);
         Assertions.assertEquals(httpCallParser.getHostNameToIdMap().size(),2);
-        Assertions.assertNotNull(httpCallParser.getHostNameToIdMap().get(domain2 + " " + vxlanId2));
+        Assertions.assertNotNull(httpCallParser.getHostNameToIdMap().get(domain2));
 
         // same vxlan but different host
 
@@ -389,12 +389,12 @@ public class TestDBSync extends MongoBasedTest {
         apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(apiCollections.size(),4);
 
-        id = domain3.hashCode() + vxlanId2;
+        id = domain3.hashCode();
         ApiCollection apiCollection3 = ApiCollectionsDao.instance.findOne(Filters.eq("_id", id));
-        Assertions.assertEquals(apiCollection3.getVxlanId(), vxlanId2);
+        Assertions.assertEquals(apiCollection3.getVxlanId(), 0);
         Assertions.assertEquals(apiCollection3.getHostName(), domain3);
         Assertions.assertEquals(httpCallParser.getHostNameToIdMap().size(),3);
-        Assertions.assertNotNull(httpCallParser.getHostNameToIdMap().get(domain3 + " " + vxlanId2));
+        Assertions.assertNotNull(httpCallParser.getHostNameToIdMap().get(domain3));
 
 
         // different vxlan and host but same id collision
@@ -411,7 +411,7 @@ public class TestDBSync extends MongoBasedTest {
         h4.setSource(Source.MIRRORING);
 
         // before processing inserting apiCollection with same id but different vxlanId and host
-        int dupId = domain4.hashCode() + vxlanId4;
+        int dupId = domain4.hashCode();
         ApiCollectionsDao.instance.insertOne(
                 new ApiCollection(dupId,"something", 0, new HashSet<>(), "hostRandom", 1234)
         );
@@ -422,13 +422,13 @@ public class TestDBSync extends MongoBasedTest {
         apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(apiCollections.size(),6);
 
-        id = domain4.hashCode() + vxlanId4;
+        id = domain4.hashCode();
         id += 1; // since duplicate so increased by 1 will work
         ApiCollection apiCollection4 = ApiCollectionsDao.instance.findOne(Filters.eq("_id", id));
-        Assertions.assertEquals(apiCollection4.getVxlanId(), vxlanId4);
+        Assertions.assertEquals(apiCollection4.getVxlanId(), 0);
         Assertions.assertEquals(apiCollection4.getHostName(), domain4);
         Assertions.assertEquals(httpCallParser.getHostNameToIdMap().size(),5);
-        Assertions.assertEquals(httpCallParser.getHostNameToIdMap().get(domain4 + " " + vxlanId4), id);
+        Assertions.assertEquals(httpCallParser.getHostNameToIdMap().get(domain4), id);
 
     }
 
