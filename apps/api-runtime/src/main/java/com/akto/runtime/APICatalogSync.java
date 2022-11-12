@@ -22,6 +22,7 @@ import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.parsers.HttpCallParser;
+import com.akto.task.Cluster;
 import com.akto.types.CappedSet;
 import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBObject;
@@ -1266,7 +1267,23 @@ public class APICatalogSync {
     }
 
 
+    private int lastMergeAsyncOutsideTs = 0;
     public void buildFromDB(boolean calcDiff, boolean fetchAllSTI) {
+
+        if (mergeAsyncOutside) {
+            if (Context.now() - lastMergeAsyncOutsideTs > 600) {
+                this.lastMergeAsyncOutsideTs = Context.now();
+
+                boolean gotDibs = Cluster.callDibs(Cluster.RUNTIME_MERGER, 1800, 60);
+                if (gotDibs) {
+                    List<ApiCollection> allCollections = ApiCollectionsDao.instance.getMetaAll();
+                    for(ApiCollection apiCollection: allCollections) {
+                        mergeUrlsAndSave(apiCollection.getId());
+                    }
+                }
+            }
+        }
+
         List<SingleTypeInfo> allParams;
         if (fetchAllSTI) {
             allParams = SingleTypeInfoDao.instance.fetchAll();
