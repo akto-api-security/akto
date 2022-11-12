@@ -18,6 +18,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.TrafficRecorder;
 import com.akto.dto.type.URLStatic;
 import com.akto.dto.type.URLTemplate;
+import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.parsers.HttpCallParser;
@@ -25,10 +26,14 @@ import com.akto.types.CappedSet;
 import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;
+import com.mongodb.client.model.BulkWriteOptions;
+import com.mongodb.client.model.DeleteManyModel;
 import com.mongodb.client.model.DeleteOneModel;
 import com.mongodb.client.model.DeleteOptions;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.InsertOneModel;
 import com.mongodb.client.model.PushOptions;
+import com.mongodb.client.model.UpdateManyModel;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
@@ -195,12 +200,222 @@ public class APICatalogSync {
         tryWithKnownURLTemplates(pendingRequests, deltaCatalog, dbCatalog, apiCollectionId );
         System.out.println("tryWithKnownURLTemplates: " + (System.currentTimeMillis() - start));
 
-        start = System.currentTimeMillis();
-        tryMergingWithKnownStrictURLs(pendingRequests, dbCatalog, deltaCatalog);
-        System.out.println("tryMergingWithKnownStrictURLs: " + (System.currentTimeMillis() - start));
+        if (!mergeAsyncOutside) {
+            start = System.currentTimeMillis();
+            tryMergingWithKnownStrictURLs(pendingRequests, dbCatalog, deltaCatalog);
+            System.out.println("tryMergingWithKnownStrictURLs: " + (System.currentTimeMillis() - start));
+        } else {
+            for (URLStatic pending: pendingRequests.keySet()) {
+                RequestTemplate pendingTemplate = pendingRequests.get(pending);
+                RequestTemplate rt = deltaCatalog.getStrictURLToMethods().get(pending);
+                if (rt != null) {
+                    rt.mergeFrom(pendingTemplate);
+                } else {
+                    deltaCatalog.getStrictURLToMethods().put(pending, pendingTemplate);
+                }
+            }
+        }
 
         System.out.println("processTime: " + RequestTemplate.insertTime + " " + RequestTemplate.processTime + " " + RequestTemplate.deleteTime);
 
+    }
+
+
+    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId) {
+        ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+
+        Bson filterQ = null;
+        if (apiCollection != null && apiCollection.getHostName() == null) {
+            filterQ = Filters.eq("apiCollectionId", apiCollectionId);
+        } else {
+            filterQ = Filters.and(
+                Filters.eq("apiCollectionId", apiCollectionId),
+                Filters.or(Filters.eq("isHeader", false), Filters.eq("param", "host"))
+            );            
+        }
+
+        int offset = 0;
+        int limit = 8_000_000;
+
+        List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
+        ApiMergerResult finalResult = new ApiMergerResult(new HashMap<>());
+        do {
+            singleTypeInfos = SingleTypeInfoDao.instance.findAll(filterQ, offset, limit, null, null);
+            System.out.println(singleTypeInfos.size());
+
+            Map<String, Set<String>> staticUrlToSti = new HashMap<>();
+            List<String> templateUrls = new ArrayList<>();
+            for(SingleTypeInfo sti: singleTypeInfos) {
+                String key = sti.getMethod() + " " + sti.getUrl();
+                if (key.contains("INTEGER") || key.contains("STRING") || key.contains("UUID")) {
+                    templateUrls.add(key);
+                    continue;
+                };
+
+                if (sti.getIsUrlParam()) continue;
+                if (sti.getIsHeader()) {
+                    staticUrlToSti.putIfAbsent(key, new HashSet<>());
+                    continue;
+                }
+
+
+                Set<String> set = staticUrlToSti.get(key);
+                if (set == null) {
+                    set = new HashSet<>();
+                    staticUrlToSti.put(key, set);
+                }
+
+                set.add(sti.getResponseCode() + " " + sti.getParam());
+            }
+
+            for(String staticURL: staticUrlToSti.keySet()) {
+                Method staticMethod = Method.fromString(staticURL.split(" ")[0]);
+                String staticEndpoint = staticURL.split(" ")[1];
+
+                for (String templateURL: templateUrls) {
+                    Method templateMethod = Method.fromString(templateURL.split(" ")[0]);
+                    String templateEndpoint = templateURL.split(" ")[1];
+
+                    URLTemplate urlTemplate = createUrlTemplate(templateEndpoint, templateMethod);
+                    if (urlTemplate.match(staticEndpoint, staticMethod)) {
+                        finalResult.deleteStaticUrls.add(staticURL);
+                        break;
+                    }
+                }
+            }
+
+            Map<Integer, Map<String, Set<String>>> sizeToUrlToSti = groupByTokenSize(staticUrlToSti);
+
+            sizeToUrlToSti.remove(1);
+            sizeToUrlToSti.remove(0);
+
+
+            for(int size: sizeToUrlToSti.keySet()) {
+                ApiMergerResult result = tryMergingWithKnownStrictURLs(sizeToUrlToSti.get(size));    
+                finalResult.templateToStaticURLs.putAll(result.templateToStaticURLs);
+            }
+
+            offset += limit;
+        } while (!singleTypeInfos.isEmpty());
+
+        return finalResult;
+    }
+
+    private static Map<Integer, Map<String, Set<String>>> groupByTokenSize(Map<String, Set<String>> catalog) {
+        Map<Integer, Map<String, Set<String>>> sizeToURL = new HashMap<>();
+        for(String rawURL: catalog.keySet()) {
+            Set<String> reqTemplate = catalog.get(rawURL);
+            String url = APICatalogSync.trim(rawURL);
+            String[] tokens = url.split("/");
+            Map<String, Set<String>> urlSet = sizeToURL.get(tokens.length);
+            urlSet = sizeToURL.get(tokens.length);
+            if (urlSet == null) {
+                urlSet = new HashMap<>();
+                sizeToURL.put(tokens.length, urlSet);
+            }
+
+            urlSet.put(rawURL, reqTemplate);
+        }
+
+        return sizeToURL;
+    }
+
+    static class ApiMergerResult {
+        public Set<String> deleteStaticUrls = new HashSet<>();
+        Map<URLTemplate, Set<String>> templateToStaticURLs = new HashMap<>();
+
+        public ApiMergerResult(Map<URLTemplate, Set<String>> templateToSti) {
+            this.templateToStaticURLs = templateToSti;
+        }
+
+        public String toString() {
+            String ret = ("templateToSti======================================================: \n");
+            for(URLTemplate urlTemplate: templateToStaticURLs.keySet()) {
+                ret += (urlTemplate.getTemplateString()) + "\n";
+                for(String str: templateToStaticURLs.get(urlTemplate)) {
+                    ret += ("\t " + str + "\n");
+                }
+            }
+
+            return ret;
+        }
+    }
+
+    private static ApiMergerResult tryMergingWithKnownStrictURLs(
+        Map<String, Set<String>> pendingRequests
+    ) {
+        Map<URLTemplate, Set<String>> templateToStaticURLs = new HashMap<>();
+
+        Iterator<Map.Entry<String, Set<String>>> iterator = pendingRequests.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, Set<String>> entry = iterator.next();
+            iterator.remove();
+
+            String newUrl = entry.getKey();
+            Set<String> newTemplate = entry.getValue();
+            Method newMethod = Method.fromString(newUrl.split(" ")[0]);
+            String newEndpoint = newUrl.split(" ")[1];
+
+            boolean matchedInDeltaTemplate = false;
+            for(URLTemplate urlTemplate: templateToStaticURLs.keySet()){
+                if (urlTemplate.match(newEndpoint, newMethod)) {
+                    matchedInDeltaTemplate = true;
+                    templateToStaticURLs.get(urlTemplate).add(newUrl);
+                    break;
+                }
+            }
+
+            if (matchedInDeltaTemplate) {
+                continue;
+            }
+
+            int countSimilarURLs = 0;
+            Map<URLTemplate, Map<String, Set<String>>> potentialMerges = new HashMap<>();
+            for(String aUrl: pendingRequests.keySet()) {
+                Set<String> aTemplate = pendingRequests.get(aUrl);
+                Method aMethod = Method.fromString(aUrl.split(" ")[0]);
+                String aEndpoint = aUrl.split(" ")[1];
+                URLStatic aStatic = new URLStatic(aEndpoint, aMethod);
+                URLStatic newStatic = new URLStatic(newEndpoint, newMethod);
+                URLTemplate mergedTemplate = APICatalogSync.tryMergeUrls(aStatic, newStatic);
+                if (mergedTemplate == null) {
+                    continue;
+                }
+
+                if (APICatalogSync.areBothUuidUrls(newStatic,aStatic,mergedTemplate) || RequestTemplate.compareKeys(aTemplate, newTemplate, mergedTemplate)) {
+                    Map<String, Set<String>> similarTemplates = potentialMerges.get(mergedTemplate);
+                    if (similarTemplates == null) {
+                        similarTemplates = new HashMap<>();
+                        potentialMerges.put(mergedTemplate, similarTemplates);
+                    } 
+                    similarTemplates.put(aUrl, aTemplate);
+
+                    if (!RequestTemplate.isMergedOnStr(mergedTemplate) || APICatalogSync.areBothUuidUrls(newStatic,aStatic,mergedTemplate)) {
+                        countSimilarURLs = APICatalogSync.STRING_MERGING_THRESHOLD;
+                    }
+
+                    countSimilarURLs++;
+                }
+            }
+
+            if (countSimilarURLs >= APICatalogSync.STRING_MERGING_THRESHOLD) {
+                URLTemplate mergedTemplate = potentialMerges.keySet().iterator().next();
+                Set<String> matchedStaticURLs = templateToStaticURLs.get(mergedTemplate);
+
+                if (matchedStaticURLs == null) {
+                    matchedStaticURLs = new HashSet<>();
+                    templateToStaticURLs.put(mergedTemplate, matchedStaticURLs);
+                }
+
+                matchedStaticURLs.add(newUrl);
+
+                for (Map.Entry<String, Set<String>> rt: potentialMerges.getOrDefault(mergedTemplate, new HashMap<>()).entrySet()) {
+                    matchedStaticURLs.add(rt.getKey());
+                }
+            }
+        }
+
+        return new ApiMergerResult(templateToStaticURLs);
     }
 
     private void tryMergingWithKnownStrictURLs(
@@ -400,6 +615,117 @@ public class APICatalogSync {
 
     }
 
+
+    public static void mergeUrlsAndSave(int apiCollectionId) {
+        ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId);
+        ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSti = new ArrayList<>();
+        ArrayList<WriteModel<SampleData>> bulkUpdatesForSampleData = new ArrayList<>();
+        ArrayList<WriteModel<ApiInfo>> bulkUpdatesForApiInfo = new ArrayList<>();
+
+        for (URLTemplate urlTemplate: result.templateToStaticURLs.keySet()) {
+            Set<String> matchStaticURLs = result.templateToStaticURLs.get(urlTemplate);
+
+            boolean isFirst = true;
+            for (String matchedURL: matchStaticURLs) {
+                Method delMethod = Method.fromString(matchedURL.split(" ")[0]);
+                String delEndpoint = matchedURL.split(" ")[1];  
+                Bson filterQ = Filters.and(
+                    Filters.eq("apiCollectionId", apiCollectionId),
+                    Filters.eq("method", delMethod.name()),
+                    Filters.eq("url", delEndpoint)
+                );
+
+                Bson filterQSampleData = Filters.and(
+                    Filters.eq("_id.apiCollectionId", apiCollectionId),
+                    Filters.eq("_id.method", delMethod.name()),
+                    Filters.eq("_id.url", delEndpoint)
+                );
+
+                if (isFirst) {
+
+                    String newTemplateUrl = urlTemplate.getTemplateString();
+                    for (int i = 0; i < urlTemplate.getTypes().length; i++) {
+                        SuperType superType = urlTemplate.getTypes()[i];
+                        if (superType == null) continue;
+
+                        SubType subType = KeyTypes.findSubType(i, i+"");
+                        SingleTypeInfo.ParamId stiId = new SingleTypeInfo.ParamId(newTemplateUrl, delMethod.name(), -1, false, i+"", subType, apiCollectionId, true);
+                        SingleTypeInfo sti = new SingleTypeInfo(
+                            stiId, new HashSet<>(), new HashSet<>(), 0, Context.now(), 0, CappedSet.create(i+""), 
+                            SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MIN_VALUE, SingleTypeInfo.ACCEPTED_MAX_VALUE);
+
+
+                        // SingleTypeInfoDao.instance.insertOne(sti);
+                        bulkUpdatesForSti.add(new InsertOneModel<>(sti));
+                    }
+
+                    // SingleTypeInfoDao.instance.getMCollection().updateMany(filterQ, Updates.set("url", newTemplateUrl));
+
+                    bulkUpdatesForSti.add(new UpdateManyModel<>(filterQ, Updates.set("url", newTemplateUrl), new UpdateOptions()));
+
+
+                    SampleData sd = SampleDataDao.instance.findOne(filterQSampleData);
+                    if (sd != null) {
+                        sd.getId().url = newTemplateUrl;
+                        // SampleDataDao.instance.insertOne(sd);
+                        bulkUpdatesForSampleData.add(new InsertOneModel<>(sd));
+                    }
+
+
+                    ApiInfo apiInfo = ApiInfoDao.instance.findOne(filterQSampleData);
+                    if (apiInfo != null) {
+                        apiInfo.getId().url = newTemplateUrl;
+                        ApiInfoDao.instance.insertOne(apiInfo);
+                        bulkUpdatesForApiInfo.add(new InsertOneModel<>(apiInfo));
+                    }
+
+                    isFirst = false;
+                } else {
+                    bulkUpdatesForSti.add(new DeleteManyModel<>(filterQ));
+                    // SingleTypeInfoDao.instance.deleteAll(filterQ);
+
+                }
+
+                bulkUpdatesForSampleData.add(new DeleteManyModel<>(filterQSampleData));
+                bulkUpdatesForApiInfo.add(new DeleteManyModel<>(filterQSampleData));
+                // SampleDataDao.instance.deleteAll(filterQSampleData);
+                // ApiInfoDao.instance.deleteAll(filterQSampleData);
+            }
+        }
+
+        for (String deleteStaticUrl: result.deleteStaticUrls) {
+            Method delMethod = Method.fromString(deleteStaticUrl.split(" ")[0]);
+            String delEndpoint = deleteStaticUrl.split(" ")[1];  
+            Bson filterQ = Filters.and(
+                Filters.eq("apiCollectionId", apiCollectionId),
+                Filters.eq("method", delMethod.name()),
+                Filters.eq("url", delEndpoint)
+            );
+
+            Bson filterQSampleData = Filters.and(
+                Filters.eq("_id.apiCollectionId", apiCollectionId),
+                Filters.eq("_id.method", delMethod.name()),
+                Filters.eq("_id.url", delEndpoint)
+            );
+
+            bulkUpdatesForSti.add(new DeleteManyModel<>(filterQ));
+            bulkUpdatesForSampleData.add(new DeleteManyModel<>(filterQSampleData));
+            // SingleTypeInfoDao.instance.deleteAll(filterQ);
+            // SampleDataDao.instance.deleteAll(filterQSampleData);
+        }
+
+        if (bulkUpdatesForSti.size() > 0) {
+            SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForSti, new BulkWriteOptions().ordered(false));
+        }
+
+        if (bulkUpdatesForSampleData.size() > 0) {
+            SampleDataDao.instance.getMCollection().bulkWrite(bulkUpdatesForSampleData, new BulkWriteOptions().ordered(false));
+        }
+
+        if (bulkUpdatesForApiInfo.size() > 0) {
+            ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
+        }
+    }
 
     private void tryWithKnownURLTemplates(
         Map<URLStatic, RequestTemplate> pendingRequests, 
@@ -955,6 +1281,11 @@ public class APICatalogSync {
             this.sensitiveParamInfoBooleanMap.put(sensitiveParamInfo, false);
         }
 
+        if (mergeAsyncOutside) {
+            this.delta = new HashMap<>();
+            return;
+        }
+
         if(calcDiff) {
             for(int collectionId: this.dbState.keySet()) {
                 APICatalog newCatalog = this.dbState.get(collectionId);
@@ -1082,16 +1413,6 @@ public class APICatalogSync {
             }
 
             keyTypes.getOccurrences().put(param.getSubType(), param);
-        }
-
-        for (APICatalog catalog: ret.values()) {
-            for (RequestTemplate requestTemplate: catalog.getStrictURLToMethods().values()) {
-                requestTemplate.buildTrie();
-
-                for (RequestTemplate responseTemplate: requestTemplate.getResponseTemplates().values()) {
-                    responseTemplate.buildTrie();
-                }    
-            }
         }
 
         return ret;
