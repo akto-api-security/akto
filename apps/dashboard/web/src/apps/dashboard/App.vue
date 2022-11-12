@@ -141,6 +141,11 @@ export default {
             link: '/dashboard/observe/sensitive'
           }
         ]
+      },
+      {
+        title: 'Issues',
+        icon: '$fas_exclamation-triangle',
+        link: '/dashboard/issues'
       }
     ]
 
