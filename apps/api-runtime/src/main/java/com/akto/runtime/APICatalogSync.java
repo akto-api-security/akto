@@ -57,7 +57,7 @@ public class APICatalogSync {
     public Map<Integer, APICatalog> dbState;
     public Map<Integer, APICatalog> delta;
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
-    private static boolean mergeAsyncOutside = false;
+    public static boolean mergeAsyncOutside = false;
 
     public APICatalogSync(String userIdentifier,int thresh) {
         this.thresh = thresh;

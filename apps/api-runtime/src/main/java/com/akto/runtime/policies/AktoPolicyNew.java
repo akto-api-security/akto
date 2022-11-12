@@ -82,7 +82,7 @@ public class AktoPolicyNew {
 
     }
 
-    public void syncWithDb(boolean initialising, Map<Integer, APICatalog> delta, boolean fetchAllSTI) {
+    public void syncWithDb(boolean initialising, boolean fetchAllSTI) {
         // logger.info("Syncing with db");
         if (!initialising) {
             AktoPolicy.UpdateReturn updateReturn = AktoPolicy.getUpdates(apiInfoCatalogMap);
@@ -122,7 +122,7 @@ public class AktoPolicyNew {
 
     }
 
-    public void main(List<HttpResponseParams> httpResponseParamsList, APICatalogSync apiCatalogSync, boolean fetchAllSTI) throws Exception {
+    public void main(List<HttpResponseParams> httpResponseParamsList, boolean syncNow, boolean fetchAllSTI) throws Exception {
         if (httpResponseParamsList == null) httpResponseParamsList = new ArrayList<>();
         for (HttpResponseParams httpResponseParams: httpResponseParamsList) {
             try {
@@ -133,8 +133,8 @@ public class AktoPolicyNew {
             }
         }
 
-        if (apiCatalogSync != null) {
-            syncWithDb(false, apiCatalogSync.dbState, fetchAllSTI);
+        if (syncNow) {
+            syncWithDb(false, fetchAllSTI);
         }
     }
 

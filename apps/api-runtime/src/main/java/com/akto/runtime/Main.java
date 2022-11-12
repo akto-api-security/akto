@@ -16,7 +16,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.kafka.Kafka;
 import com.akto.parsers.HttpCallParser;
 import com.akto.dto.HttpResponseParams;
-import com.akto.runtime.policies.AktoPolicy;
+import com.akto.runtime.policies.AktoPolicies;
 import com.google.gson.Gson;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -193,7 +193,7 @@ public class Main {
 
         Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
         Map<String, Flow> flowMap = new HashMap<>();
-        Map<String, AktoPolicy> aktoPolicyMap = new HashMap<>();
+        Map<String, AktoPolicies> aktoPolicyMap = new HashMap<>();
 
         // sync infra metrics thread
         // ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
@@ -271,13 +271,13 @@ public class Main {
 
                     if (!aktoPolicyMap.containsKey(accountId)) {
                         APICatalogSync apiCatalogSync = httpCallParserMap.get(accountId).apiCatalogSync;
-                        AktoPolicy aktoPolicy = new AktoPolicy(apiCatalogSync, fetchAllSTI);
+                        AktoPolicies aktoPolicy = new AktoPolicies(apiCatalogSync, fetchAllSTI);
                         aktoPolicyMap.put(accountId, aktoPolicy);
                     }
 
                     HttpCallParser parser = httpCallParserMap.get(accountId);
                     // Flow flow = flowMap.get(accountId);
-                    AktoPolicy aktoPolicy = aktoPolicyMap.get(accountId);
+                    AktoPolicies aktoPolicy = aktoPolicyMap.get(accountId);
 
                     try {
                         List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
