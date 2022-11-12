@@ -7,7 +7,8 @@ Vue.use(Vuex)
 
 var state = {
     loading: false,
-    issues: []
+    issues: [],
+    collections: []
 }
 
 const issues = {
@@ -17,9 +18,11 @@ const issues = {
         EMPTY_STATE (state) {
             state.loading = false
             state.issues = []
+            state.collections = []
         },
-        SAVE_ISSUES (state, {issues}) {
+        SAVE_ISSUES (state, {issues, collections}) {
             state.issues = issues
+            state.collections = collections
         }
     },
     actions: {
@@ -40,7 +43,8 @@ const issues = {
     },
     getters: {
         getLoading: (state) => state.loading,
-        getIssues: (state) => state.issues
+        getIssues: (state) => state.issues,
+        getCollections:(state) => state.collections
     }
 }
 
