@@ -315,10 +315,10 @@ public class CustomDataTypeAction extends UserAction{
                 Key apiKey = sampleData.getId();
                 try {
                     HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
-                    boolean skip1 = customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_HEADER) ? forHeaders(httpResponseParams.getHeaders(), customDataType, apiKey) : false;
-                    boolean skip2 = customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_HEADER) ? forHeaders(httpResponseParams.requestParams.getHeaders(), customDataType, apiKey) : false;
-                    boolean skip3 = customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_PAYLOAD) ? forPayload(httpResponseParams.getPayload(), customDataType, apiKey) : false;
-                    boolean skip4 = customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_PAYLOAD) ? forPayload(httpResponseParams.requestParams.getPayload(), customDataType, apiKey) : false;
+                    boolean skip1 = ( customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_HEADER) ) ? forHeaders(httpResponseParams.getHeaders(), customDataType, apiKey) : false;
+                    boolean skip2 = ( customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_HEADER) ) ? forHeaders(httpResponseParams.requestParams.getHeaders(), customDataType, apiKey) : false;
+                    boolean skip3 = ( customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_PAYLOAD) ) ? forPayload(httpResponseParams.getPayload(), customDataType, apiKey) : false;
+                    boolean skip4 = ( customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_PAYLOAD) ) ? forPayload(httpResponseParams.requestParams.getPayload(), customDataType, apiKey) : false;
                     skip = skip1 || skip2 || skip3 || skip4;
                 } catch (Exception e) {
                     e.printStackTrace();

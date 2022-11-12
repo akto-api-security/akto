@@ -428,7 +428,7 @@ public class InitializerListener implements ServletContextListener {
             aktoDataTypes.add(new AktoDataType("ADDRESS", true, Collections.emptyList(),now));
             aktoDataTypes.add(new AktoDataType("IP_ADDRESS", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER),now));
             aktoDataTypes.add(new AktoDataType("PHONE_NUMBER", true, Collections.emptyList(),now));
-            aktoDataTypes.add(new AktoDataType("UUID", true, Collections.emptyList(),now));
+            aktoDataTypes.add(new AktoDataType("UUID", false, Collections.emptyList(),now));
             AktoDataTypeDao.instance.getMCollection().drop();
             AktoDataTypeDao.instance.insertMany(aktoDataTypes);    
             

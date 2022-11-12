@@ -101,7 +101,7 @@ public class SingleTypeInfo {
             Collections.emptyList());
     public static SubType PHONE_NUMBER = new SubType("PHONE_NUMBER", true, SuperType.STRING, StringSchema.class,
             Collections.emptyList());
-    public static SubType UUID = new SubType("UUID", true, SuperType.STRING, StringSchema.class,
+    public static SubType UUID = new SubType("UUID", false, SuperType.STRING, StringSchema.class,
             Collections.emptyList());
     public static final SubType GENERIC = new SubType("GENERIC", false, SuperType.STRING, StringSchema.class,
             Collections.emptyList());
@@ -435,7 +435,7 @@ public class SingleTypeInfo {
         return composeKey(url, method, responseCode, isHeader, param, subType, apiCollectionId, isUrlParam);
     }
 
-    public String composeKeyWithCustomSubType(SubType s) {
+public String composeKeyWithCustomSubType(SubType s) {
         return composeKey(url, method, responseCode, isHeader, param, s, apiCollectionId, isUrlParam);
     }
 
