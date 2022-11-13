@@ -14,6 +14,9 @@ public class BackwardCompatibility {
     public static final String READY_FOR_NEW_TESTING_FRAMEWORK = "readyForNewTestingFramework";
     private int readyForNewTestingFramework;
 
+    public static final String MERGE_ON_HOST_INIT = "mergeOnHostInit";
+    private int mergeOnHostInit;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult, int readyForNewTestingFramework) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
@@ -65,4 +68,11 @@ public class BackwardCompatibility {
         this.readyForNewTestingFramework = readyForNewTestingFramework;
     }
 
+    public int getMergeOnHostInit() {
+        return this.mergeOnHostInit;
+    }
+
+    public void setMergeOnHostInit(int mergeOnHostInit) {
+        this.mergeOnHostInit = mergeOnHostInit;
+    }
 }

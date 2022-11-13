@@ -7,6 +7,7 @@ import com.akto.dto.*;
 import com.akto.dto.type.*;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
+import com.akto.runtime.merge.MergeSimilarUrls;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import org.junit.Before;
@@ -161,8 +162,8 @@ public class TestAktoPolicy extends MongoBasedTest {
         // next time data comes some urls got merged
         String mergedUrl = "/api/toys/INTEGER";
         Set<String> toMergeUrls = new HashSet<>(Arrays.asList("/api/toys/1", "/api/toys/2"));
-        APICatalogSync.mergeApiInfo(mergedUrl, toMergeUrls, 0, URLMethods.Method.PUT);
-        APICatalogSync.mergeFilterSampleData(mergedUrl, toMergeUrls, 0, URLMethods.Method.PUT);
+        MergeSimilarUrls.mergeApiInfo(mergedUrl, toMergeUrls, 0, URLMethods.Method.PUT);
+        MergeSimilarUrls.mergeFilterSampleData(mergedUrl, toMergeUrls, 0, URLMethods.Method.PUT);
 
         aktoPolicy.buildFromDb(true);
         apiInfoList = ApiInfoDao.instance.findAll(new BasicDBObject());

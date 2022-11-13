@@ -10,6 +10,7 @@ import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.*;
+import com.akto.runtime.merge.MergeSimilarUrls;
 import com.akto.types.CappedSet;
 import com.mongodb.BasicDBObject;
 
@@ -79,7 +80,7 @@ public class TestApiCatalogSync extends MongoBasedTest {
             buildAndInsert((String) m);
         }
 
-        APICatalogSync.mergeAndUpdateDb(mergedUrl, toMergeUrls, 100, URLMethods.Method.GET);
+        MergeSimilarUrls.mergeAndUpdateDb(mergedUrl, toMergeUrls, 100, URLMethods.Method.GET);
 
         List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(new BasicDBObject());
         for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
