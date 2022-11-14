@@ -38,7 +38,7 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
     }
 
     public List<ApiCollection> getMetaAll() {
-        return ApiCollectionsDao.instance.findAll(Projections.exclude("urls"));
+        return ApiCollectionsDao.instance.findAll(new BasicDBObject(), Projections.exclude("urls"));
     }
 
     public Map<Integer, ApiCollection> generateApiCollectionMap() {

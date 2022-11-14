@@ -952,7 +952,7 @@ public class APICatalogSync {
             }
 
             bulkUpdates.add(
-                new UpdateOneModel<>(Filters.eq("_id", trafficInfo.get_id()), Updates.combine(updates), new UpdateOptions().upsert(true))
+                new UpdateOneModel<>(Filters.eq("_id", trafficInfo.getId()), Updates.combine(updates), new UpdateOptions().upsert(true))
             );
         }
 

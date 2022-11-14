@@ -271,6 +271,10 @@ public class SingleTypeInfo {
             return isHeader;
         }
 
+        public boolean getIsHeader() {
+            return isHeader;
+        }
+
         public void setIsHeader(boolean header) {
             isHeader = header;
         }
@@ -285,6 +289,15 @@ public class SingleTypeInfo {
 
         public SubType getSubType() {
             return subType;
+        }
+
+        public void setSubType(SubType subType) {
+            this.subType = subType;
+        }        
+
+        public String getSubTypeString() {
+            if (subType == null) return null;
+            return subType.name;
         }
 
         public void setSubTypeString(String subTypeString) {
@@ -307,6 +320,14 @@ public class SingleTypeInfo {
 
         public void setApiCollectionId(int apiCollectionId) {
             this.apiCollectionId = apiCollectionId;
+        }
+
+        public boolean getIsUrlParam() {
+            return isUrlParam;
+        }
+
+        public void setIsUrlParam(boolean urlParam) {
+            isUrlParam = urlParam;
         }
     }
 

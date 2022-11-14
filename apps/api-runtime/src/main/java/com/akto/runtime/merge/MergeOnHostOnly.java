@@ -81,7 +81,7 @@ public class MergeOnHostOnly {
 
         List<TrafficInfo> trafficInfos =  TrafficInfoDao.instance.findAll("_id.apiCollectionId", oldId);
         if(trafficInfos!=null && trafficInfos.size()>0){
-            trafficInfos.forEach((trafficInfo)->trafficInfo.get_id().setApiCollectionId(newId));
+            trafficInfos.forEach((trafficInfo)->trafficInfo.getId().setApiCollectionId(newId));
             try{
                 TrafficInfoDao.instance.getMCollection().insertMany(trafficInfos,options);
             } catch(Exception e){
@@ -143,7 +143,7 @@ public class MergeOnHostOnly {
             old.setId(newApiCollectionId);
 
             try {
-                ApiCollectionsDao.instance.insertOne(new ApiCollection(newApiCollectionId, host, old.getStartTs(), new HashSet<>(), host, 0));
+                ApiCollectionsDao.instance.insertOne(new ApiCollection(newApiCollectionId, null, old.getStartTs(), new HashSet<>(), host, 0));
             } catch (Exception e) {
                 return;
             }
@@ -186,7 +186,7 @@ public class MergeOnHostOnly {
     }
 
     public void mergeHosts() {
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.getMetaAll();
 
         Map<String, List<Integer>> hostToApiCollectionId = new HashMap<>();
 
