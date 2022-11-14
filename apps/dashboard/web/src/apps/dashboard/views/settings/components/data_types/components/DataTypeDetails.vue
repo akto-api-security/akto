@@ -76,11 +76,11 @@
                 <v-btn-toggle
                 v-model="reqToggle"
                 mandatory >
-                    <v-btn value="req" :class="data_type_copy.sensitiveAlways || (data_type_copy.sensitivePosition && ( data_type_copy.sensitivePosition.includes('REQUEST_PAYLOAD') || data_type_copy.sensitivePosition.includes('REQUEST_HEADER') ) )? 'sensitive-text true' : 'sensitive-text'"
+                    <v-btn value="req" :class="data_type_copy.sensitiveAlways || (data_type_copy.sensitivePosition && ( data_type_copy.sensitivePosition.includes('REQUEST_PAYLOAD') || data_type_copy.sensitivePosition.includes('REQUEST_HEADER') ) )? 'sensitive-text true' : 'sensitive-text inactive'"
                     @click="toggleSensitiveRequest">
                         true
                     </v-btn>
-                    <v-btn value="req" :class="data_type_copy.sensitiveAlways || (data_type_copy.sensitivePosition && ( data_type_copy.sensitivePosition.includes('REQUEST_PAYLOAD') || data_type_copy.sensitivePosition.includes('REQUEST_HEADER') ) )? 'sensitive-text' : 'sensitive-text false'"
+                    <v-btn value="req" :class="data_type_copy.sensitiveAlways || (data_type_copy.sensitivePosition && ( data_type_copy.sensitivePosition.includes('REQUEST_PAYLOAD') || data_type_copy.sensitivePosition.includes('REQUEST_HEADER') ) )? 'sensitive-text inactive' : 'sensitive-text false'"
                     @click="toggleSensitiveRequest">
                         false
                     </v-btn>
@@ -93,11 +93,11 @@
                 <v-btn-toggle
                 v-model="resToggle"
                 mandatory>
-                    <v-btn value="res" :class="data_type_copy.sensitiveAlways || (data_type_copy.sensitivePosition && ( data_type_copy.sensitivePosition.includes('RESPONSE_PAYLOAD') || data_type_copy.sensitivePosition.includes('RESPONSE_HEADER') ) )? 'sensitive-text true' : 'sensitive-text'"
+                    <v-btn value="res" :class="data_type_copy.sensitiveAlways || (data_type_copy.sensitivePosition && ( data_type_copy.sensitivePosition.includes('RESPONSE_PAYLOAD') || data_type_copy.sensitivePosition.includes('RESPONSE_HEADER') ) )? 'sensitive-text true' : 'sensitive-text inactive'"
                     @click="toggleSensitiveResponse">
                         true
                     </v-btn>
-                    <v-btn value="res" :class="data_type_copy.sensitiveAlways || (data_type_copy.sensitivePosition && ( data_type_copy.sensitivePosition.includes('RESPONSE_PAYLOAD') || data_type_copy.sensitivePosition.includes('RESPONSE_HEADER') ) )? 'sensitive-text' : 'sensitive-text false'"
+                    <v-btn value="res" :class="data_type_copy.sensitiveAlways || (data_type_copy.sensitivePosition && ( data_type_copy.sensitivePosition.includes('RESPONSE_PAYLOAD') || data_type_copy.sensitivePosition.includes('RESPONSE_HEADER') ) )? 'sensitive-text inactive' : 'sensitive-text false'"
                     @click="toggleSensitiveResponse">
                         false
                     </v-btn>
@@ -308,15 +308,15 @@ export default {
         height: 38px !important
         margin-bottom: 10px
         margin-top: 10px
-        color: #47466A
-        &:before
-            background-color:#FFFFFF
+        &.inactive
+            color: #475467
+            background-color: #FCFCFD
         &.true
             color: #12B76A
-            background-color: #D1E9DC
+            background-color: #E8FFF4
         &.false
-            color: var(--v-redMetric-base)
-            background-color: #F1CECD
+            color: #F04438
+            background-color: #FFE9E8
         &:hover
             cursor: pointer
 
