@@ -77,12 +77,14 @@
                 v-model="reqToggle"
                 mandatory >
                     <v-btn value="req" :class="data_type_copy.sensitiveAlways || (data_type_copy.sensitivePosition && ( data_type_copy.sensitivePosition.includes('REQUEST_PAYLOAD') || data_type_copy.sensitivePosition.includes('REQUEST_HEADER') ) )? 'sensitive-text true' : 'sensitive-text inactive'"
-                    @click="toggleSensitiveRequest">
-                        true
+                    @click="toggleSensitiveRequest"
+                    style="padding: 0 16px">
+                        True
                     </v-btn>
                     <v-btn value="req" :class="data_type_copy.sensitiveAlways || (data_type_copy.sensitivePosition && ( data_type_copy.sensitivePosition.includes('REQUEST_PAYLOAD') || data_type_copy.sensitivePosition.includes('REQUEST_HEADER') ) )? 'sensitive-text inactive' : 'sensitive-text false'"
-                    @click="toggleSensitiveRequest">
-                        false
+                    @click="toggleSensitiveRequest"
+                    style="padding: 0 16px">
+                        False
                     </v-btn>
                 </v-btn-toggle>
             </div>
@@ -94,12 +96,14 @@
                 v-model="resToggle"
                 mandatory>
                     <v-btn value="res" :class="data_type_copy.sensitiveAlways || (data_type_copy.sensitivePosition && ( data_type_copy.sensitivePosition.includes('RESPONSE_PAYLOAD') || data_type_copy.sensitivePosition.includes('RESPONSE_HEADER') ) )? 'sensitive-text true' : 'sensitive-text inactive'"
-                    @click="toggleSensitiveResponse">
-                        true
+                    @click="toggleSensitiveResponse"
+                    style="padding: 0 16px">
+                        True
                     </v-btn>
                     <v-btn value="res" :class="data_type_copy.sensitiveAlways || (data_type_copy.sensitivePosition && ( data_type_copy.sensitivePosition.includes('RESPONSE_PAYLOAD') || data_type_copy.sensitivePosition.includes('RESPONSE_HEADER') ) )? 'sensitive-text inactive' : 'sensitive-text false'"
-                    @click="toggleSensitiveResponse">
-                        false
+                    @click="toggleSensitiveResponse"
+                    style="padding: 0 16px">
+                        False
                     </v-btn>
                 </v-btn-toggle>
             </div>
@@ -298,16 +302,13 @@ export default {
         font-weight: bold
         align-items: center
         display: flex
-        padding: 0px
-        padding-left: 12px
         vertical-align: middle
         border-radius: 4px
         text-transform: none
         letter-spacing: normal
-        width: 100%
         height: 38px !important
-        margin-bottom: 10px
-        margin-top: 10px
+        margin-bottom: 6px
+        margin-top: 6px
         &.inactive
             color: #475467
             background-color: #FCFCFD
@@ -319,6 +320,8 @@ export default {
             background-color: #FFE9E8
         &:hover
             cursor: pointer
+        &.v-btn:before
+            background-color: #FFFFFF
 
     .save-btn
         background-color: #6200EA !important
