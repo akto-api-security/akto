@@ -824,13 +824,13 @@ public class APICatalogSync {
     }
 
     public static String trim(String url) {
-        if (mergeAsyncOutside) {
-            if ( !(url.startsWith("/") ) && !( url.startsWith("http") || url.startsWith("ftp")) ){
-                url = "/" + url;
-            }
-        } else {
+        // if (mergeAsyncOutside) {
+        //     if ( !(url.startsWith("/") ) && !( url.startsWith("http") || url.startsWith("ftp")) ){
+        //         url = "/" + url;
+        //     }
+        // } else {
             if (url.startsWith("/")) url = url.substring(1, url.length());
-        }
+        // }
         
         if (url.endsWith("/")) url = url.substring(0, url.length()-1);
         return url;
