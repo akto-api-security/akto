@@ -38,8 +38,8 @@ public class URLTemplate {
         if (url.endsWith("/")) url = url.substring(0, url.length()-1);
 
         String tempUrl = this.getTemplateString();
-        if (tempUrl.startsWith("/")) url = tempUrl.substring(1, tempUrl.length());
-        if (tempUrl.endsWith("/")) url = tempUrl.substring(0, tempUrl.length()-1);
+        if (tempUrl.startsWith("/")) tempUrl = tempUrl.substring(1, tempUrl.length());
+        if (tempUrl.endsWith("/")) tempUrl = tempUrl.substring(0, tempUrl.length()-1);
 
         String a = url + " " + urlMethod.name();
         String b = tempUrl + " " + this.getMethod().name();
