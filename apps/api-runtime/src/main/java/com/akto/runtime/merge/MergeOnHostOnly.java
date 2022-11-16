@@ -45,6 +45,7 @@ public class MergeOnHostOnly {
 
         InsertManyOptions options = new InsertManyOptions();
         options.ordered(false);
+        // this allows to insert regradless of failures, i.e. in case an insert fails, it will move to insert the next one and so on...
 
         List<ApiInfo> apiInfos =  ApiInfoDao.instance.findAll("_id.apiCollectionId", oldId);
         if(apiInfos!=null && apiInfos.size()>0){
