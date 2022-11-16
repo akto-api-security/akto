@@ -60,7 +60,7 @@ public class TestApiCatalogSync extends MongoBasedTest {
     }
 
 
-    @Ignore
+    @Test
     public void testMergeAndUpdateDb() {
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiInfoDao.instance.getMCollection().drop();
@@ -110,6 +110,12 @@ public class TestApiCatalogSync extends MongoBasedTest {
             assertEquals(mergedUrl, sensitiveParamInfo.getUrl());
         }
         assertEquals(12, sensitiveParamInfoList.size());
+
+        List<FilterSampleData> filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
+        for (FilterSampleData filterSampleData: filterSampleDataList) {
+            assertEquals(mergedUrl, filterSampleData.getId().getApiInfoKey().getUrl());
+        }
+        assertEquals(3, filterSampleDataList.size());
     }
 
     public void buildAndInsert(String url) {
