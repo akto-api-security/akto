@@ -99,6 +99,7 @@ public class HttpCallParser {
     }
 
     public int createCollectionSimple(int vxlanId) {
+        System.out.println("createCollectionSimple: " + vxlanId);
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
 
@@ -111,12 +112,14 @@ public class HttpCallParser {
                 ),
                 updateOptions
         );
+        System.out.println("created: " + vxlanId);
 
         return vxlanId;
     }
 
 
     public int createCollectionBasedOnHostName(int id, String host)  throws Exception {
+        System.out.println("createCollectionBasedOnHostName: " + id + " " + host);
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
         // 3 cases
@@ -143,6 +146,7 @@ public class HttpCallParser {
             }
         }
         if (flag) { // flag tells if we were successfully able to insert collection
+            System.out.println("created CollectionBasedOnHostName: " + id);
             return id;
         } else {
             throw new Exception("Not able to insert");
@@ -189,6 +193,7 @@ public class HttpCallParser {
 
     public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
+        System.out.println("HttpCallParser.filterHttpResponseParams()");
         for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
             boolean cond = HttpResponseParams.validHttpResponseCode(httpResponseParam.getStatusCode());
             if (!cond) continue;
@@ -197,21 +202,32 @@ public class HttpCallParser {
             if (ignoreAktoFlag != null) continue;
 
             String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
+
             int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
             int apiCollectionId ;
+
+            System.out.println("host: " + hostName + " vxlanid" + vxlanId);
+
 
             if (useHostCondition(hostName, httpResponseParam.getSource())) {
                 hostName = hostName.toLowerCase();
                 hostName = hostName.trim();
 
                 String key = hostName;
+                System.out.println("key: " + key);
 
                 if (hostNameToIdMap.containsKey(key)) {
                     apiCollectionId = hostNameToIdMap.get(key);
+                    System.out.println("key found: " + apiCollectionId);
+
                 } else {
                     int id = hostName.hashCode();
                     try {
+                        System.out.println("creating collection: " + id +  " " + hostName);
+
                         apiCollectionId = createCollectionBasedOnHostName(id, hostName);
+                        System.out.println("created collection: " + apiCollectionId);
+
                         hostNameToIdMap.put(key, apiCollectionId);
                     } catch (Exception e) {
                         logger.error("Failed to create collection for host : " + hostName);
@@ -223,8 +239,9 @@ public class HttpCallParser {
 
             } else {
                 String key = "null" + " " + vxlanId;
-
+                System.out.println("use host false: " + key);
                 if (!hostNameToIdMap.containsKey(key)) {
+                    System.out.println("createCollectionSimple: " + vxlanId);
                     createCollectionSimple(vxlanId);
                     hostNameToIdMap.put(key, vxlanId);
                 }
@@ -236,6 +253,7 @@ public class HttpCallParser {
             filteredResponseParams.add(httpResponseParam);
         }
 
+        System.out.println("returning");
         return filteredResponseParams;
     }
 
