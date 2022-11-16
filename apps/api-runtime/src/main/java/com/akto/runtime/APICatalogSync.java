@@ -1136,11 +1136,14 @@ public class APICatalogSync {
                         BackwardCompatibilityDao.instance.getMCollection().updateMany(new BasicDBObject(), update);
                     }
 
-                    if (calcDiff) {
+                    try {
                         List<ApiCollection> allCollections = ApiCollectionsDao.instance.getMetaAll();
                         for(ApiCollection apiCollection: allCollections) {
                             mergeUrlsAndSave(apiCollection.getId());
                         }
+                    } catch (Exception e) {
+                        System.out.println("mergeUrlsAndSave: " + e.getMessage());
+                        e.printStackTrace();
                     }
                 }
             }
