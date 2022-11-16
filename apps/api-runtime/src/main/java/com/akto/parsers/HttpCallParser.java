@@ -14,9 +14,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import org.apache.commons.lang3.math.NumberUtils;
+import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -120,7 +122,7 @@ public class HttpCallParser {
 
     public int createCollectionBasedOnHostName(int id, String host)  throws Exception {
         System.out.println("createCollectionBasedOnHostName: " + id + " " + host);
-        UpdateOptions updateOptions = new UpdateOptions();
+        FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
         // 3 cases
         // 1. If 2 threads are trying to insert same host simultaneously then both will succeed with upsert true
@@ -130,15 +132,14 @@ public class HttpCallParser {
         for (int i=0;i < 100; i++) {
             id += i;
             try {
-                ApiCollectionsDao.instance.getMCollection().updateOne(
-                        Filters.eq(ApiCollection.HOST_NAME, host),
-                        Updates.combine(
-                            Updates.setOnInsert("_id", id),
-                            Updates.setOnInsert("startTs", Context.now()),
-                            Updates.setOnInsert("urls", new HashSet<>())
-                        ),
-                        updateOptions
+                Bson updates = Updates.combine(
+                    Updates.setOnInsert(ApiCollection.HOST_NAME, host),
+                    Updates.setOnInsert("startTs", Context.now()),
+                    Updates.setOnInsert("urls", new HashSet<>())
                 );
+
+                ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq("_id", id), updates, updateOptions);
+
                 flag = true;
                 break;
             } catch (Exception e) {
