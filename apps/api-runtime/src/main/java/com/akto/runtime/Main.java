@@ -308,6 +308,7 @@ public class Main {
           // nothing to catch. This exception is called from the shutdown hook.
         } catch (Exception e) {
             printL(e);
+            e.printStackTrace();
         } finally {
             main.consumer.close();
         }
