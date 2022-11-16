@@ -680,7 +680,7 @@ public class APICatalogSync {
                     ApiInfo apiInfo = ApiInfoDao.instance.findOne(filterQSampleData);
                     if (apiInfo != null) {
                         apiInfo.getId().url = newTemplateUrl;
-                        ApiInfoDao.instance.insertOne(apiInfo);
+                        // ApiInfoDao.instance.insertOne(apiInfo);
                         bulkUpdatesForApiInfo.add(new InsertOneModel<>(apiInfo));
                     }
 
@@ -1135,9 +1135,12 @@ public class APICatalogSync {
                         Bson update = Updates.set(BackwardCompatibility.MERGE_ON_HOST_INIT, Context.now());
                         BackwardCompatibilityDao.instance.getMCollection().updateMany(new BasicDBObject(), update);
                     }
-                    List<ApiCollection> allCollections = ApiCollectionsDao.instance.getMetaAll();
-                    for(ApiCollection apiCollection: allCollections) {
-                        mergeUrlsAndSave(apiCollection.getId());
+
+                    if (calcDiff) {
+                        List<ApiCollection> allCollections = ApiCollectionsDao.instance.getMetaAll();
+                        for(ApiCollection apiCollection: allCollections) {
+                            mergeUrlsAndSave(apiCollection.getId());
+                        }
                     }
                 }
             }
