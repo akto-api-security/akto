@@ -14,6 +14,7 @@ const team = {
         fetchTs: 0,
         team: {},
         redactPayload: null,
+        mergeAsyncOutside: null,
         dashboardVersion: null,
         apiRuntimeVersion: null,
         setupType: null
@@ -49,12 +50,14 @@ const team = {
                 state.apiRuntimeVersion = "-"
                 state.dashboardVersion = "-"
                 state.setupType = "PROD"
+                state.mergeAsyncOutside = false
             } else {
                 state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
                 state.apiRuntimeVersion = resp.accountSettings.apiRuntimeVersion ? resp.accountSettings.apiRuntimeVersion : "-"
                 state.dashboardVersion = resp.accountSettings.dashboardVersion ? resp.accountSettings.dashboardVersion : "-"
                 state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
                 state.setupType = resp.accountSettings.setupType
+                state.mergeAsyncOutside = resp.accountSettings.mergeAsyncOutside || false
             }
         },
     },
@@ -72,6 +75,11 @@ const team = {
         toggleRedactFeature({commit, dispatch, state}, v) {
             api.toggleRedactFeature(v).then((resp => {
                 state.redactPayload = v
+            }))
+        },
+        updateMergeAsyncOutside({commit, dispatch, state}) {
+            api.updateMergeAsyncOutside().then((resp => {
+                state.mergeAsyncOutside = true
             }))
         },
         updateSetupType({commit, dispatch, state}, v) {
