@@ -22,6 +22,9 @@ public class AccountSettings {
 
     public static final String AKTO_IGNORE_FLAG = "x-akto-ignore";
 
+    public static final String MERGE_ASYNC_OUTSIDE = "mergeAsyncOutside";
+    private boolean mergeAsyncOutside;
+
     public AccountSettings() {
     }
 
@@ -105,6 +108,13 @@ public class AccountSettings {
         this.centralKafkaIp = centralKafkaIp;
     }
 
+    public boolean getMergeAsyncOutside() {
+        return this.mergeAsyncOutside;
+    }
+
+    public void setMergeAsyncOutside(boolean mergeAsyncOutside) {
+        this.mergeAsyncOutside = mergeAsyncOutside;
+    }
 
     public static final int DEFAULT_CENTRAL_KAFKA_BATCH_SIZE = 999900;
     public static final int DEFAULT_CENTRAL_KAFKA_LINGER_MS = 60_000;

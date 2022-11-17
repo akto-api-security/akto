@@ -523,6 +523,10 @@ public class RequestTemplate {
     }
 
     private static boolean isWithin20Percent(Set<String> xSet, Set<String> ySet) {
+
+        if (xSet == null) xSet = new HashSet<>();
+        if (ySet == null) ySet = new HashSet<>();
+                
         int xs = xSet.size();
         int ys = ySet.size();
         if (xs == 0) return ys == 0;
@@ -553,6 +557,73 @@ public class RequestTemplate {
         return absentInX <= allowedDiffs;
     }
 
+
+    private static Map<Integer, Set<String>> groupByResponseCode(Set<String> xSet) {
+        Map<Integer, Set<String>> ret = new HashMap<>();
+        for(String x: xSet) {
+            int responseCode = Integer.parseInt(x.split(" ")[0]);
+            String param = x.split(" ")[1];
+
+            Set<String> params = ret.get(responseCode);
+            if (params == null) {
+                params = new HashSet<>();
+                ret.put(responseCode, params);
+            }
+
+            params.add(param);
+        }
+        return ret;
+    }
+
+    public static boolean compareKeys(Set<String> aReq, Set<String> bReq, URLTemplate mergedUrl) {
+        Map<Integer, Set<String>> aParams = groupByResponseCode(aReq);
+        Map<Integer, Set<String>> bParams = groupByResponseCode(bReq);
+
+        if (!isMergedOnStr(mergedUrl)) {
+            return true;
+        }
+
+        if (!isWithin20Percent(aParams.get(-1), bParams.get(-1))) {
+            return false;
+        }
+
+        aParams.remove(-1);
+        bParams.remove(-1);
+
+        for (int aStatus: aParams.keySet()) {
+            if (HttpResponseParams.validHttpResponseCode(aStatus)) {
+                if (!bParams.containsKey(aStatus)) {
+                    return false;
+                }
+            }
+        }
+
+        for (int bStatus: bParams.keySet()) {
+            if (HttpResponseParams.validHttpResponseCode(bStatus)) {
+                if (!aParams.containsKey(bStatus)) {
+                    return false;
+                }
+            }
+        }
+
+        for (int aStatus: aParams.keySet()) {
+            if (HttpResponseParams.validHttpResponseCode(aStatus)) {
+                Set<String> aResp = aParams.get(aStatus);
+                Set<String> bResp = bParams.get(aStatus);
+
+                if (aResp == null || bResp == null) {
+                    return false;
+                }
+
+                if (!isWithin20Percent(aResp, bResp)) {
+                    return false;
+                }    
+            }
+        }
+
+        return true;
+    }
+        
     private static boolean compareKeys(RequestTemplate a, RequestTemplate b, URLTemplate mergedUrl) {
         if (!isMergedOnStr(mergedUrl)) {
             return true;

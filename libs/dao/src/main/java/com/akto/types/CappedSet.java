@@ -6,6 +6,13 @@ import java.util.Set;
 public class CappedSet<T> {
 
     public static final int LIMIT = 50;
+
+    public static<T> CappedSet<T> create(T elem) {
+        CappedSet<T> ret = new CappedSet<T>();
+        ret.add(elem);
+        return ret;
+    }
+    
     Set<T> elements;
 
     public CappedSet(Set<T> elements) {
