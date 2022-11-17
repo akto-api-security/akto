@@ -320,7 +320,7 @@ public class APICatalogSync {
                 sizeToURL.put(tokens.length, urlSet);
             }
 
-            urlSet.put(rawURL, reqTemplate);
+            urlSet.put(rawURLPlusMethod, reqTemplate);
         }
 
         return sizeToURL;
