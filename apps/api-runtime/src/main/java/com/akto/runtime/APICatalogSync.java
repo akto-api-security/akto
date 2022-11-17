@@ -41,7 +41,6 @@ import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
 import org.bson.json.JsonParseException;
@@ -308,7 +307,9 @@ public class APICatalogSync {
 
     private static Map<Integer, Map<String, Set<String>>> groupByTokenSize(Map<String, Set<String>> catalog) {
         Map<Integer, Map<String, Set<String>>> sizeToURL = new HashMap<>();
-        for(String rawURL: catalog.keySet()) {
+        for(String rawURLPlusMethod: catalog.keySet()) {
+            String[] rawUrlPlusMethodSplit = rawURLPlusMethod.split(" ");
+            String rawURL = rawUrlPlusMethodSplit.length > 1 ? rawUrlPlusMethodSplit[1] : rawUrlPlusMethodSplit[0];
             Set<String> reqTemplate = catalog.get(rawURL);
             String url = APICatalogSync.trim(rawURL);
             String[] tokens = url.split("/");
