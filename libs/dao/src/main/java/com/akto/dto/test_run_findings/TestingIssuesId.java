@@ -5,6 +5,8 @@ import org.bson.codecs.pojo.annotations.BsonProperty;
 import static com.akto.util.enums.GlobalEnums.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 
+import java.util.Objects;
+
 public class TestingIssuesId {
 //    public static final String ENDPOINT_PARAMETERS = "endpoint_parameters";
 //    @BsonProperty(value = ENDPOINT_PARAMETERS)
@@ -36,6 +38,11 @@ public class TestingIssuesId {
                     && id.testErrorSource == this.testErrorSource;
         }
         return false;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(apiInfoKey, testErrorSource, testCategory);
     }
 
     public void setApiInfoKey(ApiInfoKey apiInfoKey) {
