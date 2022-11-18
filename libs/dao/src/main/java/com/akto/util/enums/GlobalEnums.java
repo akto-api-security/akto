@@ -17,7 +17,7 @@ public class GlobalEnums {
         private final String name;
         private final Severity severity;
 
-        private static final TestCategory[] values = values();
+        public static final TestCategory[] values = values();
         TestCategory(String name, Severity severity) {
             this.name = name;
             this.severity = severity;
