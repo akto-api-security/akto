@@ -70,8 +70,8 @@ public class TestingIssuesHandlerTest extends MongoBasedTest {
         Random random = new Random();
         for (int i = 0; i < 100; i++) {
             testingRunResultList.add(getTestingRunResult(new ApiInfo.ApiInfoKey(COLLECTION_ID, urls[getIndex(urls.length,random)],
-                            URLMethods.Method.values[getIndex(URLMethods.Method.values.length,random)]),
-                    GlobalEnums.TestCategory.values()[getIndex(GlobalEnums.TestCategory.values.length, random)].getName(), random));
+                            URLMethods.Method.getValuesArray()[getIndex(URLMethods.Method.getValuesArray().length,random)]),
+                    GlobalEnums.TestCategory.values()[getIndex(GlobalEnums.TestCategory.getValuesArray().length, random)].getName(), random));
         }
 
         TestingIssuesHandler.handleIssuesCreationFromTestingRunResults(testingRunResultList);

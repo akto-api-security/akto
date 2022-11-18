@@ -17,14 +17,18 @@ public class GlobalEnums {
         private final String name;
         private final Severity severity;
 
-        public static final TestCategory[] values = values();
+        private static final TestCategory[] valuesArray = values();
         TestCategory(String name, Severity severity) {
             this.name = name;
             this.severity = severity;
         }
 
+        public static TestCategory[] getValuesArray () {
+            return valuesArray;
+        }
+
         public static TestCategory getTestCategory (String category) {
-            for (TestCategory testCategory : values) {
+            for (TestCategory testCategory : valuesArray) {
                 if (testCategory.name.equalsIgnoreCase(category)) {
                     return testCategory;
                 }
