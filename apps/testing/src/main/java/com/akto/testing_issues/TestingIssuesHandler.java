@@ -22,7 +22,7 @@ import static com.akto.util.enums.GlobalEnums.*;
 
 public class TestingIssuesHandler {
 
-    private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
+    private static final Logger logger = LoggerFactory.getLogger(TestingIssuesHandler.class);
     private TestingIssuesHandler(){}
     //Update one Write models
     /*
