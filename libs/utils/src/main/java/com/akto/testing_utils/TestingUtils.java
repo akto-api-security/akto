@@ -42,15 +42,4 @@ public class TestingUtils {
         });
         return mapOfIssueIdsvsTestingRunResult;
     }
-
-
-    public static List<TestingRunIssues> testingRunIssuesList(List<TestingIssuesId> issuesIds) {
-        List<TestingRunIssues> testingRunIssuesList = new ArrayList<>(issuesIds.size());
-        issuesIds.forEach(issueId -> {
-            TestingRunIssues testingRunIssue = new TestingRunIssues(issueId, issueId.getTestCategory().getSeverity(),
-                    GlobalEnums.TestRunIssueStatus.OPEN,Context.now(),Context.now());
-            testingRunIssuesList.add(testingRunIssue);
-        });
-        return testingRunIssuesList;
-    }
 }
