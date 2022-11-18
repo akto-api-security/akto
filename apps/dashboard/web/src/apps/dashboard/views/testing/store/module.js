@@ -5,7 +5,7 @@ import api from '../api'
 
 Vue.use(Vuex)
 
-var state = {
+const state = { 
     loading: false,
     testingRuns: [],
     pastTestingRuns: [],

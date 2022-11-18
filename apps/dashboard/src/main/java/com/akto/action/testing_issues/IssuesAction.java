@@ -15,7 +15,6 @@ public class IssuesAction extends UserAction {
 
     private List<TestingRunIssues> issues;
     private List<ApiCollection> collections;
-    //todo Fetch top 1000 sorted by latest timestamp
     public String fetchAllIssues() {
         Bson sort = Sorts.descending(TestingRunIssues.CREATION_TIME);
         issues = TestingRunIssuesDao.instance.findAll(new BasicDBObject(),0,1000,sort);

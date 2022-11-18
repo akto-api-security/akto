@@ -78,9 +78,10 @@ export default {
     font-size: 14px;
     align-items: right;
     color: #101828;
+}
 
 .issue-time {
-    font-family: 'Poppins' , 'sans-serif';
+    font-family: 'Poppins', 'sans-serif';
     font-style: normal;
     font-weight: 500;
     font-size: 14px;
@@ -90,21 +91,17 @@ export default {
 }
 
 .issue-endpoint {
-    font-family: 'Poppins' , 'sans-serif';
+    font-family: 'Poppins', 'sans-serif';
     font-style: normal;
     font-weight: 400;
     font-size: 14px;
     /* identical to box height */
     align-items: left;
     color: #101828;
-
-
-    /* Inside auto layout */
-
 }
 
-.issue-method {
-    font-family: 'Poppins' , 'sans-serif';
+.issue-method { 
+    font-family: 'Poppins', 'sans-serif';
     font-style: normal;
     font-weight: 400;
     font-size: 14px;
@@ -113,8 +110,6 @@ export default {
     align-items: left;
     margin-right: 10px;
     color: #5C04D5;
-
-
 }
 
 .display-flex {
@@ -125,7 +120,7 @@ export default {
 }
 
 .issue-title {
-    font-family: 'Poppins' , 'sans-serif';
+    font-family: 'Poppins', 'sans-serif';
     font-style: normal;
     font-weight: 500;
     font-size: 24px;
@@ -137,8 +132,7 @@ export default {
 }
 
 .issue-description {
-
-    font-family: 'Poppins' , 'sans-serif';
+    font-family: 'Poppins', 'sans-serif';
     font-style: normal;
     font-weight: 400;
     font-size: 16px;
