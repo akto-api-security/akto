@@ -38,18 +38,19 @@ public class TestingIssuesHandler {
             TestingRunResult runResult = testingIssuesIdsMap.get(getIssuesIdFromMap(issuesId, testingIssuesIdsMap));
             TestRunIssueStatus status = testingRunIssues.getTestRunIssueStatus();
             Bson query = Filters.eq(ID, issuesId);
-            Bson updateStatusFields, updateSeverityField;
+            Bson updateStatusFields;
+            Bson updateSeverityField;
             if (runResult.isVulnerable()) {
                 if (status == TestRunIssueStatus.IGNORED) {
                     updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.IGNORED);
                 } else {
                     updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN);
                 }
-                updateSeverityField = Updates.set(TestingRunIssues.SEVERITY,
+                updateSeverityField = Updates.set(TestingRunIssues.KEY_SEVERITY,
                         TestCategory.valueOf(runResult.getTestSuperType()).getSeverity());
             } else {
                 updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED);
-                updateSeverityField = Updates.set(TestingRunIssues.SEVERITY,
+                updateSeverityField = Updates.set(TestingRunIssues.KEY_SEVERITY,
                         Severity.LOW);
             }
             Bson updateFields = Updates.combine(

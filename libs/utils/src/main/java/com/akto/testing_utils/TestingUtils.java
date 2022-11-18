@@ -17,7 +17,7 @@ public class TestingUtils {
 
     private static boolean doesExists(List<TestingIssuesId> idList, TestingIssuesId issueId) {
         final boolean[] found = {false};
-        idList.forEach((issue) -> {
+        idList.forEach(issue -> {
             if (issue.equals(issueId)) {
                 found[0] = true;
             }
@@ -30,7 +30,7 @@ public class TestingUtils {
 
         HashMap<TestingIssuesId, TestingRunResult> mapOfIssueIdsvsTestingRunResult = new HashMap<>();
         List<TestingIssuesId> idList = new ArrayList<>();
-        testingRunResults.forEach((runResult) -> {
+        testingRunResults.forEach(runResult -> {
             TestingIssuesId issueId = new TestingIssuesId(runResult.getApiInfoKey(),
                     isAutomatedTesting ?
                             GlobalEnums.TestErrorSource.AUTOMATED_TESTING : GlobalEnums.TestErrorSource.RUNTIME,
@@ -46,7 +46,7 @@ public class TestingUtils {
 
     public static List<TestingRunIssues> testingRunIssuesList(List<TestingIssuesId> issuesIds) {
         List<TestingRunIssues> testingRunIssuesList = new ArrayList<>(issuesIds.size());
-        issuesIds.forEach((issueId) -> {
+        issuesIds.forEach(issueId -> {
             TestingRunIssues testingRunIssue = new TestingRunIssues(issueId, issueId.getTestCategory().getSeverity(),
                     GlobalEnums.TestRunIssueStatus.OPEN,Context.now(),Context.now());
             testingRunIssuesList.add(testingRunIssue);

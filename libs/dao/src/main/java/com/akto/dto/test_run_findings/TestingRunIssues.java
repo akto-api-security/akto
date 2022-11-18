@@ -1,20 +1,8 @@
 package com.akto.dto.test_run_findings;
 
-import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.util.enums.GlobalEnums;
 
 public class TestingRunIssues {
-    //    public static final String TESTING_ISSUES_ID = "testing_issues_id";
-    //    @BsonProperty(value = TESTING_ISSUES_ID)
-
-    //    @BsonProperty(value = ISSUE_SEVERITY)
-
-    //    @BsonProperty(value = CREATION_TIME)
-
-    //    @BsonProperty(value = START_TIME)
-
-
-    //    @BsonProperty(value = TEST_RUN_ISSUES)
     public static final String TEST_RUN_ISSUES_STATUS = "testRunIssueStatus";
 
     private GlobalEnums.TestRunIssueStatus testRunIssueStatus;
@@ -27,7 +15,7 @@ public class TestingRunIssues {
     private int creationTime;
 
 
-    public static final String SEVERITY = "severity";
+    public static final String KEY_SEVERITY = "severity";
     private GlobalEnums.Severity severity;
 
     public TestingRunIssues(TestingIssuesId id, GlobalEnums.Severity severity, GlobalEnums.TestRunIssueStatus status,
