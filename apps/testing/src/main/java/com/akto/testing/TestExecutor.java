@@ -109,7 +109,7 @@ public class TestExecutor {
             logger.info("inserted counts : {}", result.getInsertedCount());
             logger.info("Modified counts : {}", result.getModifiedCount());
         }catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Error while inserting issues into db: {}",e.getMessage());
         }
 
         TestingRunResultDao.instance.insertMany(testingRunResults);
