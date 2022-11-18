@@ -53,6 +53,16 @@
             </div>
         </div>
 
+        <div class="toggle-redact-feature" v-if="!localMergeAsyncOutside">
+            <div class="entry-text">Activate new merging</div>
+            <div class="entry-value">
+                <v-switch
+                    color="#6200EA"
+                    v-model="localMergeAsyncOutside"
+                />
+            </div>
+        </div>
+
     </div>
 </template>
 
@@ -76,7 +86,7 @@ import {mapState} from 'vuex'
             this.$store.dispatch('team/fetchAdminSettings')
         },
         computed: {
-            ...mapState('team', ['redactPayload', 'setupType', 'dashboardVersion', 'apiRuntimeVersion']),
+            ...mapState('team', ['redactPayload', 'setupType', 'dashboardVersion', 'apiRuntimeVersion', 'mergeAsyncOutside']),
             localRedactPayload: {
                 get() {
                     return this.redactPayload
@@ -92,6 +102,14 @@ import {mapState} from 'vuex'
               set(v) {
                 this.$store.dispatch('team/updateSetupType', v)
               }
+            },
+            localMergeAsyncOutside: {
+                get() {
+                    return this.mergeAsyncOutside
+                },
+                set(v) {
+                    this.$store.dispatch('team/updateMergeAsyncOutside')
+                }
             }
         }
     }

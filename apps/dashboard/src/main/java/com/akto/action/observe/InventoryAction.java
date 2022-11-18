@@ -121,8 +121,8 @@ public class InventoryAction extends UserAction {
 
     public List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId) {
 
-        ApiCollection apiCollection = ApiCollectionsDao.instance.findAll(Filters.eq("_id", apiCollectionId), Projections.exclude("urls")).get(0);
-
+        ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+        
         if (apiCollection.getHostName() == null || apiCollection.getHostName().length() == 0 ) {
             return fetchEndpointsInCollection(apiCollectionId);
         } else {
