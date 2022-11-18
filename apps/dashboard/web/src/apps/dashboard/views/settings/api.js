@@ -131,6 +131,16 @@ export default {
         })
     },
 
+    updateMergeAsyncOutside() {
+        return request({
+            url: '/api/updateMergeAsyncOutside',
+            method: 'post',
+            data: {
+                
+            }
+        });
+    },
+
     updateSetupType(setupType) {
         return request({
             url: '/api/updateSetupType',

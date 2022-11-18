@@ -17,6 +17,9 @@ public class BackwardCompatibility {
     public static final String ADD_AKTO_DATA_TYPES = "addAktoDataTypes";
     private int addAktoDataTypes;
 
+    public static final String MERGE_ON_HOST_INIT = "mergeOnHostInit";
+    private int mergeOnHostInit;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult, int readyForNewTestingFramework,int addAktoDataTypes) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
@@ -75,5 +78,13 @@ public class BackwardCompatibility {
 
     public void setAddAktoDataTypes(int addAktoDataTypes) {
         this.addAktoDataTypes = addAktoDataTypes;
+    }
+    
+    public int getMergeOnHostInit() {
+        return this.mergeOnHostInit;
+    }
+
+    public void setMergeOnHostInit(int mergeOnHostInit) {
+        this.mergeOnHostInit = mergeOnHostInit;
     }
 }
