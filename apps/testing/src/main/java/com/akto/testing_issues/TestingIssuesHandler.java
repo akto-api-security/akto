@@ -5,7 +5,6 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestingRunResult;
-import com.akto.testing.TestExecutor;
 import com.akto.testing_utils.TestingUtils;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.*;
