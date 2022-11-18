@@ -13,7 +13,6 @@ import com.akto.rules.*;
 import com.akto.store.SampleMessageStore;
 import com.akto.testing_issues.TestingIssuesHandler;
 import com.mongodb.BasicDBObject;
-import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.types.ObjectId;
@@ -102,15 +101,8 @@ public class TestExecutor {
             }
         }
 
-
-        try {
-            BulkWriteResult result = TestingIssuesHandler.handleIssuesCreationFromTestingRunResults(testingRunResults);
-            logger.info("Matched records : {}", result.getMatchedCount());
-            logger.info("inserted counts : {}", result.getInsertedCount());
-            logger.info("Modified counts : {}", result.getModifiedCount());
-        }catch (Exception e) {
-            logger.error("Error while inserting issues into db: {}",e.getMessage());
-        }
+        //Creating issues from testingRunResults
+        TestingIssuesHandler.handleIssuesCreationFromTestingRunResults(testingRunResults);
 
         TestingRunResultDao.instance.insertMany(testingRunResults);
 

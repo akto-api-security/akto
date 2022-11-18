@@ -19,7 +19,6 @@ public class IssuesAction extends UserAction {
         Bson sort = Sorts.descending(TestingRunIssues.CREATION_TIME);
         issues = TestingRunIssuesDao.instance.findAll(new BasicDBObject(),0,1000,sort);
         collections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
-
         return SUCCESS.toUpperCase();
     }
 

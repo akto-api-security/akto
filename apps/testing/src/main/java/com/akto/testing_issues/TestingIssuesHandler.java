@@ -5,10 +5,13 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.testing.TestExecutor;
 import com.akto.testing_utils.TestingUtils;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,7 +22,7 @@ import static com.akto.util.enums.GlobalEnums.*;
 
 public class TestingIssuesHandler {
 
-
+    private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
     private TestingIssuesHandler(){}
     //Update one Write models
     /*
@@ -94,7 +97,7 @@ public class TestingIssuesHandler {
         });
     }
 
-    public static BulkWriteResult handleIssuesCreationFromTestingRunResults (List<TestingRunResult> testingRunResultList) {
+    public static void handleIssuesCreationFromTestingRunResults (List<TestingRunResult> testingRunResultList) {
 
         Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap = TestingUtils.
                 listOfIssuesIdsFromTestingRunResults(testingRunResultList,true);
@@ -109,6 +112,13 @@ public class TestingIssuesHandler {
         handler.writeUpdateQueryIntoWriteModel(writeModelList,testingIssuesIdsMap,testingRunIssuesList);
         handler.insertVulnerableTestsIntoIssuesCollection(writeModelList, testingIssuesIdsMap, testingRunIssuesList);
 
-        return TestingRunIssuesDao.instance.bulkWrite(writeModelList);
+        try {
+            BulkWriteResult result = TestingRunIssuesDao.instance.bulkWrite(writeModelList);
+            logger.info("Matched records : {}", result.getMatchedCount());
+            logger.info("inserted counts : {}", result.getInsertedCount());
+            logger.info("Modified counts : {}", result.getModifiedCount());
+        }catch (Exception e) {
+            logger.error("Error while inserting issues into db: {}",e.getMessage());
+        }
     }
 }
