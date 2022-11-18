@@ -33,7 +33,7 @@ export default {
         collectionName: obj.strR,
         categoryName: obj.strR,
         categoryDescription: obj.strR,
-        testType: obj.strR,
+        testType: obj.strR
     },
     methods: {
         getCreationTime(creationTime) {
@@ -72,16 +72,15 @@ export default {
 }
 
 .issue-collection {
-    font-family: 'Poppins';
+    font-family: 'Poppins', 'sans-serif';
     font-style: normal;
     font-weight: 500;
     font-size: 14px;
     align-items: right;
     color: #101828;
-}
 
 .issue-time {
-    font-family: 'Poppins';
+    font-family: 'Poppins' , 'sans-serif';
     font-style: normal;
     font-weight: 500;
     font-size: 14px;
@@ -91,7 +90,7 @@ export default {
 }
 
 .issue-endpoint {
-    font-family: 'Poppins';
+    font-family: 'Poppins' , 'sans-serif';
     font-style: normal;
     font-weight: 400;
     font-size: 14px;
@@ -105,7 +104,7 @@ export default {
 }
 
 .issue-method {
-    font-family: 'Poppins';
+    font-family: 'Poppins' , 'sans-serif';
     font-style: normal;
     font-weight: 400;
     font-size: 14px;
@@ -126,7 +125,7 @@ export default {
 }
 
 .issue-title {
-    font-family: 'Poppins';
+    font-family: 'Poppins' , 'sans-serif';
     font-style: normal;
     font-weight: 500;
     font-size: 24px;
@@ -139,7 +138,7 @@ export default {
 
 .issue-description {
 
-    font-family: 'Poppins';
+    font-family: 'Poppins' , 'sans-serif';
     font-style: normal;
     font-weight: 400;
     font-size: 16px;

@@ -39,13 +39,10 @@ export default {
             switch (name) {
                 case 'AUTOMATED_TESTING':
                     return 'testing';
-                    break;
                 case 'RUNTIME':
                     return 'runtime'
-                    break;
                 default:
                     return ''
-                    break;
             }
 
         },
