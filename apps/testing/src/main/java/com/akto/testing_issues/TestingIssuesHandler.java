@@ -22,7 +22,6 @@ import static com.akto.util.enums.GlobalEnums.*;
 public class TestingIssuesHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(TestingIssuesHandler.class);
-    public TestingIssuesHandler(){}
     //Update one Write models
     /*
      * Checks the status of issue from db,
@@ -108,8 +107,6 @@ public class TestingIssuesHandler {
         List<TestingRunIssues> testingRunIssuesList = TestingRunIssuesDao.instance.findAll(inQuery);
 
         List<WriteModel<TestingRunIssues>> writeModelList = new ArrayList<>();
-
-        TestingIssuesHandler handler = new TestingIssuesHandler();
 
         writeUpdateQueryIntoWriteModel(writeModelList,testingIssuesIdsMap,testingRunIssuesList);
         insertVulnerableTestsIntoIssuesCollection(writeModelList, testingIssuesIdsMap, testingRunIssuesList);
