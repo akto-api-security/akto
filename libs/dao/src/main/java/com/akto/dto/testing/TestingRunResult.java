@@ -36,12 +36,6 @@ public class TestingRunResult {
     public static final String TEST_RUN_RESULT_SUMMARY_ID = "testRunResultSummaryId";
     private ObjectId testRunResultSummaryId;
 
-    /*
-     * Assumption : All tests are BOLA
-     *              If vulnerable --> Severity High
-     *              If not vulnerable --> Confidence Low  --> Severity High
-     * */
-
     public TestingRunResult() { }
 
     public TestingRunResult(ObjectId testRunId, ApiInfo.ApiInfoKey apiInfoKey, String testSuperType, String testSubType,

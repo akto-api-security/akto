@@ -74,12 +74,13 @@ public class TestingIssuesHandlerTest extends MongoBasedTest {
                     GlobalEnums.TestCategory.values()[getIndex(GlobalEnums.TestCategory.getValuesArray().length, random)].getName(), random));
         }
 
-        TestingIssuesHandler.handleIssuesCreationFromTestingRunResults(testingRunResultList);
+        TestingIssuesHandler handler = new TestingIssuesHandler();
+        handler.handleIssuesCreationFromTestingRunResults(testingRunResultList);
         insertIgnoredKey();
-        TestingIssuesHandler.handleIssuesCreationFromTestingRunResults(testingRunResultList);
+        handler.handleIssuesCreationFromTestingRunResults(testingRunResultList);
         TestingRunResult runResult = testingRunResultList.get(5);
         runResult.setVulnerable(false);
-        TestingIssuesHandler.handleIssuesCreationFromTestingRunResults(testingRunResultList);
+        handler.handleIssuesCreationFromTestingRunResults(testingRunResultList);
         //When all said and done, total issue can't be more than 36
 
         int size = TestingRunIssuesDao.instance.findAll(new BasicDBObject()).size();

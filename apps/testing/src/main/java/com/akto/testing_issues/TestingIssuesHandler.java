@@ -22,7 +22,7 @@ import static com.akto.util.enums.GlobalEnums.*;
 public class TestingIssuesHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(TestingIssuesHandler.class);
-    private TestingIssuesHandler(){}
+    public TestingIssuesHandler(){}
     //Update one Write models
     /*
      * Checks the status of issue from db,
@@ -38,6 +38,9 @@ public class TestingIssuesHandler {
             TestingIssuesId issuesId = testingRunIssues.getId();
 
             TestingRunResult runResult = testingIssuesIdsMap.get(getIssuesIdFromMap(issuesId, testingIssuesIdsMap));
+            if (runResult == null) {
+                return;
+            }
             TestRunIssueStatus status = testingRunIssues.getTestRunIssueStatus();
             Bson query = Filters.eq(ID, issuesId);
             Bson updateStatusFields;
@@ -68,13 +71,12 @@ public class TestingIssuesHandler {
 
     private TestingIssuesId getIssuesIdFromMap(TestingIssuesId issuesId,
                                                Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap) {
-        final TestingIssuesId[] result = {null};
-        testingIssuesIdsMap.keySet().forEach(testingIssuesId -> {
+        for (TestingIssuesId testingIssuesId : testingIssuesIdsMap.keySet()) {
             if (testingIssuesId.equals(issuesId)) {
-                result[0] = testingIssuesId;
+                return testingIssuesId;
             }
-        });
-        return result[0];
+        }
+        return new TestingIssuesId();
     }
 
     private void insertVulnerableTestsIntoIssuesCollection(List<WriteModel<TestingRunIssues>> writeModelList,
@@ -82,13 +84,14 @@ public class TestingIssuesHandler {
                                                            List<TestingRunIssues> testingRunIssuesList) {
         int lastSeen = Context.now();
         testingIssuesIdsMap.forEach((testingIssuesId, runResult) -> {
-            final boolean[] doesExists = {false};
-            testingRunIssuesList.forEach(testingRunIssues -> {
+            boolean doesExists  = false;
+            for (TestingRunIssues testingRunIssues : testingRunIssuesList) {
                 if (testingRunIssues.getId().equals(testingIssuesId)) {
-                    doesExists[0] = true;
+                    doesExists = true;
+                    break;
                 }
-            });
-            if (!doesExists[0] && runResult.isVulnerable()) {
+            }
+            if (!doesExists && runResult.isVulnerable()) {
                 writeModelList.add(new InsertOneModel<>(new TestingRunIssues(testingIssuesId,
                         TestCategory.valueOf(runResult.getTestSuperType()).getSeverity(),
                         TestRunIssueStatus.OPEN, lastSeen, lastSeen)));
@@ -96,7 +99,7 @@ public class TestingIssuesHandler {
         });
     }
 
-    public static void handleIssuesCreationFromTestingRunResults (List<TestingRunResult> testingRunResultList) {
+    public void handleIssuesCreationFromTestingRunResults (List<TestingRunResult> testingRunResultList) {
 
         Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap = TestingUtils.
                 listOfIssuesIdsFromTestingRunResults(testingRunResultList,true);
@@ -108,11 +111,11 @@ public class TestingIssuesHandler {
 
         TestingIssuesHandler handler = new TestingIssuesHandler();
 
-        handler.writeUpdateQueryIntoWriteModel(writeModelList,testingIssuesIdsMap,testingRunIssuesList);
-        handler.insertVulnerableTestsIntoIssuesCollection(writeModelList, testingIssuesIdsMap, testingRunIssuesList);
+        writeUpdateQueryIntoWriteModel(writeModelList,testingIssuesIdsMap,testingRunIssuesList);
+        insertVulnerableTestsIntoIssuesCollection(writeModelList, testingIssuesIdsMap, testingRunIssuesList);
 
         try {
-            BulkWriteResult result = TestingRunIssuesDao.instance.bulkWrite(writeModelList);
+            BulkWriteResult result = TestingRunIssuesDao.instance.bulkWrite(writeModelList, new BulkWriteOptions().ordered(false));
             logger.info("Matched records : {}", result.getMatchedCount());
             logger.info("inserted counts : {}", result.getInsertedCount());
             logger.info("Modified counts : {}", result.getModifiedCount());

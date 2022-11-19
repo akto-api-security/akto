@@ -14,13 +14,12 @@ public class TestingUtils {
     private TestingUtils() {}
 
     private static boolean doesExists(List<TestingIssuesId> idList, TestingIssuesId issueId) {
-        final boolean[] found = {false};
-        idList.forEach(issue -> {
+        for (TestingIssuesId issue : idList) {
             if (issue.equals(issueId)) {
-                found[0] = true;
+                return true;
             }
-        });
-        return found[0];
+        }
+        return false;
     }
 
     public static Map<TestingIssuesId, TestingRunResult> listOfIssuesIdsFromTestingRunResults(List<TestingRunResult> testingRunResults,

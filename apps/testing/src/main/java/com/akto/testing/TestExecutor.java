@@ -102,7 +102,8 @@ public class TestExecutor {
         }
 
         //Creating issues from testingRunResults
-        TestingIssuesHandler.handleIssuesCreationFromTestingRunResults(testingRunResults);
+        TestingIssuesHandler handler = new TestingIssuesHandler();
+        handler.handleIssuesCreationFromTestingRunResults(testingRunResults);
 
         TestingRunResultDao.instance.insertMany(testingRunResults);
 

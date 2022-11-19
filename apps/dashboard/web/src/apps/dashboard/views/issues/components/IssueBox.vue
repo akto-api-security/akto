@@ -1,8 +1,10 @@
 <template>
     <div class="issue-box" :class="getSeverityClass(severity)">
-        <div class="issue-title">{{ categoryName }}</div>
+        <div class="display-flex-heading">
+            <div class="issue-title">{{ categoryName }}</div>
+        </div>
         <div class="issue-description">{{ categoryDescription }}</div>
-        <div class="display-flex">
+        <div class="display-flex-url">
             <span>
                 <v-icon class="margin-left-24">$fas_cog</v-icon>
                 <span class="issue-method">{{ method }}</span>
@@ -21,6 +23,7 @@
 <script>
 
 import obj from "@/util/obj"
+import func from '@/util/func'
 
 export default {
     name: "IssueBox",
@@ -36,18 +39,9 @@ export default {
         testType: obj.strR
     },
     methods: {
-        getCreationTime(creationTime) {
-            let epoch = Date.now();
-            let difference = epoch / 1000 - creationTime;
-            let numberOfDays = difference / (60 * 60 * 24)
-            if (numberOfDays < 31) {
-                return parseInt(numberOfDays) + ' d';
-            } else if (numberOfDays < 366) {
-                return parseInt(numberOfDays / 31) + ' m' + parseInt(numberOfDays % 31) + ' d';
-            } else {
-                return parseInt(numberOfDays / 365) + ' y' + parseInt((numberOfDays % 365) / 31) + ' m'
-                    + parseInt((numberOfDays % 365) % 31) + ' d';
-            }
+        getCreationTime: func.getCreationTime,
+        getSeverityName(severity) {
+            return severity.charAt(0) + severity.slice(1).toLowerCase();
         },
         getSeverityClass(severity) {
             return {
@@ -62,6 +56,11 @@ export default {
 </script>
 
 <style scoped >
+
+.display-flex-heading {
+    display: inline-flex;
+}
+
 .collection-span-css {
     float: none;
     align-self: right;
@@ -112,7 +111,7 @@ export default {
     color: #5C04D5;
 }
 
-.display-flex {
+.display-flex-url {
     display: flex;
     flex-direction: row;
     justify-content: space-between;
