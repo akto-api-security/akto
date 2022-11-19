@@ -11,6 +11,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 import org.bson.types.ObjectId;
 import org.junit.Assert;
 import org.junit.Test;
@@ -21,23 +22,14 @@ import java.util.List;
 import java.util.Random;
 
 import static com.akto.util.Constants.ID;
+import static org.junit.Assert.*;
 
 public class TestingIssuesHandlerTest extends MongoBasedTest {
 
     private static int COLLECTION_ID = 123;
-    private static String COLLECTION_NAME = "Testing_issue_collection";
     private static String[] urls = new String[]{
             "url1"
     };
-
-    private void insertIgnoredKey () {
-        TestingRunIssues issues = TestingRunIssuesDao.instance.findOne(new BasicDBObject());
-        issues.setTestRunIssueStatus(GlobalEnums.TestRunIssueStatus.IGNORED);
-        TestingRunIssuesDao.instance.replaceOne(new BasicDBObject(ID, issues.getId()),issues);
-    }
-
-    private void insertNotVulnerable () {
-    }
 
     private int getIndex (int length, Random random) {
         return Math.abs(random.nextInt()) % length;
@@ -76,15 +68,31 @@ public class TestingIssuesHandlerTest extends MongoBasedTest {
 
         TestingIssuesHandler handler = new TestingIssuesHandler();
         handler.handleIssuesCreationFromTestingRunResults(testingRunResultList);
-        insertIgnoredKey();
+
+        TestingRunIssues issues = TestingRunIssuesDao.instance.findOne(new BasicDBObject());
+        issues.setTestRunIssueStatus(GlobalEnums.TestRunIssueStatus.IGNORED);
+        TestingRunIssuesDao.instance.replaceOne(new BasicDBObject(ID, issues.getId()),issues);
+
         handler.handleIssuesCreationFromTestingRunResults(testingRunResultList);
+
+        TestingRunIssues issuesReturned = TestingRunIssuesDao.instance.findOne(Filters.eq(ID, issues.getId()));
+
+        assertEquals(GlobalEnums.TestRunIssueStatus.IGNORED, issuesReturned.getTestRunIssueStatus());
+
         TestingRunResult runResult = testingRunResultList.get(5);
         runResult.setVulnerable(false);
         handler.handleIssuesCreationFromTestingRunResults(testingRunResultList);
+
+        issues = TestingRunIssuesDao.instance.findOne(Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.FIXED));
+        assertNotNull(issues);
         //When all said and done, total issue can't be more than 36
 
         int size = TestingRunIssuesDao.instance.findAll(new BasicDBObject()).size();
-        Assert.assertTrue(size <= 36);
+        assertTrue(size <=
+                urls.length
+                        * URLMethods.Method.getValuesArray().length
+                        * GlobalEnums.TestCategory.getValuesArray().length
+        );
 
     }
 }
