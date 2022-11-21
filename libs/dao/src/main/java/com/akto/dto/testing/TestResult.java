@@ -14,10 +14,6 @@ public class TestResult extends GenericTestResult {
         HIGH, MEDIUM, LOW
     }
 
-    public enum Severity {
-        CRITICAL, HIGH, MEDIUM, LOW, INFO
-    }
-
     public enum TestError {
         NO_PATH("No sample data found for the API"),
         NO_MESSAGE_WITH_AUTH_TOKEN("No sample data found for the API which contains the auth token"),
@@ -27,7 +23,7 @@ public class TestResult extends GenericTestResult {
         FAILED_TO_CONVERT_TEST_REQUEST_TO_STRING("Failed to store test"),
         NO_AUTH_TOKEN_FOUND("No authentication token found");
 
-        private String message;
+        private final String message;
 
         TestError(String message) {
             this.message = message;

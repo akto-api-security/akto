@@ -934,6 +934,16 @@
             </result>
         </action>
 
+        <action name="api/fetchAllIssues" class="com.akto.action.testing_issues.IssuesAction" method="fetchAllIssues">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
         <action name="api/createWorkflowTest" class="com.akto.action.testing.WorkflowTestAction" method="createWorkflowTest">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
