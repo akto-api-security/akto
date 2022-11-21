@@ -133,6 +133,7 @@ public class DaoInit {
         // .build();
         ClassModel<AwsResources> awsResourcesModel = ClassModel.builder(AwsResources.class).enableDiscriminator(true)
                 .build();
+        ClassModel<AktoDataType> AktoDataTypeClassModel = ClassModel.builder(AktoDataType.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(queueEntryClassModel,
                 configClassModel,
@@ -150,7 +151,8 @@ public class DaoInit {
                 testingEndpointsClassModel, customTestingEndpointsClassModel, collectionWiseTestingEndpointsClassModel,
                 workflowTestingEndpointsClassModel, workflowTestResultClassModel,
                 cappedSetClassModel, CustomWebhookClassModel, CustomWebhookResultClassModel,
-                nodeResultClassModel, awsResourcesModel, testingRunIssuesClassModel, testingIssuesIdClassModel).automatic(true).build());
+                nodeResultClassModel, awsResourcesModel, AktoDataTypeClassModel, testingRunIssuesClassModel,
+                testingIssuesIdClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -169,6 +171,8 @@ public class DaoInit {
                 new EnumCodec<>(WorkflowNodeDetails.Type.class),
                 new EnumCodec<>(SingleTypeInfo.Domain.class),
                 new EnumCodec<>(CustomWebhook.ActiveStatus.class),
+                new EnumCodec<>(TestResult.Confidence.class),
+                new EnumCodec<>(SingleTypeInfo.Position.class),
                 new EnumCodec<>(TestResult.Confidence.class),
                 new EnumCodec<>(GlobalEnums.TestRunIssueStatus.class),
                 new EnumCodec<>(GlobalEnums.TestErrorSource.class),
