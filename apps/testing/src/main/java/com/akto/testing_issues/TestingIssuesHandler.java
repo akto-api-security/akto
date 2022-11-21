@@ -63,7 +63,7 @@ public class TestingIssuesHandler {
                     Updates.set(TestingRunIssues.LAST_SEEN, lastSeen),
                     Updates.set(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, runResult.getTestRunResultSummaryId())
             );
-            logger.info("Updating the issue with id {}, with update parameters and result_summary_Id :{} ", issuesId.toString()
+            logger.info("Updating the issue with id {}, with update parameters and result_summary_Id :{} ", issuesId
                     ,runResult.getTestRunResultSummaryId());
 
             writeModelList.add(new UpdateOneModel<>(query, updateFields));
@@ -97,7 +97,7 @@ public class TestingIssuesHandler {
                 writeModelList.add(new InsertOneModel<>(new TestingRunIssues(testingIssuesId,
                         TestSubCategory.getTestCategory(runResult.getTestSubType()).getSuperCategory().getSeverity(),
                         TestRunIssueStatus.OPEN, lastSeen, lastSeen, runResult.getTestRunResultSummaryId())));
-                logger.info("Inserting the id {} , with summary Id as {}", testingIssuesId.toString(), runResult.getTestRunResultSummaryId());
+                logger.info("Inserting the id {} , with summary Id as {}", testingIssuesId, runResult.getTestRunResultSummaryId());
             }
         });
     }
