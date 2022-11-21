@@ -11,7 +11,8 @@ import java.util.Map;
 
 public class TestingUtils {
     //Private constructor so that it's just a utility class
-    private TestingUtils() {}
+    private TestingUtils() {
+    }
 
     private static boolean doesExists(List<TestingIssuesId> idList, TestingIssuesId issueId) {
         for (TestingIssuesId issue : idList) {
@@ -31,7 +32,7 @@ public class TestingUtils {
             TestingIssuesId issueId = new TestingIssuesId(runResult.getApiInfoKey(),
                     isAutomatedTesting ?
                             GlobalEnums.TestErrorSource.AUTOMATED_TESTING : GlobalEnums.TestErrorSource.RUNTIME,
-                    GlobalEnums.TestCategory.getTestCategory(runResult.getTestSuperType()));
+                    GlobalEnums.TestSubCategory.getTestCategory(runResult.getTestSubType()));
             if (!doesExists(idList, issueId)) {
                 idList.add(issueId);
                 mapOfIssueIdsvsTestingRunResult.put(issueId, runResult);

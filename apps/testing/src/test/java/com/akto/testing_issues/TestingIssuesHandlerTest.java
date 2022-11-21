@@ -13,7 +13,6 @@ import com.akto.util.enums.GlobalEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import org.bson.types.ObjectId;
-import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -26,15 +25,14 @@ import static org.junit.Assert.*;
 
 public class TestingIssuesHandlerTest extends MongoBasedTest {
 
-    private static int COLLECTION_ID = 123;
-    private static String[] urls = new String[]{
+    private static final String[] urls = new String[]{
             "url1"
     };
 
     private int getIndex (int length, Random random) {
         return Math.abs(random.nextInt()) % length;
     }
-    private TestingRunResult getTestingRunResult (ApiInfo.ApiInfoKey apiInfoKey, String testSuperType, Random random) {
+    private TestingRunResult getTestingRunResult (ApiInfo.ApiInfoKey apiInfoKey, String testSubType, Random random) {
         List<ObjectId> ids = new ArrayList<>();
         ids.add(new ObjectId(new Date(System.currentTimeMillis())));
         ids.add(new ObjectId(new Date(System.currentTimeMillis() - 1000 * 60 * 60)));
@@ -45,8 +43,8 @@ public class TestingIssuesHandlerTest extends MongoBasedTest {
         List<SingleTypeInfo> singleTypeInfosList = new ArrayList<>();
         return new TestingRunResult(ids.get(getIndex(ids.size(),random)),
                 apiInfoKey,
-                testSuperType,
                 "",
+                testSubType,
                 results,
                 true,
                 singleTypeInfosList,
@@ -61,9 +59,10 @@ public class TestingIssuesHandlerTest extends MongoBasedTest {
         List<TestingRunResult> testingRunResultList = new ArrayList<>();
         Random random = new Random();
         for (int i = 0; i < 100; i++) {
+            int COLLECTION_ID = 123;
             testingRunResultList.add(getTestingRunResult(new ApiInfo.ApiInfoKey(COLLECTION_ID, urls[getIndex(urls.length,random)],
                             URLMethods.Method.getValuesArray()[getIndex(URLMethods.Method.getValuesArray().length,random)]),
-                    GlobalEnums.TestCategory.values()[getIndex(GlobalEnums.TestCategory.getValuesArray().length, random)].getName(), random));
+                    GlobalEnums.TestSubCategory.getValuesArray()[getIndex(GlobalEnums.TestSubCategory.getValuesArray().length, random)].getName(), random));
         }
 
         TestingIssuesHandler handler = new TestingIssuesHandler();
@@ -91,7 +90,7 @@ public class TestingIssuesHandlerTest extends MongoBasedTest {
         assertTrue(size <=
                 urls.length
                         * URLMethods.Method.getValuesArray().length
-                        * GlobalEnums.TestCategory.getValuesArray().length
+                        * GlobalEnums.TestSubCategory.getValuesArray().length
         );
 
     }

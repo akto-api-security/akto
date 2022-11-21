@@ -10,6 +10,7 @@ import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.type.URLMethods;
 import com.akto.util.enums.GlobalEnums;
+import org.bson.types.ObjectId;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -21,7 +22,7 @@ import static org.junit.Assert.assertEquals;
 public class IssuesActionTest extends MongoBasedTest {
 
     @Test
-    public void fetchAllIssues () {
+    public void fetchAllIssues() {
 
         TestingRunIssues issue = new TestingRunIssues(
                 new TestingIssuesId(
@@ -31,19 +32,20 @@ public class IssuesActionTest extends MongoBasedTest {
                                 URLMethods.Method.POST
                         ),
                         GlobalEnums.TestErrorSource.AUTOMATED_TESTING,
-                        GlobalEnums.TestCategory.BOLA
+                        GlobalEnums.TestSubCategory.ADD_METHOD_IN_PARAMETER
                 ),
                 GlobalEnums.Severity.HIGH,
                 GlobalEnums.TestRunIssueStatus.OPEN,
                 Context.now(),
-                Context.now()
+                Context.now(),
+                new ObjectId()
         );
 
         ApiCollection collection = new ApiCollection(
                 123,
                 "name",
                 Context.now(),
-                new HashSet<>(Arrays.asList("url1","url2")),
+                new HashSet<>(Arrays.asList("url1", "url2")),
                 "hostName",
                 12345
         );
@@ -63,12 +65,13 @@ public class IssuesActionTest extends MongoBasedTest {
                                 URLMethods.Method.POST
                         ),
                         GlobalEnums.TestErrorSource.AUTOMATED_TESTING,
-                        GlobalEnums.TestCategory.BOLA
+                        GlobalEnums.TestSubCategory.ADD_METHOD_IN_PARAMETER
                 ),
                 GlobalEnums.Severity.HIGH,
                 GlobalEnums.TestRunIssueStatus.OPEN,
                 Context.now(),
-                Context.now()
+                Context.now(),
+                new ObjectId()
         );
 
         ArrayList<TestingRunIssues> list = new ArrayList<>();
@@ -78,7 +81,7 @@ public class IssuesActionTest extends MongoBasedTest {
                 1234,
                 "name",
                 Context.now(),
-                new HashSet<>(Arrays.asList("url1","url2")),
+                new HashSet<>(Arrays.asList("url1", "url2")),
                 "hostName",
                 12345
         );

@@ -6,8 +6,8 @@
             <issue-box v-else v-for="(issue, index) in issues" :key="index" :creationTime="issue.creationTime"
                 :method="issue.id.apiInfoKey.method" :endpoint="issue.id.apiInfoKey.url" :severity="issue.severity"
                 :collectionName="getCollectionName(issue.id.apiInfoKey.apiCollectionId)"
-                :categoryName="getCategoryName(issue.id.testCategory)"
-                :categoryDescription="getCategoryDescription(issue.id.testCategory)"
+                :categoryName="getCategoryName(issue.id.testSubCategory)"
+                :categoryDescription="getCategoryDescription(issue.id.testSubCategory)"
                 :testType="getTestType(issue.id.testErrorSource)"
                 >
             </issue-box>
@@ -48,11 +48,13 @@ export default {
         },
         getCategoryName(name) {
             switch (name) {
-                case 'BOLA':
+                case 'REPLACE_AUTH_TOKEN':
                 case 'ADD_USER_ID':
-                case 'PRIVILEGE_ESCALATION':
+                case 'ADD_METHOD_IN_PARAMETER':
+                case 'ADD_METHOD_OVERRIDE_HEADERS':
+                case 'CHANGE_METHOD':
                     return 'Broken Object Level Authorization (BOLA)';
-                case 'NO_AUTH':
+                case 'REMOVE_TOKENS':
                     return 'Broken User Authentication (BUA)'
                 default:
                     return 'Broken Object Level Authorization (BOLA)'
@@ -60,13 +62,15 @@ export default {
         },
         getCategoryDescription(name) {
             switch (name) {
-                case 'BOLA':
+                case 'REPLACE_AUTH_TOKEN':
                     return 'Attacker can access resources of any user by changing the auth token in request.';
                 case 'ADD_USER_ID':
                     return 'Attacker can access resources of any user by adding user_id in URL.';
-                case 'PRIVILEGE_ESCALATION':
+                case 'ADD_METHOD_IN_PARAMETER':
+                case 'ADD_METHOD_OVERRIDE_HEADERS':
+                case 'CHANGE_METHOD':
                     return 'Attacker can access resources of any user by replacing method of the endpoint (eg: changemethod from get to post). This way attacker can get access to unauthorized endpoints.';
-                case 'NO_AUTH':
+                case 'REMOVE_TOKENS':
                     return 'API doesn\'t validate the authenticity of token. Attacker can remove the auth token and access the endpoint.'
                 default:
                     return ''

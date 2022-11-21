@@ -1,31 +1,34 @@
 package com.akto.dto.test_run_findings;
 
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.util.enums.GlobalEnums.TestSubCategory;
 
 import java.util.Objects;
 
-import static com.akto.util.enums.GlobalEnums.TestCategory;
 import static com.akto.util.enums.GlobalEnums.TestErrorSource;
 
 public class TestingIssuesId {
     private ApiInfoKey apiInfoKey;
     private TestErrorSource testErrorSource;
-    private TestCategory testCategory;
-    public TestingIssuesId(ApiInfoKey apiInfoKey, TestErrorSource source, TestCategory category) {
+    private TestSubCategory testSubCategory;
+
+    public TestingIssuesId(ApiInfoKey apiInfoKey, TestErrorSource source, TestSubCategory category) {
         this.apiInfoKey = apiInfoKey;
         this.testErrorSource = source;
-        this.testCategory = category;
+        this.testSubCategory = category;
     }
 
-    public TestingIssuesId(){}
+    public TestingIssuesId() {
+    }
 
     @Override
     public boolean equals(Object o) {
-        if (o == this) {return true;}
-        else if (o instanceof TestingIssuesId) {
+        if (o == this) {
+            return true;
+        } else if (o instanceof TestingIssuesId) {
             TestingIssuesId id = (TestingIssuesId) o;
             return id.apiInfoKey.equals(this.apiInfoKey)
-                    && id.testCategory == this.testCategory
+                    && id.testSubCategory == this.testSubCategory
                     && id.testErrorSource == this.testErrorSource;
         }
         return false;
@@ -33,7 +36,13 @@ public class TestingIssuesId {
 
     @Override
     public int hashCode() {
-        return Objects.hash(apiInfoKey, testErrorSource, testCategory);
+        return Objects.hash(apiInfoKey, testErrorSource, testSubCategory);
+    }
+
+    @Override
+    public String toString() {
+        return "{ApiInfoKey : " + this.apiInfoKey.toString() + ", testSubCategory : " + testSubCategory.name()
+                + ", testErrorSource : " + testErrorSource.name();
     }
 
     public void setApiInfoKey(ApiInfoKey apiInfoKey) {
@@ -44,8 +53,8 @@ public class TestingIssuesId {
         this.testErrorSource = testErrorSource;
     }
 
-    public void setTestCategory(TestCategory testCategory) {
-        this.testCategory = testCategory;
+    public void setTestSubCategory(TestSubCategory testSubCategory) {
+        this.testSubCategory = testSubCategory;
     }
 
     public ApiInfoKey getApiInfoKey() {
@@ -56,8 +65,8 @@ public class TestingIssuesId {
         return testErrorSource;
     }
 
-    public TestCategory getTestCategory() {
-        return testCategory;
+    public TestSubCategory getTestSubCategory() {
+        return testSubCategory;
     }
 
 

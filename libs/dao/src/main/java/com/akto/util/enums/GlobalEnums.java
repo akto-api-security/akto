@@ -10,27 +10,51 @@ public class GlobalEnums {
 
     /* Category of tests perfomred */
     public enum TestCategory {
-        BOLA ("BOLA", Severity.HIGH),
+        BOLA("BOLA", Severity.HIGH),
         ADD_USER_ID("ADD_USER_ID", Severity.HIGH),
         PRIVILEGE_ESCALATION("PRIVILEGE_ESCALATION", Severity.HIGH),
         NO_AUTH("NO_AUTH", Severity.HIGH);
         private final String name;
         private final Severity severity;
 
-        private static final TestCategory[] valuesArray = values();
         TestCategory(String name, Severity severity) {
             this.name = name;
             this.severity = severity;
         }
 
-        public static TestCategory[] getValuesArray () {
+        public String getName() {
+            return name;
+        }
+
+        public Severity getSeverity() {
+            return severity;
+        }
+    }
+
+    public enum TestSubCategory {
+        REPLACE_AUTH_TOKEN("REPLACE_AUTH_TOKEN", TestCategory.BOLA),
+        ADD_USER_ID("ADD_USER_ID", TestCategory.ADD_USER_ID),
+        ADD_METHOD_IN_PARAMETER("ADD_METHOD_IN_PARAMETER", TestCategory.PRIVILEGE_ESCALATION),
+        ADD_METHOD_OVERRIDE_HEADERS("ADD_METHOD_OVERRIDE_HEADERS", TestCategory.PRIVILEGE_ESCALATION),
+        CHANGE_METHOD("CHANGE_METHOD", TestCategory.PRIVILEGE_ESCALATION),
+        REMOVE_TOKENS("REMOVE_TOKENS", TestCategory.NO_AUTH);
+        private final String name;
+        private final TestCategory superCategory;
+        private static final TestSubCategory[] valuesArray = values();
+
+        TestSubCategory(String name, TestCategory superCategory) {
+            this.name = name;
+            this.superCategory = superCategory;
+        }
+
+        public static TestSubCategory[] getValuesArray() {
             return valuesArray;
         }
 
-        public static TestCategory getTestCategory (String category) {
-            for (TestCategory testCategory : valuesArray) {
-                if (testCategory.name.equalsIgnoreCase(category)) {
-                    return testCategory;
+        public static TestSubCategory getTestCategory(String category) {
+            for (TestSubCategory testSubCategory : valuesArray) {
+                if (testSubCategory.name.equalsIgnoreCase(category)) {
+                    return testSubCategory;
                 }
             }
             throw new IllegalStateException("Unknown TestCategory passed :- " + category);
@@ -40,11 +64,10 @@ public class GlobalEnums {
             return name;
         }
 
-        public Severity getSeverity () {
-            return severity;
+        public TestCategory getSuperCategory() {
+            return superCategory;
         }
     }
-
 
     public enum Severity {
         CRITICAL,

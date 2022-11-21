@@ -1,6 +1,7 @@
 package com.akto.dto.test_run_findings;
 
 import com.akto.util.enums.GlobalEnums;
+import org.bson.types.ObjectId;
 
 public class TestingRunIssues {
     public static final String TEST_RUN_ISSUES_STATUS = "testRunIssueStatus";
@@ -13,21 +14,24 @@ public class TestingRunIssues {
 
     public static final String CREATION_TIME = "creationTime";
     private int creationTime;
-
-
     public static final String KEY_SEVERITY = "severity";
     private GlobalEnums.Severity severity;
 
+    public static final String LATEST_TESTING_RUN_SUMMARY_ID = "latestTestingRunSummaryId";
+    private ObjectId latestTestingRunSummaryId;
+
     public TestingRunIssues(TestingIssuesId id, GlobalEnums.Severity severity, GlobalEnums.TestRunIssueStatus status,
-                     int creationTime, int lastSeen) {
+                            int creationTime, int lastSeen, ObjectId latestTestingRunSummaryId) {
         this.creationTime = creationTime;
         this.lastSeen = lastSeen;
         this.id = id;
         this.severity = severity;
         this.testRunIssueStatus = status;
+        this.latestTestingRunSummaryId = latestTestingRunSummaryId;
     }
 
-    public TestingRunIssues(){}
+    public TestingRunIssues() {
+    }
 
     public void setTestRunIssueStatus(GlobalEnums.TestRunIssueStatus testRunIssueStatus) {
         this.testRunIssueStatus = testRunIssueStatus;
@@ -44,6 +48,7 @@ public class TestingRunIssues {
     public void setSeverity(GlobalEnums.Severity severity) {
         this.severity = severity;
     }
+
     public void setId(TestingIssuesId id) {
         this.id = id;
     }
@@ -66,5 +71,13 @@ public class TestingRunIssues {
 
     public GlobalEnums.Severity getSeverity() {
         return severity;
+    }
+
+    public ObjectId getLatestTestingRunSummaryId() {
+        return latestTestingRunSummaryId;
+    }
+
+    public void setLatestTestingRunSummaryId(ObjectId latestTestingRunSummaryId) {
+        this.latestTestingRunSummaryId = latestTestingRunSummaryId;
     }
 }

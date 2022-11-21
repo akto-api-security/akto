@@ -28,9 +28,9 @@ public class TestingIssuesHandler {
      *
      * */
 
-    private void writeUpdateQueryIntoWriteModel (List<WriteModel<TestingRunIssues>> writeModelList,
-                                                       Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap,
-                                                       List<TestingRunIssues> testingRunIssuesList) {
+    private void writeUpdateQueryIntoWriteModel(List<WriteModel<TestingRunIssues>> writeModelList,
+                                                Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap,
+                                                List<TestingRunIssues> testingRunIssuesList) {
         int lastSeen = Context.now();
 
         testingRunIssuesList.forEach(testingRunIssues -> {
@@ -51,7 +51,7 @@ public class TestingIssuesHandler {
                     updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN);
                 }
                 updateSeverityField = Updates.set(TestingRunIssues.KEY_SEVERITY,
-                        TestCategory.valueOf(runResult.getTestSuperType()).getSeverity());
+                        TestSubCategory.valueOf(runResult.getTestSubType()).getSuperCategory().getSeverity());
             } else {
                 updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED);
                 updateSeverityField = Updates.set(TestingRunIssues.KEY_SEVERITY,
@@ -60,8 +60,10 @@ public class TestingIssuesHandler {
             Bson updateFields = Updates.combine(
                     updateStatusFields,
                     updateSeverityField,
-                    Updates.set(TestingRunIssues.LAST_SEEN,lastSeen)
+                    Updates.set(TestingRunIssues.LAST_SEEN, lastSeen),
+                    Updates.set(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, runResult.getTestRunResultSummaryId())
             );
+            logger.info("Updating the issue with id {}, with update parameters {}", issuesId.toString(), updateFields.toBsonDocument().toJson());
 
             writeModelList.add(new UpdateOneModel<>(query, updateFields));
         });
@@ -83,7 +85,7 @@ public class TestingIssuesHandler {
                                                            List<TestingRunIssues> testingRunIssuesList) {
         int lastSeen = Context.now();
         testingIssuesIdsMap.forEach((testingIssuesId, runResult) -> {
-            boolean doesExists  = false;
+            boolean doesExists = false;
             for (TestingRunIssues testingRunIssues : testingRunIssuesList) {
                 if (testingRunIssues.getId().equals(testingIssuesId)) {
                     doesExists = true;
@@ -92,32 +94,35 @@ public class TestingIssuesHandler {
             }
             if (!doesExists && runResult.isVulnerable()) {
                 writeModelList.add(new InsertOneModel<>(new TestingRunIssues(testingIssuesId,
-                        TestCategory.valueOf(runResult.getTestSuperType()).getSeverity(),
-                        TestRunIssueStatus.OPEN, lastSeen, lastSeen)));
+                        TestSubCategory.getTestCategory(runResult.getTestSubType()).getSuperCategory().getSeverity(),
+                        TestRunIssueStatus.OPEN, lastSeen, lastSeen, runResult.getTestRunResultSummaryId())));
+                logger.info("Inserting the id {} , with summary Id as {}", testingIssuesId.toString(), runResult.getTestRunResultSummaryId());
             }
         });
     }
 
-    public void handleIssuesCreationFromTestingRunResults (List<TestingRunResult> testingRunResultList) {
+    public void handleIssuesCreationFromTestingRunResults(List<TestingRunResult> testingRunResultList) {
 
         Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap = TestingUtils.
-                listOfIssuesIdsFromTestingRunResults(testingRunResultList,true);
+                listOfIssuesIdsFromTestingRunResults(testingRunResultList, true);
 
-        Bson inQuery = Filters.in(ID,testingIssuesIdsMap.keySet().toArray());
+        logger.info("Total issue id created from TestingRunResult map : {}", testingIssuesIdsMap.size());
+        Bson inQuery = Filters.in(ID, testingIssuesIdsMap.keySet().toArray());
         List<TestingRunIssues> testingRunIssuesList = TestingRunIssuesDao.instance.findAll(inQuery);
 
+        logger.info("Total list of issues from db : {}", testingRunIssuesList.size());
         List<WriteModel<TestingRunIssues>> writeModelList = new ArrayList<>();
-
-        writeUpdateQueryIntoWriteModel(writeModelList,testingIssuesIdsMap,testingRunIssuesList);
+        writeUpdateQueryIntoWriteModel(writeModelList, testingIssuesIdsMap, testingRunIssuesList);
+        logger.info("Total write queries after the update iterations: {}", writeModelList.size());
         insertVulnerableTestsIntoIssuesCollection(writeModelList, testingIssuesIdsMap, testingRunIssuesList);
-
+        logger.info("Total write queries after the insertion iterations: {}", writeModelList.size());
         try {
             BulkWriteResult result = TestingRunIssuesDao.instance.bulkWrite(writeModelList, new BulkWriteOptions().ordered(false));
             logger.info("Matched records : {}", result.getMatchedCount());
             logger.info("inserted counts : {}", result.getInsertedCount());
             logger.info("Modified counts : {}", result.getModifiedCount());
-        }catch (Exception e) {
-            logger.error("Error while inserting issues into db: {}",e.getMessage());
+        } catch (Exception e) {
+            logger.error("Error while inserting issues into db: {}", e.getMessage());
         }
     }
 }
