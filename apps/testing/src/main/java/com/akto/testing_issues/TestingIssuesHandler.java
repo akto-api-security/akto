@@ -63,7 +63,8 @@ public class TestingIssuesHandler {
                     Updates.set(TestingRunIssues.LAST_SEEN, lastSeen),
                     Updates.set(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, runResult.getTestRunResultSummaryId())
             );
-            logger.info("Updating the issue with id {}, with update parameters {}", issuesId.toString(), updateFields.toBsonDocument().toJson());
+            logger.info("Updating the issue with id {}, with update parameters and result_summary_Id :{} ", issuesId.toString()
+                    ,runResult.getTestRunResultSummaryId());
 
             writeModelList.add(new UpdateOneModel<>(query, updateFields));
         });
