@@ -62,6 +62,10 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         return null;
     }
 
+    public ApiCollection findByHost(String host) {
+        return instance.findOne(ApiCollection.HOST_NAME, host);
+    }
+
     // this is flawed. Because we were in a hurry we allowed this
     // traffic collection with internal api... do not have hosts and will also be included
     public List<ApiCollection> fetchNonTrafficApiCollections() {

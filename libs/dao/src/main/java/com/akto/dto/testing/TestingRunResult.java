@@ -1,13 +1,11 @@
 package com.akto.dto.testing;
 
 import com.akto.dto.ApiInfo;
-
 import com.akto.dto.type.SingleTypeInfo;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
 import java.util.List;
-import java.util.Map;
 
 public class TestingRunResult {
     private ObjectId id;
@@ -37,7 +35,6 @@ public class TestingRunResult {
     private int endTimestamp;
     public static final String TEST_RUN_RESULT_SUMMARY_ID = "testRunResultSummaryId";
     private ObjectId testRunResultSummaryId;
-
 
     public TestingRunResult() { }
 

@@ -99,6 +99,7 @@ const data_types = {
             let id = data_type["id"]
             let name = data_type["name"]
             let sensitiveAlways = data_type["sensitiveAlways"]
+            let sensitivePosition = data_type["sensitivePosition"]
             let operator = data_type["operator"]
             let keyOperator = data_type["keyConditions"]["operator"]
             let keyConditionFromUsers =  func.preparePredicatesForApi(data_type["keyConditions"]["predicates"])
@@ -107,7 +108,7 @@ const data_types = {
             let createNew = data_type["createNew"] ? data_type["createNew"] : false
             let active = data_type["active"]
             if (save) {
-                return api.saveCustomDataType(id,name,sensitiveAlways,operator,keyOperator, keyConditionFromUsers,valueOperator ,valueConditionFromUsers, createNew, active).then((resp) => {
+                return api.saveCustomDataType(id,name,sensitiveAlways,sensitivePosition,operator,keyOperator, keyConditionFromUsers,valueOperator ,valueConditionFromUsers, createNew, active).then((resp) => {
                     commit("UPDATE_DATA_TYPES", resp["customDataType"]);
                 })
             } else {
@@ -119,12 +120,21 @@ const data_types = {
                         break
                     }
                     idx += 1
-                    let resp = await api.reviewCustomDataType(id,name,sensitiveAlways,operator,keyOperator, keyConditionFromUsers,valueOperator ,valueConditionFromUsers,active,idx)
+                    let resp = await api.reviewCustomDataType(id,name,sensitiveAlways,sensitivePosition,operator,keyOperator, keyConditionFromUsers,valueOperator ,valueConditionFromUsers,active,idx)
                     commit("SET_REVIEW_DATA", resp);
                     batchSize = resp["currentProcessed"]
                 }
             }
         },
+        async updateAktoDataType({commit,dispatch,state},{data_type}){
+            let name = data_type["name"]
+            let sensitiveAlways = data_type["sensitiveAlways"]
+            let sensitivePosition = data_type["sensitivePosition"]
+
+            return api.saveAktoDataType(name,sensitiveAlways,sensitivePosition).then((resp) => {
+                commit("UPDATE_DATA_TYPES", resp["aktoDataType"]);
+            })
+        }
     }
 }
 

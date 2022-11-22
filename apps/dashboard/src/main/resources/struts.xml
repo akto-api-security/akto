@@ -728,6 +728,17 @@
             </result>
         </action>
 
+        <action name="api/saveAktoDataType" class="com.akto.action.CustomDataTypeAction" method="saveAktoDataType">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/reviewCustomDataType" class="com.akto.action.CustomDataTypeAction" method="reviewCustomDataType">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -914,6 +925,16 @@
             </result>
         </action>
         <action name="api/fetchLogs" class="com.akto.action.LogsAction" method="fetchLogs">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/fetchAllIssues" class="com.akto.action.testing_issues.IssuesAction" method="fetchAllIssues">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
@@ -1244,6 +1265,19 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
+            <result name= "ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchEndpointsBasedOnHostName" class="com.akto.action.observe.InventoryAction" method="fetchEndpointsBasedOnHostName">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="root">endpoints</param>
+            </result>
             <result name= "ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>

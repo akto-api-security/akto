@@ -5,6 +5,7 @@ const PageDashboard  = () => import( '@/apps/dashboard/App')
 const PageToday  = () => import( "@/apps/dashboard/views/today/Today")
 const PageQuickStart  = () => import( "@/apps/dashboard/views/quickstart/PageQuickStart")
 const PageTesting  = () => import( "@/apps/dashboard/views/testing/PageTesting")
+const PageIssues  = () => import( "@/apps/dashboard/views/issues/PageIssues")
 const TestingRunsTable  = () => import( "@/apps/dashboard/views/testing/components/TestingRunsTable")
 const TestingRunResults  = () => import( "@/apps/dashboard/views/testing/components/TestingRunResults")
 const CreateTestingRun  = () => import( "@/apps/dashboard/views/testing/components/CreateTestingRun")
@@ -116,6 +117,11 @@ const router =  new Router({
                         }                        
                     ]
                 },
+                {
+                    path: 'issues',
+                    name: 'issues',
+                    component: PageIssues
+                },        
                 {
                     path: 'settings',
                     name: 'settings',

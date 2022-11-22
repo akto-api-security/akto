@@ -151,19 +151,57 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return sensitiveSubTypes;
     }
 
+    public List<String> sensitiveSubTypeInRequestNames() {
+        List<String> sensitiveInRequest = new ArrayList<>();
+        for (SingleTypeInfo.SubType subType: SingleTypeInfo.subTypeMap.values()) {
+            if (subType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_HEADER) || subType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_PAYLOAD)) {
+                sensitiveInRequest.add(subType.getName());
+            }
+        }
+
+        for (CustomDataType customDataType: SingleTypeInfo.customDataTypeMap.values()) {
+            if (customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_HEADER) || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_PAYLOAD)) {
+                sensitiveInRequest.add(customDataType.getName());
+            }
+        }
+        return sensitiveInRequest;
+    }
+
+    public List<String> sensitiveSubTypeInResponseNames() {
+        List<String> sensitiveInResponse = new ArrayList<>();
+        for (SingleTypeInfo.SubType subType: SingleTypeInfo.subTypeMap.values()) {
+            if (subType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_HEADER) || subType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_PAYLOAD)) {
+                sensitiveInResponse.add(subType.getName());
+            }
+        }
+        for (CustomDataType customDataType: SingleTypeInfo.customDataTypeMap.values()) {
+            if (customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_HEADER) || customDataType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_PAYLOAD)) {
+                sensitiveInResponse.add(customDataType.getName());
+            }
+        }
+        return sensitiveInResponse;
+    }
+
     public Bson filterForSensitiveParamsExcludingUserMarkedSensitive(Integer apiCollectionId, String url, String method) {
         // apiCollectionId null then no filter for apiCollectionId
         List<String> sensitiveSubTypes = sensitiveSubTypeNames();
 
         Bson alwaysSensitiveFilter = Filters.in("subType", sensitiveSubTypes);
 
-        Bson sensitivityBasedOnPosition = Filters.and(
-                Filters.in("subType", Arrays.asList(SingleTypeInfo.JWT.getName(), SingleTypeInfo.IP_ADDRESS.getName())),
+        List<String> sensitiveInResponse = sensitiveSubTypeInResponseNames();
+        List<String> sensitiveInRequest = sensitiveSubTypeInRequestNames();
+
+        Bson sensitiveInResponseFilter = Filters.and(
+                Filters.in("subType",sensitiveInResponse ),
                 Filters.gt("responseCode", -1)
+        );
+        Bson sensitiveInRequestFilter = Filters.and(
+                Filters.in("subType",sensitiveInRequest ),
+                Filters.eq("responseCode", -1)
         );
 
         List<Bson> filters = new ArrayList<>();
-        filters.add(Filters.or(alwaysSensitiveFilter, sensitivityBasedOnPosition));
+        filters.add(Filters.or(alwaysSensitiveFilter, sensitiveInResponseFilter, sensitiveInRequestFilter));
 
         if (apiCollectionId != null && apiCollectionId >= 0) {
             filters.add(Filters.eq("apiCollectionId", apiCollectionId) );
