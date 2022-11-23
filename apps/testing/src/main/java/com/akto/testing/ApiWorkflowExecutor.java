@@ -252,6 +252,8 @@ public class ApiWorkflowExecutor {
         String requestPayload = updatedSampleData.getRequestPayload();
         String requestUrl = updatedSampleData.getRequestUrl();
 
+        boolean queryInReplaceUrl = false;
+        boolean userSuppliedQueryParamsNullOrEmpty = queryParams == null || queryParams.trim().length() == 0;
         if (requestUrl != null) {
             String rawUrl = executeCode(requestUrl, valuesMap);
             // this url might contain urlQueryParams. We need to move it queryParams
@@ -259,7 +261,12 @@ public class ApiWorkflowExecutor {
             request.setUrl(rawUrlArr[0]);
             if (rawUrlArr.length > 1) {
                 request.setQueryParams(rawUrlArr[1]);
+                queryInReplaceUrl = true;
             }
+        }
+
+        if (userSuppliedQueryParamsNullOrEmpty && !queryInReplaceUrl) {
+            request.setQueryParams(null);
         }
 
         if (requestPayload != null) {
@@ -273,7 +280,7 @@ public class ApiWorkflowExecutor {
             request.setHeaders(res);
         }
 
-        if (queryParams != null) {
+        if (!userSuppliedQueryParamsNullOrEmpty) {
             String finalQueryParams = executeCode(queryParams, valuesMap);
             String ogQuery = request.getQueryParams();
             if (ogQuery == null || ogQuery.isEmpty()) {
