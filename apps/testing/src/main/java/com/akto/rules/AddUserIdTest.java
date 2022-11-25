@@ -24,9 +24,8 @@ public class AddUserIdTest extends TestPlugin {
         Map<String, SingleTypeInfo> validUserIdNameMap = new HashMap<>();
         for (SingleTypeInfo singleTypeInfo: singleTypeInfos.values()) {
             String param = singleTypeInfo.getParam();
-            if (param == null) continue;
-
             String key = SingleTypeInfo.findLastKeyFromParam(param);
+            if (key == null) continue;
 
             CappedSet<String> values = singleTypeInfo.getValues();
             if (values.count() == 0) continue;
