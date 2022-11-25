@@ -1,10 +1,7 @@
 package com.akto.testing;
 
-import com.akto.DaoInit;
 import com.akto.dao.AuthMechanismsDao;
-import com.akto.dao.RuntimeFilterDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.WorkflowTestsDao;
@@ -16,7 +13,6 @@ import com.akto.rules.*;
 import com.akto.store.SampleMessageStore;
 import com.akto.testing_issues.TestingIssuesHandler;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.types.ObjectId;
@@ -32,16 +28,6 @@ import java.util.concurrent.*;
 public class TestExecutor {
 
     private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
-
-    public static void main(String[] args) {
-        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
-        Context.accountId.set(1_000_000);
-        RuntimeFilterDao.instance.initialiseFilters();
-
-        TestExecutor testExecutor = new TestExecutor();
-        TestingRun testingRun = TestingRunDao.instance.findOne(new BasicDBObject());
-        testExecutor.init(testingRun, new ObjectId());
-    }
 
     public void init(TestingRun testingRun, ObjectId summaryId) {
         if (testingRun.getTestIdConfig() == 0)     {
@@ -91,7 +77,6 @@ public class TestExecutor {
 
         List<Future<List<TestingRunResult>>> futureTestingRunResults = new ArrayList<>();
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
-            if (!apiInfoKey.getUrl().equals("https://petstore.swagger.io/v2/pet")) continue;
             try {
                  Future<List<TestingRunResult>> future = threadPool.submit(() -> startWithLatch(apiInfoKey, testingRun.getTestIdConfig(), testingRun.getId(), singleTypeInfoMap, sampleMessages, authMechanism, summaryId, accountId, latch));
                  futureTestingRunResults.add(future);
@@ -182,24 +167,24 @@ public class TestExecutor {
         ParameterPollutionTest parameterPollutionTest = new ParameterPollutionTest();
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
-//        TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
-//        testingRunResults.add(noAuthTestResult);
-//        if (!noAuthTestResult.isVulnerable()) {
-//            TestingRunResult bolaTestResult = runTest(bolaTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
-//            testingRunResults.add(bolaTestResult);
-//        }
+        TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+        testingRunResults.add(noAuthTestResult);
+        if (!noAuthTestResult.isVulnerable()) {
+            TestingRunResult bolaTestResult = runTest(bolaTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+            testingRunResults.add(bolaTestResult);
+        }
 
-//        TestingRunResult addMethodInParameterTestResult = runTest(addMethodInParameterTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
-//        testingRunResults.add(addMethodInParameterTestResult);
-//
-//        TestingRunResult addMethodOverrideHeadersTestResult = runTest(addMethodOverrideHeadersTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
-//        testingRunResults.add(addMethodOverrideHeadersTestResult);
-//
-//        TestingRunResult changeHttpMethodTestResult = runTest(changeHttpMethodTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
-//        testingRunResults.add(changeHttpMethodTestResult);
-//
-//        TestingRunResult addUserIdTestResult = runTest(addUserIdTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
-//        if (addUserIdTestResult != null) testingRunResults.add(addUserIdTestResult);
+        TestingRunResult addMethodInParameterTestResult = runTest(addMethodInParameterTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+        testingRunResults.add(addMethodInParameterTestResult);
+
+        TestingRunResult addMethodOverrideHeadersTestResult = runTest(addMethodOverrideHeadersTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+        testingRunResults.add(addMethodOverrideHeadersTestResult);
+
+        TestingRunResult changeHttpMethodTestResult = runTest(changeHttpMethodTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+        testingRunResults.add(changeHttpMethodTestResult);
+
+        TestingRunResult addUserIdTestResult = runTest(addUserIdTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+        if (addUserIdTestResult != null) testingRunResults.add(addUserIdTestResult);
 
         TestingRunResult parameterPollutionTestResult = runTest(parameterPollutionTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
         if (parameterPollutionTestResult != null) testingRunResults.add(parameterPollutionTestResult);
