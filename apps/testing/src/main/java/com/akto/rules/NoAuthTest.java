@@ -21,10 +21,10 @@ public class NoAuthTest extends TestPlugin {
         List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, authMechanism);
         if (filteredMessages.isEmpty()) return addWithoutRequestError(null, TestResult.TestError.NO_MESSAGE_WITH_AUTH_TOKEN);
 
-        RawApi rawApi = filteredMessages.get(0);
+        RawApi rawApi = filteredMessages.get(0).copy();
 
-        OriginalHttpRequest testRequest = rawApi.getRequest().copy();
-        OriginalHttpResponse originalHttpResponse = rawApi.getResponse().copy();
+        OriginalHttpRequest testRequest = rawApi.getRequest();
+        OriginalHttpResponse originalHttpResponse = rawApi.getResponse();
 
         authMechanism.removeAuthFromRequest(testRequest);
 

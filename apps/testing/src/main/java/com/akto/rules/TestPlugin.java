@@ -20,6 +20,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static com.akto.runtime.APICatalogSync.trim;
 import static com.akto.runtime.APICatalogSync.trimAndSplit;
@@ -45,6 +47,36 @@ public abstract class TestPlugin {
         JsonParser jp = factory.createParser(payload);
         JsonNode node = mapper.readTree(jp);
         RelationshipSync.extractAllValuesFromPayload(node,new ArrayList<>(),payloadMap);
+    }
+
+    public static String decrementUrlVersion(String url, int decrementValue, int limit) {
+        String regex = "\\/v(\\d+)\\/";
+        Pattern p = Pattern.compile(regex);
+        Matcher matcher = p.matcher(url);
+        StringBuffer sb = new StringBuffer();
+
+        boolean containsAtLeastOneVersion = false;
+
+        while (matcher.find()) {
+            String code = matcher.group(1);
+            int version;
+            try {
+                version = Integer.parseInt(code);
+            } catch (Exception e) {
+                e.printStackTrace();
+                return null;
+            }
+            int newVersion = version - decrementValue;
+            if (newVersion < limit) return null;
+            containsAtLeastOneVersion = true;
+            matcher.appendReplacement(sb, "/v"+newVersion+"/");
+        }
+
+        if (!containsAtLeastOneVersion) return null;
+
+        matcher.appendTail(sb);
+
+        return sb.toString();
     }
 
     public static double compareWithOriginalResponse(String originalPayload, String currentPayload) {
