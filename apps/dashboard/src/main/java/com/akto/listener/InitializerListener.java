@@ -129,6 +129,17 @@ public class InitializerListener implements ServletContextListener {
         }, delayInDays, 7, TimeUnit.DAYS);
 
     }
+    public void setUpPiiScheduler(){
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                String mongoURI = System.getenv("AKTO_MONGO_CONN");
+                DaoInit.init(new ConnectionString(mongoURI));
+                Context.accountId.set(1_000_000);
+
+                executePIISourceFetch();
+            }
+        }, 0, 24, TimeUnit.HOURS);
+    }
 
     static void executePIISourceFetch() {
         List<PIISource> piiSources = PIISourceDao.instance.findAll("active", true);
@@ -153,18 +164,13 @@ public class InitializerListener implements ServletContextListener {
 
                 for (Object dtObj: dataTypes) {
                     BasicDBObject dt = (BasicDBObject) dtObj;
-                    String piiKey = id + "_" + dt.getString("name");
+                    String piiKey = id + "_" + dt.getString("name").toUpperCase();
                     PIIType piiType = new PIIType(
                         piiKey,
                         dt.getBoolean("isSensitive"),
                         dt.getString("regexPattern"),
                         dt.getBoolean("onKey")
                     );
-
-                    if (!dt.getBoolean("active", true)) {
-                        PIISourceDao.instance.updateOne(findQ, Updates.unset("mapNameToPIIType."+piiKey));
-                        CustomDataTypeDao.instance.updateOne("name", piiKey, Updates.set("active", false));
-                    }
 
                     if (currTypes.containsKey(piiKey) && currTypes.get(piiKey).equals(piiType)) {
                         continue;
@@ -175,6 +181,11 @@ public class InitializerListener implements ServletContextListener {
                         CustomDataTypeDao.instance.deleteAll(Filters.eq("name", piiKey));
                         CustomDataTypeDao.instance.insertOne(getCustomDataTypeFromPiiType(piiSource, piiType));
                     }
+
+                    if (!dt.getBoolean("active", true)) {
+                        PIISourceDao.instance.updateOne(findQ, Updates.unset("mapNameToPIIType."+piiKey));
+                        CustomDataTypeDao.instance.updateOne("name", piiKey, Updates.set("active", false));
+                    }
                 }
 
             } catch (IOException e) {
@@ -182,6 +193,7 @@ public class InitializerListener implements ServletContextListener {
                 continue;
             }
         }
+        SingleTypeInfo.fetchCustomDataTypes();
     }
 
     private static CustomDataType getCustomDataTypeFromPiiType(PIISource piiSource, PIIType piiType) {
@@ -575,6 +587,7 @@ public class InitializerListener implements ServletContextListener {
             setUpWeeklyScheduler();
             setUpDailyScheduler();
             setUpWebhookScheduler();
+            setUpPiiScheduler();
 
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             dropSampleDataIfEarlierNotDroped(accountSettings);
