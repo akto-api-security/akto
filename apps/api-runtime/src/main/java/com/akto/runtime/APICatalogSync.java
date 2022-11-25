@@ -745,8 +745,12 @@ public class APICatalogSync {
     }
 
 
+    public static String[] trimAndSplit(String url) {
+        return trim(url).split("/");
+    }
+
     public static URLTemplate createUrlTemplate(String url, Method method) {
-        String[] tokens = trim(url).split("/");
+        String[] tokens = trimAndSplit(url);
         SuperType[] types = new SuperType[tokens.length];
         for(int i = 0; i < tokens.length; i ++ ) {
             String token = tokens[i];

@@ -8,6 +8,7 @@ import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.RelationshipSync;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.StatusCodeAnalyser;
+import com.akto.types.CappedSet;
 import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -20,6 +21,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
+import static com.akto.runtime.APICatalogSync.trim;
+import static com.akto.runtime.APICatalogSync.trimAndSplit;
 
 
 public abstract class TestPlugin {
@@ -166,7 +169,16 @@ public abstract class TestPlugin {
                 param,SingleTypeInfo.GENERIC, apiInfoKey.getApiCollectionId(), isUrlParam
         );
 
-        return singleTypeInfoMap.get(key);
+        SingleTypeInfo singleTypeInfo = singleTypeInfoMap.get(key);
+
+        if (singleTypeInfo == null) return null;
+
+        return singleTypeInfo.copy();
+    }
+
+    public void asdf(OriginalHttpRequest originalHttpRequest) {
+        String urlWithParams = originalHttpRequest.getFullUrlWithParams();
+        BasicDBObject payload = RequestTemplate.parseRequestPayload(originalHttpRequest.getJsonRequestBody(), urlWithParams);
     }
 
     public ContainsPrivateResourceResult containsPrivateResource(OriginalHttpRequest originalHttpRequest, ApiInfo.ApiInfoKey apiInfoKey, Map<String, SingleTypeInfo> singleTypeInfoMap) {
@@ -182,11 +194,16 @@ public abstract class TestPlugin {
         if (APICatalog.isTemplateUrl(url)) {
             URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, method);
             String[] tokens = urlTemplate.getTokens();
+            String[] ogTokens = trimAndSplit(url);
             for (int i = 0;i < tokens.length; i++) {
                 if (tokens[i] == null) {
                     atLeastOneValueInRequest = true;
                     SingleTypeInfo singleTypeInfo = findSti(i+"", true,apiInfoKey, false, -1, singleTypeInfoMap);
                     if (singleTypeInfo != null) {
+                        String v = ogTokens[i];
+                        Set<String> values = new HashSet<>();
+                        values.add(v);
+                        singleTypeInfo.setValues(new CappedSet<>(values));
                         singleTypeInfoList.add(singleTypeInfo);
                         isPrivate = isPrivate && singleTypeInfo.getIsPrivate();
                     }
@@ -201,6 +218,10 @@ public abstract class TestPlugin {
             atLeastOneValueInRequest = true;
             SingleTypeInfo singleTypeInfo = findSti(param,false,apiInfoKey, false, -1, singleTypeInfoMap);
             if (singleTypeInfo != null) {
+                Set<Object> valSet = flattened.get(param);
+                Set<String> valStringSet = new HashSet<>();
+                for (Object v: valSet) valStringSet.add(v.toString());
+                singleTypeInfo.setValues(new CappedSet<>(valStringSet));
                 singleTypeInfoList.add(singleTypeInfo);
                 isPrivate = isPrivate && singleTypeInfo.getIsPrivate();
             }

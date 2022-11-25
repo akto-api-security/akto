@@ -33,6 +33,13 @@ public class SingleTypeInfo {
 
     }
 
+    public static String findLastKeyFromParam(String param) {
+        if (param == null) return null;
+        String paramReplaced = param.replaceAll("#", ".").replaceAll("\\.\\$", "");
+        String[] paramList = paramReplaced.split("\\.");
+        return paramList[paramList.length-1]; // choosing the last key
+    }
+
     public static void fetchCustomDataTypes() {
         Context.accountId.set(1_000_000);
         try {
@@ -361,6 +368,8 @@ public class SingleTypeInfo {
 
     @BsonIgnore
     private boolean isPrivate; // do not use this field anywhere else. This was added to convey if STI is private or not to frontend
+    @BsonIgnore
+    private Object value;
 
     public static final String _UNIQUE_COUNT = "uniqueCount";
     public long uniqueCount = 0L;

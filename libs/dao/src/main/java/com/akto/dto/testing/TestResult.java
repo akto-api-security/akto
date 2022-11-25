@@ -25,6 +25,7 @@ public class TestResult extends GenericTestResult {
         API_REQUEST_FAILED("API request failed"),
         SOMETHING_WENT_WRONG("OOPS! Something went wrong"),
         FAILED_TO_CONVERT_TEST_REQUEST_TO_STRING("Failed to store test"),
+        INSUFFICIENT_MESSAGES("Insufficient messages"),
         NO_AUTH_TOKEN_FOUND("No authentication token found");
 
         private String message;
