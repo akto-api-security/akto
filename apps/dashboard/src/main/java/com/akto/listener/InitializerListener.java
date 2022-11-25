@@ -577,7 +577,7 @@ public class InitializerListener implements ServletContextListener {
             Context.accountId.set(1000000);
             
             if (PIISourceDao.instance.findOne("_id", "A") == null) {
-                String fileUrl = "https://raw.githubusercontent.com/Ankush12389/pii_types/main/pii_source.json";
+                String fileUrl = "https://raw.githubusercontent.com/akto-api-security/pii-types/master/general.json";
                 PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
                 piiSource.setId("A");
         
