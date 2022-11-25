@@ -14,18 +14,20 @@ import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.rules.*;
 import com.akto.store.SampleMessageStore;
+import com.akto.testing_issues.TestingIssuesHandler;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
-
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class TestExecutor {
 
@@ -113,6 +115,10 @@ public class TestExecutor {
                 e.printStackTrace();
             }
         }
+
+        //Creating issues from testingRunResults
+        TestingIssuesHandler handler = new TestingIssuesHandler();
+        handler.handleIssuesCreationFromTestingRunResults(testingRunResults);
 
         TestingRunResultDao.instance.insertMany(testingRunResults);
 

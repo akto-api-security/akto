@@ -7,23 +7,23 @@ import org.bson.codecs.pojo.annotations.BsonId;
 public class TrafficInfo {
     
     @BsonId
-    Key _id;
+    Key id;
     public Map<String, Integer> mapHoursToCount;
 
     public TrafficInfo() {
     }
 
-    public TrafficInfo(Key _id, Map<String,Integer> mapHoursToCount) {
-        this._id = _id;
+    public TrafficInfo(Key id, Map<String,Integer> mapHoursToCount) {
+        this.id = id;
         this.mapHoursToCount = mapHoursToCount;
     }
 
-    public Key get_id() {
-        return this._id;
+    public Key getId() {
+        return this.id;
     }
 
-    public void set_id(Key _id) {
-        this._id = _id;
+    public void setId(Key id) {
+        this.id = id;
     }
 
     public Map<String,Integer> getMapHoursToCount() {
@@ -37,7 +37,7 @@ public class TrafficInfo {
     @Override
     public String toString() {
         return "{" +
-            " _id='" + get_id() + "'" +
+            " _id='" + getId() + "'" +
             ", mapHoursToCount='" + getMapHoursToCount() + "'" +
             "}";
     }

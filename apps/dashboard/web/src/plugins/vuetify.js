@@ -106,7 +106,10 @@ import {
   faBuilding as farBuilding,
   faStar as farStar,
   faSquare as farSquare,
-  faCheckSquare as farCheckSquare
+  faCheckSquare as farCheckSquare,
+  faFolder as farFolder,
+  faFolderOpen as farFolderOpen,
+  faClock as farClock
 } from '@fortawesome/free-regular-svg-icons'
 
 import {
@@ -124,7 +127,7 @@ const faIcons = [
   faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faCaretSquareUp,
   faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faThumbsUp,faCaretUp,faShareAlt,faUserPlus,faCaretDown,
   
-  farComments,farCalendar, farHandPointRight, farBuilding, farStar,farSquare, farCheckSquare,
+  farComments,farCalendar, farHandPointRight, farBuilding, farStar,farSquare, farCheckSquare,farFolder,farFolderOpen,farClock,
 
   fabSalesforce,fabHubspot
 ]

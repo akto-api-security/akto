@@ -193,6 +193,19 @@ export default {
 
         return count + ' ' + unit + plural + ' ago'
     },
+    getCreationTime(creationTime) {
+        let epoch = Date.now();
+        let difference = epoch / 1000 - creationTime;
+        let numberOfDays = difference / (60 * 60 * 24)
+        if (numberOfDays < 31) {
+            return parseInt(numberOfDays) + ' d';
+        } else if (numberOfDays < 366) {
+            return parseInt(numberOfDays / 31) + ' m' + parseInt(numberOfDays % 31) + ' d';
+        } else {
+            return parseInt(numberOfDays / 365) + ' y' + parseInt((numberOfDays % 365) / 31) + ' m'
+                + parseInt((numberOfDays % 365) % 31) + ' d';
+        }
+    },
     prettifyDate(date) {
         var diffSeconds = Math.abs(this.toDate(date) - this.toDate(this.toYMD(new Date(Date.now()))))/1000
 
@@ -520,7 +533,7 @@ export default {
             case "SLACK":
                 return {name: '$slack', color: '#fe7b5b'}
             
-            case "CUSTOMWEBHOOKS":
+            case "WEBHOOKS":
                 return {name: '$customwebhooks', color: '#fe7b5b'}
         }
     },

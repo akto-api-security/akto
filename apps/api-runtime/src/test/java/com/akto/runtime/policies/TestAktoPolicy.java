@@ -7,6 +7,7 @@ import com.akto.dto.*;
 import com.akto.dto.type.*;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
+import com.akto.runtime.merge.MergeSimilarUrls;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import org.junit.Before;
@@ -71,6 +72,9 @@ public class TestAktoPolicy extends MongoBasedTest {
 
     @Test
     public void testRestart() throws Exception {
+        dropCollections();
+        initialiseAccountSettings();
+
         HttpResponseParams hrp1 = generateHttpResponseParams("url1", URLMethods.Method.GET, 0,new ArrayList<>(),false) ;
         HttpResponseParams hrp2 = generateHttpResponseParams("url2", URLMethods.Method.GET, 0,new ArrayList<>(),false) ;
         HttpResponseParams hrp3 = generateHttpResponseParams("url3", URLMethods.Method.GET, 0,new ArrayList<>(),false) ;
@@ -81,87 +85,46 @@ public class TestAktoPolicy extends MongoBasedTest {
         List<HttpResponseParams> responseParams = Arrays.asList(hrp1, hrp2, hrp3, hrpMerge1, hrpMerge2);
 
         HttpCallParser httpCallParser = new HttpCallParser("user", 1, 1,1, true);
-        AktoPolicy aktoPolicy = new AktoPolicy(httpCallParser.apiCatalogSync, true);
+        AktoPolicyNew aktoPolicy = new AktoPolicyNew(true);
         httpCallParser.syncFunction(responseParams, false, true);
         httpCallParser.apiCatalogSync.syncWithDB(false, true);
-        aktoPolicy.main(responseParams, httpCallParser.apiCatalogSync, true);
-        // sending random url to trigger moving api info from reserves to main
-        aktoPolicy.main(Collections.singletonList(hrp1), httpCallParser.apiCatalogSync, true);
+        aktoPolicy.main(responseParams, httpCallParser.apiCatalogSync != null, true);
 
         List<ApiInfo> apiInfoList = ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId", 0));
-        Assertions.assertEquals(4,apiInfoList.size());
+        Assertions.assertEquals(5,apiInfoList.size());
+        List<FilterSampleData> filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
+        Assertions.assertEquals(5, filterSampleDataList.size());
 
         // restart server means new httpCallParser and aktoPolicy
         HttpCallParser httpCallParser1 = new HttpCallParser("user", 1, 1,1, true);
-        AktoPolicy aktoPolicy1 = new AktoPolicy(httpCallParser1.apiCatalogSync, true);
-
-        apiInfoList = ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId", 0));
-        Assertions.assertEquals(4,apiInfoList.size());
-
-        httpCallParser1.syncFunction(responseParams.subList(0,1), false, true);
-        httpCallParser1.apiCatalogSync.syncWithDB(false, true);
-        aktoPolicy1.main(responseParams.subList(0,1), httpCallParser1.apiCatalogSync, true);
-
-        apiInfoList = ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId", 0));
-        Assertions.assertEquals(4,apiInfoList.size());
-
-        HttpResponseParams hrp4 = generateHttpResponseParams("url4", URLMethods.Method.GET, 0,new ArrayList<>(),false) ;
-        httpCallParser1.syncFunction(Collections.singletonList(hrp4), false, true);
-        aktoPolicy1.main(Collections.singletonList(hrp4),null, true);
-        httpCallParser1.apiCatalogSync.syncWithDB(false, true);
-        aktoPolicy1.main(Collections.singletonList(hrp1), httpCallParser1.apiCatalogSync, true);
-        aktoPolicy1.main(Collections.singletonList(hrp1), httpCallParser1.apiCatalogSync, true);
+        AktoPolicyNew aktoPolicy1 = new AktoPolicyNew( true);
 
         apiInfoList = ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId", 0));
         Assertions.assertEquals(5,apiInfoList.size());
 
+        httpCallParser1.syncFunction(responseParams.subList(0,1), false, true);
+        httpCallParser1.apiCatalogSync.syncWithDB(false, true);
+        aktoPolicy1.main(responseParams.subList(0,1), httpCallParser1.apiCatalogSync != null, true);
+
+        apiInfoList = ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId", 0));
+        Assertions.assertEquals(5,apiInfoList.size());
+        filterSampleDataList = FilterSampleDataDao.instance.findAll(Filters.eq("_id.apiInfoKey.apiCollectionId", 0));
+        Assertions.assertEquals(5, filterSampleDataList.size());
     }
 
-    @Test
-    public void testAddLastSeenToOldMissingSlashEndpoints() {
-        SingleTypeInfoDao.instance.getMCollection().drop();
-        ApiInfoDao.instance.getMCollection().drop();
-        FilterSampleDataDao.instance.getMCollection().drop();
-        AccountSettings accountSettings = new AccountSettings(0, Collections.singletonList("172.31.0.0/16"), false, AccountSettings.SetupType.STAGING);
-        AccountSettingsDao.instance.insertOne(accountSettings);
-        RuntimeFilterDao.instance.initialiseFilters();
-
-        HttpCallParser parser = new HttpCallParser("access-token", 1,40,10, true);
-
-        HttpResponseParams hrp1 = generateHttpResponseParams("api/toys/1", URLMethods.Method.GET,0, Collections.singletonList(ApiInfo.AuthType.JWT), true) ;
-        parser.syncFunction(Collections.singletonList(hrp1), false, true);
-        parser.apiCatalogSync.syncWithDB(false, true);
-
-        AktoPolicy aktoPolicy = new AktoPolicy(parser.apiCatalogSync, true);
-        URLStatic urlStatic = new URLStatic(hrp1.requestParams.url, URLMethods.Method.fromString(hrp1.requestParams.method));
-        PolicyCatalog policyCatalog = aktoPolicy.getApiInfoCatalogMap().get(0).getStrictURLToMethods().get(urlStatic);
-        Assertions.assertNull(policyCatalog.getApiInfo());
-
-        HttpResponseParams hrp2 = generateHttpResponseParams("/api/toys/1", URLMethods.Method.GET,0, Collections.singletonList(ApiInfo.AuthType.JWT), true) ;
-        try {
-            aktoPolicy.main(Collections.singletonList(hrp2), null, true);
-        } catch (Exception e) {
-            Assertions.fail();
-        }
-
-        policyCatalog = aktoPolicy.getApiInfoCatalogMap().get(0).getStrictURLToMethods().get(urlStatic);
-        Assertions.assertNotNull(policyCatalog.getApiInfo());
-
-    }
 
     @Test
     public void test1() throws Exception {
-        AccountSettings accountSettings = new AccountSettings(0, Collections.singletonList("172.31.0.0/16"), false, AccountSettings.SetupType.STAGING);
-        AccountSettingsDao.instance.insertOne(accountSettings);
-        RuntimeFilterDao.instance.initialiseFilters();
+        dropCollections();
+        initialiseAccountSettings();
 
         APICatalogSync apiCatalogSync = new APICatalogSync("", 10);
-        AktoPolicy aktoPolicy = new AktoPolicy(apiCatalogSync, true);
+        AktoPolicyNew aktoPolicy = new AktoPolicyNew(true);
 
         URLStatic urlStatic1 = new URLStatic("/api/books", URLMethods.Method.GET);
         HttpResponseParams hrp1 = generateHttpResponseParams(urlStatic1.getUrl(), urlStatic1.getMethod(),0, Collections.singletonList(ApiInfo.AuthType.JWT), true) ;
         URLStatic urlStatic2 = new URLStatic("/api/books", URLMethods.Method.POST);
-        HttpResponseParams hrp2 = generateHttpResponseParams(urlStatic2.getUrl(), urlStatic2.getMethod(),0,Collections.singletonList(ApiInfo.AuthType.JWT), true);
+        HttpResponseParams hrp2 = generateHttpResponseParams(urlStatic2.getUrl(), urlStatic2.getMethod(),0,Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED), true);
         URLStatic urlStatic3 = new URLStatic("/api/cars", URLMethods.Method.GET);
         HttpResponseParams hrp3 = generateHttpResponseParams(urlStatic3.getUrl(), urlStatic3.getMethod(),1,Collections.singletonList(ApiInfo.AuthType.JWT), false);
         URLStatic urlStatic4 = new URLStatic("/api/toys", URLMethods.Method.PUT);
@@ -169,178 +132,110 @@ public class TestAktoPolicy extends MongoBasedTest {
         URLStatic urlStatic5 = new URLStatic("/api/new/books", URLMethods.Method.GET);
         HttpResponseParams hrp5 = generateHttpResponseParams(urlStatic5.getUrl(), urlStatic5.getMethod(),0,Collections.singletonList(ApiInfo.AuthType.JWT), false);
         URLStatic urlStatic6 = new URLStatic("/api/toys/1", URLMethods.Method.PUT);
-        HttpResponseParams hrp6 = generateHttpResponseParams(urlStatic6.getUrl(), urlStatic6.getMethod(),0,Collections.singletonList(ApiInfo.AuthType.JWT), false);
-        URLStatic urlStatic9 = new URLStatic("/api/something", URLMethods.Method.GET);
-        HttpResponseParams hrp9 = generateHttpResponseParams(urlStatic9.getUrl(), urlStatic9.getMethod(),0,Collections.singletonList(ApiInfo.AuthType.BEARER), false);
-        URLStatic urlStatic10 = new URLStatic("/api/something/1", URLMethods.Method.GET);
-        HttpResponseParams hrp10 = generateHttpResponseParams(urlStatic10.getUrl(), urlStatic10.getMethod(),0,Collections.singletonList(ApiInfo.AuthType.BASIC), false);
-        URLStatic urlStatic99 = new URLStatic("api/slash/1", URLMethods.Method.GET);
-        HttpResponseParams hrp99 = generateHttpResponseParams("/"+urlStatic99.getUrl(), urlStatic99.getMethod(),99,Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED), false);
-        URLTemplate urlTemplate99 = APICatalogSync.tryMergeUrls(new URLStatic("api/slash/2", URLMethods.Method.GET), new URLStatic("api/slash/3", URLMethods.Method.GET));
+        HttpResponseParams hrp6 = generateHttpResponseParams(urlStatic6.getUrl(), urlStatic6.getMethod(),0,Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED), false);
+        URLStatic urlStatic7 = new URLStatic("/api/toys/2", URLMethods.Method.PUT);
+        HttpResponseParams hrp7 = generateHttpResponseParams(urlStatic7.getUrl(), urlStatic7.getMethod(),0,Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED), false);
 
         // sending a couple of requests to akto policy initially
-        List<HttpResponseParams> hrpList = Arrays.asList(hrp1, hrp2, hrp3, hrp4, hrp5, hrp6,hrp99);
-        aktoPolicy.main(hrpList, null, true);
+        List<HttpResponseParams> hrpList = Arrays.asList(hrp1, hrp2, hrp3, hrp4, hrp5, hrp6, hrp7);
+        aktoPolicy.main(hrpList, false, true);
 
-        // since no data initially so will be stored in reserves
-        Assertions.assertEquals(aktoPolicy.getReserveApiInfoMap().keySet().size(), hrpList.size());
-        Assertions.assertEquals(aktoPolicy.getReserveFilterSampleDataMap().keySet().size(), 1);
+        aktoPolicy.main(Collections.singletonList(hrp1), apiCatalogSync != null, true);
 
-
-        // After some threshold is reached httpCallParser will sync with db and send apiCatalogSync to aktoPolicy
-        apiCatalogSync.dbState = new HashMap<>();
-        Map<URLStatic, RequestTemplate> strictUrlToMethods = new HashMap<>();
-        strictUrlToMethods.put(urlStatic1, null);
-        strictUrlToMethods.put(urlStatic2, null);
-        strictUrlToMethods.put(urlStatic4, null);
-        strictUrlToMethods.put(urlStatic5, null);
-        strictUrlToMethods.put(urlStatic6, null);
-
-        // urlStatic3 has different apiCollectionId
-        Map<URLStatic, RequestTemplate> strictUrlToMethods1 = new HashMap<>();
-        strictUrlToMethods1.put(urlStatic3, null);
-
-        Map<URLStatic, RequestTemplate> strictUrlToMethods99 = new HashMap<>();
-        strictUrlToMethods99.put(urlStatic99, null);
-        Map<URLTemplate, RequestTemplate> templateUrlToMethods99 = new HashMap<>();
-        templateUrlToMethods99.put(urlTemplate99, null);
-
-
-        APICatalog apiCatalog = new APICatalog(0,strictUrlToMethods, new HashMap<>());
-        APICatalog apiCatalog1 = new APICatalog(0,strictUrlToMethods1, new HashMap<>());
-        APICatalog apiCatalog99 = new APICatalog(0,strictUrlToMethods99, templateUrlToMethods99);
-        apiCatalogSync.dbState.put(0, apiCatalog);
-        apiCatalogSync.dbState.put(1, apiCatalog1);
-        apiCatalogSync.dbState.put(99, apiCatalog99);
-
-        aktoPolicy.main(Collections.singletonList(hrp1), apiCatalogSync, true);
-        Assertions.assertEquals(aktoPolicy.getReserveApiInfoMap().keySet().size(), 0);
-        Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().keySet().size(), 3);
-        Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().get(0).getStrictURLToMethods().size(), hrpList.size() -2 ); // because two hrps is of different collection
-        Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().get(0).getTemplateURLToMethods().size(), 0 );
-        Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().get(1).getStrictURLToMethods().size(),1);
-        Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().get(1).getTemplateURLToMethods().size(),0);
-
-        // nothing in db because in this cycle it moves from reserve to apiCatalogMap
         List<ApiInfo> apiInfoList = ApiInfoDao.instance.findAll(new BasicDBObject());
+        assertEquals(hrpList.size(), apiInfoList.size());
+
         List<FilterSampleData> filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
-        Assertions.assertEquals(apiInfoList.size(), 0);
-        Assertions.assertEquals(filterSampleDataList.size(), 0);
+        assertEquals(3, filterSampleDataList.size());
 
-        // now it moves to db
-        aktoPolicy.main(Collections.singletonList(hrp1), apiCatalogSync, true);
+        // created a dummy AktoPolicy to use buildFromDb without touching the original AktoPolicy
+        AktoPolicyNew dummyAktoPolicy = new AktoPolicyNew(true);
+        dummyAktoPolicy.buildFromDb(true);
+
+        Assertions.assertEquals(dummyAktoPolicy.getApiInfoCatalogMap().keySet().size(), 2);
+        Assertions.assertEquals(dummyAktoPolicy.getApiInfoCatalogMap().get(0).getStrictURLToMethods().size(), hrpList.size() -1 ); // because 1 hrp is of different collection
+        Assertions.assertEquals(dummyAktoPolicy.getApiInfoCatalogMap().get(0).getTemplateURLToMethods().size(), 0 );
+        Assertions.assertEquals(dummyAktoPolicy.getApiInfoCatalogMap().get(1).getStrictURLToMethods().size(),1);
+        Assertions.assertEquals(dummyAktoPolicy.getApiInfoCatalogMap().get(1).getTemplateURLToMethods().size(),0);
+
+
+        // next time data comes some urls got merged
+        String mergedUrl = "/api/toys/INTEGER";
+        Set<String> toMergeUrls = new HashSet<>(Arrays.asList("/api/toys/1", "/api/toys/2"));
+        MergeSimilarUrls.mergeApiInfo(mergedUrl, toMergeUrls, 0, URLMethods.Method.PUT);
+        MergeSimilarUrls.mergeFilterSampleData(mergedUrl, toMergeUrls, 0, URLMethods.Method.PUT);
+
+        aktoPolicy.buildFromDb(true);
+        apiInfoList = ApiInfoDao.instance.findAll(new BasicDBObject());
+        assertEquals(hrpList.size() - 1, apiInfoList.size()); // 2 urls got merged to 1
+        filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
+        assertEquals(2, filterSampleDataList.size()); // 2 urls got merged to 1
+        dummyAktoPolicy.buildFromDb(true);
+        Assertions.assertEquals(dummyAktoPolicy.getApiInfoCatalogMap().get(0).getTemplateURLToMethods().size(), 1 );
+
+        FilterSampleData filterSampleData = FilterSampleDataDao.instance.findOne(
+                Filters.and(
+                        Filters.eq("_id.apiInfoKey.apiCollectionId", 0),
+                        Filters.eq("_id.apiInfoKey.url", "/api/toys/INTEGER"),
+                        Filters.eq("_id.apiInfoKey.method", urlStatic6.getMethod().name())
+                )
+        );
+        assertEquals(1, filterSampleData.getSamples().getElements().size());
+
+        URLStatic urlStatic8 = new URLStatic("/api/toys/3", URLMethods.Method.PUT);
+        HttpResponseParams hrp8 = generateHttpResponseParams(urlStatic8.getUrl(), urlStatic8.getMethod(),0, Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED),false) ;
+        aktoPolicy.main(Collections.singletonList(hrp8), apiCatalogSync != null, true);
 
         apiInfoList = ApiInfoDao.instance.findAll(new BasicDBObject());
-        Assertions.assertEquals(apiInfoList.size(), hrpList.size());
+        assertEquals(hrpList.size() - 1, apiInfoList.size()); // 2 urls got merged to 1
         filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
-        Assertions.assertEquals(filterSampleDataList.size(), 1);
+        assertEquals(2, filterSampleDataList.size()); // 2 urls got merged to 1
 
-        boolean flag = false;
-        for (ApiInfo apiInfo: apiInfoList) {
-            if (apiInfo.getId().getApiCollectionId() == 99 && apiInfo.getId().url.equals(urlStatic99.getUrl())) {
-                flag = true;
-                break;
-            }
-        }
-        Assertions.assertTrue(flag);
+        filterSampleData = FilterSampleDataDao.instance.findOne(
+                Filters.and(
+                        Filters.eq("_id.apiInfoKey.apiCollectionId", 0),
+                        Filters.eq("_id.apiInfoKey.url", "/api/toys/INTEGER"),
+                        Filters.eq("_id.apiInfoKey.method", urlStatic6.getMethod().name())
+                )
+        );
+        assertEquals(2, filterSampleData.getSamples().getElements().size());
 
-        URLStatic urlStatic7 = new URLStatic("/api/toys/2", URLMethods.Method.PUT);
-        HttpResponseParams hrp7 = generateHttpResponseParams(urlStatic7.getUrl(), urlStatic7.getMethod(),0, Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED),true);
+        HttpResponseParams hrp10 = generateHttpResponseParams(urlStatic6.getUrl(), urlStatic6.getMethod(),0,Collections.singletonList(ApiInfo.AuthType.JWT), false);
 
-        aktoPolicy.main(Collections.singletonList(hrp7), null, true);
-        Assertions.assertEquals(aktoPolicy.getReserveApiInfoMap().keySet().size(), 1);
-        Assertions.assertEquals(aktoPolicy.getReserveFilterSampleDataMap().keySet().size(), 1);
+        aktoPolicy.main(Collections.singletonList(hrp10), apiCatalogSync != null, true);
 
-        // next cycle api/toys/INTEGER merge
-        apiCatalogSync.dbState.get(0).getStrictURLToMethods().remove(urlStatic6);
-        apiCatalogSync.dbState.get(0).getStrictURLToMethods().put(urlStatic9, null);
-        apiCatalogSync.dbState.get(0).getStrictURLToMethods().put(urlStatic10, null);
-        apiCatalogSync.dbState.get(0).getTemplateURLToMethods().put(APICatalogSync.createUrlTemplate("api/toys/INTEGER", urlStatic6.getMethod()), null);
+        ApiInfo apiInfo = ApiInfoDao.instance.findOne(
+                Filters.and(
+                        Filters.eq("_id.apiCollectionId", 0),
+                        Filters.eq("_id.url", "/api/toys/INTEGER"),
+                        Filters.eq("_id.method", urlStatic6.getMethod().name())
+                )
+        );
 
-        HttpResponseParams hrp8 = generateHttpResponseParams(urlStatic1.getUrl(), urlStatic1.getMethod(),0, Collections.singletonList(ApiInfo.AuthType.BEARER),false) ;
+        assertEquals(2, apiInfo.getAllAuthTypesFound().size());
+        assertTrue(apiInfo.getAllAuthTypesFound().contains(new HashSet<>(Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED))));
+        assertTrue(apiInfo.getAllAuthTypesFound().contains(new HashSet<>(Collections.singletonList(ApiInfo.AuthType.JWT))));
 
-        aktoPolicy.main(Arrays.asList(hrp8,hrp9,hrp10), apiCatalogSync, true);
-        Assertions.assertEquals(aktoPolicy.getReserveApiInfoMap().keySet().size(), 0);
-        Assertions.assertEquals(aktoPolicy.getReserveFilterSampleDataMap().keySet().size(), 0);
-        Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().get(0).getDeletedInfo().size(), 1 );
-        Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().get(0).getDeletedInfo().get(0), new ApiInfo.ApiInfoKey(0, urlStatic6.getUrl(), urlStatic6.getMethod()));
-        Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().get(0).getStrictURLToMethods().size(), 6 ); // because one hrp is of different collection
-        Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().get(0).getTemplateURLToMethods().size(), 1 );
-        Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().get(0).getTemplateURLToMethods()
-                .get(APICatalogSync.createUrlTemplate("api/toys/INTEGER", urlStatic6.getMethod())).getFilterSampleDataMap().size(), 1 );
+    }
 
-        // delete will happen in next cycle
-        apiInfoList = ApiInfoDao.instance.findAll(new BasicDBObject());
-        Assertions.assertEquals(apiInfoList.size(), hrpList.size());
-        filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
-        Assertions.assertEquals(filterSampleDataList.size(), 1);
 
-        aktoPolicy.main(Collections.singletonList(hrp1), apiCatalogSync, true);
-        apiInfoList = ApiInfoDao.instance.findAll(new BasicDBObject());
-        Assertions.assertEquals(apiInfoList.size(), hrpList.size()+2);
-        filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
-        Assertions.assertEquals(filterSampleDataList.size(), 2);
+    private static void dropCollections() {
+        AccountSettingsDao.instance.getMCollection().drop();
+        FilterSampleDataDao.instance.getMCollection().drop();
+        ApiInfoDao.instance.getMCollection().drop();
+    }
 
-        Map<ApiInfo.ApiInfoKey, ApiInfo> apiInfoMap = new HashMap<>();
-        for (ApiInfo apiInfo: apiInfoList) {
-            apiInfoMap.put(apiInfo.getId(), apiInfo);
-        }
-
-        ApiInfo.ApiInfoKey toysIntegerApiInfoKey = new ApiInfo.ApiInfoKey(0,"api/toys/INTEGER", urlStatic6.getMethod());
-        Assertions.assertTrue(apiInfoMap.get(toysIntegerApiInfoKey).getApiAccessTypes().containsAll(Arrays.asList(ApiInfo.ApiAccessType.PRIVATE, ApiInfo.ApiAccessType.PUBLIC)));
-        Set<ApiInfo.AuthType> authTypes = new HashSet<>();
-        authTypes.add(ApiInfo.AuthType.UNAUTHENTICATED);
-        Assertions.assertTrue(apiInfoMap.get(toysIntegerApiInfoKey).getAllAuthTypesFound().contains(authTypes));
-        authTypes = new HashSet<>();
-        authTypes.add(ApiInfo.AuthType.JWT);
-        Assertions.assertTrue(apiInfoMap.get(toysIntegerApiInfoKey).getAllAuthTypesFound().contains(authTypes));
-
-        ApiInfo.ApiInfoKey booksGet = new ApiInfo.ApiInfoKey(0, urlStatic1.getUrl(), urlStatic1.getMethod());
-        Assertions.assertTrue(apiInfoMap.get(booksGet).getApiAccessTypes().containsAll(Arrays.asList(ApiInfo.ApiAccessType.PRIVATE, ApiInfo.ApiAccessType.PUBLIC)));
-        authTypes = new HashSet<>();
-        authTypes.add(ApiInfo.AuthType.BEARER);
-        Assertions.assertTrue(apiInfoMap.get(booksGet).getAllAuthTypesFound().contains(authTypes));
-        authTypes = new HashSet<>();
-        authTypes.add(ApiInfo.AuthType.JWT);
-        Assertions.assertTrue(apiInfoMap.get(booksGet).getAllAuthTypesFound().contains(authTypes));
-
-        HttpResponseParams hrp11 = generateHttpResponseParams(urlStatic10.getUrl(), urlStatic10.getMethod(),0, Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED),true) ;
-
-        apiCatalogSync.dbState.get(0).getStrictURLToMethods().remove(urlStatic10);
-        apiCatalogSync.dbState.get(0).getTemplateURLToMethods().put(APICatalogSync.createUrlTemplate("api/something/INTEGER", urlStatic10.getMethod()), null);
-
-        aktoPolicy.main(Arrays.asList(hrp8,hrp9,hrp10,hrp11), apiCatalogSync, true);
-        Assertions.assertEquals(aktoPolicy.getReserveApiInfoMap().keySet().size(), 0);
-        Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().get(0).getDeletedInfo().size(), 1 );
-        Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().get(0).getDeletedInfo().get(0), new ApiInfo.ApiInfoKey(0, urlStatic10.getUrl(), urlStatic10.getMethod()));
-        Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().get(0).getStrictURLToMethods().size(), 5 ); // because one hrp is of different collection
-        Assertions.assertEquals(aktoPolicy.getApiInfoCatalogMap().get(0).getTemplateURLToMethods().size(), 2 );
-
-        aktoPolicy.main(Collections.singletonList(hrp1), apiCatalogSync, true);
-
-        apiInfoMap = new HashMap<>();
-        apiInfoList = ApiInfoDao.instance.findAll(new BasicDBObject());
-        for (ApiInfo apiInfo: apiInfoList) {
-            apiInfoMap.put(apiInfo.getId(), apiInfo);
-        }
-
-        ApiInfo.ApiInfoKey somethingIntegerApiInfoKey = new ApiInfo.ApiInfoKey(0,"api/something/INTEGER", urlStatic10.getMethod());
-        Assertions.assertTrue(apiInfoMap.get(somethingIntegerApiInfoKey).getApiAccessTypes().containsAll(Arrays.asList(ApiInfo.ApiAccessType.PRIVATE, ApiInfo.ApiAccessType.PUBLIC)));
-        authTypes = new HashSet<>();
-        authTypes.add(ApiInfo.AuthType.UNAUTHENTICATED);
-        Assertions.assertTrue(apiInfoMap.get(somethingIntegerApiInfoKey).getAllAuthTypesFound().contains(authTypes));
-        authTypes = new HashSet<>();
-        authTypes.add(ApiInfo.AuthType.BASIC);
-        Assertions.assertTrue(apiInfoMap.get(somethingIntegerApiInfoKey).getAllAuthTypesFound().contains(authTypes));
-
-        filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
-        Assertions.assertEquals(filterSampleDataList.size(), 3);
+    private static void initialiseAccountSettings() {
+        AccountSettings accountSettings = new AccountSettings(0, Collections.singletonList("172.31.0.0/16"), false, AccountSettings.SetupType.STAGING);
+        AccountSettingsDao.instance.insertOne(accountSettings);
+        RuntimeFilterDao.instance.initialiseFilters();
     }
 
     @Test
     public void testFilterSampleDataGetId() {
+        dropCollections();
+
         FilterSampleData filterSampleData1 = new FilterSampleData(new ApiInfo.ApiInfoKey(0,"/api/books", URLMethods.Method.GET), 0);
-        FilterSampleData filterSampleDataRemove = new FilterSampleData(new ApiInfo.ApiInfoKey(0,"/api/delete", URLMethods.Method.GET), 0);
         FilterSampleData filterSampleData2 = new FilterSampleData(new ApiInfo.ApiInfoKey(0,"/api/books", URLMethods.Method.POST), 0);
         for (String x: Arrays.asList("1", "2")) {
             filterSampleData2.getSamples().add(x);
@@ -350,40 +245,42 @@ public class TestAktoPolicy extends MongoBasedTest {
             filterSampleData3.getSamples().add(x);
         }
 
-        FilterSampleDataDao.instance.insertMany(Arrays.asList(filterSampleData1, filterSampleData2, filterSampleData3, filterSampleDataRemove));
+        FilterSampleDataDao.instance.insertMany(Arrays.asList(filterSampleData1, filterSampleData2, filterSampleData3));
         List<ApiInfo.ApiInfoKey> filterSampleDataIdList = FilterSampleDataDao.instance.getApiInfoKeys();
 
-        Assertions.assertEquals(filterSampleDataIdList.size(),4);
+        Assertions.assertEquals(3, filterSampleDataIdList.size());
         Assertions.assertNotNull(filterSampleDataIdList.get(0));
         Assertions.assertNotNull(filterSampleDataIdList.get(1));
         Assertions.assertNotNull(filterSampleDataIdList.get(2));
-        Assertions.assertNotNull(filterSampleDataIdList.get(3));
     }
 
     @Test
     public void testConstructorInitialisation() {
-        ApiInfoDao.instance.getMCollection().drop();
+        dropCollections();
+
         ApiInfo apiInfo = new ApiInfo(0, "/url1", URLMethods.Method.GET);
         ApiInfoDao.instance.insertOne(apiInfo);
 
-        FilterSampleDataDao.instance.getMCollection().drop();
         FilterSampleData filterSampleData = new FilterSampleData(new ApiInfo.ApiInfoKey(0, "/url1", URLMethods.Method.GET), 0);
         FilterSampleDataDao.instance.insertOne(filterSampleData);
 
         APICatalogSync apiCatalogSync = new APICatalogSync("", 0);
         Map<Integer, APICatalog> dbState = new HashMap<>();
         Map<URLStatic, RequestTemplate> strictURLToMethods = new HashMap<>();
-        strictURLToMethods.put(new URLStatic("url1", URLMethods.Method.GET), new RequestTemplate());
+        strictURLToMethods.put(new URLStatic("/url1", URLMethods.Method.GET), new RequestTemplate());
         Map<URLTemplate,RequestTemplate> templateURLToMethods = new HashMap<>();
         dbState.put(0, new APICatalog(0, strictURLToMethods, templateURLToMethods));
 
         apiCatalogSync.dbState = dbState;
 
-        AktoPolicy aktoPolicy = new AktoPolicy(apiCatalogSync, true);
+        AktoPolicyNew aktoPolicy = new AktoPolicyNew( true);
         Map<Integer, ApiInfoCatalog> apiInfoCatalogMap = aktoPolicy.getApiInfoCatalogMap();
+
         Map<URLStatic, PolicyCatalog> strictPolicyMap = apiInfoCatalogMap.get(0).getStrictURLToMethods();
         assertEquals(strictPolicyMap.size(), 1);
-        assertNotNull(strictPolicyMap.get(new URLStatic("url1", URLMethods.Method.GET)));
+        assertNotNull(strictPolicyMap.get(new URLStatic("/url1", URLMethods.Method.GET)));
 
+        Map<URLTemplate, PolicyCatalog> templatePolicyCatalogMap = apiInfoCatalogMap.get(0).getTemplateURLToMethods();
+        assertEquals(templatePolicyCatalogMap.size(), 0);
     }
 }

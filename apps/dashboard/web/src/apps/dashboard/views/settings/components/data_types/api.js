@@ -10,7 +10,7 @@ export default {
         })
     },
 
-    reviewCustomDataType(id,name,sensitiveAlways,operator,keyOperator, keyConditionFromUsers,valueOperator ,
+    reviewCustomDataType(id,name,sensitiveAlways,sensitivePosition,operator,keyOperator, keyConditionFromUsers,valueOperator ,
                          valueConditionFromUsers,active, pageNum) {
         return request({
             url: '/api/reviewCustomDataType',
@@ -19,6 +19,7 @@ export default {
                 id,
                 name,
                 sensitiveAlways,
+                sensitivePosition,
                 operator,
                 keyOperator,
                 keyConditionFromUsers,
@@ -31,17 +32,27 @@ export default {
         })
     },
 
-    saveCustomDataType(id,name,sensitiveAlways,operator,keyOperator, keyConditionFromUsers,valueOperator ,valueConditionFromUsers, createNew,active) {
+    saveCustomDataType(id,name,sensitiveAlways,sensitivePosition,operator,keyOperator, keyConditionFromUsers,valueOperator ,valueConditionFromUsers, createNew,active) {
         return request({
             url: '/api/saveCustomDataType',
             method: 'post',
             data: {
-                id,name,sensitiveAlways,operator,keyOperator, keyConditionFromUsers,valueOperator ,valueConditionFromUsers, createNew, active
+                id,name,sensitiveAlways,sensitivePosition,operator,keyOperator, keyConditionFromUsers,valueOperator ,valueConditionFromUsers, createNew, active
              }
 
         })
     },
 
+    saveAktoDataType(name,sensitiveAlways,sensitivePosition) {
+        return request({
+            url:'/api/saveAktoDataType',
+            method:'post',
+            data:{
+                name,sensitiveAlways,sensitivePosition
+            }
+        })
+    },
+    
     toggleActiveParam(name, active) {
         return request({
             url: '/api/toggleDataTypeActiveParam',

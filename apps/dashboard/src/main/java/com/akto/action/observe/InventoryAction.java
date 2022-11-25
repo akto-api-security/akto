@@ -3,6 +3,8 @@ package com.akto.action.observe;
 import java.net.URI;
 import java.util.*;
 
+import javax.net.ssl.HostnameVerifier;
+
 import com.akto.action.UserAction;
 import com.akto.dao.APISpecDao;
 import com.akto.dao.ApiCollectionsDao;
@@ -19,6 +21,7 @@ import com.akto.dto.TagConfig;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
+import com.fasterxml.jackson.databind.introspect.TypeResolutionContext.Basic;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
@@ -121,13 +124,12 @@ public class InventoryAction extends UserAction {
 
     public List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId) {
 
-        ApiCollection apiCollection = ApiCollectionsDao.instance.findAll(Filters.eq("_id", apiCollectionId), Projections.exclude("urls")).get(0);
-
+        ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+        
         if (apiCollection.getHostName() == null || apiCollection.getHostName().length() == 0 ) {
             return fetchEndpointsInCollection(apiCollectionId);
         } else {
-            Bson filterQ = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, true);
-            List<SingleTypeInfo> allUrlsInCollection = SingleTypeInfoDao.instance.findAll(filterQ, skip,10_000, null);
+            List<SingleTypeInfo> allUrlsInCollection = fetchHostSTI(apiCollectionId, skip);
 
             List<BasicDBObject> endpoints = new ArrayList<>();
             for(SingleTypeInfo singleTypeInfo: allUrlsInCollection) {
@@ -138,9 +140,41 @@ public class InventoryAction extends UserAction {
             }
     
             return endpoints;
-    
         }
     }
+
+    private String hostName;
+    private List<BasicDBObject> endpoints;
+    public String fetchEndpointsBasedOnHostName() {
+        endpoints = new ArrayList<>();
+        if (hostName == null) {
+            addActionError("Host cannot be null");
+            return ERROR.toUpperCase();
+        }
+
+        ApiCollection apiCollection = ApiCollectionsDao.instance.findByHost(hostName);
+
+        if (apiCollection == null) {
+            addActionError("Invalid host");
+            return ERROR.toUpperCase();
+        }
+
+        List<SingleTypeInfo> singleTypeInfos = fetchHostSTI(apiCollection.getId(), skip);
+        for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
+            BasicDBObject value = new BasicDBObject();
+            value.put("url", singleTypeInfo.getUrl());
+            value.put("method", singleTypeInfo.getMethod());
+            endpoints.add(value);
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public static List<SingleTypeInfo> fetchHostSTI(int apiCollectionId, int skip) {
+        Bson filterQ = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, true);
+        return SingleTypeInfoDao.instance.findAll(filterQ, skip,10_000, null);
+    }
+
 
     private void attachTagsInAPIList(List<BasicDBObject> list) {
         List<TagConfig> tagConfigs = TagConfigsDao.instance.findAll(new BasicDBObject("active", true));
@@ -606,4 +640,13 @@ public class InventoryAction extends UserAction {
         this.endTimestamp = endTimestamp;
     }
 
+
+    public void setHostName(String hostName) {
+        this.hostName = hostName;
+    }
+
+
+    public List<BasicDBObject> getEndpoints() {
+        return endpoints;
+    }
 }

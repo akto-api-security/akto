@@ -14,12 +14,19 @@ public class BackwardCompatibility {
     public static final String READY_FOR_NEW_TESTING_FRAMEWORK = "readyForNewTestingFramework";
     private int readyForNewTestingFramework;
 
-    public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult, int readyForNewTestingFramework) {
+    public static final String ADD_AKTO_DATA_TYPES = "addAktoDataTypes";
+    private int addAktoDataTypes;
+
+    public static final String MERGE_ON_HOST_INIT = "mergeOnHostInit";
+    private int mergeOnHostInit;
+
+    public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult, int readyForNewTestingFramework,int addAktoDataTypes) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
         this.dropWorkflowTestResult = dropWorkflowTestResult;
         this.readyForNewTestingFramework = readyForNewTestingFramework;
+        this.addAktoDataTypes = addAktoDataTypes;
     }
 
     public BackwardCompatibility() {
@@ -65,4 +72,19 @@ public class BackwardCompatibility {
         this.readyForNewTestingFramework = readyForNewTestingFramework;
     }
 
+    public int getAddAktoDataTypes() {
+        return addAktoDataTypes;
+    }
+
+    public void setAddAktoDataTypes(int addAktoDataTypes) {
+        this.addAktoDataTypes = addAktoDataTypes;
+    }
+    
+    public int getMergeOnHostInit() {
+        return this.mergeOnHostInit;
+    }
+
+    public void setMergeOnHostInit(int mergeOnHostInit) {
+        this.mergeOnHostInit = mergeOnHostInit;
+    }
 }

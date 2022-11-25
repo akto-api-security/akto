@@ -6,6 +6,8 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
+
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
@@ -29,6 +31,16 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         return ApiCollection.class;
     }
 
+    public ApiCollection getMeta(int apiCollectionId) {
+        List<ApiCollection> ret = ApiCollectionsDao.instance.findAll(Filters.eq("_id", apiCollectionId), Projections.exclude("urls"));
+
+        return (ret != null && ret.size() > 0) ? ret.get(0) : null;
+    }
+
+    public List<ApiCollection> getMetaAll() {
+        return ApiCollectionsDao.instance.findAll(new BasicDBObject(), Projections.exclude("urls"));
+    }
+
     public Map<Integer, ApiCollection> generateApiCollectionMap() {
         Map<Integer, ApiCollection> apiCollectionMap = new HashMap<>();
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
@@ -48,6 +60,10 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
             }
         }
         return null;
+    }
+
+    public ApiCollection findByHost(String host) {
+        return instance.findOne(ApiCollection.HOST_NAME, host);
     }
 
     // this is flawed. Because we were in a hurry we allowed this
