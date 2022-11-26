@@ -9,17 +9,17 @@
                 </v-chip>
             </div>
             <div class="mr-6 mt-4">
-                <v-select :label="label(issueStatus, ignoreReason)" 
-                class="button-menu"
-                :items="items(issueStatus, ignoreReason)" solo dark
-                    append-icon="$fas_angle-down" :menu-props="{ offsetY: true, bottom: true }" dense
-                    v-model="selectedValue" @change="updateStatus(issueId, selectedValue)">
+                <v-select v-if="issueStatus !== 'FIXED'" :label="label(issueStatus, ignoreReason)" class="button-menu"
+                    :items="items(issueStatus, ignoreReason)" solo dark append-icon="$fas_angle-down"
+                    :menu-props="{ offsetY: true, bottom: true }" dense v-model="selectedValue"
+                    @change="updateStatus(issueId, selectedValue)">
                     <template slot="item" slot-scope="data">
-                        <!-- HTML that describe how select should render items when the select is open -->
-                        <v-icon size="6">$fas_circle</v-icon>
-                         {{ data.item }}
+                        {{ data.item }}
                     </template>
                 </v-select>
+                <span v-else>
+                    <v-btn class="fixed-button">Fixed</v-btn>
+                </span>
             </div>
         </div>
         <div class="issue-description">{{ categoryDescription }}</div>
@@ -138,14 +138,29 @@ export default {
 </script>
 
 <style scoped >
-.button-menu >>> .v-input__slot{
+.fixed-button {
     background-color: var(--v-themeColor-base) !important;
+    color: #FFFFFF;
+    width: 175px;
+    font-family: 'Poppins', sans-serif;;
+    font-style: normal;
+}
+
+.button-menu>>>.v-input__slot {
+    background-color: var(--v-themeColor-base) !important;
+    cursor: pointer !important;
+    font-size: 12px;
+    font-family: 'Poppins', sans-serif;;
+    font-style: normal;
+}
+
+.button-menu>>>.v-label {
+    color: #FFFFFF !important;
     cursor: pointer !important;
 }
 
-.button-menu >>> .v-label{
-    color: #FFFFFF !important;
-    cursor: pointer !important;
+.button-menu {
+    width: 175px;
 }
 
 .display-flex-heading {
