@@ -28,16 +28,9 @@ public class OldApiVersionTest extends TestPlugin {
         if (filteredMessages.isEmpty()) return addWithoutRequestError(null, TestResult.TestError.NO_MESSAGE_WITH_AUTH_TOKEN);
 
         RawApi rawApi = filteredMessages.get(0).copy();
-
-        // hit the api once without changing anything to get base condition to compare against
-        OriginalHttpResponse originalHttpResponse;
-        try {
-             originalHttpResponse = ApiExecutor.sendRequest(rawApi.getRequest(), true);
-        } catch (Exception e) {
-            return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, rawApi.getRequest());
-        }
-
         Result result = null;
+
+        boolean foundOlderVersionApiThatWorks = false;
 
         while (oldVersionUrl != null) { // todo: add a check for max
             ApiInfo.ApiInfoKey oldVersionApiInfoKey = new ApiInfo.ApiInfoKey(apiInfoKey.getApiCollectionId(), oldVersionUrl, apiInfoKey.getMethod());
@@ -51,6 +44,24 @@ public class OldApiVersionTest extends TestPlugin {
             // change the url to oldVersionUrl
             OriginalHttpRequest testRequest = rawApi.getRequest().copy();
             testRequest.setUrl(oldVersionUrl);
+
+            // hit the older version api once without changing anything else to get base condition to compare against
+            OriginalHttpResponse originalHttpResponse;
+            try {
+                originalHttpResponse = ApiExecutor.sendRequest(testRequest, true);
+            } catch (Exception e) {
+                e.printStackTrace();
+                oldVersionUrl = decrementUrlVersion(oldVersionUrl, 1, 1);
+                continue;
+            }
+
+            boolean isStatusGood = isStatusGood(originalHttpResponse.getStatusCode());
+            if (!isStatusGood) {
+                oldVersionUrl = decrementUrlVersion(oldVersionUrl, 1, 1);
+                continue;
+            }
+
+            foundOlderVersionApiThatWorks = true;
 
             // try BOLA
             BOLATest bolaTest = new BOLATest();
@@ -67,13 +78,15 @@ public class OldApiVersionTest extends TestPlugin {
 
                  result = addTestSuccessResult(
                                  executorResult.vulnerable, Collections.singletonList(testResult), executorResult.singleTypeInfos, executorResult.confidence
-                         );
+                 );
 
                 if (executorResult.vulnerable) return result;
             }
 
             oldVersionUrl = decrementUrlVersion(oldVersionUrl, 1, 1);
         }
+
+        if (!foundOlderVersionApiThatWorks) return null;
 
         return result;
     }
