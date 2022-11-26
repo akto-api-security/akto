@@ -15,15 +15,16 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static com.akto.runtime.APICatalogSync.trim;
 import static com.akto.runtime.APICatalogSync.trimAndSplit;
 
 
@@ -288,6 +289,56 @@ public abstract class TestPlugin {
         double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), testResponse.getBody());
 
         return new ApiExecutionDetails(statusCode, percentageMatch, testResponse);
+    }
+
+    // will return true if it found a JWT and was able to modify it else false
+    public static boolean modifyJwtHeaderToNoneAlgo(Map<String, List<String>> headers) {
+        boolean flag = false;
+        for (String header: headers.keySet()) {
+            List<String> values = headers.get(header);
+            List<String> newValues = new ArrayList<>();
+            for (String value: values) {
+                boolean isJwt = KeyTypes.isJWT(value);
+                if (isJwt) {
+                    try {
+                        String modifiedJwt = buildNoneAlgoToken(value);
+                        newValues.add(modifiedJwt);
+                        flag = true;
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        newValues.add(value);
+                    }
+                } else {
+                    newValues.add(value);
+                }
+            }
+            headers.put(header, newValues);
+        }
+
+        return flag;
+    }
+
+    public static String buildNoneAlgoToken(String jwt) throws Exception {
+        String[] jwtArr = jwt.split("\\.");
+        if (jwtArr.length != 3) throw new Exception("Not jwt");
+
+        String encodedHeader = jwtArr[0];
+        byte[] decodedHeaderBytes = Base64.getDecoder().decode(encodedHeader);
+        String decodedHeaderStr = new String(decodedHeaderBytes, StandardCharsets.UTF_8);
+
+        // convert string to map
+        Map<String, Object> json = new Gson().fromJson(decodedHeaderStr, Map.class);
+        // alg -> none
+        json.put("alg", "none");
+        // rebuild string
+        String modifiedHeaderStr = mapper.writeValueAsString(json);
+        // encode it and remove trailing =
+        String encodedModifiedHeader = Base64.getEncoder().encodeToString(modifiedHeaderStr.getBytes(StandardCharsets.UTF_8));
+        if (encodedModifiedHeader.endsWith("=")) encodedModifiedHeader = encodedModifiedHeader.substring(0, encodedModifiedHeader.length()-1);
+
+        String encodedBody = jwtArr[1];
+
+        return encodedModifiedHeader + "." + encodedBody + ".";
     }
 
     public static class ApiExecutionDetails {

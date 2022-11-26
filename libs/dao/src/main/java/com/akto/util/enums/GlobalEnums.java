@@ -39,7 +39,9 @@ public class GlobalEnums {
         CHANGE_METHOD("CHANGE_METHOD", TestCategory.PRIVILEGE_ESCALATION),
         REMOVE_TOKENS("REMOVE_TOKENS", TestCategory.NO_AUTH),
         PARAMETER_POLLUTION("PARAMETER_POLLUTION", TestCategory.BOLA),
-        REPLACE_AUTH_TOKEN_OLD_VERSION("REPLACE_AUTH_TOKEN_OLD_VERSION", TestCategory.BOLA);
+        REPLACE_AUTH_TOKEN_OLD_VERSION("REPLACE_AUTH_TOKEN_OLD_VERSION", TestCategory.BOLA),
+        JWT_NONE_ALGO("JWT_NONE_ALGO", TestCategory.NO_AUTH);
+
         private final String name;
         private final TestCategory superCategory;
         private static final TestSubCategory[] valuesArray = values();

@@ -2,7 +2,6 @@ package com.akto.testing;
 
 import com.akto.DaoInit;
 import com.akto.dao.AuthMechanismsDao;
-import com.akto.dao.RuntimeFilterDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
@@ -179,6 +178,7 @@ public class TestExecutor {
         AddUserIdTest addUserIdTest = new AddUserIdTest();
         ParameterPollutionTest parameterPollutionTest = new ParameterPollutionTest();
         OldApiVersionTest oldApiVersionTest = new OldApiVersionTest();
+        JWTNoneAlgoTest  jwtNoneAlgoTest = new JWTNoneAlgoTest();
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
         TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
@@ -186,6 +186,9 @@ public class TestExecutor {
         if (!noAuthTestResult.isVulnerable()) {
             TestingRunResult bolaTestResult = runTest(bolaTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
             testingRunResults.add(bolaTestResult);
+
+            TestingRunResult jwtNoneAlgoTestResult = runTest(jwtNoneAlgoTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+            if (jwtNoneAlgoTestResult != null) testingRunResults.add(jwtNoneAlgoTestResult);
         }
 
         TestingRunResult addMethodInParameterTestResult = runTest(addMethodInParameterTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);

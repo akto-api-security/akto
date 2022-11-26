@@ -53,8 +53,10 @@ export default {
                 case 'ADD_METHOD_IN_PARAMETER':
                 case 'ADD_METHOD_OVERRIDE_HEADERS':
                 case 'CHANGE_METHOD':
+                case 'REPLACE_AUTH_TOKEN_OLD_VERSION':
                     return 'Broken Object Level Authorization (BOLA)';
                 case 'REMOVE_TOKENS':
+                case 'JWT_NONE_ALGO':
                     return 'Broken User Authentication (BUA)'
                 default:
                     return 'Broken Object Level Authorization (BOLA)'
@@ -64,8 +66,12 @@ export default {
             switch (name) {
                 case 'REPLACE_AUTH_TOKEN':
                     return 'Attacker can access resources of any user by changing the auth token in request.';
+                case 'JWT_NONE_ALGO':
+                    return 'Attacker can tamper with the payload of JWT and access protected resources.'
                 case 'ADD_USER_ID':
                     return 'Attacker can access resources of any user by adding user_id in URL.';
+                case 'REPLACE_AUTH_TOKEN_OLD_VERSION':
+                    return 'Attacker can access resources of any user by changing the auth token in request and using older version of an API'
                 case 'ADD_METHOD_IN_PARAMETER':
                 case 'ADD_METHOD_OVERRIDE_HEADERS':
                 case 'CHANGE_METHOD':
