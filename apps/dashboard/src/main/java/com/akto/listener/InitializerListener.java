@@ -25,6 +25,9 @@ import com.akto.types.CappedSet;
 import com.akto.util.Pair;
 import com.akto.utils.RedactSampleData;
 import com.google.gson.Gson;
+import com.mashape.unirest.http.HttpResponse;
+import com.mashape.unirest.http.Unirest;
+import com.mashape.unirest.http.exceptions.UnirestException;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -470,6 +473,7 @@ public class InitializerListener implements ServletContextListener {
             dropWorkflowTestResultCollection(backwardCompatibility);
             readyForNewTestingFramework(backwardCompatibility);
             addAktoDataTypes(backwardCompatibility);
+            updateDeploymentStatus(backwardCompatibility);
 
             SingleTypeInfo.init();
 
@@ -488,5 +492,36 @@ public class InitializerListener implements ServletContextListener {
         } catch (Exception e) {
             logger.error("error while updating dashboard version: " + e.getMessage());
         }
+    }
+
+    public void updateDeploymentStatus(BackwardCompatibility backwardCompatibility) {
+        String ownerEmail = System.getenv("OWNER_EMAIL");
+        if(ownerEmail == null) {
+            logger.info("Owner email missing, might be an existing customer, skipping sending an slack and mixpanel alert");
+            return;
+        }
+        if(backwardCompatibility.isDeploymentStatusUpdated()){
+            logger.info("Deployment status has already been updated, skipping this");
+            return;
+        }
+        Unirest.setTimeouts(0, 0);
+        try {
+            HttpResponse<String> response = Unirest.post(getUpdateDeploymentStatusUrl())
+                    .header("Content-Type", "application/json")
+                    .body("{\n    \"ownerEmail\": \""+ ownerEmail +"\",\n    \"stackStatus\": \"COMPLETED\",\n    \"cloudType\": \"AWS\"\n}")
+                    .asString();
+            logger.info("Update deployment status reponse: {}", response.getBody());
+        } catch (UnirestException e) {
+            logger.error("Exception while updating deployment status ", e);
+        }
+        BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.DEPLOYMENT_STATUS_UPDATED, true)
+        );
+    }
+
+    private String getUpdateDeploymentStatusUrl() {
+        String url = System.getenv("UPDATE_DEPLOYMENT_STATUS_URL");
+        return url != null ? url: "https://stairway.akto.io/deployment/status";
     }
 }
