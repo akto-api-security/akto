@@ -4,11 +4,13 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.util.HashMap;
+import java.util.List;
 
 import com.akto.MongoBasedTest;
 import com.akto.dao.CustomDataTypeDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.pii.PIISourceDao;
+import com.akto.dto.CustomDataType;
 import com.akto.dto.pii.PIISource;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Updates;
@@ -30,16 +32,21 @@ public class TestListener extends MongoBasedTest {
         
         PIISourceDao.instance.insertOne(piiSource);
         InitializerListener.executePIISourceFetch();
-        assertTrue(CustomDataTypeDao.instance.findAll(new BasicDBObject()).size() == 2);
-        assertTrue(PIISourceDao.instance.findOne("_id", "A").getMapNameToPIIType().size() == 1);
+        List<PIISource> piiSources = PIISourceDao.instance.findAll(new BasicDBObject());
+        List<CustomDataType> customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject()); 
+        assertTrue(customDataTypes.size() == 4);
+        assertTrue(piiSources.get(0).getMapNameToPIIType().size() == 2);
 
 
         String fileUrl2 = filePath.concat("/src/test/resources/pii_source_2.json");
         PIISourceDao.instance.updateOne("_id", piiSource.getId(), Updates.set("fileUrl", fileUrl2));
 
         InitializerListener.executePIISourceFetch();
-        assertTrue(CustomDataTypeDao.instance.findAll(new BasicDBObject()).size() == 3);
-        assertTrue(PIISourceDao.instance.findOne("_id", "A").getMapNameToPIIType().size() == 2);
+
+        piiSources = PIISourceDao.instance.findAll(new BasicDBObject());
+        customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject()); 
+        assertTrue(customDataTypes.size() == 5);
+        assertTrue(piiSources.get(0).getMapNameToPIIType().size() == 3);
 
     }
 

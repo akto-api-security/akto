@@ -138,7 +138,7 @@ public class InitializerListener implements ServletContextListener {
 
                 executePIISourceFetch();
             }
-        }, 0, 24, TimeUnit.HOURS);
+        }, 0, 4, TimeUnit.HOURS);
     }
 
     static void executePIISourceFetch() {
@@ -164,27 +164,33 @@ public class InitializerListener implements ServletContextListener {
 
                 for (Object dtObj: dataTypes) {
                     BasicDBObject dt = (BasicDBObject) dtObj;
-                    String piiKey = id + "_" + dt.getString("name").toUpperCase();
+                    String piiKey = dt.getString("name").toUpperCase();
                     PIIType piiType = new PIIType(
                         piiKey,
-                        dt.getBoolean("isSensitive"),
+                        dt.getBoolean("sensitive"),
                         dt.getString("regexPattern"),
                         dt.getBoolean("onKey")
                     );
 
-                    if (currTypes.containsKey(piiKey) && currTypes.get(piiKey).equals(piiType)) {
-                        continue;
-                    } else {
-                        Bson updateQ = Updates.set("mapNameToPIIType."+piiKey, piiType);
-                        PIISourceDao.instance.updateOne(findQ, updateQ);
-
-                        CustomDataTypeDao.instance.deleteAll(Filters.eq("name", piiKey));
-                        CustomDataTypeDao.instance.insertOne(getCustomDataTypeFromPiiType(piiSource, piiType));
-                    }
-
                     if (!dt.getBoolean("active", true)) {
                         PIISourceDao.instance.updateOne(findQ, Updates.unset("mapNameToPIIType."+piiKey));
                         CustomDataTypeDao.instance.updateOne("name", piiKey, Updates.set("active", false));
+                    }
+
+                    if (currTypes.containsKey(piiKey) && currTypes.get(piiKey).equals(piiType)) {
+                        continue;
+                    } else {
+                        CustomDataTypeDao.instance.deleteAll(Filters.eq("name", piiKey));
+                        if (!dt.getBoolean("active", true)) {
+                            PIISourceDao.instance.updateOne(findQ, Updates.unset("mapNameToPIIType."+piiKey));
+                            CustomDataTypeDao.instance.insertOne(getCustomDataTypeFromPiiType(piiSource, piiType,false));
+
+                        } else {
+                            Bson updateQ = Updates.set("mapNameToPIIType."+piiKey, piiType);
+                            PIISourceDao.instance.updateOne(findQ, updateQ);
+                            CustomDataTypeDao.instance.insertOne(getCustomDataTypeFromPiiType(piiSource, piiType,true));
+                        } 
+                        
                     }
                 }
 
@@ -196,7 +202,7 @@ public class InitializerListener implements ServletContextListener {
         SingleTypeInfo.fetchCustomDataTypes();
     }
 
-    private static CustomDataType getCustomDataTypeFromPiiType(PIISource piiSource, PIIType piiType) {
+    private static CustomDataType getCustomDataTypeFromPiiType(PIISource piiSource, PIIType piiType,Boolean active) {
         String piiKey = piiType.getName();
 
         List<Predicate> predicates = new ArrayList<>(); 
@@ -208,7 +214,7 @@ public class InitializerListener implements ServletContextListener {
             piiType.getIsSensitive(), 
             Collections.emptyList(), 
             piiSource.getAddedByUser(), 
-            true, 
+            active, 
             conditions, 
             (piiType.getOnKey() ? null : conditions), 
             Operator.OR
