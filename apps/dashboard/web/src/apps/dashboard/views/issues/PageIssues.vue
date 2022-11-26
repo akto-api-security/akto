@@ -54,6 +54,7 @@ export default {
                 case 'ADD_METHOD_OVERRIDE_HEADERS':
                 case 'CHANGE_METHOD':
                 case 'REPLACE_AUTH_TOKEN_OLD_VERSION':
+                case 'PARAMETER_POLLUTION':
                     return 'Broken Object Level Authorization (BOLA)';
                 case 'REMOVE_TOKENS':
                 case 'JWT_NONE_ALGO':
@@ -68,6 +69,8 @@ export default {
                     return 'Attacker can access resources of any user by changing the auth token in request.';
                 case 'JWT_NONE_ALGO':
                     return 'Attacker can tamper with the payload of JWT and access protected resources.'
+                case 'PARAMETER_POLLUTION':
+                    return 'Attacker can access resources of any user by introducing multiple parameters with same name.'
                 case 'ADD_USER_ID':
                     return 'Attacker can access resources of any user by adding user_id in URL.';
                 case 'REPLACE_AUTH_TOKEN_OLD_VERSION':
