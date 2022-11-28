@@ -32,9 +32,6 @@ import com.akto.notifications.slack.DailyUpdate;
 import com.akto.util.Pair;
 import com.akto.utils.RedactSampleData;
 import com.google.gson.Gson;
-import com.mashape.unirest.http.HttpResponse;
-import com.mashape.unirest.http.Unirest;
-import com.mashape.unirest.http.exceptions.UnirestException;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
@@ -622,15 +619,15 @@ public class InitializerListener implements ServletContextListener {
             logger.info("Deployment status has already been updated, skipping this");
             return;
         }
-        Unirest.setTimeouts(0, 0);
+        String body = "{\n    \"ownerEmail\": \""+ ownerEmail +"\",\n    \"stackStatus\": \"COMPLETED\",\n    \"cloudType\": \"AWS\"\n}";
+        String headers = "{\"Content-Type\": \"application/json\"}";
+        OriginalHttpRequest request = new OriginalHttpRequest(getUpdateDeploymentStatusUrl(),"","POST", body, OriginalHttpRequest.buildHeadersMap(headers),"");
         try {
-            HttpResponse<String> response = Unirest.post(getUpdateDeploymentStatusUrl())
-                    .header("Content-Type", "application/json")
-                    .body("{\n    \"ownerEmail\": \""+ ownerEmail +"\",\n    \"stackStatus\": \"COMPLETED\",\n    \"cloudType\": \"AWS\"\n}")
-                    .asString();
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request,false);
             logger.info("Update deployment status reponse: {}", response.getBody());
-        } catch (UnirestException e) {
-            logger.error("Exception while updating deployment status ", e);
+        } catch(Exception e){
+            logger.error("Failed to update deployment status, will try again on next boot up", e);
+            return;
         }
         BackwardCompatibilityDao.instance.updateOne(
                 Filters.eq("_id", backwardCompatibility.getId()),
