@@ -9,7 +9,7 @@ const state = {
     loading: false,
     issues: [],
     currentPage: 1,
-    limit: 4,
+    limit: 20,
     totalIssuesCount: 0
 }
 
@@ -20,7 +20,7 @@ const issues = {
         EMPTY_STATE(state) {
             state.loading = false
             state.issues = []
-            state.limit = 4
+            state.limit = 20
             state.totalIssuesCount = 0
         },
         SAVE_ISSUES(state, { issues, totalIssuesCount }) {
