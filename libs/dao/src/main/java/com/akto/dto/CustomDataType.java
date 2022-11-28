@@ -159,4 +159,21 @@ public class CustomDataType {
     public void setActive(boolean active) {
         this.active = active;
     }
+
+
+    @Override
+    public String toString() {
+        return "{" +
+            " id='" + getId() + "'" +
+            ", name='" + getName() + "'" +
+            ", sensitiveAlways='" + isSensitiveAlways() + "'" +
+            ", sensitivePosition='" + getSensitivePosition() + "'" +
+            ", creatorId='" + getCreatorId() + "'" +
+            ", timestamp='" + getTimestamp() + "'" +
+            ", active='" + isActive() + "'" +
+            ", keyConditions='" + getKeyConditions() + "'" +
+            ", valueConditions='" + getValueConditions() + "'" +
+            ", operator='" + getOperator() + "'" +
+            "}";
+    }
 }
