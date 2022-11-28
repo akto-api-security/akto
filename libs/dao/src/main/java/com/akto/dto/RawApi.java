@@ -22,6 +22,10 @@ public class RawApi {
         return new RawApi(request, response, message);
     }
 
+    public RawApi copy() {
+        return new RawApi(this.request.copy(), this.response.copy(), this.originalMessage);
+    }
+
     public RawApi() { }
 
     public OriginalHttpRequest getRequest() {

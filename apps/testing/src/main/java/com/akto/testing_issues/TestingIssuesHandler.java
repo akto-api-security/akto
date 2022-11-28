@@ -118,10 +118,14 @@ public class TestingIssuesHandler {
         insertVulnerableTestsIntoIssuesCollection(writeModelList, testingIssuesIdsMap, testingRunIssuesList);
         logger.info("Total write queries after the insertion iterations: {}", writeModelList.size());
         try {
-            BulkWriteResult result = TestingRunIssuesDao.instance.bulkWrite(writeModelList, new BulkWriteOptions().ordered(false));
-            logger.info("Matched records : {}", result.getMatchedCount());
-            logger.info("inserted counts : {}", result.getInsertedCount());
-            logger.info("Modified counts : {}", result.getModifiedCount());
+            if (writeModelList.size() > 0) {
+                BulkWriteResult result = TestingRunIssuesDao.instance.bulkWrite(writeModelList, new BulkWriteOptions().ordered(false));
+                logger.info("Matched records : {}", result.getMatchedCount());
+                logger.info("inserted counts : {}", result.getInsertedCount());
+                logger.info("Modified counts : {}", result.getModifiedCount());
+            } else {
+                logger.info("writeModelList is empty");
+            }
         } catch (Exception e) {
             logger.error("Error while inserting issues into db: {}", e.getMessage());
         }

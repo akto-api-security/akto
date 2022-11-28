@@ -149,6 +149,20 @@ public class TestSingleTypeInfo {
         );
     }
 
+    @Test
+    public void testFindLastKeyFromParam() {
+        String result = SingleTypeInfo.findLastKeyFromParam("name");
+        assertEquals("name", result);
+
+        result = SingleTypeInfo.findLastKeyFromParam("user#name");
+        assertEquals("name", result);
+
+        result = SingleTypeInfo.findLastKeyFromParam("cards#$#name");
+        assertEquals("name", result);
+
+        assertNull(SingleTypeInfo.findLastKeyFromParam(null));
+    }
+
 
 
 }

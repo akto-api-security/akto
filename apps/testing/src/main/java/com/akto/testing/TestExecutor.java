@@ -1,7 +1,9 @@
 package com.akto.testing;
 
+import com.akto.DaoInit;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.WorkflowTestsDao;
@@ -13,6 +15,7 @@ import com.akto.rules.*;
 import com.akto.store.SampleMessageStore;
 import com.akto.testing_issues.TestingIssuesHandler;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.types.ObjectId;
@@ -35,6 +38,15 @@ public class TestExecutor {
         } else {
             workflowInit(testingRun, summaryId);
         }
+    }
+
+    public static void main(String[] args) {
+        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
+        Context.accountId.set(1_000_000);
+
+        TestExecutor testExecutor = new TestExecutor();
+        TestingRun testingRun = TestingRunDao.instance.findOne(new BasicDBObject());
+        testExecutor.init(testingRun, new ObjectId());
     }
 
     public void workflowInit (TestingRun testingRun, ObjectId summaryId) {
@@ -164,6 +176,9 @@ public class TestExecutor {
         AddMethodInParameterTest addMethodInParameterTest = new AddMethodInParameterTest();
         AddMethodOverrideHeadersTest addMethodOverrideHeadersTest = new AddMethodOverrideHeadersTest();
         AddUserIdTest addUserIdTest = new AddUserIdTest();
+        ParameterPollutionTest parameterPollutionTest = new ParameterPollutionTest();
+        OldApiVersionTest oldApiVersionTest = new OldApiVersionTest();
+        JWTNoneAlgoTest  jwtNoneAlgoTest = new JWTNoneAlgoTest();
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
         TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
@@ -171,6 +186,18 @@ public class TestExecutor {
         if (!noAuthTestResult.isVulnerable()) {
             TestingRunResult bolaTestResult = runTest(bolaTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
             testingRunResults.add(bolaTestResult);
+
+            TestingRunResult addUserIdTestResult = runTest(addUserIdTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+            if (addUserIdTestResult != null) testingRunResults.add(addUserIdTestResult);
+
+            TestingRunResult parameterPollutionTestResult = runTest(parameterPollutionTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+            if (parameterPollutionTestResult != null) testingRunResults.add(parameterPollutionTestResult);
+
+            TestingRunResult oldApiVersionTestResult = runTest(oldApiVersionTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+            if (oldApiVersionTestResult != null) testingRunResults.add(oldApiVersionTestResult);
+
+            TestingRunResult jwtNoneAlgoTestResult = runTest(jwtNoneAlgoTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+            if (jwtNoneAlgoTestResult != null) testingRunResults.add(jwtNoneAlgoTestResult);
         }
 
         TestingRunResult addMethodInParameterTestResult = runTest(addMethodInParameterTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
@@ -182,8 +209,7 @@ public class TestExecutor {
         TestingRunResult changeHttpMethodTestResult = runTest(changeHttpMethodTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
         testingRunResults.add(changeHttpMethodTestResult);
 
-        TestingRunResult addUserIdTestResult = runTest(addUserIdTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
-        if (addUserIdTestResult != null) testingRunResults.add(addUserIdTestResult);
+
 
         return testingRunResults;
     }
