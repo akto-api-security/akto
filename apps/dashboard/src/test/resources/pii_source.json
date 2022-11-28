@@ -1,0 +1,32 @@
+{
+    "types": [
+        {
+            "name": "Github token",
+            "sensitive": false,
+            "regexPattern": ".*GITHUB_TOKEN.*",
+            "onKey": false,
+            "active" : true
+        },
+        {
+            "name": "AWS Secret",
+            "sensitive": true,
+            "regexPattern": ".*AWS.*SECRET.*",
+            "onKey": true,
+            "active" : false
+        },
+        {
+            "name": "AA AWS Secret",
+            "sensitive": true,
+            "regexPattern": ".*AWS.*SECRET.*",
+            "onKey": true,
+            "active" : false
+        },
+        {
+            "name": "BB AWS Secret",
+            "sensitive": true,
+            "regexPattern": ".*AWS.*SECRET.*",
+            "onKey": true,
+            "active" : true
+        }
+    ]
+}

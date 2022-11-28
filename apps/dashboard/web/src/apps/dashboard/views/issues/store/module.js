@@ -8,33 +8,46 @@ Vue.use(Vuex)
 const state = {
     loading: false,
     issues: [],
-    collections: []
+    currentPage: 1,
+    limit: 4,
+    totalIssuesCount: 0
 }
 
 const issues = {
     namespaced: true,
     state: state,
     mutations: {
-        EMPTY_STATE (state) {
+        EMPTY_STATE(state) {
             state.loading = false
             state.issues = []
-            state.collections = []
+            state.limit = 4
+            state.totalIssuesCount = 0
         },
-        SAVE_ISSUES (state, {issues, collections}) {
+        SAVE_ISSUES(state, { issues, totalIssuesCount }) {
             state.issues = issues
-            state.collections = collections
+            state.totalIssuesCount = totalIssuesCount
+        },
+        updateCurrentPage(state, {pageIndex}) {
+            state.currentPage = pageIndex
         }
     },
     actions: {
-        emptyState({commit}, payload, options) {
-            commit('EMPTY_STATE', payload, options)
+        emptyState({ commit }) {
+            commit('EMPTY_STATE')
         },
-        loadIssues({commit}) {
+        loadIssues({ commit }) {
             commit('EMPTY_STATE')
             state.loading = true
-            return api.fetchIssues().then((resp) => {
+            return api.fetchIssues((state.currentPage - 1) * state.limit, state.limit).then((resp) => {
                 commit('SAVE_ISSUES', resp)
-
+                state.loading = false
+            }).catch(() => {
+                state.loading = false
+            })
+        },
+        updateIssueStatus({ commit }, { selectedIssueId, selectedStatus, ignoreReason }) {
+            state.loading = true
+            return api.updateIssueStatus(selectedIssueId, selectedStatus, ignoreReason).then((resp) => {
                 state.loading = false
             }).catch(() => {
                 state.loading = false
@@ -44,7 +57,9 @@ const issues = {
     getters: {
         getLoading: (state) => state.loading,
         getIssues: (state) => state.issues,
-        getCollections:(state) => state.collections
+        getCurrentPage: (state) => state.currentPage,
+        getLimit: (state) => state.limit,
+        getTotalIssuesCount: (state) => state.totalIssuesCount
     }
 }
 
