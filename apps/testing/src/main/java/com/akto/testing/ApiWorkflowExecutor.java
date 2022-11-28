@@ -72,6 +72,8 @@ public class ApiWorkflowExecutor {
     }
 
     public WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap) {
+        System.out.println("\n");
+        System.out.println("NODE: " + node.getId());
         List<String> testErrors = new ArrayList<>();
         String nodeId = node.getId();
         WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
@@ -255,7 +257,9 @@ public class ApiWorkflowExecutor {
         boolean queryInReplaceUrl = false;
         boolean userSuppliedQueryParamsNullOrEmpty = queryParams == null || queryParams.trim().length() == 0;
         if (requestUrl != null) {
+            System.out.println("requestUrl: " + requestUrl);
             String rawUrl = executeCode(requestUrl, valuesMap);
+            System.out.println("rawUrl: " + requestUrl);
             // this url might contain urlQueryParams. We need to move it queryParams
             String[] rawUrlArr = rawUrl.split("\\?");
             request.setUrl(rawUrlArr[0]);
@@ -263,9 +267,12 @@ public class ApiWorkflowExecutor {
                 request.setQueryParams(rawUrlArr[1]);
                 queryInReplaceUrl = true;
             }
+            System.out.println("final url: " + request.getUrl());
+            System.out.println("final query: " + request.getQueryParams());
         }
 
         if (userSuppliedQueryParamsNullOrEmpty && !queryInReplaceUrl) {
+            System.out.println("setting null");
             request.setQueryParams(null);
         }
 
@@ -281,13 +288,17 @@ public class ApiWorkflowExecutor {
         }
 
         if (!userSuppliedQueryParamsNullOrEmpty) {
+            System.out.println("user has supplied query params");
             String finalQueryParams = executeCode(queryParams, valuesMap);
+            System.out.println("finalQueryParams: " + finalQueryParams);
             String ogQuery = request.getQueryParams();
+            System.out.println("ogQuery: " + ogQuery);
             if (ogQuery == null || ogQuery.isEmpty()) {
                 request.setQueryParams(finalQueryParams);
             } else {
                 // combine original query params and user defined query params and latter overriding former
                 String combinedQueryParams = OriginalHttpRequest.combineQueryParams(ogQuery, finalQueryParams);
+                System.out.println("combinedQueryParams: " + combinedQueryParams);
                 request.setQueryParams(combinedQueryParams);
             }
         }
