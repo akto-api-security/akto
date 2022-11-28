@@ -187,6 +187,15 @@ public class TestExecutor {
             TestingRunResult bolaTestResult = runTest(bolaTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
             testingRunResults.add(bolaTestResult);
 
+            TestingRunResult addUserIdTestResult = runTest(addUserIdTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+            if (addUserIdTestResult != null) testingRunResults.add(addUserIdTestResult);
+
+            TestingRunResult parameterPollutionTestResult = runTest(parameterPollutionTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+            if (parameterPollutionTestResult != null) testingRunResults.add(parameterPollutionTestResult);
+
+            TestingRunResult oldApiVersionTestResult = runTest(oldApiVersionTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+            if (oldApiVersionTestResult != null) testingRunResults.add(oldApiVersionTestResult);
+
             TestingRunResult jwtNoneAlgoTestResult = runTest(jwtNoneAlgoTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
             if (jwtNoneAlgoTestResult != null) testingRunResults.add(jwtNoneAlgoTestResult);
         }
@@ -200,14 +209,6 @@ public class TestExecutor {
         TestingRunResult changeHttpMethodTestResult = runTest(changeHttpMethodTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
         testingRunResults.add(changeHttpMethodTestResult);
 
-        TestingRunResult addUserIdTestResult = runTest(addUserIdTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
-        if (addUserIdTestResult != null) testingRunResults.add(addUserIdTestResult);
-
-        TestingRunResult parameterPollutionTestResult = runTest(parameterPollutionTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
-        if (parameterPollutionTestResult != null) testingRunResults.add(parameterPollutionTestResult);
-
-        TestingRunResult oldApiVersionTestResult = runTest(oldApiVersionTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
-        if (oldApiVersionTestResult != null) testingRunResults.add(oldApiVersionTestResult);
 
 
         return testingRunResults;
