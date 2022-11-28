@@ -46,7 +46,7 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
                             TestingRunResult.API_INFO_KEY,
                             TestingRunResult.TEST_SUPER_TYPE,
                             TestingRunResult.TEST_SUB_TYPE,
-                            TestingRunResult.IS_VULNERABLE,
+                            TestingRunResult.VULNERABLE,
                             TestingRunResult.CONFIDENCE_PERCENTAGE,
                             TestingRunResult.START_TIMESTAMP,
                             TestingRunResult.END_TIMESTAMP,
