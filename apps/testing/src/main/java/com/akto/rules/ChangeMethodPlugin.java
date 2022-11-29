@@ -28,7 +28,7 @@ public abstract class ChangeMethodPlugin extends TestPlugin {
         List<URLMethods.Method> undocumentedMethods = findUndocumentedMethods(sampleMessages, apiInfoKey);
 
         List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleMessages);
-        if (messages.isEmpty()) return addWithoutRequestError(null, TestResult.TestError.NO_PATH);
+        if (messages.isEmpty()) return null;
 
         RawApi rawApi = messages.get(0);
 
