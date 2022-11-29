@@ -3,7 +3,7 @@
         <div class="display-flex-heading">
             <div class="issue-title">
                 <span>{{ categoryName }}</span>
-                <v-chip outlined :color="getSeverityColor(severity)">
+                <v-chip class="severity-chip" outlined :color="getSeverityColor(severity)">
                     <v-icon size="6">$fas_circle</v-icon>
                     {{ getSeverityName(severity) }}
                 </v-chip>
@@ -138,6 +138,12 @@ export default {
 </script>
 
 <style scoped >
+
+.severity-chip >>> .v-icon {
+    justify-content: flex-start !important;
+    width: 12px !important;
+}
+
 .fixed-button {
     background-color: var(--v-themeColor-base) !important;
     color: #FFFFFF;
