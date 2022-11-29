@@ -14,7 +14,7 @@
                 :issueStatus="issue.testRunIssueStatus"
                 :ignoreReason="issue.ignoreReason" >
             </issue-box>
-            <v-pagination v-model="currentPageIndex" v-if=" totalPages > 1"
+            <v-pagination color="var(--v-themeColor-base)" v-model="currentPageIndex" v-if=" totalPages > 1"
                 :length="totalPages"
                 prev-icon = "$fas_angle-left"
                 next-icon = "$fas_angle-right"
