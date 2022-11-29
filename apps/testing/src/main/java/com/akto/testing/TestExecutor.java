@@ -182,10 +182,10 @@ public class TestExecutor {
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
         TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
-        testingRunResults.add(noAuthTestResult);
-        if (!noAuthTestResult.isVulnerable()) {
+        if (noAuthTestResult != null) testingRunResults.add(noAuthTestResult);
+        if (noAuthTestResult != null && !noAuthTestResult.isVulnerable()) {
             TestingRunResult bolaTestResult = runTest(bolaTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
-            testingRunResults.add(bolaTestResult);
+            if (bolaTestResult != null) testingRunResults.add(bolaTestResult);
 
             TestingRunResult addUserIdTestResult = runTest(addUserIdTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
             if (addUserIdTestResult != null) testingRunResults.add(addUserIdTestResult);
@@ -201,13 +201,13 @@ public class TestExecutor {
         }
 
         TestingRunResult addMethodInParameterTestResult = runTest(addMethodInParameterTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
-        testingRunResults.add(addMethodInParameterTestResult);
+        if (addMethodInParameterTestResult != null) testingRunResults.add(addMethodInParameterTestResult);
 
         TestingRunResult addMethodOverrideHeadersTestResult = runTest(addMethodOverrideHeadersTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
-        testingRunResults.add(addMethodOverrideHeadersTestResult);
+        if (addMethodOverrideHeadersTestResult != null) testingRunResults.add(addMethodOverrideHeadersTestResult);
 
         TestingRunResult changeHttpMethodTestResult = runTest(changeHttpMethodTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
-        testingRunResults.add(changeHttpMethodTestResult);
+        if (changeHttpMethodTestResult != null) testingRunResults.add(changeHttpMethodTestResult);
 
 
 
