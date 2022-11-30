@@ -145,7 +145,7 @@ public class StartTestAction extends UserAction {
             return ERROR.toUpperCase();
         }
         
-        this.testingRunResults = TestingRunResultDao.instance.findAll("testRunResultSummaryId", testingRunResultSummaryId);
+        this.testingRunResults = TestingRunResultDao.instance.fetchLatestTestingRunResult( testingRunResultSummaryId);
 
         return SUCCESS.toUpperCase();
     }

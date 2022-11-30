@@ -17,6 +17,8 @@ import com.amazonaws.services.lambda.model.InvokeRequest;
 import com.amazonaws.services.lambda.model.InvokeResult;
 import com.amazonaws.services.lambda.model.ListFunctionsResult;
 import com.amazonaws.services.lambda.model.ServiceException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
@@ -28,6 +30,7 @@ public class AccountAction extends UserAction {
 
     private String newAccountName;
     private int newAccountId;
+    private static final Logger logger = LoggerFactory.getLogger(AccountAction.class);
 
     @Override
     public String execute() {
@@ -46,12 +49,10 @@ public class AccountAction extends UserAction {
             System.out.println("Invoke lambda "+functionName);
             invokeResult = awsLambda.invoke(invokeRequest);
 
-            String ans = new String(invokeResult.getPayload().array(), StandardCharsets.UTF_8);
-
-            //write out the return value
-            System.out.println(ans);        
+            String resp = new String(invokeResult.getPayload().array(), StandardCharsets.UTF_8);
+            logger.info("Function: {}, response: {}", functionName, resp);
         } catch (AWSLambdaException e) {
-            System.out.println(e);
+            logger.error(String.format("Error while invoking Lambda: %s", functionName), e);
         }
     }
 
@@ -63,22 +64,20 @@ public class AccountAction extends UserAction {
             List<FunctionConfiguration> list = functionResult.getFunctions();
 
             for (FunctionConfiguration config: list) {
-                System.out.println("The function name is "+config.getFunctionName());
+                logger.info("Found function: {}",config.getFunctionName());
 
                 if(config.getFunctionName().contains(functionName)) {
+                    logger.info("Invoking function: {}", config.getFunctionName());
                     invokeExactLambda(config.getFunctionName(), awsLambda);
                 }
             }
         } catch (AWSLambdaException e) {
-            System.out.println(e);
-            invokeExactLambda(functionName, awsLambda);
+            logger.error("Error while updating Akto",e);
         }
     }
 
     public String takeUpdate() {
-        listMatchingLambda("TrafficMirroringInstanceRefreshHandler");
-        listMatchingLambda("DashboardInstanceRefreshHandler");
-        listMatchingLambda("AktoContextAnalyzerInstanceRefreshHandler");
+        listMatchingLambda("InstanceRefresh");
         return Action.SUCCESS.toUpperCase();
     }
 

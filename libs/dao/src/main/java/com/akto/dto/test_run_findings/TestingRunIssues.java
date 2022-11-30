@@ -8,17 +8,16 @@ public class TestingRunIssues {
 
     private GlobalEnums.TestRunIssueStatus testRunIssueStatus;
     private TestingIssuesId id;
-
     public static final String LAST_SEEN = "lastSeen";
     private int lastSeen;
-
     public static final String CREATION_TIME = "creationTime";
     private int creationTime;
     public static final String KEY_SEVERITY = "severity";
     private GlobalEnums.Severity severity;
-
     public static final String LATEST_TESTING_RUN_SUMMARY_ID = "latestTestingRunSummaryId";
     private ObjectId latestTestingRunSummaryId;
+    public static final String IGNORE_REASON = "ignoreReason";
+    private String ignoreReason;
 
     public TestingRunIssues(TestingIssuesId id, GlobalEnums.Severity severity, GlobalEnums.TestRunIssueStatus status,
                             int creationTime, int lastSeen, ObjectId latestTestingRunSummaryId) {
@@ -79,5 +78,13 @@ public class TestingRunIssues {
 
     public void setLatestTestingRunSummaryId(ObjectId latestTestingRunSummaryId) {
         this.latestTestingRunSummaryId = latestTestingRunSummaryId;
+    }
+
+    public String getIgnoreReason() {
+        return ignoreReason;
+    }
+
+    public void setIgnoreReason(String ignoreReason) {
+        this.ignoreReason = ignoreReason;
     }
 }

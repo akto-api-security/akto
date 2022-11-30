@@ -22,8 +22,8 @@ public class TestingRunResult {
     private String testSubType;
     public static final String TEST_RESULTS = "testResults";
     private List<TestResult> testResults;
-    public static final String IS_VULNERABLE = "isVulnerable";
-    private boolean isVulnerable;
+    public static final String VULNERABLE = "vulnerable";
+    private boolean vulnerable;
     public static final String SINGLE_TYPE_INFOS = "singleTypeInfos";
     private List<SingleTypeInfo> singleTypeInfos;
     public static final String CONFIDENCE_PERCENTAGE = "confidencePercentage";
@@ -39,14 +39,14 @@ public class TestingRunResult {
     public TestingRunResult() { }
 
     public TestingRunResult(ObjectId testRunId, ApiInfo.ApiInfoKey apiInfoKey, String testSuperType, String testSubType,
-                            List<TestResult> testResults, boolean isVulnerable, List<SingleTypeInfo> singleTypeInfos,
+                            List<TestResult> testResults, boolean vulnerable, List<SingleTypeInfo> singleTypeInfos,
                             int confidencePercentage, int startTimestamp, int endTimestamp, ObjectId testRunResultSummaryId) {
         this.testRunId = testRunId;
         this.apiInfoKey = apiInfoKey;
         this.testSuperType = testSuperType;
         this.testSubType = testSubType;
         this.testResults = testResults;
-        this.isVulnerable = isVulnerable;
+        this.vulnerable = vulnerable;
         this.singleTypeInfos = singleTypeInfos;
         this.confidencePercentage = confidencePercentage;
         this.startTimestamp = startTimestamp;
@@ -137,11 +137,11 @@ public class TestingRunResult {
     }
 
     public boolean isVulnerable() {
-        return isVulnerable;
+        return vulnerable;
     }
 
     public void setVulnerable(boolean vulnerable) {
-        isVulnerable = vulnerable;
+        this.vulnerable = vulnerable;
     }
 
     public List<SingleTypeInfo> getSingleTypeInfos() {
@@ -168,7 +168,7 @@ public class TestingRunResult {
                 ", apiInfoKey=" + apiInfoKey +
                 ", testSuperType='" + testSuperType + '\'' +
                 ", testSubType='" + testSubType + '\'' +
-                ", isVulnerable=" + isVulnerable +
+                ", isVulnerable=" + vulnerable +
                 ", confidencePercentage=" + confidencePercentage +
                 ", startTimestamp=" + startTimestamp +
                 ", endTimestamp=" + endTimestamp +

@@ -20,13 +20,18 @@ public class BackwardCompatibility {
     public static final String MERGE_ON_HOST_INIT = "mergeOnHostInit";
     private int mergeOnHostInit;
 
-    public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult, int readyForNewTestingFramework,int addAktoDataTypes) {
+    public static final String DEPLOYMENT_STATUS_UPDATED = "deploymentStatusUpdated";
+    private boolean deploymentStatusUpdated;
+
+    public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
+                                 int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
         this.dropWorkflowTestResult = dropWorkflowTestResult;
         this.readyForNewTestingFramework = readyForNewTestingFramework;
         this.addAktoDataTypes = addAktoDataTypes;
+        this.deploymentStatusUpdated = deploymentStatusUpdated;
     }
 
     public BackwardCompatibility() {
@@ -86,5 +91,13 @@ public class BackwardCompatibility {
 
     public void setMergeOnHostInit(int mergeOnHostInit) {
         this.mergeOnHostInit = mergeOnHostInit;
+    }
+
+    public boolean isDeploymentStatusUpdated() {
+        return deploymentStatusUpdated;
+    }
+
+    public void setDeploymentStatusUpdated(boolean deploymentStatusUpdated) {
+        this.deploymentStatusUpdated = deploymentStatusUpdated;
     }
 }

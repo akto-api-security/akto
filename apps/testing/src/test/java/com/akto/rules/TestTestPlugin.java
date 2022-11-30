@@ -149,4 +149,53 @@ public class TestTestPlugin extends MongoBasedTest {
     }
 
 
+    @Test
+    public void testDecrementUrlVersion() {
+        String result = TestPlugin.decrementUrlVersion("/api/v2/books/v3n0m/", 1, 1);
+        assertEquals("/api/v1/books/v3n0m/", result);
+
+        result = TestPlugin.decrementUrlVersion("/api/v22/books/v3/cars", 2, 1);
+        assertEquals("/api/v20/books/v1/cars", result);
+
+        result = TestPlugin.decrementUrlVersion("/api/v22/books/", 2, 1);
+        assertEquals("/api/v20/books/", result);
+
+        result = TestPlugin.decrementUrlVersion("/api/v22/books", -1, 1);
+        assertEquals("/api/v23/books", result);
+
+        result = TestPlugin.decrementUrlVersion("/api/v1/books", 1, 1);
+        assertNull(result);
+
+    }
+
+    @Test
+    public void testBuildNoneAlgoToken() throws Exception {
+        String result = TestPlugin.buildNoneAlgoToken("eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MiwiaWF0IjoxNTczMzU4Mzk2fQ.RwNNHvOKZk8p6fICIeezuajDalK8ZSOkEGMhZsRPFSk");
+        assertEquals("eyJ0eXAiOiJKV1QiLCJhbGciOiJub25lIn0.eyJpZCI6MiwiaWF0IjoxNTczMzU4Mzk2fQ.", result);
+
+        result = TestPlugin.buildNoneAlgoToken("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c");
+        assertEquals("eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.", result);
+    }
+
+    @Test
+    public void testModifyJwtHeaderToNoneAlgo() {
+
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("origin", Collections.singletonList("https://www.akto.io"));
+        headers.put("random", Collections.singletonList("avneesh_is_studddd"));
+
+        // no change to headers since it doesn't find any JWT token
+        boolean result = TestPlugin.modifyJwtHeaderToNoneAlgo(headers);
+        assertFalse(result);
+        assertEquals(2, headers.size());
+        assertEquals("https://www.akto.io", headers.get("origin").get(0));
+        assertEquals("avneesh_is_studddd", headers.get("random").get(0));
+
+        headers.put("access-token", Collections.singletonList("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"));
+        result = TestPlugin.modifyJwtHeaderToNoneAlgo(headers);
+        assertTrue(result);
+        assertEquals("eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.", headers.get("access-token").get(0));
+    }
+
+
 }

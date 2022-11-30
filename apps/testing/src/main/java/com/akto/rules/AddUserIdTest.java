@@ -24,10 +24,8 @@ public class AddUserIdTest extends TestPlugin {
         Map<String, SingleTypeInfo> validUserIdNameMap = new HashMap<>();
         for (SingleTypeInfo singleTypeInfo: singleTypeInfos.values()) {
             String param = singleTypeInfo.getParam();
-            if (param == null) continue;
-            String paramReplaced = param.replaceAll("#", ".").replaceAll("\\.\\$", "");
-            String[] paramList = paramReplaced.split("\\.");
-            String key = paramList[paramList.length-1]; // choosing the last key
+            String key = SingleTypeInfo.findLastKeyFromParam(param);
+            if (key == null) continue;
 
             CappedSet<String> values = singleTypeInfo.getValues();
             if (values.count() == 0) continue;
@@ -37,9 +35,9 @@ public class AddUserIdTest extends TestPlugin {
         if (validUserIdNameMap.isEmpty()) return null;
 
         List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleMessages);
-        if (messages.isEmpty()) return addWithoutRequestError(null, TestResult.TestError.NO_PATH);
+        if (messages.isEmpty()) return null;
         List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, authMechanism);
-        if (filteredMessages.isEmpty()) return addWithoutRequestError(null, TestResult.TestError.NO_MESSAGE_WITH_AUTH_TOKEN);
+        if (filteredMessages.isEmpty()) return null;
 
         RawApi rawApi = filteredMessages.get(0);
         List<TestResult> testResults = new ArrayList<>();
