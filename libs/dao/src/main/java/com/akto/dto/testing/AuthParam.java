@@ -1,7 +1,8 @@
 package com.akto.dto.testing;
 
-import com.akto.dto.HttpRequestParams;
 import com.akto.dto.OriginalHttpRequest;
+
+import java.util.ArrayList;
 
 public abstract class AuthParam {
 
@@ -9,6 +10,10 @@ public abstract class AuthParam {
     public abstract boolean removeAuthTokens(OriginalHttpRequest request);
 
     public abstract boolean authTokenPresent(OriginalHttpRequest request);
+
+    public abstract String getAuthTokenPath();
+
+    public abstract void setParamValue(String value);
 
     public enum Location {
         HEADER

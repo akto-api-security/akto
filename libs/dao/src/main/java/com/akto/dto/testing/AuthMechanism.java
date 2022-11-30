@@ -4,17 +4,24 @@ import com.akto.dto.HttpRequestParams;
 import com.akto.dto.OriginalHttpRequest;
 import org.bson.types.ObjectId;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class AuthMechanism {
     private ObjectId id;
     private List<AuthParam> authParams;
 
+    private String type;
+
+    private ArrayList<RequestData> requestData;
+
     public AuthMechanism() {
     }
 
-    public AuthMechanism(List<AuthParam> authParams) {
+    public AuthMechanism(List<AuthParam> authParams, ArrayList<RequestData> requestData, String type) {
         this.authParams = authParams;
+        this.requestData = requestData;
+        this.type = type;
     }
 
     public boolean addAuthToRequest(OriginalHttpRequest request) {
@@ -53,8 +60,21 @@ public class AuthMechanism {
         return authParams;
     }
 
+    public AuthParam getFirstAuthParams() {
+        return authParams.get(0);
+    }
+
+    //public AuthParam set
+
     public void setAuthParams(List<AuthParam> authParams) {
         this.authParams = authParams;
     }
 
+    public ArrayList<RequestData> getRequestData() {
+        return this.requestData;
+    }
+
+    public String getType() {
+        return this.type;
+    }
 }

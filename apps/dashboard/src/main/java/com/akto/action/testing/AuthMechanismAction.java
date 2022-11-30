@@ -5,8 +5,11 @@ import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dto.testing.*;
+import com.akto.testing.TestExecutor;
+import com.akto.util.enums.LoginFlowEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,6 +21,12 @@ public class AuthMechanismAction extends UserAction {
     private String key;
     private String value;
 
+    private ArrayList<RequestData> requestData;
+
+    private String authTokenPath;
+
+    private String type;
+
     public String addAuthMechanism() {
         List<AuthParam> authParams = new ArrayList<>();
         if (location == null || key == null || value == null) {
@@ -25,10 +34,42 @@ public class AuthMechanismAction extends UserAction {
             return ERROR.toUpperCase();
         }
         AuthMechanismsDao.instance.deleteAll(new BasicDBObject());
+        type = type != null ? type : LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString();
+
+        if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
+            authParams.add(new HardcodedAuthParam(location, key, value));
+        } else {
+            authParams.add(new LoginRequestAuthParam(location, key, value, authTokenPath));
+        }
         authParams.add(new HardcodedAuthParam(location, key, value));
-        AuthMechanism authMechanism = new AuthMechanism(authParams);
+        AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type);
 
         AuthMechanismsDao.instance.insertOne(authMechanism);
+        return SUCCESS.toUpperCase();
+    }
+
+    public String triggerLoginFlowSteps() {
+        List<AuthParam> authParams = new ArrayList<>();
+        if (location == null || key == null || value == null || requestData == null || authTokenPath == null) {
+            addActionError("Location, Key, requestData, authTokenPath or Value can't be empty");
+            return ERROR.toUpperCase();
+        }
+        type = type != null ? type : LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString();
+
+        if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
+            authParams.add(new HardcodedAuthParam(location, key, value));
+        } else {
+            authParams.add(new LoginRequestAuthParam(location, key, value, authTokenPath));
+        }
+        AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type);
+
+        TestExecutor testExecutor = new TestExecutor();
+        try {
+            testExecutor.executeLoginFlow(authMechanism);
+        } catch(Exception e) {
+            addActionError(e.getMessage());
+            return ERROR.toUpperCase();
+        }
         return SUCCESS.toUpperCase();
     }
 

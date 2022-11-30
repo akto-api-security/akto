@@ -8,12 +8,16 @@ import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.rules.*;
 import com.akto.store.SampleMessageStore;
 import com.akto.testing_issues.TestingIssuesHandler;
+import com.akto.util.enums.LoginFlowEnums;
+import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -78,7 +82,15 @@ public class TestExecutor {
 
         Map<String, SingleTypeInfo> singleTypeInfoMap = SampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
         Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = SampleMessageStore.fetchSampleMessages();
+
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
+
+        try {
+            executeLoginFlow(authMechanism);
+        } catch (Exception e) {
+            logger.error(e.getMessage());
+            return;
+        }
 
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
@@ -140,6 +152,50 @@ public class TestExecutor {
                     Updates.set(TestingRunResultSummary.TOTAL_APIS, apiInfoKeyList.size())
             )
         );
+    }
+
+    public AuthMechanism executeLoginFlow(AuthMechanism authMechanism) throws Exception {
+
+        AuthParam authParam = authMechanism.getFirstAuthParams();
+        if (!authMechanism.getType().equals(LoginFlowEnums.AuthMechanismTypes.SINGLE_REQUEST.toString())) {
+            return authMechanism;
+        }
+
+        ArrayList<RequestData> requestData = authMechanism.getRequestData();
+
+        // todo: handle multiple steps later
+        RequestData data = requestData.get(0);
+
+        OriginalHttpRequest request = new OriginalHttpRequest(data.getUrl(), data.getQueryParams(), data.getMethod(),
+                data.getBody(), OriginalHttpRequest.buildHeadersMap(data.getHeaders()),"");
+
+        OriginalHttpResponse response;
+        try {
+            response = ApiExecutor.sendRequest(request, false);
+            logger.info("Login Call Response {}", response.getBody());
+        } catch(Exception e){
+            logger.error("Login call failed {}", e.getMessage());
+            throw new Exception("Login Flow Failed");
+        }
+
+        Gson gson = new Gson();
+        String token;
+        try {
+            Map<String, Object> json = gson.fromJson(response.getBody(), Map.class);
+            token = (String) json.get(authParam.getAuthTokenPath());
+            logger.info("Token {}", token);
+        } catch(Exception e){
+            logger.error("Token Parsing failed in login flow {}", e.getMessage());
+            throw new Exception("Token Parsing failed in login flow");
+        }
+
+        authParam.setParamValue(token);
+
+        ArrayList<AuthParam> ax = new ArrayList<>();
+        ax.add(authParam);
+        authMechanism.setAuthParams(ax);
+
+        return authMechanism;
     }
 
     public List<TestingRunResult> startWithLatch(
