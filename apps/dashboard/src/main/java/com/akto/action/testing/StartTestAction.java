@@ -13,6 +13,7 @@ import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -114,6 +115,7 @@ public class StartTestAction extends UserAction {
 
     String testingRunHexId;
     List<TestingRunResultSummary> testingRunResultSummaries;
+    final int limitForTestingRunResultSummary = 20;
     public String fetchTestingRunResultSummaries() {
         ObjectId testingRunId;
         try {
@@ -123,13 +125,11 @@ public class StartTestAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        Bson filterQ = Filters.and(
-            Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRunId),
-            Filters.gte(TestingRunResultSummary.START_TIMESTAMP, startTimestamp),
-            Filters.lte(TestingRunResultSummary.END_TIMESTAMP, endTimestamp)
-        );
+        Bson filterQ = Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRunId);
 
-        this.testingRunResultSummaries = TestingRunResultSummariesDao.instance.findAll(filterQ);
+        Bson sort = Sorts.descending(TestingRunResultSummary.START_TIMESTAMP) ;
+
+        this.testingRunResultSummaries = TestingRunResultSummariesDao.instance.findAll(filterQ, 0, limitForTestingRunResultSummary , sort);
 
         return SUCCESS.toUpperCase();
     }

@@ -84,6 +84,11 @@ public class TestExecutor {
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         System.out.println("APIs: " + apiInfoKeyList.size());
 
+        TestingRunResultSummariesDao.instance.updateOne(
+            Filters.eq("_id", summaryId),
+            Updates.set(TestingRunResultSummary.TOTAL_APIS, apiInfoKeyList.size())
+        );
+
         CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
         ExecutorService threadPool = Executors.newFixedThreadPool(100);
 
@@ -113,11 +118,16 @@ public class TestExecutor {
             }
         }
 
+        TestingRunResultDao.instance.insertMany(testingRunResults);
+
+        TestingRunResultSummariesDao.instance.updateOne(
+            Filters.eq("_id", summaryId),
+            Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, testingRunResults.size())
+        );
+
         //Creating issues from testingRunResults
         TestingIssuesHandler handler = new TestingIssuesHandler();
         handler.handleIssuesCreationFromTestingRunResults(testingRunResults);
-
-        TestingRunResultDao.instance.insertMany(testingRunResults);
 
         Map<String, Integer> totalCountIssues = new HashMap<>();
         totalCountIssues.put("HIGH", 0);
@@ -136,8 +146,7 @@ public class TestExecutor {
             Updates.combine(
                     Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
                     Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
-                    Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues),
-                    Updates.set(TestingRunResultSummary.TOTAL_APIS, apiInfoKeyList.size())
+                    Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)
             )
         );
     }
