@@ -41,7 +41,6 @@ public class AuthMechanismAction extends UserAction {
         } else {
             authParams.add(new LoginRequestAuthParam(location, key, value, authTokenPath));
         }
-        authParams.add(new HardcodedAuthParam(location, key, value));
         AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type);
 
         AuthMechanismsDao.instance.insertOne(authMechanism);
@@ -50,8 +49,8 @@ public class AuthMechanismAction extends UserAction {
 
     public String triggerLoginFlowSteps() {
         List<AuthParam> authParams = new ArrayList<>();
-        if (location == null || key == null || value == null || requestData == null || authTokenPath == null) {
-            addActionError("Location, Key, requestData, authTokenPath or Value can't be empty");
+        if (location == null || key == null || requestData == null || authTokenPath == null) {
+            addActionError("Location, Key, requestData, authTokenPath can't be empty");
             return ERROR.toUpperCase();
         }
         type = type != null ? type : LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString();
@@ -105,6 +104,18 @@ public class AuthMechanismAction extends UserAction {
         return this.value;
     }
 
+    public String getType() {
+        return this.type;
+    }
+
+    public String getAuthTokenPath() {
+        return this.authTokenPath;
+    }
+
+    public ArrayList<RequestData> getRequestData() {
+        return this.requestData;
+    }
+
     public void setLocation(AuthParam.Location location) {
         this.location = location;
     }
@@ -129,4 +140,15 @@ public class AuthMechanismAction extends UserAction {
         return workflowTestingRun;
     }
 
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public void setRequestData(ArrayList<RequestData> requestData) {
+        this.requestData = requestData;
+    }
+
+    public void setAuthTokenPath(String authTokenPath) {
+        this.authTokenPath = authTokenPath;
+    }
 }

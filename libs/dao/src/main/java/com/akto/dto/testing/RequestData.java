@@ -12,6 +12,7 @@ public class RequestData {
 
     private String method;
 
+    public RequestData() { }
     public RequestData(String body, String headers, String queryParams, String url, String method) {
         this.body = body;
         this.headers = headers;
@@ -40,4 +41,21 @@ public class RequestData {
         return this.method;
     }
 
+    public void setBody(String body) {
+        this.body = body;
+    }
+
+    public void setHeaders(String headers) {
+        this.headers = headers;
+    }
+
+    public void setQueryParams(String queryParams) {
+        this.queryParams = queryParams;
+    }
+    public void setUrl(String url) {
+        this.url = url;
+    }
+    public void setMethod(String method) {
+        this.method = method;
+    }
 }

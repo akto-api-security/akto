@@ -60,7 +60,7 @@ public class AuthMechanism {
         return authParams;
     }
 
-    public AuthParam getFirstAuthParams() {
+    public AuthParam fetchFirstAuthParam() {
         return authParams.get(0);
     }
 

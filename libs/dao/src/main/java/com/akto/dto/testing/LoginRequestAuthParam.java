@@ -57,7 +57,30 @@ public class LoginRequestAuthParam extends AuthParam {
         return this.authTokenPath;
     }
 
-    public void setParamValue(String value) {
+    public void setAuthTokenPath(String authTokenPath) {
+        this.authTokenPath = authTokenPath;
+    }
+    public Location getWhere() {
+        return where;
+    }
+
+    public void setWhere(Location where) {
+        this.where = where;
+    }
+
+    public String getKey() {
+        return key;
+    }
+
+    public void setKey(String key) {
+        this.key = key;
+    }
+
+    public String getValue() {
+        return value;
+    }
+
+    public void setValue(String value) {
         this.value = value;
     }
 }

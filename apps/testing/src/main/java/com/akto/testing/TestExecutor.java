@@ -156,7 +156,7 @@ public class TestExecutor {
 
     public AuthMechanism executeLoginFlow(AuthMechanism authMechanism) throws Exception {
 
-        AuthParam authParam = authMechanism.getFirstAuthParams();
+        AuthParam authParam = authMechanism.fetchFirstAuthParam();
         if (!authMechanism.getType().equals(LoginFlowEnums.AuthMechanismTypes.SINGLE_REQUEST.toString())) {
             return authMechanism;
         }
@@ -183,17 +183,12 @@ public class TestExecutor {
         try {
             Map<String, Object> json = gson.fromJson(response.getBody(), Map.class);
             token = (String) json.get(authParam.getAuthTokenPath());
-            logger.info("Token {}", token);
         } catch(Exception e){
             logger.error("Token Parsing failed in login flow {}", e.getMessage());
             throw new Exception("Token Parsing failed in login flow");
         }
 
-        authParam.setParamValue(token);
-
-        ArrayList<AuthParam> ax = new ArrayList<>();
-        ax.add(authParam);
-        authMechanism.setAuthParams(ax);
+        authParam.setValue(token);
 
         return authMechanism;
     }

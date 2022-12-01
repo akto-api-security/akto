@@ -13,7 +13,7 @@ public abstract class AuthParam {
 
     public abstract String getAuthTokenPath();
 
-    public abstract void setParamValue(String value);
+    public abstract void setValue(String value);
 
     public enum Location {
         HEADER

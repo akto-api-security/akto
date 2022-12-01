@@ -72,7 +72,7 @@ public class HardcodedAuthParam extends AuthParam {
         return value;
     }
 
-    public void setParamValue(String value) {
+    public void setValue(String value) {
         this.value = value;
     }
 }
