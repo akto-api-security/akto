@@ -84,7 +84,6 @@ public class HarAction extends UserAction {
             List<String> messages = har.getMessages(harString, apiCollectionId);
             harErrors = har.getErrors();
             List<HttpResponseParams> responses = new ArrayList<>();
-            skipKafka = true;
             for (String message: messages){
                 if (message.length() < 0.8 * KafkaListener.BATCH_SIZE_CONFIG) {
                     if (!skipKafka) {
