@@ -58,12 +58,51 @@
                             style="width: 500px"
                         />                    
                     </div>
-                </div>
 
                 <v-btn primary dark color="#6200EA" @click="saveAuthMechanism" v-if="someAuthChanged">
                     Save changes
                 </v-btn>
             </div>
+
+
+                <div class="d-flex">
+                    <div class="input-value">
+                        <v-text-field 
+                            placeholder="Click Fetch Token to generate token"
+                            style="width: 500px"
+                        />
+                    </div>
+
+                    <v-btn primary dark color="#6200EA" @click="showLoginStepBuilder">
+                        Automate Token Generation Step
+                    </v-btn>
+                </div>
+
+                
+
+                
+
+
+                    <v-dialog
+                        v-model="stepBuilder"
+                        width="80%"
+                    >
+                        <div style="padding: 12px 24px 12px 24px; background: white">
+                        <div style="margin-bottom: 24px">
+                            <v-btn icon primary dark color="#6200EA" class="float-right" @click="() => { stepBuilder = false;}">
+                                <v-icon>$fas_times</v-icon>
+                            </v-btn>
+                        </div>
+
+                        <div style="margin-top: 12px">
+                            <login-step-builder :showLoginSaveOption="showLoginSaveOption" v-if="stepBuilder" @testLoginStep="testLoginStep" @saveLoginStep="saveLoginStep"/>
+                        </div>
+
+                        </div>
+                    </v-dialog>
+
+            </div>
+            
         </template>        
     </layout-with-tabs>
 </template>
@@ -82,6 +121,7 @@ import { mapState } from 'vuex'
 import api from './api'
 import LayoutWithLeftPane from '@/apps/dashboard/layouts/LayoutWithLeftPane'
 import ApiCollectionGroup from '@/apps/dashboard/shared/components/menus/ApiCollectionGroup'
+import LoginStepBuilder from './LoginStepBuilder'
 
 export default {
     name: "PageTesting",
@@ -92,17 +132,20 @@ export default {
         SampleData,
         LayoutWithTabs,
         LayoutWithLeftPane,
-        ApiCollectionGroup
+        ApiCollectionGroup,
+        LoginStepBuilder
     },
     props: {
 
     },
     data() {
         return  {
+            stepBuilder: false,
             newKey: this.nonNullAuth ? this.nonNullAuth.key : null,
             newVal: this.nonNullAuth ? this.nonNullAuth.value: null,
             stopAllTestsLoading: false,
-            drawer: null
+            drawer: null,
+            showLoginSaveOption: false
         }
     },
     methods: {
@@ -140,6 +183,108 @@ export default {
             }).catch((e) => {
                 this.stopAllTestsLoading = false
             })
+        },
+        showLoginStepBuilder() {
+            this.stepBuilder = true
+        },
+        testLoginStep(data) {
+          let updatedData = data["updatedData"]
+
+          let url = updatedData["url"]
+          if (!url) {
+              func.showErrorSnackBar("Invalid URL")
+              return
+          }
+
+          let queryParams = updatedData["queryParams"]
+
+          let method = updatedData["method"]
+          method = this.validateMethod(method)
+          if (!method) {
+              func.showErrorSnackBar("Invalid HTTP method")
+              return
+          }
+
+          let headerString =  updatedData["headerString"]
+
+          let body = updatedData["body"]
+
+          let key = updatedData["authKey"]
+
+          let authTokenPath = updatedData["authTokenPath"]
+
+        let result = api.triggerLoginSteps(key, "", "HEADER", "SINGLE_REQUEST", authTokenPath, [{
+                "url": url,
+                "body": body,
+                "headers": headerString,
+                "queryParams": queryParams,
+                "method": method
+            }
+        ])
+
+          result.then((resp) => {
+              this.showLoginSaveOption = true
+              func.showSuccessSnackBar("Login Flow Ran Successfully!")
+          }).catch((err) => {
+              this.showLoginSaveOption = false
+              console.log(err);
+          })
+
+      },
+      showLoginStepBuilder() {
+            this.stepBuilder = true
+            console.log('hi')
+        },
+
+        saveLoginStep(data) {
+          let updatedData = data["updatedData"]
+
+          let url = updatedData["url"]
+          if (!url) {
+              func.showErrorSnackBar("Invalid URL")
+              return
+          }
+
+          let queryParams = updatedData["queryParams"]
+
+          let method = updatedData["method"]
+          method = this.validateMethod(method)
+          if (!method) {
+              func.showErrorSnackBar("Invalid HTTP method")
+              return
+          }
+
+          let headerString =  updatedData["headerString"]
+
+          let body = updatedData["body"]
+
+          let key = updatedData["authKey"]
+
+          let authTokenPath = updatedData["authTokenPath"]
+
+          let result = api.addAuthMechanism(key, "", "HEADER", "SINGLE_REQUEST", authTokenPath, [{
+                "url": url,
+                "body": body,
+                "headers": headerString,
+                "queryParams": queryParams,
+                "method": method
+            }
+        ])
+
+          result.then((resp) => {
+              func.showSuccessSnackBar("Login Flow saved successfully!")
+          }).catch((err) => {
+              console.log(err);
+          })
+
+
+      },
+      validateMethod(methodName) {
+          let m = methodName.toUpperCase()
+          let allowedMethods = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "TRACE", "PATCH"]
+          let idx = allowedMethods.indexOf(m);
+          if (idx === -1) return null
+          return allowedMethods[idx]
         }
     },
     computed: {

@@ -27,6 +27,8 @@ public class AuthMechanismAction extends UserAction {
 
     private String type;
 
+    private AuthMechanism authMechanism;
+
     public String addAuthMechanism() {
         List<AuthParam> authParams = new ArrayList<>();
         if (location == null || key == null || value == null) {
@@ -72,6 +74,17 @@ public class AuthMechanismAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String fetchAuthMechanismData() {
+
+        AuthMechanism authMechanism = null;
+        try {
+            authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
+        } catch(Exception e) {
+            addActionError(e.getMessage());
+            return ERROR.toUpperCase();
+        }
+        return SUCCESS.toUpperCase();
+    }
 
     private int workflowTestId;
     private WorkflowTestResult workflowTestResult;
@@ -114,6 +127,10 @@ public class AuthMechanismAction extends UserAction {
 
     public ArrayList<RequestData> getRequestData() {
         return this.requestData;
+    }
+
+    public AuthMechanism getAuthMechanism() {
+        return this.authMechanism;
     }
 
     public void setLocation(AuthParam.Location location) {
