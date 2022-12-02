@@ -938,13 +938,30 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
 
+        <action name="api/fetchTestingRunResult" class="com.akto.action.testing_issues.IssuesAction" method="fetchTestingRunResult">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
             <result name="ERROR" type="httpheader">
                 <param name="status">401</param>
             </result>
         </action>
 
         <action name="api/updateIssueStatus" class="com.akto.action.testing_issues.IssuesAction" method="updateIssueStatus">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/bulkUpdateIssueStatus" class="com.akto.action.testing_issues.IssuesAction" method="bulkUpdateIssueStatus">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>

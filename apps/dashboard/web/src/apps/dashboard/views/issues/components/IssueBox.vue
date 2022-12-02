@@ -2,24 +2,34 @@
     <div class="issue-box" :style='{ "border-left": "6px solid " + getSeverityColor(severity) }'>
         <div class="display-flex-heading">
             <div class="issue-title">
-                <span>{{ categoryName }}</span>
-                <v-chip class="severity-chip" outlined :color="getSeverityColor(severity)">
+                <span v-if="!(filterStatus.length === 0 || filterStatus.length === 1 && filterStatus[0] === 'FIXED')">
+                    <input type="checkbox" v-model="issueChecked"/>
+                </span>
+                <v-btn @click="openDialogBox">{{ categoryName }}</v-btn>
+                <v-chip outlined dark class="severity-chip" :color="getSeverityColor(severity)">
                     <v-icon size="6">$fas_circle</v-icon>
                     {{ getSeverityName(severity) }}
                 </v-chip>
             </div>
             <div class="mr-6 mt-4">
-                <v-select v-if="issueStatus !== 'FIXED'" :label="label(issueStatus, ignoreReason)" class="button-menu"
-                    :items="items(issueStatus, ignoreReason)" solo dark append-icon="$fas_angle-down"
-                    :menu-props="{ offsetY: true, bottom: true }" dense v-model="selectedValue"
-                    @change="updateStatus(issueId, selectedValue)">
-                    <template slot="item" slot-scope="data">
-                        {{ data.item }}
-                    </template>
-                </v-select>
-                <span v-else>
-                    <v-btn class="fixed-button">Fixed</v-btn>
-                </span>
+                <div v-if="issueStatus !== 'FIXED'">
+                    <v-menu offset-y>
+                        <template v-slot:activator="{ on, attrs }">
+                            <v-btn v-bind="attrs" v-on="on" primary class="white--text " color="var(--v-themeColor-base)">
+                                <span>{{label(issueStatus, ignoreReason)}}</span>
+                                <v-icon>$fas_angle-down</v-icon>
+                            </v-btn>
+                        </template>
+                        <v-list>
+                            <v-list-item v-for="(item, index) in items(issueStatus, ignoreReason)" :key="index" link
+                                @click="updateStatus(issueId, item)">
+                                <span>
+                                    {{ item }}
+                                </span>
+                            </v-list-item>
+                        </v-list>
+                    </v-menu>
+                </div>
             </div>
         </div>
         <div class="issue-description">{{ categoryDescription }}</div>
@@ -58,7 +68,9 @@ export default {
         testType: obj.strR,
         issueId: obj.objR,
         issueStatus: obj.strR,
-        ignoreReason: obj.strN
+        ignoreReason: obj.strN,
+        issueChecked: obj.boolR,
+        filterStatus: obj.arrR
     },
     data() {
         const ignoreReasons = [
@@ -70,14 +82,19 @@ export default {
         return {
             ignoreReasons,
             reOpen,
-            selectedValue: ""
+            selectedValue: "",
         }
     },
-    computed: {
-
+    watch: {
+        issueChecked (newValue) {
+            this.$emit('clickedIssueCheckbox',{'issueId': this.issueId, 'checked': newValue})
+        }
     },
     methods: {
         getCreationTime: func.getCreationTime,
+        openDialogBox() {
+            this.$emit('openDialogBox',{'issueId': this.issueId})
+        },
         label(issueStatus, ignoreReason) {
             if (issueStatus === "IGNORED") {
                 return ignoreReason
@@ -97,13 +114,17 @@ export default {
             }
             return this.ignoreReasons
         },
-        updateStatus(issueId, selectedValue) {
-            debugger
+        async updateStatus(issueId, selectedValue) {
             if (selectedValue !== this.reOpen) {//Ignore case
-                this.$store.dispatch("issues/updateIssueStatus", { selectedIssueId: issueId, selectedStatus: "IGNORED", ignoreReason: selectedValue });
+                await this.$store.dispatch("issues/updateIssueStatus", { selectedIssueId: issueId, selectedStatus: "IGNORED", ignoreReason: selectedValue });
             } else {//Reopen case
-                this.$store.dispatch("issues/updateIssueStatus", { selectedIssueId: issueId, selectedStatus: "OPEN", ignoreReason: selectedValue });
+                await this.$store.dispatch("issues/updateIssueStatus", { selectedIssueId: issueId, selectedStatus: "OPEN", ignoreReason: selectedValue });
             }
+            //If already selected case
+            if (this.issueChecked) {//if checked, mark unchecked
+                this.$emit('clickedIssueCheckbox',{'issueId': issueId, 'checked': false})
+            }
+            this.$store.dispatch('issues/loadIssues')
         },
         getCollectionLink(issueId) {
             return '/dashboard/observe/inventory/' + issueId.apiInfoKey.apiCollectionId;
@@ -142,6 +163,13 @@ export default {
 .severity-chip >>> .v-icon {
     justify-content: flex-start !important;
     width: 12px !important;
+}
+
+.severity-chip {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
 }
 
 .fixed-button {
@@ -239,7 +267,7 @@ export default {
     font-family: 'Poppins', sans-serif;
     font-style: normal;
     font-weight: 500;
-    font-size: 24px;
+    font-size: 20px;
     /* identical to box height */
     text-align: left;
     margin-top: 24px;
@@ -251,8 +279,7 @@ export default {
     font-family: 'Poppins', sans-serif;
     font-style: normal;
     font-weight: 400;
-    font-size: 16px;
-    line-height: 24px;
+    font-size: 14px;
     margin-top: 4px;
     margin-left: 24px;
     margin-bottom: 20px;

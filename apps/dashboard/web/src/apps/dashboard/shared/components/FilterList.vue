@@ -1,6 +1,6 @@
 <template>
     <div>
-        <div class="list-header">
+        <div v-if="!hideListTitle" class="list-header">
             <div>{{title}}</div>
             <div>{{Object.values(checkedMap).filter(x => x).length}}/{{Object.values(checkedMap).length}}</div>
         </div>
@@ -80,7 +80,8 @@ export default {
         title: obj.strR,
         items: obj.arrN,
         width: obj.strN,
-        hideOperators: obj.boolN
+        hideOperators: obj.boolN,
+        hideListTitle: obj.boolN
     },
     data () {
         return {

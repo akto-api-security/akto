@@ -8,8 +8,10 @@ import java.util.Objects;
 import static com.akto.util.enums.GlobalEnums.TestErrorSource;
 
 public class TestingIssuesId {
+    public static final String API_KEY_INFO = "apiInfoKey";
     private ApiInfoKey apiInfoKey;
     private TestErrorSource testErrorSource;
+    public static final String TEST_SUB_CATEGORY = "testSubCategory";
     private TestSubCategory testSubCategory;
 
     public TestingIssuesId(ApiInfoKey apiInfoKey, TestErrorSource source, TestSubCategory category) {
