@@ -29,7 +29,7 @@ public class AuthMechanismAction extends UserAction {
 
     public String addAuthMechanism() {
         List<AuthParam> authParams = new ArrayList<>();
-        if (location == null || key == null || value == null) {
+        if (location == null || key == null) {
             addActionError("Location, Key or Value can't be empty");
             return ERROR.toUpperCase();
         }

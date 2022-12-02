@@ -183,6 +183,9 @@ public class TestExecutor {
         try {
             Map<String, Object> json = gson.fromJson(response.getBody(), Map.class);
             token = (String) json.get(authParam.getAuthTokenPath());
+            if (token == null) {
+                throw new Exception("Invalid Token Path");
+            }
         } catch(Exception e){
             logger.error("Token Parsing failed in login flow {}", e.getMessage());
             throw new Exception("Token Parsing failed in login flow");
