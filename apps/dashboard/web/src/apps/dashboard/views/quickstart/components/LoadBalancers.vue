@@ -150,6 +150,7 @@ export default {
                 `            "Effect": "Allow",`,
                 `            "Action": [`,
                 `                "cloudformation:CreateStack",`,
+                `                "cloudformation:DescribeStackResources",`,
                 `                "cloudformation:DescribeStacks"`,
                 `            ],`,
                 `            "Resource": [`,
