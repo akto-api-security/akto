@@ -76,13 +76,7 @@ public class AuthMechanismAction extends UserAction {
 
     public String fetchAuthMechanismData() {
 
-        AuthMechanism authMechanism = null;
-        try {
-            authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
-        } catch(Exception e) {
-            addActionError(e.getMessage());
-            return ERROR.toUpperCase();
-        }
+        authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
         return SUCCESS.toUpperCase();
     }
 

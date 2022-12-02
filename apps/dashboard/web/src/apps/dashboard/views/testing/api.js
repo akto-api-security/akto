@@ -126,4 +126,14 @@ export default {
             return resp
         })
     },
+
+    fetchAuthMechanismData() {
+        return request({
+            url: '/api/fetchAuthMechanismData',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
+    },
 }

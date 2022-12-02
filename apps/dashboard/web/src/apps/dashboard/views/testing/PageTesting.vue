@@ -68,13 +68,13 @@
                 <div class="d-flex">
                     <div class="input-value">
                         <v-text-field 
-                            placeholder="Click Fetch Token to generate token"
-                            style="width: 500px"
+                            :placeholder="loginInputText"
+                            style="width: 600px"
                         />
                     </div>
 
                     <v-btn primary dark color="#6200EA" @click="showLoginStepBuilder">
-                        Automate Token Generation Step
+                        Fetch Token
                     </v-btn>
                 </div>
 
@@ -145,7 +145,8 @@ export default {
             newVal: this.nonNullAuth ? this.nonNullAuth.value: null,
             stopAllTestsLoading: false,
             drawer: null,
-            showLoginSaveOption: false
+            showLoginSaveOption: false,
+            authMechanismData: {}
         }
     },
     methods: {
@@ -233,7 +234,6 @@ export default {
       },
       showLoginStepBuilder() {
             this.stepBuilder = true
-            console.log('hi')
         },
 
         saveLoginStep(data) {
@@ -285,7 +285,12 @@ export default {
           let idx = allowedMethods.indexOf(m);
           if (idx === -1) return null
           return allowedMethods[idx]
-        }
+        },
+      fetchAuthMechanismData() {
+        api.fetchAuthMechanismData().then((resp) => {
+          this.authMechanismData = resp.authMechanism;
+        })
+      }
     },
     computed: {
         ...mapState('testing', ['testingRuns', 'authMechanism', 'testingRunResults', 'pastTestingRuns']),
@@ -368,9 +373,37 @@ export default {
                     ]
                 }
             ]
+        },
+        loginInputText: function() {
+
+            let text = "Click on fetch Token Button To Automate ->"
+            if (!this.authMechanismData) return text
+
+            let id = this.authMechanismData["id"]
+            let requestData = this.authMechanismData["requestData"]
+            if (!id || !requestData || requestData.length === 0) return text
+
+            let data = requestData[0]
+
+            let url = data["url"]
+
+            if (!url || url == "") return text
+
+
+            let date = id["date"]
+
+            if (!date || date == "") return text
+
+            date = date.slice(0, 10) + " " + date.slice(11)
+
+
+            text = "URL: " + url + "; created on: " + date
+
+            return text
         }
     },
     mounted() {
+        this.fetchAuthMechanismData()
         let now = func.timeNow()
         this.$store.dispatch('testing/loadTestingDetails', {startTimestamp: now - func.recencyPeriod, endTimestamp: now})
     },
