@@ -262,6 +262,7 @@ export default {
                 `                "lambda:UpdateFunctionCode", `,
                 `                "lambda:GetFunctionCodeSigningConfig", `,
                 `                "lambda:InvokeFunction", `,
+                `                "lambda:ListFunctions", `,
                 `                "lambda:AddPermission"`,
                 `            ], `,
                 `            "Resource": [`,
