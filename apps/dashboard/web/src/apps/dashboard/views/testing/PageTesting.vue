@@ -39,9 +39,25 @@
                     Stop all tests
                 </v-btn>
 
-                <div>
-                    <span class="heading">Auth tokens</span>
+             <div>
+
+                <div class="di-flex">
+
+                    <div class="col_1">
+                        <p> 1 </p>
+                    </div>
+                    
+                    <div>
+                        <h2> Manual </h2>
+                    </div>
+
+                    <div class="p_padding">
+                        <small> Add your API Token below </small>
+                    </div>
                 </div>
+                <!-- <div>
+                    <span class="heading">Auth tokens</span>
+                </div> -->
 
                 <div class="d-flex">
                     <div class="input-value">
@@ -65,11 +81,26 @@
             </div>
 
 
-                <div class="d-flex">
+            <div class="di-flex">
+
+                    <div class="col_1">
+                        <p> 2 </p>
+                    </div>
+                    
+                    <div>
+                        <h2> Automatic </h2>
+                    </div>
+
+                    <div class="p_padding">
+                        <small> Automate your API Token below </small>
+                    </div>
+                </div>
+                
+                <div class="di-flex">
                     <div class="input-value">
                         <v-text-field 
                             :placeholder="loginInputText"
-                            style="width: 600px"
+                            style="width: 700px"
                         />
                     </div>
 
@@ -77,6 +108,8 @@
                         Fetch Token
                     </v-btn>
                 </div>
+
+            </div>
 
                 
 
@@ -397,7 +430,7 @@ export default {
             date = date.slice(0, 10) + " " + date.slice(11)
 
 
-            text = "URL: " + url + "; created on: " + date
+            text = "URL: " + url + ";   CREATED ON: " + date
 
             return text
         }
@@ -440,6 +473,33 @@ export default {
 .page-testing >>> input {
   font-size: 12px;
   font-weight: 400;
+}
+
+.col_1 {
+    box-sizing: border-box;
+    width: 32px;
+    height: 32px;
+    left: 0px;
+    top: 0px;
+    border: 2px solid #6200EA;
+    border-radius: 50%;
+    text-align: center;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 20px;
+    line-height: 30px;
+    color: #6200EA;
+}
+
+.di-flex {
+    display: flex;
+    gap: 16px;
+    padding-bottom: 11px;
+}
+
+.p_padding {
+    opacity: 0.4;
+    margin: 10px;
 }
 
 </style>
