@@ -31,12 +31,19 @@ public class AuthMechanismAction extends UserAction {
 
     public String addAuthMechanism() {
         List<AuthParam> authParams = new ArrayList<>();
-        if (location == null || key == null || value == null) {
+        if (location == null || key == null) {
             addActionError("Location, Key or Value can't be empty");
             return ERROR.toUpperCase();
         }
-        AuthMechanismsDao.instance.deleteAll(new BasicDBObject());
+
         type = type != null ? type : LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString();
+
+        if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString()) && value == null ) {
+            addActionError("Value can't be empty");
+            return ERROR.toUpperCase();
+        }
+
+        AuthMechanismsDao.instance.deleteAll(new BasicDBObject());
 
         if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
             authParams.add(new HardcodedAuthParam(location, key, value));

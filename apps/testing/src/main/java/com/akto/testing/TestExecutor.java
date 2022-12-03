@@ -198,6 +198,9 @@ public class TestExecutor {
                 }
             }
 
+            if (token == null) {
+                throw new Exception("Invalid Token Path");
+            }
         } catch(Exception e){
             logger.error("Token Parsing failed in login flow {}", e.getMessage());
             throw new Exception("Token Parsing failed in login flow");
