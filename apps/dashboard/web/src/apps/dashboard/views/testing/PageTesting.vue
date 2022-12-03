@@ -75,20 +75,20 @@
                         />                    
                     </div>
 
-                <v-btn primary dark color="#6200EA" @click="saveAuthMechanism" v-if="someAuthChanged">
+                <v-btn primary dark color="#3366ff" @click="saveAuthMechanism" v-if="someAuthChanged">
                     Save changes
                 </v-btn>
             </div>
 
 
-            <div class="di-flex">
+            <div class="di-flex-bottom">
 
                     <div class="col_1">
                         <p> 2 </p>
                     </div>
                     
                     <div>
-                        <h2> Automatic </h2>
+                        <h2> Automated </h2>
                     </div>
 
                     <div class="p_padding">
@@ -494,6 +494,13 @@ export default {
 .di-flex {
     display: flex;
     gap: 16px;
+    padding-bottom: 11px;
+}
+
+.di-flex-bottom {
+    display: flex;
+    gap: 16px;
+    padding-top: 20px;
     padding-bottom: 11px;
 }
 
