@@ -2,8 +2,9 @@
     <div class="issue-box ml-8 mr-8 mt-4 mb-4" :style='{ "border-left": "6px solid " + getSeverityColor(severity) }'>
         <div class="display-flex-heading">
             <div class="issue-title mt-6 ml-6">
-                <span class="mr-2" v-if="!(filterStatus.length === 0 || filterStatus.length === 1 && filterStatus[0] === 'FIXED')">
-                    <input type="checkbox" class="checkbox-primary issue-checkbox-size" v-model="issueChecked"/>
+                <span class="mr-2"
+                    v-if="!(filterStatus.length === 0 || filterStatus.length === 1 && filterStatus[0] === 'FIXED')">
+                    <input type="checkbox" class="checkbox-primary issue-checkbox-size" v-model="issueChecked" />
                 </span>
                 <span class="clickable-line" @click="openDialogBox">{{ categoryName }}</span>
                 <v-chip outlined dark class="severity-chip ml-3" :color="getSeverityColor(severity)">
@@ -15,8 +16,9 @@
                 <div v-if="issueStatus !== 'FIXED'">
                     <v-menu offset-y>
                         <template v-slot:activator="{ on, attrs }">
-                            <v-btn v-bind="attrs" v-on="on" primary class="white--text ignore-button" color="var(--v-themeColor-base)">
-                                <span>{{label(issueStatus, ignoreReason)}}</span>
+                            <v-btn v-bind="attrs" v-on="on" primary class="white--text ignore-button"
+                                color="var(--v-themeColor-base)">
+                                <span>{{ label(issueStatus, ignoreReason) }}</span>
                                 <v-icon>$fas_angle-down</v-icon>
                             </v-btn>
                         </template>
@@ -36,13 +38,16 @@
         <div class="display-flex-url mb-4">
             <span>
                 <span class="issue-method ml-6 mb-6">{{ method }}</span>
-                <span class="issue-endpoint clickable-line"><a :href="getEndpointLink(issueId)" target="_blank">{{ endpoint
+                <span class="issue-endpoint clickable-line"><a :href="getEndpointLink(issueId)" target="_blank">{{
+                        endpoint
                 }}</a></span>
             </span>
             <span class="collection-span-css">
                 <v-icon>$far_folder-open</v-icon>
-                <span class="issue-collection clickable-line"><a :href="getCollectionLink(issueId)" target="_blank">{{ collectionName
-                }}</a></span>
+                <span class="issue-collection clickable-line"><a class="truncate-collection"
+                        :href="getCollectionLink(issueId)" target="_blank">
+                        {{ collectionName }}
+                    </a></span>
                 <v-icon>$far_clock</v-icon>
                 <span class="issue-time mr-6">{{ getCreationTime(creationTime) }}</span>
             </span>
@@ -86,14 +91,14 @@ export default {
         }
     },
     watch: {
-        issueChecked (newValue) {
-            this.$emit('clickedIssueCheckbox',{'issueId': this.issueId, 'checked': newValue})
+        issueChecked(newValue) {
+            this.$emit('clickedIssueCheckbox', { 'issueId': this.issueId, 'checked': newValue })
         }
     },
     methods: {
         getCreationTime: func.getCreationTime,
         openDialogBox() {
-            this.$emit('openDialogBox',{'issueId': this.issueId})
+            this.$emit('openDialogBox', { 'issueId': this.issueId })
         },
         label(issueStatus, ignoreReason) {
             if (issueStatus === "IGNORED") {
@@ -122,7 +127,7 @@ export default {
             }
             //If already selected case
             if (this.issueChecked) {//if checked, mark unchecked
-                this.$emit('clickedIssueCheckbox',{'issueId': issueId, 'checked': false})
+                this.$emit('clickedIssueCheckbox', { 'issueId': issueId, 'checked': false })
             }
             this.$store.dispatch('issues/loadIssues')
         },
@@ -159,17 +164,18 @@ export default {
 </script>
 
 <style scoped >
-
-.severity-chip >>> .v-icon {
+.severity-chip>>>.v-icon {
     justify-content: flex-start !important;
     width: 12px !important;
 }
+
 .ignore-button {
     font-weight: 500;
     font-size: 12px;
     padding-left: 10px !important;
     padding-right: 10px !important;
 }
+
 .severity-chip {
     font-weight: 500;
     font-size: 12px;
@@ -178,24 +184,36 @@ export default {
     padding-right: 10px !important;
     border-width: 1.5px !important;
 }
+
 .display-flex-heading {
     display: flex;
     justify-content: space-between;
 }
+
 .issue-checkbox-size {
     width: 20px;
     height: 20px;
     display: inline-block;
     vertical-align: middle;
 }
+
 .collection-span-css {
     float: none;
     align-self: right;
 }
+
 .issue-collection {
     font-weight: 500;
     font-size: 14px;
     align-items: right;
+}
+
+.truncate-collection {
+    max-width: 300px !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    text-overflow: ellipsis !important;
+    display: table-cell;
 }
 
 .issue-time {
