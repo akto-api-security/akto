@@ -31,6 +31,13 @@ export default {
     props: {
         openDetailsDialog: obj.boolR,
         testingRunResult : obj.objR
+    },
+    watch: {
+        openDetailsDialog(newValue) {
+            if (!newValue) {
+                this.$emit('closeDialogBox')
+            }
+        }
     }
 }
 

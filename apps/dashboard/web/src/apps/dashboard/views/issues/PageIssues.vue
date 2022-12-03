@@ -10,6 +10,7 @@
             <issues-dialog 
                 :openDetailsDialog="dialogBox"
                 :testingRunResult="testingRunResult"
+                @closeDialogBox="(dialogBox = false)"
             >
             </issues-dialog>
             <issue-box v-for="(issue, index) in issues" :key="index" :creationTime="issue.creationTime"

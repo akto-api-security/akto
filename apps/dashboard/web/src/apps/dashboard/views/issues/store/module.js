@@ -58,7 +58,6 @@ const issues = {
             }
         },
         SAVE_TESTING_RESULT(state, {testingRunResult}) {
-            debugger
             state.testingRunResult = testingRunResult
         }
     },

@@ -1,86 +1,77 @@
 <template>
-<div>
-    <div class="display-flex">
-        <div>
-            <v-menu offset-y>
-                <template v-slot:activator="{ on, attrs }">
-                    <v-btn v-bind="attrs" v-on="on" primary>
-                        <span>{{ selectedStatusName }}</span>
-                        <v-icon>$fas_angle-down</v-icon>
-                    </v-btn>
-                </template>
-                <v-list>
-                    <v-list-item v-for="(item, index) in statusItems" :key="index" link
-                        @click="clickedStatusItem(item)">
-                        <span>
-                            {{ item.title }}
-                        </span>
-                    </v-list-item>
-                </v-list>
-            </v-menu>
+    <div>
+        <div class="display-flex ml-8 mt-6 mr-8">
+            <div>
+                <v-menu offset-y>
+                    <template v-slot:activator="{ on, attrs }">
+                        <v-btn class="filter-button" v-bind="attrs" v-on="on" primary>
+                            <span>{{ selectedStatusName }}</span>
+                            <v-icon>$fas_angle-down</v-icon>
+                        </v-btn>
+                    </template>
+                    <filter-list :title="selectedStatusName" :items="statusItems"
+                        @clickedItem="clickedStatusItem($event)" hideOperators hideListTitle selectExactlyOne />
+                </v-menu>
+            </div>
+            <div class="display-flex">
+                <div v-for="(filterMenu, index) in filterMenus">
+                    <v-menu :key="index" offset-y :close-on-content-click="false">
+                        <template v-slot:activator="{ on, attrs }">
+                            <v-btn class="filter-button mr-3" :ripple="false" v-bind="attrs" v-on="on" primary>
+                                <span>{{ filterMenu.text }}
+                                    <v-icon :size="14">$fas_angle-down</v-icon>
+                                </span>
+                            </v-btn>
+                        </template>
+                        <filter-list :title="filterMenu.text" :items="filterMenu.items"
+                            @clickedItem="appliedFilter(filterMenu.value, $event)"
+                            @operatorChanged="operatorChanged(filterMenu.value, $event)" hideOperators hideListTitle
+                            @selectedAll="selectedAll(filterMenu.value, $event)" />
+                    </v-menu>
+                </div>
+                <div>
+                    <v-menu offset-y>
+                        <template v-slot:activator="{ on, attrs }">
+                            <v-btn class="filter-button" v-bind="attrs" v-on="on" primary>
+                                <span>{{ selectedTimeName }}</span>
+                                <v-icon>$fas_angle-down</v-icon>
+                            </v-btn>
+                        </template>
+                        <filter-list :title="selectedTimeName" :items="selectedTime"
+                            @clickedItem="clickedTimePeriod($event)" hideOperators hideListTitle selectExactlyOne />
+                    </v-menu>
+                </div>
+            </div>
         </div>
-        <div v-for="(filterMenu, index) in filterMenus">
-            <v-menu :key="index" offset-y :close-on-content-click="false">
-                <template v-slot:activator="{ on, attrs }">
-                    <v-btn :ripple="false" v-bind="attrs" v-on="on" primary>
-                        <span>{{ filterMenu.text }}
-                            <v-icon :size="14">$fas_angle-down</v-icon>
-                        </span>
-                    </v-btn>
-                </template>
-                <filter-list :title="filterMenu.text" :items="filterMenu.items"
-                    @clickedItem="appliedFilter(filterMenu.value, $event)"
-                    @operatorChanged="operatorChanged(filterMenu.value, $event)" hideOperators hideListTitle
-                    @selectedAll="selectedAll(filterMenu.value, $event)" />
-            </v-menu>
-        </div>
-        <div>
-            <v-menu offset-y>
-                <template v-slot:activator="{ on, attrs }">
-                    <v-btn v-bind="attrs" v-on="on" primary>
-                        <span>{{ selectedTimeName }}</span>
-                        <v-icon>$fas_angle-down</v-icon>
-                    </v-btn>
-                </template>
-                <v-list>
-                    <v-list-item v-for="(item, index) in selectedTime" :key="index" link
-                        @click="clickedTimePeriod(item)">
-                        <span>
-                            {{ item.title }}
-                        </span>
-                    </v-list-item>
-                </v-list>
-            </v-menu>
+        <div v-if="issues.length !== 0 && !(filterStatus.length === 0 || filterStatus.length === 1 && filterStatus[0] === 'FIXED')"
+            class="mt-10 mr-14 ml-9" :style="{ 'display': 'flex', 'justify-content': 'space-between', 'height' :'36px' }">
+            <span class="ml-6">
+                <input type="checkbox" class="global-checkbox-size checkbox-primary" v-model="globalCheckbox" />
+                <span class="ml-3 select-all">Select All</span>
+            </span>
+            <span v-if="(filterStatus.length === 1 && filterStatus[0] === 'IGNORED' && selectedIssueIds.length > 0)">
+                <v-btn primary color="var(--v-themeColor-base)" class="white--text ignore-button"
+                    @click="bulkReopen()"><span>Reopen</span></v-btn>
+            </span>
+            <span v-else-if="(filterStatus.length === 1 && filterStatus[0] === 'OPEN' && selectedIssueIds.length > 0)">
+                <v-menu offset-y>
+                    <template v-slot:activator="{ on, attrs }">
+                        <v-btn v-bind="attrs" v-on="on" primary color="var(--v-themeColor-base)" class="white--text ignore-button">
+                            <span>Ignore</span>
+                            <v-icon>$fas_angle-down</v-icon>
+                        </v-btn>
+                    </template>
+                    <v-list>
+                        <v-list-item v-for="(item, index) in ignoreReasons" :key="index" link @click="bulkIgnore(item)">
+                            <span>
+                                {{ item }}
+                            </span>
+                        </v-list-item>
+                    </v-list>
+                </v-menu>
+            </span>
         </div>
     </div>
-    <div v-if="issues.length !== 0 && !(filterStatus.length === 0 || filterStatus.length === 1 && filterStatus[0] === 'FIXED')"
-        class="mt-4 mr-8 ml-8" :style="{ 'display': 'flex', 'justify-content': 'space-between' }">
-        <span>
-            <input type="checkbox" v-model="globalCheckbox" />Select All
-        </span>
-        <span v-if="(filterStatus.length === 1 && filterStatus[0] === 'IGNORED' && selectedIssueIds.length > 0)">
-            <v-btn primary color="var(--v-themeColor-base)" class="white--text"
-                @click="bulkReopen()"><span>Reopen</span></v-btn>
-        </span>
-        <span v-else-if="(filterStatus.length === 1 && filterStatus[0] === 'OPEN' && selectedIssueIds.length > 0)">
-            <v-menu offset-y>
-                <template v-slot:activator="{ on, attrs }">
-                    <v-btn v-bind="attrs" v-on="on" primary color="var(--v-themeColor-base)" class="white--text">
-                        <span>Ignore</span>
-                        <v-icon>$fas_angle-down</v-icon>
-                    </v-btn>
-                </template>
-                <v-list>
-                    <v-list-item v-for="(item, index) in ignoreReasons" :key="index" link @click="bulkIgnore(item)">
-                        <span>
-                            {{ item }}
-                        </span>
-                    </v-list-item>
-                </v-list>
-            </v-menu>
-        </span>
-    </div>
-</div>
 </template>
 
 <script>
@@ -202,7 +193,7 @@ export default {
         }
     },
     watch: {
-        globalCheckbox (newValue)   {
+        globalCheckbox(newValue) {
             let selectedIssueIds = []
             if (newValue) {// global filter checked case
                 this.issues.forEach((issue) => {
@@ -217,25 +208,29 @@ export default {
     },
     methods: {
         async bulkReopen() {
-            await this.$store.dispatch("issues/bulkUpdateIssueStatus", { selectedIssueIds : this.selectedIssueIds, ignoreReason : '', selectedStatus: "OPEN" });
+            await this.$store.dispatch("issues/bulkUpdateIssueStatus", { selectedIssueIds: this.selectedIssueIds, ignoreReason: '', selectedStatus: "OPEN" });
+            this.$store.commit('issues/updateCurrentPage', { 'pageIndex': 1 })
             this.$store.dispatch('issues/loadIssues')
             this.globalCheckbox = false
         },
         async bulkIgnore(ignoreReason) {
-            await this.$store.dispatch("issues/bulkUpdateIssueStatus", { selectedIssueIds : this.selectedIssueIds, 'ignoreReason' : ignoreReason, selectedStatus: "IGNORED" });
+            await this.$store.dispatch("issues/bulkUpdateIssueStatus", { selectedIssueIds: this.selectedIssueIds, 'ignoreReason': ignoreReason, selectedStatus: "IGNORED" });
+            this.$store.commit('issues/updateCurrentPage', { 'pageIndex': 1 })
             this.$store.dispatch('issues/loadIssues')
             this.globalCheckbox = false
         },
-        clickedStatusItem(item) {
+        clickedStatusItem({ item }) {
             let filterStatus = []
             if (item.value !== 'ALL') {
                 filterStatus.push(item.value)
             }
+            this.$store.commit('issues/updateCurrentPage', { 'pageIndex': 1 })
             this.$store.commit('issues/updateFilters', { filterStatus })
             this.$store.dispatch('issues/loadIssues')
         },
-        clickedTimePeriod(item) {
+        clickedTimePeriod({ item }) {
             let startEpoch = item.epoch
+            this.$store.commit('issues/updateCurrentPage', { 'pageIndex': 1 })
             this.$store.commit('issues/updateFilters', { startEpoch })
             this.$store.dispatch('issues/loadIssues')
         },
@@ -302,6 +297,7 @@ export default {
                     }
                 }
             }
+            this.$store.commit('issues/updateCurrentPage', { 'pageIndex': 1 })
             this.$store.commit('issues/updateFilters', { filterCollectionsId, filterSeverity, filterSubCategory1, startEpoch })
             this.$store.dispatch('issues/loadIssues')
         },
@@ -326,6 +322,7 @@ export default {
                 startEpoch = 0
             }
 
+            this.$store.commit('issues/updateCurrentPage', { 'pageIndex': 1 })
             this.$store.commit('issues/updateFilters', { filterStatus, filterCollectionsId, filterSeverity, filterSubCategory1, startEpoch })
             this.$store.dispatch('issues/loadIssues')
         },
@@ -349,6 +346,38 @@ export default {
 <style scoped >
 .display-flex {
     display: flex;
-    justify-content: space-evenly;
+    justify-content: space-between;
+}
+.select-all {
+    font-weight: 500;
+    font-size: 14px;
+}
+.ignore-button {
+    font-weight: 500;
+    font-size: 12px;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+}
+.global-checkbox-size {
+    width: 20px;
+    height: 20px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.filter-button {
+    box-sizing: border-box;
+
+    width: fit-content;
+    height: 40px;
+
+    background: #FFFFFF;
+    border: 1px solid #D0D5DD;
+
+    font-weight: 500;
+    font-size: 14px;
+
+    box-shadow: 0px 1px 2px rgba(16, 24, 40, 0.05);
+    border-radius: 4px;
 }
 </style>
