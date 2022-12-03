@@ -183,6 +183,21 @@ public class TestExecutor {
         try {
             Map<String, Object> json = gson.fromJson(response.getBody(), Map.class);
             token = (String) json.get(authParam.getAuthTokenPath());
+
+            if (token == null) {
+                Map<String, List<String>> headers = response.getHeaders();
+
+                for (String headerName: headers.keySet()) {
+                    if (!headerName.equals(authParam.getAuthTokenPath())) {
+                        continue;
+                    }
+                    List<String> values = headers.get(headerName);
+                    if (values == null || values.isEmpty() || headerName.length()<1) continue;
+                    String value = String.join(",", values);
+                    token = value;
+                }
+            }
+
         } catch(Exception e){
             logger.error("Token Parsing failed in login flow {}", e.getMessage());
             throw new Exception("Token Parsing failed in login flow");
