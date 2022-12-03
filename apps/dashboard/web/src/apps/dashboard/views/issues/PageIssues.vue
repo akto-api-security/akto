@@ -112,22 +112,6 @@ export default {
                     return ''
             }
         },
-        getSubcategoryArray(superCateogoryName) {
-            switch (superCateogoryName) {
-                case "BOLA":
-                    return [
-                        'REPLACE_AUTH_TOKEN'
-                        , 'ADD_USER_ID'
-                        , 'ADD_METHOD_IN_PARAMETER'
-                        , 'ADD_METHOD_OVERRIDE_HEADERS'
-                        , 'CHANGE_METHOD'
-                        , 'REPLACE_AUTH_TOKEN_OLD_VERSION'
-                        , 'PARAMETER_POLLUTION'
-                    ]
-                case "BUA":
-                    return ['REMOVE_TOKENS', 'JWT_NONE_ALGO']
-            }
-        },
         getCategoryName(name) {
             switch (name) {
                 case 'REPLACE_AUTH_TOKEN':
