@@ -25,7 +25,6 @@ public class AuthPolicy {
 
         // find Authorization header
         Map<String, List<String>> headers = httpResponseParams.getRequestParams().getHeaders();
-        List<String> authHeadersList = headers.getOrDefault(AUTHORIZATION_HEADER_NAME, new ArrayList<>());
         List<String> cookieList = headers.getOrDefault(COOKIE_NAME, new ArrayList<>());
         Set<ApiInfo.AuthType> authTypes = new HashSet<>();
 
@@ -39,7 +38,7 @@ public class AuthPolicy {
                     authTypes.add(ApiInfo.AuthType.BEARER);
                 } else if (twoFields && value.substring(0, Math.min(5,value.length())).equalsIgnoreCase("basic")) {
                     authTypes.add(ApiInfo.AuthType.BASIC);
-                } else if (header==AUTHORIZATION_HEADER_NAME || header=="auth") {
+                } else if (header.equals(AUTHORIZATION_HEADER_NAME) || header.equals("auth")) {
                     // todo: check jwt first and then this
                     authTypes.add(ApiInfo.AuthType.AUTHORIZATION_HEADER);
                 }
@@ -60,7 +59,7 @@ public class AuthPolicy {
                         authTypes.add(ApiInfo.AuthType.BEARER);
                     } else if (twoFields && value.substring(0, Math.min(5, value.length())).equalsIgnoreCase("basic")) {
                         authTypes.add(ApiInfo.AuthType.BASIC);
-                    } else if (cookieFields[0] == AUTHORIZATION_HEADER_NAME || cookieFields[0] == "auth") {
+                    } else if (cookieFields[0].equals(AUTHORIZATION_HEADER_NAME) || cookieFields[0].equals("auth")) {
                         authTypes.add(ApiInfo.AuthType.AUTHORIZATION_HEADER);
                     }
                 }
