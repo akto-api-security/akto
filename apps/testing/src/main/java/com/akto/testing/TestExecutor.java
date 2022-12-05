@@ -8,13 +8,18 @@ import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
+import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.rules.*;
 import com.akto.store.SampleMessageStore;
 import com.akto.testing_issues.TestingIssuesHandler;
+import com.akto.util.enums.LoginFlowEnums;
+import com.akto.util.JSONUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -79,7 +84,15 @@ public class TestExecutor {
 
         Map<String, SingleTypeInfo> singleTypeInfoMap = SampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
         Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = SampleMessageStore.fetchSampleMessages();
+
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
+
+        try {
+            executeLoginFlow(authMechanism);
+        } catch (Exception e) {
+            logger.error(e.getMessage());
+            return;
+        }
 
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
@@ -161,6 +174,101 @@ public class TestExecutor {
 
         loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao");
 
+    }
+
+    public AuthMechanism executeLoginFlow(AuthMechanism authMechanism) throws Exception {
+
+        AuthParam authParam = authMechanism.fetchFirstAuthParam();
+        if (!authMechanism.getType().equals(LoginFlowEnums.AuthMechanismTypes.SINGLE_REQUEST.toString())) {
+            return authMechanism;
+        }
+
+        ArrayList<RequestData> requestData = authMechanism.getRequestData();
+
+        // todo: handle multiple steps later
+        RequestData data = requestData.get(0);
+
+        OriginalHttpRequest request = new OriginalHttpRequest(data.getUrl(), data.getQueryParams(), data.getMethod(),
+                data.getBody(), OriginalHttpRequest.buildHeadersMap(data.getHeaders()),"");
+
+        OriginalHttpResponse response;
+        try {
+            response = ApiExecutor.sendRequest(request, false);
+            logger.info("Login Call Response {}", response.getBody());
+        } catch(Exception e){
+            logger.error("Login call failed {}", e.getMessage());
+            throw new Exception("Login Flow Failed");
+        }
+
+        String token;
+        try {
+
+            Map<String, Object> respMap = new HashMap<>();
+            respMap = generateResponseMap(response.getBody(), request.getHeaders());
+
+            token = (String) respMap.get(authParam.getAuthTokenPath());
+            if (token == null) {
+                throw new Exception("Invalid Token Path");
+            }
+        } catch(Exception e){
+            logger.error("Token Parsing failed in login flow {}", e.getMessage());
+            throw new Exception("Token Parsing failed in login flow");
+        }
+
+        authParam.setValue(token);
+
+        return authMechanism;
+    }
+
+
+    public Map<String, Object> generateResponseMap(String payloadStr, Map<String, List<String>> headers) {
+        boolean isList = false;
+
+        Map<String, Object> respMap = new HashMap<>();
+
+        if (payloadStr == null) payloadStr = "{}";
+        if (payloadStr.startsWith("[")) {
+            payloadStr = "{\"json\": "+payloadStr+"}";
+            isList = true;
+        }
+
+        BasicDBObject payloadObj;
+        try {
+            payloadObj = BasicDBObject.parse(payloadStr);
+        } catch (Exception e) {
+            boolean isPostFormData = payloadStr.contains("&") && payloadStr.contains("=");
+            if (isPostFormData) {
+                String mockUrl = "url?"+ payloadStr; // because getQueryJSON function needs complete url
+                payloadObj = RequestTemplate.getQueryJSON(mockUrl);
+            } else {
+                payloadObj = BasicDBObject.parse("{}");
+            }
+        }
+
+        Object obj;
+        if (isList) {
+            obj = payloadObj.get("json");
+        } else {
+            obj = payloadObj;
+        }
+
+        BasicDBObject flattened = JSONUtils.flattenWithDots(obj);
+
+
+        for (String param: flattened.keySet()) {
+            System.out.println(param);
+            System.out.println(flattened.get(param));
+            respMap.put(param, flattened.get(param));
+        }
+
+        for (String headerName: headers.keySet()) {
+            for (String val: headers.get(headerName)) {
+                System.out.println(headerName);
+                System.out.println(val);
+                respMap.put(headerName, val);
+            }
+        }
+        return respMap;
     }
 
     public List<TestingRunResult> startWithLatch(
