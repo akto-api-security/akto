@@ -10,15 +10,6 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 
 public class AuthPolicy {
-    public static void main(String args[]){
-        HttpResponseParams httpResponseParams = new HttpResponseParams();
-        Map<String, List<String>> headers = new HashMap<>();
-        httpResponseParams.getRequestParams().setHeaders(null);
-        ApiInfo apiInfo = new ApiInfo(httpResponseParams);
-        RuntimeFilter filter = new RuntimeFilter();
-        boolean done = findAuthType(httpResponseParams, apiInfo, filter);
-        System.out.println(done);
-    }
 
     public static final String AUTHORIZATION_HEADER_NAME = "authorization";
     public static final String COOKIE_NAME = "cookie";
