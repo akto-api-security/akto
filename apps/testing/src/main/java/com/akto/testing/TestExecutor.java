@@ -90,7 +90,7 @@ public class TestExecutor {
         try {
             executeLoginFlow(authMechanism);
         } catch (Exception e) {
-            logger.error(e.getMessage());
+            loggerMaker.errorAndAddToDb(e.getMessage());
             return;
         }
 
@@ -194,9 +194,9 @@ public class TestExecutor {
         OriginalHttpResponse response;
         try {
             response = ApiExecutor.sendRequest(request, false);
-            logger.info("Login Call Response {}", response.getBody());
+            loggerMaker.infoAndAddToDb("Login Call Response {}", response.getBody());
         } catch(Exception e){
-            logger.error("Login call failed {}", e.getMessage());
+            loggerMaker.errorAndAddToDb("Login call failed {}", e.getMessage());
             throw new Exception("Login Flow Failed");
         }
 
@@ -211,7 +211,8 @@ public class TestExecutor {
                 throw new Exception("Invalid Token Path");
             }
         } catch(Exception e){
-            logger.error("Token Parsing failed in login flow {}", e.getMessage());
+            String errorString = "Token Parsing failed in login flow {}" + e.getMessage();
+            loggerMaker.errorAndAddToDb(errorString);
             throw new Exception("Token Parsing failed in login flow");
         }
 
