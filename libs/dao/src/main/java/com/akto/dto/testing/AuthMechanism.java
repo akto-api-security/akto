@@ -56,6 +56,14 @@ public class AuthMechanism {
         this.id = id;
     }
 
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public void setRequestData(ArrayList<RequestData> requestData) {
+        this.requestData = requestData;
+    }
+
     public List<AuthParam> getAuthParams() {
         return authParams;
     }

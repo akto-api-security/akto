@@ -12,12 +12,13 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
+import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.rules.*;
 import com.akto.store.SampleMessageStore;
 import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.util.enums.LoginFlowEnums;
-import com.google.gson.Gson;
+import com.akto.util.JSONUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -178,11 +179,13 @@ public class TestExecutor {
             throw new Exception("Login Flow Failed");
         }
 
-        Gson gson = new Gson();
         String token;
         try {
-            Map<String, Object> json = gson.fromJson(response.getBody(), Map.class);
-            token = (String) json.get(authParam.getAuthTokenPath());
+
+            Map<String, Object> respMap = new HashMap<>();
+            respMap = generateResponseMap(response.getBody(), request.getHeaders());
+
+            token = (String) respMap.get(authParam.getAuthTokenPath());
             if (token == null) {
                 throw new Exception("Invalid Token Path");
             }
@@ -194,6 +197,57 @@ public class TestExecutor {
         authParam.setValue(token);
 
         return authMechanism;
+    }
+
+
+    public Map<String, Object> generateResponseMap(String payloadStr, Map<String, List<String>> headers) {
+        boolean isList = false;
+
+        Map<String, Object> respMap = new HashMap<>();
+
+        if (payloadStr == null) payloadStr = "{}";
+        if (payloadStr.startsWith("[")) {
+            payloadStr = "{\"json\": "+payloadStr+"}";
+            isList = true;
+        }
+
+        BasicDBObject payloadObj;
+        try {
+            payloadObj = BasicDBObject.parse(payloadStr);
+        } catch (Exception e) {
+            boolean isPostFormData = payloadStr.contains("&") && payloadStr.contains("=");
+            if (isPostFormData) {
+                String mockUrl = "url?"+ payloadStr; // because getQueryJSON function needs complete url
+                payloadObj = RequestTemplate.getQueryJSON(mockUrl);
+            } else {
+                payloadObj = BasicDBObject.parse("{}");
+            }
+        }
+
+        Object obj;
+        if (isList) {
+            obj = payloadObj.get("json");
+        } else {
+            obj = payloadObj;
+        }
+
+        BasicDBObject flattened = JSONUtils.flattenWithDots(obj);
+
+
+        for (String param: flattened.keySet()) {
+            System.out.println(param);
+            System.out.println(flattened.get(param));
+            respMap.put(param, flattened.get(param));
+        }
+
+        for (String headerName: headers.keySet()) {
+            for (String val: headers.get(headerName)) {
+                System.out.println(headerName);
+                System.out.println(val);
+                respMap.put(headerName, val);
+            }
+        }
+        return respMap;
     }
 
     public List<TestingRunResult> startWithLatch(
