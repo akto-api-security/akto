@@ -128,7 +128,7 @@
                         </div>
 
                         <div style="margin-top: 12px">
-                            <login-step-builder :showLoginSaveOption="showLoginSaveOption" v-if="stepBuilder" @testLoginStep="testLoginStep" @saveLoginStep="saveLoginStep"/>
+                            <login-step-builder :originalDbState="originalDbState" :showLoginSaveOption="showLoginSaveOption" v-if="stepBuilder" @testLoginStep="testLoginStep" @saveLoginStep="saveLoginStep"/>
                         </div>
 
                         </div>
@@ -173,6 +173,7 @@ export default {
     },
     data() {
         return  {
+            originalDbState: null,
             stepBuilder: false,
             newKey: this.nonNullAuth ? this.nonNullAuth.key : null,
             newVal: this.nonNullAuth ? this.nonNullAuth.value: null,
@@ -322,6 +323,26 @@ export default {
       fetchAuthMechanismData() {
         api.fetchAuthMechanismData().then((resp) => {
           this.authMechanismData = resp.authMechanism;
+          if (!this.authMechanismData) return
+            let requestData = this.authMechanismData["requestData"]
+            let str = JSON.stringify(this.authMechanismData);
+            console.log(str)
+            if (!requestData || requestData.length === 0) return
+
+            let authParamData = this.authMechanismData["authParams"]
+            if (!authParamData || authParamData.length === 0) return
+
+            let data = requestData[0]
+
+            let authData = authParamData[0]
+
+            let url = data["url"]
+
+            if (!url || url == "") return
+
+            this.originalDbState = {"url": url, "body": data["body"], "headers": data["headers"], "method": data["method"], 
+            "queryParams": data["queryParams"], "authKey": authData["key"], "authTokenPath": authData["authTokenPath"]}
+
         })
       }
     },

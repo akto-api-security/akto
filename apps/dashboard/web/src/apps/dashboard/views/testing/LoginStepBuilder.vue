@@ -84,6 +84,7 @@ export default {
       }
     },
     props: {
+      originalDbState: obj.objN,
       showLoginSaveOption: obj.boolR
     },
     methods: {
@@ -125,6 +126,7 @@ export default {
     },
     computed: {
         updatedData() {
+            if (this.originalDbState) return {...this.originalDbState}
             return {
                 "url": this.defaultUrl,
                 "queryParams": this.defaultQueryParams,
