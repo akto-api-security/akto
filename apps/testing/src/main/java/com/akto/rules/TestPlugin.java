@@ -1,6 +1,7 @@
 package com.akto.rules;
 
 import com.akto.dto.*;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.type.*;
@@ -16,6 +17,7 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
+import com.google.protobuf.Method;
 import com.mongodb.BasicDBObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -273,10 +275,33 @@ public abstract class TestPlugin {
                 URLMethods.Method.GET, URLMethods.Method.POST, URLMethods.Method.PUT, URLMethods.Method.DELETE,
                 URLMethods.Method.PATCH
         );
-        for (URLMethods.Method method: methodList) {
-            ApiInfo.ApiInfoKey methodApiInfoKey = new ApiInfo.ApiInfoKey(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), method);
+
+        String apiUrl = apiInfoKey.getUrl();
+        URLMethods.Method  apiMethod = apiInfoKey.getMethod();
+
+
+        for (URLMethods.Method fakeMethod: methodList) {
+            ApiInfo.ApiInfoKey methodApiInfoKey = new ApiInfo.ApiInfoKey(apiInfoKey.getApiCollectionId(), apiUrl, fakeMethod);
             if (sampleMessages.containsKey(methodApiInfoKey)) continue;
-            undocumentedMethods.add(method);
+
+            boolean found = false;
+            for (ApiInfoKey apiInfoKeyFromDb: sampleMessages.keySet()) {
+                String apiFromDbUrl = apiInfoKeyFromDb.getUrl(); 
+                URLMethods.Method apiFromDbMethod = apiInfoKeyFromDb.getMethod();
+                if (apiInfoKeyFromDb.getApiCollectionId() != apiInfoKey.getApiCollectionId()) continue;
+
+                if (!APICatalog.isTemplateUrl(apiFromDbUrl)) continue;
+                
+                URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(apiFromDbUrl, apiFromDbMethod);
+
+                found = urlTemplate.match(apiUrl, fakeMethod);
+
+                if (found) break;
+            }
+
+            if (found) continue;
+
+            undocumentedMethods.add(fakeMethod);
         }
 
         return undocumentedMethods;
