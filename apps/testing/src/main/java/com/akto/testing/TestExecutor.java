@@ -194,9 +194,9 @@ public class TestExecutor {
         OriginalHttpResponse response;
         try {
             response = ApiExecutor.sendRequest(request, false);
-            loggerMaker.infoAndAddToDb("Login Call Response {}", response.getBody());
+            loggerMaker.infoAndAddToDb("Login Call Response {}" + response.getBody());
         } catch(Exception e){
-            loggerMaker.errorAndAddToDb("Login call failed {}", e.getMessage());
+            loggerMaker.errorAndAddToDb("Login call failed {}" + e.getMessage());
             throw new Exception("Login Flow Failed");
         }
 
