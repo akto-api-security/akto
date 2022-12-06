@@ -1,6 +1,6 @@
 <template>
     <div>
-        <div class="list-header">
+        <div v-if="!hideListTitle" class="list-header">
             <div>{{title}}</div>
             <div>{{Object.values(checkedMap).filter(x => x).length}}/{{Object.values(checkedMap).length}}</div>
         </div>
@@ -18,7 +18,7 @@
         </div>
         <v-list dense class="filter-list" :style="{'width':  width || '250px'}">
             <v-list-item v-if="items && items.length > 8">
-                <span>
+                <span v-if="!selectExactlyOne">
                     <v-btn icon primary plain :ripple="false" @click="globalCheckboxClicked" class="checkbox-btn">
                         <v-icon>
                             {{globalCheckbox? '$far_check-square': '$far_square'}}
@@ -54,14 +54,18 @@
             </v-list-item>
 
             <v-list-item v-for="(item, index) in filteredItems.slice(startItemIndex, endItemIndex)" :key="index">
-                <span>
+                <span v-if="!selectExactlyOne">
                     <v-btn icon primary plain :ripple="false" @click="checkboxClicked(item)" class="checkbox-btn">
                         <v-icon>
                             {{checkedMap[item.value]? '$far_check-square': '$far_square'}}
                         </v-icon>
                     </v-btn>
                 </span>
-                <v-list-item-content>
+                <v-list-item-content v-if="!selectExactlyOne">
+                    <span class="item-label">{{item.title}}</span>
+                    <span class="item-subtitle">{{item.subtitle}}</span>
+                </v-list-item-content>
+                <v-list-item-content v-else class="clickable-bg" @click="checkboxClicked(item)">
                     <span class="item-label">{{item.title}}</span>
                     <span class="item-subtitle">{{item.subtitle}}</span>
                 </v-list-item-content>
@@ -80,7 +84,9 @@ export default {
         title: obj.strR,
         items: obj.arrN,
         width: obj.strN,
-        hideOperators: obj.boolN
+        hideOperators: obj.boolN,
+        hideListTitle: obj.boolN,
+        selectExactlyOne: obj.boolN
     },
     data () {
         return {

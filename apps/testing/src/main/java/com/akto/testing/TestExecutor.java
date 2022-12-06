@@ -8,12 +8,18 @@ import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
+import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.log.LoggerMaker;
 import com.akto.rules.*;
 import com.akto.store.SampleMessageStore;
 import com.akto.testing_issues.TestingIssuesHandler;
+import com.akto.util.enums.LoginFlowEnums;
+import com.akto.util.JSONUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -30,7 +36,7 @@ import java.util.concurrent.*;
 
 public class TestExecutor {
 
-    private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class);
 
     public void init(TestingRun testingRun, ObjectId summaryId) {
         if (testingRun.getTestIdConfig() == 0)     {
@@ -52,7 +58,7 @@ public class TestExecutor {
     public void workflowInit (TestingRun testingRun, ObjectId summaryId) {
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
         if (!testingEndpoints.getType().equals(TestingEndpoints.Type.WORKFLOW)) {
-            logger.error("Invalid workflow type");
+            loggerMaker.errorAndAddToDb("Invalid workflow type");
             return;
         }
 
@@ -64,7 +70,7 @@ public class TestExecutor {
         );
 
         if (workflowTest == null) {
-            logger.error("Workflow test has been deleted");
+            loggerMaker.errorAndAddToDb("Workflow test has been deleted");
             return ;
         }
 
@@ -78,11 +84,25 @@ public class TestExecutor {
 
         Map<String, SingleTypeInfo> singleTypeInfoMap = SampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
         Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = SampleMessageStore.fetchSampleMessages();
+
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
+
+        try {
+            executeLoginFlow(authMechanism);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e.getMessage());
+            return;
+        }
 
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         System.out.println("APIs: " + apiInfoKeyList.size());
+        loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size());
+
+        TestingRunResultSummariesDao.instance.updateOne(
+            Filters.eq("_id", summaryId),
+            Updates.set(TestingRunResultSummary.TOTAL_APIS, apiInfoKeyList.size())
+        );
 
         CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
         ExecutorService threadPool = Executors.newFixedThreadPool(100);
@@ -93,15 +113,19 @@ public class TestExecutor {
                  Future<List<TestingRunResult>> future = threadPool.submit(() -> startWithLatch(apiInfoKey, testingRun.getTestIdConfig(), testingRun.getId(), singleTypeInfoMap, sampleMessages, authMechanism, summaryId, accountId, latch));
                  futureTestingRunResults.add(future);
             } catch (Exception e) {
-                logger.error(e.getMessage());
+                loggerMaker.errorAndAddToDb("Error in API " + apiInfoKey + " : " + e.getMessage());
             }
         }
+
+        loggerMaker.infoAndAddToDb("Waiting...");
 
         try {
             latch.await();
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+
+        loggerMaker.infoAndAddToDb("Finished testing");
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
         for (Future<List<TestingRunResult>> future: futureTestingRunResults) {
@@ -113,11 +137,19 @@ public class TestExecutor {
             }
         }
 
+        TestingRunResultDao.instance.insertMany(testingRunResults);
+        loggerMaker.infoAndAddToDb("Finished adding " + testingRunResults.size() + " testingRunResults");
+
+        TestingRunResultSummariesDao.instance.updateOne(
+            Filters.eq("_id", summaryId),
+            Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, testingRunResults.size())
+        );
+
         //Creating issues from testingRunResults
         TestingIssuesHandler handler = new TestingIssuesHandler();
         handler.handleIssuesCreationFromTestingRunResults(testingRunResults);
 
-        TestingRunResultDao.instance.insertMany(testingRunResults);
+        loggerMaker.infoAndAddToDb("Finished adding issues");
 
         Map<String, Integer> totalCountIssues = new HashMap<>();
         totalCountIssues.put("HIGH", 0);
@@ -136,10 +168,108 @@ public class TestExecutor {
             Updates.combine(
                     Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
                     Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
-                    Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues),
-                    Updates.set(TestingRunResultSummary.TOTAL_APIS, apiInfoKeyList.size())
+                    Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)
             )
         );
+
+        loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao");
+
+    }
+
+    public AuthMechanism executeLoginFlow(AuthMechanism authMechanism) throws Exception {
+
+        AuthParam authParam = authMechanism.fetchFirstAuthParam();
+        if (!authMechanism.getType().equals(LoginFlowEnums.AuthMechanismTypes.SINGLE_REQUEST.toString())) {
+            return authMechanism;
+        }
+
+        ArrayList<RequestData> requestData = authMechanism.getRequestData();
+
+        // todo: handle multiple steps later
+        RequestData data = requestData.get(0);
+
+        OriginalHttpRequest request = new OriginalHttpRequest(data.getUrl(), data.getQueryParams(), data.getMethod(),
+                data.getBody(), OriginalHttpRequest.buildHeadersMap(data.getHeaders()),"");
+
+        OriginalHttpResponse response;
+        try {
+            response = ApiExecutor.sendRequest(request, false);
+            loggerMaker.infoAndAddToDb("Login Call Response {}" + response.getBody());
+        } catch(Exception e){
+            loggerMaker.errorAndAddToDb("Login call failed {}" + e.getMessage());
+            throw new Exception("Login Flow Failed");
+        }
+
+        String token;
+        try {
+
+            Map<String, Object> respMap = new HashMap<>();
+            respMap = generateResponseMap(response.getBody(), request.getHeaders());
+
+            token = (String) respMap.get(authParam.getAuthTokenPath());
+            if (token == null) {
+                throw new Exception("Invalid Token Path");
+            }
+        } catch(Exception e){
+            String errorString = "Token Parsing failed in login flow {}" + e.getMessage();
+            loggerMaker.errorAndAddToDb(errorString);
+            throw new Exception("Token Parsing failed in login flow");
+        }
+
+        authParam.setValue(token);
+
+        return authMechanism;
+    }
+
+
+    public Map<String, Object> generateResponseMap(String payloadStr, Map<String, List<String>> headers) {
+        boolean isList = false;
+
+        Map<String, Object> respMap = new HashMap<>();
+
+        if (payloadStr == null) payloadStr = "{}";
+        if (payloadStr.startsWith("[")) {
+            payloadStr = "{\"json\": "+payloadStr+"}";
+            isList = true;
+        }
+
+        BasicDBObject payloadObj;
+        try {
+            payloadObj = BasicDBObject.parse(payloadStr);
+        } catch (Exception e) {
+            boolean isPostFormData = payloadStr.contains("&") && payloadStr.contains("=");
+            if (isPostFormData) {
+                String mockUrl = "url?"+ payloadStr; // because getQueryJSON function needs complete url
+                payloadObj = RequestTemplate.getQueryJSON(mockUrl);
+            } else {
+                payloadObj = BasicDBObject.parse("{}");
+            }
+        }
+
+        Object obj;
+        if (isList) {
+            obj = payloadObj.get("json");
+        } else {
+            obj = payloadObj;
+        }
+
+        BasicDBObject flattened = JSONUtils.flattenWithDots(obj);
+
+
+        for (String param: flattened.keySet()) {
+            System.out.println(param);
+            System.out.println(flattened.get(param));
+            respMap.put(param, flattened.get(param));
+        }
+
+        for (String headerName: headers.keySet()) {
+            for (String val: headers.get(headerName)) {
+                System.out.println(headerName);
+                System.out.println(val);
+                respMap.put(headerName, val);
+            }
+        }
+        return respMap;
     }
 
     public List<TestingRunResult> startWithLatch(
@@ -166,7 +296,7 @@ public class TestExecutor {
                                       AuthMechanism authMechanism, ObjectId testRunResultSummaryId) {
 
         if (testIdConfig != 0) {
-            logger.error("Test id config is not 0 but " + testIdConfig);
+            loggerMaker.errorAndAddToDb("Test id config is not 0 but " + testIdConfig);
             return new ArrayList<>();
         }
 

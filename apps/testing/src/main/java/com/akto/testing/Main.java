@@ -6,6 +6,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.testing.*;
 import com.akto.dao.testing.*;
+import com.akto.log.LoggerMaker;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -20,18 +21,18 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 public class Main {
-    private static final Logger logger = LoggerFactory.getLogger(Main.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
+
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
     public static void main(String[] args) throws InterruptedException {
-        logger.info("Starting testing module....");
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         DaoInit.init(new ConnectionString(mongoURI));
         Context.accountId.set(1_000_000);
 
         int delta = Context.now() - 20*60;
 
-        logger.info("Starting.......");
+        loggerMaker.infoAndAddToDb("Starting.......");
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(new BasicDBObject());
         boolean runStatusCodeAnalyser = accountSettings == null ||
@@ -74,9 +75,9 @@ public class Main {
                 }
             }
 
-            logger.info("Found one + " + testingRun.getId().toHexString());
+            loggerMaker.infoAndAddToDb("Found one + " + testingRun.getId().toHexString());
 
-            TestingRunResultSummary summary = new TestingRunResultSummary(start, 0, new HashMap<>(), 0, testingRun.getId(), testingRun.getId().toHexString());
+            TestingRunResultSummary summary = new TestingRunResultSummary(start, 0, new HashMap<>(), 0, testingRun.getId(), testingRun.getId().toHexString(), 0);
 
             ObjectId summaryId = TestingRunResultSummariesDao.instance.insertOne(summary).getInsertedId().asObjectId().getValue();
 
@@ -104,7 +105,7 @@ public class Main {
             );
 
 
-            logger.info("Tests completed in " + (Context.now() - start) + " seconds");
+            loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds");
         }
     }
 }

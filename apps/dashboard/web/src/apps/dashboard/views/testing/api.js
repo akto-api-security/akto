@@ -75,11 +75,11 @@ export default {
         })        
     },
 
-    addAuthMechanism(key, value, location) {
+    addAuthMechanism(key, value, location, type, authTokenPath, requestData) {
         return request({
             url: '/api/addAuthMechanism',
             method: 'post',
-            data: {key, value, location}
+            data: {key, value, location, type, authTokenPath, requestData}
         }).then((resp) => {
             return resp
         })        
@@ -114,6 +114,26 @@ export default {
             data: {
                 testingRunResultHexId
             }
+        })
+    },
+
+    triggerLoginSteps(key, value, location, type, authTokenPath, requestData) {
+        return request({
+            url: 'api/triggerLoginSteps',
+            method: 'post',
+            data: {key, value, location, type, authTokenPath, requestData}
+        }).then((resp) => {
+            return resp
+        })
+    },
+
+    fetchAuthMechanismData() {
+        return request({
+            url: '/api/fetchAuthMechanismData',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
         })
     },
 }

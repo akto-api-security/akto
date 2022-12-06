@@ -3,17 +3,17 @@ package com.akto.action.testing;
 import com.akto.MongoBasedTest;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunDao;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.*;
 import com.akto.dto.type.URLMethods;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.junit.Test;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 import static org.junit.Assert.assertEquals;
 
@@ -56,5 +56,35 @@ public class TestStartTestAction extends MongoBasedTest {
         testingRuns = TestingRunDao.instance.findAll(Filters.eq(TestingRun.STATE, TestingRun.State.COMPLETED));
         assertEquals(1, testingRuns.size());
         assertEquals(testingRun5.getId(), testingRuns.get(0).getId());
+    }
+
+
+    @Test
+    public void testFetchTestingRunResultSummaries() {
+        TestingRunResultSummariesDao.instance.getMCollection().drop();
+
+        List<TestingRunResultSummary> testingRunResultSummaryList = new ArrayList<>();
+        ObjectId testingRunId = new ObjectId();
+        for (int startTimestamp=0; startTimestamp < 30; startTimestamp++) {
+            TestingRunResultSummary testingRunResultSummary = new TestingRunResultSummary(
+                startTimestamp, startTimestamp+10, new HashMap<>(), 10, testingRunId, testingRunId.toHexString(), 10
+            );
+
+            testingRunResultSummaryList.add(testingRunResultSummary);
+        }
+
+        TestingRunResultSummariesDao.instance.insertMany(testingRunResultSummaryList);
+
+        StartTestAction startTestAction = new StartTestAction();
+        startTestAction.setTestingRunHexId(testingRunId.toHexString());
+
+        String result = startTestAction.fetchTestingRunResultSummaries();
+        assertEquals("SUCCESS", result);
+
+        List<TestingRunResultSummary> summariesFromDb = startTestAction.getTestingRunResultSummaries();
+        assertEquals(startTestAction.limitForTestingRunResultSummary, summariesFromDb.size());
+        assertEquals(29, summariesFromDb.get(0).getStartTimestamp());
+        assertEquals(10, summariesFromDb.get(summariesFromDb.size()-1).getStartTimestamp());
+
     }
 }

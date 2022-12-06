@@ -106,7 +106,7 @@ public class ApiWorkflowExecutorTest {
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         OriginalHttpRequest originalHttpRequest = apiWorkflowExecutor.buildHttpRequest(workflowUpdatedSampleData, valuesMap);
 
-        assertEquals(originalHttpRequest.getQueryParams(), "random=hehe&user=avneesh");
+        assertEquals(originalHttpRequest.getQueryParams(), "user=avneesh");
         assertEquals(originalHttpRequest.getHeaders().size(), 11);
         assertEquals(originalHttpRequest.getBody(), requestPayload);
         assertEquals(originalHttpRequest.getUrl(), "https://stud.akto.io/stud_10");
