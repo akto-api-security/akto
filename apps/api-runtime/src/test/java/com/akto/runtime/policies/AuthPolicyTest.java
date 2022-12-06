@@ -40,9 +40,51 @@ public class AuthPolicyTest {
     }
 
     @Test
+    public void testAuthHeader() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("auth", Collections.singletonList("Bearer woiefjwoeifw something somethingElse"));
+        HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
+        ApiInfo apiInfo = new ApiInfo(httpResponseParams);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null);
+        Assertions.assertFalse(result);
+        Set<ApiInfo.AuthType> s = new HashSet<>();
+        s.add(ApiInfo.AuthType.AUTHORIZATION_HEADER);
+        Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 1);
+        Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
+    }
+
+    @Test
     public void testBearer() {
         Map<String, List<String>> headers = new HashMap<>();
         headers.put(AuthPolicy.AUTHORIZATION_HEADER_NAME, Collections.singletonList("Bearer woiefjwoeifw"));
+        HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
+        ApiInfo apiInfo = new ApiInfo(httpResponseParams);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null);
+        Assertions.assertFalse(result);
+        Set<ApiInfo.AuthType> s = new HashSet<>();
+        s.add(ApiInfo.AuthType.BEARER);
+        Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 1);
+        Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
+    }
+
+    @Test
+    public void testBearerWithoutHeader() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("someRandom", Collections.singletonList("bearer woiefjwoeifw"));
+        HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
+        ApiInfo apiInfo = new ApiInfo(httpResponseParams);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null);
+        Assertions.assertFalse(result);
+        Set<ApiInfo.AuthType> s = new HashSet<>();
+        s.add(ApiInfo.AuthType.BEARER);
+        Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 1);
+        Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
+    }
+
+    @Test
+    public void testBearerInCookie() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("cookie", Collections.singletonList("auth=bearer woiefj"));
         HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null);
@@ -86,9 +128,51 @@ public class AuthPolicyTest {
     }
 
     @Test
+    public void testBasicWithoutHeader() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("someRandom", Collections.singletonList("basic woiefjwoeifw"));
+        HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
+        ApiInfo apiInfo = new ApiInfo(httpResponseParams);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null);
+        Assertions.assertFalse(result);
+        Set<ApiInfo.AuthType> s = new HashSet<>();
+        s.add(ApiInfo.AuthType.BASIC);
+        Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 1);
+        Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
+    }
+
+    @Test
+    public void testBasicInCookie() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("cookie", Collections.singletonList("auth=Basic woiefjwoeifw"));
+        HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
+        ApiInfo apiInfo = new ApiInfo(httpResponseParams);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null);
+        Assertions.assertFalse(result);
+        Set<ApiInfo.AuthType> s = new HashSet<>();
+        s.add(ApiInfo.AuthType.BASIC);
+        Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 1);
+        Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
+    }
+
+    @Test
     public void testJwt() {
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("someRandom", Collections.singletonList("eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoicmVmcmVzaFRva2VuIiwic2lnbmVkVXAiOiJ0cnVlIiwidXNlcm5hbWUiOiJhbmt1c2hAZ21haWwuY29tIiwiaWF0IjoxNjQwNjkzNDUzLCJleHAiOjE2NDEyMTE4NTN9.oTq5FEeTlNt1YjaZ9JA8qdymArxJ8unNI8m5HLYn4ECeFOKQCv8SWnQ6uvwbbWPHa6HOYeLoD-tvPyVq-c6jlyGNf7bno8cCMB5ldyJ-I--F1xVp0iWKCMtlgdS2DgwFBdaZ9mdLCP3eZuieQV2Za8Lrzw1G1CpgJ-3vkijTw3KurKSDLT5Zv8JQRSxwj_VLeuaVkhSjYVltzTfY5tkl3CO3vNmlz6HIc4shxFXowA30xxgL438V1ELamv85fyGXg2EMhk5XeRDXq1QiLPBsQZ28FSk5TJAn2Xc_pwWXBw-N2P6Y_Hh0bL7KXpErgKQNQiAfNFHFzAUbuLefD6dJKg"));
+        HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
+        ApiInfo apiInfo = new ApiInfo(httpResponseParams);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null);
+        Assertions.assertFalse(result);
+        Set<ApiInfo.AuthType> s = new HashSet<>();
+        s.add(ApiInfo.AuthType.JWT);
+        Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 1);
+        Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
+    }
+
+    @Test
+    public void testJwtInCookie() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("cookie", Collections.singletonList("Path=/; JWT=eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoicmVmcmVzaFRva2VuIiwic2lnbmVkVXAiOiJ0cnVlIiwidXNlcm5hbWUiOiJhbmt1c2hAZ21haWwuY29tIiwiaWF0IjoxNjQwNjkzNDUzLCJleHAiOjE2NDEyMTE4NTN9.oTq5FEeTlNt1YjaZ9JA8qdymArxJ8unNI8m5HLYn4ECeFOKQCv8SWnQ6uvwbbWPHa6HOYeLoD-tvPyVq-c6jlyGNf7bno8cCMB5ldyJ-I--F1xVp0iWKCMtlgdS2DgwFBdaZ9mdLCP3eZuieQV2Za8Lrzw1G1CpgJ-3vkijTw3KurKSDLT5Zv8JQRSxwj_VLeuaVkhSjYVltzTfY5tkl3CO3vNmlz6HIc4shxFXowA30xxgL438V1ELamv85fyGXg2EMhk5XeRDXq1QiLPBsQZ28FSk5TJAn2Xc_pwWXBw-N2P6Y_Hh0bL7KXpErgKQNQiAfNFHFzAUbuLefD6dJKg;; HttpOnly"));
         HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null);
