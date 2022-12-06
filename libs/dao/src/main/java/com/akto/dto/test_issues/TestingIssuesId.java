@@ -1,4 +1,4 @@
-package com.akto.dto.test_run_findings;
+package com.akto.dto.test_issues;
 
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.util.enums.GlobalEnums.TestSubCategory;

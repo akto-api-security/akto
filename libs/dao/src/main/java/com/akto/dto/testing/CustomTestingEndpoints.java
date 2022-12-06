@@ -16,8 +16,6 @@ public class CustomTestingEndpoints extends TestingEndpoints {
         super(Type.CUSTOM);
         this.apisList = apisList;
     }
-
-
     public List<ApiInfo.ApiInfoKey> getApisList() {
         return apisList;
     }
@@ -29,5 +27,10 @@ public class CustomTestingEndpoints extends TestingEndpoints {
     @Override
     public List<ApiInfo.ApiInfoKey> returnApis() {
         return this.getApisList();
+    }
+
+    @Override
+    public boolean containsApi(ApiInfo.ApiInfoKey key) {
+        return false;
     }
 }

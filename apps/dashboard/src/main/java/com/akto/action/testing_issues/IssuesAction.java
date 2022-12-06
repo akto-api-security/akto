@@ -2,19 +2,16 @@ package com.akto.action.testing_issues;
 
 import com.akto.action.UserAction;
 import com.akto.dao.testing.TestingRunResultDao;
-import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dao.testing_issues.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.test_run_findings.TestingIssuesId;
-import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.test_issues.TestingIssuesId;
+import com.akto.dto.test_issues.TestingRunIssues;
 import com.akto.dto.testing.TestingRunResult;
-import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
-import com.mongodb.client.result.UpdateResult;
 import org.bson.conversions.Bson;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import static com.akto.util.Constants.ID;

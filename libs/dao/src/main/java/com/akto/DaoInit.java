@@ -9,8 +9,8 @@ import com.akto.dto.runtime_filters.FieldExistsFilter;
 import com.akto.dto.FilterSampleData;
 import com.akto.dto.runtime_filters.ResponseCodeRuntimeFilter;
 import com.akto.dto.runtime_filters.RuntimeFilter;
-import com.akto.dto.test_run_findings.TestingIssuesId;
-import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.test_issues.TestingIssuesId;
+import com.akto.dto.test_issues.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
@@ -130,6 +130,8 @@ public class DaoInit {
                 .builder(TestingRunIssues.class).enableDiscriminator(true).build();
         ClassModel<TestingIssuesId> testingIssuesIdClassModel = ClassModel
                 .builder(TestingIssuesId.class).enableDiscriminator(true).build();
+        ClassModel<EndpointLogicalGroup> endpointLogicalGroupClassModel = ClassModel
+                .builder(EndpointLogicalGroup.class).enableDiscriminator(true).build();
         // ClassModel<AwsResource> awsResourceModel =
         // ClassModel.builder(AwsResource.class).enableDiscriminator(true)
         // .build();
@@ -154,7 +156,7 @@ public class DaoInit {
                 workflowTestingEndpointsClassModel, workflowTestResultClassModel,
                 cappedSetClassModel, CustomWebhookClassModel, CustomWebhookResultClassModel,
                 nodeResultClassModel, awsResourcesModel, AktoDataTypeClassModel, testingRunIssuesClassModel,
-                testingIssuesIdClassModel).automatic(true).build());
+                testingIssuesIdClassModel, endpointLogicalGroupClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),

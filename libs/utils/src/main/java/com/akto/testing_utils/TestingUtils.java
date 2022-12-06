@@ -1,6 +1,6 @@
 package com.akto.testing_utils;
 
-import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.dto.test_issues.TestingIssuesId;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.util.enums.GlobalEnums;
 

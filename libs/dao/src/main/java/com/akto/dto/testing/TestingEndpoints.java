@@ -13,9 +13,11 @@ public abstract class TestingEndpoints {
 
     public abstract List<ApiInfo.ApiInfoKey> returnApis();
 
+    public abstract boolean containsApi (ApiInfo.ApiInfoKey key);
+
 
     public enum Type {
-        CUSTOM, COLLECTION_WISE, WORKFLOW
+        CUSTOM, COLLECTION_WISE, WORKFLOW, LOGICAL_GROUP
     }
 
     public Type getType() {

@@ -1,7 +1,7 @@
-package com.akto.dao.testing_run_findings;
+package com.akto.dao.testing_issues;
 
 import com.akto.dao.AccountsContextDao;
-import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.test_issues.TestingRunIssues;
 import com.akto.util.enums.MongoDBEnums;
 
 public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {

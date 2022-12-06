@@ -24,6 +24,11 @@ public class CollectionWiseTestingEndpoints extends TestingEndpoints {
         return SingleTypeInfoDao.instance.fetchEndpointsInCollection(apiCollectionId);
     }
 
+    @Override
+    public boolean containsApi(ApiInfo.ApiInfoKey key) {
+        return false;
+    }
+
     public int getApiCollectionId() {
         return apiCollectionId;
     }
