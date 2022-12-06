@@ -139,6 +139,9 @@ public abstract class MCollection<T> {
         return this.getMCollection().findOneAndUpdate(q, obj, new FindOneAndUpdateOptions().upsert(true));
     }
 
+    public UpdateResult updateMany (Bson q, Bson obj) {
+        return this.getMCollection().updateMany(q, obj);
+    }
     public BulkWriteResult bulkWrite (List<WriteModel<T>> modelList, BulkWriteOptions options) {
         return this.getMCollection().bulkWrite(modelList, options);
     }

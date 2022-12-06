@@ -39,9 +39,25 @@
                     Stop all tests
                 </v-btn>
 
-                <div>
-                    <span class="heading">Auth tokens</span>
+             <div>
+
+                <div class="di-flex">
+
+                    <div class="col_1">
+                        <p> 1 </p>
+                    </div>
+                    
+                    <div>
+                        <h2> Manual </h2>
+                    </div>
+
+                    <div class="p_padding">
+                        <small> Add your API Token below </small>
+                    </div>
                 </div>
+                <!-- <div>
+                    <span class="heading">Auth tokens</span>
+                </div> -->
 
                 <div class="d-flex">
                     <div class="input-value">
@@ -58,12 +74,68 @@
                             style="width: 500px"
                         />                    
                     </div>
-                </div>
 
-                <v-btn primary dark color="#6200EA" @click="saveAuthMechanism" v-if="someAuthChanged">
+                <v-btn primary dark color="#3366ff" @click="saveAuthMechanism" v-if="someAuthChanged">
                     Save changes
                 </v-btn>
             </div>
+
+
+            <div class="di-flex-bottom">
+
+                    <div class="col_1">
+                        <p> 2 </p>
+                    </div>
+                    
+                    <div>
+                        <h2> Automated </h2>
+                    </div>
+
+                    <div class="p_padding">
+                        <small> Automate your API Token below </small>
+                    </div>
+                </div>
+                
+                <div class="di-flex">
+                    <div class="input-value">
+                        <v-text-field 
+                            :placeholder="loginInputText"
+                            style="width: 700px"
+                        />
+                    </div>
+
+                    <v-btn primary dark color="#6200EA" @click="showLoginStepBuilder">
+                        Fetch Token
+                    </v-btn>
+                </div>
+
+            </div>
+
+                
+
+                
+
+
+                    <v-dialog
+                        v-model="stepBuilder"
+                        width="80%"
+                    >
+                        <div style="padding: 12px 24px 12px 24px; background: white">
+                        <div style="margin-bottom: 24px">
+                            <v-btn icon primary dark color="#6200EA" class="float-right" @click="() => { stepBuilder = false;}">
+                                <v-icon>$fas_times</v-icon>
+                            </v-btn>
+                        </div>
+
+                        <div style="margin-top: 12px">
+                            <login-step-builder :originalDbState="originalDbState" :showLoginSaveOption="showLoginSaveOption" v-if="stepBuilder" @testLoginStep="testLoginStep" @saveLoginStep="saveLoginStep"/>
+                        </div>
+
+                        </div>
+                    </v-dialog>
+
+            </div>
+            
         </template>        
     </layout-with-tabs>
 </template>
@@ -82,6 +154,7 @@ import { mapState } from 'vuex'
 import api from './api'
 import LayoutWithLeftPane from '@/apps/dashboard/layouts/LayoutWithLeftPane'
 import ApiCollectionGroup from '@/apps/dashboard/shared/components/menus/ApiCollectionGroup'
+import LoginStepBuilder from './LoginStepBuilder'
 
 export default {
     name: "PageTesting",
@@ -92,17 +165,22 @@ export default {
         SampleData,
         LayoutWithTabs,
         LayoutWithLeftPane,
-        ApiCollectionGroup
+        ApiCollectionGroup,
+        LoginStepBuilder
     },
     props: {
 
     },
     data() {
         return  {
+            originalDbState: null,
+            stepBuilder: false,
             newKey: this.nonNullAuth ? this.nonNullAuth.key : null,
             newVal: this.nonNullAuth ? this.nonNullAuth.value: null,
             stopAllTestsLoading: false,
-            drawer: null
+            drawer: null,
+            showLoginSaveOption: false,
+            authMechanismData: {}
         }
     },
     methods: {
@@ -140,7 +218,133 @@ export default {
             }).catch((e) => {
                 this.stopAllTestsLoading = false
             })
-        }
+        },
+        showLoginStepBuilder() {
+            this.stepBuilder = true
+        },
+        testLoginStep(data) {
+          let updatedData = data["updatedData"]
+
+          let url = updatedData["url"]
+          if (!url) {
+              func.showErrorSnackBar("Invalid URL")
+              return
+          }
+
+          let queryParams = updatedData["queryParams"]
+
+          let method = updatedData["method"]
+          method = this.validateMethod(method)
+          if (!method) {
+              func.showErrorSnackBar("Invalid HTTP method")
+              return
+          }
+
+          let headerString =  updatedData["headerString"]
+
+          let body = updatedData["body"]
+
+          let key = updatedData["authKey"]
+
+          let authTokenPath = updatedData["authTokenPath"]
+
+        let result = api.triggerLoginSteps(key, "", "HEADER", "SINGLE_REQUEST", authTokenPath, [{
+                "url": url,
+                "body": body,
+                "headers": headerString,
+                "queryParams": queryParams,
+                "method": method
+            }
+        ])
+
+          result.then((resp) => {
+              this.showLoginSaveOption = true
+              func.showSuccessSnackBar("Login Flow Ran Successfully!")
+          }).catch((err) => {
+              this.showLoginSaveOption = false
+              console.log(err);
+          })
+
+      },
+      showLoginStepBuilder() {
+            this.stepBuilder = true
+        },
+
+        saveLoginStep(data) {
+          let updatedData = data["updatedData"]
+
+          let url = updatedData["url"]
+          if (!url) {
+              func.showErrorSnackBar("Invalid URL")
+              return
+          }
+
+          let queryParams = updatedData["queryParams"]
+
+          let method = updatedData["method"]
+          method = this.validateMethod(method)
+          if (!method) {
+              func.showErrorSnackBar("Invalid HTTP method")
+              return
+          }
+
+          let headerString =  updatedData["headerString"]
+
+          let body = updatedData["body"]
+
+          let key = updatedData["authKey"]
+
+          let authTokenPath = updatedData["authTokenPath"]
+
+          let result = api.addAuthMechanism(key, "", "HEADER", "SINGLE_REQUEST", authTokenPath, [{
+                "url": url,
+                "body": body,
+                "headers": headerString,
+                "queryParams": queryParams,
+                "method": method
+            }
+        ])
+
+          result.then((resp) => {
+              func.showSuccessSnackBar("Login Flow saved successfully!")
+          }).catch((err) => {
+              console.log(err);
+          })
+
+
+      },
+      validateMethod(methodName) {
+          let m = methodName.toUpperCase()
+          let allowedMethods = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "TRACE", "PATCH"]
+          let idx = allowedMethods.indexOf(m);
+          if (idx === -1) return null
+          return allowedMethods[idx]
+        },
+      fetchAuthMechanismData() {
+        api.fetchAuthMechanismData().then((resp) => {
+          this.authMechanismData = resp.authMechanism;
+          if (!this.authMechanismData) return
+            let requestData = this.authMechanismData["requestData"]
+            let str = JSON.stringify(this.authMechanismData);
+            console.log(str)
+            if (!requestData || requestData.length === 0) return
+
+            let authParamData = this.authMechanismData["authParams"]
+            if (!authParamData || authParamData.length === 0) return
+
+            let data = requestData[0]
+
+            let authData = authParamData[0]
+
+            let url = data["url"]
+
+            if (!url || url == "") return
+
+            this.originalDbState = {"url": url, "body": data["body"], "headers": data["headers"], "method": data["method"], 
+            "queryParams": data["queryParams"], "authKey": authData["key"], "authTokenPath": authData["authTokenPath"]}
+
+        })
+      }
     },
     computed: {
         ...mapState('testing', ['testingRuns', 'authMechanism', 'testingRunResults', 'pastTestingRuns']),
@@ -223,9 +427,37 @@ export default {
                     ]
                 }
             ]
+        },
+        loginInputText: function() {
+
+            let text = "Click on fetch Token Button To Automate ->"
+            if (!this.authMechanismData) return text
+
+            let id = this.authMechanismData["id"]
+            let requestData = this.authMechanismData["requestData"]
+            if (!id || !requestData || requestData.length === 0) return text
+
+            let data = requestData[0]
+
+            let url = data["url"]
+
+            if (!url || url == "") return text
+
+
+            let date = id["date"]
+
+            if (!date || date == "") return text
+
+            date = date.slice(0, 10) + " " + date.slice(11)
+
+
+            text = "URL: " + url + ";   CREATED ON: " + date
+
+            return text
         }
     },
     mounted() {
+        this.fetchAuthMechanismData()
         let now = func.timeNow()
         this.$store.dispatch('testing/loadTestingDetails', {startTimestamp: now - func.recencyPeriod, endTimestamp: now})
     },
@@ -262,6 +494,40 @@ export default {
 .page-testing >>> input {
   font-size: 12px;
   font-weight: 400;
+}
+
+.col_1 {
+    box-sizing: border-box;
+    width: 32px;
+    height: 32px;
+    left: 0px;
+    top: 0px;
+    border: 2px solid #6200EA;
+    border-radius: 50%;
+    text-align: center;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 20px;
+    line-height: 30px;
+    color: #6200EA;
+}
+
+.di-flex {
+    display: flex;
+    gap: 16px;
+    padding-bottom: 11px;
+}
+
+.di-flex-bottom {
+    display: flex;
+    gap: 16px;
+    padding-top: 20px;
+    padding-bottom: 11px;
+}
+
+.p_padding {
+    opacity: 0.4;
+    margin: 10px;
 }
 
 </style>
