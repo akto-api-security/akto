@@ -28,11 +28,7 @@ public class CollectionWiseTestingEndpoints extends TestingEndpoints {
 
     @Override
     public boolean containsApi(ApiInfo.ApiInfoKey key) {
-        Bson filter = Filters.and(Filters.eq(ApiInfo.ApiInfoKey.API_COLLECTION_ID, key.getApiCollectionId())
-                , Filters.eq(ApiInfo.ApiInfoKey.URL, key.getUrl())
-                , Filters.eq(ApiInfo.ApiInfoKey.METHOD, key.getMethod()));
-        long count = SingleTypeInfoDao.instance.getMCollection().countDocuments(filter);
-        return count > 0;
+        return key.getApiCollectionId() == this.apiCollectionId;
     }
 
     public int getApiCollectionId() {
