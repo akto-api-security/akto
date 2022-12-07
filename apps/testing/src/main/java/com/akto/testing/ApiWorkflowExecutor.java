@@ -55,7 +55,7 @@ public class ApiWorkflowExecutor {
         for (Node node: nodes) {
             WorkflowTestResult.NodeResult nodeResult;
             try {
-                nodeResult = processNode(node, valuesMap);
+                nodeResult = processNode(node, valuesMap, true);
             } catch (Exception e) {
                 e.printStackTrace();
                 List<String> testErrors = new ArrayList<>();
@@ -71,7 +71,42 @@ public class ApiWorkflowExecutor {
         WorkflowTestResultsDao.instance.insertOne(workflowTestResult);
     }
 
-    public WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap) {
+    public void runLoginFlow(WorkflowTest workflowTest, AuthMechanism authMechanism) throws Exception {
+        Graph graph = new Graph();
+        graph.buildGraph(workflowTest);
+
+        List<Node> nodes = graph.sort();
+        Map<String, Object> valuesMap = new HashMap<>();
+
+        for (Node node: nodes) {
+            WorkflowTestResult.NodeResult nodeResult;
+            try {
+                nodeResult = processNode(node, valuesMap, false);
+            } catch (Exception e) {
+                e.printStackTrace();
+                List<String> testErrors = new ArrayList<>();
+                testErrors.add("Error Processing Node In Login Flow " + e.getMessage());
+                nodeResult = new WorkflowTestResult.NodeResult("{}", false, testErrors);
+            }
+
+            if (nodeResult.getErrors().size() > 0) break;
+        }
+
+        for (AuthParam param : authMechanism.getAuthParams()) {
+            try {
+                String value = executeCode(param.getValue(), valuesMap);
+                if (value == null) {
+                    throw new Exception("auth param not found at specified path " + param.getValue());
+                }
+                param.setValue(value);
+            } catch(Exception e) {
+                throw new Exception("error resolving auth param " + param.getValue());
+            }
+        }
+    }
+
+
+    public WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes) {
         System.out.println("\n");
         System.out.println("NODE: " + node.getId());
         List<String> testErrors = new ArrayList<>();
@@ -121,6 +156,10 @@ public class ApiWorkflowExecutor {
                 response = ApiExecutor.sendRequest(request, followRedirects);
 
                 int statusCode = response.getStatusCode();
+
+                if (!allowAllStatusCodes && (statusCode >= 400)) {
+                    testErrors.add("process node failed with status code " + statusCode);
+                }
                 String statusKey =   nodeId + "." + "response" + "." + "status_code";
                 valuesMap.put(statusKey, statusCode);
 

@@ -12,15 +12,12 @@ public class LoginRequestAuthParam extends AuthParam {
 
     private String key;
     private String value;
-    private String valueLocation;
-
     public LoginRequestAuthParam() { }
 
-    public LoginRequestAuthParam(Location where, String key, String value, String valueLocation) {
+    public LoginRequestAuthParam(Location where, String key, String value) {
         this.key = key;
         this.value = value;
         this.where = where;
-        this.valueLocation = valueLocation;
     }
 
     @Override
@@ -52,13 +49,6 @@ public class LoginRequestAuthParam extends AuthParam {
         return headers.containsKey(k);
     }
 
-    public String getValueLocation() {
-        return this.valueLocation;
-    }
-
-    public void setValueLocation(String valueLocation) {
-        this.valueLocation = valueLocation;
-    }
     public Location getWhere() {
         return where;
     }

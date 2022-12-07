@@ -17,7 +17,7 @@ import java.util.List;
 
 public class AuthMechanismAction extends UserAction {
 
-    //todo: rename requestData
+    //todo: rename requestData, also add len check
     private ArrayList<RequestData> requestData;
 
     private String type;
@@ -27,6 +27,7 @@ public class AuthMechanismAction extends UserAction {
     private ArrayList<AuthParamData> authParamData;
 
     public String addAuthMechanism() {
+        // todo: add more validations
         List<AuthParam> authParams = new ArrayList<>();
 
         type = type != null ? type : LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString();
@@ -34,8 +35,7 @@ public class AuthMechanismAction extends UserAction {
         AuthMechanismsDao.instance.deleteAll(new BasicDBObject());
 
         if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
-            if (authParamData.get(0).getKey() == null || authParamData.get(0).getValue() == null ||
-                    authParamData.get(0).getWhere() == null) {
+            if (!authParamData.get(0).validate()) {
                 addActionError("Key, Value, Location can't be empty");
                 return ERROR.toUpperCase();
             }
@@ -45,14 +45,12 @@ public class AuthMechanismAction extends UserAction {
         } else {
 
             for (AuthParamData param: authParamData) {
-                if (param.getKey() == null || param.getValue() == null || param.getValueLocation() == null ||
-                        param.getWhere() == null) {
-                    addActionError("Key, Value, ValueLocation, Location can't be empty");
+                if (!param.validate()) {
+                    addActionError("Key, Value, Location can't be empty");
                     return ERROR.toUpperCase();
                 }
 
-                authParams.add(new LoginRequestAuthParam(param.getWhere(), param.getKey(), param.getValue(),
-                        param.getValueLocation()));
+                authParams.add(new LoginRequestAuthParam(param.getWhere(), param.getKey(), param.getValue()));
             }
         }
         AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type);
@@ -63,17 +61,20 @@ public class AuthMechanismAction extends UserAction {
 
     public String triggerLoginFlowSteps() {
         List<AuthParam> authParams = new ArrayList<>();
-        if (location == null || key == null || requestData == null || authTokenPath == null) {
-            addActionError("Location, Key, requestData, authTokenPath can't be empty");
+
+        if (!type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
+            addActionError("Invalid Type Value");
             return ERROR.toUpperCase();
         }
-        type = type != null ? type : LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString();
 
-        if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
-            authParams.add(new HardcodedAuthParam(location, key, value));
-        } else {
-            authParams.add(new LoginRequestAuthParam(location, key, value, authTokenPath));
+        for (AuthParamData param: authParamData) {
+            if (!param.validate()) {
+                addActionError("Key, Value, Location can't be empty");
+                return ERROR.toUpperCase();
+            }
+            authParams.add(new LoginRequestAuthParam(param.getWhere(), param.getKey(), param.getValue()));
         }
+
         AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type);
 
         TestExecutor testExecutor = new TestExecutor();

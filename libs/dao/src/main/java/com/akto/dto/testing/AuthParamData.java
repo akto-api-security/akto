@@ -7,14 +7,11 @@ public class AuthParamData {
 
     private String value;
 
-    private String valueLocation;
-
     public AuthParamData() { }
-    public AuthParamData(AuthParam.Location where, String key, String value, String valueLocation) {
+    public AuthParamData(AuthParam.Location where, String key, String value) {
         this.where = where;
         this.key = key;
         this.value = value;
-        this.valueLocation = valueLocation;
     }
 
     public AuthParam.Location getWhere() {return this.where;}
@@ -27,10 +24,6 @@ public class AuthParamData {
         return this.value;
     }
 
-    public String getValueLocation() {
-        return this.valueLocation;
-    }
-
     public void setKey(String key) {
         this.key = key;
     }
@@ -39,11 +32,14 @@ public class AuthParamData {
         this.value = value;
     }
 
-    public void setValueLocation(String valueLocation) {
-        this.valueLocation = valueLocation;
-    }
-
     public void setWhere(AuthParam.Location where) {this.where = where;}
+
+    public Boolean validate() {
+        if (this.key == null || this.value == null || this.where == null) {
+            return false;
+        }
+        return true;
+    }
 
 }
 
