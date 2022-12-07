@@ -1,9 +1,13 @@
 package com.akto.runtime.policies;
 
+import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.CustomAuthType;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.type.KeyTypes;
+import com.mongodb.BasicDBObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -94,6 +98,52 @@ public class AuthPolicy {
                     flag = true;
                     break;
                 }
+            }
+        }
+
+        List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(new BasicDBObject());
+
+        for (CustomAuthType customAuthType : customAuthTypes) {
+
+            if (!customAuthType.isActive()) {
+                continue;
+            }
+
+            Set<String> foundKeys = new HashSet<>();
+            // Find custom auth type in header
+            for (String header : headers.keySet()) {
+                List<String> headerValues = headers.getOrDefault(header, new ArrayList<>());
+                for (String value : headerValues) {
+                    value = value.trim();
+                    for (String key : customAuthType.getKeys()) {
+                        if (header.equals(key) || value.contains(key)) {
+                            foundKeys.add(key);
+                        }
+                    }
+                }
+            }
+
+            // Find custom auth type in cookie
+            for (String cookieValues : cookieList) {
+                String[] cookies = cookieValues.split("; ");
+                for (String cookie : cookies) {
+                    String[] cookieFields = cookie.split("=");
+                    boolean twoCookieFields = cookieFields.length == 2;
+                    if (twoCookieFields) {
+                        for (String key : customAuthType.getKeys()) {
+                            if (cookieFields[0].equals(key) || cookieFields[1].contains(key)) {
+                                foundKeys.add(key);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if ((customAuthType.getOperator().equals(Operator.AND)
+                    && foundKeys.size() == customAuthType.getKeys().size())
+                    || (customAuthType.getOperator().equals(Operator.OR) && foundKeys.size() > 0)) {
+                authTypes.add(ApiInfo.AuthType.CUSTOM);
+                break;
             }
         }
 

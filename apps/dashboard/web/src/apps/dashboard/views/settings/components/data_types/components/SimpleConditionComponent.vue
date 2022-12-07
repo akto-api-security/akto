@@ -24,7 +24,7 @@
                                 click
                         </span>
                     </template>
-                    <v-list>
+                    <v-list v-if="(onlyEqual==false)">
                         <v-list-item 
                             v-for="(item, index) in operation_types" 
                             :key="index"
@@ -61,7 +61,10 @@ export default {
     name: "SimpleConditionComponent",
     props: {
         condition: obj.objR,
-        initial_string: obj.strR
+        initial_string: obj.strR,
+        onlyEqual: {
+            type:Boolean
+        },
     },
     components: {
     },
