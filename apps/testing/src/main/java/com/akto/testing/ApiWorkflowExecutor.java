@@ -72,6 +72,8 @@ public class ApiWorkflowExecutor {
     }
 
     public WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap) {
+        System.out.println("\n");
+        System.out.println("NODE: " + node.getId());
         List<String> testErrors = new ArrayList<>();
         String nodeId = node.getId();
         WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
@@ -252,14 +254,26 @@ public class ApiWorkflowExecutor {
         String requestPayload = updatedSampleData.getRequestPayload();
         String requestUrl = updatedSampleData.getRequestUrl();
 
+        String queryFromReplacedUrl = null;
+
+        boolean userSuppliedQueryParamsNullOrEmpty = queryParams == null || queryParams.trim().length() == 0;
         if (requestUrl != null) {
+            System.out.println("requestUrl: " + requestUrl);
             String rawUrl = executeCode(requestUrl, valuesMap);
+            System.out.println("rawUrl: " + requestUrl);
             // this url might contain urlQueryParams. We need to move it queryParams
             String[] rawUrlArr = rawUrl.split("\\?");
             request.setUrl(rawUrlArr[0]);
             if (rawUrlArr.length > 1) {
-                request.setQueryParams(rawUrlArr[1]);
+                queryFromReplacedUrl = rawUrlArr[1];
             }
+            System.out.println("final url: " + request.getUrl());
+            System.out.println("queryFromReplacedUrl: " + queryFromReplacedUrl);
+        }
+
+        if (userSuppliedQueryParamsNullOrEmpty) {
+            System.out.println("setting null");
+            request.setQueryParams(null);
         }
 
         if (requestPayload != null) {
@@ -273,16 +287,22 @@ public class ApiWorkflowExecutor {
             request.setHeaders(res);
         }
 
-        if (queryParams != null) {
+        boolean queryFromReplacedUrlNullOrEmpty = queryFromReplacedUrl == null || queryFromReplacedUrl.trim().isEmpty();
+
+        if (!userSuppliedQueryParamsNullOrEmpty) {
+            System.out.println("user has supplied query params");
             String finalQueryParams = executeCode(queryParams, valuesMap);
-            String ogQuery = request.getQueryParams();
-            if (ogQuery == null || ogQuery.isEmpty()) {
+            System.out.println("finalQueryParams: " + finalQueryParams);
+            if (queryFromReplacedUrlNullOrEmpty) {
                 request.setQueryParams(finalQueryParams);
             } else {
                 // combine original query params and user defined query params and latter overriding former
-                String combinedQueryParams = OriginalHttpRequest.combineQueryParams(ogQuery, finalQueryParams);
+                String combinedQueryParams = OriginalHttpRequest.combineQueryParams(queryFromReplacedUrl, finalQueryParams);
+                System.out.println("combinedQueryParams: " + combinedQueryParams);
                 request.setQueryParams(combinedQueryParams);
             }
+        } else if (!queryFromReplacedUrlNullOrEmpty) {
+            request.setQueryParams(queryFromReplacedUrl);
         }
 
         return request;

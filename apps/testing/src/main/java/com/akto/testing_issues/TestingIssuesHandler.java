@@ -50,13 +50,11 @@ public class TestingIssuesHandler {
                 } else {
                     updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN);
                 }
-                updateSeverityField = Updates.set(TestingRunIssues.KEY_SEVERITY,
-                        TestSubCategory.valueOf(runResult.getTestSubType()).getSuperCategory().getSeverity());
             } else {
                 updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED);
-                updateSeverityField = Updates.set(TestingRunIssues.KEY_SEVERITY,
-                        Severity.LOW);
             }
+            updateSeverityField = Updates.set(TestingRunIssues.KEY_SEVERITY,
+                    TestSubCategory.valueOf(runResult.getTestSubType()).getSuperCategory().getSeverity());
             Bson updateFields = Updates.combine(
                     updateStatusFields,
                     updateSeverityField,

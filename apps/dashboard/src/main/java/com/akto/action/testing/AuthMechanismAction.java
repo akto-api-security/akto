@@ -5,8 +5,11 @@ import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dto.testing.*;
+import com.akto.testing.TestExecutor;
+import com.akto.util.enums.LoginFlowEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,20 +21,71 @@ public class AuthMechanismAction extends UserAction {
     private String key;
     private String value;
 
+    private ArrayList<RequestData> requestData;
+
+    private String authTokenPath;
+
+    private String type;
+
+    private AuthMechanism authMechanism;
+
     public String addAuthMechanism() {
         List<AuthParam> authParams = new ArrayList<>();
-        if (location == null || key == null || value == null) {
+        if (location == null || key == null) {
             addActionError("Location, Key or Value can't be empty");
             return ERROR.toUpperCase();
         }
+
+        type = type != null ? type : LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString();
+
+        if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString()) && value == null ) {
+            addActionError("Value can't be empty");
+            return ERROR.toUpperCase();
+        }
+
         AuthMechanismsDao.instance.deleteAll(new BasicDBObject());
-        authParams.add(new HardcodedAuthParam(location, key, value));
-        AuthMechanism authMechanism = new AuthMechanism(authParams);
+
+        if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
+            authParams.add(new HardcodedAuthParam(location, key, value));
+        } else {
+            authParams.add(new LoginRequestAuthParam(location, key, value, authTokenPath));
+        }
+        AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type);
 
         AuthMechanismsDao.instance.insertOne(authMechanism);
         return SUCCESS.toUpperCase();
     }
 
+    public String triggerLoginFlowSteps() {
+        List<AuthParam> authParams = new ArrayList<>();
+        if (location == null || key == null || requestData == null || authTokenPath == null) {
+            addActionError("Location, Key, requestData, authTokenPath can't be empty");
+            return ERROR.toUpperCase();
+        }
+        type = type != null ? type : LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString();
+
+        if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
+            authParams.add(new HardcodedAuthParam(location, key, value));
+        } else {
+            authParams.add(new LoginRequestAuthParam(location, key, value, authTokenPath));
+        }
+        AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type);
+
+        TestExecutor testExecutor = new TestExecutor();
+        try {
+            testExecutor.executeLoginFlow(authMechanism);
+        } catch(Exception e) {
+            addActionError(e.getMessage());
+            return ERROR.toUpperCase();
+        }
+        return SUCCESS.toUpperCase();
+    }
+
+    public String fetchAuthMechanismData() {
+
+        authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
+        return SUCCESS.toUpperCase();
+    }
 
     private int workflowTestId;
     private WorkflowTestResult workflowTestResult;
@@ -64,6 +118,22 @@ public class AuthMechanismAction extends UserAction {
         return this.value;
     }
 
+    public String getType() {
+        return this.type;
+    }
+
+    public String getAuthTokenPath() {
+        return this.authTokenPath;
+    }
+
+    public ArrayList<RequestData> getRequestData() {
+        return this.requestData;
+    }
+
+    public AuthMechanism getAuthMechanism() {
+        return this.authMechanism;
+    }
+
     public void setLocation(AuthParam.Location location) {
         this.location = location;
     }
@@ -88,4 +158,15 @@ public class AuthMechanismAction extends UserAction {
         return workflowTestingRun;
     }
 
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public void setRequestData(ArrayList<RequestData> requestData) {
+        this.requestData = requestData;
+    }
+
+    public void setAuthTokenPath(String authTokenPath) {
+        this.authTokenPath = authTokenPath;
+    }
 }

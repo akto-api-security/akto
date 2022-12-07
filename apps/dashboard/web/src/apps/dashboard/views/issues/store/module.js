@@ -10,7 +10,14 @@ const state = {
     issues: [],
     currentPage: 1,
     limit: 20,
-    totalIssuesCount: 0
+    totalIssuesCount: 0,
+    filterStatus : ['OPEN'],
+    filterCollectionsId : [],
+    filterSeverity : [],
+    filterSubCategory1 : [],
+    startEpoch : 0,
+    selectedIssueIds : [],
+    testingRunResult: {}
 }
 
 const issues = {
@@ -29,16 +36,52 @@ const issues = {
         },
         updateCurrentPage(state, {pageIndex}) {
             state.currentPage = pageIndex
+        },
+        updateSelectedIssueIds(state, {selectedIssueIds}) {
+            state.selectedIssueIds = selectedIssueIds
+        },
+        updateFilters(state, {filterStatus, filterCollectionsId, filterSeverity, filterSubCategory1, startEpoch}) {
+            if (filterStatus !== undefined) {
+                state.filterStatus = filterStatus
+            }
+            if (filterCollectionsId !== undefined) {
+                state.filterCollectionsId = filterCollectionsId
+            }
+            if (filterSeverity !== undefined) {
+                state.filterSeverity = filterSeverity
+            }
+            if (filterSubCategory1 !== undefined) {
+                state.filterSubCategory1 = filterSubCategory1
+            }
+            if (startEpoch !== undefined) {
+                state.startEpoch = startEpoch
+            }
+        },
+        SAVE_TESTING_RESULT(state, {testingRunResult}) {
+            state.testingRunResult = testingRunResult
         }
     },
     actions: {
         emptyState({ commit }) {
             commit('EMPTY_STATE')
         },
+        loadTestingResult({commit}, {issueId}) {
+            return api.fetchTestingRunResult(issueId).then((resp) => {
+                commit('SAVE_TESTING_RESULT',resp)
+            }).catch(() => {
+            })
+        },
         loadIssues({ commit }) {
             commit('EMPTY_STATE')
             state.loading = true
-            return api.fetchIssues((state.currentPage - 1) * state.limit, state.limit).then((resp) => {
+            return api.fetchIssues((state.currentPage - 1) * state.limit
+            , state.limit
+            , state.filterStatus
+            , state.filterCollectionsId
+            , state.filterSeverity
+            , state.filterSubCategory1
+            , state.startEpoch)
+            .then((resp) => {
                 commit('SAVE_ISSUES', resp)
                 state.loading = false
             }).catch(() => {
@@ -52,6 +95,14 @@ const issues = {
             }).catch(() => {
                 state.loading = false
             })
+        },
+        bulkUpdateIssueStatus({ commit }, { selectedIssueIds, selectedStatus, ignoreReason }) {
+            state.loading = true
+            return api.bulkUpdateIssueStatus(selectedIssueIds, selectedStatus, ignoreReason).then((resp) => {
+                state.loading = false
+            }).catch(() => {
+                state.loading = false
+            })
         }
     },
     getters: {
@@ -59,7 +110,9 @@ const issues = {
         getIssues: (state) => state.issues,
         getCurrentPage: (state) => state.currentPage,
         getLimit: (state) => state.limit,
-        getTotalIssuesCount: (state) => state.totalIssuesCount
+        getTotalIssuesCount: (state) => state.totalIssuesCount,
+        getSelectedIssueIds: (state) => state.selectedIssueIds,
+        getTestingRunResult: (state) => state.testingRunResult
     }
 }
 

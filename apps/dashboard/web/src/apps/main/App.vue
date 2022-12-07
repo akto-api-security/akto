@@ -90,6 +90,28 @@
     .clickable {
         cursor: pointer;
     }
+    
+    .clickable-line {
+        cursor: pointer;
+    }
+
+    .clickable-line:hover {
+        text-decoration: underline;
+        color: var(--v-themeColor-base);
+    }
+
+    .checkbox-primary {
+        accent-color: var(--v-themeColor-base);
+    }
+
+    .clickable-bg {
+        cursor: pointer;
+    }
+
+    .clickable-bg:hover {
+        cursor: pointer;
+        background-color: #47466A0D;
+    }
 
 </style>
 
