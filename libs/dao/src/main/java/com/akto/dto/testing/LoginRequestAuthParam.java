@@ -2,7 +2,6 @@ package com.akto.dto.testing;
 
 import com.akto.dto.OriginalHttpRequest;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -13,15 +12,15 @@ public class LoginRequestAuthParam extends AuthParam {
 
     private String key;
     private String value;
-    private String authTokenPath;
+    private String valueLocation;
 
     public LoginRequestAuthParam() { }
 
-    public LoginRequestAuthParam(Location where, String key, String value, String authTokenPath) {
+    public LoginRequestAuthParam(Location where, String key, String value, String valueLocation) {
         this.key = key;
         this.value = value;
         this.where = where;
-        this.authTokenPath = authTokenPath;
+        this.valueLocation = valueLocation;
     }
 
     @Override
@@ -53,12 +52,12 @@ public class LoginRequestAuthParam extends AuthParam {
         return headers.containsKey(k);
     }
 
-    public String getAuthTokenPath() {
-        return this.authTokenPath;
+    public String getValueLocation() {
+        return this.valueLocation;
     }
 
-    public void setAuthTokenPath(String authTokenPath) {
-        this.authTokenPath = authTokenPath;
+    public void setValueLocation(String valueLocation) {
+        this.valueLocation = valueLocation;
     }
     public Location getWhere() {
         return where;

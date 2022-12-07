@@ -48,7 +48,7 @@ public class HardcodedAuthParam extends AuthParam {
         return headers.containsKey(k);
     }
 
-    public String getAuthTokenPath() {
+    public String getValueLocation() {
         return null;
     }
 

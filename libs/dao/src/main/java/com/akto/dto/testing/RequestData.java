@@ -12,13 +12,20 @@ public class RequestData {
 
     private String method;
 
+    private String type;
+
+    private LoginVerificationCodeData verificationCodeData;
+
     public RequestData() { }
-    public RequestData(String body, String headers, String queryParams, String url, String method) {
+    public RequestData(String body, String headers, String queryParams, String url, String method, String type,
+                       LoginVerificationCodeData verificationCodeData) {
         this.body = body;
         this.headers = headers;
         this.queryParams = queryParams;
         this.url = url;
         this.method = method;
+        this.type = type;
+        this.verificationCodeData = verificationCodeData;
     }
 
     public String getBody() {
@@ -41,6 +48,14 @@ public class RequestData {
         return this.method;
     }
 
+    public String getType() {
+        return this.type;
+    }
+
+    public LoginVerificationCodeData getVerificationCodeData() {
+        return this.verificationCodeData;
+    }
+
     public void setBody(String body) {
         this.body = body;
     }
@@ -57,5 +72,12 @@ public class RequestData {
     }
     public void setMethod(String method) {
         this.method = method;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+    public void setVerificationCodeData(LoginVerificationCodeData verificationCodeData) {
+        this.verificationCodeData = verificationCodeData;
     }
 }

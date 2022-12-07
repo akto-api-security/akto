@@ -17,38 +17,43 @@ import java.util.List;
 
 public class AuthMechanismAction extends UserAction {
 
-    private AuthParam.Location location;
-    private String key;
-    private String value;
-
+    //todo: rename requestData
     private ArrayList<RequestData> requestData;
-
-    private String authTokenPath;
 
     private String type;
 
     private AuthMechanism authMechanism;
 
+    private ArrayList<AuthParamData> authParamData;
+
     public String addAuthMechanism() {
         List<AuthParam> authParams = new ArrayList<>();
-        if (location == null || key == null) {
-            addActionError("Location, Key or Value can't be empty");
-            return ERROR.toUpperCase();
-        }
 
         type = type != null ? type : LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString();
-
-        if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString()) && value == null ) {
-            addActionError("Value can't be empty");
-            return ERROR.toUpperCase();
-        }
 
         AuthMechanismsDao.instance.deleteAll(new BasicDBObject());
 
         if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
-            authParams.add(new HardcodedAuthParam(location, key, value));
+            if (authParamData.get(0).getKey() == null || authParamData.get(0).getValue() == null ||
+                    authParamData.get(0).getWhere() == null) {
+                addActionError("Key, Value, Location can't be empty");
+                return ERROR.toUpperCase();
+            }
+
+            authParams.add(new HardcodedAuthParam(authParamData.get(0).getWhere(), authParamData.get(0).getKey(),
+                    authParamData.get(0).getValue()));
         } else {
-            authParams.add(new LoginRequestAuthParam(location, key, value, authTokenPath));
+
+            for (AuthParamData param: authParamData) {
+                if (param.getKey() == null || param.getValue() == null || param.getValueLocation() == null ||
+                        param.getWhere() == null) {
+                    addActionError("Key, Value, ValueLocation, Location can't be empty");
+                    return ERROR.toUpperCase();
+                }
+
+                authParams.add(new LoginRequestAuthParam(param.getWhere(), param.getKey(), param.getValue(),
+                        param.getValueLocation()));
+            }
         }
         AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type);
 
@@ -106,25 +111,10 @@ public class AuthMechanismAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public AuthParam.Location getLocation() {
-        return this.location;
-    }
-
-    public String getKey() {
-        return this.key;
-    }
-
-    public String getValue() {
-        return this.value;
-    }
-
     public String getType() {
         return this.type;
     }
 
-    public String getAuthTokenPath() {
-        return this.authTokenPath;
-    }
 
     public ArrayList<RequestData> getRequestData() {
         return this.requestData;
@@ -134,17 +124,10 @@ public class AuthMechanismAction extends UserAction {
         return this.authMechanism;
     }
 
-    public void setLocation(AuthParam.Location location) {
-        this.location = location;
+    public ArrayList<AuthParamData> getAuthParamData() {
+        return this.authParamData;
     }
 
-    public void setKey(String key) {
-        this.key = key;
-    }
-
-    public void setValue(String value) {
-        this.value = value;
-    }
 
     public void setWorkflowTestId(int workflowTestId) {
         this.workflowTestId = workflowTestId;
@@ -166,7 +149,8 @@ public class AuthMechanismAction extends UserAction {
         this.requestData = requestData;
     }
 
-    public void setAuthTokenPath(String authTokenPath) {
-        this.authTokenPath = authTokenPath;
+    public void setAuthParamData(ArrayList<AuthParamData> authParamData) {
+        this.authParamData = authParamData;
     }
+
 }
