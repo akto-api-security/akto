@@ -9,9 +9,10 @@ public class EndpointLogicalGroupDao extends AccountsContextDao<EndpointLogicalG
     public String getCollName() {
         return MongoDBEnums.Collection.ENDPOINT_LOGICAL_GROUP.getCollectionName();
     }
-
     @Override
     public Class<EndpointLogicalGroup> getClassT() {
         return EndpointLogicalGroup.class;
     }
+    public static final EndpointLogicalGroupDao instance = new EndpointLogicalGroupDao();
+    private EndpointLogicalGroupDao(){}
 }

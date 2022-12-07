@@ -8,7 +8,8 @@ public class MongoDBEnums {
     public enum Collection {
 
         TESTING_RUN_ISSUES ("testing_run_issues", DB.ACCOUNT),
-        ENDPOINT_LOGICAL_GROUP ("endpoint_logical_group", DB.ACCOUNT);
+        ENDPOINT_LOGICAL_GROUP ("endpoint_logical_group", DB.ACCOUNT),
+        ROLES_LOGICAL_GROUP("roles_logical_group", DB.ACCOUNT);
         private final DB db;
         private final String collectionName;
 
