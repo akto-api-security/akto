@@ -31,6 +31,6 @@ public class CustomTestingEndpoints extends TestingEndpoints {
 
     @Override
     public boolean containsApi(ApiInfo.ApiInfoKey key) {
-        return false;
+        return this.getApisList().contains(key);
     }
 }

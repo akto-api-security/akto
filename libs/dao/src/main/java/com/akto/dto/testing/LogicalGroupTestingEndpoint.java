@@ -3,21 +3,35 @@ package com.akto.dto.testing;
 import com.akto.dto.ApiInfo;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 public class LogicalGroupTestingEndpoint extends TestingEndpoints{
     private String regex;
     private List<ApiInfo.ApiInfoKey> includedApiInfoKey;
     private List<ApiInfo.ApiInfoKey> excludedApiInfoKey;
 
-    public LogicalGroupTestingEndpoint(Type type) {
+    public LogicalGroupTestingEndpoint() {
         super(Type.LOGICAL_GROUP);
     }
 
     @Override
     public boolean containsApi (ApiInfo.ApiInfoKey key) {
-        return true;
+        if (key == null) {
+            return false;
+        }
+        if (excludedApiInfoKey != null && excludedApiInfoKey.contains(key)) {
+            return false;
+        }
+        if (includedApiInfoKey != null && includedApiInfoKey.contains(key)) {
+            return true;
+        }
+        try {
+            return Pattern.matches(regex, key.getUrl());
+        } catch (PatternSyntaxException e) {
+            return false;
+        }
     }
 
     public String getRegex() {
