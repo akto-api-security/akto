@@ -43,6 +43,16 @@ import static com.mongodb.client.model.Updates.set;
 public class SignupAction implements Action, ServletResponseAware, ServletRequestAware {
 
     public static final String SIGN_IN = "signin";
+    private String redirect;
+
+    public String getRedirect() {
+        return redirect;
+    }
+
+    public void setRedirect(String redirect) {
+        this.redirect = redirect;
+    }
+
 
     public String getCode() {
         return code;
@@ -351,6 +361,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 return ERROR.toUpperCase();
             }
             
+        }
+
+        if(SingleTypeInfoDao.instance.getEstimatedCount() == 0){
+            this.redirect = "dashboard/quick-start";
         }
         return "SUCCESS";
     }
