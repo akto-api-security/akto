@@ -100,7 +100,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             logger.info("New user, showing quick start page");
             loginResult.put("redirect", "dashboard/quick-start");
         } else {
-            logger.debug("Existing user, not redirecting to quick start page");
+            logger.info("Existing user, not redirecting to quick start page");
         }
     }
 
