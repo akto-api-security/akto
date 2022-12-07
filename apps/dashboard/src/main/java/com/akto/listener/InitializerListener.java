@@ -300,10 +300,10 @@ public class InitializerListener implements ServletContextListener {
 
         Map<String,Object> valueMap = new HashMap<>();
 
-        valueMap.put("AKTO.changes_info.newSensitiveEndpoints", gson.toJson(ci.newSensitiveParams));
+        valueMap.put("AKTO.changes_info.newSensitiveEndpoints", ci.newSensitiveParams);
         valueMap.put("AKTO.changes_info.newSensitiveEndpointsCount",ci.newSensitiveParams.size());
 
-        valueMap.put("AKTO.changes_info.newEndpoints",gson.toJson(ci.newEndpointsLast7Days));
+        valueMap.put("AKTO.changes_info.newEndpoints",ci.newEndpointsLast7DaysObject);
         valueMap.put("AKTO.changes_info.newEndpointsCount",ci.newEndpointsLast7Days.size());
 
         valueMap.put("AKTO.changes_info.newSensitiveParametersCount",ci.recentSentiiveParams);
@@ -313,7 +313,7 @@ public class InitializerListener implements ServletContextListener {
         String payload = null;
 
         try{
-            payload = apiWorkflowExecutor.replaceVariables(webhook.getBody(),valueMap);
+            payload = apiWorkflowExecutor.replaceVariables(webhook.getBody(),valueMap, false);
         } catch(Exception e){
             errors.add("Failed to replace variables");
         }
@@ -374,19 +374,41 @@ public class InitializerListener implements ServletContextListener {
     static class ChangesInfo {
         public Map<String, String> newSensitiveParams = new HashMap<>();
         public List<String> newEndpointsLast7Days = new ArrayList<>();
+        public List<BasicDBObject> newEndpointsLast7DaysObject = new ArrayList<>();
         public List<String> newEndpointsLast31Days = new ArrayList<>();
+        public List<BasicDBObject> newEndpointsLast31DaysObject = new ArrayList<>();
         public int totalSensitiveParams = 0;
         public int recentSentiiveParams = 0;
         public int newParamsInExistingEndpoints = 0;
     }
 
+    public static class UrlResult {
+        String urlString;
+        BasicDBObject urlObject;
 
-    public static String extractUrlFromBasicDbObject(BasicDBObject singleTypeInfo, Map<Integer, ApiCollection> apiCollectionMap)  {
+        public UrlResult(String urlString, BasicDBObject urlObject) {
+            this.urlString = urlString;
+            this.urlObject = urlObject;
+        }
+    }
+
+
+    public static UrlResult extractUrlFromBasicDbObject(BasicDBObject singleTypeInfo, Map<Integer, ApiCollection> apiCollectionMap)  {
         String method = singleTypeInfo.getString("method");
         String path = singleTypeInfo.getString("url");
 
         Object apiCollectionIdObj = singleTypeInfo.get("apiCollectionId");
-        if (apiCollectionIdObj == null) return method + " " + path;
+
+        String urlString;
+
+        BasicDBObject urlObject = new BasicDBObject();
+        if (apiCollectionIdObj == null) {
+            urlString = method + " " + path;
+            urlObject.put("host", null);
+            urlObject.put("path", path);
+            urlObject.put("method", method);
+            return new UrlResult(urlString, urlObject);
+        }
 
         int apiCollectionId = (int) apiCollectionIdObj;
         ApiCollection apiCollection = apiCollectionMap.get(apiCollectionId);
@@ -399,7 +421,14 @@ public class InitializerListener implements ServletContextListener {
             url = path;
         }
 
-        return  method + " " + url;
+        urlString = method + " " + url;
+
+        urlObject = new BasicDBObject();
+        urlObject.put("host", hostName);
+        urlObject.put("path", path);
+        urlObject.put("method", method);
+
+        return new UrlResult(urlString, urlObject);
     }
 
     protected static ChangesInfo getChangesInfo(int newEndpointsFrequency, int newSensitiveParamsFrequency) {
@@ -417,14 +446,16 @@ public class InitializerListener implements ServletContextListener {
             for (BasicDBObject singleTypeInfo: newEndpointsSmallerDuration) {
                 newParamInNewEndpoint += (int) singleTypeInfo.getOrDefault("countTs", 0);
                 singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
-                String url = extractUrlFromBasicDbObject(singleTypeInfo, apiCollectionMap);
-                ret.newEndpointsLast7Days.add(url);
+                UrlResult urlResult = extractUrlFromBasicDbObject(singleTypeInfo, apiCollectionMap);
+                ret.newEndpointsLast7Days.add(urlResult.urlString);
+                ret.newEndpointsLast7DaysObject.add(urlResult.urlObject);
             }
     
             for (BasicDBObject singleTypeInfo: newEndpointsBiggerDuration) {
                 singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
-                String url = extractUrlFromBasicDbObject(singleTypeInfo, apiCollectionMap);
-                ret.newEndpointsLast31Days.add(url);
+                UrlResult urlResult = extractUrlFromBasicDbObject(singleTypeInfo, apiCollectionMap);
+                ret.newEndpointsLast31Days.add(urlResult.urlString);
+                ret.newEndpointsLast31DaysObject.add(urlResult.urlObject);
             }
     
             List<SingleTypeInfo> sensitiveParamsList = new InventoryAction().fetchSensitiveParams();

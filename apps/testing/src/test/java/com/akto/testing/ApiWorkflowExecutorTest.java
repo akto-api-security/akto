@@ -154,13 +154,13 @@ public class ApiWorkflowExecutorTest {
 
         String body = "{\"newSensitiveEndpoints\" : ${AKTO.changes_info.newSensitiveEndpoints}, \"name\" : \"${x1.response.body.name}\"}";
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
-        String payload = apiWorkflowExecutor.replaceVariables(body, valuesMap);
+        String payload = apiWorkflowExecutor.replaceVariables(body, valuesMap, false);
 
         assertEquals("{\"newSensitiveEndpoints\" : 123, \"name\" : \"Avneesh\"}", payload );
 
 
         body = "There are {${AKTO.changes_info.newParameters}} new $parameters and ${x}";
-        payload = apiWorkflowExecutor.replaceVariables(body, valuesMap);
+        payload = apiWorkflowExecutor.replaceVariables(body, valuesMap, false);
         assertEquals("There are {456} new $parameters and ${x}", payload );
 
     }
