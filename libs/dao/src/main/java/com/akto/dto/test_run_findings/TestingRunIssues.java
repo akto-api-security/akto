@@ -1,4 +1,4 @@
-package com.akto.dto.test_issues;
+package com.akto.dto.test_run_findings;
 
 import com.akto.util.enums.GlobalEnums;
 import org.bson.types.ObjectId;

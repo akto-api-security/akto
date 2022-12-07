@@ -2,10 +2,10 @@ package com.akto.action.testing_issues;
 
 import com.akto.MongoBasedTest;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing_issues.TestingRunIssuesDao;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.test_issues.TestingIssuesId;
-import com.akto.dto.test_issues.TestingRunIssues;
+import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.type.URLMethods;
 import com.akto.util.enums.GlobalEnums;
 import org.bson.types.ObjectId;
