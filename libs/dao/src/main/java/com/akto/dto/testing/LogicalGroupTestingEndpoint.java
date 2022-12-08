@@ -16,6 +16,13 @@ public class LogicalGroupTestingEndpoint extends TestingEndpoints{
         super(Type.LOGICAL_GROUP);
     }
 
+    public LogicalGroupTestingEndpoint(String regex, List<ApiInfo.ApiInfoKey> includedApiInfoKey, List<ApiInfo.ApiInfoKey> excludedApiInfoKey) {
+        super(Type.LOGICAL_GROUP);
+        this.regex = regex;
+        this.includedApiInfoKey = includedApiInfoKey;
+        this.excludedApiInfoKey = excludedApiInfoKey;
+    }
+
     @Override
     public boolean containsApi (ApiInfo.ApiInfoKey key) {
         if (key == null) {
@@ -60,8 +67,7 @@ public class LogicalGroupTestingEndpoint extends TestingEndpoints{
 
     @Override
     public List<ApiInfo.ApiInfoKey> returnApis() {
-        ArrayList<ApiInfo.ApiInfoKey> list = new ArrayList<>();
 
-        return list;
+        return new ArrayList<>();
     }
 }
