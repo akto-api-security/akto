@@ -95,7 +95,6 @@ export default {
         TagSettings,
         TagConfigDetails,
         DataTypeDetails,
-        DataTypes,
         AuthTypeDetails,
         ACard
     },

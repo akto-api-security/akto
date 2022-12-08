@@ -6,7 +6,7 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.data_types.Conditions.Operator;
+import com.mongodb.BasicDBObject;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.Test;
@@ -21,6 +21,12 @@ public class AuthPolicyTest extends MongoBasedTest {
         return new HttpResponseParams("",200,"",new HashMap<>(),"",httpRequestParams ,0,"0",false, HttpResponseParams.Source.OTHER, "", "");
     }
 
+    public static String createSimpleResponsePayload() {
+        BasicDBObject ret = new BasicDBObject();
+        ret.append("a1", 1).append("a2", "2").append("a3", 3).append("AT", "somerandomlygeneratedtoken");
+        return ret.toJson();
+    }
+    
     List<CustomAuthType> customAuthTypes = new ArrayList<>();
 
     @Test
@@ -223,13 +229,32 @@ public class AuthPolicyTest extends MongoBasedTest {
     }
 
     @Test
-    public void testCustomAuthType() {
+    public void testCustomAuthTypeHeader() {
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("AT", Collections.singletonList("arandomlygeneratedsecurecode"));
         HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
         List<String> keys = new ArrayList<>();
         keys.add("AT");
-        CustomAuthType customAuthType = new CustomAuthType("AT", keys, Operator.OR, true,0);
+        CustomAuthType customAuthType = new CustomAuthType("AT", keys,keys, true,0);
+        CustomAuthTypeDao.instance.insertOne(customAuthType);
+        List<CustomAuthType> authTypes = new ArrayList<>(Collections.singletonList(customAuthType));
+        ApiInfo apiInfo = new ApiInfo(httpResponseParams);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,authTypes);
+        Assertions.assertFalse(result);
+        Set<ApiInfo.AuthType> s = new HashSet<>();
+        s.add(ApiInfo.AuthType.CUSTOM);
+        Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 1);
+        Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
+    }
+
+    @Test
+    public void testCustomAuthTypePayload() {
+        Map<String, List<String>> headers = new HashMap<>();
+        HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
+        httpResponseParams.getRequestParams().setPayload(createSimpleResponsePayload());
+        List<String> keys = new ArrayList<>();
+        keys.add("AT");
+        CustomAuthType customAuthType = new CustomAuthType("AT", keys,keys, true,0);
         CustomAuthTypeDao.instance.insertOne(customAuthType);
         List<CustomAuthType> authTypes = new ArrayList<>(Collections.singletonList(customAuthType));
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);

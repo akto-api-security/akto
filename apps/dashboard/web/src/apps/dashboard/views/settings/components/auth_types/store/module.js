@@ -27,19 +27,30 @@ const auth_types = {
         SET_NEW_AUTH_TYPE(state) {
             state.auth_type = {
                 "name": "",
-                "keyConditions": {"operator": "AND", "predicates": []},
+                "operator":"OR",
+                "headerKeyConditions": {"operator": "AND", "predicates": []},
+                "payloadKeyConditions": {"operator": "AND", "predicates": []},
                 "active": true,
                 "createNew": true
             }
 
         },
         UPDATE_AUTH_TYPES(state,result) {
-            state.auth_types=func.prepareAuthTypes(result)
-            state.auth_types.forEach((auth_type) => {
-                if(auth_type["name"]==state.auth_type["name"]){
-                    state.auth_type=auth_type
+            let flag = false
+            state.auth_types.forEach((auth_type,index) => {
+                if (auth_type["name"] === result["name"]) {
+                    flag = true
+                    state.auth_types[index] = result
+                    state.auth_type = result
                 }
-            });
+            })
+            if (!flag) {
+                state.auth_types = [result].concat(state.auth_types)
+                state.auth_type = result
+            }
+
+            state.auth_types = func.prepareAuthTypes(state.auth_types)
+            state.auth_types = [].concat(state.auth_types)       
         }
     },
     actions: {
@@ -48,7 +59,7 @@ const auth_types = {
         },
         toggleActivateAuthType({commit, dispatch}, item) {
             return api.updateCustomAuthTypeStatus(item.name, !item.active).then((resp) => {
-                commit("UPDATE_AUTH_TYPES", resp["customAuthTypes"]);
+                commit("UPDATE_AUTH_TYPES", resp["customAuthType"]);
             })
         },
         fetchCustomAuthTypes({commit, dispatch}) {
@@ -58,17 +69,17 @@ const auth_types = {
         },
         async createAuthType({commit, dispatch, state}, { auth_type, save}) {
             let name = auth_type["name"]
-            let operator = auth_type["keyConditions"]["operator"]
-            let keys = func.generateKeysForApi(auth_type["keyConditions"]["predicates"])
+            let headerKeys = func.generateKeysForApi(auth_type["headerKeyConditions"]["predicates"])
+            let payloadKeys = func.generateKeysForApi(auth_type["payloadKeyConditions"]["predicates"])
             let createNew = auth_type["createNew"] ? auth_type["createNew"] : false
             let active = auth_type["active"] ? auth_type["active"] : true 
             if (createNew) {
-                return api.addCustomAuthType(name, operator, keys, active).then((resp) => {
-                    commit("UPDATE_AUTH_TYPES", resp["customAuthTypes"]);
+                return api.addCustomAuthType(name, headerKeys, payloadKeys, active).then((resp) => {
+                    commit("UPDATE_AUTH_TYPES", resp["customAuthType"]);
                 })
             } else {
-                return api.updateCustomAuthType(name,operator,keys,active).then((resp)=>{
-                    commit("UPDATE_AUTH_TYPES", resp["customAuthTypes"]);
+                return api.updateCustomAuthType(name, headerKeys, payloadKeys, active).then((resp)=>{
+                    commit("UPDATE_AUTH_TYPES", resp["customAuthType"]);
                 })
             }
         },

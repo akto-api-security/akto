@@ -9,7 +9,6 @@ import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.CustomAuthType;
-import com.akto.dto.data_types.Conditions;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -18,11 +17,12 @@ import com.akto.dto.User;
 
 public class CustomAuthTypeAction extends UserAction{
     private String name;
-    private List<String> keys;
-    private Conditions.Operator operator;
+    private List<String> headerKeys;
+    private List<String> payloadKeys;
     private boolean active;
     private List<CustomAuthType> customAuthTypes;
     private Map<Integer,String> usersMap;
+    private CustomAuthType customAuthType;
     public String fetchCustomAuthTypes(){
         customAuthTypes = CustomAuthTypeDao.instance.findAll(new BasicDBObject());
         Set<Integer> userIds = new HashSet<>();
@@ -35,13 +35,13 @@ public class CustomAuthTypeAction extends UserAction{
 
     public String addCustomAuthType(){
         User user = getSUser();
-        CustomAuthType customAuthType = CustomAuthTypeDao.instance.findOne("name",name);
+        customAuthType = CustomAuthTypeDao.instance.findOne("name",name);
         if(customAuthType!=null){
             addActionError("Auth type name needs to be unique");
             return ERROR.toUpperCase();
         } else {
             active = true;
-            customAuthType = new CustomAuthType(name, keys, operator, active,user.getId());
+            customAuthType = new CustomAuthType(name, headerKeys, payloadKeys, active,user.getId());
             CustomAuthTypeDao.instance.insertOne(customAuthType);
         }
         fetchCustomAuthTypes();
@@ -50,7 +50,7 @@ public class CustomAuthTypeAction extends UserAction{
 
     public String updateCustomAuthType(){
         User user = getSUser();
-        CustomAuthType customAuthType = CustomAuthTypeDao.instance.findOne("name",name);
+        customAuthType = CustomAuthTypeDao.instance.findOne("name",name);
         if(customAuthType==null){
             addActionError("Custom Auth Type does not exist");
             return ERROR.toUpperCase();
@@ -61,18 +61,19 @@ public class CustomAuthTypeAction extends UserAction{
             CustomAuthTypeDao.instance.updateOne(Filters.eq("name", name),
                     Updates.combine(
                         Updates.set("active", active), 
-                        Updates.set("keys", keys),
-                        Updates.set("operator", operator), 
+                        Updates.set("headerKeys", headerKeys),
+                        Updates.set("payloadKeys", payloadKeys),
                         Updates.set("name", name),
                         Updates.set("timestamp", Context.now())));
         }
         fetchCustomAuthTypes();
+        customAuthType = CustomAuthTypeDao.instance.findOne("name",name);
         return Action.SUCCESS.toUpperCase();
     }
 
     public String updateCustomAuthTypeStatus(){
         User user = getSUser();
-        CustomAuthType customAuthType = CustomAuthTypeDao.instance.findOne("name",name);
+        customAuthType = CustomAuthTypeDao.instance.findOne("name",name);
         if(customAuthType==null){
             addActionError("Custom Auth Type does not exist");
             return ERROR.toUpperCase();
@@ -86,6 +87,7 @@ public class CustomAuthTypeAction extends UserAction{
                         Updates.set("timestamp",Context.now())));
         }
         fetchCustomAuthTypes();
+        customAuthType = CustomAuthTypeDao.instance.findOne("name",name);
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -93,12 +95,12 @@ public class CustomAuthTypeAction extends UserAction{
         this.name = name;
     }
 
-    public void setKeys(List<String> keys) {
-        this.keys = keys;
+    public void setHeaderKeys(List<String> headerKeys) {
+        this.headerKeys = headerKeys;
     }
 
-    public void setOperator(Conditions.Operator operator) {
-        this.operator = operator;
+    public void setPayloadKeys(List<String> payloadKeys) {
+        this.payloadKeys = payloadKeys;
     }
 
     public void setActive(boolean active) {
@@ -111,5 +113,8 @@ public class CustomAuthTypeAction extends UserAction{
 
     public Map<Integer, String> getUsersMap() {
         return usersMap;
+    }
+    public CustomAuthType getCustomAuthType() {
+        return customAuthType;
     }
 }

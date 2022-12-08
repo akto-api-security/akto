@@ -5,26 +5,24 @@ import java.util.List;
 import org.bson.types.ObjectId;
 
 import com.akto.dao.context.Context;
-import com.akto.dto.data_types.Conditions;
-import com.akto.dto.data_types.Conditions.Operator;
 
 public class CustomAuthType {
     private ObjectId id;
     private String name;
-    private List<String> keys;
-    private Conditions.Operator operator;
+    private List<String> headerKeys;
+    private List<String> payloadKeys;
     private boolean active;
     private int creatorId;
-    private int timestamp;    // timestamp
-    // createrId
+    private int timestamp;
+    
     public CustomAuthType() {
     }
-    public CustomAuthType(String name, List<String> keys, Operator operator, boolean active, int createrId) {
+    public CustomAuthType(String name, List<String> headerKeys, List<String> payloadKeys, boolean active, int creatorId) {
         this.name = name;
-        this.keys = keys;
-        this.operator = operator;
+        this.headerKeys = headerKeys;
+        this.payloadKeys = payloadKeys;
         this.active = active;
-        this.creatorId = createrId;
+        this.creatorId = creatorId;
         this.timestamp = Context.now();
     }
     public String getName() {
@@ -33,17 +31,17 @@ public class CustomAuthType {
     public void setName(String name) {
         this.name = name;
     }
-    public List<String> getKeys() {
-        return keys;
+    public List<String> getHeaderKeys() {
+        return headerKeys;
     }
-    public void setKeys(List<String> keys) {
-        this.keys = keys;
+    public void setHeaderKeys(List<String> headerKeys) {
+        this.headerKeys = headerKeys;
     }
-    public Conditions.Operator getOperator() {
-        return operator;
+    public List<String> getPayloadKeys() {
+        return payloadKeys;
     }
-    public void setOperator(Conditions.Operator operator) {
-        this.operator = operator;
+    public void setPayloadKeys(List<String> payloadKeys) {
+        this.payloadKeys = payloadKeys;
     }
     public boolean isActive() {
         return active;

@@ -487,16 +487,26 @@ export default {
     prepareAuthTypes(auth_types){
         if(auth_types) {
             auth_types.forEach((x)=>{
+                x["operator"]="OR"
                 x["prefix"] = x["id"] ? "[custom]" : ""
-                let predicates =[]
-                x["keys"].forEach((key)=>{
+                let headerPredicates =[]
+                x["headerKeys"].forEach((key)=>{
                     let obj = {"type":"EQUALS_TO","value":key}
-                    predicates.push(obj)
+                    headerPredicates.push(obj)
+                })
+                let payloadPredicates =[]
+                x["payloadKeys"].forEach((key)=>{
+                    let obj = {"type":"EQUALS_TO","value":key}
+                    payloadPredicates.push(obj)
                 })
                 if(x["id"]){
-                    x["keyConditions"] = {
-                        "operator":x["operator"],
-                        "predicates": predicates
+                    x["headerKeyConditions"] = {
+                        "operator":"AND",
+                        "predicates": headerPredicates
+                    }
+                    x["payloadKeyConditions"] = {
+                        "operator":"AND",
+                        "predicates": payloadPredicates
                     }
                 }
             })

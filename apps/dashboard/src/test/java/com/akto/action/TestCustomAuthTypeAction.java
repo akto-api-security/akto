@@ -14,7 +14,6 @@ import com.akto.MongoBasedTest;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.User;
-import com.akto.dto.data_types.Conditions;
 
 public class TestCustomAuthTypeAction extends MongoBasedTest {
     
@@ -22,8 +21,8 @@ public class TestCustomAuthTypeAction extends MongoBasedTest {
     public void testFetchCustomAuthTypes(){
         CustomAuthTypeDao.instance.getMCollection().drop();
         List<CustomAuthType> customAuthTypes = new ArrayList<>();
-        customAuthTypes.add(new CustomAuthType("auth1", new ArrayList<>(Collections.singletonList("authtoken")), Conditions.Operator.AND, true, ACCOUNT_ID));
-        customAuthTypes.add(new CustomAuthType("auth2", new ArrayList<>(Collections.singletonList("newauthtoken")), Conditions.Operator.AND, true, ACCOUNT_ID));
+        customAuthTypes.add(new CustomAuthType("auth1", new ArrayList<>(Collections.singletonList("authtoken")),new ArrayList<>(Collections.singletonList("authtoken")), true, ACCOUNT_ID));
+        customAuthTypes.add(new CustomAuthType("auth2", new ArrayList<>(Collections.singletonList("newauthtoken")),new ArrayList<>(Collections.singletonList("authtoken")), true, ACCOUNT_ID));
         CustomAuthTypeDao.instance.insertMany(customAuthTypes);
 
         CustomAuthTypeAction customAuthTypeAction = new CustomAuthTypeAction();
@@ -45,8 +44,8 @@ public class TestCustomAuthTypeAction extends MongoBasedTest {
         customAuthTypeAction.setSession(session);
 
         customAuthTypeAction.setName("auth1");
-        customAuthTypeAction.setKeys(new ArrayList<>(Collections.singletonList("somekey")));
-        customAuthTypeAction.setOperator(Conditions.Operator.AND);
+        customAuthTypeAction.setHeaderKeys(new ArrayList<>(Collections.singletonList("somekey")));
+        customAuthTypeAction.setPayloadKeys(new ArrayList<>(Collections.singletonList("somekey")));
         customAuthTypeAction.setActive(true);
 
         String result = customAuthTypeAction.addCustomAuthType();
@@ -57,7 +56,7 @@ public class TestCustomAuthTypeAction extends MongoBasedTest {
     @Test
     public void testUpdateCustomAuthType(){
         CustomAuthTypeDao.instance.getMCollection().drop();
-        CustomAuthType customAuthType = new CustomAuthType("auth1", new ArrayList<>(Collections.singletonList("authtoken")), Conditions.Operator.AND, true, ACCOUNT_ID);
+        CustomAuthType customAuthType = new CustomAuthType("auth1", new ArrayList<>(Collections.singletonList("authtoken")),new ArrayList<>(Collections.singletonList("authtoken")), true, ACCOUNT_ID);
         CustomAuthTypeDao.instance.insertOne(customAuthType);
         CustomAuthTypeAction customAuthTypeAction = new CustomAuthTypeAction();
 
@@ -69,8 +68,8 @@ public class TestCustomAuthTypeAction extends MongoBasedTest {
         customAuthTypeAction.setSession(session);
 
         customAuthTypeAction.setName("auth1");
-        customAuthTypeAction.setKeys(new ArrayList<>(Collections.singletonList("somekey")));
-        customAuthTypeAction.setOperator(Conditions.Operator.AND);
+        customAuthTypeAction.setHeaderKeys(new ArrayList<>(Collections.singletonList("somekey")));
+        customAuthTypeAction.setPayloadKeys(new ArrayList<>(Collections.singletonList("somekey")));
         customAuthTypeAction.setActive(false);
 
         String result = customAuthTypeAction.updateCustomAuthType();
@@ -82,7 +81,7 @@ public class TestCustomAuthTypeAction extends MongoBasedTest {
     @Test
     public void testUpdateCustomAuthTypeStatus(){
         CustomAuthTypeDao.instance.getMCollection().drop();
-        CustomAuthType customAuthType = new CustomAuthType("auth1", new ArrayList<>(Collections.singletonList("authtoken")), Conditions.Operator.AND, true, ACCOUNT_ID);
+        CustomAuthType customAuthType = new CustomAuthType("auth1", new ArrayList<>(Collections.singletonList("authtoken")),new ArrayList<>(Collections.singletonList("authtoken")), true, ACCOUNT_ID);
         CustomAuthTypeDao.instance.insertOne(customAuthType);
         CustomAuthTypeAction customAuthTypeAction = new CustomAuthTypeAction();
 

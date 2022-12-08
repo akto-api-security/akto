@@ -10,28 +10,28 @@ export default {
         })
     },
 
-    addCustomAuthType(name, operator, keys, active) {
+    addCustomAuthType(name, headerKeys, payloadKeys, active) {
         return request({
             url: '/api/addCustomAuthType',
             method: 'post',
             data: {
                 name,
-                operator,
-                keys,
+                headerKeys,
+                payloadKeys,
                 active
             }
 
         })
     },
 
-    updateCustomAuthType(name, operator, keys, active) {
+    updateCustomAuthType(name, headerKeys, payloadKeys, active) {
         return request({
             url: '/api/updateCustomAuthType',
             method: 'post',
             data: {
                 name,
-                operator,
-                keys,
+                headerKeys,
+                payloadKeys,
                 active
              }
 

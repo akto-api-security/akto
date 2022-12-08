@@ -48,10 +48,23 @@
             <div v-if="auth_type_copy.id || auth_type_copy.createNew">
             <v-row style="padding: 36px 12px 12px 12px"  >
                     <conditions-table
-                    :conditions="auth_type_copy.keyConditions"
+                    :conditions="auth_type_copy.headerKeyConditions"
                     :onlyEqual="true"
                     initial_string="key"
-                    table_header="Auth keys"
+                    table_header="Header keys"
+                    />
+                </v-row>
+                <v-row
+                    style="padding: 12px 12px 12px 12px"
+                >
+                    <operator-component :operator="auth_type_copy.operator" :onlyEqual="true"/>
+                </v-row>
+            <v-row style="padding: 12px"  >
+                    <conditions-table
+                    :conditions="auth_type_copy.payloadKeyConditions"
+                    :onlyEqual="true"
+                    initial_string="key"
+                    table_header="Payload keys"
                     />
                 </v-row>
             </div>
@@ -77,6 +90,7 @@
 <script>
 import obj from "@/util/obj"
 import ConditionsTable from '../data_types/components/ConditionsTable.vue'
+import OperatorComponent from "../data_types/components/OperatorComponent.vue"
 import {mapState} from "vuex";
 import func from "@/util/func";
 export default {
@@ -85,6 +99,7 @@ export default {
     },
     components: {
         ConditionsTable,
+        OperatorComponent,
     },
     data() {
         return {
