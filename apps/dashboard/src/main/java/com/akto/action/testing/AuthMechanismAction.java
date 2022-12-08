@@ -5,14 +5,20 @@ import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dto.testing.*;
+import com.akto.log.LoggerMaker;
 import com.akto.testing.TestExecutor;
 import com.akto.util.enums.LoginFlowEnums;
+import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 public class AuthMechanismAction extends UserAction {
@@ -25,6 +31,12 @@ public class AuthMechanismAction extends UserAction {
     private AuthMechanism authMechanism;
 
     private ArrayList<AuthParamData> authParamData;
+
+    private String verificationCodeBody;
+
+    private String uuid;
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(AuthMechanismAction.class);
 
     public String addAuthMechanism() {
         // todo: add more validations
@@ -62,7 +74,7 @@ public class AuthMechanismAction extends UserAction {
     public String triggerLoginFlowSteps() {
         List<AuthParam> authParams = new ArrayList<>();
 
-        if (!type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
+        if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
             addActionError("Invalid Type Value");
             return ERROR.toUpperCase();
         }
@@ -91,6 +103,61 @@ public class AuthMechanismAction extends UserAction {
 
         authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
         return SUCCESS.toUpperCase();
+    }
+
+    public String saveOtpData() {
+
+        // fetch from url param
+        uuid="7634d57f-5697-4d13-9262-a9e243f7659c";
+        Bson filters = Filters.eq("uuid", uuid);
+        try {
+            authMechanism = AuthMechanismsDao.instance.findOne(filters);
+        } catch(Exception e) {
+            loggerMaker.errorAndAddToDb("error extracting verification code for auth Id " + uuid);
+            return ERROR.toUpperCase();
+        }
+
+        for (RequestData data : authMechanism.getRequestData()) {
+            if (!(data.getType().equals("EMAIL_CODE_VERIFICATION") || data.getType().equals("MOBILE_CODE_VERIFICATION"))) {
+                continue;
+            }
+            LoginVerificationCodeData verificationCodeData = data.getVerificationCodeData();
+
+            String key = verificationCodeData.getKey();
+            String body = data.getBody();
+            String verificationCode;
+            try {
+                verificationCode = extractVerificationCode(verificationCodeBody, verificationCodeData.getRegexString());
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error parsing regex string " + verificationCodeData.getRegexString() +
+                        "for auth Id " + uuid);
+                return ERROR.toUpperCase();
+            }
+
+            if (verificationCode == null) {
+                loggerMaker.errorAndAddToDb("error extracting verification code for auth Id " + uuid);
+                return ERROR.toUpperCase();
+            }
+
+            Gson gson = new Gson();
+            Map<String, Object> json = gson.fromJson(body, Map.class);
+            json.put(key, verificationCode);
+
+            // update mongo object
+
+        }
+
+        return SUCCESS.toUpperCase();
+    }
+
+    private String extractVerificationCode(String text, String regex) {
+        Pattern pattern = Pattern.compile("\\*(\\d+)*\\");
+        Matcher matcher = pattern.matcher(text);
+        String verificationCode = null;
+        if (matcher.find()) {
+            verificationCode = matcher.group(1);
+        }
+        return verificationCode;
     }
 
     private int workflowTestId;
@@ -129,6 +196,14 @@ public class AuthMechanismAction extends UserAction {
         return this.authParamData;
     }
 
+    public String getVerificationCodeBody() {
+        return this.verificationCodeBody;
+    }
+
+    public String getUuid() {
+        return this.uuid;
+    }
+
 
     public void setWorkflowTestId(int workflowTestId) {
         this.workflowTestId = workflowTestId;
@@ -154,4 +229,11 @@ public class AuthMechanismAction extends UserAction {
         this.authParamData = authParamData;
     }
 
+    public void setVerificationCodeBody(String verificationCodeBody) {
+        this.verificationCodeBody = verificationCodeBody;
+    }
+
+    public void setUuid(String uuid) {
+        this.uuid = uuid;
+    }
 }

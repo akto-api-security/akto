@@ -44,9 +44,9 @@ public class LoginWorkflowGraphEdge {
     @Override
     public String toString() {
         return "{" +
-                " source='" + getSource() + "'" +
-                ", target='" + getTarget() + "'" +
-                ", id='" + getId() + "'" +
+                "\"source\":\"" + getSource() + "\"" +
+                ",\"target\":\"" + getTarget() + "\"" +
+                ",\"id\":\"" + getId() + "\"" +
                 "}";
     }
 }

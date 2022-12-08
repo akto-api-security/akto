@@ -25,7 +25,9 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
+import org.bson.json.JsonObject;
 import org.bson.types.ObjectId;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -210,7 +212,14 @@ public class TestExecutor {
             edgeObj = new LoginWorkflowGraphEdge(source, target, target);
             edges.add(edgeObj.toString());
 
-            WorkflowUpdatedSampleData sampleData = new WorkflowUpdatedSampleData("", data.getQueryParams(),
+            JSONObject json = new JSONObject() ;
+            json.put("method", data.getMethod());
+            json.put("requestPayload", data.getBody());
+            json.put("path", data.getUrl());
+            json.put("requestHeaders", data.getHeaders());
+            json.put("type", "");
+
+            WorkflowUpdatedSampleData sampleData = new WorkflowUpdatedSampleData(json.toString(), data.getQueryParams(),
                     data.getHeaders(), data.getBody(), data.getUrl());
 
             WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(0, data.getUrl(),

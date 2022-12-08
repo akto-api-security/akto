@@ -4,27 +4,27 @@ public class LoginVerificationCodeData {
 
     private String key;
 
-    private String regex;
+    private String regexString;
 
     public LoginVerificationCodeData() { }
-    public LoginVerificationCodeData(String key, String regex) {
+    public LoginVerificationCodeData(String key, String regexString) {
         this.key = key;
-        this.regex = regex;
+        this.regexString = regexString;
     }
 
     public String getKey() {
         return this.key;
     }
 
-    public String getRegex() {
-        return this.regex;
+    public String getRegexString() {
+        return this.regexString;
     }
 
     public void setKey(String key) {
         this.key = key;
     }
 
-    public void setRegex(String value) {
-        this.regex = regex;
+    public void setRegexString(String regexString) {
+        this.regexString = regexString;
     }
 }

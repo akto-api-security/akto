@@ -89,13 +89,13 @@ public class ApiWorkflowExecutor {
                 nodeResult = new WorkflowTestResult.NodeResult("{}", false, testErrors);
             }
 
-            if (nodeResult.getErrors().size() > 0) break;
+            if (nodeResult.getErrors().size() > 0)  throw new Exception("Error Processing Node In Login Flow " + node.getId());
         }
 
         for (AuthParam param : authMechanism.getAuthParams()) {
             try {
                 String value = executeCode(param.getValue(), valuesMap);
-                if (value == null) {
+                if (!param.getValue().equals(value) && value == null) {
                     throw new Exception("auth param not found at specified path " + param.getValue());
                 }
                 param.setValue(value);
