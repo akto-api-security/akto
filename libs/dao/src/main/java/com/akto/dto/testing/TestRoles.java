@@ -20,7 +20,6 @@ public class TestRoles {
         }
         return this.endpointLogicalGroup;
     }
-
     public ObjectId getId() {
         return id;
     }
@@ -51,5 +50,13 @@ public class TestRoles {
 
     public void setAuthMechanism(AuthMechanism authMechanism) {
         this.authMechanism = authMechanism;
+    }
+
+    public EndpointLogicalGroup getEndpointLogicalGroup() {
+        return endpointLogicalGroup;
+    }
+
+    public void setEndpointLogicalGroup(EndpointLogicalGroup endpointLogicalGroup) {
+        this.endpointLogicalGroup = endpointLogicalGroup;
     }
 }

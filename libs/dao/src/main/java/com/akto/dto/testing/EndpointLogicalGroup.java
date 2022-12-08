@@ -1,17 +1,23 @@
 package com.akto.dto.testing;
 
-import com.akto.dto.ApiInfo;
 import org.bson.types.ObjectId;
 
-import java.util.List;
-
 public class EndpointLogicalGroup {
+    public static final String GROUP_NAME_SUFFIX = "_endpoint-logical-group";
     private ObjectId id;
     private int createdTs;
     private String createdBy;
     private String groupName;
     private TestingEndpoints testingEndpoints;
 
+    public EndpointLogicalGroup() {}
+    public EndpointLogicalGroup(ObjectId id, int createdTs, String createdBy, String groupName, TestingEndpoints testingEndpoints) {
+        this.id = id;
+        this.createdTs = createdTs;
+        this.createdBy = createdBy;
+        this.groupName = groupName;
+        this.testingEndpoints = testingEndpoints;
+    }
     public int getCreatedTs() {
         return createdTs;
     }

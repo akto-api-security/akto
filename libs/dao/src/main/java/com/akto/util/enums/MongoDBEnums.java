@@ -9,7 +9,7 @@ public class MongoDBEnums {
 
         TESTING_RUN_ISSUES ("testing_run_issues", DB.ACCOUNT),
         ENDPOINT_LOGICAL_GROUP ("endpoint_logical_group", DB.ACCOUNT),
-        ROLES_LOGICAL_GROUP("roles_logical_group", DB.ACCOUNT);
+        TEST_ROLES("test_roles", DB.ACCOUNT);
         private final DB db;
         private final String collectionName;
 
