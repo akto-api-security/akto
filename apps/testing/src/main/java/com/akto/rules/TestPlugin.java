@@ -193,6 +193,15 @@ public abstract class TestPlugin {
             }
             return res;
         }
+
+        public Set<String> findPrivateParams() {
+            Set<String> privateParams = new HashSet<>();
+            for (SingleTypeInfo privateSTI: findPrivateOnes()) {
+                privateParams.add(privateSTI.getParam());
+            }
+
+            return privateParams;
+        }
     }
 
     public static SingleTypeInfo findSti(String param, boolean isUrlParam,
@@ -390,6 +399,35 @@ public abstract class TestPlugin {
             this.singleTypeInfos = singleTypeInfos;
             this.confidencePercentage = confidencePercentage;
         }
+    }
+
+
+
+    public Result convertExecutorResultsToResult(List<BOLATest.ExecutorResult> results) {
+
+        if (results.isEmpty()) return null;
+
+        boolean vulnerable = false;
+
+        List<TestResult> testResults = new ArrayList<>();
+        for (BOLATest.ExecutorResult result: results) {
+            vulnerable = vulnerable || result.vulnerable;
+            TestResult testResult;
+            if (result.testError == null) {
+                testResult = buildTestResult(
+                        result.testRequest, result.testResponse, result.rawApi.getOriginalMessage(),
+                        result.percentageMatch, result.vulnerable
+                );
+            } else {
+                testResult = buildFailedTestResultWithOriginalMessage(result.rawApi.getOriginalMessage(), result.testError, result.testRequest);
+            }
+            testResults.add(testResult);
+        }
+
+
+        return addTestSuccessResult(
+                vulnerable, testResults, results.get(0).singleTypeInfos, TestResult.Confidence.HIGH
+        );
     }
 
 }

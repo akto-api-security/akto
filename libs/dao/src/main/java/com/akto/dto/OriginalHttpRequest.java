@@ -74,30 +74,39 @@ public class OriginalHttpRequest {
         if (acceptableContentType != null && rawRequest.length() > 0) {
             // only if request payload is of FORM_URL_ENCODED_CONTENT_TYPE we convert it to json
             if (acceptableContentType.equals(FORM_URL_ENCODED_CONTENT_TYPE)) {
-                String myStringDecoded = null;
-                try {
-                    myStringDecoded = URLDecoder.decode(rawRequest, "UTF-8");
-                } catch (UnsupportedEncodingException e) {
-                    return rawRequest;
-                }
-                String[] parts = myStringDecoded.split("&");
-                Map<String,String> valueMap = new HashMap<>();
-
-                for(String part: parts){
-                    String[] keyVal = part.split("="); // The equal separates key and values
-                    if (keyVal.length == 2) {
-                        valueMap.put(keyVal[0], keyVal[1]);
-                    }
-                }
-                try {
-                    return mapper.writeValueAsString(valueMap);
-                } catch (JsonProcessingException e) {
-                    return rawRequest;
-                }
+                return convertFormUrlEncodedToJson(rawRequest);
             }
         }
 
         return rawRequest;
+    }
+
+    public boolean isJsonRequest() {
+        String acceptableContentType = getAcceptableContentType(this.headers);
+        return acceptableContentType != null && acceptableContentType.equals(JSON_CONTENT_TYPE);
+    }
+
+    public static String convertFormUrlEncodedToJson(String rawRequest) {
+        String myStringDecoded = null;
+        try {
+            myStringDecoded = URLDecoder.decode(rawRequest, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            return rawRequest;
+        }
+        String[] parts = myStringDecoded.split("&");
+        Map<String,String> valueMap = new HashMap<>();
+
+        for(String part: parts){
+            String[] keyVal = part.split("="); // The equal separates key and values
+            if (keyVal.length == 2) {
+                valueMap.put(keyVal[0], keyVal[1]);
+            }
+        }
+        try {
+            return mapper.writeValueAsString(valueMap);
+        } catch (JsonProcessingException e) {
+            return rawRequest;
+        }
     }
 
     public static String getAcceptableContentType(Map<String,List<String>> headers) {
