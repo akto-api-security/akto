@@ -29,7 +29,6 @@ public class CustomAuthTypeAction extends UserAction{
         for (CustomAuthType customAuthType: customAuthTypes) {
             userIds.add(customAuthType.getCreatorId());
         }
-        userIds.add(getSUser().getId());
         usersMap = UsersDao.instance.getUsernames(userIds);
         return Action.SUCCESS.toUpperCase();
     }
@@ -51,10 +50,13 @@ public class CustomAuthTypeAction extends UserAction{
     }
 
     public String updateCustomAuthType(){
-
+        User user = getSUser();
         CustomAuthType customAuthType = CustomAuthTypeDao.instance.findOne("name",name);
         if(customAuthType==null){
             addActionError("Custom Auth Type does not exist");
+            return ERROR.toUpperCase();
+        } else if(user.getId()!=customAuthType.getCreatorId()){
+            addActionError("Unautherized Request");
             return ERROR.toUpperCase();
         } else {
             CustomAuthTypeDao.instance.updateOne(Filters.eq("name", name),
@@ -70,11 +72,15 @@ public class CustomAuthTypeAction extends UserAction{
     }
 
     public String updateCustomAuthTypeStatus(){
+        User user = getSUser();
         CustomAuthType customAuthType = CustomAuthTypeDao.instance.findOne("name",name);
         if(customAuthType==null){
             addActionError("Custom Auth Type does not exist");
             return ERROR.toUpperCase();
-        } else {
+        } else if(user.getId()!=customAuthType.getCreatorId()){
+            addActionError("Unautherized Request");
+            return ERROR.toUpperCase();
+        }  else {
             CustomAuthTypeDao.instance.updateOne(Filters.eq("name", name),
                     Updates.combine(
                         Updates.set("active", active),
