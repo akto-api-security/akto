@@ -43,7 +43,6 @@ public class CustomAuthTypeAction extends UserAction{
             active = true;
             customAuthType = new CustomAuthType(name, keys, operator, active,user.getId());
             CustomAuthTypeDao.instance.insertOne(customAuthType);
-            //TODO: add a function to call runtime to update auth types found.
         }
         fetchCustomAuthTypes();
         return Action.SUCCESS.toUpperCase();

@@ -21,12 +21,14 @@ public class AuthPolicyTest extends MongoBasedTest {
         return new HttpResponseParams("",200,"",new HashMap<>(),"",httpRequestParams ,0,"0",false, HttpResponseParams.Source.OTHER, "", "");
     }
 
+    List<CustomAuthType> customAuthTypes = new ArrayList<>();
+
     @Test
     public void testUnauthenticated() {
         Map<String, List<String>> headers = new HashMap<>();
         HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
-        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertTrue(result);
     }
 
@@ -36,7 +38,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         headers.put(AuthPolicy.AUTHORIZATION_HEADER_NAME, Collections.singletonList("Bearer woiefjwoeifw w"));
         HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
-        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
         Set<ApiInfo.AuthType> s = new HashSet<>();
         s.add(ApiInfo.AuthType.AUTHORIZATION_HEADER);
@@ -50,7 +52,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         headers.put("auth", Collections.singletonList("Bearer woiefjwoeifw something somethingElse"));
         HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
-        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
         Set<ApiInfo.AuthType> s = new HashSet<>();
         s.add(ApiInfo.AuthType.AUTHORIZATION_HEADER);
@@ -64,7 +66,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         headers.put(AuthPolicy.AUTHORIZATION_HEADER_NAME, Collections.singletonList("Bearer woiefjwoeifw"));
         HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
-        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
         Set<ApiInfo.AuthType> s = new HashSet<>();
         s.add(ApiInfo.AuthType.BEARER);
@@ -78,7 +80,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         headers.put("someRandom", Collections.singletonList("bearer woiefjwoeifw"));
         HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
-        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
         Set<ApiInfo.AuthType> s = new HashSet<>();
         s.add(ApiInfo.AuthType.BEARER);
@@ -92,7 +94,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         headers.put("cookie", Collections.singletonList("auth=bearer woiefj"));
         HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
-        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
         Set<ApiInfo.AuthType> s = new HashSet<>();
         s.add(ApiInfo.AuthType.BEARER);
@@ -109,7 +111,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         Set<ApiInfo.AuthType> s = new HashSet<>();
         s.add(ApiInfo.AuthType.UNAUTHENTICATED);
         apiInfo.getAllAuthTypesFound().add(s);
-        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
         Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 2);
         Set<ApiInfo.AuthType> s2 = new HashSet<>();
@@ -124,7 +126,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         headers.put(AuthPolicy.AUTHORIZATION_HEADER_NAME, Collections.singletonList("Basic woiefjwoeifw"));
         HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
-        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
         Set<ApiInfo.AuthType> s = new HashSet<>();
         s.add(ApiInfo.AuthType.BASIC);
@@ -138,7 +140,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         headers.put("someRandom", Collections.singletonList("basic woiefjwoeifw"));
         HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
-        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
         Set<ApiInfo.AuthType> s = new HashSet<>();
         s.add(ApiInfo.AuthType.BASIC);
@@ -152,7 +154,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         headers.put("cookie", Collections.singletonList("auth=Basic woiefjwoeifw"));
         HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
-        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
         Set<ApiInfo.AuthType> s = new HashSet<>();
         s.add(ApiInfo.AuthType.BASIC);
@@ -166,7 +168,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         headers.put("someRandom", Collections.singletonList("eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoicmVmcmVzaFRva2VuIiwic2lnbmVkVXAiOiJ0cnVlIiwidXNlcm5hbWUiOiJhbmt1c2hAZ21haWwuY29tIiwiaWF0IjoxNjQwNjkzNDUzLCJleHAiOjE2NDEyMTE4NTN9.oTq5FEeTlNt1YjaZ9JA8qdymArxJ8unNI8m5HLYn4ECeFOKQCv8SWnQ6uvwbbWPHa6HOYeLoD-tvPyVq-c6jlyGNf7bno8cCMB5ldyJ-I--F1xVp0iWKCMtlgdS2DgwFBdaZ9mdLCP3eZuieQV2Za8Lrzw1G1CpgJ-3vkijTw3KurKSDLT5Zv8JQRSxwj_VLeuaVkhSjYVltzTfY5tkl3CO3vNmlz6HIc4shxFXowA30xxgL438V1ELamv85fyGXg2EMhk5XeRDXq1QiLPBsQZ28FSk5TJAn2Xc_pwWXBw-N2P6Y_Hh0bL7KXpErgKQNQiAfNFHFzAUbuLefD6dJKg"));
         HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
-        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
         Set<ApiInfo.AuthType> s = new HashSet<>();
         s.add(ApiInfo.AuthType.JWT);
@@ -180,7 +182,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         headers.put("cookie", Collections.singletonList("Path=/; JWT=eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoicmVmcmVzaFRva2VuIiwic2lnbmVkVXAiOiJ0cnVlIiwidXNlcm5hbWUiOiJhbmt1c2hAZ21haWwuY29tIiwiaWF0IjoxNjQwNjkzNDUzLCJleHAiOjE2NDEyMTE4NTN9.oTq5FEeTlNt1YjaZ9JA8qdymArxJ8unNI8m5HLYn4ECeFOKQCv8SWnQ6uvwbbWPHa6HOYeLoD-tvPyVq-c6jlyGNf7bno8cCMB5ldyJ-I--F1xVp0iWKCMtlgdS2DgwFBdaZ9mdLCP3eZuieQV2Za8Lrzw1G1CpgJ-3vkijTw3KurKSDLT5Zv8JQRSxwj_VLeuaVkhSjYVltzTfY5tkl3CO3vNmlz6HIc4shxFXowA30xxgL438V1ELamv85fyGXg2EMhk5XeRDXq1QiLPBsQZ28FSk5TJAn2Xc_pwWXBw-N2P6Y_Hh0bL7KXpErgKQNQiAfNFHFzAUbuLefD6dJKg; HttpOnly"));
         HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
-        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
         Set<ApiInfo.AuthType> s = new HashSet<>();
         s.add(ApiInfo.AuthType.JWT);
@@ -195,7 +197,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         headers.put(AuthPolicy.AUTHORIZATION_HEADER_NAME, Collections.singletonList("Basic woiefjwoeifw"));
         HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
-        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
         Set<ApiInfo.AuthType> s = new HashSet<>();
         s.add(ApiInfo.AuthType.JWT);
@@ -214,7 +216,7 @@ public class AuthPolicyTest extends MongoBasedTest {
         s.add(ApiInfo.AuthType.JWT);
         s.add(ApiInfo.AuthType.BASIC);
         apiInfo.getAllAuthTypesFound().add(s);
-        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
         Assertions.assertFalse(result);
         Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 1);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
@@ -229,8 +231,9 @@ public class AuthPolicyTest extends MongoBasedTest {
         keys.add("AT");
         CustomAuthType customAuthType = new CustomAuthType("AT", keys, Operator.OR, true,0);
         CustomAuthTypeDao.instance.insertOne(customAuthType);
+        List<CustomAuthType> authTypes = new ArrayList<>(Collections.singletonList(customAuthType));
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
-        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null);
+        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,authTypes);
         Assertions.assertFalse(result);
         Set<ApiInfo.AuthType> s = new HashSet<>();
         s.add(ApiInfo.AuthType.CUSTOM);
