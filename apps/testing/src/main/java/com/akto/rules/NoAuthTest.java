@@ -13,15 +13,10 @@ import java.util.List;
 import java.util.Map;
 
 
-public class NoAuthTest extends TestPlugin {
+public class NoAuthTest extends AuthRequiredTestPlugin {
 
     @Override
-    public Result  start(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) {
-        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
-        if (messages.isEmpty()) return addWithoutRequestError(null, TestResult.TestError.NO_PATH);
-        List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, testingUtil.getAuthMechanism());
-        if (filteredMessages.isEmpty()) return addWithoutRequestError(null, TestResult.TestError.NO_MESSAGE_WITH_AUTH_TOKEN);
-
+    public Result exec(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil, List<RawApi> filteredMessages) {
         RawApi rawApi = filteredMessages.get(0).copy();
 
         OriginalHttpRequest testRequest = rawApi.getRequest();

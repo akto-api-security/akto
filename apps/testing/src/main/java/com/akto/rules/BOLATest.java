@@ -15,35 +15,9 @@ import com.akto.util.modifier.NestedObjectModifier;
 
 import java.util.*;
 
-public class BOLATest extends TestPlugin {
+public class BOLATest extends AuthRequiredRunAllTestPlugin {
 
     public BOLATest() { }
-
-    @Override
-    public Result start(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) {
-
-        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
-        if (messages.isEmpty()) return null;
-        List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, testingUtil.getAuthMechanism());
-        if (filteredMessages.isEmpty()) return null;
-
-        boolean vulnerable = false;
-        List<ExecutorResult> results = null;
-
-        for (RawApi rawApi: filteredMessages) {
-            if (vulnerable) break;
-            results = execute(rawApi, apiInfoKey, testingUtil.getAuthMechanism(), testingUtil.getSingleTypeInfoMap());
-            for (ExecutorResult result: results) {
-                if (result.vulnerable) {
-                    vulnerable = true;
-                    break;
-                }
-            }
-        }
-
-        return convertExecutorResultsToResult(results);
-
-    }
 
     @Override
     public String superTestName() {
@@ -56,13 +30,14 @@ public class BOLATest extends TestPlugin {
     }
 
 
-    public List<ExecutorResult> execute(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<String, SingleTypeInfo> singleTypeInfoMap) {
+    @Override
+    public List<ExecutorResult> execute(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) {
         OriginalHttpRequest testRequest = rawApi.getRequest().copy();
         OriginalHttpResponse originalHttpResponse = rawApi.getResponse().copy();
 
-        authMechanism.addAuthToRequest(testRequest);
+        testingUtil.getAuthMechanism().addAuthToRequest(testRequest);
 
-        ContainsPrivateResourceResult containsPrivateResourceResult = containsPrivateResource(testRequest, apiInfoKey, singleTypeInfoMap);
+        ContainsPrivateResourceResult containsPrivateResourceResult = containsPrivateResource(testRequest, apiInfoKey, testingUtil.getSingleTypeInfoMap());
         // We consider API contains private resources if : 
         //      a) Contains 1 or more private resources
         //      b) We couldn't find uniqueCount or publicCount for some request params

@@ -2,9 +2,7 @@ package com.akto.rules;
 
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.testing.AuthMechanism;
-import com.akto.dto.testing.TestResult;
-import com.akto.dto.testing.TestRoles;
+import com.akto.dto.testing.*;
 import com.akto.dto.testing.info.TestInfo;
 import com.akto.dto.type.*;
 import com.akto.runtime.APICatalogSync;
@@ -457,6 +455,34 @@ public abstract class TestPlugin {
         return addTestSuccessResult(
                 vulnerable, testResults, results.get(0).singleTypeInfos, TestResult.Confidence.HIGH
         );
+    }
+
+
+    public static class TestRoleMatcher {
+        List<TestRoles> friends;
+        List<TestRoles> enemies;
+
+        public TestRoleMatcher(List<TestRoles> testRolesList, ApiInfo.ApiInfoKey apiInfoKey) {
+            this.friends = new ArrayList<>();
+            this.enemies = new ArrayList<>();
+
+            for (TestRoles testRoles: testRolesList) {
+                EndpointLogicalGroup endpointLogicalGroup = testRoles.fetchEndpointLogicalGroup();
+                if (endpointLogicalGroup == null) continue;
+                TestingEndpoints testingEndpoints = endpointLogicalGroup.getTestingEndpoints();
+                if (testingEndpoints == null) continue;
+                if (testingEndpoints.containsApi(apiInfoKey) ) {
+                    this.friends.add(testRoles);
+                } else {
+                    this.enemies.add(testRoles);
+                }
+            }
+        }
+
+
+        public boolean shouldDoBFLA() {
+            return this.friends.size() > 0;
+        }
     }
 
 }

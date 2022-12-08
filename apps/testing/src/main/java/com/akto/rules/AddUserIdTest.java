@@ -13,10 +13,10 @@ import com.akto.types.CappedSet;
 
 import java.util.*;
 
-public class AddUserIdTest extends TestPlugin {
+public class AddUserIdTest extends AuthRequiredTestPlugin{
 
     @Override
-    public Result start(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) {
+    public Result exec(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil, List<RawApi> filteredMessages) {
         List<String> userIdNameList = Arrays.asList(
                 "user", "User", "userId", "UserId", "user_id", "customer_id", "customerId", "CustomerId", "customer",
                 "user_name", "username", "UserName","customer_name"
@@ -34,11 +34,6 @@ public class AddUserIdTest extends TestPlugin {
         }
 
         if (validUserIdNameMap.isEmpty()) return null;
-
-        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
-        if (messages.isEmpty()) return null;
-        List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, testingUtil.getAuthMechanism());
-        if (filteredMessages.isEmpty()) return null;
 
         RawApi rawApi = filteredMessages.get(0);
         List<TestResult> testResults = new ArrayList<>();

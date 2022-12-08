@@ -15,14 +15,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-public class JWTNoneAlgoTest extends TestPlugin {
-    @Override
-    public Result start(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) {
-        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
-        if (messages.isEmpty()) return null;
-        List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, testingUtil.getAuthMechanism());
-        if (filteredMessages.isEmpty()) return null;
+public class JWTNoneAlgoTest extends AuthRequiredTestPlugin {
 
+    @Override
+    public Result exec(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil, List<RawApi> filteredMessages) {
         RawApi rawApi = filteredMessages.get(0).copy();
 
         OriginalHttpRequest testRequest = rawApi.getRequest();

@@ -16,17 +16,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-public class OldApiVersionTest extends TestPlugin {
+public class OldApiVersionTest extends AuthRequiredTestPlugin{
     @Override
-    public Result start(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) {
+    public Result exec(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil, List<RawApi> filteredMessages) {
         String url = apiInfoKey.getUrl();
         String oldVersionUrl = decrementUrlVersion(url, 1, 1);
         if (oldVersionUrl == null) return null;
-
-        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
-        if (messages.isEmpty()) return null;
-        List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, testingUtil.getAuthMechanism());
-        if (filteredMessages.isEmpty()) return null;
 
         RawApi rawApi = filteredMessages.get(0).copy();
         Result result = null;
@@ -67,7 +62,7 @@ public class OldApiVersionTest extends TestPlugin {
             // try BOLA
             BOLATest bolaTest = new BOLATest();
             RawApi dummy = new RawApi(testRequest, originalHttpResponse, rawApi.getOriginalMessage());
-            List<BOLATest.ExecutorResult> executorResults = bolaTest.execute(dummy, apiInfoKey, testingUtil.getAuthMechanism(), testingUtil.getSingleTypeInfoMap());
+            List<BOLATest.ExecutorResult> executorResults = bolaTest.execute(dummy, apiInfoKey, testingUtil);
             result = convertExecutorResultsToResult(executorResults);
 
             if (result.isVulnerable) return result;

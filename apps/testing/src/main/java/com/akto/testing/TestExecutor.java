@@ -320,19 +320,9 @@ public class TestExecutor {
         if (noAuthTestResult != null) testingRunResults.add(noAuthTestResult);
         if (noAuthTestResult != null && !noAuthTestResult.isVulnerable()) {
 
-            boolean flag = false;
-            for (TestRoles testRoles: testingUtil.getTestRoles()) {
-                EndpointLogicalGroup endpointLogicalGroup = testRoles.fetchEndpointLogicalGroup();
-                if (endpointLogicalGroup == null) continue;
-                TestingEndpoints testingEndpoints = endpointLogicalGroup.getTestingEndpoints();
-                if (testingEndpoints == null) continue;
-                flag = testingEndpoints.containsApi(apiInfoKey);
-                if (flag) break;
-            }
+            TestPlugin.TestRoleMatcher testRoleMatcher = new TestPlugin.TestRoleMatcher(testingUtil.getTestRoles(), apiInfoKey);
 
-            System.out.println(apiInfoKey + " : " + flag);
-
-            if (flag) {
+            if (testRoleMatcher.shouldDoBFLA()) {
                 TestingRunResult bflaTestResult = runTest(bflaTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
                 if (bflaTestResult != null) testingRunResults.add(bflaTestResult);
             } else {
