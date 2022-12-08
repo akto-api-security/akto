@@ -9,6 +9,7 @@ import com.akto.dto.testing.HardcodedAuthParam;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.store.SampleMessageStore;
+import com.akto.store.TestingUtil;
 import com.akto.testing.ApiExecutor;
 
 import java.util.Collections;
@@ -17,14 +18,14 @@ import java.util.Map;
 
 public class OldApiVersionTest extends TestPlugin {
     @Override
-    public Result start(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages, Map<String, SingleTypeInfo> singleTypeInfos) {
+    public Result start(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) {
         String url = apiInfoKey.getUrl();
         String oldVersionUrl = decrementUrlVersion(url, 1, 1);
         if (oldVersionUrl == null) return null;
 
-        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleMessages);
+        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
         if (messages.isEmpty()) return null;
-        List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, authMechanism);
+        List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, testingUtil.getAuthMechanism());
         if (filteredMessages.isEmpty()) return null;
 
         RawApi rawApi = filteredMessages.get(0).copy();
@@ -36,7 +37,7 @@ public class OldApiVersionTest extends TestPlugin {
             ApiInfo.ApiInfoKey oldVersionApiInfoKey = new ApiInfo.ApiInfoKey(apiInfoKey.getApiCollectionId(), oldVersionUrl, apiInfoKey.getMethod());
 
             // ignore if exists in traffic data
-            if (sampleMessages.containsKey(oldVersionApiInfoKey)) {
+            if (testingUtil.getSampleMessages().containsKey(oldVersionApiInfoKey)) {
                 oldVersionUrl = decrementUrlVersion(oldVersionUrl, 1, 1);
                 continue;
             }
@@ -66,7 +67,7 @@ public class OldApiVersionTest extends TestPlugin {
             // try BOLA
             BOLATest bolaTest = new BOLATest();
             RawApi dummy = new RawApi(testRequest, originalHttpResponse, rawApi.getOriginalMessage());
-            List<BOLATest.ExecutorResult> executorResults = bolaTest.execute(dummy, apiInfoKey, authMechanism, singleTypeInfos);
+            List<BOLATest.ExecutorResult> executorResults = bolaTest.execute(dummy, apiInfoKey, testingUtil.getAuthMechanism(), testingUtil.getSingleTypeInfoMap());
             result = convertExecutorResultsToResult(executorResults);
 
             if (result.isVulnerable) return result;

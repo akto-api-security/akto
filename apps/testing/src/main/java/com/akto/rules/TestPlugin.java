@@ -4,9 +4,12 @@ import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestRoles;
+import com.akto.dto.testing.info.TestInfo;
 import com.akto.dto.type.*;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.RelationshipSync;
+import com.akto.store.TestingUtil;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.StatusCodeAnalyser;
 import com.akto.types.CappedSet;
@@ -36,8 +39,7 @@ public abstract class TestPlugin {
 
     private static final Logger logger = LoggerFactory.getLogger(TestPlugin.class);
 
-    public abstract Result  start(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages,
-                                     Map<String, SingleTypeInfo> singleTypeInfos);
+    public abstract Result  start(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil);
 
     public abstract String superTestName();
     public abstract String subTestName();
@@ -132,11 +134,11 @@ public abstract class TestPlugin {
 
     public Result addWithoutRequestError(String originalMessage, TestResult.TestError testError) {
         List<TestResult> testResults = new ArrayList<>();
-        testResults.add(new TestResult(null, originalMessage, Collections.singletonList(testError), 0, false, TestResult.Confidence.HIGH));
+        testResults.add(new TestResult(null, originalMessage, Collections.singletonList(testError), 0, false, TestResult.Confidence.HIGH, null));
         return new Result(testResults, false,new ArrayList<>(), 0);
     }
 
-    public TestResult buildFailedTestResultWithOriginalMessage(String originalMessage, TestResult.TestError testError, OriginalHttpRequest request) {
+    public TestResult buildFailedTestResultWithOriginalMessage(String originalMessage, TestResult.TestError testError, OriginalHttpRequest request, TestInfo testInfo) {
         String message = null;
         try {
             message = RedactSampleData.convertOriginalReqRespToString(request, null);
@@ -144,18 +146,18 @@ public abstract class TestPlugin {
             e.printStackTrace();
         }
 
-        return new TestResult(message, originalMessage, Collections.singletonList(testError), 0, false, TestResult.Confidence.HIGH);
+        return new TestResult(message, originalMessage, Collections.singletonList(testError), 0, false, TestResult.Confidence.HIGH, testInfo);
     }
 
-    public Result addWithRequestError(String originalMessage, TestResult.TestError testError, OriginalHttpRequest request) {
-        TestResult testResult = buildFailedTestResultWithOriginalMessage(originalMessage,testError,request);
+    public Result addWithRequestError(String originalMessage, TestResult.TestError testError, OriginalHttpRequest request, TestInfo testInfo) {
+        TestResult testResult = buildFailedTestResultWithOriginalMessage(originalMessage,testError,request, testInfo);
         List<TestResult> testResults = new ArrayList<>();
         testResults.add(testResult);
         return new Result(testResults, false,new ArrayList<>(), 0);
     }
 
-    public TestResult buildTestResult(OriginalHttpRequest request,
-                                      OriginalHttpResponse response, String originalMessage,double percentageMatch, boolean isVulnerable) {
+    public TestResult buildTestResult(OriginalHttpRequest request, OriginalHttpResponse response, String originalMessage,
+                                      double percentageMatch, boolean isVulnerable, TestInfo testInfo) {
 
         List<TestResult.TestError> errors = new ArrayList<>();
         String message = null;
@@ -168,7 +170,7 @@ public abstract class TestPlugin {
             errors.add(TestResult.TestError.FAILED_TO_CONVERT_TEST_REQUEST_TO_STRING);
         }
 
-        return new TestResult(message, originalMessage, errors, percentageMatch, isVulnerable, TestResult.Confidence.HIGH);
+        return new TestResult(message, originalMessage, errors, percentageMatch, isVulnerable, TestResult.Confidence.HIGH, testInfo);
 
     }
 
@@ -387,6 +389,33 @@ public abstract class TestPlugin {
         }
     }
 
+    public static class ExecutorResult {
+        boolean vulnerable;
+        TestResult.Confidence confidence;
+        List<SingleTypeInfo> singleTypeInfos;
+        double percentageMatch;
+        RawApi rawApi;
+        OriginalHttpResponse testResponse;
+        OriginalHttpRequest testRequest;
+
+        TestResult.TestError testError;
+        TestInfo testInfo;
+
+        public ExecutorResult(boolean vulnerable, TestResult.Confidence confidence, List<SingleTypeInfo> singleTypeInfos,
+                              double percentageMatch, RawApi rawApi, TestResult.TestError testError,
+                              OriginalHttpRequest testRequest, OriginalHttpResponse testResponse, TestInfo testInfo) {
+            this.vulnerable = vulnerable;
+            this.confidence = confidence;
+            this.singleTypeInfos = singleTypeInfos;
+            this.percentageMatch = percentageMatch;
+            this.rawApi = rawApi;
+            this.testError = testError;
+            this.testRequest = testRequest;
+            this.testResponse = testResponse;
+            this.testInfo = testInfo;
+        }
+    }
+
     public static class Result {
         public List<TestResult> testResults;
         public boolean isVulnerable;
@@ -416,10 +445,10 @@ public abstract class TestPlugin {
             if (result.testError == null) {
                 testResult = buildTestResult(
                         result.testRequest, result.testResponse, result.rawApi.getOriginalMessage(),
-                        result.percentageMatch, result.vulnerable
+                        result.percentageMatch, result.vulnerable, result.testInfo
                 );
             } else {
-                testResult = buildFailedTestResultWithOriginalMessage(result.rawApi.getOriginalMessage(), result.testError, result.testRequest);
+                testResult = buildFailedTestResultWithOriginalMessage(result.rawApi.getOriginalMessage(), result.testError, result.testRequest, result.testInfo);
             }
             testResults.add(testResult);
         }

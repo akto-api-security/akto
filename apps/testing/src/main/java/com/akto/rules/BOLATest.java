@@ -6,6 +6,7 @@ import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.store.SampleMessageStore;
+import com.akto.store.TestingUtil;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.StatusCodeAnalyser;
 import com.akto.util.JSONUtils;
@@ -19,11 +20,11 @@ public class BOLATest extends TestPlugin {
     public BOLATest() { }
 
     @Override
-    public Result start(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages, Map<String, SingleTypeInfo> singleTypeInfoMap) {
+    public Result start(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) {
 
-        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleMessages);
+        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
         if (messages.isEmpty()) return null;
-        List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, authMechanism);
+        List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, testingUtil.getAuthMechanism());
         if (filteredMessages.isEmpty()) return null;
 
         boolean vulnerable = false;
@@ -31,7 +32,7 @@ public class BOLATest extends TestPlugin {
 
         for (RawApi rawApi: filteredMessages) {
             if (vulnerable) break;
-            results = execute(rawApi, apiInfoKey, authMechanism, singleTypeInfoMap);
+            results = execute(rawApi, apiInfoKey, testingUtil.getAuthMechanism(), testingUtil.getSingleTypeInfoMap());
             for (ExecutorResult result: results) {
                 if (result.vulnerable) {
                     vulnerable = true;
@@ -54,30 +55,6 @@ public class BOLATest extends TestPlugin {
         return "REPLACE_AUTH_TOKEN";
     }
 
-    public static class ExecutorResult {
-        boolean vulnerable;
-        TestResult.Confidence confidence;
-        List<SingleTypeInfo> singleTypeInfos;
-        double percentageMatch;
-        RawApi rawApi;
-        OriginalHttpResponse testResponse;
-        OriginalHttpRequest testRequest;
-
-        TestResult.TestError testError;
-
-        public ExecutorResult(boolean vulnerable, TestResult.Confidence confidence, List<SingleTypeInfo> singleTypeInfos,
-                              double percentageMatch, RawApi rawApi, TestResult.TestError testError,
-                              OriginalHttpRequest testRequest, OriginalHttpResponse testResponse) {
-            this.vulnerable = vulnerable;
-            this.confidence = confidence;
-            this.singleTypeInfos = singleTypeInfos;
-            this.percentageMatch = percentageMatch;
-            this.rawApi = rawApi;
-            this.testError = testError;
-            this.testRequest = testRequest;
-            this.testResponse = testResponse;
-        }
-    }
 
     public List<ExecutorResult> execute(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<String, SingleTypeInfo> singleTypeInfoMap) {
         OriginalHttpRequest testRequest = rawApi.getRequest().copy();
@@ -126,7 +103,7 @@ public class BOLATest extends TestPlugin {
             apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, originalHttpResponse);
         } catch (Exception e) {
             return new ExecutorResult(false, null, new ArrayList<>(), 0, rawApi,
-                    TestResult.TestError.API_REQUEST_FAILED, testRequest, null);
+                    TestResult.TestError.API_REQUEST_FAILED, testRequest, null, null);
         }
 
         TestResult.Confidence confidence = containsPrivateResourceResult.findPrivateOnes().size() > 0 ? TestResult.Confidence.HIGH : TestResult.Confidence.LOW;
@@ -137,7 +114,7 @@ public class BOLATest extends TestPlugin {
         if (!vulnerable) confidence = Confidence.HIGH;
 
         return new ExecutorResult(vulnerable,confidence, containsPrivateResourceResult.singleTypeInfos, apiExecutionDetails.percentageMatch,
-                rawApi, null, testRequest, apiExecutionDetails.testResponse);
+                rawApi, null, testRequest, apiExecutionDetails.testResponse, null);
 
     }
 

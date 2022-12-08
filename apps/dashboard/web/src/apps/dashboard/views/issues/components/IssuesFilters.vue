@@ -340,6 +340,8 @@ export default {
                     ]
                 case "BUA":
                     return ['REMOVE_TOKENS', 'JWT_NONE_ALGO']
+                case "BFLA":
+                    return ["BFLA"]
             }
         },
         getCollections1() {

@@ -125,6 +125,8 @@ export default {
                 case 'REMOVE_TOKENS':
                 case 'JWT_NONE_ALGO':
                     return 'Broken User Authentication (BUA)'
+                case 'BFLA':
+                    return 'Broken Function Level Authorization (BFLA)'
                 default:
                     return 'Broken Object Level Authorization (BOLA)'
             }
@@ -145,6 +147,8 @@ export default {
                 case 'ADD_METHOD_OVERRIDE_HEADERS':
                 case 'CHANGE_METHOD':
                     return 'Attacker can access resources of any user by replacing method of the endpoint (eg: changemethod from get to post). This way attacker can get access to unauthorized endpoints.';
+                case 'BFLA':
+                    return 'Less privileged attacker can access admin resources'
                 case 'REMOVE_TOKENS':
                     return 'API doesn\'t validate the authenticity of token. Attacker can remove the auth token and access the endpoint.'
                 default:
