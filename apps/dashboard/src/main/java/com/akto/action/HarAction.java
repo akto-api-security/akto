@@ -101,6 +101,7 @@ public class HarAction extends UserAction {
             if(skipKafka) {
                 HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
                 SingleTypeInfo.fetchCustomDataTypes();
+                SingleTypeInfo.fetchCustomAuthTypes();
                 APICatalogSync apiCatalogSync = parser.syncFunction(responses, true, false);
                 AktoPolicy aktoPolicy = new AktoPolicy(parser.apiCatalogSync, false); // keep inside if condition statement because db call when initialised
                 aktoPolicy.main(responses, apiCatalogSync, false);
