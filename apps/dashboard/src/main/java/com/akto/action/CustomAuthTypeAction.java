@@ -43,7 +43,7 @@ public class CustomAuthTypeAction extends UserAction{
 
     public String addCustomAuthType(){
         User user = getSUser();
-        customAuthType = CustomAuthTypeDao.instance.findOne("name",name);
+        customAuthType = CustomAuthTypeDao.instance.findOne(CustomAuthType.NAME,name);
         if(customAuthType!=null){
             addActionError("Auth type name needs to be unique");
             return ERROR.toUpperCase();
@@ -66,7 +66,7 @@ public class CustomAuthTypeAction extends UserAction{
 
     public String updateCustomAuthType(){
         User user = getSUser();
-        customAuthType = CustomAuthTypeDao.instance.findOne("name",name);
+        customAuthType = CustomAuthTypeDao.instance.findOne(CustomAuthType.NAME,name);
         if(customAuthType==null){
             addActionError("Custom Auth Type does not exist");
             return ERROR.toUpperCase();
@@ -74,17 +74,17 @@ public class CustomAuthTypeAction extends UserAction{
             addActionError("Unautherized Request");
             return ERROR.toUpperCase();
         } else {
-            CustomAuthTypeDao.instance.updateOne(Filters.eq("name", name),
+            CustomAuthTypeDao.instance.updateOne(Filters.eq(CustomAuthType.NAME, name),
                     Updates.combine(
-                        Updates.set("active", active), 
+                        Updates.set(CustomAuthType.ACTIVE, active), 
                         Updates.set("headerKeys", headerKeys),
                         Updates.set("payloadKeys", payloadKeys),
-                        Updates.set("name", name),
+                        Updates.set(CustomAuthType.NAME, name),
                         Updates.set("timestamp", Context.now())));
         }
         fetchCustomAuthTypes();
         SingleTypeInfo.fetchCustomAuthTypes();
-        customAuthType = CustomAuthTypeDao.instance.findOne("name",name);
+        customAuthType = CustomAuthTypeDao.instance.findOne(CustomAuthType.NAME,name);
         int accountId = Context.accountId.get();
         executorService.schedule( new Runnable() {
             public void run() {
@@ -97,7 +97,7 @@ public class CustomAuthTypeAction extends UserAction{
 
     public String updateCustomAuthTypeStatus(){
         User user = getSUser();
-        customAuthType = CustomAuthTypeDao.instance.findOne("name",name);
+        customAuthType = CustomAuthTypeDao.instance.findOne(CustomAuthType.NAME,name);
         if(customAuthType==null){
             addActionError("Custom Auth Type does not exist");
             return ERROR.toUpperCase();
@@ -105,14 +105,14 @@ public class CustomAuthTypeAction extends UserAction{
             addActionError("Unautherized Request");
             return ERROR.toUpperCase();
         }  else {
-            CustomAuthTypeDao.instance.updateOne(Filters.eq("name", name),
+            CustomAuthTypeDao.instance.updateOne(Filters.eq(CustomAuthType.NAME, name),
                     Updates.combine(
-                        Updates.set("active", active),
+                        Updates.set(CustomAuthType.ACTIVE, active),
                         Updates.set("timestamp",Context.now())));
         }
         fetchCustomAuthTypes();
         SingleTypeInfo.fetchCustomAuthTypes();
-        customAuthType = CustomAuthTypeDao.instance.findOne("name",name);
+        customAuthType = CustomAuthTypeDao.instance.findOne(CustomAuthType.NAME,name);
         return Action.SUCCESS.toUpperCase();
     }
 

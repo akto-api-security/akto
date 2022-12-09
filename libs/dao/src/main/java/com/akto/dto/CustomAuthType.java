@@ -8,9 +8,11 @@ import com.akto.dao.context.Context;
 
 public class CustomAuthType {
     private ObjectId id;
+    public static final String NAME = "name";
     private String name;
     private List<String> headerKeys;
     private List<String> payloadKeys;
+    public static final String ACTIVE = "active";
     private boolean active;
     private int creatorId;
     private int timestamp;

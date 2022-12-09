@@ -79,7 +79,7 @@ public class SingleTypeInfo {
     public static List<CustomAuthType> activeCustomAuthTypes = new ArrayList<>();
 
     public static void fetchCustomAuthTypes() {
-        activeCustomAuthTypes = CustomAuthTypeDao.instance.findAll("active",true);
+        activeCustomAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
     }
 
     public enum SuperType {
