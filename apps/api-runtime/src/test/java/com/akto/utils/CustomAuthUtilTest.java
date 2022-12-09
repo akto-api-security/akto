@@ -36,9 +36,14 @@ public class CustomAuthUtilTest extends MongoBasedTest{
         authTypes.add(types);
         apiInfo.setAllAuthTypesFound(authTypes);
         List<CustomAuthType> customAuthTypes = new ArrayList<>();
-        customAuthTypes.add(new CustomAuthType("auth1", new ArrayList<>(Collections.singletonList("authtoken")),new ArrayList<>(Collections.singletonList("authtoken")), true, ACCOUNT_ID));
+        List<String> headerKeys = new ArrayList<>();
+        headerKeys.add("authtoken");
+        headerKeys.add("newauthtoken");
+        customAuthTypes.add(new CustomAuthType("auth1", headerKeys,new ArrayList<>(), true, ACCOUNT_ID));
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
         singleTypeInfos.add(generateSingleTypeInfo("authtoken",true));
+        singleTypeInfos.add(generateSingleTypeInfo("cookie",true));
+        singleTypeInfos.get(1).setValues(new CappedSet<>(new HashSet<>(Collections.singletonList("newauthtoken=wow; someothertoken=verysecure"))));
         ApiInfoDao.instance.insertOne(apiInfo);
         CustomAuthTypeDao.instance.insertMany(customAuthTypes);
         SingleTypeInfoDao.instance.insertMany(singleTypeInfos);

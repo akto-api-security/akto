@@ -77,19 +77,9 @@ public class SingleTypeInfo {
     }
 
     public static List<CustomAuthType> activeCustomAuthTypes = new ArrayList<>();
-    public static List<CustomAuthType> allCustomAuthTypes = new ArrayList<>();
 
     public static void fetchCustomAuthTypes() {
-
-        List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(new BasicDBObject());
-        List<CustomAuthType> authTypes = new ArrayList<>();
-        for(CustomAuthType customAuthType : customAuthTypes){
-            if(customAuthType.isActive()){
-                authTypes.add(customAuthType);
-            }
-        }
-        activeCustomAuthTypes = new ArrayList<>(authTypes);
-        allCustomAuthTypes = new ArrayList<>(customAuthTypes);
+        activeCustomAuthTypes = CustomAuthTypeDao.instance.findAll("active",true);
     }
 
     public enum SuperType {

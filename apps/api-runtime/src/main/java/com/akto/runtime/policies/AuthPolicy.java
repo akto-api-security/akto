@@ -34,13 +34,17 @@ public class AuthPolicy {
 
     public static Map<String,String> parseCookie(List<String> cookieList){
         Map<String,String> cookieMap = new HashMap<>();
+        if(cookieList==null)return cookieMap;
         for (String cookieValues : cookieList) {
-            String[] cookies = cookieValues.split("; ");
+            String[] cookies = cookieValues.split(";");
             for (String cookie : cookies) {
+                cookie=cookie.trim();
                 String[] cookieFields = cookie.split("=");
                 boolean twoCookieFields = cookieFields.length == 2;
                 if (twoCookieFields) {
-                    cookieMap.put(cookieFields[0], cookieFields[1]);
+                    if(!cookieMap.containsKey(cookieFields[0])){
+                        cookieMap.put(cookieFields[0], cookieFields[1]);
+                    }
                 }
             }
         }
