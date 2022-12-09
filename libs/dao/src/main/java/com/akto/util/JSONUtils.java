@@ -5,6 +5,9 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.type.RequestTemplate;
+import com.akto.util.modifier.PayloadModifier;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
@@ -107,5 +110,49 @@ public class JSONUtils {
             ret.put(prefix, obj);
         }
     }
+
+    public static String modify(String jsonBody, Set<String> values, PayloadModifier payloadModifier) {
+        try {
+            BasicDBObject payload = RequestTemplate.parseRequestPayload(jsonBody, null);
+            if (payload.isEmpty()) return null;
+            BasicDBObject modifiedPayload = modify(payload, values, payloadModifier);
+            if (modifiedPayload.containsKey("json")) {
+                modifiedPayload = (BasicDBObject) modifiedPayload.get("json");
+            }
+            return modifiedPayload.toJson();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public static BasicDBObject modify(BasicDBObject obj, Set<String> values, PayloadModifier payloadModifier) {
+        BasicDBObject result = (BasicDBObject) obj.copy();
+        modify(result, "" ,values, payloadModifier);
+        return result;
+    }
+
+    private static void modify(Object obj, String prefix, Set<String> values, PayloadModifier payloadModifier) {
+        if (obj instanceof BasicDBObject) {
+            BasicDBObject basicDBObject = (BasicDBObject) obj;
+            Set<String> keySet = basicDBObject.keySet();
+
+            for(String key: keySet) {
+                if (key == null) continue;
+                String fullKey = prefix + (prefix.isEmpty() ? "" : "#") + key;
+                Object value = basicDBObject.get(key);
+                if (values.contains(fullKey)) {
+                    basicDBObject.put(key, payloadModifier.modify(key, value));
+                }
+                modify(value, fullKey, values, payloadModifier);
+            }
+
+        } else if (obj instanceof BasicDBList) {
+            for (Object elem: (BasicDBList) obj) {
+                modify(elem, prefix+(prefix.isEmpty() ? "$" : "#$"), values, payloadModifier);
+            }
+        }
+    }
+
+
 
 }

@@ -13,7 +13,8 @@ public class GlobalEnums {
         BOLA("BOLA", Severity.HIGH),
         ADD_USER_ID("ADD_USER_ID", Severity.HIGH),
         PRIVILEGE_ESCALATION("PRIVILEGE_ESCALATION", Severity.HIGH),
-        NO_AUTH("NO_AUTH", Severity.HIGH);
+        NO_AUTH("NO_AUTH", Severity.HIGH),
+        BFLA("BFLA", Severity.HIGH);
         private final String name;
         private final Severity severity;
 
@@ -40,7 +41,8 @@ public class GlobalEnums {
         REMOVE_TOKENS("REMOVE_TOKENS", TestCategory.NO_AUTH),
         PARAMETER_POLLUTION("PARAMETER_POLLUTION", TestCategory.BOLA),
         REPLACE_AUTH_TOKEN_OLD_VERSION("REPLACE_AUTH_TOKEN_OLD_VERSION", TestCategory.BOLA),
-        JWT_NONE_ALGO("JWT_NONE_ALGO", TestCategory.NO_AUTH);
+        JWT_NONE_ALGO("JWT_NONE_ALGO", TestCategory.NO_AUTH),
+        BFLA("BFLA", TestCategory.BFLA);
 
         private final String name;
         private final TestCategory superCategory;

@@ -1,6 +1,8 @@
 package com.akto.store;
 
 import com.akto.dao.SampleDataDao;
+import com.akto.dao.testing.EndpointLogicalGroupDao;
+import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.*;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.ApiInfo;
@@ -64,6 +66,10 @@ public class SampleMessageStore {
         }
 
         return singleTypeInfoMap;
+    }
+
+    public static List<TestRoles> fetchTestRoles() {
+        return TestRolesDao.instance.findAll(new BasicDBObject());
     }
 
 
