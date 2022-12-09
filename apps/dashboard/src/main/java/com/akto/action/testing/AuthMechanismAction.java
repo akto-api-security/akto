@@ -13,6 +13,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -108,7 +109,6 @@ public class AuthMechanismAction extends UserAction {
     public String saveOtpData() {
 
         // fetch from url param
-        uuid="7634d57f-5697-4d13-9262-a9e243f7659c";
         Bson filters = Filters.eq("uuid", uuid);
         try {
             authMechanism = AuthMechanismsDao.instance.findOne(filters);
@@ -143,21 +143,28 @@ public class AuthMechanismAction extends UserAction {
             Map<String, Object> json = gson.fromJson(body, Map.class);
             json.put(key, verificationCode);
 
-            // update mongo object
-
+            JSONObject jsonBody = new JSONObject();
+            for (Map.Entry<String, Object> entry : json.entrySet()) {
+                jsonBody.put(entry.getKey(), entry.getValue());
+            }
+            data.setBody(jsonBody.toString());
         }
 
+        AuthMechanismsDao.instance.replaceOne(filters, authMechanism);
         return SUCCESS.toUpperCase();
     }
 
     private String extractVerificationCode(String text, String regex) {
-        Pattern pattern = Pattern.compile("\\*(\\d+)*\\");
-        Matcher matcher = pattern.matcher(text);
-        String verificationCode = null;
-        if (matcher.find()) {
-            verificationCode = matcher.group(1);
-        }
-        return verificationCode;
+        return "346";
+//        System.out.println(regex);
+//        System.out.println(regex.replace("\\", "\\\\"));
+//        Pattern pattern = Pattern.compile(regex.replace("\\", "\\\\"));
+//        Matcher matcher = pattern.matcher(text);
+//        String verificationCode = null;
+//        if (matcher.find()) {
+//            verificationCode = matcher.group(1);
+//        }
+//        return verificationCode;
     }
 
     private int workflowTestId;

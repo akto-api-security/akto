@@ -112,7 +112,7 @@
             </div>
 
                 
-
+            <token-automation/>
                 
 
 
@@ -155,6 +155,7 @@ import api from './api'
 import LayoutWithLeftPane from '@/apps/dashboard/layouts/LayoutWithLeftPane'
 import ApiCollectionGroup from '@/apps/dashboard/shared/components/menus/ApiCollectionGroup'
 import LoginStepBuilder from './LoginStepBuilder'
+import TokenAutomation from './components/token/TokenAutomation'
 
 export default {
     name: "PageTesting",
@@ -166,7 +167,8 @@ export default {
         LayoutWithTabs,
         LayoutWithLeftPane,
         ApiCollectionGroup,
-        LoginStepBuilder
+        LoginStepBuilder,
+        TokenAutomation
     },
     props: {
 
