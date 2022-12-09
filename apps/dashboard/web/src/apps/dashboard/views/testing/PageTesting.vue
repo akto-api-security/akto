@@ -1,5 +1,5 @@
 <template>
-    <layout-with-tabs title="API Testing" class="page-testing" :tabs='["Test results", "User config"]'>
+    <layout-with-tabs title="API Testing" class="page-testing" :tabs='["User config", "Test results"]'>
         <template slot="Test results">
             <div class="py-8">
                 <div>                
@@ -111,8 +111,9 @@
 
             </div>
 
-                
-            <token-automation/>
+            <v-dialog v-model="showTokenAutomation" class="token-automation-modal">
+                <token-automation/>
+            </v-dialog>    
                 
 
 
@@ -154,7 +155,7 @@ import { mapState } from 'vuex'
 import api from './api'
 import LayoutWithLeftPane from '@/apps/dashboard/layouts/LayoutWithLeftPane'
 import ApiCollectionGroup from '@/apps/dashboard/shared/components/menus/ApiCollectionGroup'
-import LoginStepBuilder from './LoginStepBuilder'
+import LoginStepBuilder from './components/token/LoginStepBuilder'
 import TokenAutomation from './components/token/TokenAutomation'
 
 export default {
@@ -182,7 +183,8 @@ export default {
             stopAllTestsLoading: false,
             drawer: null,
             showLoginSaveOption: false,
-            authMechanismData: {}
+            authMechanismData: {},
+            showTokenAutomation: true
         }
     },
     methods: {
@@ -530,6 +532,11 @@ export default {
 .p_padding {
     opacity: 0.4;
     margin: 10px;
+}
+
+.token-automation-modal {
+    width: 600px; 
+    height: 400px
 }
 
 </style>

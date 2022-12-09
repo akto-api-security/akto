@@ -51,26 +51,36 @@
     <div style="height: 24px"></div>
 
     <div class="d-flex ma-2">
-        <v-btn class = "mx-2" primary dark color="#6200EA" @click="testLoginStep">
+        <v-btn primary dark color="#6200EA" @click="testLoginStep">
             Test
         </v-btn>
-        <v-btn v-if="showLoginSaveOption" primary dark color="#6200EA" @click="saveLoginStep">
+        <v-btn primary dark color="#6200EA" @click="saveLoginStep">
             Save
         </v-btn>
+        <v-btn primary dark color="#6200EA" @click="emitAddTab">
+            Add Step
+        </v-btn>
+        <v-btn primary plain color="#6200EA" @click="emitRemoveTab" >
+            Remove Step
+        </v-btn>
+
     </div>
   </div>
 </template>
 
 <script>
 
-import TemplateStringEditor from "./components/react/TemplateStringEditor.jsx";
-import api from "./api";
+import TemplateStringEditor from "../react/TemplateStringEditor.jsx";
+import api from "../../api";
 import obj from "@/util/obj";
 
 export default {
     name: "LoginStepBuilder",
     components: {
       'template-string-editor' : TemplateStringEditor
+    },
+    props: {
+      tabName: obj.strR
     },
     data () {
       return {
@@ -84,10 +94,15 @@ export default {
       }
     },
     props: {
-      originalDbState: obj.objN,
-      showLoginSaveOption: obj.boolR
+      originalDbState: obj.objN
     },
     methods: {
+        emitRemoveTab() {
+          this.$emit('removeTab', this.tabName)
+        },
+        emitAddTab() {
+          this.$emit('addTab', this.tabName)
+        },
         testLoginStep() {
             console.log('test event')
             console.log(this.updatedData)
