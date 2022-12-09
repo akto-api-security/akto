@@ -14,6 +14,7 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 import com.akto.dto.User;
+import com.akto.dto.type.SingleTypeInfo;
 
 public class CustomAuthTypeAction extends UserAction{
     private String name;
@@ -45,6 +46,7 @@ public class CustomAuthTypeAction extends UserAction{
             CustomAuthTypeDao.instance.insertOne(customAuthType);
         }
         fetchCustomAuthTypes();
+        SingleTypeInfo.fetchCustomAuthTypes();
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -67,6 +69,7 @@ public class CustomAuthTypeAction extends UserAction{
                         Updates.set("timestamp", Context.now())));
         }
         fetchCustomAuthTypes();
+        SingleTypeInfo.fetchCustomAuthTypes();
         customAuthType = CustomAuthTypeDao.instance.findOne("name",name);
         return Action.SUCCESS.toUpperCase();
     }
@@ -87,6 +90,7 @@ public class CustomAuthTypeAction extends UserAction{
                         Updates.set("timestamp",Context.now())));
         }
         fetchCustomAuthTypes();
+        SingleTypeInfo.fetchCustomAuthTypes();
         customAuthType = CustomAuthTypeDao.instance.findOne("name",name);
         return Action.SUCCESS.toUpperCase();
     }
