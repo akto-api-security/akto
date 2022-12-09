@@ -4,6 +4,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.UsersDao;
@@ -15,6 +18,7 @@ import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 import com.akto.dto.User;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.utils.CustomAuthUtil;
 
 public class CustomAuthTypeAction extends UserAction{
     private String name;
@@ -24,6 +28,9 @@ public class CustomAuthTypeAction extends UserAction{
     private List<CustomAuthType> customAuthTypes;
     private Map<Integer,String> usersMap;
     private CustomAuthType customAuthType;
+
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
     public String fetchCustomAuthTypes(){
         customAuthTypes = CustomAuthTypeDao.instance.findAll(new BasicDBObject());
         Set<Integer> userIds = new HashSet<>();
@@ -47,6 +54,13 @@ public class CustomAuthTypeAction extends UserAction{
         }
         fetchCustomAuthTypes();
         SingleTypeInfo.fetchCustomAuthTypes();
+        int accountId = Context.accountId.get();
+        executorService.schedule( new Runnable() {
+            public void run() {
+                Context.accountId.set(accountId);
+                CustomAuthUtil.customAuthTypeUtil(SingleTypeInfo.activeCustomAuthTypes);
+            }
+        }, 5 , TimeUnit.SECONDS);
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -71,6 +85,13 @@ public class CustomAuthTypeAction extends UserAction{
         fetchCustomAuthTypes();
         SingleTypeInfo.fetchCustomAuthTypes();
         customAuthType = CustomAuthTypeDao.instance.findOne("name",name);
+        int accountId = Context.accountId.get();
+        executorService.schedule( new Runnable() {
+            public void run() {
+                Context.accountId.set(accountId);
+                CustomAuthUtil.customAuthTypeUtil(SingleTypeInfo.activeCustomAuthTypes);
+            }
+        }, 5 , TimeUnit.SECONDS);
         return Action.SUCCESS.toUpperCase();
     }
 

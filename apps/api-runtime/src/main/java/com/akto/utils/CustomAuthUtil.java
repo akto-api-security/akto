@@ -27,8 +27,6 @@ public class CustomAuthUtil {
         );
         return filters;
     }
-
-    // TODO: use this in customAuthTypeaction in a seperate thread
     public static void customAuthTypeUtil(List<CustomAuthType> customAuthTypes){
         List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(new BasicDBObject());
         Set<ApiInfo.AuthType> unauthenticatedTypes = new HashSet<>();
