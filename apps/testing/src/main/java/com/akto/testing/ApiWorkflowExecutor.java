@@ -71,9 +71,13 @@ public class ApiWorkflowExecutor {
         WorkflowTestResultsDao.instance.insertOne(workflowTestResult);
     }
 
-    public void runLoginFlow(WorkflowTest workflowTest, AuthMechanism authMechanism) throws Exception {
+    public ArrayList<Object> runLoginFlow(WorkflowTest workflowTest, AuthMechanism authMechanism) throws Exception {
         Graph graph = new Graph();
         graph.buildGraph(workflowTest);
+
+        ArrayList<Object> responses;
+
+        responses = null;
 
         List<Node> nodes = graph.sort();
         Map<String, Object> valuesMap = new HashMap<>();
@@ -90,6 +94,7 @@ public class ApiWorkflowExecutor {
             }
 
             if (nodeResult.getErrors().size() > 0)  throw new Exception("Error Processing Node In Login Flow " + node.getId());
+            responses.add(valuesMap.get(node.getId() + "response.body"));
         }
 
         for (AuthParam param : authMechanism.getAuthParams()) {
@@ -103,6 +108,7 @@ public class ApiWorkflowExecutor {
                 throw new Exception("error resolving auth param " + param.getValue());
             }
         }
+        return responses;
     }
 
 

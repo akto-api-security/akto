@@ -12,6 +12,11 @@
                     </div>
                 </div>
             </template>
+
+            <div class="d-flex jc-end pb-3">
+                <icon-menu icon="$fas_download" :items="dropDownMenuOptions"/>
+            </div>
+
         </layout-with-tabs>
     </div> 
 </template>
@@ -20,10 +25,12 @@
 import func from '@/util/func'
 import obj from '@/util/obj'
 import testing from '@/util/testing'
+import api from '../../api'
 
 import {mapState} from 'vuex'
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import LoginStepBuilder from './LoginStepBuilder'
+import IconMenu from '@/apps/dashboard/shared/components/IconMenu'
 
 export default {
     name: "TokenAutomation",
@@ -38,7 +45,15 @@ export default {
             apiTabs: ["API-1"],
             counter: 1,
             apiTabsInfo: {},
-            currTabName: "API-1"
+            currTabName: "API-1",
+            dropDownMenuOptions: [
+                {
+                    label: "Done"
+                },
+                {
+                    label: "Add Step"
+                }
+            ],
         }
     },
     methods: {
@@ -61,8 +76,7 @@ export default {
             this.currTabName = this.apiTabs[Math.min(0, indexTab-1)]
             this.apiTabs.splice(indexTab, 1)
         }
-
-    },
+      },
     computed: {
 
     }

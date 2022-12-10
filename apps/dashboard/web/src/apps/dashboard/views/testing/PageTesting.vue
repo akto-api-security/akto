@@ -252,6 +252,8 @@ export default {
 
           let authTokenPath = updatedData["authTokenPath"]
 
+        // type, requestData, authParamData
+
         let result = api.triggerLoginSteps(key, "", "HEADER", "SINGLE_REQUEST", authTokenPath, [{
                 "url": url,
                 "body": body,

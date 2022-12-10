@@ -37,6 +37,8 @@ public class AuthMechanismAction extends UserAction {
 
     private String uuid;
 
+    private ArrayList<Object> responses;
+
     private static final LoggerMaker loggerMaker = new LoggerMaker(AuthMechanismAction.class);
 
     public String addAuthMechanism() {
@@ -92,7 +94,7 @@ public class AuthMechanismAction extends UserAction {
 
         TestExecutor testExecutor = new TestExecutor();
         try {
-            testExecutor.executeLoginFlow(authMechanism);
+            testExecutor.executeLoginFlow(authMechanism, responses);
         } catch(Exception e) {
             addActionError(e.getMessage());
             return ERROR.toUpperCase();
@@ -209,6 +211,10 @@ public class AuthMechanismAction extends UserAction {
 
     public String getUuid() {
         return this.uuid;
+    }
+
+    public ArrayList<Object> getResponses() {
+        return this.responses;
     }
 
 

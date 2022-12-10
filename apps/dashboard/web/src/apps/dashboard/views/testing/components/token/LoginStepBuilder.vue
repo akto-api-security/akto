@@ -33,37 +33,46 @@
           :onChange=onChangeBody
         />
 
-        <div class="request-title">Auth header key</div>
-        <template-string-editor 
-          :defaultText="this.updatedData['authKey']"
-          :onChange=onChangeAuthKey
-        />
-
-        <div class="request-title">Auth header response key name</div>
-        <template-string-editor 
-          :defaultText="this.updatedData['authTokenPath']"
-          :onChange=onChangeAuthTokenPath
-        />
-
       </div>  
     </div>
 
     <div style="height: 24px"></div>
 
     <div class="d-flex ma-2">
-        <v-btn primary dark color="#6200EA" @click="testLoginStep">
+        <v-btn primary color="#6200EA" @click="testLoginStep">
             Test
         </v-btn>
-        <v-btn primary dark color="#6200EA" @click="saveLoginStep">
-            Save
-        </v-btn>
-        <v-btn primary dark color="#6200EA" @click="emitAddTab">
-            Add Step
+        <v-btn primary color="#6200EA" @click="saveStepData" :disabled="!testedSuccessfully">
+            Save and add step
         </v-btn>
         <v-btn primary plain color="#6200EA" @click="emitRemoveTab" >
             Remove Step
         </v-btn>
+        <v-btn primary plain color="#6200EA" @click="toggleShowAuthParams" >
+            Done
+        </v-btn>
 
+    </div>
+
+    <div class="d-flex" v-if="showAuthParams">
+            <div class="input-value">
+                <v-text-field 
+                    label="Auth header key"
+                    style="width: 200px"
+                />
+            </div>
+            <div class="input-value">
+                <v-text-field 
+                    label="Auth header value"
+                    style="width: 500px"
+                />                    
+            </div>
+    </div>
+
+    <div class="d-flex">
+        <v-btn primary plain color="#6200EA" @click="saveLoginStep" >
+            Save
+        </v-btn>
     </div>
   </div>
 </template>
@@ -73,6 +82,7 @@
 import TemplateStringEditor from "../react/TemplateStringEditor.jsx";
 import api from "../../api";
 import obj from "@/util/obj";
+import func from '@/util/func'
 
 export default {
     name: "LoginStepBuilder",
@@ -90,7 +100,11 @@ export default {
         defaultHeaderString: "{'content-type': 'application/json'}",
         defaultBody: "{}",
         defaultAuthKey: "",
-        defaultAuthTokenPath: ""
+        defaultAuthTokenPath: "",
+        stepData: [],
+        testedSuccessfully: false,
+        showAuthParams: false,
+        authParamData: []
       }
     },
     props: {
@@ -103,21 +117,13 @@ export default {
         emitAddTab() {
           this.$emit('addTab', this.tabName)
         },
-        testLoginStep() {
-            console.log('test event')
-            console.log(this.updatedData)
-            this.$emit("testLoginStep", {"updatedData": this.updatedData})
-        },
-        saveLoginStep() {
-            console.log('save event')
-            this.$emit("saveLoginStep", {"updatedData": this.updatedData})
-        },
         onChangeURL(newData) {
             console.log('url changed')
             console.log(newData)
             this.onChange("url", newData)
         },
         onChangeMethod(newData) {
+            console.log('method changed')
             this.onChange("method", newData)
         },
         onChangeQueryParams(newData) { 
@@ -137,22 +143,65 @@ export default {
         },
         onChange(key, newData) {
             this.updatedData[key] = newData
-        }
+            this.testedSuccessfully = false
+        },
+        toggleShowAuthParams() {
+          this.showAuthParams = true
+        },
+        testLoginStep() {
+        
+          let reqData = this.stepData
+          reqData.push(this.updatedData)
+          let result = api.triggerLoginSteps("LOGIN_REQUEST", reqData, [])
+
+          result.then((resp) => {
+              this.showLoginSaveOption = true
+              console.log('success')
+              func.showSuccessSnackBar("Login flow ran successfully!")
+              this.testedSuccessfully = true
+          }).catch((err) => {
+              this.showLoginSaveOption = false
+              console.log(err);
+          })
+
+          //this.$emit("testLoginStep", {"updatedData": this.stepData})
+
+
+      },
+      saveStepData() {
+        this.stepData.push(this.updatedData)
+        this.emitAddTab()
+      },
+      saveLoginStep() {
+          
+          let result = api.addAuthMechanism("LOGIN_REQUEST", this.stepData, this.authParamData)
+
+          result.then((resp) => {
+              func.showSuccessSnackBar("Login Flow saved successfully!")
+          }).catch((err) => {
+              console.log(err);
+          })
+
+      }
     },
-    computed: {
-        updatedData() {
-            if (this.originalDbState) return {...this.originalDbState}
-            return {
-                "url": this.defaultUrl,
-                "queryParams": this.defaultQueryParams,
-                "method": this.defaultMethod,
-                "headerString": this.defaultHeaderString,
-                "body": this.defaultBody,
-                "authKey": this.defaultAuthKey,
-                "authTokenPath": this.defaultAuthTokenPath
-            }
-        }
-    }
+      computed: {
+          updatedData() {
+              if (this.originalDbState) return {...this.originalDbState}
+              return {
+                  "url": this.defaultUrl,
+                  "queryParams": this.defaultQueryParams,
+                  "method": this.defaultMethod,
+                  "headerString": this.defaultHeaderString,
+                  "body": this.defaultBody,
+                  "authKey": this.defaultAuthKey,
+                  "authTokenPath": this.defaultAuthTokenPath
+              }
+          },
+        urlAndMethodFilled() {
+            return this.updatedData["url"]
+          }
+      }
+    
 }
 </script>
 
