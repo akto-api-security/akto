@@ -210,4 +210,13 @@ public class Main {
         return jsonNode.toString();
     }
 
+    public JsonNode fetchWorkspace(String workspaceId){
+        String url = BASE_URL + "workspaces/" + workspaceId;
+        return ApiRequest.getRequest(generateHeadersWithAuth(), url);
+    }
+
+    public JsonNode fetchCollection(String collectionId){
+        String url = BASE_URL + "collections/" + collectionId;
+        return ApiRequest.getRequest(generateHeadersWithAuth(), url);
+    }
 }

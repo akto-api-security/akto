@@ -57,5 +57,32 @@ export default{
             method: 'post',
             data: {}
         })
-    }
+    },
+    getPostmanCredentials() {
+        return request({
+            url: '/api/getPostmanCredential',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    fetchPostmanWorkspaces(api_key) {
+        return request({
+            url: '/api/fetchPostmanWorkspaces',
+            method: 'post',
+            data: {api_key}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    importPostmanWorkspace(workspace_id) {
+        return request({
+            url: '/api/importDataFromPostman',
+            method: 'post',
+            data: {workspace_id}
+        }).then((resp) => {
+            return resp
+        })
+    },
 }

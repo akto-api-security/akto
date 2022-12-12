@@ -1,32 +1,40 @@
 package com.akto.action;
 
 import com.akto.ApiRequest;
-import com.akto.DaoInit;
+import com.akto.analyser.ResourceAnalyser;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
-import com.akto.dto.APISpec;
-import com.akto.dto.ApiCollection;
-import com.akto.dto.SensitiveSampleData;
-import com.akto.dto.User;
+import com.akto.dto.*;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.listener.KafkaListener;
+import com.akto.parsers.HttpCallParser;
 import com.akto.postman.Main;
+import com.akto.runtime.APICatalogSync;
+import com.akto.runtime.policies.AktoPolicy;
 import com.akto.utils.SampleDataToSTI;
+import com.akto.utils.Utils;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.ReplaceOptions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import io.swagger.v3.oas.models.OpenAPI;
 import org.json.JSONObject;
 
 import java.util.*;
 
 public class PostmanAction extends UserAction {
+
+    private static final Logger logger = LoggerFactory.getLogger(PostmanAction.class);
     private static final ObjectMapper mapper = new ObjectMapper();
     @Override
     public String execute() {
@@ -224,6 +232,94 @@ public class PostmanAction extends UserAction {
 
         return SUCCESS.toUpperCase();
     }
+
+    private boolean skipKafka = true;
+
+    public String importDataFromPostman() throws Exception {
+        PostmanCredential postmanCredential = fetchPostmanCredential();
+        if (postmanCredential == null) {
+            addActionError("Please add postman credentials in settings");
+            return ERROR.toUpperCase();
+        }
+        Main main = new Main(postmanCredential.getApiKey());
+        String workspaceId = this.workspace_id;
+        JsonNode workspaceDetails = main.fetchWorkspace(workspaceId);
+        JsonNode workspaceObj = workspaceDetails.get("workspace");
+        ArrayNode collectionsObj = (ArrayNode) workspaceObj.get("collections");
+        Map<Integer, List<String>> aktoFormat = new HashMap<>();
+        for(JsonNode collectionObj: collectionsObj){
+            List<String> msgs = new ArrayList<>();
+            String collectionId = collectionObj.get("id").asText();
+            int aktoCollectionId = collectionId.hashCode();
+            aktoCollectionId = aktoCollectionId < 0 ? aktoCollectionId * -1: aktoCollectionId;
+            JsonNode collectionDetails = main.fetchCollection(collectionId);
+            JsonNode collectionDetailsObj = collectionDetails.get("collection");
+            Map<String, String> variablesMap = Utils.getVariableMap((ArrayNode) collectionDetailsObj.get("variable"));
+            ArrayNode itemsArr = (ArrayNode) collectionDetailsObj.get("item");
+            String collectionName = collectionDetailsObj.get("info").get("name").asText();
+            if(itemsArr == null) {
+                logger.info("Collection {} has no requests, skipping it", collectionName);
+                continue;
+            }
+            for(JsonNode item: itemsArr){
+                Map<String, String> apiInAktoFormat = Utils.convertApiInAktoFormat(item, variablesMap);
+                if(apiInAktoFormat != null){
+                    ApiCollectionsDao.instance.insertOne(new ApiCollection(aktoCollectionId, "Postman " + collectionName, (int)(new Date().getTime()/1000) , new HashSet<>(),  null, 0));
+                    try{
+                        String s = mapper.writeValueAsString(apiInAktoFormat);
+                        logger.info("CollectionName: {}, AktoFormat: {}",collectionName, s);
+                        msgs.add(s);
+                    } catch (JsonProcessingException e){
+                        logger.error(e.getMessage(), e);
+                    }
+                }
+            }
+            if(msgs.size() > 0) {
+                aktoFormat.put(aktoCollectionId, msgs);
+                logger.info("Pushed {} apis from collection {}", msgs.size(), collectionName);
+            }
+
+        }
+        //Push to Akto
+        String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
+        List<HttpResponseParams> responses = new ArrayList<>();
+        for(Map.Entry<Integer, List<String>> entry: aktoFormat.entrySet()){
+            //For each entry, push a message to Kafka
+            int aktoCollectionId = entry.getKey();
+            List<String> msgs = entry.getValue();
+            for(String msg: msgs){
+                if(msg.length() < 0.8 * KafkaListener.BATCH_SIZE_CONFIG){
+                    if(!skipKafka){
+                        KafkaListener.kafka.send(msg,"har_" + topic);
+                    } else {
+                        HttpResponseParams responseParams =  HttpCallParser.parseKafkaMessage(msg);
+                        responseParams.getRequestParams().setApiCollectionId(aktoCollectionId);
+                        responses.add(responseParams);
+                        logger.info("Api successfully pushed to Akto");
+                    }
+                } else {
+                    logger.error("Apiinfo too big, not sending to Kafka, msg size: {}", msg.length());
+                }
+            }
+
+            if(skipKafka) {
+                HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
+                SingleTypeInfo.fetchCustomDataTypes();
+                APICatalogSync apiCatalogSync = parser.syncFunction(responses, true, false);
+                AktoPolicy aktoPolicy = new AktoPolicy(parser.apiCatalogSync, false); // keep inside if condition statement because db call when initialised
+                aktoPolicy.main(responses, apiCatalogSync, false);
+                ResourceAnalyser resourceAnalyser = new ResourceAnalyser(300_000, 0.01, 100_000, 0.01);
+                for (HttpResponseParams responseParams: responses)  {
+                    responseParams.requestParams.getHeaders().put("x-forwarded-for", Collections.singletonList("127.0.0.1"));
+                    resourceAnalyser.analyse(responseParams);
+                }
+                resourceAnalyser.syncWithDb();
+            }
+        }
+        return SUCCESS.toUpperCase();
+    }
+
+
 
     public List<BasicDBObject> getCollections() {
         return collections;
