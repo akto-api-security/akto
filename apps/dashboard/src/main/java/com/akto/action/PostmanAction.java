@@ -1,7 +1,6 @@
 package com.akto.action;
 
 import com.akto.ApiRequest;
-import com.akto.analyser.ResourceAnalyser;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
@@ -10,11 +9,7 @@ import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.listener.KafkaListener;
-import com.akto.parsers.HttpCallParser;
 import com.akto.postman.Main;
-import com.akto.runtime.APICatalogSync;
-import com.akto.runtime.policies.AktoPolicy;
 import com.akto.utils.SampleDataToSTI;
 import com.akto.utils.Utils;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -171,20 +166,10 @@ public class PostmanAction extends UserAction {
     }
 
 
-    public PostmanCredential fetchPostmanCredential() {
-        int userId = getSUser().getId();
-        ThirdPartyAccess thirdPartyAccess = ThirdPartyAccessDao.instance.findOne(
-                Filters.and(
-                        Filters.eq("owner", userId),
-                        Filters.eq("credential.type", Credential.Type.POSTMAN)
-                )
-        );
-
-        if (thirdPartyAccess == null) {
-            return null;
-        }
-
-        return (PostmanCredential) thirdPartyAccess.getCredential();
+    private PostmanCredential fetchPostmanCredential() {
+        User u = getSUser();
+        int userId = u.getId();
+        return Utils.fetchPostmanCredential(userId);
     }
 
     private List<BasicDBObject> workspaces;
@@ -290,39 +275,11 @@ public class PostmanAction extends UserAction {
         //Push to Akto
         logger.info("Starting to push data to Akto, pushin data in {} collections", aktoFormat.size());
         String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
-        List<HttpResponseParams> responses = new ArrayList<>();
         for(Map.Entry<Integer, List<String>> entry: aktoFormat.entrySet()){
             //For each entry, push a message to Kafka
             int aktoCollectionId = entry.getKey();
             List<String> msgs = entry.getValue();
-            for(String msg: msgs){
-                if(msg.length() < 0.8 * KafkaListener.BATCH_SIZE_CONFIG){
-                    if(!skipKafka){
-                        KafkaListener.kafka.send(msg,"har_" + topic);
-                    } else {
-                        HttpResponseParams responseParams =  HttpCallParser.parseKafkaMessage(msg);
-                        responseParams.getRequestParams().setApiCollectionId(aktoCollectionId);
-                        responses.add(responseParams);
-                        logger.info("Api successfully pushed to Akto");
-                    }
-                } else {
-                    logger.error("Apiinfo too big, not sending to Kafka, msg size: {}", msg.length());
-                }
-            }
-
-            if(skipKafka) {
-                HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
-                SingleTypeInfo.fetchCustomDataTypes();
-                APICatalogSync apiCatalogSync = parser.syncFunction(responses, true, false);
-                AktoPolicy aktoPolicy = new AktoPolicy(parser.apiCatalogSync, false); // keep inside if condition statement because db call when initialised
-                aktoPolicy.main(responses, apiCatalogSync, false);
-                ResourceAnalyser resourceAnalyser = new ResourceAnalyser(300_000, 0.01, 100_000, 0.01);
-                for (HttpResponseParams responseParams: responses)  {
-                    responseParams.requestParams.getHeaders().put("x-forwarded-for", Collections.singletonList("127.0.0.1"));
-                    resourceAnalyser.analyse(responseParams);
-                }
-                resourceAnalyser.syncWithDb();
-            }
+            Utils.pushDataToKafka(aktoCollectionId, topic, msgs, new ArrayList<>(), skipKafka);
             logger.info("Pushed data in apicollection id {}", aktoCollectionId);
         }
         return SUCCESS.toUpperCase();

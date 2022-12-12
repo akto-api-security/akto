@@ -1,5 +1,16 @@
 package com.akto.utils;
 
+import com.akto.analyser.ResourceAnalyser;
+import com.akto.dao.ThirdPartyAccessDao;
+import com.akto.dto.HttpResponseParams;
+import com.akto.dto.third_party_access.Credential;
+import com.akto.dto.third_party_access.PostmanCredential;
+import com.akto.dto.third_party_access.ThirdPartyAccess;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.listener.KafkaListener;
+import com.akto.parsers.HttpCallParser;
+import com.akto.runtime.APICatalogSync;
+import com.akto.runtime.policies.AktoPolicy;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -7,10 +18,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 
 import java.sql.Timestamp;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
+import com.mongodb.client.model.Filters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -172,6 +182,52 @@ public class Utils {
             }
         }
 
+    }
+
+    public static void pushDataToKafka(int apiCollectionId, String topic, List<String> messages, List<String> errors, boolean skipKafka) throws Exception {
+        List<HttpResponseParams> responses = new ArrayList<>();
+        for (String message: messages){
+            if (message.length() < 0.8 * KafkaListener.BATCH_SIZE_CONFIG) {
+                if (!skipKafka) {
+                    KafkaListener.kafka.send(message,"har_" + topic);
+                } else {
+                    HttpResponseParams responseParams =  HttpCallParser.parseKafkaMessage(message);
+                    responseParams.getRequestParams().setApiCollectionId(apiCollectionId);
+                    responses.add(responseParams);
+                }
+            } else {
+                errors.add("Message too big size: " + message.length());
+            }
+        }
+
+        if(skipKafka) {
+            HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
+            SingleTypeInfo.fetchCustomDataTypes();
+            APICatalogSync apiCatalogSync = parser.syncFunction(responses, true, false);
+            AktoPolicy aktoPolicy = new AktoPolicy(parser.apiCatalogSync, false); // keep inside if condition statement because db call when initialised
+            aktoPolicy.main(responses, apiCatalogSync, false);
+            ResourceAnalyser resourceAnalyser = new ResourceAnalyser(300_000, 0.01, 100_000, 0.01);
+            for (HttpResponseParams responseParams: responses)  {
+                responseParams.requestParams.getHeaders().put("x-forwarded-for", Collections.singletonList("127.0.0.1"));
+                resourceAnalyser.analyse(responseParams);
+            }
+            resourceAnalyser.syncWithDb();
+        }
+    }
+
+    public static PostmanCredential fetchPostmanCredential(int userId) {
+        ThirdPartyAccess thirdPartyAccess = ThirdPartyAccessDao.instance.findOne(
+                Filters.and(
+                        Filters.eq("owner", userId),
+                        Filters.eq("credential.type", Credential.Type.POSTMAN)
+                )
+        );
+
+        if (thirdPartyAccess == null) {
+            return null;
+        }
+
+        return (PostmanCredential) thirdPartyAccess.getCredential();
     }
 
 }
