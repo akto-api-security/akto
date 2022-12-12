@@ -108,6 +108,7 @@ public class AuthMechanismAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    // fix and use this for dynamic otp
     public String saveOtpData() {
 
         // fetch from url param
