@@ -33,11 +33,18 @@ public class TestRolesAction extends UserAction {
 
     public String createTestRole () {
         if (roleName == null || roleName.isEmpty() || regex == null || regex.isEmpty()) {
+            addActionError("Test role is empty");
             return ERROR.toUpperCase();
         }
         try {
             Pattern.compile(regex);
         } catch (PatternSyntaxException e) {
+            addActionError("invalid regex");
+            return ERROR.toUpperCase();
+        }
+
+        if (TestRolesDao.instance.getMCollection().countDocuments(Filters.eq(TestRoles.NAME, roleName)) > 0) {//Role exists
+            addActionError("Role already exists");
             return ERROR.toUpperCase();
         }
         //Valid role name and regex

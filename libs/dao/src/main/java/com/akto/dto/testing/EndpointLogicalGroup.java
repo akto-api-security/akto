@@ -34,6 +34,8 @@ public class EndpointLogicalGroup {
         this.createdBy = createdBy;
     }
 
+    public static final String GROUP_NAME = "groupName";
+
     public String getGroupName() {
         return groupName;
     }

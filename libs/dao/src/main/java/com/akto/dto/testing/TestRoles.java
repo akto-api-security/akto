@@ -9,6 +9,7 @@ import static com.akto.util.Constants.ID;
 
 public class TestRoles {
     private ObjectId id;
+    public static final String NAME = "name";
     private String name;
     private ObjectId endpointLogicalGroupId;
     private AuthMechanism authMechanism;
