@@ -89,7 +89,7 @@ public class TestExecutor {
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
 
         try {
-            executeLoginFlow(authMechanism);
+            executeLoginFlow(authMechanism, null);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e.getMessage());
             return;
