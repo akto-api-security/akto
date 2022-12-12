@@ -8,8 +8,11 @@ import com.akto.util.modifier.NestedObjectModifier;
 import com.mongodb.BasicDBObject;
 import org.junit.Test;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+
+import static org.junit.Assert.*;
 
 public class TestJsonUtils {
 
@@ -21,10 +24,22 @@ public class TestJsonUtils {
 
         ConvertToArrayPayloadModifier convertToArrayPayloadModifier = new ConvertToArrayPayloadModifier();
         BasicDBObject modifiedPayload = JSONUtils.modify(payload, s, convertToArrayPayloadModifier);
-        System.out.println(modifiedPayload);
+        assertTrue(JSONUtils.flatten(modifiedPayload).get("friends#$#name").contains(Collections.singletonList("ankush")));
+        assertTrue(JSONUtils.flatten(modifiedPayload).get("friends#$#name").contains(Collections.singletonList("ankita")));
 
         NestedObjectModifier nestedObjectModifier = new NestedObjectModifier();
         modifiedPayload = JSONUtils.modify(payload, s, nestedObjectModifier);
-        System.out.println(modifiedPayload);
+        assertTrue(JSONUtils.flatten(modifiedPayload).get("friends#$#name#name").contains("ankush"));
+        assertTrue(JSONUtils.flatten(modifiedPayload).get("friends#$#name#name").contains("ankita"));
+    }
+
+    @Test
+    public void testNonJsonModify() {
+        String payload = "user=avneesh";
+        Set<String> s = new HashSet<>();
+        s.add("friends#$#name");
+        ConvertToArrayPayloadModifier convertToArrayPayloadModifier = new ConvertToArrayPayloadModifier();
+        String modifiedPayload = JSONUtils.modify(payload, s, convertToArrayPayloadModifier);
+        assertNull(modifiedPayload);
     }
 }
