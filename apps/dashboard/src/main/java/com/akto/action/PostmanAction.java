@@ -171,7 +171,7 @@ public class PostmanAction extends UserAction {
     }
 
 
-    private PostmanCredential fetchPostmanCredential() {
+    public PostmanCredential fetchPostmanCredential() {
         int userId = getSUser().getId();
         ThirdPartyAccess thirdPartyAccess = ThirdPartyAccessDao.instance.findOne(
                 Filters.and(
@@ -243,6 +243,7 @@ public class PostmanAction extends UserAction {
         }
         Main main = new Main(postmanCredential.getApiKey());
         String workspaceId = this.workspace_id;
+        logger.info("Fetching details for workspace_id: {}", workspace_id);
         JsonNode workspaceDetails = main.fetchWorkspace(workspaceId);
         JsonNode workspaceObj = workspaceDetails.get("workspace");
         ArrayNode collectionsObj = (ArrayNode) workspaceObj.get("collections");
@@ -255,19 +256,22 @@ public class PostmanAction extends UserAction {
             JsonNode collectionDetails = main.fetchCollection(collectionId);
             JsonNode collectionDetailsObj = collectionDetails.get("collection");
             Map<String, String> variablesMap = Utils.getVariableMap((ArrayNode) collectionDetailsObj.get("variable"));
-            ArrayNode itemsArr = (ArrayNode) collectionDetailsObj.get("item");
+            ArrayList<JsonNode> jsonNodes = new ArrayList<>();
+            fetchApisRecursively((ArrayNode) collectionDetailsObj.get("item"), jsonNodes);
             String collectionName = collectionDetailsObj.get("info").get("name").asText();
-            if(itemsArr == null) {
+            if(jsonNodes.size() == 0) {
                 logger.info("Collection {} has no requests, skipping it", collectionName);
                 continue;
             }
-            for(JsonNode item: itemsArr){
+            logger.info("Found {} apis in collection {}", jsonNodes.size(), collectionName);
+            for(JsonNode item: jsonNodes){
+                String apiName = item.get("name").asText();
+                logger.info("Processing api {} if collection {}", apiName, collectionName);
                 Map<String, String> apiInAktoFormat = Utils.convertApiInAktoFormat(item, variablesMap);
                 if(apiInAktoFormat != null){
-                    ApiCollectionsDao.instance.insertOne(new ApiCollection(aktoCollectionId, "Postman " + collectionName, (int)(new Date().getTime()/1000) , new HashSet<>(),  null, 0));
                     try{
                         String s = mapper.writeValueAsString(apiInAktoFormat);
-                        logger.info("CollectionName: {}, AktoFormat: {}",collectionName, s);
+                        logger.info("Api name: {}, CollectionName: {}, AktoFormat: {}", apiName, collectionName, s);
                         msgs.add(s);
                     } catch (JsonProcessingException e){
                         logger.error(e.getMessage(), e);
@@ -276,11 +280,15 @@ public class PostmanAction extends UserAction {
             }
             if(msgs.size() > 0) {
                 aktoFormat.put(aktoCollectionId, msgs);
+                if(ApiCollectionsDao.instance.findOne(Filters.eq("_id", aktoCollectionId)) == null){
+                    ApiCollectionsDao.instance.insertOne(ApiCollection.createManualCollection(aktoCollectionId, collectionName));
+                }
                 logger.info("Pushed {} apis from collection {}", msgs.size(), collectionName);
             }
 
         }
         //Push to Akto
+        logger.info("Starting to push data to Akto, pushin data in {} collections", aktoFormat.size());
         String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
         List<HttpResponseParams> responses = new ArrayList<>();
         for(Map.Entry<Integer, List<String>> entry: aktoFormat.entrySet()){
@@ -315,10 +323,24 @@ public class PostmanAction extends UserAction {
                 }
                 resourceAnalyser.syncWithDb();
             }
+            logger.info("Pushed data in apicollection id {}", aktoCollectionId);
         }
         return SUCCESS.toUpperCase();
     }
 
+    private void fetchApisRecursively(ArrayNode items, ArrayList<JsonNode> jsonNodes) {
+        if(items == null || items.size() == 0){
+            return;
+        }
+        for(JsonNode item: items){
+            if(item.has("item")){
+                fetchApisRecursively( (ArrayNode) item.get("item"), jsonNodes);
+            } else {
+                jsonNodes.add(item);
+            }
+        }
+
+    }
 
 
     public List<BasicDBObject> getCollections() {

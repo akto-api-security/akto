@@ -1,5 +1,7 @@
 package com.akto.dto;
 
+import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -120,5 +122,9 @@ public class ApiCollection {
         return result;
     }
 
+    // To be called if you are creating a collection that is not from mirroring
+    public static ApiCollection createManualCollection(int id, String name){
+        return new ApiCollection(id, name, (int)(new Date().getTime()/1000) , new HashSet<>(),  null, 0);
+    }
 
 }

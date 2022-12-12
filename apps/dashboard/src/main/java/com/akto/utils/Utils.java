@@ -15,8 +15,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-
-
 public class Utils {
 
     private static final Logger logger = LoggerFactory.getLogger(Utils.class);
@@ -31,6 +29,7 @@ public class Utils {
         }
         return result;
     }
+    
     public static Map<String, String> convertApiInAktoFormat(JsonNode apiInfo, Map<String, String> variables) {
         try {
             JsonNode request = apiInfo.get("request");
