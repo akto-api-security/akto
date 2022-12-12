@@ -8,8 +8,10 @@ import java.util.Set;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.util.modifier.PayloadModifier;
+import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import org.json.JSONArray;
 
 public class JSONUtils {
     private static void flatten(Object obj, String prefix, Map<String, Set<Object>> ret) {
@@ -117,10 +119,11 @@ public class JSONUtils {
             if (payload.isEmpty()) return null;
             BasicDBObject modifiedPayload = modify(payload, values, payloadModifier);
             if (modifiedPayload.containsKey("json")) {
-                modifiedPayload = (BasicDBObject) modifiedPayload.get("json");
+                return new Gson().toJson(modifiedPayload.get("json"));
             }
-            return modifiedPayload.toJson();
+            return new Gson().toJson(modifiedPayload);
         } catch (Exception e) {
+            e.printStackTrace();
             return null;
         }
     }
