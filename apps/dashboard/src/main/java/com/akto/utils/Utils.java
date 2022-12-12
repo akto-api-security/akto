@@ -160,5 +160,18 @@ public class Utils {
         return  result;
     }
 
+    public static void fetchApisRecursively(ArrayNode items, ArrayList<JsonNode> jsonNodes) {
+        if(items == null || items.size() == 0){
+            return;
+        }
+        for(JsonNode item: items){
+            if(item.has("item")){
+                fetchApisRecursively( (ArrayNode) item.get("item"), jsonNodes);
+            } else {
+                jsonNodes.add(item);
+            }
+        }
+
+    }
 
 }

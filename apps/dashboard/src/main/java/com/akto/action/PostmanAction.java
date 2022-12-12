@@ -257,7 +257,7 @@ public class PostmanAction extends UserAction {
             JsonNode collectionDetailsObj = collectionDetails.get("collection");
             Map<String, String> variablesMap = Utils.getVariableMap((ArrayNode) collectionDetailsObj.get("variable"));
             ArrayList<JsonNode> jsonNodes = new ArrayList<>();
-            fetchApisRecursively((ArrayNode) collectionDetailsObj.get("item"), jsonNodes);
+            Utils.fetchApisRecursively((ArrayNode) collectionDetailsObj.get("item"), jsonNodes);
             String collectionName = collectionDetailsObj.get("info").get("name").asText();
             if(jsonNodes.size() == 0) {
                 logger.info("Collection {} has no requests, skipping it", collectionName);
@@ -281,7 +281,7 @@ public class PostmanAction extends UserAction {
             if(msgs.size() > 0) {
                 aktoFormat.put(aktoCollectionId, msgs);
                 if(ApiCollectionsDao.instance.findOne(Filters.eq("_id", aktoCollectionId)) == null){
-                    ApiCollectionsDao.instance.insertOne(ApiCollection.createManualCollection(aktoCollectionId, collectionName));
+                    ApiCollectionsDao.instance.insertOne(ApiCollection.createManualCollection(aktoCollectionId, "Postman " + collectionName));
                 }
                 logger.info("Pushed {} apis from collection {}", msgs.size(), collectionName);
             }
@@ -326,20 +326,6 @@ public class PostmanAction extends UserAction {
             logger.info("Pushed data in apicollection id {}", aktoCollectionId);
         }
         return SUCCESS.toUpperCase();
-    }
-
-    private void fetchApisRecursively(ArrayNode items, ArrayList<JsonNode> jsonNodes) {
-        if(items == null || items.size() == 0){
-            return;
-        }
-        for(JsonNode item: items){
-            if(item.has("item")){
-                fetchApisRecursively( (ArrayNode) item.get("item"), jsonNodes);
-            } else {
-                jsonNodes.add(item);
-            }
-        }
-
     }
 
 
