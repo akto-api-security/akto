@@ -7,8 +7,8 @@
         <div v-else>
             <div v-if="postman_setup_complete">
                 <spinner v-if="workspace_loading" />
-                <div v-else>
-                    <div>Select a workspace to import data from:</div>
+                <div v-else class="mt-3">
+                    
                     <div>
                         <v-select v-model="workspace" :items="workspaces" item-text="name" item-value="id"
                             label="Select workspace" />
@@ -22,8 +22,8 @@
                     </div>
                 </div>
             </div>
-            <div v-else>
-                Navigate to the Settings > Integrations page and add Postman key to start importing data
+            <div v-else class="mt-3">
+                Navigate to the Settings > Integrations page by clicking <a class="clickable-docs" href="/dashboard/settings" >here</a>  and add Postman key to start importing data
             </div>
         </div>
     </div>
@@ -75,6 +75,11 @@ export default {
             this.importing_workspace = true;
             let resp = await api.importPostmanWorkspace(this.workspace);
             this.importing_workspace = false;
+            window._AKTO.$emit('SHOW_SNACKBAR', {
+                show: true,
+                text: `Imported! Go to API inventory and refresh to view your postman collection.`,
+                color: 'green'
+            })
         }
     }
 }
