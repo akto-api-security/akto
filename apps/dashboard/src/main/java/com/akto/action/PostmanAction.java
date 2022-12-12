@@ -267,7 +267,7 @@ public class PostmanAction extends UserAction {
             for(JsonNode item: jsonNodes){
                 String apiName = item.get("name").asText();
                 logger.info("Processing api {} if collection {}", apiName, collectionName);
-                Map<String, String> apiInAktoFormat = Utils.convertApiInAktoFormat(item, variablesMap);
+                Map<String, String> apiInAktoFormat = Utils.convertApiInAktoFormat(item, variablesMap, String.valueOf(1_000_000));
                 if(apiInAktoFormat != null){
                     try{
                         String s = mapper.writeValueAsString(apiInAktoFormat);

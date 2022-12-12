@@ -30,7 +30,7 @@ public class Utils {
         return result;
     }
     
-    public static Map<String, String> convertApiInAktoFormat(JsonNode apiInfo, Map<String, String> variables) {
+    public static Map<String, String> convertApiInAktoFormat(JsonNode apiInfo, Map<String, String> variables, String accountId) {
         try {
             JsonNode request = apiInfo.get("request");
             JsonNode response = apiInfo.has("response") ?  apiInfo.get("response").get(0): null;
@@ -42,7 +42,7 @@ public class Utils {
             Timestamp timestamp = new Timestamp(System.currentTimeMillis());
 
             Map<String, String> result = new HashMap<>();
-            result.put("akto_account_id", String.valueOf(1_000_000));
+            result.put("akto_account_id", accountId);
             result.put("path", getPath(request, variables));
             Map<String, String> requestHeadersMap = getHeaders((ArrayNode) request.get("header"));
             Map<String, String> responseHeadersMap = getHeaders((ArrayNode) response.get("header"));

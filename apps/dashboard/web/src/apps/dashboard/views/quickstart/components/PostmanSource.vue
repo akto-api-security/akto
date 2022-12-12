@@ -52,9 +52,7 @@ export default {
     },
     mounted () {
         api.getPostmanCredentials().then((resp) => {
-            console.log(resp);
             this.loading = false;
-            debugger;
             if (resp.postmanCred.api_key !== undefined) {
                 this.postman_setup_complete = true
                 this.postman_api_key = resp.postmanCred.api_key
@@ -68,7 +66,6 @@ export default {
         async fetchWorkspaces() {
             this.workspace_loading = true
             let resp = await api.fetchPostmanWorkspaces(this.postman_api_key)
-            console.log(resp);
             if(resp.workspaces){
                 this.workspaces = resp.workspaces
                 this.workspace_loading = false
@@ -78,7 +75,6 @@ export default {
             this.importing_workspace = true;
             let resp = await api.importPostmanWorkspace(this.workspace);
             this.importing_workspace = false;
-            console.log(resp)
         }
     }
 }

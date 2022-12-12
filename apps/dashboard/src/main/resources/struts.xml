@@ -550,7 +550,7 @@
             </result>
         </action>
 
-        <action name="api/importDataFromPostman" class="com.akto.action.PostmanAction" method="importDataFromPostman">
+        <action name="api/importPostmanWorkspace" class="com.akto.action.PostmanAction" method="importDataFromPostman">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json">

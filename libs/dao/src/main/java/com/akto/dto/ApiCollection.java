@@ -1,13 +1,13 @@
 package com.akto.dto;
 
-import java.util.Date;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
 import org.bson.codecs.pojo.annotations.BsonId;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
+
+import com.akto.dao.context.Context;
 
 public class ApiCollection {
 
@@ -124,7 +124,7 @@ public class ApiCollection {
 
     // To be called if you are creating a collection that is not from mirroring
     public static ApiCollection createManualCollection(int id, String name){
-        return new ApiCollection(id, name, (int)(new Date().getTime()/1000) , new HashSet<>(),  null, 0);
+        return new ApiCollection(id, name, Context.now() , new HashSet<>(),  null, 0);
     }
 
 }

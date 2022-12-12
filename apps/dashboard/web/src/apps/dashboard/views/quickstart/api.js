@@ -78,7 +78,7 @@ export default{
     },
     importPostmanWorkspace(workspace_id) {
         return request({
-            url: '/api/importDataFromPostman',
+            url: '/api/importPostmanWorkspace',
             method: 'post',
             data: {workspace_id}
         }).then((resp) => {
