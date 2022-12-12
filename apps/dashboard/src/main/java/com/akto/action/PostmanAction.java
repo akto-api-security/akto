@@ -233,7 +233,7 @@ public class PostmanAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    private boolean skipKafka = true;
+    private boolean skipKafka;
 
     public String importDataFromPostman() throws Exception {
         PostmanCredential postmanCredential = fetchPostmanCredential();
