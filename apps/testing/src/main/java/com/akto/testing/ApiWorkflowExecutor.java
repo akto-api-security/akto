@@ -18,6 +18,7 @@ import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,9 +76,7 @@ public class ApiWorkflowExecutor {
         Graph graph = new Graph();
         graph.buildGraph(workflowTest);
 
-        ArrayList<Object> responses;
-
-        responses = null;
+        ArrayList<Object> responses = new ArrayList<Object>();
 
         List<Node> nodes = graph.sort();
         Map<String, Object> valuesMap = new HashMap<>();
@@ -94,7 +93,11 @@ public class ApiWorkflowExecutor {
             }
 
             if (nodeResult.getErrors().size() > 0)  throw new Exception("Error Processing Node In Login Flow " + node.getId());
-            responses.add(valuesMap.get(node.getId() + "response.body"));
+
+            JSONObject respString = new JSONObject();
+            respString.put("headers", valuesMap.get(node.getId() + ".response.header"));
+            respString.put("body", valuesMap.get(node.getId() + ".response.body"));
+            responses.add(respString.toString());
         }
 
         for (AuthParam param : authMechanism.getAuthParams()) {
@@ -276,13 +279,18 @@ public class ApiWorkflowExecutor {
             }
         }
 
+        JSONObject headerString = new JSONObject();
         for (String headerName: headers.keySet()) {
+            headerString.put("method", headers.get(headerName));
+
             for (String val: headers.get(headerName)) {
                 String key = nodeId + "." + reqOrResp + "." + "header" + "." + headerName;
                 valuesMap.put(key, val);
             }
         }
 
+        String fullHeadersKey = nodeId + "." + reqOrResp + "." + "header";
+        valuesMap.put(fullHeadersKey, headerString.toString());
     }
 
 

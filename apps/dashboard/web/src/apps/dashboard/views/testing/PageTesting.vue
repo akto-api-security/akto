@@ -197,7 +197,12 @@ export default {
             this.saveAuth()
         },
         saveAuthMechanism() {
-            this.$store.dispatch('testing/addAuthMechanism', {key: this.newKey, value: this.newVal, location: "HEADER"})
+            this.$store.dispatch('testing/addAuthMechanism', {type: "HARDCODED", requestData: [], authParamData: [{
+                "key": this.newKey,
+                "value": this.newVal,
+                "where": "HEADER"
+            }]})
+            //key: this.newKey, value: this.newVal, location: "HEADER"
         },
         prepareItemForTable(x){
             return {

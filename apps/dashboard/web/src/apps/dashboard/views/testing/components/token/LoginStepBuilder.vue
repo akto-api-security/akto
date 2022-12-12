@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div style="overflow:scroll">
     <div style="display: flex; padding-bottom: 24px;">
       <div style="width: 100%">
 
@@ -42,7 +42,7 @@
         <v-btn primary color="#6200EA" @click="testLoginStep">
             Test
         </v-btn>
-        <v-btn primary color="#6200EA" @click="saveStepData" :disabled="!testedSuccessfully">
+        <v-btn primary color="#6200EA" @click="saveStepData">
             Save and add step
         </v-btn>
         <v-btn primary plain color="#6200EA" @click="emitRemoveTab" >
@@ -54,19 +54,31 @@
 
     </div>
 
-    <div class="d-flex" v-if="showAuthParams">
-            <div class="input-value">
+    <div v-if="showAuthParams">
+          <div v-for="(key, index) in authParamsList">
+            <div class="input-value d-flex">
                 <v-text-field 
                     label="Auth header key"
                     style="width: 200px"
+                    v-model="authParamsList[index].key"
                 />
-            </div>
-            <div class="input-value">
+
                 <v-text-field 
                     label="Auth header value"
                     style="width: 500px"
-                />                    
+                    v-model="authParamsList[index].value"
+                />       
+
+                <v-btn primary plain color="#6200EA" @click="deleteAuthElem" >
+                    Delete
+                </v-btn>
+
             </div>
+          </div>
+          <v-btn primary plain color="#6200EA" @click='addNewAuthParamElem' >
+              Add
+          </v-btn>
+
     </div>
 
     <div class="d-flex">
@@ -90,9 +102,11 @@ export default {
       'template-string-editor' : TemplateStringEditor
     },
     props: {
-      tabName: obj.strR
+      tabName: obj.strR,
+      showAddStepOption: obj.boolR
     },
     data () {
+      console.log("data: " , this.tabName);
       return {
         defaultUrl: "",
         defaultQueryParams: "",
@@ -104,18 +118,25 @@ export default {
         stepData: [],
         testedSuccessfully: false,
         showAuthParams: false,
-        authParamData: []
+        authParamData: [],
+        authParamsList: [{key: "", "where": "HEADER", value: ""}]
       }
     },
-    props: {
-      originalDbState: obj.objN
-    },
     methods: {
+        addNewAuthParamElem() {
+          let authParamClone = [...this.authParamsList]
+          authParamClone.push({key: "", "where": "HEADER", value:""})
+          this.authParamsList = authParamClone
+        },
         emitRemoveTab() {
+          console.log('logging tabname')
+          console.log(this.tabName)
           this.$emit('removeTab', this.tabName)
         },
         emitAddTab() {
-          this.$emit('addTab', this.tabName)
+          console.log('logging add tabname')
+          console.log(this.tabName)
+          this.$emit('addTab', this.updatedData)
         },
         onChangeURL(newData) {
             console.log('url changed')
@@ -147,41 +168,29 @@ export default {
         },
         toggleShowAuthParams() {
           this.showAuthParams = true
+          this.$emit('saveTabInfo', this.updatedData)
         },
         testLoginStep() {
-        
-          let reqData = this.stepData
-          reqData.push(this.updatedData)
-          let result = api.triggerLoginSteps("LOGIN_REQUEST", reqData, [])
-
-          result.then((resp) => {
-              this.showLoginSaveOption = true
-              console.log('success')
-              func.showSuccessSnackBar("Login flow ran successfully!")
-              this.testedSuccessfully = true
-          }).catch((err) => {
-              this.showLoginSaveOption = false
-              console.log(err);
-          })
-
-          //this.$emit("testLoginStep", {"updatedData": this.stepData})
-
-
-      },
+          console.log(this.updatedData)
+          this.$emit('testLoginStep', this.updatedData)
+          console.log('emit test event')
+        },
       saveStepData() {
-        this.stepData.push(this.updatedData)
+        console.log("stepData log")
+        console.log(JSON.stringify(this.stepData))
+        let data = this.stepData
+        data.push(JSON.stringify(this.updatedData))
+        this.stepData = data
+        console.log("stepData log2")
+        console.log(this.stepData)
         this.emitAddTab()
       },
       saveLoginStep() {
-          
-          let result = api.addAuthMechanism("LOGIN_REQUEST", this.stepData, this.authParamData)
-
-          result.then((resp) => {
-              func.showSuccessSnackBar("Login Flow saved successfully!")
-          }).catch((err) => {
-              console.log(err);
-          })
-
+          this.$emit('saveLoginStep', this.authParamsList)
+      },
+      deleteAuthElem(item) {
+        console.log("delete auth")
+        console.log(item)
       }
     },
       computed: {

@@ -94,7 +94,7 @@ public class AuthMechanismAction extends UserAction {
 
         TestExecutor testExecutor = new TestExecutor();
         try {
-            testExecutor.executeLoginFlow(authMechanism, responses);
+            responses = testExecutor.executeLoginFlow(authMechanism, responses);
         } catch(Exception e) {
             addActionError(e.getMessage());
             return ERROR.toUpperCase();
