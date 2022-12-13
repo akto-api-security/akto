@@ -192,7 +192,6 @@ export default {
                 "value": this.newVal,
                 "where": "HEADER"
             }]})
-            //key: this.newKey, value: this.newVal, location: "HEADER"
         },
         prepareItemForTable(x){
             return {
@@ -247,7 +246,6 @@ export default {
 
           let authTokenPath = updatedData["authTokenPath"]
 
-        // type, requestData, authParamData
 
         let result = api.triggerLoginSteps(key, "", "HEADER", "SINGLE_REQUEST", authTokenPath, [{
                 "url": url,
@@ -330,18 +328,6 @@ export default {
             if (!authParamData || authParamData.length === 0) return
 
             this.originalDbState = this.authMechanismData
-
-            // let data = requestData
-
-            // let authData = authParamData[0]
-
-            // let url = data["url"]
-
-            // if (!url || url == "") return
-
-            // this.originalDbState = {"url": url, "body": data["body"], "headers": data["headers"], "method": data["method"], 
-            // "queryParams": data["queryParams"], "authKey": authData["key"], "authTokenPath": authData["authTokenPath"]}
-
         })
       }
     },
