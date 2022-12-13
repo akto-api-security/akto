@@ -113,7 +113,7 @@ export default {
                 text: "Issue Category",
                 value: "issueCategory",
                 showFilterMenu: false,
-                items: [{ title: "Broken Object Level Authorization (BOLA)", value: "BOLA" }, { title: "Broken User Authentication (BUA)", value: "BUA" }]
+                items: []
             },
             {
                 text: "Collections",
@@ -154,13 +154,17 @@ export default {
             "No time to fix"
         ]
         const reOpen = "Reopen"
+        const subCategoriesToTitles = []
+        const categoryToSubCategories = {}
         return {
             ignoreReasons,
             reOpen,
             filterMenus,
             selectedTime,
             statusItems,
-            globalCheckbox: false
+            globalCheckbox: false,
+            subCategoriesToTitles,
+            categoryToSubCategories
         }
     },
     computed: {
@@ -203,8 +207,23 @@ export default {
             this.$store.commit('issues/updateSelectedIssueIds', { selectedIssueIds })
         }
     },
-    mounted() {
+    async mounted() {
         this.filterMenus[2].items = this.getCollections1()
+        this.$store.dispatch('issues/fetchAllSubCategories').then((x) => {
+            let store = {}
+            let result = []
+            this.$store.state.issues.allSubCategories.forEach((x) => {
+                let superCategory = x.superCategory
+                if (!store[superCategory.name]) {
+                    result.push({"title": superCategory.displayName, "value": superCategory.name})
+                    store[superCategory.name] = []
+                }
+                store[superCategory.name].push(x._name);
+            })  
+
+            this.filterMenus[1].items = [].concat(result)
+            this.categoryToSubCategories = store
+        })
     },
     methods: {
         async bulkReopen() {
@@ -327,22 +346,7 @@ export default {
             this.$store.dispatch('issues/loadIssues')
         },
         getSubcategoryArray(superCateogoryName) {
-            switch (superCateogoryName) {
-                case "BOLA":
-                    return [
-                        'REPLACE_AUTH_TOKEN'
-                        , 'ADD_USER_ID'
-                        , 'ADD_METHOD_IN_PARAMETER'
-                        , 'ADD_METHOD_OVERRIDE_HEADERS'
-                        , 'CHANGE_METHOD'
-                        , 'REPLACE_AUTH_TOKEN_OLD_VERSION'
-                        , 'PARAMETER_POLLUTION'
-                    ]
-                case "BUA":
-                    return ['REMOVE_TOKENS', 'JWT_NONE_ALGO']
-                case "BFLA":
-                    return ["BFLA"]
-            }
+            return this.categoryToSubCategories[superCateogoryName]
         },
         getCollections1() {
 

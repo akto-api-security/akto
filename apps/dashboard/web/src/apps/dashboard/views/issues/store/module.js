@@ -17,7 +17,8 @@ const state = {
     filterSubCategory1 : [],
     startEpoch : 0,
     selectedIssueIds : [],
-    testingRunResult: {}
+    testingRunResult: {},
+    allSubCategories: []
 }
 
 const issues = {
@@ -103,7 +104,15 @@ const issues = {
             }).catch(() => {
                 state.loading = false
             })
-        }
+        },
+        fetchAllSubCategories() {
+            return api.fetchAllSubCategories().then((resp) => {
+                state.allSubCategories = resp.subCategories
+            }).catch((err) => {
+                console.log(err);
+                state.allSubCategories = []
+            })
+        },
     },
     getters: {
         getLoading: (state) => state.loading,
