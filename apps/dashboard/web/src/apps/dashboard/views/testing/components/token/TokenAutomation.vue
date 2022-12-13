@@ -118,9 +118,7 @@ export default {
     },
     methods: {
         deleteAuthElem(item) {
-            console.log("delete auth")
             this.authParamsList.splice(item, 1)
-            console.log(item)
         },
 
         addNewAuthParamElem() {
@@ -159,14 +157,12 @@ export default {
 
            result.then((resp) => {
               this.showLoginSaveOption = true
-              console.log('success')
               func.showSuccessSnackBar("Login flow ran successfully!")
               let index = 0;
 
               let stepDataCopyObj = {}
 
               for (let key in this.stepData) {
-                console.log(key, this.stepData[key]);
                 
                 // if (this.stepData[key]["data"]==null) {
                 //     break

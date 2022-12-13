@@ -1,5 +1,5 @@
 <template>
-    <layout-with-tabs title="API Testing" class="page-testing" :tabs='["User config", "Test results"]'>
+    <layout-with-tabs title="API Testing" class="page-testing" :tabs='["Test results", "User config"]'>
         <template slot="Test results">
             <div class="py-8">
                 <div>                
@@ -324,7 +324,6 @@ export default {
           if (!this.authMechanismData) return
             let requestData = this.authMechanismData["requestData"]
             let str = JSON.stringify(this.authMechanismData);
-            console.log(str)
             if (!requestData || requestData.length === 0) return
 
             let authParamData = this.authMechanismData["authParams"]

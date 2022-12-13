@@ -54,19 +54,7 @@
           <div class="request-title">[Response] Payload</div>
           <div class="request-editor request-editor-payload">
             {{tabData.responsePayload}}
-          </div>
-          <div class="request-title">[Response] Payload</div>
-          <div class="request-editor request-editor-payload">
-            {{tabData.responsePayload}}
-          </div>
-          <div class="request-title">[Response] Payload</div>
-          <div class="request-editor request-editor-payload">
-            {{tabData.responsePayload}}
-          </div>
-          <div class="request-title">[Response] Payload</div>
-          <div class="request-editor request-editor-payload">
-            {{tabData.responsePayload}}
-          </div>
+          </div> 
         </div>
         <div v-else class="d-flex jc-sa">
           Click on the "Test" button to get the response
