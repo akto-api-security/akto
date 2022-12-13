@@ -13,11 +13,13 @@ import com.akto.dto.testing.*;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
+import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,6 +33,7 @@ import java.util.regex.Pattern;
 public class ApiWorkflowExecutor {
 
     private static final Logger logger = LoggerFactory.getLogger(ApiWorkflowExecutor.class);
+    private static final Gson gson = new Gson();
 
     public static void main(String[] args) {
         DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
@@ -55,7 +58,7 @@ public class ApiWorkflowExecutor {
         for (Node node: nodes) {
             WorkflowTestResult.NodeResult nodeResult;
             try {
-                nodeResult = processNode(node, valuesMap);
+                nodeResult = processNode(node, valuesMap, true);
             } catch (Exception e) {
                 e.printStackTrace();
                 List<String> testErrors = new ArrayList<>();
@@ -71,7 +74,54 @@ public class ApiWorkflowExecutor {
         WorkflowTestResultsDao.instance.insertOne(workflowTestResult);
     }
 
-    public WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap) {
+    public ArrayList<Object> runLoginFlow(WorkflowTest workflowTest, AuthMechanism authMechanism) throws Exception {
+        Graph graph = new Graph();
+        graph.buildGraph(workflowTest);
+
+        ArrayList<Object> responses = new ArrayList<Object>();
+
+        List<Node> nodes = graph.sort();
+        Map<String, Object> valuesMap = new HashMap<>();
+
+        for (Node node: nodes) {
+            WorkflowTestResult.NodeResult nodeResult;
+            try {
+                nodeResult = processNode(node, valuesMap, false);
+            } catch (Exception e) {
+                e.printStackTrace();
+                List<String> testErrors = new ArrayList<>();
+                testErrors.add("Error Processing Node In Login Flow " + e.getMessage());
+                nodeResult = new WorkflowTestResult.NodeResult("{}", false, testErrors);
+            }
+
+            if (nodeResult.getErrors().size() > 0)  throw new Exception("Error Processing Node In Login Flow " + node.getId());
+
+            JSONObject respString = new JSONObject();
+            
+            
+            Map<String, Object> json = gson.fromJson(nodeResult.getMessage(), Map.class);
+
+            respString.put("headers", valuesMap.get(node.getId() + ".response.header"));
+            respString.put("body", valuesMap.get(node.getId() + ".response.body"));
+            responses.add(respString.toString());
+        }
+
+        for (AuthParam param : authMechanism.getAuthParams()) {
+            try {
+                String value = executeCode(param.getValue(), valuesMap);
+                if (!param.getValue().equals(value) && value == null) {
+                    throw new Exception("auth param not found at specified path " + param.getValue());
+                }
+                param.setValue(value);
+            } catch(Exception e) {
+                throw new Exception("error resolving auth param " + param.getValue());
+            }
+        }
+        return responses;
+    }
+
+
+    public WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes) {
         System.out.println("\n");
         System.out.println("NODE: " + node.getId());
         List<String> testErrors = new ArrayList<>();
@@ -121,6 +171,10 @@ public class ApiWorkflowExecutor {
                 response = ApiExecutor.sendRequest(request, followRedirects);
 
                 int statusCode = response.getStatusCode();
+
+                if (!allowAllStatusCodes && (statusCode >= 400)) {
+                    testErrors.add("process node failed with status code " + statusCode);
+                }
                 String statusKey =   nodeId + "." + "response" + "." + "status_code";
                 valuesMap.put(statusKey, statusCode);
 
@@ -231,13 +285,19 @@ public class ApiWorkflowExecutor {
             }
         }
 
+        JSONObject headerString = new JSONObject();
         for (String headerName: headers.keySet()) {
+
+            headerString.put(headerName, headers.get(headerName));
+
             for (String val: headers.get(headerName)) {
                 String key = nodeId + "." + reqOrResp + "." + "header" + "." + headerName;
                 valuesMap.put(key, val);
             }
         }
 
+        String fullHeadersKey = nodeId + "." + reqOrResp + "." + "header";
+        valuesMap.put(fullHeadersKey, headerString.toString());
     }
 
 

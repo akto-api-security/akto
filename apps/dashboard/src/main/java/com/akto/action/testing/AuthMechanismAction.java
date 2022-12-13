@@ -5,50 +5,70 @@ import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dto.testing.*;
+import com.akto.log.LoggerMaker;
 import com.akto.testing.TestExecutor;
 import com.akto.util.enums.LoginFlowEnums;
+import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 public class AuthMechanismAction extends UserAction {
 
-    private AuthParam.Location location;
-    private String key;
-    private String value;
-
+    //todo: rename requestData, also add len check
     private ArrayList<RequestData> requestData;
-
-    private String authTokenPath;
 
     private String type;
 
     private AuthMechanism authMechanism;
 
+    private ArrayList<AuthParamData> authParamData;
+
+    private String verificationCodeBody;
+
+    private String uuid;
+
+    private ArrayList<Object> responses;
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(AuthMechanismAction.class);
+
     public String addAuthMechanism() {
+        // todo: add more validations
         List<AuthParam> authParams = new ArrayList<>();
-        if (location == null || key == null) {
-            addActionError("Location, Key or Value can't be empty");
-            return ERROR.toUpperCase();
-        }
 
         type = type != null ? type : LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString();
-
-        if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString()) && value == null ) {
-            addActionError("Value can't be empty");
-            return ERROR.toUpperCase();
-        }
 
         AuthMechanismsDao.instance.deleteAll(new BasicDBObject());
 
         if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
-            authParams.add(new HardcodedAuthParam(location, key, value));
+            if (authParamData != null) {
+                if (!authParamData.get(0).validate()) {
+                    addActionError("Key, Value, Location can't be empty");
+                    return ERROR.toUpperCase();
+                }
+                authParams.add(new HardcodedAuthParam(authParamData.get(0).getWhere(), authParamData.get(0).getKey(),
+                    authParamData.get(0).getValue()));
+            }
+            
         } else {
-            authParams.add(new LoginRequestAuthParam(location, key, value, authTokenPath));
+
+            for (AuthParamData param: authParamData) {
+                if (!param.validate()) {
+                    addActionError("Key, Value, Location can't be empty");
+                    return ERROR.toUpperCase();
+                }
+
+                authParams.add(new LoginRequestAuthParam(param.getWhere(), param.getKey(), param.getValue()));
+            }
         }
         AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type);
 
@@ -58,22 +78,25 @@ public class AuthMechanismAction extends UserAction {
 
     public String triggerLoginFlowSteps() {
         List<AuthParam> authParams = new ArrayList<>();
-        if (location == null || key == null || requestData == null || authTokenPath == null) {
-            addActionError("Location, Key, requestData, authTokenPath can't be empty");
-            return ERROR.toUpperCase();
-        }
-        type = type != null ? type : LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString();
 
         if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
-            authParams.add(new HardcodedAuthParam(location, key, value));
-        } else {
-            authParams.add(new LoginRequestAuthParam(location, key, value, authTokenPath));
+            addActionError("Invalid Type Value");
+            return ERROR.toUpperCase();
         }
+
+        for (AuthParamData param: authParamData) {
+            if (!param.validate()) {
+                addActionError("Key, Value, Location can't be empty");
+                return ERROR.toUpperCase();
+            }
+            authParams.add(new LoginRequestAuthParam(param.getWhere(), param.getKey(), param.getValue()));
+        }
+
         AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type);
 
         TestExecutor testExecutor = new TestExecutor();
         try {
-            testExecutor.executeLoginFlow(authMechanism);
+            responses = testExecutor.executeLoginFlow(authMechanism, responses);
         } catch(Exception e) {
             addActionError(e.getMessage());
             return ERROR.toUpperCase();
@@ -85,6 +108,68 @@ public class AuthMechanismAction extends UserAction {
 
         authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
         return SUCCESS.toUpperCase();
+    }
+
+    // fix and use this for dynamic otp
+    public String saveOtpData() {
+
+        // fetch from url param
+        Bson filters = Filters.eq("uuid", uuid);
+        try {
+            authMechanism = AuthMechanismsDao.instance.findOne(filters);
+        } catch(Exception e) {
+            loggerMaker.errorAndAddToDb("error extracting verification code for auth Id " + uuid);
+            return ERROR.toUpperCase();
+        }
+
+        for (RequestData data : authMechanism.getRequestData()) {
+            if (!(data.getType().equals("EMAIL_CODE_VERIFICATION") || data.getType().equals("MOBILE_CODE_VERIFICATION"))) {
+                continue;
+            }
+            LoginVerificationCodeData verificationCodeData = data.getVerificationCodeData();
+
+            String key = verificationCodeData.getKey();
+            String body = data.getBody();
+            String verificationCode;
+            try {
+                verificationCode = extractVerificationCode(verificationCodeBody, verificationCodeData.getRegexString());
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error parsing regex string " + verificationCodeData.getRegexString() +
+                        "for auth Id " + uuid);
+                return ERROR.toUpperCase();
+            }
+
+            if (verificationCode == null) {
+                loggerMaker.errorAndAddToDb("error extracting verification code for auth Id " + uuid);
+                return ERROR.toUpperCase();
+            }
+
+            Gson gson = new Gson();
+            Map<String, Object> json = gson.fromJson(body, Map.class);
+            json.put(key, verificationCode);
+
+            JSONObject jsonBody = new JSONObject();
+            for (Map.Entry<String, Object> entry : json.entrySet()) {
+                jsonBody.put(entry.getKey(), entry.getValue());
+            }
+            data.setBody(jsonBody.toString());
+        }
+
+        AuthMechanismsDao.instance.replaceOne(filters, authMechanism);
+        return SUCCESS.toUpperCase();
+    }
+
+    private String extractVerificationCode(String text, String regex) {
+        return "346";
+//        System.out.println(regex);
+//        System.out.println(regex.replace("\\", "\\\\"));
+//        Pattern pattern = Pattern.compile(regex.replace("\\", "\\\\"));
+//        Matcher matcher = pattern.matcher(text);
+//        String verificationCode = null;
+//        if (matcher.find()) {
+//            verificationCode = matcher.group(1);
+//        }
+//        return verificationCode;
     }
 
     private int workflowTestId;
@@ -106,25 +191,10 @@ public class AuthMechanismAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public AuthParam.Location getLocation() {
-        return this.location;
-    }
-
-    public String getKey() {
-        return this.key;
-    }
-
-    public String getValue() {
-        return this.value;
-    }
-
     public String getType() {
         return this.type;
     }
 
-    public String getAuthTokenPath() {
-        return this.authTokenPath;
-    }
 
     public ArrayList<RequestData> getRequestData() {
         return this.requestData;
@@ -134,17 +204,22 @@ public class AuthMechanismAction extends UserAction {
         return this.authMechanism;
     }
 
-    public void setLocation(AuthParam.Location location) {
-        this.location = location;
+    public ArrayList<AuthParamData> getAuthParamData() {
+        return this.authParamData;
     }
 
-    public void setKey(String key) {
-        this.key = key;
+    public String getVerificationCodeBody() {
+        return this.verificationCodeBody;
     }
 
-    public void setValue(String value) {
-        this.value = value;
+    public String getUuid() {
+        return this.uuid;
     }
+
+    public ArrayList<Object> getResponses() {
+        return this.responses;
+    }
+
 
     public void setWorkflowTestId(int workflowTestId) {
         this.workflowTestId = workflowTestId;
@@ -166,7 +241,15 @@ public class AuthMechanismAction extends UserAction {
         this.requestData = requestData;
     }
 
-    public void setAuthTokenPath(String authTokenPath) {
-        this.authTokenPath = authTokenPath;
+    public void setAuthParamData(ArrayList<AuthParamData> authParamData) {
+        this.authParamData = authParamData;
+    }
+
+    public void setVerificationCodeBody(String verificationCodeBody) {
+        this.verificationCodeBody = verificationCodeBody;
+    }
+
+    public void setUuid(String uuid) {
+        this.uuid = uuid;
     }
 }

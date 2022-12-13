@@ -14,6 +14,7 @@ import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.rules.*;
 import com.akto.store.SampleMessageStore;
@@ -24,9 +25,9 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
+import org.bson.json.JsonObject;
 import org.bson.types.ObjectId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -88,7 +89,7 @@ public class TestExecutor {
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
 
         try {
-            executeLoginFlow(authMechanism);
+            executeLoginFlow(authMechanism, null);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e.getMessage());
             return;
@@ -176,51 +177,65 @@ public class TestExecutor {
 
     }
 
-    public AuthMechanism executeLoginFlow(AuthMechanism authMechanism) throws Exception {
+    public ArrayList<Object> executeLoginFlow(AuthMechanism authMechanism, ArrayList<Object> resp) throws Exception {
 
-        AuthParam authParam = authMechanism.fetchFirstAuthParam();
-        if (!authMechanism.getType().equals(LoginFlowEnums.AuthMechanismTypes.SINGLE_REQUEST.toString())) {
-            return authMechanism;
+        if (!authMechanism.getType().equals(LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString())) {
+            return new ArrayList<Object>();
         }
 
-        ArrayList<RequestData> requestData = authMechanism.getRequestData();
-
-        // todo: handle multiple steps later
-        RequestData data = requestData.get(0);
-
-        OriginalHttpRequest request = new OriginalHttpRequest(data.getUrl(), data.getQueryParams(), data.getMethod(),
-                data.getBody(), OriginalHttpRequest.buildHeadersMap(data.getHeaders()),"");
-
-        OriginalHttpResponse response;
+        WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData());
+        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
+        ArrayList<Object> responses = new ArrayList<Object>();
         try {
-            response = ApiExecutor.sendRequest(request, false);
-            loggerMaker.infoAndAddToDb("Login Call Response {}" + response.getBody());
+            resp = apiWorkflowExecutor.runLoginFlow(workflowObj, authMechanism);
         } catch(Exception e){
             loggerMaker.errorAndAddToDb("Login call failed {}" + e.getMessage());
             throw new Exception("Login Flow Failed");
         }
-
-        String token;
-        try {
-
-            Map<String, Object> respMap = new HashMap<>();
-            respMap = generateResponseMap(response.getBody(), request.getHeaders());
-
-            token = (String) respMap.get(authParam.getAuthTokenPath());
-            if (token == null) {
-                throw new Exception("Invalid Token Path");
-            }
-        } catch(Exception e){
-            String errorString = "Token Parsing failed in login flow {}" + e.getMessage();
-            loggerMaker.errorAndAddToDb(errorString);
-            throw new Exception("Token Parsing failed in login flow");
-        }
-
-        authParam.setValue(token);
-
-        return authMechanism;
+        return resp;
     }
 
+    public WorkflowTest convertToWorkflowGraph(ArrayList<RequestData> requestData) {
+
+        String source, target;
+        List<String> edges = new ArrayList<>();
+        int edgeNumber = 1;
+        LoginWorkflowGraphEdge edgeObj;
+        Map<String,WorkflowNodeDetails> mapNodeIdToWorkflowNodeDetails = new HashMap<>();
+        for (int i=0; i< requestData.size(); i++) {
+
+            RequestData data = requestData.get(i);
+
+            source = (i==0)? "1" : "x"+ (edgeNumber - 2);
+            target = "x"+ edgeNumber;
+            edgeNumber += 2;
+
+            edgeObj = new LoginWorkflowGraphEdge(source, target, target);
+            edges.add(edgeObj.toString());
+
+            JSONObject json = new JSONObject() ;
+            json.put("method", data.getMethod());
+            json.put("requestPayload", data.getBody());
+            json.put("path", data.getUrl());
+            json.put("requestHeaders", data.getHeaders());
+            json.put("type", "");
+
+            WorkflowUpdatedSampleData sampleData = new WorkflowUpdatedSampleData(json.toString(), data.getQueryParams(),
+                    data.getHeaders(), data.getBody(), data.getUrl());
+
+            WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(0, data.getUrl(),
+                    URLMethods.Method.fromString(data.getMethod()), "", sampleData,
+                    WorkflowNodeDetails.Type.API, true, data.getWaitTime());
+
+            mapNodeIdToWorkflowNodeDetails.put(target, workflowNodeDetails);
+        }
+
+        edgeObj = new LoginWorkflowGraphEdge("x"+ (edgeNumber - 2), "3", "x"+ edgeNumber);
+        edges.add(edgeObj.toString());
+
+        return new WorkflowTest(0, 0, "", Context.now(), "", Context.now(),
+                null, edges, mapNodeIdToWorkflowNodeDetails, WorkflowTest.State.DRAFT);
+    }
 
     public Map<String, Object> generateResponseMap(String payloadStr, Map<String, List<String>> headers) {
         boolean isList = false;
