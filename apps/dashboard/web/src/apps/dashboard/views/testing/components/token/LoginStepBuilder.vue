@@ -81,7 +81,6 @@ export default {
       tabData: obj.objR
     },
     data () {
-      console.log("data: " , this.tabName);
       return {
         defaultUrl: "https://juice-shop.herokuapp.com/rest/user/login",
         defaultQueryParams: "",
@@ -98,12 +97,9 @@ export default {
     },
     methods: {
         onChangeURL(newData) {
-            console.log('url changed')
-            console.log(newData)
             this.onChange("url", newData)
         },
         onChangeMethod(newData) {
-            console.log('method changed')
             this.onChange("method", newData)
         },
         onChangeQueryParams(newData) { 

@@ -134,10 +134,6 @@ export default {
 
         testLoginStep(updatedData, tabString) {
           this.testedDataButNotSaved = updatedData
-          console.log("test login log")
-          console.log(JSON.stringify(updatedData))
-          console.log(tabString)
-          console.log(JSON.stringify(this.stepData))
 
           
           let currentTabPushed = false
@@ -206,7 +202,6 @@ export default {
           
           let reqData = []
           for (let key in this.stepData) {
-            console.log(key, this.stepData[key]);
             
             if (this.stepData[key]["data"]==null) {
                 continue
@@ -226,8 +221,6 @@ export default {
           this.$emit('closeLoginStepBuilder')
         },
         addTab(tabString) {
-            console.log('tabString')
-            console.log(tabString)
             let updatedData = this.testedDataButNotSaved
             this.addNewDataToTestReq = true
             this.stepData[tabString] = {"data": updatedData, "showAddStepOption": false,
@@ -238,20 +231,10 @@ export default {
             apiTabsCopy.push(newTabName)
             this.apiTabs = apiTabsCopy
             this.currTabName = newTabName
-
-            console.log('add tab data')
-            console.log(JSON.stringify(updatedData))
-            console.log(JSON.stringify(this.stepData))
-
             let objData = {"showAddStepOption": false,
              "testedSuccessfully": false}
 
             this.$set(this.stepData, newTabName, objData)
-
-            // let reqData = this.stepData
-            // this.stepData.push(updatedData)
-            // this.stepData = reqData
-            console.log(JSON.stringify(this.stepData))
         },
         saveTabInfo(tabString) {
             if (this.testedDataButNotSaved) {
@@ -271,12 +254,9 @@ export default {
                 return
             }
             let indexTab = this.apiTabs.indexOf(tabName)
-            console.log(indexTab)
             this.currTabName = this.apiTabs[Math.min(0, indexTab-1)]
-            //this.apiTabs = Array.from({length: this.apiTabs.length -1}, (_, i) => this.apiTabs[i >= indexTab ? i + 1: i]);
             this.apiTabs.splice(indexTab, 1)
             Vue.delete(this.stepData, tabName);
-            //this.stepData.splice(indexTab, 1)
         }
     },
 
