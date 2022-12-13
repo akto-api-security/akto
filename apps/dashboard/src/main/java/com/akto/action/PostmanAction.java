@@ -255,6 +255,7 @@ public class PostmanAction extends UserAction {
                 Map<String, String> apiInAktoFormat = Utils.convertApiInAktoFormat(item, variablesMap, String.valueOf(1_000_000));
                 if(apiInAktoFormat != null){
                     try{
+                        apiInAktoFormat.put("akto_vxlan_id", String.valueOf(apiCollectionId));
                         String s = mapper.writeValueAsString(apiInAktoFormat);
                         logger.info("Api name: {}, CollectionName: {}, AktoFormat: {}", apiName, collectionName, s);
                         msgs.add(s);
