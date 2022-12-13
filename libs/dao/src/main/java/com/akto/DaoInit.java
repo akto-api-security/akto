@@ -130,6 +130,8 @@ public class DaoInit {
                 .builder(TestingRunIssues.class).enableDiscriminator(true).build();
         ClassModel<TestingIssuesId> testingIssuesIdClassModel = ClassModel
                 .builder(TestingIssuesId.class).enableDiscriminator(true).build();
+        ClassModel<CustomAuthType> customAuthTypeModel = ClassModel
+                .builder(CustomAuthType.class).enableDiscriminator(true).build();
         // ClassModel<AwsResource> awsResourceModel =
         // ClassModel.builder(AwsResource.class).enableDiscriminator(true)
         // .build();
@@ -154,7 +156,7 @@ public class DaoInit {
                 workflowTestingEndpointsClassModel, workflowTestResultClassModel,
                 cappedSetClassModel, CustomWebhookClassModel, CustomWebhookResultClassModel,
                 nodeResultClassModel, awsResourcesModel, AktoDataTypeClassModel, testingRunIssuesClassModel,
-                testingIssuesIdClassModel).automatic(true).build());
+                testingIssuesIdClassModel, customAuthTypeModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),

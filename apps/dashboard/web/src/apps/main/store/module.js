@@ -10,6 +10,7 @@ import sensitive from '@/apps/dashboard/views/observe/sensitive/store/module'
 import collections from '@/apps/dashboard/views/observe/collections/store/module'
 import data_types from '@/apps/dashboard/views/settings/components/data_types/store/module'
 import tag_configs from '@/apps/dashboard/views/settings/components/tag_configs/store/module'
+import auth_types from '../../dashboard/views/settings/components/auth_types/store/module'
 import issues from '@/apps/dashboard/views/issues/store/module'
 
 Vue.use(Vuex)
@@ -26,6 +27,7 @@ const store = new Vuex.Store({
         sensitive,
         data_types,
         tag_configs,
+        auth_types,
         testing,
         issues
     }
