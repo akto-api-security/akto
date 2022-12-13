@@ -17,9 +17,9 @@
                     <div style="display: flex; justify-content: space-between">
                         <div style="display: flex">
                             <div style="padding-right: 20px" v-if="index !== 0">
-                                <operator-component :operator="conditions.operator" @operatorChanged="operatorChanged"/>
+                                <operator-component :operator="conditions.operator" @operatorChanged="operatorChanged" :onlyEqual="onlyEqual ? onlyEqual : false"/>
                             </div>
-                            <simple-condition-component :initial_string="initial_string" :condition="condition"/>
+                            <simple-condition-component :initial_string="initial_string" :condition="condition" :onlyEqual="onlyEqual ? onlyEqual : false"/>
                         </div>
                         <div v-if="hover">
                             <v-icon 
@@ -44,6 +44,9 @@ export default {
     name: "CondtionsTable",
     props: {
         conditions: obj.objN,
+        onlyEqual: {
+            type:Boolean
+        },
         initial_string: obj.strR,
         table_header: obj.strR
     },

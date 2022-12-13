@@ -73,11 +73,12 @@ export default {
             return resp
         })        
     },
-    addAuthMechanism(key, value, location, type, authTokenPath, requestData) {
+
+    addAuthMechanism(type, requestData, authParamData) {
         return request({
             url: '/api/addAuthMechanism',
             method: 'post',
-            data: {key, value, location, type, authTokenPath, requestData}
+            data: {type, requestData, authParamData}
         }).then((resp) => {
             return resp
         })        
@@ -115,11 +116,11 @@ export default {
         })
     },
 
-    triggerLoginSteps(key, value, location, type, authTokenPath, requestData) {
+    triggerLoginSteps(type, requestData, authParamData) {
         return request({
             url: 'api/triggerLoginSteps',
             method: 'post',
-            data: {key, value, location, type, authTokenPath, requestData}
+            data: {type, requestData, authParamData}
         }).then((resp) => {
             return resp
         })
