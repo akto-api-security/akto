@@ -93,10 +93,9 @@ public class Utils {
             result.put("ip", "null");
             result.put("time", Long.toString(timestamp.getTime() / 1000L));
             result.put("statusCode", response.get("code").asText());
-            result.put("type", "http"); // TODO discuss with Ankush / Avneesh
+            result.put("type", "http");
             result.put("status", response.get("status").asText());
-
-            result.put("contentType", contentType); // TODO discuss with Ankush / Avneesh
+            result.put("contentType", contentType);
             result.put("source", "POSTMAN");
 
             return result;
@@ -110,10 +109,17 @@ public class Utils {
         if(responseHeadersMap.containsKey("content-type")){
             return responseHeadersMap.get("content-type");
         }
-        if(request.has("body") && request.get("body").has("options") &&
-         request.get("body").get("options").has("raw") && 
-         request.get("body").get("options").get("raw").has("language")){
-            return request.get("body").get("options").get("raw").get("language").asText();
+        if(request.has("body")){
+            JsonNode body = request.get("body");
+            if(body.has("options")){
+                JsonNode options = request.get("options");
+                if(options.has("raw")){
+                    JsonNode raw = request.get("raw");
+                    if(raw.has("language")){
+                        return raw.get("language").asText();
+                    }
+                }
+            }
         }
         return response.get("_postman_previewlanguage").asText();
     }
@@ -204,7 +210,7 @@ public class Utils {
             HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
             SingleTypeInfo.fetchCustomDataTypes();
             APICatalogSync apiCatalogSync = parser.syncFunction(responses, true, false);
-            AktoPolicy aktoPolicy = new AktoPolicy(parser.apiCatalogSync, false); // keep inside if condition statement because db call when initialised
+            AktoPolicy aktoPolicy = new AktoPolicy(parser.apiCatalogSync, false);
             aktoPolicy.main(responses, apiCatalogSync, false);
             ResourceAnalyser resourceAnalyser = new ResourceAnalyser(300_000, 0.01, 100_000, 0.01);
             for (HttpResponseParams responseParams: responses)  {
