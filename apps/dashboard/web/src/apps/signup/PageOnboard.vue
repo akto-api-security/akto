@@ -156,8 +156,7 @@ export default {
           allEmails: this.allEmails
         }
       }).then((resp) => {
-        console.log(resp);
-        window.location.href = resp.redirect != undefined ? resp.redirect: 'dashboard/testing'
+        window.location.href = '/dashboard/testing'
       })
     }
   }
