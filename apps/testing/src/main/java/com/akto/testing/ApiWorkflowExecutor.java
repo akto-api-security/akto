@@ -155,7 +155,7 @@ public class ApiWorkflowExecutor {
 
         ScriptEngine engine = factory.getEngineByName("nashorn");
         try {
-            String code = replaceVariables(testValidatorCode, valuesMap);
+            String code = replaceVariables(testValidatorCode, valuesMap, true);
             System.out.println("*******************************************************************");
             System.out.println("TEST VALIDATOR CODE:");
             System.out.println(code);
@@ -312,7 +312,7 @@ public class ApiWorkflowExecutor {
     private final ScriptEngineManager factory = new ScriptEngineManager();
 
     public String executeCode(String ogPayload, Map<String, Object> valuesMap) throws Exception {
-        String variablesReplacedPayload = replaceVariables(ogPayload,valuesMap);
+        String variablesReplacedPayload = replaceVariables(ogPayload,valuesMap, true);
 
         String regex = "\\#\\[(.*?)]#";
         Pattern p = Pattern.compile(regex);
@@ -346,7 +346,7 @@ public class ApiWorkflowExecutor {
 
 
     // todo: test invalid cases
-    public String replaceVariables(String payload, Map<String, Object> valuesMap) throws Exception {
+    public String replaceVariables(String payload, Map<String, Object> valuesMap, boolean escapeString) throws Exception {
         String regex = "\\$\\{(x\\d+\\.[\\w\\[\\].]+|AKTO\\.changes_info\\..*?)\\}"; // todo: integer inside brackets
         Pattern p = Pattern.compile(regex);
 
@@ -362,15 +362,17 @@ public class ApiWorkflowExecutor {
                 logger.error("couldn't find: " + key);
                 throw new Exception("Couldn't find " + key);
             }
-            String val = obj.toString()
-                    .replace("\\", "\\\\")
-                    .replace("\t", "\\t")
-                    .replace("\b", "\\b")
-                    .replace("\n", "\\n")
-                    .replace("\r", "\\r")
-                    .replace("\f", "\\f")
-                    .replace("\'", "\\'")
-                    .replace("\"", "\\\"");
+            String val = obj.toString();
+            if (escapeString) {
+                val = val.replace("\\", "\\\\")
+                        .replace("\t", "\\t")
+                        .replace("\b", "\\b")
+                        .replace("\n", "\\n")
+                        .replace("\r", "\\r")
+                        .replace("\f", "\\f")
+                        .replace("\'", "\\'")
+                        .replace("\"", "\\\"");
+            }
             matcher.appendReplacement(sb, "");
             sb.append(val);
         }
