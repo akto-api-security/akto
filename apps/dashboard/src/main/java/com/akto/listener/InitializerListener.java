@@ -282,7 +282,6 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void webhookSenderUtil(CustomWebhook webhook){
-        Gson gson = new Gson();
         int now = Context.now();
 
         boolean shouldSend = ( webhook.getLastSentTimestamp() + webhook.getFrequencyInSeconds() ) <= now ;
@@ -300,7 +299,7 @@ public class InitializerListener implements ServletContextListener {
 
         Map<String,Object> valueMap = new HashMap<>();
 
-        valueMap.put("AKTO.changes_info.newSensitiveEndpoints", ci.newSensitiveParams);
+        valueMap.put("AKTO.changes_info.newSensitiveEndpoints", ci.newSensitiveParamsObject);
         valueMap.put("AKTO.changes_info.newSensitiveEndpointsCount",ci.newSensitiveParams.size());
 
         valueMap.put("AKTO.changes_info.newEndpoints",ci.newEndpointsLast7DaysObject);
@@ -373,6 +372,7 @@ public class InitializerListener implements ServletContextListener {
 
     static class ChangesInfo {
         public Map<String, String> newSensitiveParams = new HashMap<>();
+        public List<BasicDBObject> newSensitiveParamsObject = new ArrayList<>();
         public List<String> newEndpointsLast7Days = new ArrayList<>();
         public List<BasicDBObject> newEndpointsLast7DaysObject = new ArrayList<>();
         public List<String> newEndpointsLast31Days = new ArrayList<>();
@@ -487,7 +487,17 @@ public class InitializerListener implements ServletContextListener {
             }
 
             for(Pair<String, String> key: endpointToSubTypes.keySet()) {
-                ret.newSensitiveParams.put(key.getFirst() + ": " + StringUtils.join(endpointToSubTypes.get(key), ","), key.getSecond());
+                String subTypes = StringUtils.join(endpointToSubTypes.get(key), ",");
+                String methodPlusUrl = key.getFirst();
+                ret.newSensitiveParams.put(methodPlusUrl + ": " + subTypes, key.getSecond());
+
+                BasicDBObject basicDBObject = new BasicDBObject();
+                String[] methodPlusUrlList = methodPlusUrl.split(" ");
+                if (methodPlusUrlList.length != 2) continue;
+                basicDBObject.put("url", methodPlusUrlList[1]);
+                basicDBObject.put("method", methodPlusUrlList[0]);
+                basicDBObject.put("subTypes",  subTypes);
+                ret.newSensitiveParamsObject.add(basicDBObject);
             }
 
             List<SingleTypeInfo> allNewParameters = new InventoryAction().fetchAllNewParams(now - newEndpointsFrequency, now);

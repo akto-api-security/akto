@@ -4,6 +4,8 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.testing.WorkflowUpdatedSampleData;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.runtime.URLAggregator;
+import com.akto.types.BasicDBListL;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import org.junit.Test;
 
@@ -141,27 +143,58 @@ public class ApiWorkflowExecutorTest {
         assertTrue(vulnerable);
     }
 
+    private BasicDBObject generateValue(String host, String endpoint, String method) {
+        BasicDBObject value = new BasicDBObject();
+        value.put("host", host);
+        value.put("url", endpoint);
+        value.put("method", method);
+        return value;
+    }
+
     @Test
     public void testReplaceVariables() throws Exception {
         Map<String, Object> valuesMap = new HashMap<>();
 
-        valuesMap.put("AKTO.changes_info.newSensitiveEndpoints", 123);
-        valuesMap.put("AKTO.changes_info.newEndpoints", 234);
-        valuesMap.put("AKTO.changes_info.newSensitiveParameters",345);
-        valuesMap.put("AKTO.changes_info.newParameters",456);
+        List<BasicDBObject> newSensitiveEndpoints = new ArrayList<>();
+        newSensitiveEndpoints.add(generateValue("host1", "endpoint1", "GET"));
+        newSensitiveEndpoints.add(generateValue("host2", "endpoint2", "GET"));
+        newSensitiveEndpoints.add(generateValue("host3", "endpoint3", "POST"));
 
-        valuesMap.put("x1.response.body.name","Avneesh");
+        List<BasicDBObject> newEndpoints = new ArrayList<>();
+        newEndpoints.add(generateValue("host4", "endpoint1", "GET"));
+        newEndpoints.add(generateValue("host5", "endpoint2", "GET"));
 
-        String body = "{\"newSensitiveEndpoints\" : ${AKTO.changes_info.newSensitiveEndpoints}, \"name\" : \"${x1.response.body.name}\"}";
+        valuesMap.put("AKTO.changes_info.newSensitiveEndpoints", newSensitiveEndpoints);
+        valuesMap.put("AKTO.changes_info.newSensitiveEndpointsCount", 139);
+        valuesMap.put("AKTO.changes_info.newEndpoints", newEndpoints);
+        valuesMap.put("AKTO.changes_info.newEndpointsCount", 2088);
+        valuesMap.put("AKTO.changes_info.newSensitiveParametersCount", 305);
+        valuesMap.put("AKTO.changes_info.newParametersCount", 0);
+
+        String body = "{" +
+                "\"newSensitiveEndpoints\" : ${AKTO.changes_info.newSensitiveEndpoints}," +
+                " \"newSensitiveEndpointsCount\" : ${AKTO.changes_info.newSensitiveEndpointsCount}," +
+                " \"newEndpoints\" : ${AKTO.changes_info.newEndpoints}," +
+                " \"newEndpointsCount\" : ${AKTO.changes_info.newEndpointsCount}," +
+                " \"newSensitiveParametersCount\" : ${AKTO.changes_info.newSensitiveParametersCount}," +
+                " \"newParametersCount\" : ${AKTO.changes_info.newParametersCount}" +
+                "}";
+
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         String payload = apiWorkflowExecutor.replaceVariables(body, valuesMap, false);
 
-        assertEquals("{\"newSensitiveEndpoints\" : 123, \"name\" : \"Avneesh\"}", payload );
+        BasicDBObject payloadObject = BasicDBObject.parse(payload);
 
+        assertEquals( 139 ,payloadObject.get("newSensitiveEndpointsCount"));
+        assertEquals( 2088 ,payloadObject.get("newEndpointsCount"));
+        assertEquals( 305,payloadObject.get("newSensitiveParametersCount"));
+        assertEquals( 0,payloadObject.get("newParametersCount"));
 
-        body = "There are {${AKTO.changes_info.newParameters}} new $parameters and ${x}";
-        payload = apiWorkflowExecutor.replaceVariables(body, valuesMap, false);
-        assertEquals("There are {456} new $parameters and ${x}", payload );
+        BasicDBList basicDBList = (BasicDBList) payloadObject.get("newEndpoints");
+        assertEquals(2, basicDBList.size());
+
+        basicDBList = (BasicDBList) payloadObject.get("newSensitiveEndpoints");
+        assertEquals(3, basicDBList.size());
 
     }
 }
