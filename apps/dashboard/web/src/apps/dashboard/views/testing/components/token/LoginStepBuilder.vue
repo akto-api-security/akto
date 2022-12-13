@@ -1,109 +1,78 @@
 <template>
-  <div style="overflow:scroll" class="d-flex">
-    <div>
-      <div style="display: flex; padding-bottom: 24px;">
-        <div style="width: 100%">
+  <div class="pt-2">
+    <div class="login-builder-container">
+    
+      <div>
+        <div style="display: flex; padding-bottom: 24px;">
+          <div style="width: 100%">
 
-          <div class="request-title">URL</div>
-          <template-string-editor 
-            :defaultText="this.updatedData['url']"
-            :onChange=onChangeURL
-          />
+            <div class="request-title">URL</div>
+            <template-string-editor 
+              :defaultText="this.updatedData['url']"
+              :onChange=onChangeURL
+            />
 
-          <div class="request-title">Query params</div>
-          <template-string-editor 
-            :defaultText="this.updatedData['queryParams']"
-            :onChange=onChangeQueryParams
-          />
+            <div class="request-title">Query params</div>
+            <template-string-editor 
+              :defaultText="this.updatedData['queryParams']"
+              :onChange=onChangeQueryParams
+            />
 
-          <div class="request-title">Method</div>
-          <template-string-editor 
-            :defaultText="this.updatedData['method']"
-            :onChange=onChangeMethod
-          />
+            <div class="request-title">Method</div>
+            <template-string-editor 
+              :defaultText="this.updatedData['method']"
+              :onChange=onChangeMethod
+            />
 
-          <div class="request-title">Headers</div>
-          <template-string-editor 
-            :defaultText="this.updatedData['headers']"
-            :onChange=onChangeHeaders
-          />
+            <div class="request-title">Headers</div>
+            <template-string-editor 
+              :defaultText="this.updatedData['headers']"
+              :onChange=onChangeHeaders
+            />
 
-          <div class="request-title">Body</div>
-          <template-string-editor 
-            :defaultText="this.updatedData['body']"
-            :onChange=onChangeBody
-          />
+            <div class="request-title">Body</div>
+            <template-string-editor 
+              :defaultText="this.updatedData['body']"
+              :onChange=onChangeBody
+            />
 
-        </div>  
+          </div>  
+        </div>
+
+
+        <v-btn dark outlined primary color="#6200EA" @click="testLoginStep">
+            Test
+        </v-btn>
       </div>
 
-      <div style="height: 24px"></div>
-
-      <div class="d-flex ma-2">
-          <v-btn primary color="#6200EA" @click="testLoginStep">
-              Test
-          </v-btn>
-          <v-btn :disabled="!tabData.showAddStepOption" primary color="#6200EA" @click="saveStepData">
-              Save and add step
-          </v-btn>
-          <v-btn primary color="#6200EA" @click="emitRemoveTab" >
-              Remove Step
-          </v-btn>
-          <v-btn :disabled="!tabData.testedSuccessfully" primary color="#6200EA" @click="toggleShowAuthParams" >
-              Done
-          </v-btn>
-
-      </div>
-
-      <div v-if="showAuthParams">
-            <div v-for="(key, index) in authParamsList">
-              <div class="input-value d-flex">
-                  <v-text-field 
-                      label="Auth header key"
-                      style="width: 200px"
-                      v-model="authParamsList[index].key"
-                  />
-
-                  <v-text-field 
-                      label="Auth header value"
-                      style="width: 200px"
-                      v-model="authParamsList[index].value"
-                  />       
-
-                  <v-btn primary plain color="#6200EA" @click="deleteAuthElem(index)" >
-                      Delete
-                  </v-btn>
-
-              </div>
-            </div>
-            <v-btn primary plain color="#6200EA" @click='addNewAuthParamElem' >
-                Add
-            </v-btn>
-            <v-btn primary plain color="#6200EA" @click='toggleSaveLoginStep' >
-                Done
-            </v-btn>
-
-      </div>
-
-      <div class="d-flex">
-          <v-btn :disabled="!showLoginSaveOption || !tabData.testedSuccessfully" primary plain color="#6200EA" @click="saveLoginStep" >
-              Save
-          </v-btn>
-      </div>
-
-      </div>
-
-    <div style="width: 400px; opacity: 0.5">
-          <div className="request-title">[Response] Headers</div>
-          <div className="request-editor request-editor-headers">
+      <div class="response-data pr-2">
+        <div v-if="hasResponseData" style="height: 400px">
+          <div class="request-title">[Response] Headers</div>
+          <div class="request-editor request-editor-headers">
             {{tabData.responseHeaders}}
           </div>
-          <div className="request-title">[Response] Payload</div>
-          <div className="request-editor request-editor-payload">
+          <div class="request-title">[Response] Payload</div>
+          <div class="request-editor request-editor-payload">
+            {{tabData.responsePayload}}
+          </div>
+          <div class="request-title">[Response] Payload</div>
+          <div class="request-editor request-editor-payload">
+            {{tabData.responsePayload}}
+          </div>
+          <div class="request-title">[Response] Payload</div>
+          <div class="request-editor request-editor-payload">
+            {{tabData.responsePayload}}
+          </div>
+          <div class="request-title">[Response] Payload</div>
+          <div class="request-editor request-editor-payload">
             {{tabData.responsePayload}}
           </div>
         </div>
-
+        <div v-else class="d-flex jc-sa">
+          Click on the "Test" button to get the response
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -126,7 +95,7 @@ export default {
     data () {
       console.log("data: " , this.tabName);
       return {
-        defaultUrl: "http://juice-appli-1fi2t5cedjkey-1701018947.ap-south-1.elb.amazonaws.com/rest/user/login",
+        defaultUrl: "https://juice-shop.herokuapp.com/rest/user/login",
         defaultQueryParams: "",
         defaultMethod: "POST",
         defaultHeaderString: "{'content-type': 'application/json'}",
@@ -136,26 +105,10 @@ export default {
         stepData: [],
         showAuthParams: false,
         authParamData: [],
-        authParamsList: [{key: "", "where": "HEADER", value: ""}],
         showLoginSaveOption: false
       }
     },
     methods: {
-        addNewAuthParamElem() {
-          let authParamClone = [...this.authParamsList]
-          authParamClone.push({key: "", "where": "HEADER", value:""})
-          this.authParamsList = authParamClone
-        },
-        emitRemoveTab() {
-          console.log('logging tabname')
-          console.log(this.tabName)
-          this.$emit('removeTab', this.tabName)
-        },
-        emitAddTab() {
-          console.log('logging add tabname')
-          console.log(this.tabName)
-          this.$emit('addTab', this.updatedData, this.tabName)
-        },
         onChangeURL(newData) {
             console.log('url changed')
             console.log(newData)
@@ -184,43 +137,13 @@ export default {
             this.updatedData[key] = newData
             this.tabData.testedSuccessfully = false
         },
-        toggleShowAuthParams() {
-          this.showAuthParams = true
-          this.$emit('saveTabInfo', this.updatedData, this.tabName)
-        },
         testLoginStep() {
-          console.log('login test logs')
-          console.log(this.updatedData)
-          console.log('login test logs2')
-          console.log(this.tabName)
           this.$emit('testLoginStep', this.updatedData, this.tabName)
-          console.log('emit test event')
-        },
-        toggleSaveLoginStep() {
-          this.showLoginSaveOption = true
-        },
-      saveStepData() {
-        console.log("stepData log")
-        console.log(JSON.stringify(this.stepData))
-        let data = this.stepData
-        data.push(JSON.stringify(this.updatedData))
-        this.stepData = data
-        console.log("stepData log2")
-        console.log(this.stepData)
-        this.emitAddTab()
-      },
-      saveLoginStep() {
-          this.$emit('saveLoginStep', this.authParamsList)
-      },
-      deleteAuthElem(item) {
-        console.log("delete auth")
-        this.authParamsList.splice(item, 1)
-        console.log(item)
-      }
+        }
     },
       computed: {
           updatedData() {
-              if (this.originalDbState) return {...this.originalDbState}
+              if (this.tabData.data) return {...this.tabData.data}
               return {
                   "url": this.defaultUrl,
                   "queryParams": this.defaultQueryParams,
@@ -231,6 +154,9 @@ export default {
                   "authTokenPath": this.defaultAuthTokenPath
               }
           },
+          hasResponseData() {
+            return this.tabData.responseHeaders != null || this.tabData.responsePayload != null
+          },
         urlAndMethodFilled() {
             return this.updatedData["url"]
           }
@@ -240,15 +166,22 @@ export default {
 </script>
 
 <style lang="sass">
-.request-title
-  padding-top: 12px
-  font-size: 14px
-  color: #47466A
-  font-family: 'Poppins'
-  font-weight: 500
-
 .request-editor 
-  font-size: 14px !important
-  word-wrap: break-word !important
+  overflow-wrap: anywhere !important
+
+.response-data 
+  color: #47466A99
+  font-size: 14px
+  margin: auto
+  overflow-y: scroll
+  height: 400px
+
+.login-builder-container
+  display: flex
+  overflow: scroll
+
+.login-builder-container > div
+  flex: 0 0 50%
+
 
 </style>

@@ -13,6 +13,7 @@ import com.akto.dto.testing.*;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
+import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -32,6 +33,7 @@ import java.util.regex.Pattern;
 public class ApiWorkflowExecutor {
 
     private static final Logger logger = LoggerFactory.getLogger(ApiWorkflowExecutor.class);
+    private static final Gson gson = new Gson();
 
     public static void main(String[] args) {
         DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
@@ -95,6 +97,10 @@ public class ApiWorkflowExecutor {
             if (nodeResult.getErrors().size() > 0)  throw new Exception("Error Processing Node In Login Flow " + node.getId());
 
             JSONObject respString = new JSONObject();
+            
+            
+            Map<String, Object> json = gson.fromJson(nodeResult.getMessage(), Map.class);
+
             respString.put("headers", valuesMap.get(node.getId() + ".response.header"));
             respString.put("body", valuesMap.get(node.getId() + ".response.body"));
             responses.add(respString.toString());
@@ -281,7 +287,8 @@ public class ApiWorkflowExecutor {
 
         JSONObject headerString = new JSONObject();
         for (String headerName: headers.keySet()) {
-            headerString.put("method", headers.get(headerName));
+
+            headerString.put(headerName, headers.get(headerName));
 
             for (String val: headers.get(headerName)) {
                 String key = nodeId + "." + reqOrResp + "." + "header" + "." + headerName;

@@ -1,22 +1,58 @@
 <template>
-    <div class="pa-4" style="background-color: #FFFFFF">
-        <layout-with-tabs :tabs='apiTabs' :defaultTabName='currTabName'>
-            <template v-for="(apiTabName, index) in apiTabs" v-slot:[apiTabName]="slotprops">
+    <div class="pa-4" style="background-color: #FFFFFF; height: 550px">
+        <div v-if="showAuthParams">
+              <div v-for="(key, index) in authParamsList" :key="index">
+                <div class="input-value d-flex">
+                    <v-text-field 
+                        label="Header key"
+                        style="width: 200px"
+                        v-model="authParamsList[index].key"
+                    />
+
+                    <v-text-field 
+                        label="Header"
+                        style="width: 200px"
+                        v-model="authParamsList[index].value"
+                    />       
+
+                    <v-btn primary icon color="#6200EA" @click="deleteAuthElem(index)" class="ma-auto" v-if="authParamsList.length > 1">
+                        <v-icon>$fas_trash</v-icon>
+                    </v-btn>
+
+                </div>
+              </div>
+              <v-btn primary icon color="#6200EA" @click='addNewAuthParamElem' >
+                  <v-icon> $fas_plus </v-icon>
+              </v-btn>
+              <v-btn primary plain color="#6200EA" @click='saveLoginStep' >
+                  Done
+              </v-btn>
+
+        </div>
+
+        <layout-with-tabs :tabs='apiTabs' :defaultTabName='currTabName' v-else>
+            <template v-for="(apiTabName, index) in apiTabs" v-slot:[apiTabName]>
                 <div :key="index" class="fd-column">
-                    <div style="height: 500px" class="d-flex">
+                    <div>
                         <login-step-builder
                             :tabName="apiTabName"
                             :tabData="stepData[apiTabName]"
-                            @addTab=addTab 
-                            @removeTab=removeTab 
                             @testLoginStep=testLoginStep
-                            @saveLoginStep=saveLoginStep
-                            @saveTabInfo=saveTabInfo
                         />
+                        <v-btn plain color="#6200EA" @click="removeTab(apiTabName)" class="top-right-btn">
+                            Remove Step
+                        </v-btn>
+                        <div class="float-right ma-2">
+                            <v-btn dark  primary color="#6200EA" @click="addTab(apiTabName)">
+                                Next step
+                            </v-btn>
+                            <v-btn dark  primary color="#6200EA" @click="toggleShowAuthParams(apiTabName)" >
+                                Extract
+                            </v-btn>
+                        </div>
                     </div>
                 </div>
             </template>
-
         </layout-with-tabs>
     </div>
 </template>
@@ -39,48 +75,86 @@ export default {
         LoginStepBuilder
     },
     props: {
+        originalDbState: obj.objR
     },
     data() {
-        return {
-            apiTabs: ["API-1"],
-            counter: 1,
-            apiTabsInfo: {},
-            currTabName: "API-1",
-            stepData: {
+        let tabIndex = 0
+        let tabs = []
+        let stepsData = {}
+        let paramList = []
+        if (this.originalDbState != null) {
+            this.originalDbState.requestData.forEach(function (data) {
+                tabIndex++
+                let key = "API-"+tabIndex
+                tabs.push(key)
+                stepsData[key] = {"data": data, "showAddStepOption": false,
+                "testedSuccessfully": true}
+            });
+            paramList = this.originalDbState.authParams
+        } else {
+            tabs = ["API-1"]
+            tabIndex++
+            stepsData = {
                 "API-1": {
                     "showAddStepOption": false, 
                     "testedSuccessfully": false
                 }
-            },
+            }
+            paramList = [{key: "", "where": "HEADER", value: ""}]
+        }
+        
+        return {
+            apiTabs: tabs,
+            counter: tabIndex,
+            apiTabsInfo: {},
+            currTabName: "API-1",
+            showAuthParams: false,
+            stepData: stepsData,
             showLoginSaveOption: false,
-            addNewDataToTestReq: true
+            addNewDataToTestReq: true,
+            testedDataButNotSaved: null,
+            authParamsList: paramList
         }
     },
     methods: {
+        deleteAuthElem(item) {
+            console.log("delete auth")
+            this.authParamsList.splice(item, 1)
+            console.log(item)
+        },
+
+        addNewAuthParamElem() {
+          let authParamClone = [...this.authParamsList]
+          authParamClone.push({key: "", "where": "HEADER", value:""})
+          this.authParamsList = authParamClone
+        },
+
+        toggleShowAuthParams(tabName) {
+          this.showAuthParams = true
+          this.saveTabInfo(tabName)
+        },
+
         testLoginStep(updatedData, tabString) {
-            
+          this.testedDataButNotSaved = updatedData
           console.log("test login log")
           console.log(JSON.stringify(updatedData))
           console.log(tabString)
           console.log(JSON.stringify(this.stepData))
 
-          let reqData = []
+          
+          let currentTabPushed = false
 
-          for (let key in this.stepData) {
-            console.log(key, this.stepData[key]);
-            
-            if (this.stepData[key]["data"]==null) {
-                continue
-            }
-            reqData.push(this.stepData[key]["data"]) 
+          if (!this.stepData[tabString]) {
+            this.stepData[tabString] = {}
           }
 
-          if (this.addNewDataToTestReq) {
-            reqData.push(updatedData) 
-          }
-        //   console.log("test login log2")
-        //   console.log(JSON.stringify(updatedData))
-        //   console.log(JSON.stringify(reqData))
+          this.stepData[tabString]["data"] = updatedData
+          this.stepData = {...this.stepData}
+
+          this.stepData[tabString]["data"] = updatedData
+
+
+          let reqData = Object.values(this.stepData).filter(x => x.data != null).map(x => x.data)
           let result = api.triggerLoginSteps("LOGIN_REQUEST", reqData, [])
 
            result.then((resp) => {
@@ -89,24 +163,31 @@ export default {
               func.showSuccessSnackBar("Login flow ran successfully!")
               let index = 0;
 
+              let stepDataCopyObj = {}
+
               for (let key in this.stepData) {
                 console.log(key, this.stepData[key]);
                 
                 // if (this.stepData[key]["data"]==null) {
                 //     break
                 // }
-                let r = this.stepData[key]
+               //let stepDataCopy = this.stepData[key]
+                let stepDataCopy = JSON.parse(JSON.stringify(this.stepData[key]));
                 let respData = resp.responses[index]
                 let myobj = JSON.parse(respData);
-                r.responseHeaders = myobj.headers
-                r.responsePayload = myobj.body
+                stepDataCopy.responseHeaders = myobj.headers
+                stepDataCopy.responsePayload = myobj.body
                 if (key == tabString) {
-                    r.showAddStepOption = true
-                    r.testedSuccessfully = true
+                    stepDataCopy.showAddStepOption = true
+                    stepDataCopy.testedSuccessfully = true
                 }
-                this.stepData[key] = r 
+                //this.$set(this.stepData, key, this.stepData[key])
+                //Vue.set(this.stepData, key, stepDataCopy)
+                stepDataCopyObj[key] = stepDataCopy
                 index++
-            }    
+            }
+
+            this.stepData = Object.assign({}, this.stepData, stepDataCopyObj)
 
             //   let this.stepData = Object.keys(this.stepData).sort().reduce(
             //     (obj, key) => { 
@@ -125,7 +206,7 @@ export default {
               console.log(err);
           })
         },
-        saveLoginStep(authParamsList) {
+        saveLoginStep() {
           
           let reqData = []
           for (let key in this.stepData) {
@@ -137,7 +218,7 @@ export default {
             reqData.push(this.stepData[key]["data"]) 
           }
 
-          let result = api.addAuthMechanism("LOGIN_REQUEST", reqData, authParamsList)
+          let result = api.addAuthMechanism("LOGIN_REQUEST", reqData, this.authParamsList)
 
           result.then((resp) => {
               func.showSuccessSnackBar("Login Flow saved successfully!")
@@ -145,10 +226,13 @@ export default {
               console.log(err);
           })
 
+          this.showAuthParams = false
+          this.$emit('closeLoginStepBuilder')
         },
-        addTab(updatedData, tabString) {
+        addTab(tabString) {
             console.log('tabString')
             console.log(tabString)
+            let updatedData = this.testedDataButNotSaved
             this.addNewDataToTestReq = true
             this.stepData[tabString] = {"data": updatedData, "showAddStepOption": false,
              "testedSuccessfully": true}
@@ -173,9 +257,12 @@ export default {
             // this.stepData = reqData
             console.log(JSON.stringify(this.stepData))
         },
-        saveTabInfo(updatedData, tabString) {
-            this.stepData[tabString] = {"data": updatedData, "showAddStepOption": false,
-             "testedSuccessfully": true}
+        saveTabInfo(tabString) {
+            if (this.testedDataButNotSaved) {
+                let updatedData = this.testedDataButNotSaved
+                this.stepData[tabString] = {"data": updatedData, "showAddStepOption": false,
+                "testedSuccessfully": true}
+            }
         },
         removeTab (tabName) {
             this.addNewDataToTestReq = false
@@ -207,5 +294,9 @@ export default {
 </script>
 
 <style lang="sass" scoped>
+.top-right-btn
+  position: absolute
+  top: 10px
+  right: 0px  
 
 </style>

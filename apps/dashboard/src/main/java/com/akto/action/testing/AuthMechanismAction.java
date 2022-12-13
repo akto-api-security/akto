@@ -50,13 +50,15 @@ public class AuthMechanismAction extends UserAction {
         AuthMechanismsDao.instance.deleteAll(new BasicDBObject());
 
         if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
-            if (!authParamData.get(0).validate()) {
-                addActionError("Key, Value, Location can't be empty");
-                return ERROR.toUpperCase();
-            }
-
-            authParams.add(new HardcodedAuthParam(authParamData.get(0).getWhere(), authParamData.get(0).getKey(),
+            if (authParamData != null) {
+                if (!authParamData.get(0).validate()) {
+                    addActionError("Key, Value, Location can't be empty");
+                    return ERROR.toUpperCase();
+                }
+                authParams.add(new HardcodedAuthParam(authParamData.get(0).getWhere(), authParamData.get(0).getKey(),
                     authParamData.get(0).getValue()));
+            }
+            
         } else {
 
             for (AuthParamData param: authParamData) {

@@ -185,6 +185,9 @@
 .jc-sa
     justify-content: space-around
 
+.ma-auto
+    margin: auto
+
 .fd-column
     flex-direction: column
     display: flex
