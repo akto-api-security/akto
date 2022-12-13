@@ -49,7 +49,8 @@
         props: {
             title: obj.strN,
             tabs: obj.arrR,
-            description: obj.strN
+            description: obj.strN,
+            defaultTabName: obj.strN
         },
         data () {
             return {
@@ -59,6 +60,12 @@
         methods: {
             reset() {
                 this.tabName = 0
+            }
+        },
+        watch: {
+            defaultTabName: function (newVal) {
+                console.log(newVal, this.tabs.indexOf(newVal))
+                this.tabName = this.tabs.indexOf(newVal)
             }
         }
     }

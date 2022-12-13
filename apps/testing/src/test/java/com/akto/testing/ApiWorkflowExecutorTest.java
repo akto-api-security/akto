@@ -67,7 +67,7 @@ public class ApiWorkflowExecutorTest {
         String queryParams = "status=online";
         apiWorkflowExecutor.populateValuesMap(valuesMap, payload, nodeId, headers, true, queryParams);
 
-        assertEquals(8, valuesMap.size()); // 7 normal values + entire body string
+        assertEquals(9, valuesMap.size()); // 7 normal values + entire body string
         assertEquals("online", valuesMap.get("x1.request.query.status"));
         assertEquals("avneesh", valuesMap.get("x1.request.body.users[0].name"));
         assertEquals(99, valuesMap.get("x1.request.body.users[0].age"));
@@ -80,14 +80,14 @@ public class ApiWorkflowExecutorTest {
         headers.put("x-forwarded-for", Arrays.asList("ip1", "ip2"));
         apiWorkflowExecutor.populateValuesMap(valuesMap, payload, nodeId, headers, false, null);
 
-        assertEquals(11, valuesMap.size()); // 8 from earlier + 2 values + 1 body string (this time for isRequest false)
+        assertEquals(13, valuesMap.size()); // 8 from earlier + 2 values + 1 body string (this time for isRequest false)
         assertEquals("Akto", valuesMap.get("x1.response.body.company"));
         assertEquals("ip2", valuesMap.get("x1.response.header.x-forwarded-for"));
 
 
         payload = "mobNo=999999999&Vehicle=Car";
         apiWorkflowExecutor.populateValuesMap(valuesMap, payload, nodeId, new HashMap<>(),true, null);
-        assertEquals(13, valuesMap.size()); // 11 + 2 new (no request.body because already filled)
+        assertEquals(15, valuesMap.size()); // 11 + 2 new (no request.body because already filled)
         assertEquals("999999999", valuesMap.get("x1.request.body.mobNo"));
         assertEquals("Car", valuesMap.get("x1.request.body.Vehicle"));
     }

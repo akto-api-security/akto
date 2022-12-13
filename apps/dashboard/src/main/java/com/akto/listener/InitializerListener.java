@@ -522,6 +522,16 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
+    public void dropAuthMechanismData(BackwardCompatibility authMechanismData) {
+        if (authMechanismData.getAuthMechanismData() == 0) {
+            AuthMechanismsDao.instance.getMCollection().drop();
+        }
+        BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", authMechanismData.getId()),
+                Updates.set(BackwardCompatibility.AUTH_MECHANISM_DATA, Context.now())
+        );
+    }
+
     public void dropWorkflowTestResultCollection(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getDropWorkflowTestResult() == 0) {
             WorkflowTestResultsDao.instance.getMCollection().drop();
@@ -619,6 +629,7 @@ public class InitializerListener implements ServletContextListener {
             readyForNewTestingFramework(backwardCompatibility);
             addAktoDataTypes(backwardCompatibility);
             updateDeploymentStatus(backwardCompatibility);
+            dropAuthMechanismData(backwardCompatibility);
 
             SingleTypeInfo.init();
 
