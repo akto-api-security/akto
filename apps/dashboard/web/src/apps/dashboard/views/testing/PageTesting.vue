@@ -1,6 +1,6 @@
 <template>
     <layout-with-tabs title="API Testing" class="page-testing"
-        :tabs='["Test results", "User config", "Roles"]'>
+        :tabs='["Test results", "User config"]'>
         <template slot="Test results">
             <div class="py-8">
                 <div>
@@ -103,8 +103,8 @@
                 </v-dialog>
             </div>
         </template>
-        <template slot="Roles">
-            <div>
+        <!-- <template slot="Roles">
+            <div> -->
                 <!-- <div>
                     <span v-if="(testRoles.length === 0)">No role exists</span>
                     <div v-else>
@@ -122,7 +122,7 @@
                     <v-text-field v-model="testLogicalGroupRegex" placeholder="regex"></v-text-field>
                 </div>
                  -->
-                <test-roles title="Roles" :testRoles="testRoles" :createNewRole="createNewRole">
+                <!-- <test-roles title="Roles" :testRoles="testRoles" :createNewRole="createNewRole">
                     <template #details-container="{}">
                         <a-card title="Details" color="rgba(33, 150, 243)" style="min-height: 600px">
                             <test-roles-config-details></test-roles-config-details>
@@ -131,7 +131,7 @@
                 </test-roles>
 
             </div>
-        </template>
+        </template> -->
     </layout-with-tabs>
 </template>
 
