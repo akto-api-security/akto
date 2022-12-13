@@ -70,9 +70,8 @@ export default {
                 },
                 {
                     icon: "$postman",
-                    key: "SWAGGER",
+                    key: "POSTMAN",
                     title: "Postman",
-                    subtitle: "Coming soon",
                     detailComponent: 'PostmanSource',
                     connected: "More"
                 }

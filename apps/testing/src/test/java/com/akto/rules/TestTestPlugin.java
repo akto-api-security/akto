@@ -11,6 +11,7 @@ import com.akto.store.SampleMessageStore;
 import com.akto.types.CappedSet;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.sendgrid.Method;
 import org.bson.types.ObjectId;
 import org.junit.Test;
 
@@ -196,6 +197,27 @@ public class TestTestPlugin extends MongoBasedTest {
         assertTrue(result);
         assertEquals("eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.", headers.get("access-token").get(0));
     }
+
+    @Test
+    public void testFindUndocumentedMethods() {
+        Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = new HashMap<>();
+        sampleMessages.put(new ApiInfo.ApiInfoKey(0, "/api/books", URLMethods.Method.GET), Collections.singletonList(""));
+        sampleMessages.put(new ApiInfo.ApiInfoKey(0, "/api/books", URLMethods.Method.POST), Collections.singletonList(""));
+        sampleMessages.put(new ApiInfo.ApiInfoKey(1, "/api/books", URLMethods.Method.PUT), Collections.singletonList(""));
+        sampleMessages.put(new ApiInfo.ApiInfoKey(0, "/api/books/INTEGER", URLMethods.Method.GET), Collections.singletonList(""));
+        sampleMessages.put(new ApiInfo.ApiInfoKey(0, "/api/books/INTEGER", URLMethods.Method.POST), Collections.singletonList(""));
+        sampleMessages.put(new ApiInfo.ApiInfoKey(1, "/api/books/INTEGER", URLMethods.Method.PUT), Collections.singletonList(""));
+
+        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(0, "/api/books", URLMethods.Method.GET);
+        List<URLMethods.Method> undocumentedMethods = TestPlugin.findUndocumentedMethods(sampleMessages, apiInfoKey);
+        assertEquals(3, undocumentedMethods.size());
+
+        apiInfoKey = new ApiInfo.ApiInfoKey(0, "/api/books/1", URLMethods.Method.GET);
+        undocumentedMethods = TestPlugin.findUndocumentedMethods(sampleMessages, apiInfoKey);
+        assertEquals(3, undocumentedMethods.size());
+
+    }
+
 
 
 }

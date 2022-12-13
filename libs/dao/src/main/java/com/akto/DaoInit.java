@@ -106,6 +106,8 @@ public class DaoInit {
                 .build();
         ClassModel<HardcodedAuthParam> hardcodedAuthParamClassModel = ClassModel.builder(HardcodedAuthParam.class)
                 .enableDiscriminator(true).build();
+        ClassModel<LoginRequestAuthParam> loginReqAuthParamClassModel = ClassModel.builder(LoginRequestAuthParam.class)
+                .enableDiscriminator(true).build();
         ClassModel<TestingEndpoints> testingEndpointsClassModel = ClassModel.builder(TestingEndpoints.class)
                 .enableDiscriminator(true).build();
         ClassModel<CustomTestingEndpoints> customTestingEndpointsClassModel = ClassModel
@@ -149,7 +151,7 @@ public class DaoInit {
                 cappedListClassModel,
                 equalsToPredicateClassModel, isNumberPredicateClassModel, testingRunClassModel,
                 testingRunResultClassModel, testResultClassModel,
-                authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel,
+                authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel, loginReqAuthParamClassModel,
                 testingEndpointsClassModel, customTestingEndpointsClassModel, collectionWiseTestingEndpointsClassModel,
                 workflowTestingEndpointsClassModel, workflowTestResultClassModel,
                 cappedSetClassModel, CustomWebhookClassModel, CustomWebhookResultClassModel,

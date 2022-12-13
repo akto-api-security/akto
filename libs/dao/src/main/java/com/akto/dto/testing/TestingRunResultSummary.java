@@ -13,6 +13,7 @@ public class TestingRunResultSummary {
     public static final String TOTAL_APIS = "totalApis";    
     public static final String TESTING_RUN_ID = "testingRunId";    
     public static final String STATE = "state";    
+    public static final String TEST_RESULTS_COUNT = "testResultsCount";
 
     private ObjectId id;
     private int startTimestamp;
@@ -24,6 +25,7 @@ public class TestingRunResultSummary {
     private String testingRunHexId;
 
     private TestingRun.State state; 
+    private int testResultsCount;
 
     @BsonIgnore
     private String hexId;
@@ -32,7 +34,7 @@ public class TestingRunResultSummary {
     public TestingRunResultSummary() {
     }
 
-    public TestingRunResultSummary(int startTimestamp, int endTimestamp, Map<String,Integer> countIssues, int totalApis, ObjectId testingRunId, String testingRunHexId) {
+    public TestingRunResultSummary(int startTimestamp, int endTimestamp, Map<String,Integer> countIssues, int totalApis, ObjectId testingRunId, String testingRunHexId, int testResultsCount) {
         this.startTimestamp = startTimestamp;
         this.endTimestamp = endTimestamp;
         this.countIssues = countIssues;
@@ -40,6 +42,7 @@ public class TestingRunResultSummary {
         this.testingRunId = testingRunId;
         this.testingRunHexId = testingRunHexId;
         this.state = TestingRun.State.RUNNING;
+        this.testResultsCount = testResultsCount;
     }
 
     public ObjectId getId() {
@@ -108,6 +111,14 @@ public class TestingRunResultSummary {
 
     public String getHexId() {
         return this.id.toHexString();
+    }
+
+    public int getTestResultsCount() {
+        return testResultsCount;
+    }
+
+    public void setTestResultsCount(int testResultsCount) {
+        this.testResultsCount = testResultsCount;
     }
 
     @Override
