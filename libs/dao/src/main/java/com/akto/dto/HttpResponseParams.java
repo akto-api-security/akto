@@ -8,7 +8,7 @@ import java.util.Map;
 public class HttpResponseParams {
 
     public enum Source {
-        HAR, PCAP, MIRRORING, SDK, OTHER
+        HAR, PCAP, MIRRORING, SDK, OTHER, POSTMAN
     }
 
     public String accountId;

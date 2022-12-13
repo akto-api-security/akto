@@ -550,6 +550,16 @@
             </result>
         </action>
 
+        <action name="api/importPostmanWorkspace" class="com.akto.action.PostmanAction" method="importDataFromPostman">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
         <action name="api/addBurpToken" class="com.akto.action.ApiTokenAction" method="addBurpToken">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
