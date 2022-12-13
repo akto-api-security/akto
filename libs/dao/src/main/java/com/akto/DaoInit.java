@@ -12,6 +12,8 @@ import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.info.BFLATestInfo;
+import com.akto.dto.testing.info.TestInfo;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
 import com.akto.dto.type.SingleTypeInfo;
@@ -130,6 +132,12 @@ public class DaoInit {
                 .builder(TestingRunIssues.class).enableDiscriminator(true).build();
         ClassModel<TestingIssuesId> testingIssuesIdClassModel = ClassModel
                 .builder(TestingIssuesId.class).enableDiscriminator(true).build();
+        ClassModel<EndpointLogicalGroup> endpointLogicalGroupClassModel = ClassModel
+                .builder(EndpointLogicalGroup.class).enableDiscriminator(true).build();
+        ClassModel<TestRoles> testRolesClassModel = ClassModel
+                .builder(TestRoles.class).enableDiscriminator(true).build();
+        ClassModel<LogicalGroupTestingEndpoint> logicalGroupTestingEndpointClassModel = ClassModel
+                .builder(LogicalGroupTestingEndpoint.class).enableDiscriminator(true).build();
         ClassModel<CustomAuthType> customAuthTypeModel = ClassModel
                 .builder(CustomAuthType.class).enableDiscriminator(true).build();
         // ClassModel<AwsResource> awsResourceModel =
@@ -138,6 +146,8 @@ public class DaoInit {
         ClassModel<AwsResources> awsResourcesModel = ClassModel.builder(AwsResources.class).enableDiscriminator(true)
                 .build();
         ClassModel<AktoDataType> AktoDataTypeClassModel = ClassModel.builder(AktoDataType.class).enableDiscriminator(true).build();
+        ClassModel<TestInfo> testInfoClassModel = ClassModel.builder(TestInfo.class).enableDiscriminator(true).build();
+        ClassModel<BFLATestInfo> bflaTestInfoClassModel = ClassModel.builder(BFLATestInfo.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(queueEntryClassModel,
                 configClassModel,
@@ -156,7 +166,8 @@ public class DaoInit {
                 workflowTestingEndpointsClassModel, workflowTestResultClassModel,
                 cappedSetClassModel, CustomWebhookClassModel, CustomWebhookResultClassModel,
                 nodeResultClassModel, awsResourcesModel, AktoDataTypeClassModel, testingRunIssuesClassModel,
-                testingIssuesIdClassModel, customAuthTypeModel).automatic(true).build());
+                testingIssuesIdClassModel, endpointLogicalGroupClassModel, testRolesClassModel,
+                logicalGroupTestingEndpointClassModel, testInfoClassModel , bflaTestInfoClassModel, testingIssuesIdClassModel, customAuthTypeModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),

@@ -28,5 +28,12 @@ export default {
             method: 'post',
             data: {issueId}
         })
+    },
+    fetchAllSubCategories () {
+        return request({
+            url: 'api/fetchAllSubCategories',
+            method: 'post',
+            data: {}
+        })
     }
 }
