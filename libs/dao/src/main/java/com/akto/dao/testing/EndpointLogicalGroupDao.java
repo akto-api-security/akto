@@ -2,11 +2,14 @@ package com.akto.dao.testing;
 
 import com.akto.dao.AccountsContextDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.EndpointLogicalGroup;
 import com.akto.dto.testing.LogicalGroupTestingEndpoint;
 import com.akto.util.enums.MongoDBEnums;
 import com.mongodb.MongoException;
 import org.bson.types.ObjectId;
+
+import java.util.List;
 
 public class EndpointLogicalGroupDao extends AccountsContextDao<EndpointLogicalGroup> {
     @Override
@@ -21,8 +24,9 @@ public class EndpointLogicalGroupDao extends AccountsContextDao<EndpointLogicalG
 
     public static final EndpointLogicalGroupDao instance = new EndpointLogicalGroupDao();
 
-    public EndpointLogicalGroup createUsingRegex(String name, String regex, String user) {
-        LogicalGroupTestingEndpoint testingEndpoint = new LogicalGroupTestingEndpoint(regex, null, null);
+    public EndpointLogicalGroup createUsingRegex(String name, String regex, String user,
+                                                 List<ApiInfo.ApiInfoKey> includedApiInfoKey, List<ApiInfo.ApiInfoKey> excludedApiInfoKey) {
+        LogicalGroupTestingEndpoint testingEndpoint = new LogicalGroupTestingEndpoint(regex, includedApiInfoKey, excludedApiInfoKey);
         EndpointLogicalGroup endpointLogicalGroup = new EndpointLogicalGroup(new ObjectId(), Context.now(), user,name, testingEndpoint);
         try {
             this.insertOne(endpointLogicalGroup);

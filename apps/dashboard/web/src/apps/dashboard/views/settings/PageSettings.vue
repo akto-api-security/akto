@@ -87,6 +87,7 @@ export default {
         ACard
     },
     mounted() {
+        debugger
         this.$store.dispatch("data_types/fetchDataTypes")
         this.$store.dispatch("tag_configs/fetchTagConfigs")
     },

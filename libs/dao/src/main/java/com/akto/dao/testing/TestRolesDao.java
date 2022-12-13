@@ -48,12 +48,8 @@ public class TestRolesDao extends AccountsContextDao<TestRoles> {
         }
     }
 
-    public TestRoles createTestRole (String roleName, ObjectId endpointLogicalGroupId) {
-        ObjectId id = new ObjectId();
-        TestRoles role = new TestRoles();
-        role.setEndpointLogicalGroupId(endpointLogicalGroupId);
-        role.setId(id);
-        role.setName(roleName);
+    public TestRoles createTestRole (String roleName, ObjectId endpointLogicalGroupId, String userName) {
+        TestRoles role = new TestRoles(roleName, endpointLogicalGroupId, null,userName,Context.now());
 
         this.insertOne(role);
         this.getLogger().info("Created test role with name :{}, and logical group id : {}", roleName, endpointLogicalGroupId.toHexString());

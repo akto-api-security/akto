@@ -10,8 +10,7 @@ const state = {
     testingRuns: [],
     pastTestingRuns: [],
     authMechanism: null,
-    testingRunResults: [],
-    testRoles: []
+    testingRunResults: []
 }
 
 const testing = {
@@ -40,9 +39,6 @@ const testing = {
         },
         SAVE_TESTING_RUN_RESULTS(state, {testingRunResults}) {
             state.testingRunResults = testingRunResults
-        },
-        SAVE_TEST_ROLES(state, {testRoles}) {
-            state.testRoles = testRoles
         }
     },
     actions: {
@@ -61,19 +57,6 @@ const testing = {
 
                 })
 
-                state.loading = false
-            }).catch(() => {
-                state.loading = false
-            })
-        },
-        loadTestRoles({commit}) {
-            return api.fetchTestRoles().then((resp) => {
-                commit('SAVE_TEST_ROLES', resp)
-            })
-        },
-        addTestRoles ({commit}, {roleName, regex}) {
-            state.loading = true
-            api.addTestRoles(roleName, regex).then((resp) => {
                 state.loading = false
             }).catch(() => {
                 state.loading = false

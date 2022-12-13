@@ -3,6 +3,7 @@ package com.akto.action.testing;
 import com.akto.action.UserAction;
 import com.akto.dao.testing.EndpointLogicalGroupDao;
 import com.akto.dao.testing.TestRolesDao;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.EndpointLogicalGroup;
 import com.akto.dto.testing.TestRoles;
 import com.mongodb.client.model.Filters;
@@ -13,6 +14,8 @@ import java.util.regex.PatternSyntaxException;
 
 public class TestRolesAction extends UserAction {
     private List<TestRoles> testRoles;
+    private List<ApiInfo.ApiInfoKey> includedApiList;
+    private List<ApiInfo.ApiInfoKey> excludedApiList;
     private String regex;
     private String roleName;
 
@@ -32,12 +35,17 @@ public class TestRolesAction extends UserAction {
     }
 
     public String createTestRole () {
-        if (roleName == null || roleName.isEmpty() || regex == null || regex.isEmpty()) {
-            addActionError("Test role is empty");
+        boolean areFieldsEmpty = (regex == null || regex.isEmpty())
+                && (excludedApiList == null || excludedApiList.isEmpty())
+                && (includedApiList == null || includedApiList.isEmpty());
+        if ((roleName == null || roleName.isEmpty()) && areFieldsEmpty) {
+            addActionError("Test role is empty with regex : " + (regex == null ? "null" : regex));
             return ERROR.toUpperCase();
         }
         try {
-            Pattern.compile(regex);
+            if (regex != null && !regex.isEmpty()) {
+                Pattern.compile(regex);
+            }
         } catch (PatternSyntaxException e) {
             addActionError("invalid regex");
             return ERROR.toUpperCase();
@@ -51,8 +59,8 @@ public class TestRolesAction extends UserAction {
         String logicalGroupName = roleName + EndpointLogicalGroup.GROUP_NAME_SUFFIX;
 
         EndpointLogicalGroup logicalGroup = EndpointLogicalGroupDao.instance.
-                createUsingRegex(logicalGroupName, regex,this.getSUser().getLogin());
-        TestRolesDao.instance.createTestRole(roleName, logicalGroup.getId());
+                createUsingRegex(logicalGroupName, regex,this.getSUser().getLogin(), includedApiList, excludedApiList);
+        TestRolesDao.instance.createTestRole(roleName, logicalGroup.getId(), this.getSUser().getLogin());
         return SUCCESS.toUpperCase();
     }
     public List<TestRoles> getTestRoles() {
@@ -77,5 +85,21 @@ public class TestRolesAction extends UserAction {
 
     public void setRoleName(String roleName) {
         this.roleName = roleName;
+    }
+
+    public List<ApiInfo.ApiInfoKey> getIncludedApiList() {
+        return includedApiList;
+    }
+
+    public void setIncludedApiList(List<ApiInfo.ApiInfoKey> includedApiList) {
+        this.includedApiList = includedApiList;
+    }
+
+    public List<ApiInfo.ApiInfoKey> getExcludedApiList() {
+        return excludedApiList;
+    }
+
+    public void setExcludedApiList(List<ApiInfo.ApiInfoKey> excludedApiList) {
+        this.excludedApiList = excludedApiList;
     }
 }

@@ -73,24 +73,6 @@ export default {
             return resp
         })        
     },
-    fetchTestRoles() {
-        return request({
-            url: '/api/fetchTestRoles',
-            method: 'post',
-            data: {}
-        }).then((resp) => {
-            return resp
-        })
-    },
-    addTestRoles (roleName, regex) {
-        return request({
-            url: '/api/addTestRoles',
-            method: 'post',
-            data: {roleName, regex}
-        }).then((resp) => {
-            return resp
-        })        
-    },
     addAuthMechanism(key, value, location, type, authTokenPath, requestData) {
         return request({
             url: '/api/addAuthMechanism',

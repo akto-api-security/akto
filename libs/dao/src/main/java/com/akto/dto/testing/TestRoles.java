@@ -15,6 +15,16 @@ public class TestRoles {
     private AuthMechanism authMechanism;
     @BsonIgnore
     private EndpointLogicalGroup endpointLogicalGroup;
+    private String createdBy;
+    private int createdTs;
+    public TestRoles(){}
+    public TestRoles(String name, ObjectId endpointLogicalGroupId, AuthMechanism authMechanism, String createdBy, int createdTs) {
+        this.name = name;
+        this.endpointLogicalGroupId = endpointLogicalGroupId;
+        this.authMechanism = authMechanism;
+        this.createdBy = createdBy;
+        this.createdTs = createdTs;
+    }
     public EndpointLogicalGroup fetchEndpointLogicalGroup() {
         if (this.endpointLogicalGroup == null) {
             this.endpointLogicalGroup = EndpointLogicalGroupDao.instance.findOne(Filters.eq(ID, this.endpointLogicalGroupId));
@@ -59,5 +69,21 @@ public class TestRoles {
 
     public void setEndpointLogicalGroup(EndpointLogicalGroup endpointLogicalGroup) {
         this.endpointLogicalGroup = endpointLogicalGroup;
+    }
+
+    public String getCreatedBy() {
+        return createdBy;
+    }
+
+    public void setCreatedBy(String createdBy) {
+        this.createdBy = createdBy;
+    }
+
+    public int getCreatedTs() {
+        return createdTs;
+    }
+
+    public void setCreatedTs(int createdTs) {
+        this.createdTs = createdTs;
     }
 }

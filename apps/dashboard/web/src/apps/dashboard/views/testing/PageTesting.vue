@@ -1,6 +1,6 @@
 <template>
     <layout-with-tabs title="API Testing" class="page-testing"
-        :tabs='["Test results", "User config", "Roles management"]'>
+        :tabs='["Test results", "User config", "Roles"]'>
         <template slot="Test results">
             <div class="py-8">
                 <div>
@@ -103,9 +103,9 @@
                 </v-dialog>
             </div>
         </template>
-        <template slot="Roles management">
+        <template slot="Roles">
             <div>
-                <div>
+                <!-- <div>
                     <span v-if="(testRoles.length === 0)">No role exists</span>
                     <div v-else>
                         <span v-for="(testRole, index) in testRoles" :key="index">
@@ -121,6 +121,15 @@
                     <v-text-field v-model="testRoleName" placeholder="Role name"></v-text-field>
                     <v-text-field v-model="testLogicalGroupRegex" placeholder="regex"></v-text-field>
                 </div>
+                 -->
+                <test-roles title="Roles" :testRoles="testRoles" :createNewRole="createNewRole">
+                    <template #details-container="{}">
+                        <a-card title="Details" color="rgba(33, 150, 243)" style="min-height: 600px">
+                            <test-roles-config-details></test-roles-config-details>
+                        </a-card>
+                    </template>
+                </test-roles>
+
             </div>
         </template>
     </layout-with-tabs>
@@ -133,6 +142,9 @@ import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChip
 import ACard from '@/apps/dashboard/shared/components/ACard'
 import SampleData from '@/apps/dashboard/shared/components/SampleData'
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
+import TestRoles from './components/test_roles/TestRoles'
+import TestRolesConfigDetails from './components/test_roles/components/TestRolesConfigDetails'
+
 
 import func from '@/util/func'
 import testing from '@/util/testing'
@@ -152,7 +164,9 @@ export default {
         LayoutWithTabs,
         LayoutWithLeftPane,
         ApiCollectionGroup,
-        LoginStepBuilder
+        LoginStepBuilder,
+        TestRoles,
+        TestRolesConfigDetails
     },
     props: {
 
@@ -172,6 +186,9 @@ export default {
         }
     },
     methods: {
+        createNewRole() {
+            this.$store.commit('test_roles/SET_NEW_SELECTED_ROLE')
+        },
         setAuthHeaderKey(newKey) {
             this.newKey = newKey
             this.saveAuth()
@@ -344,7 +361,8 @@ export default {
         }
     },
     computed: {
-        ...mapState('testing', ['testingRuns', 'authMechanism', 'testingRunResults', 'pastTestingRuns', 'testRoles']),
+        ...mapState('test_roles', ['testRoles', 'loading', 'selectedRole']),
+        ...mapState('testing', ['testingRuns', 'authMechanism', 'testingRunResults', 'pastTestingRuns']),
         mapCollectionIdToName() {
             return this.$store.state.collections.apiCollections.reduce((m, e) => {
                 m[e.id] = e.displayName
@@ -454,8 +472,8 @@ export default {
     mounted() {
         this.fetchAuthMechanismData()
         let now = func.timeNow()
+        this.$store.dispatch('test_roles/loadTestRoles')
         this.$store.dispatch('testing/loadTestingDetails', { startTimestamp: now - func.recencyPeriod, endTimestamp: now })
-        this.$store.dispatch('testing/loadTestRoles')
     },
     watch: {
         authMechanism: {
