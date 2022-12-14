@@ -213,6 +213,7 @@ export default {
 
           result.then((resp) => {
               func.showSuccessSnackBar("Login Flow saved successfully!")
+              this.$emit('toggleOriginalStateDb')
           }).catch((err) => {
               console.log(err);
           })

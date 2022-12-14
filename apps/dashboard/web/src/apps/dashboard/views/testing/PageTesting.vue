@@ -120,7 +120,7 @@
                 </div>
 
                 <v-dialog v-model="showTokenAutomation" class="token-automation-modal">
-                    <token-automation :originalDbState="originalDbState" @closeLoginStepBuilder=toggleLoginStepBuilder />
+                    <token-automation :originalDbState="originalDbState" @closeLoginStepBuilder=toggleLoginStepBuilder @toggleOriginalStateDb=toggleOriginalStateDb />
                 </v-dialog>    
                 
             </div>
@@ -219,6 +219,10 @@ export default {
         },
         toggleLoginStepBuilder() {
             this.showTokenAutomation = !this.showTokenAutomation
+        },
+        toggleOriginalStateDb() {
+            console.log('got db state event')
+            this.fetchAuthMechanismData()
         },
         testLoginStep(data) {
           let updatedData = data["updatedData"]
