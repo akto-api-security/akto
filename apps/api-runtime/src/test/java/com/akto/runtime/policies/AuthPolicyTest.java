@@ -251,10 +251,19 @@ public class AuthPolicyTest extends MongoBasedTest {
     public void testCustomAuthTypePayload() {
         Map<String, List<String>> headers = new HashMap<>();
         HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
-        httpResponseParams.getRequestParams().setPayload(createSimpleResponsePayload());
+
+        BasicDBObject ret = new BasicDBObject();
+        BasicDBObject nested = new BasicDBObject();
+        nested.append("AT", "somerandomlygeneratedtoken");
+        ret.append("a1", 1).append("a2", "2").append("a3", nested);
+        String payload = ret.toJson();
+
+        httpResponseParams.getRequestParams().setPayload(payload);
+
         List<String> keys = new ArrayList<>();
-        keys.add("AT");
-        CustomAuthType customAuthType = new CustomAuthType("AT", keys,keys, true,0);
+        keys.add("a3.AT");
+        CustomAuthType customAuthType = new CustomAuthType("AT", new ArrayList<>(),keys, true,0);
+
         CustomAuthTypeDao.instance.insertOne(customAuthType);
         List<CustomAuthType> authTypes = new ArrayList<>(Collections.singletonList(customAuthType));
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
