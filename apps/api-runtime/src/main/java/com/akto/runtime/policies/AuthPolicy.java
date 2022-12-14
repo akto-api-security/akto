@@ -5,8 +5,9 @@ import com.akto.dto.CustomAuthType;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.type.KeyTypes;
-import com.google.gson.Gson;
+import com.akto.util.JSONUtils;
 
+import com.mongodb.BasicDBObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,12 +66,12 @@ public class AuthPolicy {
         Map<String,String> cookieMap = parseCookie(cookieList);
         Set<ApiInfo.AuthType> authTypes = new HashSet<>();
 
-        Gson gson = new Gson();
-        Map<String, Object> json = new HashMap<>();
+        BasicDBObject flattenedPayload = null;
         try{
-            json = gson.fromJson(httpResponseParams.getRequestParams().getPayload(),Map.class);
+            BasicDBObject basicDBObject =  BasicDBObject.parse(httpResponseParams.getRequestParams().getPayload());
+            flattenedPayload = JSONUtils.flattenWithDots(basicDBObject);
         } catch (Exception e){
-            System.out.println(e.getMessage());
+            e.printStackTrace();
         }
         for (CustomAuthType customAuthType : customAuthTypes) {
 
@@ -79,13 +80,15 @@ public class AuthPolicy {
             headerAndCookieKeys.addAll(cookieMap.keySet());
 
             // Find custom auth type in header and cookie
-            if ( headerAndCookieKeys.containsAll(customAuthType.getHeaderKeys())) {
+            List<String> customAuthTypeHeaderKeys = customAuthType.getHeaderKeys();
+            if (!headerAndCookieKeys.isEmpty() && !customAuthTypeHeaderKeys.isEmpty() && headerAndCookieKeys.containsAll(customAuthTypeHeaderKeys)) {
                 authTypes.add(ApiInfo.AuthType.CUSTOM);
                 break;
             }
 
             // Find custom auth type in payload
-            if(json!=null && json.keySet().containsAll(customAuthType.getPayloadKeys())){
+            List<String> customAuthTypePayloadKeys = customAuthType.getPayloadKeys();
+            if(flattenedPayload != null && !flattenedPayload.isEmpty() && !customAuthTypePayloadKeys.isEmpty() && flattenedPayload.keySet().containsAll(customAuthTypePayloadKeys)){
                 authTypes.add(ApiInfo.AuthType.CUSTOM);
                 break;
             }
