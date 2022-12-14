@@ -7,12 +7,16 @@ import java.util.*;
 
 import com.akto.utils.cloud.stack.dto.StackState;
 import org.bson.conversions.Bson;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.akto.action.UserAction;
 import com.akto.dao.ApiTokensDao;
 import com.akto.dao.AwsResourcesDao;
+import com.akto.dao.BackwardCompatibilityDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.AwsResources;
+import com.akto.dto.BackwardCompatibility;
 import com.akto.utils.cloud.CloudType;
 import com.akto.utils.cloud.Utils;
 import com.akto.utils.cloud.serverless.ServerlessFunction;
@@ -28,7 +32,7 @@ import com.amazonaws.services.elasticloadbalancingv2.model.DescribeLoadBalancers
 import com.amazonaws.services.elasticloadbalancingv2.model.LoadBalancer;
 import com.akto.dto.ApiToken;
 import com.akto.dto.AwsResource;
-
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
@@ -46,6 +50,8 @@ public class QuickStartAction extends UserAction {
 
     private final Stack stack = new AwsStack();
     private final ServerlessFunction serverlessFunction = new Lambda();
+
+    private static final Logger logger = LoggerFactory.getLogger(QuickStartAction.class);
 
     public String fetchQuickStartPageState() {
 
@@ -155,7 +161,37 @@ public class QuickStartAction extends UserAction {
 
     public String checkStackCreationProgress() {
         this.stackState = this.stack.fetchStackStatus();
+        invokeLambdaIfNecessary(stackState);
+        if(Stack.StackStatus.CREATION_FAILED.toString().equals(this.stackState.getStatus())){
+            AwsResourcesDao.instance.getMCollection().deleteOne(Filters.eq("_id", Context.accountId.get()));
+            logger.info("Current stack status is failed, so we are removing entry from db");
+        }
         return Action.SUCCESS.toUpperCase();
+    }
+
+    private void invokeLambdaIfNecessary(StackState stackState){
+        Runnable runnable = () -> {
+            if(Stack.StackStatus.CREATE_COMPLETE.toString().equals(this.stackState.getStatus())){
+                Context.accountId.set(1_000_000);
+                BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
+                if(!backwardCompatibility.isMirroringLambdaTriggered()){
+                    try{
+                        String functionName = stack.fetchResourcePhysicalIdByLogicalId("CreateMirrorSession");
+                        serverlessFunction.invokeFunction(functionName);
+                        BackwardCompatibilityDao.instance.updateOne(
+                                Filters.eq("_id", backwardCompatibility.getId()),
+                                Updates.set(BackwardCompatibility.MIRRORING_LAMBDA_TRIGGERED, true)
+                        );
+                        logger.info("Successfully triggered CreateMirrorSession");
+                    } catch(Exception e){
+                        logger.error("Failed to invoke lambda for the first time", e);
+                    }
+                } else {
+                    logger.info("Already invoked");
+                }
+            }
+        };
+        new Thread(runnable).start();
     }
 
     public boolean getDashboardHasNecessaryRole() {
