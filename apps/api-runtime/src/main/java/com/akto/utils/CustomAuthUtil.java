@@ -21,19 +21,21 @@ import com.mongodb.client.model.Updates;
 public class CustomAuthUtil {
     
     public static Bson getFilters(ApiInfo apiInfo,Boolean isHeader,List<String> params){
-        Bson filters = Filters.and(
-            Filters.eq("url",apiInfo.getId().getUrl()),
-            Filters.eq("apiCollectionId",apiInfo.getId().getApiCollectionId()),
-            Filters.eq("method",apiInfo.getId().getMethod().name()),
-            Filters.eq("isHeader",isHeader),
-            Filters.in("param",params)
+        return Filters.and(
+                Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1),
+                Filters.eq(SingleTypeInfo._URL,apiInfo.getId().getUrl()),
+                Filters.eq(SingleTypeInfo._API_COLLECTION_ID,apiInfo.getId().getApiCollectionId()),
+                Filters.eq(SingleTypeInfo._METHOD,apiInfo.getId().getMethod().name()),
+                Filters.eq(SingleTypeInfo._IS_HEADER,isHeader),
+                Filters.in(SingleTypeInfo._PARAM,params)
         );
-        return filters;
     }
     public static void customAuthTypeUtil(List<CustomAuthType> customAuthTypes){
-        
+
+        System.out.println("customAuthTypes count: " + customAuthTypes.size());
         Set<ApiInfo.AuthType> unauthenticatedTypes = new HashSet<>(Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED));
         List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(Filters.eq("allAuthTypesFound",unauthenticatedTypes));
+        System.out.println("api count: " + apiInfos.size());
         
         Set<ApiInfo.AuthType> customTypes = new HashSet<>(Collections.singletonList(ApiInfo.AuthType.CUSTOM));
         Set<Set<ApiInfo.AuthType>> authTypes = new HashSet<>(Collections.singletonList(customTypes));
@@ -57,6 +59,7 @@ public class CustomAuthUtil {
                 }
 
                 // checking headerAuthKeys in header and cookie in any unathenticated API
+                System.out.println( apiInfo.key() + " : " +  headerAndCookieKeys.size());
                 if (headerAndCookieKeys.containsAll(customAuthType.getHeaderKeys())) {
                     ApiInfoDao.instance.updateOne(ApiInfoDao.getFilter(apiInfo.getId()),
                             Updates.set(ApiInfo.ALL_AUTH_TYPES_FOUND, authTypes));
@@ -65,6 +68,8 @@ public class CustomAuthUtil {
 
                 // checking if all payload keys occur in any unauthenticated API
                 List<SingleTypeInfo> payloadSTIs = SingleTypeInfoDao.instance.findAll(getFilters(apiInfo, false, customAuthType.getPayloadKeys()));
+                System.out.println( apiInfo.key() + " : " +  headerAndCookieKeys.size());
+                System.out.println("\n");
                 if (payloadSTIs!=null && payloadSTIs.size()==customAuthType.getPayloadKeys().size()) {
                     ApiInfoDao.instance.updateOne(ApiInfoDao.getFilter(apiInfo.getId()),
                             Updates.set(ApiInfo.ALL_AUTH_TYPES_FOUND, authTypes));
