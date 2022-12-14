@@ -312,6 +312,6 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
     }
 
     public long getEstimatedCount(){
-        return instance.getMCollection().countDocuments();
+        return instance.getMCollection().estimatedDocumentCount();
     }
 }
