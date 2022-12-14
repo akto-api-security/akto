@@ -47,7 +47,6 @@ public class HarAction extends UserAction {
 
     @Override
     public String execute() throws IOException {
-        skipKafka = true;
         ApiCollection apiCollection = null;
         if (apiCollectionName != null) {
             apiCollection =  ApiCollectionsDao.instance.findByName(apiCollectionName);
