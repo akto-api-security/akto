@@ -85,39 +85,39 @@
                 </div>
 
 
-                <div class="di-flex-bottom">
+<!--                <div class="di-flex-bottom">-->
 
-                        <div class="col_1">
-                            <p> 2 </p>
-                        </div>
-                        
-                        <div>
-                            <h3> Automate auth token generation </h3>
-                        </div>
-                    </div>
-                    
-                    <div class="di-flex">
-                        <div class="input-value">
-                            <div  v-if="authTokenUrl != null && authTokenDate != null">
-                                <span class="auth-token-title">URL: </span>
-                                <span class="auth-token-text">{{authTokenUrl}}</span>
-                                <br/>
-                                <span class="auth-token-title">Created on: </span>
-                                <span class="auth-token-text">{{authTokenDate}}</span>
-                            </div>
-                        </div>
+<!--                        <div class="col_1">-->
+<!--                            <p> 2 </p>-->
+<!--                        </div>-->
 
-                        <v-btn primary dark color="#6200EA" @click="toggleLoginStepBuilder">
-                            <span v-if="originalDbState">Edit</span>
-                            <span v-else>Create</span>
-                        </v-btn>
-                    </div>
+<!--                        <div>-->
+<!--                            <h3> Automate auth token generation </h3>-->
+<!--                        </div>-->
+<!--                    </div>-->
+
+<!--                    <div class="di-flex">-->
+<!--                        <div class="input-value">-->
+<!--                            <div  v-if="authTokenUrl != null && authTokenDate != null">-->
+<!--                                <span class="auth-token-title">URL: </span>-->
+<!--                                <span class="auth-token-text">{{authTokenUrl}}</span>-->
+<!--                                <br/>-->
+<!--                                <span class="auth-token-title">Created on: </span>-->
+<!--                                <span class="auth-token-text">{{authTokenDate}}</span>-->
+<!--                            </div>-->
+<!--                        </div>-->
+
+<!--                        <v-btn primary dark color="#6200EA" @click="toggleLoginStepBuilder">-->
+<!--                            <span v-if="originalDbState">Edit</span>-->
+<!--                            <span v-else>Create</span>-->
+<!--                        </v-btn>-->
+<!--                    </div>-->
 
                 </div>
 
-                <v-dialog v-model="showTokenAutomation" class="token-automation-modal">
-                    <token-automation :originalDbState="originalDbState" @closeLoginStepBuilder=toggleLoginStepBuilder />
-                </v-dialog>    
+<!--                <v-dialog v-model="showTokenAutomation" class="token-automation-modal">-->
+<!--                    <token-automation :originalDbState="originalDbState" @closeLoginStepBuilder=toggleLoginStepBuilder />-->
+<!--                </v-dialog>-->
                 
             </div>
         </template>

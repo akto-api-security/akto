@@ -2,7 +2,7 @@
     <simple-layout title="Issues">
         <issues-filters :filterStatus="filterStatus" :issues="issues" :filterCollectionsId="filterCollectionsId"
             :filterSeverity="filterSeverity" :filterSubCategory1="filterSubCategory1"
-            :selectedIssueIds="selectedIssueIds" :startEpoch="startEpoch">
+            :selectedIssueIds="selectedIssueIds" :startEpoch="startEpoch" :issuesCategories="issuesCategories" :categoryToSubCategories="categoryToSubCategories">
         </issues-filters>
         <spinner v-if="loading">
         </spinner>
@@ -14,12 +14,12 @@
             >
             </issues-dialog>
             <issue-box v-for="(issue, index) in issues" :key="index" :creationTime="issue.creationTime"
-                :method="issue.id.apiInfoKey.method._name" :endpoint="issue.id.apiInfoKey.url" :severity="issue.severity._name"
+                :method="issue.id.apiInfoKey.method" :endpoint="issue.id.apiInfoKey.url" :severity="issue.severity"
                 :collectionName="getCollectionName(issue.id.apiInfoKey.apiCollectionId)"
-                :categoryName="issue.id.testSubCategory.superCategory.displayName"
-                :categoryDescription="issue.id.testSubCategory.issueDescription"
-                :testType="issue.id.testErrorSource.name" :issueId="issue.id"
-                :issueStatus="issue.testRunIssueStatus._name" :ignoreReason="issue.ignoreReason"
+                :categoryName="getCategoryName(issue.id.testSubCategory)"
+                :categoryDescription="getCategoryDescription(issue.id.testSubCategory)"
+                :testType="getTestType(issue.id.testErrorSource)" :issueId="issue.id"
+                :issueStatus="issue.testRunIssueStatus" :ignoreReason="issue.ignoreReason"
                 :issueChecked="(selectedIssueIds.indexOf(issue.id) > -1)" :filterStatus="filterStatus"
                 @clickedIssueCheckbox="updateSelectedIssueIds"
                 @openDialogBox="openDialogBox">
@@ -53,7 +53,9 @@ export default {
     data() {
         return {
             currentPageIndex: 1,
-            dialogBox: false
+            dialogBox: false,
+            issuesCategories: [],
+            categoryToSubCategories: {}
         }
     },
     watch: {
@@ -80,8 +82,24 @@ export default {
             }, {})
         }
     },
-    mounted() {
+    async mounted() {
         this.$store.dispatch('issues/loadIssues')
+        await this.$store.dispatch('issues/fetchAllSubCategories')
+
+        let store = {}
+        let result = []
+        Object.values(this.$store.state.issues.subCatogoryMap).forEach((x) => {
+            let superCategory = x.superCategory
+            if (!store[superCategory.name]) {
+                result.push({"title": superCategory.displayName, "value": superCategory.name})
+                store[superCategory.name] = []
+            }
+            store[superCategory.name].push(x._name);
+        })  
+
+        this.issuesCategories = [].concat(result)
+        this.categoryToSubCategories = store
+
     },
     methods: {
         async openDialogBox({issueId}) {
@@ -101,6 +119,22 @@ export default {
                 }
             }
             this.$store.commit('issues/updateSelectedIssueIds', { selectedIssueIds })
+        },
+        getTestType(name) {
+            switch (name) {
+                case 'AUTOMATED_TESTING':
+                    return 'testing';
+                case 'RUNTIME':
+                    return 'runtime'
+                default:
+                    return ''
+            }
+        },
+        getCategoryName(name) {
+            return this.$store.state.issues.subCatogoryMap[name].superCategory.displayName;
+        },
+        getCategoryDescription(name) {
+            return this.$store.state.issues.subCatogoryMap[name].issueDescription
         },
         getCollectionName(collectionId) {
             return this.mapCollectionIdToName[collectionId];

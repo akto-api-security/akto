@@ -91,7 +91,9 @@ export default {
         filterSeverity: obj.arrR,
         filterSubCategory1: obj.arrR,
         selectedIssueIds: obj.arrR,
-        startEpoch: obj.numR
+        startEpoch: obj.numR,
+        issuesCategories: obj.arrR,
+        categoryToSubCategories: obj.ObjR
     },
     data() {
         var statusItems = [
@@ -113,7 +115,7 @@ export default {
                 text: "Issue Category",
                 value: "issueCategory",
                 showFilterMenu: false,
-                items: []
+                items: this.issuesCategories
             },
             {
                 text: "Collections",
@@ -154,17 +156,13 @@ export default {
             "No time to fix"
         ]
         const reOpen = "Reopen"
-        const subCategoriesToTitles = []
-        const categoryToSubCategories = {}
         return {
             ignoreReasons,
             reOpen,
             filterMenus,
             selectedTime,
             statusItems,
-            globalCheckbox: false,
-            subCategoriesToTitles,
-            categoryToSubCategories
+            globalCheckbox: false
         }
     },
     computed: {
@@ -205,25 +203,13 @@ export default {
                 })
             }
             this.$store.commit('issues/updateSelectedIssueIds', { selectedIssueIds })
+        },
+        issuesCategories(newValue) {
+            this.filterMenus[1].items = newValue
         }
     },
     async mounted() {
         this.filterMenus[2].items = this.getCollections1()
-        this.$store.dispatch('issues/fetchAllSubCategories').then((x) => {
-            let store = {}
-            let result = []
-            this.$store.state.issues.allSubCategories.forEach((x) => {
-                let superCategory = x.superCategory
-                if (!store[superCategory.name]) {
-                    result.push({"title": superCategory.displayName, "value": superCategory.name})
-                    store[superCategory.name] = []
-                }
-                store[superCategory.name].push(x._name);
-            })  
-
-            this.filterMenus[1].items = [].concat(result)
-            this.categoryToSubCategories = store
-        })
     },
     methods: {
         async bulkReopen() {

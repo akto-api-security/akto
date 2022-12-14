@@ -18,7 +18,7 @@ const state = {
     startEpoch : 0,
     selectedIssueIds : [],
     testingRunResult: {},
-    allSubCategories: []
+    subCatogoryMap: {}
 }
 
 const issues = {
@@ -107,10 +107,12 @@ const issues = {
         },
         fetchAllSubCategories() {
             return api.fetchAllSubCategories().then((resp) => {
-                state.allSubCategories = resp.subCategories
+                state.subCatogoryMap = {}
+                resp.subCategories.forEach((x) => {
+                    state.subCatogoryMap[x.name] = x
+                })
             }).catch((err) => {
                 console.log(err);
-                state.allSubCategories = []
             })
         },
     },
