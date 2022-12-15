@@ -22,6 +22,11 @@ public class WorkflowTestingEndpoints extends TestingEndpoints{
         return null;
     }
 
+    @Override
+    public boolean containsApi(ApiInfo.ApiInfoKey key) {
+        return false;
+    }
+
     public WorkflowTest getWorkflowTest() {
         return workflowTest;
     }

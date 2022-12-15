@@ -20,7 +20,7 @@
                             click
                     </span>
                 </template>
-                <v-list>
+                <v-list v-if="(onlyEqual==false)">
                     <v-list-item 
                         v-for="(item, index) in operators" 
                         :key="index"
@@ -42,6 +42,9 @@ export default {
     name: "OperatorComponent",
     props: {
         operator: obj.strR,
+        onlyEqual: {
+            type:Boolean
+        },
     },
     components: {
     },

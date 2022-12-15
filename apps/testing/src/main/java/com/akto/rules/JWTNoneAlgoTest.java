@@ -8,20 +8,17 @@ import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.store.SampleMessageStore;
+import com.akto.store.TestingUtil;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-public class JWTNoneAlgoTest extends TestPlugin {
-    @Override
-    public Result start(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages, Map<String, SingleTypeInfo> singleTypeInfos) {
-        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleMessages);
-        if (messages.isEmpty()) return null;
-        List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, authMechanism);
-        if (filteredMessages.isEmpty()) return null;
+public class JWTNoneAlgoTest extends AuthRequiredTestPlugin {
 
+    @Override
+    public Result exec(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil, List<RawApi> filteredMessages) {
         RawApi rawApi = filteredMessages.get(0).copy();
 
         OriginalHttpRequest testRequest = rawApi.getRequest();
@@ -36,13 +33,13 @@ public class JWTNoneAlgoTest extends TestPlugin {
         try {
             apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, originalHttpResponse);
         } catch (Exception e) {
-            return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest);
+            return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest, null);
         }
 
         boolean vulnerable = isStatusGood(apiExecutionDetails.statusCode);
 
         TestResult testResult = buildTestResult(
-                testRequest, apiExecutionDetails.testResponse, rawApi.getOriginalMessage(), apiExecutionDetails.percentageMatch, vulnerable
+                testRequest, apiExecutionDetails.testResponse, rawApi.getOriginalMessage(), apiExecutionDetails.percentageMatch, vulnerable, null
         );
 
         return addTestSuccessResult(

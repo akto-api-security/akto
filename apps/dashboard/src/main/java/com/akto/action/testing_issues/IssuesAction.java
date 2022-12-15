@@ -7,14 +7,13 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestingRunResult;
-import com.mongodb.BasicDBObject;
+import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.TestSubCategory;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
-import com.mongodb.client.result.UpdateResult;
 import org.bson.conversions.Bson;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import static com.akto.util.Constants.ID;
@@ -78,6 +77,14 @@ public class IssuesAction extends UserAction {
         testingRunResult = TestingRunResultDao.instance.findOne(filterForRunResult);
         return SUCCESS.toUpperCase();
     }
+
+    private TestSubCategory[] subCategories;
+    public String fetchAllSubCategories() {
+        this.subCategories = GlobalEnums.TestSubCategory.values();
+        return SUCCESS.toUpperCase();
+    }
+
+
     public String updateIssueStatus () {
         if (issueId == null || statusToBeUpdated == null || ignoreReason == null) {
             throw new IllegalStateException();
@@ -241,5 +248,9 @@ public class IssuesAction extends UserAction {
 
     public void setTestingRunResult(TestingRunResult testingRunResult) {
         this.testingRunResult = testingRunResult;
+    }
+
+    public TestSubCategory[] getSubCategories() {
+        return this.subCategories;
     }
 }

@@ -1,13 +1,9 @@
 package com.akto.action;
 
 import com.akto.ApiRequest;
-import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
-import com.akto.dto.APISpec;
-import com.akto.dto.ApiCollection;
-import com.akto.dto.SensitiveSampleData;
-import com.akto.dto.User;
+import com.akto.dto.*;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
@@ -15,18 +11,25 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.postman.Main;
 import com.akto.utils.SampleDataToSTI;
+import com.akto.utils.Utils;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.ReplaceOptions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import io.swagger.v3.oas.models.OpenAPI;
 import org.json.JSONObject;
 
 import java.util.*;
 
 public class PostmanAction extends UserAction {
+
+    private static final Logger logger = LoggerFactory.getLogger(PostmanAction.class);
     private static final ObjectMapper mapper = new ObjectMapper();
     @Override
     public String execute() {
@@ -164,19 +167,9 @@ public class PostmanAction extends UserAction {
 
 
     private PostmanCredential fetchPostmanCredential() {
-        int userId = getSUser().getId();
-        ThirdPartyAccess thirdPartyAccess = ThirdPartyAccessDao.instance.findOne(
-                Filters.and(
-                        Filters.eq("owner", userId),
-                        Filters.eq("credential.type", Credential.Type.POSTMAN)
-                )
-        );
-
-        if (thirdPartyAccess == null) {
-            return null;
-        }
-
-        return (PostmanCredential) thirdPartyAccess.getCredential();
+        User u = getSUser();
+        int userId = u.getId();
+        return Utils.fetchPostmanCredential(userId);
     }
 
     private List<BasicDBObject> workspaces;
@@ -224,6 +217,75 @@ public class PostmanAction extends UserAction {
 
         return SUCCESS.toUpperCase();
     }
+
+    private boolean skipKafka;
+
+    public String importDataFromPostman() throws Exception {
+        PostmanCredential postmanCredential = fetchPostmanCredential();
+        if (postmanCredential == null) {
+            addActionError("Please add postman credentials in settings");
+            return ERROR.toUpperCase();
+        }
+        Main main = new Main(postmanCredential.getApiKey());
+        String workspaceId = this.workspace_id;
+        logger.info("Fetching details for workspace_id: {}", workspace_id);
+        JsonNode workspaceDetails = main.fetchWorkspace(workspaceId);
+        JsonNode workspaceObj = workspaceDetails.get("workspace");
+        ArrayNode collectionsObj = (ArrayNode) workspaceObj.get("collections");
+        Map<Integer, List<String>> aktoFormat = new HashMap<>();
+        for(JsonNode collectionObj: collectionsObj){
+            List<String> msgs = new ArrayList<>();
+            String collectionId = collectionObj.get("id").asText();
+            int aktoCollectionId = collectionId.hashCode();
+            aktoCollectionId = aktoCollectionId < 0 ? aktoCollectionId * -1: aktoCollectionId;
+            JsonNode collectionDetails = main.fetchCollection(collectionId);
+            JsonNode collectionDetailsObj = collectionDetails.get("collection");
+            Map<String, String> variablesMap = Utils.getVariableMap((ArrayNode) collectionDetailsObj.get("variable"));
+            ArrayList<JsonNode> jsonNodes = new ArrayList<>();
+            Utils.fetchApisRecursively((ArrayNode) collectionDetailsObj.get("item"), jsonNodes);
+            String collectionName = collectionDetailsObj.get("info").get("name").asText();
+            if(jsonNodes.size() == 0) {
+                logger.info("Collection {} has no requests, skipping it", collectionName);
+                continue;
+            }
+            logger.info("Found {} apis in collection {}", jsonNodes.size(), collectionName);
+            for(JsonNode item: jsonNodes){
+                String apiName = item.get("name").asText();
+                logger.info("Processing api {} if collection {}", apiName, collectionName);
+                Map<String, String> apiInAktoFormat = Utils.convertApiInAktoFormat(item, variablesMap, String.valueOf(1_000_000));
+                if(apiInAktoFormat != null){
+                    try{
+                        apiInAktoFormat.put("akto_vxlan_id", String.valueOf(aktoCollectionId));
+                        String s = mapper.writeValueAsString(apiInAktoFormat);
+                        logger.info("Api name: {}, CollectionName: {}, AktoFormat: {}", apiName, collectionName, s);
+                        msgs.add(s);
+                    } catch (JsonProcessingException e){
+                        logger.error(e.getMessage(), e);
+                    }
+                }
+            }
+            if(msgs.size() > 0) {
+                aktoFormat.put(aktoCollectionId, msgs);
+                if(ApiCollectionsDao.instance.findOne(Filters.eq("_id", aktoCollectionId)) == null){
+                    ApiCollectionsDao.instance.insertOne(ApiCollection.createManualCollection(aktoCollectionId, "Postman " + collectionName));
+                }
+                logger.info("Pushed {} apis from collection {}", msgs.size(), collectionName);
+            }
+
+        }
+        //Push to Akto
+        logger.info("Starting to push data to Akto, pushin data in {} collections", aktoFormat.size());
+        String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
+        for(Map.Entry<Integer, List<String>> entry: aktoFormat.entrySet()){
+            //For each entry, push a message to Kafka
+            int aktoCollectionId = entry.getKey();
+            List<String> msgs = entry.getValue();
+            Utils.pushDataToKafka(aktoCollectionId, topic, msgs, new ArrayList<>(), skipKafka);
+            logger.info("Pushed data in apicollection id {}", aktoCollectionId);
+        }
+        return SUCCESS.toUpperCase();
+    }
+
 
     public List<BasicDBObject> getCollections() {
         return collections;

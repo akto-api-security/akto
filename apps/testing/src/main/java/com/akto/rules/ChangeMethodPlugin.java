@@ -9,6 +9,7 @@ import com.akto.dto.testing.TestResult;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.store.SampleMessageStore;
+import com.akto.store.TestingUtil;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.StatusCodeAnalyser;
 
@@ -23,11 +24,11 @@ public abstract class ChangeMethodPlugin extends TestPlugin {
     public abstract boolean isVulnerable(double percentageBodyMatch, int statusCode);
 
     @Override
-    public Result start(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages, Map<String, SingleTypeInfo> singleTypeInfos) {
+    public Result start(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) {
 
-        List<URLMethods.Method> undocumentedMethods = findUndocumentedMethods(sampleMessages, apiInfoKey);
+        List<URLMethods.Method> undocumentedMethods = findUndocumentedMethods( testingUtil.getSampleMessages(), apiInfoKey);
 
-        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleMessages);
+        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
         if (messages.isEmpty()) return null;
 
         RawApi rawApi = messages.get(0);
@@ -50,9 +51,9 @@ public abstract class ChangeMethodPlugin extends TestPlugin {
                 boolean vulnerable = isVulnerable(percentageMatch, statusCode);
                 overallVulnerable = overallVulnerable || vulnerable;
 
-                testResult = buildTestResult(testRequest, apiExecutionDetails.testResponse, rawApi.getOriginalMessage(), percentageMatch, vulnerable);
+                testResult = buildTestResult(testRequest, apiExecutionDetails.testResponse, rawApi.getOriginalMessage(), percentageMatch, vulnerable, null);
             } catch (Exception e) {
-                testResult = buildFailedTestResultWithOriginalMessage( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest);
+                testResult = buildFailedTestResultWithOriginalMessage( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest, null);
             }
 
             testResults.add(testResult);
