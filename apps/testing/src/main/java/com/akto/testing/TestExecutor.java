@@ -185,7 +185,6 @@ public class TestExecutor {
 
         WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData());
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
-        ArrayList<Object> responses = new ArrayList<Object>();
         try {
             resp = apiWorkflowExecutor.runLoginFlow(workflowObj, authMechanism);
         } catch(Exception e){
@@ -225,13 +224,15 @@ public class TestExecutor {
 
             int maxPollRetries = 0;
             int pollRetryDuration = 0;
-            if (data.getType().equals("OTP_VERIFICATION")) {
+            WorkflowNodeDetails.Type nodeType = WorkflowNodeDetails.Type.API;
+            if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.OTP_VERIFICATION.toString())) {
                 maxPollRetries = 20;
                 pollRetryDuration = 10;
+                nodeType = WorkflowNodeDetails.Type.POLL;
             }
             WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(0, data.getUrl(),
                     URLMethods.Method.fromString(data.getMethod()), "", sampleData,
-                    WorkflowNodeDetails.Type.API, true, data.getWaitTime(), maxPollRetries, pollRetryDuration);
+                    nodeType, true, 0, maxPollRetries, pollRetryDuration);
 
             mapNodeIdToWorkflowNodeDetails.put(target, workflowNodeDetails);
         }

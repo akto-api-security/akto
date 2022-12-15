@@ -7,6 +7,8 @@
     <constant name="struts.devMode" value="false"></constant>
     <constant name="struts.enable.SlashesInActionNames" value="true"/>
     <constant name="struts.mapper.alwaysSelectFullNamespace" value="false"/>
+    <constant name="struts.patternMatcher" value="regex" />
+    <constant name="struts.matcher.appendNamedParameters" value="true"/>
 
     <package name="user" namespace="" extends="struts-default, json-default">
         <default-action-ref name="home" />
@@ -899,22 +901,11 @@
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
             </result>
         </action>
 
         <action name="api/fetchAuthMechanismData" class="com.akto.action.testing.AuthMechanismAction" method="fetchAuthMechanismData">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="api/saveOtpData" class="com.akto.action.testing.AuthMechanismAction" method="saveOtpData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
@@ -1344,7 +1335,7 @@
             </result>
         </action>
 
-        <action name="api/saveOtpData" class="com.akto.action.testing.OtpTestDataAction" method="saveOtpData">
+        <action name="api/saveOtpData/{uuid}" class="com.akto.action.testing.OtpTestDataAction" method="saveOtpData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
@@ -1355,7 +1346,7 @@
             </result>
         </action>
 
-        <action name="api/fetchOtpData" class="com.akto.action.testing.OtpTestDataAction" method="fetchOtpData">
+        <action name="api/fetchOtpData/{uuid}" class="com.akto.action.testing.OtpTestDataAction" method="fetchOtpData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>

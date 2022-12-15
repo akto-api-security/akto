@@ -3,15 +3,12 @@ package com.akto.action.testing;
 import com.akto.action.UserAction;
 import com.akto.dao.OtpTestDataDao;
 import com.akto.dto.testing.OtpTestData;
-import com.google.gson.Gson;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -41,7 +38,7 @@ public class OtpTestDataAction extends UserAction {
                 Updates.set("usedInLoginFlow", false)
         );
 
-        OtpTestDataDao.instance.getMCollection().findOneAndUpdate(Filters.eq("uuid", uuid), updates);
+        OtpTestDataDao.instance.updateOne(Filters.eq("uuid", uuid), updates); 
 
         return SUCCESS.toUpperCase();
     }
@@ -55,11 +52,15 @@ public class OtpTestDataAction extends UserAction {
 
         Bson filters = Filters.and(
                 Filters.eq("uuid", uuid),
-                Filters.eq("usedInLoginFlow", true)
+                Filters.eq("usedInLoginFlow", false)
         );
         OtpTestData otpTestData = null;
         try {
             otpTestData = OtpTestDataDao.instance.findOne(filters);
+            if (otpTestData == null) {
+                logger.error("otp data not received for uuid " + uuid);
+                return ERROR.toUpperCase();
+            }
         } catch(Exception e) {
             logger.error("Error fetching otp data for uuid " + uuid + " error " + e.getMessage());
             return ERROR.toUpperCase();
@@ -67,19 +68,27 @@ public class OtpTestDataAction extends UserAction {
 
         otp = extractVerificationCode(otpTestData.getOtpText(), regex);
 
+        otpTestData.setUsedInLoginFlow(true);
+
+        Bson updates = Updates.combine(
+                Updates.set("usedInLoginFlow", true)
+        );
+        OtpTestDataDao.instance.getMCollection().findOneAndUpdate(Filters.eq("uuid", uuid), updates);
+
         return SUCCESS.toUpperCase();
 
     }
 
     private String extractVerificationCode(String text, String regex) {
         System.out.println(regex);
-        System.out.println(regex.replace("\\", "\\\\"));
-        Pattern pattern = Pattern.compile(regex.replace("\\", "\\\\"));
+
+        Pattern pattern = Pattern.compile(regex);
         Matcher matcher = pattern.matcher(text);
         String verificationCode = null;
         if (matcher.find()) {
             verificationCode = matcher.group(1);
         }
+
         return verificationCode;
     }
 
@@ -114,45 +123,4 @@ public class OtpTestDataAction extends UserAction {
     public void setOtp(String otp) {
         this.otp = otp;
     }
-
-
-
-
-
-
-
-//        for (RequestData data : authMechanism.getRequestData()) {
-//            if (!(data.getType().equals("EMAIL_CODE_VERIFICATION") || data.getType().equals("MOBILE_CODE_VERIFICATION"))) {
-//                continue;
-//            }
-//            LoginVerificationCodeData verificationCodeData = data.getVerificationCodeData();
-//
-//            String key = verificationCodeData.getKey();
-//            String body = data.getBody();
-//            String verificationCode;
-//            try {
-//                verificationCode = extractVerificationCode(verificationCodeBody, verificationCodeData.getRegexString());
-//            } catch (Exception e) {
-//                loggerMaker.errorAndAddToDb("error parsing regex string " + verificationCodeData.getRegexString() +
-//                        "for auth Id " + uuid);
-//                return ERROR.toUpperCase();
-//            }
-//
-//            if (verificationCode == null) {
-//                loggerMaker.errorAndAddToDb("error extracting verification code for auth Id " + uuid);
-//                return ERROR.toUpperCase();
-//            }
-//
-//            Gson gson = new Gson();
-//            Map<String, Object> json = gson.fromJson(body, Map.class);
-//            json.put(key, verificationCode);
-//
-//            JSONObject jsonBody = new JSONObject();
-//            for (Map.Entry<String, Object> entry : json.entrySet()) {
-//                jsonBody.put(entry.getKey(), entry.getValue());
-//            }
-//            data.setBody(jsonBody.toString());
-//        }
-//
-//        AuthMechanismsDao.instance.replaceOne(filters, authMechanism);
 }

@@ -95,14 +95,15 @@ public class ApiWorkflowExecutor {
                 nodeResult = new WorkflowTestResult.NodeResult("{}", false, testErrors);
             }
 
-            if (nodeResult.getErrors().size() > 0)  throw new Exception("Error Processing Node In Login Flow " + node.getId());
-
             JSONObject respString = new JSONObject();
             Map<String, Map<String, Object>> json = gson.fromJson(nodeResult.getMessage(), Map.class);
 
             respString.put("headers", json.get("response").get("headers"));
             respString.put("body", json.get("response").get("body"));
             responses.add(respString.toString());
+            
+            if (nodeResult.getErrors().size() > 0)  return responses;
+
         }
 
         for (AuthParam param : authMechanism.getAuthParams()) {
