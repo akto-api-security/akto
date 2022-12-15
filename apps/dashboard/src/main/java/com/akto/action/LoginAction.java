@@ -1,6 +1,7 @@
 package com.akto.action;
 
 import com.akto.dao.SignupDao;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
@@ -15,6 +16,8 @@ import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
@@ -34,6 +37,8 @@ import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
 // Adds the refresh token to http-only cookie
 // Adds the access token to header
 public class LoginAction implements Action, ServletResponseAware, ServletRequestAware {
+    private static final Logger logger = LoggerFactory.getLogger(LoginAction.class);
+    
     public static final String REFRESH_TOKEN_COOKIE_NAME = "refreshToken";
     public BasicDBObject getLoginResult() {
         return loginResult;
@@ -82,9 +87,21 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             System.out.println("Auth Failed");
             return "ERROR";
         }
-
         String result = loginUser(user, servletResponse, true, servletRequest);
+        decideFirstPage(loginResult);
         return result;
+    }
+
+    private void decideFirstPage(BasicDBObject loginResult){
+        //TODO get this reviewed
+        Context.accountId.set(1_000_000);
+        long count = SingleTypeInfoDao.instance.getEstimatedCount();
+        if(count == 0){
+            logger.info("New user, showing quick start page");
+            loginResult.put("redirect", "dashboard/quick-start");
+        } else {
+            logger.info("Existing user, not redirecting to quick start page");
+        }
     }
 
     public static String loginUser(User user, HttpServletResponse servletResponse, boolean signedUp, HttpServletRequest servletRequest) {

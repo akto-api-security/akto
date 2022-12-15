@@ -126,9 +126,17 @@ service.interceptors.response.use((response) => {
   }
   if (response.data.error !== undefined) {
     window._AKTO.$emit('API_FAILED', response.data.error)
+  } else {
+    if (window.mixpanel && window.mixpanel.track && response.config && response.config.url){
+        raiseMixpanelEvent(response.config.url);
+    }
   }
 
   return response.data
 }, err)
+
+async function raiseMixpanelEvent(api){
+  window.mixpanel.track(api)
+}
 
 export default service

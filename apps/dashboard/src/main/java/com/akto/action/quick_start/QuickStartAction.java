@@ -17,13 +17,14 @@ import com.akto.dao.BackwardCompatibilityDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.AwsResources;
 import com.akto.dto.BackwardCompatibility;
+import com.akto.dto.User;
+import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.utils.cloud.CloudType;
 import com.akto.utils.cloud.Utils;
 import com.akto.utils.cloud.serverless.ServerlessFunction;
 import com.akto.utils.cloud.serverless.UpdateFunctionRequest;
 import com.akto.utils.cloud.serverless.aws.Lambda;
 import com.akto.utils.cloud.stack.Stack;
-import com.akto.utils.cloud.stack.Stack.StackStatus;
 import com.akto.utils.cloud.stack.aws.AwsStack;
 import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancing;
 import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancingClientBuilder;
@@ -65,6 +66,11 @@ public class QuickStartAction extends UserAction {
         ApiToken burpToken = ApiTokensDao.instance.findOne(Filters.eq(ApiToken.UTILITY, ApiToken.Utility.BURP));
         if (burpToken != null) {
             configuredItems.add(ApiToken.Utility.BURP.toString());
+        }
+        User u = getSUser();
+        PostmanCredential postmanCredential = com.akto.utils.Utils.fetchPostmanCredential(u.getId());
+        if(postmanCredential != null) {
+            configuredItems.add("POSTMAN");
         }
         return Action.SUCCESS.toUpperCase();
     }

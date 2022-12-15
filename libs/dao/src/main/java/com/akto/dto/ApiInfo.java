@@ -27,7 +27,7 @@ public class ApiInfo {
     private int lastSeen;
 
     public enum AuthType {
-        UNAUTHENTICATED, BASIC, AUTHORIZATION_HEADER, JWT, API_TOKEN, BEARER
+        UNAUTHENTICATED, BASIC, AUTHORIZATION_HEADER, JWT, API_TOKEN, BEARER, CUSTOM
     }
 
     public enum ApiAccessType {

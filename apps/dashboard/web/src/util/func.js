@@ -474,6 +474,46 @@ export default {
 
         return result;
     },
+
+    generateKeysForApi(predicates){
+        let result =[]
+        if(!predicates) return result
+        predicates.forEach((predicate)=>{
+            result.push(predicate["value"])
+        })
+        return result;
+    },
+
+    prepareAuthTypes(auth_types){
+        if(auth_types) {
+            auth_types.forEach((x)=>{
+                x["operator"]="OR"
+                x["prefix"] = x["id"] ? "[custom]" : ""
+                let headerPredicates =[]
+                x["headerKeys"].forEach((key)=>{
+                    let obj = {"type":"EQUALS_TO","value":key}
+                    headerPredicates.push(obj)
+                })
+                let payloadPredicates =[]
+                x["payloadKeys"].forEach((key)=>{
+                    let obj = {"type":"EQUALS_TO","value":key}
+                    payloadPredicates.push(obj)
+                })
+                if(x["id"]){
+                    x["headerKeyConditions"] = {
+                        "operator":"AND",
+                        "predicates": headerPredicates
+                    }
+                    x["payloadKeyConditions"] = {
+                        "operator":"AND",
+                        "predicates": payloadPredicates
+                    }
+                }
+            })
+        }
+        return auth_types
+    },
+
     prepareDataTypes(data_types) {
         if (data_types) {
             data_types.forEach((x) => {

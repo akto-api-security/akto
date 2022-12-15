@@ -82,8 +82,8 @@ const testing = {
                 commit('SAVE_TESTING_RUNS', resp)
             })
         },
-        addAuthMechanism({commit}, {key, value, location}) {
-            return api.addAuthMechanism(key, value, location).then(resp => {
+        addAuthMechanism({commit}, {type, requestData, authParamData}) {
+            return api.addAuthMechanism(type, requestData, authParamData).then(resp => {
                 commit('SAVE_AUTH_MECHANISM', resp)
             })
         },

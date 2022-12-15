@@ -6,6 +6,7 @@ import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 public class AuthMechanism {
     private ObjectId id;
@@ -15,6 +16,8 @@ public class AuthMechanism {
 
     private ArrayList<RequestData> requestData;
 
+    private String uuid;
+
     public AuthMechanism() {
     }
 
@@ -22,6 +25,7 @@ public class AuthMechanism {
         this.authParams = authParams;
         this.requestData = requestData;
         this.type = type;
+        this.uuid = UUID.randomUUID().toString();
     }
 
     public boolean addAuthToRequest(OriginalHttpRequest request) {
@@ -50,6 +54,10 @@ public class AuthMechanism {
 
     public ObjectId getId() {
         return id;
+    }
+
+    public String getUuid() {
+        return uuid;
     }
 
     public void setId(ObjectId id) {
@@ -85,4 +93,9 @@ public class AuthMechanism {
     public String getType() {
         return this.type;
     }
+
+    public void setUuid(String uuid) {
+        this.uuid = uuid;
+    }
+
 }

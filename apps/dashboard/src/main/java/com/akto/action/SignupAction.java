@@ -352,6 +352,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             }
             
         }
+
         return "SUCCESS";
     }
 
