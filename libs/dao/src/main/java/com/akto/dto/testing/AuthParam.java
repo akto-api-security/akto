@@ -11,7 +11,7 @@ public abstract class AuthParam {
 
     public abstract boolean authTokenPresent(OriginalHttpRequest request);
 
-    public abstract String getAuthTokenPath();
+    public abstract String getValue();
 
     public abstract void setValue(String value);
 

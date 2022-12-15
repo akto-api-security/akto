@@ -6,9 +6,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import com.akto.dao.AktoDataTypeDao;
+import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.CustomDataTypeDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.AktoDataType;
+import com.akto.dto.CustomAuthType;
 import com.akto.dto.CustomDataType;
 import com.akto.types.CappedSet;
 import com.mongodb.BasicDBObject;
@@ -30,6 +32,7 @@ public class SingleTypeInfo {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 fetchCustomDataTypes();
+                fetchCustomAuthTypes();
             }
         }, 0, 5, TimeUnit.MINUTES);
 
@@ -73,6 +76,11 @@ public class SingleTypeInfo {
         }
     }
 
+    public static List<CustomAuthType> activeCustomAuthTypes = new ArrayList<>();
+
+    public static void fetchCustomAuthTypes() {
+        activeCustomAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
+    }
 
     public enum SuperType {
         BOOLEAN, INTEGER, FLOAT, STRING, NULL, OTHER, CUSTOM

@@ -9,37 +9,35 @@ import com.akto.dto.testing.HardcodedAuthParam;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.store.SampleMessageStore;
+import com.akto.store.TestingUtil;
 import com.akto.testing.ApiExecutor;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-public class OldApiVersionTest extends TestPlugin {
+public class OldApiVersionTest extends AuthRequiredTestPlugin{
     @Override
-    public Result start(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages, Map<String, SingleTypeInfo> singleTypeInfos) {
+    public Result exec(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil, List<RawApi> filteredMessages) {
         String url = apiInfoKey.getUrl();
         String oldVersionUrl = decrementUrlVersion(url, 1, 1);
         if (oldVersionUrl == null) return null;
 
-        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleMessages);
-        if (messages.isEmpty()) return null;
-        List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, authMechanism);
-        if (filteredMessages.isEmpty()) return null;
-
         RawApi rawApi = filteredMessages.get(0).copy();
         Result result = null;
 
-        boolean foundOlderVersionApiThatWorks = false;
-
-        while (oldVersionUrl != null) { // todo: add a check for max
+        int i = 0;
+        while (oldVersionUrl != null) {
+            if (i >= 10) break;
             ApiInfo.ApiInfoKey oldVersionApiInfoKey = new ApiInfo.ApiInfoKey(apiInfoKey.getApiCollectionId(), oldVersionUrl, apiInfoKey.getMethod());
 
             // ignore if exists in traffic data
-            if (sampleMessages.containsKey(oldVersionApiInfoKey)) {
+            if (testingUtil.getSampleMessages().containsKey(oldVersionApiInfoKey)) {
                 oldVersionUrl = decrementUrlVersion(oldVersionUrl, 1, 1);
                 continue;
             }
+
+            i += 1;
 
             // change the url to oldVersionUrl
             OriginalHttpRequest testRequest = rawApi.getRequest().copy();
@@ -61,32 +59,16 @@ public class OldApiVersionTest extends TestPlugin {
                 continue;
             }
 
-            foundOlderVersionApiThatWorks = true;
-
             // try BOLA
             BOLATest bolaTest = new BOLATest();
             RawApi dummy = new RawApi(testRequest, originalHttpResponse, rawApi.getOriginalMessage());
-            BOLATest.ExecutorResult executorResult = bolaTest.execute(dummy, apiInfoKey, authMechanism, singleTypeInfos);
-            TestResult.TestError testError = executorResult.testError;
-            if (testError != null) {
-                return addWithRequestError(executorResult.rawApi.getOriginalMessage(), testError, executorResult.rawApi.getRequest());
-            } else {
-                 TestResult testResult = buildTestResult(
-                        executorResult.testRequest, executorResult.testResponse, executorResult.rawApi.getOriginalMessage(),
-                        executorResult.percentageMatch, executorResult.vulnerable
-                 );
+            List<BOLATest.ExecutorResult> executorResults = bolaTest.execute(dummy, apiInfoKey, testingUtil);
+            result = convertExecutorResultsToResult(executorResults);
 
-                 result = addTestSuccessResult(
-                                 executorResult.vulnerable, Collections.singletonList(testResult), executorResult.singleTypeInfos, executorResult.confidence
-                 );
-
-                if (executorResult.vulnerable) return result;
-            }
+            if (result.isVulnerable) return result;
 
             oldVersionUrl = decrementUrlVersion(oldVersionUrl, 1, 1);
         }
-
-        if (!foundOlderVersionApiThatWorks) return null;
 
         return result;
     }

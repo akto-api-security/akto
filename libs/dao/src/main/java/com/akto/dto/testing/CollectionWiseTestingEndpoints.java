@@ -3,6 +3,8 @@ package com.akto.dto.testing;
 
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.ApiInfo;
+import com.mongodb.client.model.Filters;
+import org.bson.conversions.Bson;
 
 import java.util.List;
 
@@ -22,6 +24,11 @@ public class CollectionWiseTestingEndpoints extends TestingEndpoints {
     @Override
     public List<ApiInfo.ApiInfoKey> returnApis() {
         return SingleTypeInfoDao.instance.fetchEndpointsInCollection(apiCollectionId);
+    }
+
+    @Override
+    public boolean containsApi(ApiInfo.ApiInfoKey key) {
+        return key.getApiCollectionId() == this.apiCollectionId;
     }
 
     public int getApiCollectionId() {

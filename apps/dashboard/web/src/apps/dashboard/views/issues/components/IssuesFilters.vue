@@ -91,7 +91,9 @@ export default {
         filterSeverity: obj.arrR,
         filterSubCategory1: obj.arrR,
         selectedIssueIds: obj.arrR,
-        startEpoch: obj.numR
+        startEpoch: obj.numR,
+        issuesCategories: obj.arrR,
+        categoryToSubCategories: obj.ObjR
     },
     data() {
         var statusItems = [
@@ -113,7 +115,7 @@ export default {
                 text: "Issue Category",
                 value: "issueCategory",
                 showFilterMenu: false,
-                items: [{ title: "Broken Object Level Authorization (BOLA)", value: "BOLA" }, { title: "Broken User Authentication (BUA)", value: "BUA" }]
+                items: this.issuesCategories
             },
             {
                 text: "Collections",
@@ -201,9 +203,12 @@ export default {
                 })
             }
             this.$store.commit('issues/updateSelectedIssueIds', { selectedIssueIds })
+        },
+        issuesCategories(newValue) {
+            this.filterMenus[1].items = newValue
         }
     },
-    mounted() {
+    async mounted() {
         this.filterMenus[2].items = this.getCollections1()
     },
     methods: {
@@ -327,20 +332,7 @@ export default {
             this.$store.dispatch('issues/loadIssues')
         },
         getSubcategoryArray(superCateogoryName) {
-            switch (superCateogoryName) {
-                case "BOLA":
-                    return [
-                        'REPLACE_AUTH_TOKEN'
-                        , 'ADD_USER_ID'
-                        , 'ADD_METHOD_IN_PARAMETER'
-                        , 'ADD_METHOD_OVERRIDE_HEADERS'
-                        , 'CHANGE_METHOD'
-                        , 'REPLACE_AUTH_TOKEN_OLD_VERSION'
-                        , 'PARAMETER_POLLUTION'
-                    ]
-                case "BUA":
-                    return ['REMOVE_TOKENS', 'JWT_NONE_ALGO']
-            }
+            return this.categoryToSubCategories[superCateogoryName]
         },
         getCollections1() {
 

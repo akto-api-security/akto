@@ -1,22 +1,17 @@
 <template>
-    <layout-with-tabs title="API Testing" class="page-testing" :tabs='["Test results", "User config"]'>
+    <layout-with-tabs title="API Testing" class="page-testing"
+        :tabs='["Test results", "User config"]'>
         <template slot="Test results">
             <div class="py-8">
-                <div>                
+                <div>
                     <layout-with-left-pane title="Run test">
                         <div>
-                            <router-view :key="$route.fullPath"/>
+                            <router-view :key="$route.fullPath" />
                         </div>
                         <template #leftPane>
-                            <v-navigation-drawer
-                                v-model="drawer"
-                                floating
-                                width="250px"
-                            >
+                            <v-navigation-drawer v-model="drawer" floating width="250px">
                                 <div class="nav-section">
-                                    <api-collection-group
-                                        :items=leftNavItems
-                                    >
+                                    <api-collection-group :items=leftNavItems>
                                         <!-- <template #prependItem>
                                             <v-btn primary dark color="#6200EA" tile style="width: -webkit-fill-available" class="mt-8 mb-8">
                                                 <div style="width: 100%">
@@ -35,108 +30,127 @@
         </template>
         <template slot="User config">
             <div class="pa-8">
-                <v-btn primary dark color="#6200EA" @click="stopAllTests" :loading="stopAllTestsLoading" style="float:right">
+                <v-btn primary dark color="#6200EA" @click="stopAllTests" :loading="stopAllTestsLoading"
+                    style="float:right">
                     Stop all tests
                 </v-btn>
 
-             <div>
+                <div>
 
-                <div class="di-flex">
-
-                    <div class="col_1">
-                        <p> 1 </p>
+                    <div class="di-flex-bottom">
+                        <div class="col_1">
+                            <p> 1 </p>
+                        </div>
+                        <div>
+                            <h3> Inject hard-coded auth token </h3>
+                        </div>
                     </div>
-                    
-                    <div>
-                        <h2> Manual </h2>
-                    </div>
+                    <!-- <div>
+                        <span class="heading">Auth tokens</span>
+                    </div> -->
 
-                    <div class="p_padding">
-                        <small> Add your API Token below </small>
-                    </div>
-                </div>
-                <!-- <div>
-                    <span class="heading">Auth tokens</span>
-                </div> -->
+                    <div class="d-flex">
+                        <div class="input-value">
+                            <v-text-field 
+                                v-model="newKey"
+                                style="width: 200px"
+                            >
+                                <template slot="label">
+                                    <div class="d-flex">
+                                        Auth header key
+                                        <help-tooltip :size="12" text="Please enter name of the header which contains your auth token. This field is case-sensitive. eg Authorization"/>
+                                    </div>
+                                </template>
+                            </v-text-field>
+                            
+                        </div>
+                        <div class="input-value">
+                            <v-text-field 
+                                v-model="newVal"
+                                style="width: 500px"
+                            >              
+                                <template slot="label">
+                                    <div class="d-flex">
+                                        Auth header value
+                                        <help-tooltip :size="12" text="Please enter the value of the auth token."/>
+                                    </div>
+                                </template>
 
-                <div class="d-flex">
-                    <div class="input-value">
-                        <v-text-field 
-                            v-model="newKey"
-                            label="Auth header key"
-                            style="width: 200px"
-                        />
-                    </div>
-                    <div class="input-value">
-                        <v-text-field 
-                            v-model="newVal"
-                            label="Auth header value"
-                            style="width: 500px"
-                        />                    
-                    </div>
+                            </v-text-field>
+                        </div>
 
-                <v-btn primary dark color="#3366ff" @click="saveAuthMechanism" v-if="someAuthChanged">
-                    Save changes
-                </v-btn>
-            </div>
-
-
-            <div class="di-flex-bottom">
-
-                    <div class="col_1">
-                        <p> 2 </p>
-                    </div>
-                    
-                    <div>
-                        <h2> Automated </h2>
-                    </div>
-
-                    <div class="p_padding">
-                        <small> Automate your API Token below </small>
-                    </div>
-                </div>
-                
-                <div class="di-flex">
-                    <div class="input-value">
-                        <v-text-field 
-                            :placeholder="loginInputText"
-                            style="width: 700px"
-                        />
-                    </div>
-
-                    <v-btn primary dark color="#6200EA" @click="showLoginStepBuilder">
-                        Fetch Token
+                    <v-btn primary dark color="#3366ff" @click="saveAuthMechanism" v-if="someAuthChanged">
+                        Save changes
                     </v-btn>
                 </div>
 
-            </div>
 
+<!--                <div class="di-flex-bottom">-->
+
+<!--                        <div class="col_1">-->
+<!--                            <p> 2 </p>-->
+<!--                        </div>-->
+
+<!--                        <div>-->
+<!--                            <h3> Automate auth token generation </h3>-->
+<!--                        </div>-->
+<!--                    </div>-->
+
+<!--                    <div class="di-flex">-->
+<!--                        <div class="input-value">-->
+<!--                            <div  v-if="authTokenUrl != null && authTokenDate != null">-->
+<!--                                <span class="auth-token-title">URL: </span>-->
+<!--                                <span class="auth-token-text">{{authTokenUrl}}</span>-->
+<!--                                <br/>-->
+<!--                                <span class="auth-token-title">Created on: </span>-->
+<!--                                <span class="auth-token-text">{{authTokenDate}}</span>-->
+<!--                            </div>-->
+<!--                        </div>-->
+
+<!--                        <v-btn primary dark color="#6200EA" @click="toggleLoginStepBuilder">-->
+<!--                            <span v-if="originalDbState">Edit</span>-->
+<!--                            <span v-else>Create</span>-->
+<!--                        </v-btn>-->
+<!--                    </div>-->
+
+                </div>
+
+<!--                <v-dialog v-model="showTokenAutomation" class="token-automation-modal">-->
+<!--                    <token-automation :originalDbState="originalDbState" @closeLoginStepBuilder=toggleLoginStepBuilder />-->
+<!--                </v-dialog>-->
                 
-
-                
-
-
-                    <v-dialog
-                        v-model="stepBuilder"
-                        width="80%"
-                    >
-                        <div style="padding: 12px 24px 12px 24px; background: white">
-                        <div style="margin-bottom: 24px">
-                            <v-btn icon primary dark color="#6200EA" class="float-right" @click="() => { stepBuilder = false;}">
-                                <v-icon>$fas_times</v-icon>
-                            </v-btn>
-                        </div>
-
-                        <div style="margin-top: 12px">
-                            <login-step-builder :originalDbState="originalDbState" :showLoginSaveOption="showLoginSaveOption" v-if="stepBuilder" @testLoginStep="testLoginStep" @saveLoginStep="saveLoginStep"/>
-                        </div>
-
-                        </div>
-                    </v-dialog>
-
             </div>
-            
-        </template>        
+        </template>
+
+        <!-- <template slot="Roles">
+            <div> -->
+                <!-- <div>
+                    <span v-if="(testRoles.length === 0)">No role exists</span>
+                    <div v-else>
+                        <span v-for="(testRole, index) in testRoles" :key="index">
+                            <span> role Name : {{testRole['name']}}</span>
+                            <span> logical group id : {{testRole['endpointLogicalGroupId']}}</span>
+                            <span> logical group regex : {{testRole['endpointLogicalGroup']['testingEndpoints']['regex']}}</span>
+                        </span>
+                    </div>
+                </div>
+                <div>
+                    <v-btn primary class="white--text ignore-button" color="var(--v-themeColor-base)"
+                        @click="saveTestRoles">Create role</v-btn>
+                    <v-text-field v-model="testRoleName" placeholder="Role name"></v-text-field>
+                    <v-text-field v-model="testLogicalGroupRegex" placeholder="regex"></v-text-field>
+                </div>
+                 -->
+                <!-- <test-roles title="Roles" :testRoles="testRoles" :createNewRole="createNewRole">
+                    <template #details-container="{}">
+                        <a-card title="Details" color="rgba(33, 150, 243)" style="min-height: 600px">
+                            <test-roles-config-details></test-roles-config-details>
+                        </a-card>
+                    </template>
+                </test-roles>
+            </div>
+        </template> -->
+
     </layout-with-tabs>
 </template>
 
@@ -147,6 +161,9 @@ import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChip
 import ACard from '@/apps/dashboard/shared/components/ACard'
 import SampleData from '@/apps/dashboard/shared/components/SampleData'
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
+import TestRoles from './components/test_roles/TestRoles'
+import TestRolesConfigDetails from './components/test_roles/components/TestRolesConfigDetails'
+
 
 import func from '@/util/func'
 import testing from '@/util/testing'
@@ -154,7 +171,9 @@ import { mapState } from 'vuex'
 import api from './api'
 import LayoutWithLeftPane from '@/apps/dashboard/layouts/LayoutWithLeftPane'
 import ApiCollectionGroup from '@/apps/dashboard/shared/components/menus/ApiCollectionGroup'
-import LoginStepBuilder from './LoginStepBuilder'
+import LoginStepBuilder from './components/token/LoginStepBuilder'
+import TokenAutomation from './components/token/TokenAutomation'
+import HelpTooltip from '@/apps/dashboard/shared/components/help/HelpTooltip'
 
 export default {
     name: "PageTesting",
@@ -166,24 +185,34 @@ export default {
         LayoutWithTabs,
         LayoutWithLeftPane,
         ApiCollectionGroup,
-        LoginStepBuilder
+        LoginStepBuilder,
+        TestRoles,
+        TestRolesConfigDetails,
+        TokenAutomation,
+        HelpTooltip
     },
     props: {
 
     },
     data() {
-        return  {
+        return {
             originalDbState: null,
             stepBuilder: false,
             newKey: this.nonNullAuth ? this.nonNullAuth.key : null,
-            newVal: this.nonNullAuth ? this.nonNullAuth.value: null,
+            newVal: this.nonNullAuth ? this.nonNullAuth.value : null,
             stopAllTestsLoading: false,
             drawer: null,
             showLoginSaveOption: false,
-            authMechanismData: {}
+            authMechanismData: {},
+            testRoleName: "",
+            testLogicalGroupRegex: "",
+            showTokenAutomation: false
         }
     },
     methods: {
+        createNewRole() {
+            this.$store.commit('test_roles/SET_NEW_SELECTED_ROLE')
+        },
         setAuthHeaderKey(newKey) {
             this.newKey = newKey
             this.saveAuth()
@@ -193,9 +222,20 @@ export default {
             this.saveAuth()
         },
         saveAuthMechanism() {
-            this.$store.dispatch('testing/addAuthMechanism', {key: this.newKey, value: this.newVal, location: "HEADER"})
+            this.$store.dispatch('testing/addAuthMechanism', {type: "HARDCODED", requestData: [], authParamData: [{
+                "key": this.newKey,
+                "value": this.newVal,
+                "where": "HEADER"
+            }]})
         },
-        prepareItemForTable(x){
+        async saveTestRoles() {
+            debugger
+            if (this.testRoleName && this.testLogicalGroupRegex) {
+                await this.$store.dispatch('testing/addTestRoles', { roleName: this.testRoleName, regex: this.testLogicalGroupRegex })
+                this.$store.dispatch('testing/loadTestRoles')
+            } 
+        },
+        prepareItemForTable(x) {
             return {
                 url: x.apiInfoKey.url,
                 method: x.apiInfoKey.method,
@@ -219,134 +259,123 @@ export default {
                 this.stopAllTestsLoading = false
             })
         },
-        showLoginStepBuilder() {
-            this.stepBuilder = true
+        toggleLoginStepBuilder() {
+            this.showTokenAutomation = !this.showTokenAutomation
         },
         testLoginStep(data) {
-          let updatedData = data["updatedData"]
+            let updatedData = data["updatedData"]
 
-          let url = updatedData["url"]
-          if (!url) {
-              func.showErrorSnackBar("Invalid URL")
-              return
-          }
+            let url = updatedData["url"]
+            if (!url) {
+                func.showErrorSnackBar("Invalid URL")
+                return
+            }
 
-          let queryParams = updatedData["queryParams"]
+            let queryParams = updatedData["queryParams"]
 
-          let method = updatedData["method"]
-          method = this.validateMethod(method)
-          if (!method) {
-              func.showErrorSnackBar("Invalid HTTP method")
-              return
-          }
+            let method = updatedData["method"]
+            method = this.validateMethod(method)
+            if (!method) {
+                func.showErrorSnackBar("Invalid HTTP method")
+                return
+            }
 
-          let headerString =  updatedData["headerString"]
+            let headerString = updatedData["headerString"]
 
-          let body = updatedData["body"]
+            let body = updatedData["body"]
 
-          let key = updatedData["authKey"]
+            let key = updatedData["authKey"]
 
-          let authTokenPath = updatedData["authTokenPath"]
+            let authTokenPath = updatedData["authTokenPath"]
 
-        let result = api.triggerLoginSteps(key, "", "HEADER", "SINGLE_REQUEST", authTokenPath, [{
+
+            let result = api.triggerLoginSteps(key, "", "HEADER", "SINGLE_REQUEST", authTokenPath, [{
                 "url": url,
                 "body": body,
                 "headers": headerString,
                 "queryParams": queryParams,
                 "method": method
             }
-        ])
+            ])
 
-          result.then((resp) => {
-              this.showLoginSaveOption = true
-              func.showSuccessSnackBar("Login Flow Ran Successfully!")
-          }).catch((err) => {
-              this.showLoginSaveOption = false
-              console.log(err);
-          })
+            result.then((resp) => {
+                this.showLoginSaveOption = true
+                func.showSuccessSnackBar("Login Flow Ran Successfully!")
+            }).catch((err) => {
+                this.showLoginSaveOption = false
+                console.log(err);
+            })
 
       },
-      showLoginStepBuilder() {
-            this.stepBuilder = true
-        },
 
         saveLoginStep(data) {
-          let updatedData = data["updatedData"]
+            let updatedData = data["updatedData"]
 
-          let url = updatedData["url"]
-          if (!url) {
-              func.showErrorSnackBar("Invalid URL")
-              return
-          }
+            let url = updatedData["url"]
+            if (!url) {
+                func.showErrorSnackBar("Invalid URL")
+                return
+            }
 
-          let queryParams = updatedData["queryParams"]
+            let queryParams = updatedData["queryParams"] 
 
-          let method = updatedData["method"]
-          method = this.validateMethod(method)
-          if (!method) {
-              func.showErrorSnackBar("Invalid HTTP method")
-              return
-          }
+            let method = updatedData["method"]
+            method = this.validateMethod(method)
+            if (!method) {
+                func.showErrorSnackBar("Invalid HTTP method")
+                return
+            }
 
-          let headerString =  updatedData["headerString"]
+            let headerString = updatedData["headerString"]
 
-          let body = updatedData["body"]
+            let body = updatedData["body"]
 
-          let key = updatedData["authKey"]
+            let key = updatedData["authKey"]
 
-          let authTokenPath = updatedData["authTokenPath"]
+            let authTokenPath = updatedData["authTokenPath"]
 
-          let result = api.addAuthMechanism(key, "", "HEADER", "SINGLE_REQUEST", authTokenPath, [{
+            let result = api.addAuthMechanism(key, "", "HEADER", "SINGLE_REQUEST", authTokenPath, [{
                 "url": url,
                 "body": body,
                 "headers": headerString,
                 "queryParams": queryParams,
                 "method": method
             }
-        ])
+            ])
 
-          result.then((resp) => {
-              func.showSuccessSnackBar("Login Flow saved successfully!")
-          }).catch((err) => {
-              console.log(err);
-          })
+            result.then((resp) => {
+                func.showSuccessSnackBar("Login Flow saved successfully!")
+            }).catch((err) => {
+                console.log(err);
+            })
 
 
-      },
-      validateMethod(methodName) {
-          let m = methodName.toUpperCase()
-          let allowedMethods = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "TRACE", "PATCH"]
-          let idx = allowedMethods.indexOf(m);
-          if (idx === -1) return null
-          return allowedMethods[idx]
         },
-      fetchAuthMechanismData() {
-        api.fetchAuthMechanismData().then((resp) => {
-          this.authMechanismData = resp.authMechanism;
-          if (!this.authMechanismData) return
-            let requestData = this.authMechanismData["requestData"]
-            let str = JSON.stringify(this.authMechanismData);
-            console.log(str)
-            if (!requestData || requestData.length === 0) return
 
-            let authParamData = this.authMechanismData["authParams"]
-            if (!authParamData || authParamData.length === 0) return
+        validateMethod(methodName) {
+            let m = methodName.toUpperCase()
+            let allowedMethods = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "TRACE", "PATCH"]
+            let idx = allowedMethods.indexOf(m);
+            if (idx === -1) return null
+            return allowedMethods[idx]
+        },
+        fetchAuthMechanismData() {
+            api.fetchAuthMechanismData().then((resp) => {
+            this.authMechanismData = resp.authMechanism;
+            if (!this.authMechanismData) return
+                let requestData = this.authMechanismData["requestData"]
+                let str = JSON.stringify(this.authMechanismData);
+                if (!requestData || requestData.length === 0) return
 
-            let data = requestData[0]
+                let authParamData = this.authMechanismData["authParams"]
+                if (!authParamData || authParamData.length === 0) return
 
-            let authData = authParamData[0]
-
-            let url = data["url"]
-
-            if (!url || url == "") return
-
-            this.originalDbState = {"url": url, "body": data["body"], "headers": data["headers"], "method": data["method"], 
-            "queryParams": data["queryParams"], "authKey": authData["key"], "authTokenPath": authData["authTokenPath"]}
-
-        })
-      }
+                this.originalDbState = this.authMechanismData
+            })
+        }
     },
     computed: {
+        ...mapState('test_roles', ['testRoles', 'loading', 'selectedRole']),
         ...mapState('testing', ['testingRuns', 'authMechanism', 'testingRunResults', 'pastTestingRuns']),
         mapCollectionIdToName() {
             return this.$store.state.collections.apiCollections.reduce((m, e) => {
@@ -355,14 +384,12 @@ export default {
             }, {})
         },
         nonNullAuth() {
-            return this.authMechanism && this.authMechanism.authParams && this.authMechanism.authParams[0]
+            return this.authMechanism && this.authMechanism.authParams && this.authMechanism.type == "HARDCODED" && this.authMechanism.authParams[0]
         },
-        someAuthChanged () {
+        someAuthChanged() {
             let nonNullData = this.newKey != null && this.newVal != null && this.newKey != "" && this.newVal != ""
             if (this.nonNullAuth) {
-                
                 return nonNullData && (this.authMechanism.authParams[0].key !== this.newKey || this.authMechanism.authParams[0].value !== this.newVal)
-
             } else {
                 return nonNullData
             }
@@ -397,7 +424,7 @@ export default {
                         ...(this.testingRuns || []).map(x => {
                             return {
                                 title: testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
-                                link: "/dashboard/testing/"+x.hexId+"/results",
+                                link: "/dashboard/testing/" + x.hexId + "/results",
                                 active: true
                             }
                         })
@@ -420,7 +447,7 @@ export default {
                         ...(this.pastTestingRuns || []).map(x => {
                             return {
                                 title: testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
-                                link: "/dashboard/testing/"+x.hexId+"/results",
+                                link: "/dashboard/testing/" + x.hexId + "/results",
                                 active: true
                             }
                         })
@@ -428,44 +455,38 @@ export default {
                 }
             ]
         },
-        loginInputText: function() {
-
-            let text = "Click on fetch Token Button To Automate ->"
-            if (!this.authMechanismData) return text
-
-            let id = this.authMechanismData["id"]
+        authTokenUrl: function() {
+            if (!this.authMechanismData) return null
             let requestData = this.authMechanismData["requestData"]
-            if (!id || !requestData || requestData.length === 0) return text
-
-            let data = requestData[0]
-
-            let url = data["url"]
-
-            if (!url || url == "") return text
-
+            if (!requestData || requestData.length === 0) return null
+            return requestData[0]["url"]
+        },
+        authTokenDate: function() {
+            if (!this.authMechanismData) return null
+            let id = this.authMechanismData["id"]
+            if (!id) return null
 
             let date = id["date"]
 
-            if (!date || date == "") return text
+            if (!date || date == "") return null
 
-            date = date.slice(0, 10) + " " + date.slice(11)
+            let dayStartEpochMs = func.toDate(parseInt(date.slice(0, 10).replaceAll("-", "")))
+            let dayStr = func.toDateStr(new Date(dayStartEpochMs), false)
 
-
-            text = "URL: " + url + ";   CREATED ON: " + date
-
-            return text
-        }
+            return dayStr + " " + date.slice(11)
+        }        
     },
     mounted() {
         this.fetchAuthMechanismData()
         let now = func.timeNow()
-        this.$store.dispatch('testing/loadTestingDetails', {startTimestamp: now - func.recencyPeriod, endTimestamp: now})
+        this.$store.dispatch('test_roles/loadTestRoles')
+        this.$store.dispatch('testing/loadTestingDetails', { startTimestamp: now - func.recencyPeriod, endTimestamp: now })
     },
     watch: {
         authMechanism: {
             handler() {
                 this.newKey = this.nonNullAuth ? this.nonNullAuth.key : null
-                this.newVal = this.nonNullAuth ? this.nonNullAuth.value: null
+                this.newVal = this.nonNullAuth ? this.nonNullAuth.value : null
             }
         }
     }
@@ -485,21 +506,21 @@ export default {
 </style>
 
 <style scoped>
-.page-testing >>> .v-label {
-  font-size: 12px;
-  color: #6200EA;
-  font-weight: 400;
+.page-testing>>>.v-label {
+    font-size: 12px;
+    color: #6200EA;
+    font-weight: 400;
 }
 
-.page-testing >>> input {
-  font-size: 12px;
-  font-weight: 400;
+.page-testing>>>input {
+    font-size: 12px;
+    font-weight: 400;
 }
 
 .col_1 {
     box-sizing: border-box;
-    width: 32px;
-    height: 32px;
+    width: 24px;
+    height: 24px;
     left: 0px;
     top: 0px;
     border: 2px solid #6200EA;
@@ -507,8 +528,8 @@ export default {
     text-align: center;
     font-style: normal;
     font-weight: 600;
-    font-size: 20px;
-    line-height: 30px;
+    font-size: 16px;
+    line-height: 22px;
     color: #6200EA;
 }
 
@@ -520,7 +541,7 @@ export default {
 
 .di-flex-bottom {
     display: flex;
-    gap: 16px;
+    gap: 8px;
     padding-top: 20px;
     padding-bottom: 11px;
 }
@@ -528,6 +549,20 @@ export default {
 .p_padding {
     opacity: 0.4;
     margin: 10px;
+}
+
+.token-automation-modal {
+    width: 600px; 
+    height: 400px
+}
+
+.auth-token-title {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.auth-token-text {
+    font-size: 14px;
 }
 
 </style>

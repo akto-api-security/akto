@@ -13,6 +13,7 @@ import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.policies.AktoPolicy;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -83,34 +84,7 @@ public class HarAction extends UserAction {
             HAR har = new HAR();
             List<String> messages = har.getMessages(harString, apiCollectionId);
             harErrors = har.getErrors();
-            List<HttpResponseParams> responses = new ArrayList<>();
-            for (String message: messages){
-                if (message.length() < 0.8 * KafkaListener.BATCH_SIZE_CONFIG) {
-                    if (!skipKafka) {
-                        KafkaListener.kafka.send(message,"har_" + topic);
-                    } else {
-                        HttpResponseParams responseParams =  HttpCallParser.parseKafkaMessage(message);
-                        responseParams.getRequestParams().setApiCollectionId(apiCollectionId);
-                        responses.add(responseParams);
-                    }
-                } else {
-                    harErrors.add("Message too big size: " + message.length());
-                }
-            }
-            
-            if(skipKafka) {
-                HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
-                SingleTypeInfo.fetchCustomDataTypes();
-                APICatalogSync apiCatalogSync = parser.syncFunction(responses, true, false);
-                AktoPolicy aktoPolicy = new AktoPolicy(parser.apiCatalogSync, false); // keep inside if condition statement because db call when initialised
-                aktoPolicy.main(responses, apiCatalogSync, false);
-                ResourceAnalyser resourceAnalyser = new ResourceAnalyser(300_000, 0.01, 100_000, 0.01);
-                for (HttpResponseParams responseParams: responses)  {
-                    responseParams.requestParams.getHeaders().put("x-forwarded-for", Collections.singletonList("127.0.0.1"));
-                    resourceAnalyser.analyse(responseParams);
-                }
-                resourceAnalyser.syncWithDb();
-            }
+            Utils.pushDataToKafka(apiCollectionId, topic, messages, harErrors, skipKafka);
         } catch (Exception e) {
             e.printStackTrace();
             return SUCCESS.toUpperCase();
