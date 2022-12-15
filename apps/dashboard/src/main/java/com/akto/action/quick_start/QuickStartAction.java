@@ -171,6 +171,7 @@ public class QuickStartAction extends UserAction {
             if(resources != null && resources.getLoadBalancers().size() > 0){
                 AwsResourcesDao.instance.getMCollection().deleteOne(AwsResourcesDao.generateFilter());
                 logger.info("Stack does not exists but entry present in DB, removing it");
+                fetchLoadBalancers();
             } else {
                 logger.info("Nothing set in DB, moving on");
             }
