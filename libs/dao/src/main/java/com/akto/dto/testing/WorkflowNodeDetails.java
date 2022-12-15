@@ -14,6 +14,10 @@ public class WorkflowNodeDetails {
 
     int waitInSeconds;
 
+    int maxPollRetries;
+
+    int pollRetryDuration;
+
     public enum Type {
         POLL, API
     }
@@ -33,7 +37,8 @@ public class WorkflowNodeDetails {
     }
 
     public WorkflowNodeDetails(int apiCollectionId, String endpoint, Method method, String testValidatorCode,
-                               WorkflowUpdatedSampleData updatedSampleData, Type type, boolean overrideRedirect, int waitInSeconds) {
+                               WorkflowUpdatedSampleData updatedSampleData, Type type, boolean overrideRedirect,
+                               int waitInSeconds, int maxPollRetries, int pollRetryDuration) {
         this.apiCollectionId = apiCollectionId;
         this.endpoint = endpoint;
         this.method = method;
@@ -42,6 +47,8 @@ public class WorkflowNodeDetails {
         this.overrideRedirect = overrideRedirect;
         this.testValidatorCode = testValidatorCode;
         this.waitInSeconds = waitInSeconds;
+        this.maxPollRetries = maxPollRetries;
+        this.pollRetryDuration = pollRetryDuration;
     }
 
     public int getApiCollectionId() {
@@ -111,6 +118,22 @@ public class WorkflowNodeDetails {
 
     public void setWaitInSeconds(int waitInSeconds) {
         this.waitInSeconds = waitInSeconds;
+    }
+
+    public int getMaxPollRetries() {
+        return maxPollRetries;
+    }
+
+    public void setMaxPollRetries(int maxPollRetries) {
+        this.maxPollRetries = maxPollRetries;
+    }
+
+    public int getPollRetryDuration() {
+        return pollRetryDuration;
+    }
+
+    public void setPollRetryDuration(int pollRetryDuration) {
+        this.pollRetryDuration = pollRetryDuration;
     }
 
     @Override

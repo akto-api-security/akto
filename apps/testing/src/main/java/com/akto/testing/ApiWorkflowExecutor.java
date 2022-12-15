@@ -18,6 +18,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.common.protocol.types.Field.Str;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -97,12 +98,10 @@ public class ApiWorkflowExecutor {
             if (nodeResult.getErrors().size() > 0)  throw new Exception("Error Processing Node In Login Flow " + node.getId());
 
             JSONObject respString = new JSONObject();
-            
-            
-            Map<String, Object> json = gson.fromJson(nodeResult.getMessage(), Map.class);
+            Map<String, Map<String, Object>> json = gson.fromJson(nodeResult.getMessage(), Map.class);
 
-            respString.put("headers", valuesMap.get(node.getId() + ".response.header"));
-            respString.put("body", valuesMap.get(node.getId() + ".response.body"));
+            respString.put("headers", json.get("response").get("headers"));
+            respString.put("body", json.get("response").get("body"));
             responses.add(respString.toString());
         }
 
@@ -147,7 +146,7 @@ public class ApiWorkflowExecutor {
                 true, request.getQueryParams());
 
         OriginalHttpResponse response = null;
-        int maxRetries = type.equals(WorkflowNodeDetails.Type.POLL) ? 20 : 1;
+        int maxRetries = type.equals(WorkflowNodeDetails.Type.POLL) ? node.getWorkflowNodeDetails().getMaxPollRetries() : 1;
 
         try {
             int waitInSeconds = Math.min(workflowNodeDetails.getWaitInSeconds(),60);
@@ -162,8 +161,8 @@ public class ApiWorkflowExecutor {
 
         for (int i = 0; i < maxRetries; i++) {
             try {
-                if (i > 0) {
-                    int sleep = 6000;
+                if (i > 0 || type.equals(WorkflowNodeDetails.Type.POLL)) {
+                    int sleep = node.getWorkflowNodeDetails().getPollRetryDuration();
                     logger.info("Waiting "+ (sleep/1000) +" before sending another request......");
                     Thread.sleep(sleep);
                 }
@@ -285,19 +284,13 @@ public class ApiWorkflowExecutor {
             }
         }
 
-        JSONObject headerString = new JSONObject();
         for (String headerName: headers.keySet()) {
-
-            headerString.put(headerName, headers.get(headerName));
 
             for (String val: headers.get(headerName)) {
                 String key = nodeId + "." + reqOrResp + "." + "header" + "." + headerName;
                 valuesMap.put(key, val);
             }
         }
-
-        String fullHeadersKey = nodeId + "." + reqOrResp + "." + "header";
-        valuesMap.put(fullHeadersKey, headerString.toString());
     }
 
 

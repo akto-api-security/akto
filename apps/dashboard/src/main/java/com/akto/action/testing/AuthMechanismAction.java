@@ -33,8 +33,6 @@ public class AuthMechanismAction extends UserAction {
 
     private ArrayList<AuthParamData> authParamData;
 
-    private String verificationCodeBody;
-
     private String uuid;
 
     private ArrayList<Object> responses;
@@ -110,68 +108,6 @@ public class AuthMechanismAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    // fix and use this for dynamic otp
-    public String saveOtpData() {
-
-        // fetch from url param
-        Bson filters = Filters.eq("uuid", uuid);
-        try {
-            authMechanism = AuthMechanismsDao.instance.findOne(filters);
-        } catch(Exception e) {
-            loggerMaker.errorAndAddToDb("error extracting verification code for auth Id " + uuid);
-            return ERROR.toUpperCase();
-        }
-
-        for (RequestData data : authMechanism.getRequestData()) {
-            if (!(data.getType().equals("EMAIL_CODE_VERIFICATION") || data.getType().equals("MOBILE_CODE_VERIFICATION"))) {
-                continue;
-            }
-            LoginVerificationCodeData verificationCodeData = data.getVerificationCodeData();
-
-            String key = verificationCodeData.getKey();
-            String body = data.getBody();
-            String verificationCode;
-            try {
-                verificationCode = extractVerificationCode(verificationCodeBody, verificationCodeData.getRegexString());
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("error parsing regex string " + verificationCodeData.getRegexString() +
-                        "for auth Id " + uuid);
-                return ERROR.toUpperCase();
-            }
-
-            if (verificationCode == null) {
-                loggerMaker.errorAndAddToDb("error extracting verification code for auth Id " + uuid);
-                return ERROR.toUpperCase();
-            }
-
-            Gson gson = new Gson();
-            Map<String, Object> json = gson.fromJson(body, Map.class);
-            json.put(key, verificationCode);
-
-            JSONObject jsonBody = new JSONObject();
-            for (Map.Entry<String, Object> entry : json.entrySet()) {
-                jsonBody.put(entry.getKey(), entry.getValue());
-            }
-            data.setBody(jsonBody.toString());
-        }
-
-        AuthMechanismsDao.instance.replaceOne(filters, authMechanism);
-        return SUCCESS.toUpperCase();
-    }
-
-    private String extractVerificationCode(String text, String regex) {
-        return "346";
-//        System.out.println(regex);
-//        System.out.println(regex.replace("\\", "\\\\"));
-//        Pattern pattern = Pattern.compile(regex.replace("\\", "\\\\"));
-//        Matcher matcher = pattern.matcher(text);
-//        String verificationCode = null;
-//        if (matcher.find()) {
-//            verificationCode = matcher.group(1);
-//        }
-//        return verificationCode;
-    }
-
     private int workflowTestId;
     private WorkflowTestResult workflowTestResult;
     private TestingRun workflowTestingRun;
@@ -208,10 +144,6 @@ public class AuthMechanismAction extends UserAction {
         return this.authParamData;
     }
 
-    public String getVerificationCodeBody() {
-        return this.verificationCodeBody;
-    }
-
     public String getUuid() {
         return this.uuid;
     }
@@ -243,10 +175,6 @@ public class AuthMechanismAction extends UserAction {
 
     public void setAuthParamData(ArrayList<AuthParamData> authParamData) {
         this.authParamData = authParamData;
-    }
-
-    public void setVerificationCodeBody(String verificationCodeBody) {
-        this.verificationCodeBody = verificationCodeBody;
     }
 
     public void setUuid(String uuid) {

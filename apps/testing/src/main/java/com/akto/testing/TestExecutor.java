@@ -223,9 +223,15 @@ public class TestExecutor {
             WorkflowUpdatedSampleData sampleData = new WorkflowUpdatedSampleData(json.toString(), data.getQueryParams(),
                     data.getHeaders(), data.getBody(), data.getUrl());
 
+            int maxPollRetries = 0;
+            int pollRetryDuration = 0;
+            if (data.getType().equals("OTP_VERIFICATION")) {
+                maxPollRetries = 20;
+                pollRetryDuration = 10;
+            }
             WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(0, data.getUrl(),
                     URLMethods.Method.fromString(data.getMethod()), "", sampleData,
-                    WorkflowNodeDetails.Type.API, true, data.getWaitTime());
+                    WorkflowNodeDetails.Type.API, true, data.getWaitTime(), maxPollRetries, pollRetryDuration);
 
             mapNodeIdToWorkflowNodeDetails.put(target, workflowNodeDetails);
         }
