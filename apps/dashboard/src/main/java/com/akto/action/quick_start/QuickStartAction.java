@@ -162,9 +162,18 @@ public class QuickStartAction extends UserAction {
     public String checkStackCreationProgress() {
         this.stackState = this.stack.fetchStackStatus();
         invokeLambdaIfNecessary(stackState);
-        if(Stack.StackStatus.CREATION_FAILED.toString().equals(this.stackState.getStatus())){
+        if(Stack.StackStatus.CREATION_FAILED.toString().equalsIgnoreCase(this.stackState.getStatus())){
             AwsResourcesDao.instance.getMCollection().deleteOne(Filters.eq("_id", Context.accountId.get()));
             logger.info("Current stack status is failed, so we are removing entry from db");
+        }
+        if(Stack.StackStatus.DOES_NOT_EXISTS.toString().equalsIgnoreCase(this.stackState.getStatus())){
+            AwsResources resources = AwsResourcesDao.instance.findOne(AwsResourcesDao.generateFilter());
+            if(resources != null && resources.getLoadBalancers().size() > 0){
+                AwsResourcesDao.instance.getMCollection().deleteOne(AwsResourcesDao.generateFilter());
+                logger.info("Stack does not exists but entry present in DB, removing it");
+            } else {
+                logger.info("Nothing set in DB, moving on");
+            }
         }
         return Action.SUCCESS.toUpperCase();
     }
