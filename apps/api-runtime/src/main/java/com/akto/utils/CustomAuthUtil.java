@@ -58,7 +58,7 @@ public class CustomAuthUtil {
                 }
 
                 // checking headerAuthKeys in header and cookie in any unathenticated API
-                if (headerAndCookieKeys.containsAll(customAuthType.getHeaderKeys())) {
+                if (!headerAndCookieKeys.isEmpty() && !customAuthType.getHeaderKeys().isEmpty() && headerAndCookieKeys.containsAll(customAuthType.getHeaderKeys())) {
                     UpdateOneModel<ApiInfo> update = new UpdateOneModel<>(
                             ApiInfoDao.getFilter(apiInfo.getId()),
                             Updates.set(ApiInfo.ALL_AUTH_TYPES_FOUND, authTypes),
