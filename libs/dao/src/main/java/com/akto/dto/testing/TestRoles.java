@@ -17,13 +17,16 @@ public class TestRoles {
     private EndpointLogicalGroup endpointLogicalGroup;
     private String createdBy;
     private int createdTs;
+    private int lastUpdatedTs;
     public TestRoles(){}
-    public TestRoles(String name, ObjectId endpointLogicalGroupId, AuthMechanism authMechanism, String createdBy, int createdTs) {
+    public TestRoles(ObjectId id, String name, ObjectId endpointLogicalGroupId, AuthMechanism authMechanism, String createdBy, int createdTs, int lastUpdatedTs) {
+        this.id = id;
         this.name = name;
         this.endpointLogicalGroupId = endpointLogicalGroupId;
         this.authMechanism = authMechanism;
         this.createdBy = createdBy;
         this.createdTs = createdTs;
+        this.lastUpdatedTs = lastUpdatedTs;
     }
     public EndpointLogicalGroup fetchEndpointLogicalGroup() {
         if (this.endpointLogicalGroup == null) {
@@ -85,5 +88,13 @@ public class TestRoles {
 
     public void setCreatedTs(int createdTs) {
         this.createdTs = createdTs;
+    }
+
+    public int getLastUpdatedTs() {
+        return lastUpdatedTs;
+    }
+
+    public void setLastUpdatedTs(int lastUpdatedTs) {
+        this.lastUpdatedTs = lastUpdatedTs;
     }
 }

@@ -1,34 +1,24 @@
 <template>
-    <div class='condition-block' >
+    <div class='condition-block'>
         <span class="inline-block-child" style="color: #6200EA">
-            {{initial_string}}
+            {{ initial_string }}
         </span>
         <div class="inline-block-child" style="padding-left: 20px">
             <div class="text-center">
                 <v-menu offset-y>
                     <template v-slot:activator="{ on, attrs }">
-                        <span
-                            v-if="condition.type"
-                            v-bind="attrs"
-                            v-on="on"
-                            style="text-decoration: underline"
-                            >
-                            {{formatConditionType(condition.type)}}
+                        <span v-if="condition.type" v-bind="attrs" v-on="on" style="text-decoration: underline">
+                            {{ formatConditionType(condition.type) }}
                         </span>
-                        <span
-                            v-else
-                            v-bind="attrs"
-                            v-on="on"
-                            style="text-decoration: italic; color: grey"
-                            >
-                                click
+                        <span v-else v-bind="attrs" v-on="on" style="text-decoration: italic; color: grey">
+                            click
                         </span>
                     </template>
                     <v-list v-if="(onlyEqual==false)">
                         <v-list-item 
                             v-for="(item, index) in operation_types" 
                             :key="index"
-                            @click="condition.type = item.value"
+                            @click="$emit('conditionTypeChanged', item.value)"
                         >
                             <v-list-item-title>{{ item.text}}</v-list-item-title>
                         </v-list-item>
@@ -36,20 +26,23 @@
                 </v-menu>
             </div>
         </div>
-        <div 
-            class="inline-block-child"
-            style="padding-left: 20px"
-            v-if="['EQUALS_TO','REGEX', 'STARTS_WITH', 'ENDS_WITH'].includes(condition.type)"
-        >
-            <v-text-field
-                height="15px"
-                placeholder="value"
-                flat
-                :style="getValueStyle(condition.value)"
-                v-model="condition.value"
-                class="value_predicate"
-                :rules="[value => !!value || 'Required']"
-            />
+        <div class="inline-block-child" style="padding-left: 20px"
+            v-if="requireTextInputForTypeArray.includes(condition.type)">
+            <v-text-field height="15px" placeholder="value" flat :style="getValueStyle(condition.value)"
+                v-model="condition.value" class="value_predicate" :rules="[value => !!value || 'Required']" />
+        </div>
+        <div class="inline-block-child" style="padding-left: 20px"
+            v-else-if="requireMapInputForTypeArray && requireMapInputForTypeArray.includes(condition.type)">
+            <v-menu offset-y>
+                <template v-slot:activator="{ on, attrs }">
+                    <v-btn class="filter-button" v-bind="attrs" v-on="on" primary>
+                        <span>{{ selectedStatusName }}</span>
+                        <v-icon>$fas_angle-down</v-icon>
+                    </v-btn>
+                </template>
+                <filter-list :title="selectedStatusName" :items="statusItems" @clickedItem="clickedStatusItem($event)"
+                    hideOperators hideListTitle selectExactlyOne />
+            </v-menu>
         </div>
     </div>
 </template>
@@ -62,6 +55,10 @@ export default {
     props: {
         condition: obj.objR,
         initial_string: obj.strR,
+        operators: obj.arrR,
+        operation_types: obj.arrR,
+        requireTextInputForTypeArray: obj.arrR,
+        requireMapInputForTypeArray: obj.arrN
         onlyEqual: {
             type:Boolean
         },
@@ -70,46 +67,21 @@ export default {
     },
     data() {
         return {
-            operators: [
-                "OR", "AND"
-            ],
-            operation_types: [
-                {
-                    "text": "equals to",
-                    "value": "EQUALS_TO"
-                },
-                {
-                  "text": "starts with",
-                  "value": "STARTS_WITH"
-                },
-                {
-                    "text": "ends with",
-                    "value": "ENDS_WITH"
-                },
-                {
-                    "text": "matches regex",
-                    "value": "REGEX"
-                },
-                {
-                    "text": "is number",
-                    "value": "IS_NUMBER"
-                }
 
-            ]
         }
     },
     methods: {
         getValueStyle(value) {
-            let width = !value  ? 6 : value.length + 4
-            return { 'width': width+ 'ch' }
+            let width = !value ? 6 : value.length + 4
+            return { 'width': width + 'ch' }
         },
         getValueStyleOperator(value) {
-            let width = !value  ? 6 : value.length + 4
-            return { 'width': width+ 'ch', "color": "grey" }
+            let width = !value ? 6 : value.length + 4
+            return { 'width': width + 'ch', "color": "grey" }
         },
         formatConditionType(value) {
             let finalValue = null
-            for (let i=0; i < this.operation_types.length; i++) {
+            for (let i = 0; i < this.operation_types.length; i++) {
                 let operation = this.operation_types[i]
                 if (operation["value"] === value) {
                     finalValue = operation["text"]
@@ -126,7 +98,7 @@ export default {
     computed: {
 
     },
-    watch : {
+    watch: {
 
     }
 
@@ -149,17 +121,34 @@ export default {
 </style>
 
 <style >
-    .inline-block-child .v-text-field .v-input__control .v-input__slot {
-        min-height: auto !important;
-        display: flex !important;
-        align-items: center !important;
-        background-color: transparent;
-    }
-    .inline-block-child .v-input__slot::before {
-        border-style: none !important;
-    }
-    .inline-block-child .value_predicate .v-text-field__slot input {
-        color: #00f !important;
-    }
+.filter-button {
+    box-sizing: border-box;
 
+    width: fit-content;
+    height: 40px;
+
+    background: #FFFFFF;
+    border: 1px solid #D0D5DD;
+
+    font-weight: 500;
+    font-size: 14px;
+
+    box-shadow: 0px 1px 2px rgba(16, 24, 40, 0.05);
+    border-radius: 4px;
+}
+
+.inline-block-child .v-text-field .v-input__control .v-input__slot {
+    min-height: auto !important;
+    display: flex !important;
+    align-items: center !important;
+    background-color: transparent;
+}
+
+.inline-block-child .v-input__slot::before {
+    border-style: none !important;
+}
+
+.inline-block-child .value_predicate .v-text-field__slot input {
+    color: #00f !important;
+}
 </style>

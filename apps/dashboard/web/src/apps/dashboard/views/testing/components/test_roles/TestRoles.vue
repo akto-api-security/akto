@@ -6,7 +6,7 @@
                     style="min-height: 600px; flex: 1 1 20%"
                     icon_right="$fas_plus"
                     icon_right_color="#6200EA"
-                    @icon_right_clicked="createNewRole"
+                    @icon_right_clicked="openCreateRoleDialog"
                 >
                     <div v-for="(testRole, index) in testRoles" :key="index">
                         <test-role-card :item="testRole" @selectedEntry="entryUpdated"/>
@@ -30,26 +30,17 @@ export default {
     },
     props: {
         title: obj.strR,
-        testRoles: obj.arrR,
-        createNewRole: obj.funcR
+        testRoles: obj.arrR
     },
     methods: {
         entryUpdated(item) {
-            this.$emit("selectedEntry", item)
+            this.$store.commit('test_roles/SAVE_CREATE_NEW', {createNew: false})
+            this.$store.commit('test_roles/SAVE_SELECTED_ROLE', {selectedRole: item})
         },
-        toggleSuccessFunc (resp, item) {
-            window._AKTO.$emit('SHOW_SNACKBAR', {
-                show: true,
-                text: `${item.name} `+ (item.active? 'de' : '') +`activated successfully!`,
-                color: 'green'
-            })
-        },
-        toggleFailureFunc (err, item) {
-            window._AKTO.$emit('SHOW_SNACKBAR', {
-                show: true,
-                text: `An error occurred while `+ (item.active? 'de' : '')+`activating ${item.name}!`,
-                color: 'red'
-            })
+        openCreateRoleDialog() {
+            //When create dialog opens, create new is true, and selected is empty
+            this.$store.commit('test_roles/SAVE_CREATE_NEW', {createNew: true})
+            this.$store.commit('test_roles/SAVE_SELECTED_ROLE', {selectedRole: {}})
         },
     }
 }

@@ -4,7 +4,7 @@ public abstract class Predicate {
     private Type type;
 
     public enum Type {
-        REGEX, STARTS_WITH, ENDS_WITH, IS_NUMBER, EQUALS_TO
+        REGEX, STARTS_WITH, ENDS_WITH, IS_NUMBER, EQUALS_TO, CONTAINS
     }
 
     public Predicate(Type type) {

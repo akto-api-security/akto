@@ -1,20 +1,34 @@
 <template>
-    <div style="padding: 24px; height: 100%" v-if="(Object.keys(selectedRole) !== 0)">
+    <div style="padding: 24px; height: 100%" v-if="(createNew || !isSelectedRoleEmpty)">
         <v-container>
             <div style=" display: flex">
                 <div class="form-text">
                     Role Name
                 </div>
                 <div style="padding-top: 0px">
-                    <v-text-field
-                        placeholder="Define role name"
-                        flat solo
-                        class="form-value"
-                        :readonly="(Object.keys(selectedRole).length !== 0)"
-                        v-model="roleName"
-                        :rules="name_rules"
-                        hide-details
-                    />
+                    <v-text-field :placeholder="(selectedRole.name ? selectedRole.name : 'Define role name')" flat solo class="form-value" v-model="roleName"
+                        :rules="name_rules" hide-details :readonly="!(createNew)"
+                         />
+                </div>
+            </div>
+            <div v-if="!isSelectedRoleEmpty">
+                <div style=" display: flex">
+                    <div class="form-text">
+                        Creator
+                    </div>
+                    <div style="padding-top: 0px">
+                        <v-text-field flat solo class="form-value" readonly hide-details
+                            :value="selectedRole.createdBy" />
+                    </div>
+                </div>
+                <div style="display: flex">
+                    <div class="form-text">
+                        Last Updated
+                    </div>
+                    <div style="padding-top: 0px">
+                        <v-text-field flat solo class="ma-0 pa-0" readonly hide-details
+                            :value='computeLastUpdated(selectedRole.lastUpdatedTs)' />
+                    </div>
                 </div>
             </div>
             <div style=" display: flex">
@@ -23,157 +37,203 @@
                 </div>
             </div>
 
-          <div v-if="selected_role_copy.createNew">
-            <v-row style="padding: 36px 12px 12px 12px"  >
-                    <conditions-table
-                    :conditions="selected_role_copy.keyConditions"
-                    initial_string="param_name"
-                    table_header="Key conditions"
-                    />
+            <div>
+                <v-row style="padding: 36px 12px 12px 12px">
+                    <test-role-conditions-table initial_string="endpoint" :selectedRole="selectedRole"
+                        table_header="Role endpoint conditions" :operators="operators"
+                        :requireTextInputForTypeArray="requireTextInputForTypeArray"
+                        :requireMapInputForTypeArray="requireMapInputForTypeArray"
+                        :operation_types="operation_types" />
                 </v-row>
-                <v-row
-                    style="padding: 12px 12px 12px 12px"
-                    v-if="showMainOperator" 
-                >
-                    <operator-component :operator="selected_role_copy.operator" @operatorChanged="operatorChanged"/>
-                </v-row>
+                <!-- <v-row style="padding: 36px 12px 12px 12px">
+                    <div class='condition-row first'>
+                        <div style="display: flex; justify-content: space-between">
+                            <div style="display: flex">
+                                <div style="padding-right: 20px">
+                                    endpoint contains
+                                </div>
+                                <v-text-field height="15px" placeholder="value" flat v-model="regex"
+                                    class="value_predicate" />
+                            </div>
+                        </div>
+                    </div>
+                </v-row> -->
             </div>
             <v-row style="padding-top: 30px">
                 <div style="padding: 12px">
-                  <v-btn
-                        @click="save"
-                        color="#6200EA"
-                        class="save-btn"
-                        height="40px"
-                        width="100px"
-                        :loading="saveLoading"
-                  >
-                    Save
-                  </v-btn>
-                </div>
-                <div v-if="selected_role_copy.id || selected_role_copy.createNew" style="padding: 12px">
-                  <v-btn
-                        @click="reviewCustomDataType"
-                        color="#white"
-                        class="review-btn"
-                        height="40px"
-                        width="100px"
-                        :loading="reviewLoading"
-                    >
-                      Review
-                        <span slot="loader">
-                            <v-progress-circular
-                                :rotate="360"
-                                :size="30"
-                                :width="5"
-                                :value="computeLoading"
-                                color="#6200EA"
-                            >
-                            </v-progress-circular>
-                            {{ computeLoading + "%"}}
-                        </span>
+                    <v-btn @click="save" color="#6200EA" class="save-btn" height="40px" width="100px"
+                        :loading="saveLoading">
+                        Save
                     </v-btn>
                 </div>
+                <!-- <div v-if="selectedRole_copy.id || selectedRole_copy.createNew" style="padding: 12px">
+                    <v-btn @click="reviewCustomDataType" color="#white" class="review-btn" height="40px" width="100px"
+                        :loading="reviewLoading">
+                        Review
+                        <span slot="loader">
+                            <v-progress-circular :rotate="360" :size="30" :width="5" :value="computeLoading"
+                                color="#6200EA">
+                            </v-progress-circular>
+                            {{ computeLoading + "%" }}
+                        </span>
+                    </v-btn>
+                </div> -->
             </v-row>
-            <review-table v-if="reviewData" :review-data="reviewData"/>
+            <!-- <review-table v-if="reviewData" :review-data="reviewData" /> -->
         </v-container>
     </div>
 </template>
 
 
 <script>
-import ConditionsTable from '@/apps/dashboard/views/settings/components/data_types/components/ConditionsTable.vue'
-import OperatorComponent from '@/apps/dashboard/views/settings/components/data_types/components/OperatorComponent.vue'
 import ReviewTable from "@/apps/dashboard/views/settings/components/data_types/components/ReviewTable";
-import {mapState} from "vuex";
+import TestRoleConditionsTable from "./TestRoleConditionsTable.vue"
+import { mapState } from "vuex";
 import func from "@/util/func";
 export default {
-    name: "DataTypeDetails",
+    name: "TestRolesConfigDetails",
     props: {
     },
     components: {
-        ConditionsTable,
-        OperatorComponent,
-        ReviewTable
+        ReviewTable,
+        TestRoleConditionsTable
     },
     data() {
+        var operators = [
+            'OR',
+            'AND'
+        ]
+        var requireTextInputForTypeArray = [
+            'CONTAINS'
+        ]
+        var requireMapInputForTypeArray = [
+            'BELONGS_TO',
+            'NOT_BELONGS_TO'
+        ]
+        var operation_types = [
+            { value: 'CONTAINS', text: 'contains', operators: ['OR', 'AND'] },
+            { value: 'BELONGS_TO', text: 'belongs to', operators: ['OR'] },
+            { value: 'NOT_BELONGS_TO', text: 'does not belongs to', operators: ['AND'] }
+        ]
         return {
-            selected_role_copy: null,
+            operators,
+            operation_types,
+            requireTextInputForTypeArray,
+            requireMapInputForTypeArray,
             saveLoading: false,
             reviewLoading: false,
             roleName: "",
+            isValuePresent: false,
             name_rules: [
-                    value => {
-                        if (!value) return "Required"
-                        const regex = /^[a-z0-9_]+$/i;
-                        if (!value.match(regex)) return "Alphanumeric and underscore characters"
-                        return true
-                    },
-                ],
+                value => {
+                    if (!value) return "Required"
+                    const regex = /^[a-z0-9_]+$/i;
+                    if (!value.match(regex)) return "Alphanumeric and underscore characters"
+                    return true
+                },
+            ],
         }
     },
     methods: {
-        operatorChanged(value) {
-            this.selected_role_copy.operator = value
+        fillConditionsFromSelectedRole () {
+
         },
-        save() {
-            this.saveLoading = true
-            
-            if(this.selected_role_copy.id || this.selected_role_copy.createNew){
-                this.$store.dispatch("data_types/createCustomDataType", {data_type: this.selected_role_copy, save: true})
-                .then((resp) => {
-                  this.saveLoading = false
-                }).catch((err) => {
-                  this.saveLoading = false
-                })
-            } else {
-                this.$store.dispatch("data_types/updateAktoDataType", {data_type: this.selected_role_copy})
-                .then((resp) => {
-                  this.saveLoading = false
-                }).catch((err) => {
-                  this.saveLoading = false
-                })
+        computeLastUpdated(timestamp) {
+          let t = timestamp
+          if (t) {
+              return func.prettifyEpoch(t)
+          } else if (t===0) {
+            return func.prettifyEpoch(1667413800)
+          }
+        },
+        filterContainsConditions(operator) {//operator is string as 'OR' or 'AND'
+        debugger
+            let filteredCondition = {}
+            let found = false
+            filteredCondition['operator'] = operator
+            filteredCondition['predicates'] = []
+            this.conditions.forEach(element => {
+                if (element.type === 'CONTAINS' && element.operator === operator && element.value !== null) {
+                    filteredCondition['predicates'].push({ type: 'CONTAINS', value: element.value })
+                    this.isValuePresent = true
+                    found = true
+                }
+            });
+            if (found) {
+                return filteredCondition;
             }
         },
-        reviewCustomDataType() {
-          this.reviewLoading = true
-          this.$store.dispatch("data_types/createCustomDataType", {data_type: this.selected_role_copy, save: false})
-              .then((resp) => {
-                this.reviewLoading = false
-              })
-              .catch((err) => {
-                this.reviewLoading = false
-              })
+
+        async save() {
+            let roleName = this.roleName
+            let andConditions = this.filterContainsConditions('AND')
+            let orConditions = this.filterContainsConditions('OR')
+            let includedApiList = {}
+            let excludeApiList = {}
+
+            debugger
+            if (this.isValuePresent) {
+                this.saveLoading = true
+                await this.$store.dispatch('test_roles/addTestRoles', {
+                    roleName,
+                    andConditions,
+                    orConditions,
+                    includedApiList,
+                    excludeApiList
+                })
+                    .then((resp) => {
+                        this.saveLoading = false
+
+                        window._AKTO.$emit('SHOW_SNACKBAR', {
+                            show: true,
+                            text: `Role with name` + `${resp.roleName} ` + `activated successfully!`,
+                            color: 'green'
+                        })
+                    }).catch((err) => {
+                        this.saveLoading = false
+                    })
+            } else {
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                            show: true,
+                            text: `All values are empty`,
+                            color: 'red'
+                        })
+            }
         }
     },
     mounted() {
     },
     computed: {
-        ...mapState('test_roles', ['testRoles', 'loading', 'selectedRole']),
-        showMainOperator() {
-            return this.selected_role_copy.keyConditions && this.selected_role_copy.keyConditions.predicates &&
-            this.selected_role_copy.keyConditions.predicates.length > 0 &&
-            this.selected_role_copy.valueConditions && this.selected_role_copy.valueConditions.predicates &&
-            this.selected_role_copy.valueConditions.predicates.length > 0
+        ...mapState('test_roles', ['testRoles', 'loading', 'selectedRole', 'listOfEndpointsInCollection', 'createNew', 'conditions']),
+        mapCollectionIdToName() {
+            return this.$store.state.collections.apiCollections.reduce((m, e) => {
+                m[e.id] = e.displayName
+                return m
+            }, {})
         },
-        computeLoading() {
-            if (this.total_sample_data_count === 0) return 0
-            let val = Math.round(100*this.current_sample_data_count / this.total_sample_data_count)
-            if (val > 100) return 100
-            return val
+        isSelectedRoleEmpty() {
+            return Object.keys(this.selectedRole).length === 0
         }
     },
     watch: {
-        data_type: function(newVal, oldVal) {
-            this.selected_role_copy = JSON.parse(JSON.stringify(newVal))
-            this.$store.state.data_types.reviewData = null
-        },
     }
 }
 
 </script>
 
 <style lang="sass" scoped>
+    .condition-row
+        width: 100%
+        border-style: solid
+        padding: 16px
+        border-color: rgba(71,70,106,0.2)
+        border-top-width: 0.5px
+        border-bottom-width: 1px
+        border-left-width: 1px
+        border-right-width: 1px
+        &.first
+            border-top-width: 1px 
+
     .sensitive-text
         font-size: 16px
         font-weight: bold
@@ -235,11 +295,17 @@ export default {
         width: 200px
         align-items: center
         display: flex
+
+    .inline-block-child .value_predicate .v-text-field__slot input 
+        color: #00f !important
     
+        
 </style>
 
 <style>
-    .v-input, .v-input input, .v-input textarea {
-        color:  #47466a !important
-    }
+.v-input,
+.v-input input,
+.v-input textarea {
+    color: #47466a !important
+}
 </style>

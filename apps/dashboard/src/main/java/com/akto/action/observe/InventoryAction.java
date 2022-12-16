@@ -170,6 +170,28 @@ public class InventoryAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    private List<ApiInfoKey> listOfEndpointsInCollection;
+    public String fetchCollectionWiseApiEndpoints () {
+        listOfEndpointsInCollection = new ArrayList<>();
+        List<BasicDBObject> list = null;
+        if (apiCollectionId > -1) {
+            list = fetchEndpointsInCollectionUsingHost(apiCollectionId);
+        }
+        if (list != null && !list.isEmpty()) {
+            list.forEach((item) -> {
+                ApiInfoKey apiInfoKey = new ApiInfoKey(
+                        item.getInt(ApiInfoKey.API_COLLECTION_ID, apiCollectionId),
+                        item.getString(ApiInfoKey.URL),
+                        Method.fromString(item.getString(ApiInfoKey.METHOD)));
+                if (!listOfEndpointsInCollection.contains(apiInfoKey)) {
+                    listOfEndpointsInCollection.add(apiInfoKey);
+                }
+            });
+        }
+        return SUCCESS.toUpperCase();
+    }
+
+
     public static List<SingleTypeInfo> fetchHostSTI(int apiCollectionId, int skip) {
         Bson filterQ = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, true);
         return SingleTypeInfoDao.instance.findAll(filterQ, skip,10_000, null);
@@ -648,5 +670,13 @@ public class InventoryAction extends UserAction {
 
     public List<BasicDBObject> getEndpoints() {
         return endpoints;
+    }
+
+    public List<ApiInfoKey> getListOfEndpointsInCollection() {
+        return listOfEndpointsInCollection;
+    }
+
+    public void setListOfEndpointsInCollection(List<ApiInfoKey> listOfEndpointsInCollection) {
+        this.listOfEndpointsInCollection = listOfEndpointsInCollection;
     }
 }

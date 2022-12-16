@@ -1,26 +1,31 @@
 package com.akto.dto.testing;
 
 import com.akto.dto.ApiInfo;
+import com.akto.dto.data_types.Conditions;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Pattern;
+import java.util.Map;
 import java.util.regex.PatternSyntaxException;
 
 public class LogicalGroupTestingEndpoint extends TestingEndpoints{
-    private String regex;
-    private List<ApiInfo.ApiInfoKey> includedApiInfoKey;
-    private List<ApiInfo.ApiInfoKey> excludedApiInfoKey;
+    private Conditions andConditions;
+    private Conditions orConditions;
+    private Map<String, List<ApiInfo.ApiInfoKey>> includedCollectionsApiInfoKey;
+    private Map<String, List<ApiInfo.ApiInfoKey>> excludedCollectionsApiInfoKey;
 
     public LogicalGroupTestingEndpoint() {
         super(Type.LOGICAL_GROUP);
     }
 
-    public LogicalGroupTestingEndpoint(String regex, List<ApiInfo.ApiInfoKey> includedApiInfoKey, List<ApiInfo.ApiInfoKey> excludedApiInfoKey) {
+    public LogicalGroupTestingEndpoint(Map<String, List<ApiInfo.ApiInfoKey>> includedCollectionsApiInfoKey
+            , Map<String, List<ApiInfo.ApiInfoKey>> excludedCollectionsApiInfoKey
+            , Conditions andConditions, Conditions orConditions) {
         super(Type.LOGICAL_GROUP);
-        this.regex = regex;
-        this.includedApiInfoKey = includedApiInfoKey;
-        this.excludedApiInfoKey = excludedApiInfoKey;
+        this.includedCollectionsApiInfoKey = includedCollectionsApiInfoKey;
+        this.excludedCollectionsApiInfoKey = excludedCollectionsApiInfoKey;
+        this.andConditions = andConditions;
+        this.orConditions = orConditions;
     }
 
     @Override
@@ -28,46 +33,61 @@ public class LogicalGroupTestingEndpoint extends TestingEndpoints{
         if (key == null) {
             return false;
         }
-        if (excludedApiInfoKey != null && excludedApiInfoKey.contains(key)) {
-            return false;
-        }
-        if (includedApiInfoKey != null && includedApiInfoKey.contains(key)) {
-            return true;
-        }
+        if (containsApiInCollection(excludedCollectionsApiInfoKey,key)) return false;
+        if (containsApiInCollection(includedCollectionsApiInfoKey,key)) return true;
         try {
-            return Pattern.matches(regex, key.getUrl());
+            return this.andConditions.validate(key.getUrl()) && this.orConditions.validate(key.getUrl());
         } catch (PatternSyntaxException e) {
             return false;
         }
     }
-
-    public String getRegex() {
-        return regex;
-    }
-
-    public void setRegex(String regex) {
-        this.regex = regex;
-    }
-
-    public List<ApiInfo.ApiInfoKey> getIncludedApiInfoKey() {
-        return includedApiInfoKey;
-    }
-
-    public void setIncludedApiInfoKey(List<ApiInfo.ApiInfoKey> includedApiInfoKey) {
-        this.includedApiInfoKey = includedApiInfoKey;
-    }
-
-    public List<ApiInfo.ApiInfoKey> getExcludedApiInfoKey() {
-        return excludedApiInfoKey;
-    }
-
-    public void setExcludedApiInfoKey(List<ApiInfo.ApiInfoKey> excludedApiInfoKey) {
-        this.excludedApiInfoKey = excludedApiInfoKey;
+    private boolean containsApiInCollection(Map<String, List<ApiInfo.ApiInfoKey>> collectionsApiInfoKey, ApiInfo.ApiInfoKey key) {
+        if (collectionsApiInfoKey != null && collectionsApiInfoKey.containsKey(String.valueOf(key.getApiCollectionId()))) {
+            List<ApiInfo.ApiInfoKey> apiInfoKeyList = collectionsApiInfoKey.get(String.valueOf(key.getApiCollectionId()));
+            for (ApiInfo.ApiInfoKey apiInfoKey : apiInfoKeyList) {
+                if (apiInfoKey.equals(key)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     @Override
     public List<ApiInfo.ApiInfoKey> returnApis() {
 
         return new ArrayList<>();
+    }
+
+    public Conditions getAndConditions() {
+        return andConditions;
+    }
+
+    public void setAndConditions(Conditions andConditions) {
+        this.andConditions = andConditions;
+    }
+
+    public Conditions getOrConditions() {
+        return orConditions;
+    }
+
+    public void setOrConditions(Conditions orConditions) {
+        this.orConditions = orConditions;
+    }
+
+    public Map<String, List<ApiInfo.ApiInfoKey>> getIncludedCollectionsApiInfoKey() {
+        return includedCollectionsApiInfoKey;
+    }
+
+    public void setIncludedCollectionsApiInfoKey(Map<String, List<ApiInfo.ApiInfoKey>> includedCollectionsApiInfoKey) {
+        this.includedCollectionsApiInfoKey = includedCollectionsApiInfoKey;
+    }
+
+    public Map<String, List<ApiInfo.ApiInfoKey>> getExcludedCollectionsApiInfoKey() {
+        return excludedCollectionsApiInfoKey;
+    }
+
+    public void setExcludedCollectionsApiInfoKey(Map<String, List<ApiInfo.ApiInfoKey>> excludedCollectionsApiInfoKey) {
+        this.excludedCollectionsApiInfoKey = excludedCollectionsApiInfoKey;
     }
 }

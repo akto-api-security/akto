@@ -51,7 +51,7 @@
 
                     <div class="d-flex">
                         <div class="input-value">
-                            <v-text-field 
+                            <v-text-field
                                 v-model="newKey"
                                 style="width: 200px"
                             >
@@ -62,13 +62,13 @@
                                     </div>
                                 </template>
                             </v-text-field>
-                            
+
                         </div>
                         <div class="input-value">
-                            <v-text-field 
+                            <v-text-field
                                 v-model="newVal"
                                 style="width: 500px"
-                            >              
+                            >
                                 <template slot="label">
                                     <div class="d-flex">
                                         Auth header value
@@ -118,7 +118,7 @@
 <!--                <v-dialog v-model="showTokenAutomation" class="token-automation-modal">-->
 <!--                    <token-automation :originalDbState="originalDbState" @closeLoginStepBuilder=toggleLoginStepBuilder />-->
 <!--                </v-dialog>-->
-                
+
             </div>
         </template>
 
@@ -141,7 +141,7 @@
                     <v-text-field v-model="testLogicalGroupRegex" placeholder="regex"></v-text-field>
                 </div>
                  -->
-                <!-- <test-roles title="Roles" :testRoles="testRoles" :createNewRole="createNewRole">
+                <test-roles title="Roles" :testRoles="testRoles">
                     <template #details-container="{}">
                         <a-card title="Details" color="rgba(33, 150, 243)" style="min-height: 600px">
                             <test-roles-config-details></test-roles-config-details>
@@ -210,9 +210,6 @@ export default {
         }
     },
     methods: {
-        createNewRole() {
-            this.$store.commit('test_roles/SET_NEW_SELECTED_ROLE')
-        },
         setAuthHeaderKey(newKey) {
             this.newKey = newKey
             this.saveAuth()
@@ -474,7 +471,7 @@ export default {
             let dayStr = func.toDateStr(new Date(dayStartEpochMs), false)
 
             return dayStr + " " + date.slice(11)
-        }        
+        }
     },
     mounted() {
         this.fetchAuthMechanismData()
@@ -552,7 +549,7 @@ export default {
 }
 
 .token-automation-modal {
-    width: 600px; 
+    width: 600px;
     height: 400px
 }
 
