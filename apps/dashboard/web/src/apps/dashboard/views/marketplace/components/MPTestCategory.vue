@@ -114,13 +114,14 @@ export default {
         
 .testcases-layout
     display: flex
-    margin: 32px
+    margin: 32px 0
     flex-wrap: wrap
     gap: 40px
+    justify-content: space-between
 
 .testcase-container
     display: flex      
-    max-width: 40%
+    max-width: 45%
     flex-grow: 1
     flex-shrink: 0
     margin-bottom: 32px
