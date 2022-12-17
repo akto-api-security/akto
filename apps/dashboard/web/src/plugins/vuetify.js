@@ -96,7 +96,9 @@ import {
   faCaretUp,
   faCaretDown,
   faShareAlt,
-  faUserPlus
+  faUserPlus,
+  faLaptopHouse,
+  faAnchor
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -126,6 +128,7 @@ const faIcons = [
   faCreditCard,faAddressCard,faChalkboard,faFilter,faKey,faAngleDoubleDown,faAngleDoubleUp,faUpload,faRedo,faGlobe,faAngleDown,
   faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faCaretSquareUp,
   faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faThumbsUp,faCaretUp,faShareAlt,faUserPlus,faCaretDown,
+  faLaptopHouse,faAnchor,
   
   farComments,farCalendar, farHandPointRight, farBuilding, farStar,farSquare, farCheckSquare,farFolder,farFolderOpen,farClock,
 

@@ -146,6 +146,11 @@ export default {
         title: 'Issues',
         icon: '$fas_exclamation-triangle',
         link: '/dashboard/issues'
+      },
+      {
+        title: 'Marketplace',
+        icon: '$fas_laptop-house',
+        link: '/dashboard/marketplace'
       }
     ]
 

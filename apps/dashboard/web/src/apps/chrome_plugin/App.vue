@@ -242,6 +242,11 @@
 .d-flex
     display: flex    
 
+.d-grid-2
+    display: grid    
+    grid-template-columns: 1fr 1fr
+    column-gap: 40px
+
 .pa-2
     padding: 8px
 

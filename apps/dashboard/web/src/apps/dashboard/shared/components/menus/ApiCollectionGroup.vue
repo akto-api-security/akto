@@ -7,6 +7,7 @@
             v-model="item.active"
             :group="item.group"
             :color="item.color || $vuetify.theme.themes.dark.themeColor"
+            class="pb-4"
             no-action
         >
             <template v-slot:appendIcon>
