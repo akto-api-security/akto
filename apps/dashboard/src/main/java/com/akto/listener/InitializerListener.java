@@ -8,10 +8,7 @@ import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.BackwardCompatibilityDao;
 import com.akto.dao.FilterSampleDataDao;
 import com.akto.dao.UsersDao;
-import com.akto.dao.testing.TestingRunDao;
-import com.akto.dao.testing.TestingRunResultDao;
-import com.akto.dao.testing.TestingSchedulesDao;
-import com.akto.dao.testing.WorkflowTestResultsDao;
+import com.akto.dao.testing.*;
 import com.akto.dto.*;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhookResult;
@@ -282,7 +279,6 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void webhookSenderUtil(CustomWebhook webhook){
-        Gson gson = new Gson();
         int now = Context.now();
 
         boolean shouldSend = ( webhook.getLastSentTimestamp() + webhook.getFrequencyInSeconds() ) <= now ;
@@ -300,10 +296,10 @@ public class InitializerListener implements ServletContextListener {
 
         Map<String,Object> valueMap = new HashMap<>();
 
-        valueMap.put("AKTO.changes_info.newSensitiveEndpoints", gson.toJson(ci.newSensitiveParams));
+        valueMap.put("AKTO.changes_info.newSensitiveEndpoints", ci.newSensitiveParamsObject);
         valueMap.put("AKTO.changes_info.newSensitiveEndpointsCount",ci.newSensitiveParams.size());
 
-        valueMap.put("AKTO.changes_info.newEndpoints",gson.toJson(ci.newEndpointsLast7Days));
+        valueMap.put("AKTO.changes_info.newEndpoints",ci.newEndpointsLast7DaysObject);
         valueMap.put("AKTO.changes_info.newEndpointsCount",ci.newEndpointsLast7Days.size());
 
         valueMap.put("AKTO.changes_info.newSensitiveParametersCount",ci.recentSentiiveParams);
@@ -313,7 +309,7 @@ public class InitializerListener implements ServletContextListener {
         String payload = null;
 
         try{
-            payload = apiWorkflowExecutor.replaceVariables(webhook.getBody(),valueMap);
+            payload = apiWorkflowExecutor.replaceVariables(webhook.getBody(),valueMap, false);
         } catch(Exception e){
             errors.add("Failed to replace variables");
         }
@@ -373,20 +369,43 @@ public class InitializerListener implements ServletContextListener {
 
     static class ChangesInfo {
         public Map<String, String> newSensitiveParams = new HashMap<>();
+        public List<BasicDBObject> newSensitiveParamsObject = new ArrayList<>();
         public List<String> newEndpointsLast7Days = new ArrayList<>();
+        public List<BasicDBObject> newEndpointsLast7DaysObject = new ArrayList<>();
         public List<String> newEndpointsLast31Days = new ArrayList<>();
+        public List<BasicDBObject> newEndpointsLast31DaysObject = new ArrayList<>();
         public int totalSensitiveParams = 0;
         public int recentSentiiveParams = 0;
         public int newParamsInExistingEndpoints = 0;
     }
 
+    public static class UrlResult {
+        String urlString;
+        BasicDBObject urlObject;
 
-    public static String extractUrlFromBasicDbObject(BasicDBObject singleTypeInfo, Map<Integer, ApiCollection> apiCollectionMap)  {
+        public UrlResult(String urlString, BasicDBObject urlObject) {
+            this.urlString = urlString;
+            this.urlObject = urlObject;
+        }
+    }
+
+
+    public static UrlResult extractUrlFromBasicDbObject(BasicDBObject singleTypeInfo, Map<Integer, ApiCollection> apiCollectionMap)  {
         String method = singleTypeInfo.getString("method");
         String path = singleTypeInfo.getString("url");
 
         Object apiCollectionIdObj = singleTypeInfo.get("apiCollectionId");
-        if (apiCollectionIdObj == null) return method + " " + path;
+
+        String urlString;
+
+        BasicDBObject urlObject = new BasicDBObject();
+        if (apiCollectionIdObj == null) {
+            urlString = method + " " + path;
+            urlObject.put("host", null);
+            urlObject.put("path", path);
+            urlObject.put("method", method);
+            return new UrlResult(urlString, urlObject);
+        }
 
         int apiCollectionId = (int) apiCollectionIdObj;
         ApiCollection apiCollection = apiCollectionMap.get(apiCollectionId);
@@ -399,7 +418,14 @@ public class InitializerListener implements ServletContextListener {
             url = path;
         }
 
-        return  method + " " + url;
+        urlString = method + " " + url;
+
+        urlObject = new BasicDBObject();
+        urlObject.put("host", hostName);
+        urlObject.put("path", path);
+        urlObject.put("method", method);
+
+        return new UrlResult(urlString, urlObject);
     }
 
     protected static ChangesInfo getChangesInfo(int newEndpointsFrequency, int newSensitiveParamsFrequency) {
@@ -417,14 +443,16 @@ public class InitializerListener implements ServletContextListener {
             for (BasicDBObject singleTypeInfo: newEndpointsSmallerDuration) {
                 newParamInNewEndpoint += (int) singleTypeInfo.getOrDefault("countTs", 0);
                 singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
-                String url = extractUrlFromBasicDbObject(singleTypeInfo, apiCollectionMap);
-                ret.newEndpointsLast7Days.add(url);
+                UrlResult urlResult = extractUrlFromBasicDbObject(singleTypeInfo, apiCollectionMap);
+                ret.newEndpointsLast7Days.add(urlResult.urlString);
+                ret.newEndpointsLast7DaysObject.add(urlResult.urlObject);
             }
     
             for (BasicDBObject singleTypeInfo: newEndpointsBiggerDuration) {
                 singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
-                String url = extractUrlFromBasicDbObject(singleTypeInfo, apiCollectionMap);
-                ret.newEndpointsLast31Days.add(url);
+                UrlResult urlResult = extractUrlFromBasicDbObject(singleTypeInfo, apiCollectionMap);
+                ret.newEndpointsLast31Days.add(urlResult.urlString);
+                ret.newEndpointsLast31DaysObject.add(urlResult.urlObject);
             }
     
             List<SingleTypeInfo> sensitiveParamsList = new InventoryAction().fetchSensitiveParams();
@@ -456,7 +484,17 @@ public class InitializerListener implements ServletContextListener {
             }
 
             for(Pair<String, String> key: endpointToSubTypes.keySet()) {
-                ret.newSensitiveParams.put(key.getFirst() + ": " + StringUtils.join(endpointToSubTypes.get(key), ","), key.getSecond());
+                String subTypes = StringUtils.join(endpointToSubTypes.get(key), ",");
+                String methodPlusUrl = key.getFirst();
+                ret.newSensitiveParams.put(methodPlusUrl + ": " + subTypes, key.getSecond());
+
+                BasicDBObject basicDBObject = new BasicDBObject();
+                String[] methodPlusUrlList = methodPlusUrl.split(" ");
+                if (methodPlusUrlList.length != 2) continue;
+                basicDBObject.put("url", methodPlusUrlList[1]);
+                basicDBObject.put("method", methodPlusUrlList[0]);
+                basicDBObject.put("subTypes",  subTypes);
+                ret.newSensitiveParamsObject.add(basicDBObject);
             }
 
             List<SingleTypeInfo> allNewParameters = new InventoryAction().fetchAllNewParams(now - newEndpointsFrequency, now);
@@ -478,6 +516,16 @@ public class InitializerListener implements ServletContextListener {
         BackwardCompatibilityDao.instance.updateOne(
                 Filters.eq("_id", backwardCompatibility.getId()),
                 Updates.set(BackwardCompatibility.DROP_FILTER_SAMPLE_DATA, Context.now())
+        );
+    }
+
+    public void dropAuthMechanismData(BackwardCompatibility authMechanismData) {
+        if (authMechanismData.getAuthMechanismData() == 0) {
+            AuthMechanismsDao.instance.getMCollection().drop();
+        }
+        BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", authMechanismData.getId()),
+                Updates.set(BackwardCompatibility.AUTH_MECHANISM_DATA, Context.now())
         );
     }
 
@@ -563,6 +611,8 @@ public class InitializerListener implements ServletContextListener {
 
         Context.accountId.set(1_000_000);
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
+        TestRolesDao.instance.createIndicesIfAbsent();
+
         ApiInfoDao.instance.createIndicesIfAbsent();
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
         if (backwardCompatibility == null) {
@@ -578,6 +628,7 @@ public class InitializerListener implements ServletContextListener {
             readyForNewTestingFramework(backwardCompatibility);
             addAktoDataTypes(backwardCompatibility);
             updateDeploymentStatus(backwardCompatibility);
+            dropAuthMechanismData(backwardCompatibility);
 
             SingleTypeInfo.init();
 

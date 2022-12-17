@@ -1,5 +1,7 @@
 package com.akto.dto.testing;
 
+import com.akto.dto.testing.info.TestInfo;
+
 import java.util.List;
 
 public class TestResult extends GenericTestResult {
@@ -9,6 +11,7 @@ public class TestResult extends GenericTestResult {
 
     private String originalMessage;
     private double percentageMatch;
+    private TestInfo testInfo;
 
     public enum Confidence {
         HIGH, MEDIUM, LOW
@@ -35,12 +38,14 @@ public class TestResult extends GenericTestResult {
         }
     }
 
-    public TestResult(String message, String originalMessage, List<TestError> errors, double percentageMatch, boolean isVulnerable, Confidence confidence) {
+    public TestResult(String message, String originalMessage, List<TestError> errors, double percentageMatch, boolean isVulnerable,
+                      Confidence confidence, TestInfo testInfo) {
         super(isVulnerable, confidence);
         this.message = message;
         this.errors = errors;
         this.originalMessage = originalMessage;
         this.percentageMatch = percentageMatch;
+        this.testInfo = testInfo;
     }
 
     public TestResult() {
@@ -76,5 +81,13 @@ public class TestResult extends GenericTestResult {
 
     public void setPercentageMatch(double percentageMatch) {
         this.percentageMatch = !Double.isFinite(percentageMatch) ? 0 :  percentageMatch;
+    }
+
+    public TestInfo getTestInfo() {
+        return testInfo;
+    }
+
+    public void setTestInfo(TestInfo testInfo) {
+        this.testInfo = testInfo;
     }
 }

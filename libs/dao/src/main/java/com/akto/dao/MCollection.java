@@ -10,15 +10,16 @@ import org.bson.Document;
 import com.mongodb.client.result.UpdateResult;
 
 import org.bson.conversions.Bson;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
 import static com.mongodb.client.model.Filters.*;
 
 public abstract class MCollection<T> {
-
+    private Logger logger = LoggerFactory.getLogger(getClassT());
     public static MongoClient[] clients = new MongoClient[1];
-
     abstract public String getDBName();
     abstract public String getCollName();
     abstract public Class<T> getClassT();
@@ -174,5 +175,9 @@ public abstract class MCollection<T> {
             result.add(cursor.next());
         }
         return result;
+    }
+
+    public Logger getLogger() {
+        return logger;
     }
 }

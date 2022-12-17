@@ -169,6 +169,8 @@ export default {
     data() {
         return {
             data_type_copy: null,
+            reqToggle: null,
+            resToggle: null,
             saveLoading: false,
             reviewLoading: false,
             name_rules: [
@@ -191,8 +193,6 @@ export default {
                 if (this.data_type_copy.sensitiveAlways || this.data_type_copy.sensitivePosition.includes("RESPONSE_PAYLOAD")) temp.push("RESPONSE_PAYLOAD")
                 if (this.data_type_copy.sensitiveAlways || this.data_type_copy.sensitivePosition.includes("RESPONSE_HEADER")) temp.push("RESPONSE_HEADER")
                 this.data_type_copy.sensitivePosition = temp
-                console.log(this.data_type_copy.sensitivePosition)
-
                 this.data_type_copy.sensitiveAlways = this.data_type_copy.sensitivePosition.length == 4 ? true : false
                 if(this.data_type_copy.sensitivePosition.length==4) this.data_type_copy.sensitivePosition=[]
             }
@@ -206,8 +206,6 @@ export default {
                 if (!this.data_type_copy.sensitiveAlways && !this.data_type_copy.sensitivePosition.includes("RESPONSE_PAYLOAD")) temp.push("RESPONSE_PAYLOAD")
                 if (!this.data_type_copy.sensitiveAlways && !this.data_type_copy.sensitivePosition.includes("RESPONSE_HEADER")) temp.push("RESPONSE_HEADER")
                 this.data_type_copy.sensitivePosition = temp
-                console.log(this.data_type_copy.sensitivePosition)
-
                 this.data_type_copy.sensitiveAlways = this.data_type_copy.sensitivePosition.length == 4 ? true : false
                 if(this.data_type_copy.sensitivePosition.length==4) this.data_type_copy.sensitivePosition=[]
             }

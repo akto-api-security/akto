@@ -2,7 +2,7 @@
     <simple-layout title="Issues">
         <issues-filters :filterStatus="filterStatus" :issues="issues" :filterCollectionsId="filterCollectionsId"
             :filterSeverity="filterSeverity" :filterSubCategory1="filterSubCategory1"
-            :selectedIssueIds="selectedIssueIds" :startEpoch="startEpoch">
+            :selectedIssueIds="selectedIssueIds" :startEpoch="startEpoch" :issuesCategories="issuesCategories" :categoryToSubCategories="categoryToSubCategories">
         </issues-filters>
         <spinner v-if="loading">
         </spinner>
@@ -53,7 +53,9 @@ export default {
     data() {
         return {
             currentPageIndex: 1,
-            dialogBox: false
+            dialogBox: false,
+            issuesCategories: [],
+            categoryToSubCategories: {}
         }
     },
     watch: {
@@ -80,8 +82,24 @@ export default {
             }, {})
         }
     },
-    mounted() {
+    async mounted() {
         this.$store.dispatch('issues/loadIssues')
+        await this.$store.dispatch('issues/fetchAllSubCategories')
+
+        let store = {}
+        let result = []
+        Object.values(this.$store.state.issues.subCatogoryMap).forEach((x) => {
+            let superCategory = x.superCategory
+            if (!store[superCategory.name]) {
+                result.push({"title": superCategory.displayName, "value": superCategory.name})
+                store[superCategory.name] = []
+            }
+            store[superCategory.name].push(x._name);
+        })  
+
+        this.issuesCategories = [].concat(result)
+        this.categoryToSubCategories = store
+
     },
     methods: {
         async openDialogBox({issueId}) {
@@ -113,43 +131,10 @@ export default {
             }
         },
         getCategoryName(name) {
-            switch (name) {
-                case 'REPLACE_AUTH_TOKEN':
-                case 'ADD_USER_ID':
-                case 'ADD_METHOD_IN_PARAMETER':
-                case 'ADD_METHOD_OVERRIDE_HEADERS':
-                case 'CHANGE_METHOD':
-                case 'REPLACE_AUTH_TOKEN_OLD_VERSION':
-                case 'PARAMETER_POLLUTION':
-                    return 'Broken Object Level Authorization (BOLA)';
-                case 'REMOVE_TOKENS':
-                case 'JWT_NONE_ALGO':
-                    return 'Broken User Authentication (BUA)'
-                default:
-                    return 'Broken Object Level Authorization (BOLA)'
-            }
+            return this.$store.state.issues.subCatogoryMap[name].superCategory.displayName;
         },
         getCategoryDescription(name) {
-            switch (name) {
-                case 'REPLACE_AUTH_TOKEN':
-                    return 'Attacker can access resources of any user by changing the auth token in request.';
-                case 'JWT_NONE_ALGO':
-                    return 'Attacker can tamper with the payload of JWT and access protected resources.'
-                case 'PARAMETER_POLLUTION':
-                    return 'Attacker can access resources of any user by introducing multiple parameters with same name.'
-                case 'ADD_USER_ID':
-                    return 'Attacker can access resources of any user by adding user_id in URL.';
-                case 'REPLACE_AUTH_TOKEN_OLD_VERSION':
-                    return 'Attacker can access resources of any user by changing the auth token in request and using older version of an API'
-                case 'ADD_METHOD_IN_PARAMETER':
-                case 'ADD_METHOD_OVERRIDE_HEADERS':
-                case 'CHANGE_METHOD':
-                    return 'Attacker can access resources of any user by replacing method of the endpoint (eg: changemethod from get to post). This way attacker can get access to unauthorized endpoints.';
-                case 'REMOVE_TOKENS':
-                    return 'API doesn\'t validate the authenticity of token. Attacker can remove the auth token and access the endpoint.'
-                default:
-                    return ''
-            }
+            return this.$store.state.issues.subCatogoryMap[name].issueDescription
         },
         getCollectionName(collectionId) {
             return this.mapCollectionIdToName[collectionId];

@@ -23,8 +23,12 @@ public class BackwardCompatibility {
     public static final String DEPLOYMENT_STATUS_UPDATED = "deploymentStatusUpdated";
     private boolean deploymentStatusUpdated;
 
+    public static final String AUTH_MECHANISM_DATA  = "authMechanismData";
+    private int authMechanismData;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
-                                 int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated) {
+                                 int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
+                                 int authMechanismData) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -32,6 +36,7 @@ public class BackwardCompatibility {
         this.readyForNewTestingFramework = readyForNewTestingFramework;
         this.addAktoDataTypes = addAktoDataTypes;
         this.deploymentStatusUpdated = deploymentStatusUpdated;
+        this.authMechanismData = authMechanismData;
     }
 
     public BackwardCompatibility() {
@@ -100,4 +105,13 @@ public class BackwardCompatibility {
     public void setDeploymentStatusUpdated(boolean deploymentStatusUpdated) {
         this.deploymentStatusUpdated = deploymentStatusUpdated;
     }
+
+    public int getAuthMechanismData() {
+        return this.authMechanismData;
+    }
+
+    public void setAuthMechanismData(int authMechanismData) {
+        this.authMechanismData = authMechanismData;
+    }
+
 }

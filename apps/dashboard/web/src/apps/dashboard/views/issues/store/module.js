@@ -17,7 +17,8 @@ const state = {
     filterSubCategory1 : [],
     startEpoch : 0,
     selectedIssueIds : [],
-    testingRunResult: {}
+    testingRunResult: {},
+    subCatogoryMap: {}
 }
 
 const issues = {
@@ -103,7 +104,17 @@ const issues = {
             }).catch(() => {
                 state.loading = false
             })
-        }
+        },
+        fetchAllSubCategories() {
+            return api.fetchAllSubCategories().then((resp) => {
+                state.subCatogoryMap = {}
+                resp.subCategories.forEach((x) => {
+                    state.subCatogoryMap[x.name] = x
+                })
+            }).catch((err) => {
+                console.log(err);
+            })
+        },
     },
     getters: {
         getLoading: (state) => state.loading,

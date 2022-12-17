@@ -310,4 +310,8 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
                 Updates.unset(SingleTypeInfo._VALUES)
         );
     }
+
+    public long getEstimatedCount(){
+        return instance.getMCollection().estimatedDocumentCount();
+    }
 }
