@@ -6,35 +6,70 @@
         <div style="display: flex; padding-bottom: 24px;">
           <div style="width: 100%">
 
+
+          <v-btn primary plain color="#6200EA" @click='toggleShowOtpForm' >
+                      Toggle
+                  </v-btn>
+
+          <div v-if="this.showOtpForm">
+
+              <div class="input-value">
+                          <v-text-field 
+                              value="Connect with zapier to send data to webhook url"
+                              style="width: 700px"
+                              readonly
+                          />
+                      </div>
+
+              <div class="input-value">
+                          <v-text-field 
+                              :value="this.webhookUrl"
+                              style="width: 700px"
+                              readonly
+                          />
+                      </div>
+                
+               <div class="request-title">Regex</div>
+                  <template-string-editor
+                    :defaultText="this.updatedData['regex']"
+                    :onChange=onChangeRegex
+                  />
+            
+          </div>
+
+          <div v-else>
+
             <div class="request-title">URL</div>
-            <template-string-editor 
+            <template-string-editor
               :defaultText="this.updatedData['url']"
               :onChange=onChangeURL
             />
 
             <div class="request-title">Query params</div>
-            <template-string-editor 
+            <template-string-editor
               :defaultText="this.updatedData['queryParams']"
               :onChange=onChangeQueryParams
             />
 
             <div class="request-title">Method</div>
-            <template-string-editor 
+            <template-string-editor
               :defaultText="this.updatedData['method']"
               :onChange=onChangeMethod
             />
 
             <div class="request-title">Headers</div>
-            <template-string-editor 
+            <template-string-editor
               :defaultText="this.updatedData['headers']"
               :onChange=onChangeHeaders
             />
 
             <div class="request-title">Body</div>
-            <template-string-editor 
+            <template-string-editor
               :defaultText="this.updatedData['body']"
               :onChange=onChangeBody
             />
+
+          </div>
 
           </div>  
         </div>
@@ -70,6 +105,9 @@ import TemplateStringEditor from "../react/TemplateStringEditor.jsx";
 import api from "../../api";
 import obj from "@/util/obj";
 import func from '@/util/func'
+import IconMenu from '../../../../shared/components/IconMenu'
+import { v4 as uuidv4 } from 'uuid';
+import store from "@/apps/main/store/module";
 
 export default {
     name: "LoginStepBuilder",
@@ -92,7 +130,17 @@ export default {
         stepData: [],
         showAuthParams: false,
         authParamData: [],
-        showLoginSaveOption: false
+        showLoginSaveOption: false,
+        showOtpForm: false,
+        dropDownItems: [
+          {
+              label: "OTP VERIFICATION",
+              click: this.toggleShowOtpForm
+          }
+        ],
+        stepType: "LOGIN_FORM",
+        webhookUrl: "",
+        regex: ""
       }
     },
     methods: {
@@ -117,17 +165,48 @@ export default {
         onChangeAuthTokenPath(newData) {
             this.onChange("authTokenPath", newData)
         },
+        onChangeRegex(newData) {
+            this.onChange("regex", newData)
+        },
         onChange(key, newData) {
             this.updatedData[key] = newData
             this.tabData.testedSuccessfully = false
         },
         testLoginStep() {
           this.$emit('testLoginStep', this.updatedData, this.tabName)
+        },
+        toggleShowOtpForm() {
+          this.showOtpForm = !this.showOtpForm
+          if(this.showOtpForm) {
+            this.stepType = "OTP_VERIFICATION"
+          } else {
+            this.stepType = "LOGIN_FORM"
+          }
+        },
+        webhookUrlGenerator() {
+          let uuid = uuidv4();
+          this.webhookUrl = window.location.origin + "/api/fetchOtpData/" + uuid
         }
     },
       computed: {
           updatedData() {
               if (this.tabData.data) return {...this.tabData.data}
+              if (this.showOtpForm) {
+                let body = {"regex": this.regex}
+                let headers = {
+                  "Content-Type": "application/json",
+                  "access-token": store.getters["auth/getAccessToken"]
+                }
+                return {
+                  "url": this.webhookUrl,
+                  "queryParams": "",
+                  "method": "POST",
+                  "type": this.stepType,
+                  "body": JSON.stringify(body),
+                  "headers": JSON.stringify(headers)
+                }
+
+              }
               return {
                   "url": this.defaultUrl,
                   "queryParams": this.defaultQueryParams,
@@ -135,7 +214,9 @@ export default {
                   "headers": this.defaultHeaderString,
                   "body": this.defaultBody,
                   "authKey": this.defaultAuthKey,
-                  "authTokenPath": this.defaultAuthTokenPath
+                  "authTokenPath": this.defaultAuthTokenPath,
+                  "type": this.stepType,
+                  "regex": this.regex
               }
           },
           hasResponseData() {
@@ -144,6 +225,9 @@ export default {
         urlAndMethodFilled() {
             return this.updatedData["url"]
           }
+      },
+      mounted() {
+        this.webhookUrlGenerator()
       }
     
 }

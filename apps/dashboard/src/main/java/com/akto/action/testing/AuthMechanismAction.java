@@ -95,10 +95,10 @@ public class AuthMechanismAction extends UserAction {
         TestExecutor testExecutor = new TestExecutor();
         try {
             LoginFlowResponse loginFlowResponse = testExecutor.executeLoginFlow(authMechanism);
-            if (!loginFlowResponse.getSuccess()) {
-                throw new Exception("error executing login flow");
-            }
             responses = loginFlowResponse.getResponses();
+            if (!loginFlowResponse.getSuccess()) {
+                throw new Exception(loginFlowResponse.getError());
+            }
         } catch(Exception e) {
             addActionError(e.getMessage());
             return ERROR.toUpperCase();

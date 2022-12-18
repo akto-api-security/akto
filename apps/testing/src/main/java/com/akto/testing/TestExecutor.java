@@ -89,7 +89,10 @@ public class TestExecutor {
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
 
         try {
-            executeLoginFlow(authMechanism, null);
+            LoginFlowResponse loginFlowResponse = executeLoginFlow(authMechanism);
+            if (!loginFlowResponse.getSuccess()) {
+                throw new Exception("login flow failed");
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e.getMessage());
             return;
@@ -177,21 +180,17 @@ public class TestExecutor {
 
     }
 
-    public ArrayList<Object> executeLoginFlow(AuthMechanism authMechanism, ArrayList<Object> resp) throws Exception {
+    public LoginFlowResponse executeLoginFlow(AuthMechanism authMechanism) throws Exception {
 
         if (!authMechanism.getType().equals(LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString())) {
-            return new ArrayList<Object>();
+            return new LoginFlowResponse(null, null, true);
         }
 
         WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData());
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
-        try {
-            resp = apiWorkflowExecutor.runLoginFlow(workflowObj, authMechanism);
-        } catch(Exception e){
-            loggerMaker.errorAndAddToDb("Login call failed {}" + e.getMessage());
-            throw new Exception("Login Flow Failed");
-        }
-        return resp;
+        LoginFlowResponse loginFlowResp;
+        loginFlowResp = apiWorkflowExecutor.runLoginFlow(workflowObj, authMechanism);
+        return loginFlowResp;
     }
 
     public WorkflowTest convertToWorkflowGraph(ArrayList<RequestData> requestData) {

@@ -21,14 +21,14 @@
 
                 </div>
               </div>
-              <v-btn primary icon color="#6200EA" @click='addNewAuthParamElem' >
-                  <v-icon> $fas_plus </v-icon>
-              </v-btn>
-              <v-btn primary plain color="#6200EA" @click='saveLoginStep' >
-                  Done
-              </v-btn>
+                <v-btn primary icon color="#6200EA" @click='addNewAuthParamElem' >
+                    <v-icon> $fas_plus </v-icon>
+                </v-btn>
+                <v-btn primary plain color="#6200EA" @click='saveLoginStep' >
+                    Done
+                </v-btn>
 
-        </div>
+            </div>
 
         <layout-with-tabs :tabs='apiTabs' :defaultTabName='currTabName' v-else>
             <template v-for="(apiTabName, index) in apiTabs" v-slot:[apiTabName]>
@@ -66,7 +66,6 @@ import api from '../../api'
 import {mapState} from 'vuex'
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import LoginStepBuilder from './LoginStepBuilder'
-import IconMenu from '@/apps/dashboard/shared/components/IconMenu'
 
 export default {
     name: "TokenAutomation",
@@ -149,6 +148,19 @@ export default {
 
 
           let reqData = Object.values(this.stepData).filter(x => x.data != null).map(x => x.data)
+          
+          let otpSteps = 0
+          for (var i = 0; i < reqData.length; i++) { 
+            if (reqData[i]["type"] == "OTP_VERIFICATION") {
+                otpSteps++
+            }
+          }
+
+          if (otpSteps > 1) {
+            func.showErrorSnackBar("Please specify only a single otp verification step")
+            return
+          }
+
           let result = api.triggerLoginSteps("LOGIN_REQUEST", reqData, [])
 
            result.then((resp) => {
@@ -263,6 +275,7 @@ export default {
 
     mounted () {
     },
+
     
     computed: {
 

@@ -75,7 +75,7 @@ public class ApiWorkflowExecutor {
         WorkflowTestResultsDao.instance.insertOne(workflowTestResult);
     }
 
-    public ArrayList<Object> runLoginFlow(WorkflowTest workflowTest, AuthMechanism authMechanism) throws Exception {
+    public LoginFlowResponse runLoginFlow(WorkflowTest workflowTest, AuthMechanism authMechanism) throws Exception {
         Graph graph = new Graph();
         graph.buildGraph(workflowTest);
 
@@ -102,7 +102,9 @@ public class ApiWorkflowExecutor {
             respString.put("body", json.get("response").get("body"));
             responses.add(respString.toString());
             
-            if (nodeResult.getErrors().size() > 0)  return responses;
+            if (nodeResult.getErrors().size() > 0) {
+                return new LoginFlowResponse(responses, "Failed to process node " + node.getId(), false);
+            }
 
         }
 
@@ -110,14 +112,15 @@ public class ApiWorkflowExecutor {
             try {
                 String value = executeCode(param.getValue(), valuesMap);
                 if (!param.getValue().equals(value) && value == null) {
-                    throw new Exception("auth param not found at specified path " + param.getValue());
+                    return new LoginFlowResponse(responses, "auth param not found at specified path " + 
+                    param.getValue(), false);
                 }
                 param.setValue(value);
             } catch(Exception e) {
-                throw new Exception("error resolving auth param " + param.getValue());
+                return new LoginFlowResponse(responses, "error resolving auth param " + param.getValue(), false);
             }
         }
-        return responses;
+        return new LoginFlowResponse(responses, null, true);
     }
 
 

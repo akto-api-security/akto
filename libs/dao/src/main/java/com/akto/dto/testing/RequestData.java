@@ -14,14 +14,17 @@ public class RequestData {
 
     private String type;
 
+    private String regex;
+
     public RequestData() { }
-    public RequestData(String body, String headers, String queryParams, String url, String method, String type) {
+    public RequestData(String body, String headers, String queryParams, String url, String method, String type, String regex) {
         this.body = body;
         this.headers = headers;
         this.queryParams = queryParams;
         this.url = url;
         this.method = method;
         this.type = type;
+        this.regex = regex;
     }
 
     public String getBody() {
@@ -48,6 +51,10 @@ public class RequestData {
         return this.type;
     }
 
+    public String getRegex() {
+        return this.regex;
+    }
+
     public void setBody(String body) {
         this.body = body;
     }
@@ -68,5 +75,9 @@ public class RequestData {
 
     public void setType(String type) {
         this.type = type;
+    }
+
+    public void setRegex(String regex) {
+        this.regex = regex;
     }
 }
