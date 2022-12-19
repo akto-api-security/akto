@@ -6,10 +6,7 @@
         <div style="display: flex; padding-bottom: 24px;">
           <div style="width: 100%">
 
-
-          <v-btn primary plain color="#6200EA" @click='toggleShowOtpForm' >
-                      Toggle
-                  </v-btn>
+          <icon-menu v-if="!this.tabData.data" icon="$fas_caret-down" :items="dropDownItems"/>
 
           <div v-if="this.showOtpForm">
 
@@ -107,12 +104,12 @@ import obj from "@/util/obj";
 import func from '@/util/func'
 import IconMenu from '../../../../shared/components/IconMenu'
 import { v4 as uuidv4 } from 'uuid';
-import store from "@/apps/main/store/module";
 
 export default {
     name: "LoginStepBuilder",
     components: {
-      'template-string-editor' : TemplateStringEditor
+      'template-string-editor' : TemplateStringEditor,
+      'icon-menu' : IconMenu
     },
     props: {
       tabName: obj.strR,
@@ -136,11 +133,15 @@ export default {
           {
               label: "OTP VERIFICATION",
               click: this.toggleShowOtpForm
+          },
+          {
+              label: "LOGIN FORM",
+              click: this.toggleShowOtpForm
           }
         ],
-        stepType: "LOGIN_FORM",
+        stepType: "OTP_VERIFICATION",
         webhookUrl: "",
-        regex: ""
+        defaultRegex: ""
       }
     },
     methods: {
@@ -166,11 +167,12 @@ export default {
             this.onChange("authTokenPath", newData)
         },
         onChangeRegex(newData) {
-            this.onChange("regex", newData)
+            let parts = newData.split('\\');
+            let output = parts.join('\\');
+            this.onChange("regex", output)
         },
         onChange(key, newData) {
             this.updatedData[key] = newData
-            this.tabData.testedSuccessfully = false
         },
         testLoginStep() {
           this.$emit('testLoginStep', this.updatedData, this.tabName)
@@ -185,45 +187,38 @@ export default {
         },
         webhookUrlGenerator() {
           let uuid = uuidv4();
-          this.webhookUrl = window.location.origin + "/api/fetchOtpData/" + uuid
+          this.webhookUrl = window.location.origin + "/xyz/fetchOtpData/5e1aaeff-115a-4c36-8026-2fa3e552b106"
         }
     },
       computed: {
           updatedData() {
+              this.showOtpForm;
               if (this.tabData.data) return {...this.tabData.data}
               if (this.showOtpForm) {
-                let body = {"regex": this.regex}
-                let headers = {
-                  "Content-Type": "application/json",
-                  "access-token": store.getters["auth/getAccessToken"]
-                }
                 return {
                   "url": this.webhookUrl,
                   "queryParams": "",
                   "method": "POST",
                   "type": this.stepType,
-                  "body": JSON.stringify(body),
-                  "headers": JSON.stringify(headers)
+                  "regex": this.defaultRegex
                 }
 
-              }
-              return {
-                  "url": this.defaultUrl,
-                  "queryParams": this.defaultQueryParams,
-                  "method": this.defaultMethod,
-                  "headers": this.defaultHeaderString,
-                  "body": this.defaultBody,
-                  "authKey": this.defaultAuthKey,
-                  "authTokenPath": this.defaultAuthTokenPath,
-                  "type": this.stepType,
-                  "regex": this.regex
+              } else {
+                return {
+                    "url": this.defaultUrl,
+                    "queryParams": this.defaultQueryParams,
+                    "method": this.defaultMethod,
+                    "headers": this.defaultHeaderString,
+                    "body": this.defaultBody,
+                    "authKey": this.defaultAuthKey,
+                    "authTokenPath": this.defaultAuthTokenPath,
+                    "type": this.stepType,
+                    "regex": this.defaultRegex
+                }
               }
           },
           hasResponseData() {
             return this.tabData.responseHeaders != null || this.tabData.responsePayload != null
-          },
-        urlAndMethodFilled() {
-            return this.updatedData["url"]
           }
       },
       mounted() {

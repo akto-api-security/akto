@@ -21,8 +21,14 @@
 
                 </div>
               </div>
+              <v-btn primary icon color="#6200EA" @click='toggleShowAuthParamsAuthTab' >
+                    <v-icon> $fas_arrow-left </v-icon>
+                </v-btn>
                 <v-btn primary icon color="#6200EA" @click='addNewAuthParamElem' >
                     <v-icon> $fas_plus </v-icon>
+                </v-btn>
+                <v-btn primary plain color="#6200EA" @click='testLoginStepWithAuthParams' >
+                    Test
                 </v-btn>
                 <v-btn primary plain color="#6200EA" @click='saveLoginStep' >
                     Done
@@ -66,6 +72,7 @@ import api from '../../api'
 import {mapState} from 'vuex'
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import LoginStepBuilder from './LoginStepBuilder'
+import store from "@/apps/main/store/module";
 
 export default {
     name: "TokenAutomation",
@@ -131,6 +138,10 @@ export default {
           this.saveTabInfo(tabName)
         },
 
+        toggleShowAuthParamsAuthTab() {
+            this.showAuthParams = !this.showAuthParams
+        },
+
         testLoginStep(updatedData, tabString) {
           this.testedDataButNotSaved = updatedData
 
@@ -139,6 +150,16 @@ export default {
 
           if (!this.stepData[tabString]) {
             this.stepData[tabString] = {}
+          }
+
+          if (updatedData.type == "OTP_VERIFICATION") {
+            let reqBody = {"regex": updatedData.regex}
+            let headers = {
+                "Content-Type": "application/json",
+                "access-token": store.getters["auth/getAccessToken"]
+            }
+            updatedData.headers = JSON.stringify(headers)
+            updatedData.body = JSON.stringify(reqBody)
           }
 
           this.stepData[tabString]["data"] = updatedData
@@ -171,11 +192,6 @@ export default {
               let stepDataCopyObj = {}
 
               for (let key in this.stepData) {
-                
-                // if (this.stepData[key]["data"]==null) {
-                //     break
-                // }
-               //let stepDataCopy = this.stepData[key]
                 let stepDataCopy = JSON.parse(JSON.stringify(this.stepData[key]));
                 let respData = resp.responses[index]
                 let myobj = JSON.parse(respData);
@@ -185,28 +201,49 @@ export default {
                     stepDataCopy.showAddStepOption = true
                     stepDataCopy.testedSuccessfully = true
                 }
-                //this.$set(this.stepData, key, this.stepData[key])
-                //Vue.set(this.stepData, key, stepDataCopy)
                 stepDataCopyObj[key] = stepDataCopy
                 index++
             }
 
-            this.stepData = Object.assign({}, this.stepData, stepDataCopyObj)
-
-            //   let this.stepData = Object.keys(this.stepData).sort().reduce(
-            //     (obj, key) => { 
-            //         obj[key] = this.stepData[key]; 
-            //         return obj;
-            //     }, 
-            //     {}
-            //   );      
+            this.stepData = Object.assign({}, this.stepData, stepDataCopyObj)  
           }).catch((err) => {
-              this.showLoginSaveOption = false
-              this.testedSuccessfully = false
-              let r = this.stepData[tabString]
-              r.showAddStepOption = false
-              r.testedSuccessfully = false
-              this.stepData[tabString].showAddStepOption = false
+              
+              console.log(err);
+              let errResp = err.response.data.responses
+              if (errResp == null || errResp.length == 0) return
+              let index = 0;
+              let stepDataCopyObj = {}
+
+              for (let key in this.stepData) {
+                let stepDataCopy = JSON.parse(JSON.stringify(this.stepData[key]));
+                if (index < errResp.length) {
+                    let respData = errResp[index]
+                    let myobj = JSON.parse(respData);
+                    stepDataCopy.responseHeaders = myobj.headers
+                    stepDataCopy.responsePayload = myobj.body
+                    if (key == tabString) {
+                        stepDataCopy.showAddStepOption = false
+                        stepDataCopy.testedSuccessfully = false
+                    }
+                } else {
+                    stepDataCopy.responseHeaders = null
+                    stepDataCopy.responsePayload = null
+                }
+                stepDataCopyObj[key] = stepDataCopy
+                index++
+              }
+              this.stepData = Object.assign({}, this.stepData, stepDataCopyObj)
+          })
+        },
+        testLoginStepWithAuthParams() {
+
+          let reqData = Object.values(this.stepData).filter(x => x.data != null).map(x => x.data)
+
+          let result = api.triggerLoginSteps("LOGIN_REQUEST", reqData, this.authParamsList)
+
+           result.then((resp) => {
+              func.showSuccessSnackBar("Login flow ran successfully!")
+          }).catch((err) => {
               console.log(err);
           })
         },

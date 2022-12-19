@@ -34,8 +34,7 @@ public class OtpTestDataAction extends UserAction {
         OtpTestData otpTestData = new OtpTestData(otpText, false);
 
         Bson updates = Updates.combine(
-                Updates.set("otpText", otpText),
-                Updates.set("usedInLoginFlow", false)
+                Updates.set("otpText", otpText)
         );
 
         OtpTestDataDao.instance.updateOne(Filters.eq("uuid", uuid), updates); 
@@ -45,35 +44,68 @@ public class OtpTestDataAction extends UserAction {
 
     public String fetchOtpData() {
 
+        if (uuid == null) {
+            addActionError("uuid cannot be null");
+            return ERROR.toUpperCase();
+        }
+
+        Bson filters = Filters.and(
+            Filters.eq("uuid", uuid)
+        );
+        OtpTestData otpTestData = null;
+        try {
+            otpTestData = OtpTestDataDao.instance.findOne(filters);
+            if (otpTestData == null) {
+                addActionError("otp data not received for uuid " + uuid);
+                return ERROR.toUpperCase();
+            }
+        } catch(Exception e) {
+            addActionError("Error fetching otp data for uuid " + uuid + " error " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+
+        otpText = otpTestData.getOtpText();
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String extractOtpData() {
+
         if (regex == null || uuid == null) {
             addActionError("regex, uuid cannot be null");
             return ERROR.toUpperCase();
         }
 
         Bson filters = Filters.and(
-                Filters.eq("uuid", uuid),
-                Filters.eq("usedInLoginFlow", false)
+            Filters.eq("uuid", uuid)
         );
         OtpTestData otpTestData = null;
         try {
             otpTestData = OtpTestDataDao.instance.findOne(filters);
             if (otpTestData == null) {
-                logger.error("otp data not received for uuid " + uuid);
+                addActionError("otp data not received for uuid " + uuid);
                 return ERROR.toUpperCase();
             }
         } catch(Exception e) {
-            logger.error("Error fetching otp data for uuid " + uuid + " error " + e.getMessage());
+            addActionError("Error fetching otp data for uuid " + uuid + " error " + e.getMessage());
             return ERROR.toUpperCase();
         }
 
         otp = extractVerificationCode(otpTestData.getOtpText(), regex);
 
-        otpTestData.setUsedInLoginFlow(true);
+        if (otp == null) {
+            addActionError("No otp found for " + uuid + " error ");
+            return ERROR.toUpperCase();
+        }
 
-        Bson updates = Updates.combine(
-                Updates.set("usedInLoginFlow", true)
-        );
-        OtpTestDataDao.instance.getMCollection().findOneAndUpdate(Filters.eq("uuid", uuid), updates);
+        // todo: add time check
+        
+        // otpTestData.setUsedInLoginFlow(true);
+
+        // Bson updates = Updates.combine(
+        //         Updates.set("usedInLoginFlow", true)
+        // );
+       // OtpTestDataDao.instance.getMCollection().findOneAndUpdate(Filters.eq("uuid", uuid), updates);
 
         return SUCCESS.toUpperCase();
 

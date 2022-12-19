@@ -175,13 +175,15 @@ public class ApiWorkflowExecutor {
 
                 int statusCode = response.getStatusCode();
 
-                if (!allowAllStatusCodes && (statusCode >= 400)) {
-                    testErrors.add("process node failed with status code " + statusCode);
-                }
                 String statusKey =   nodeId + "." + "response" + "." + "status_code";
                 valuesMap.put(statusKey, statusCode);
 
                 populateValuesMap(valuesMap, response.getBody(), nodeId, response.getHeaders(), false, null);
+                if (!allowAllStatusCodes && (statusCode >= 400)) {
+                    testErrors.add("process node failed with status code " + statusCode);
+                } else {
+                    break;
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } catch (Exception e) {
