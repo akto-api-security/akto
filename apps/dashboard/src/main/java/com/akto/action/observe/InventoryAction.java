@@ -21,6 +21,7 @@ import com.akto.dto.TagConfig;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.util.Constants;
 import com.fasterxml.jackson.databind.introspect.TypeResolutionContext.Basic;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -34,6 +35,7 @@ import com.opensymphony.xwork2.Action;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.servers.Server;
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
 import io.swagger.parser.OpenAPIParser;
@@ -178,9 +180,13 @@ public class InventoryAction extends UserAction {
             list = fetchEndpointsInCollectionUsingHost(apiCollectionId);
         }
         if (list != null && !list.isEmpty()) {
-            list.forEach((item) -> {
+            list.forEach((element) -> {
+                BasicDBObject item = (BasicDBObject) element.get(Constants.ID);
+                    if (item == null) {
+                        return;
+                    }
                 ApiInfoKey apiInfoKey = new ApiInfoKey(
-                        item.getInt(ApiInfoKey.API_COLLECTION_ID, apiCollectionId),
+                        apiCollectionId,
                         item.getString(ApiInfoKey.URL),
                         Method.fromString(item.getString(ApiInfoKey.METHOD)));
                 if (!listOfEndpointsInCollection.contains(apiInfoKey)) {

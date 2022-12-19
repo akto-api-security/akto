@@ -1,10 +1,13 @@
 package com.akto.dto.data_types;
 
+import com.akto.dto.ApiInfo;
+
 public class ContainsPredicate extends Predicate{
 
     private String value;
 
-    public ContainsPredicate(Type type) {
+
+    public ContainsPredicate() {
         super(Type.CONTAINS);
     }
 
@@ -15,11 +18,11 @@ public class ContainsPredicate extends Predicate{
 
     @Override
     public boolean validate(Object value) {
-        if (value instanceof String) {
-            String str = (String) value;
-            if (str.contains(this.value)) {
-                return true;
-            }
+        if (value instanceof ApiInfo.ApiInfoKey) {
+            ApiInfo.ApiInfoKey infoKey = (ApiInfo.ApiInfoKey) value;
+            return infoKey.getUrl() != null && infoKey.getUrl().contains(this.value);
+        } else if (value instanceof String) {
+            return ((String) value).contains(this.value);
         }
         return false;
     }

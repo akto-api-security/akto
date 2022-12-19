@@ -9,9 +9,9 @@ const state = {
     loading: false,
     testRoles: [],
     selectedRole: {},
-    listOfEndpointsInCollection: [],
     conditions: [],
-    createNew : false
+    createNew : false,
+    collectionWiseApiInfoKeyMap: {}
 }
 
 const test_roles = {
@@ -22,7 +22,6 @@ const test_roles = {
             state.loading = false
             state.testRoles = []
             state.selectedRole = {}
-            state.listOfEndpointsInCollection = []
         },
         SAVE_TEST_ROLES(state, {testRoles}) {
             state.testRoles = testRoles
@@ -30,15 +29,15 @@ const test_roles = {
         SAVE_SELECTED_ROLE(state, {selectedRole}) {
             state.selectedRole = selectedRole
         },
-        SAVE_LIST_OF_ENDPOINTS_IN_COLLECTION(state, {listOfEndpointsInCollection}) {
-            state.listOfEndpointsInCollection = listOfEndpointsInCollection;
-        },
         SAVE_CREATE_NEW(state, {createNew}) {
             state.createNew = createNew;
         },
         SAVE_CONDITIONS (state, {conditions}) {
             debugger
             state.conditions = conditions
+        },
+        SAVE_COLLECTION_WISE_INFO_KEY_MAP(state, {collectionWiseApiInfoKeyMap}) {
+            state.collectionWiseApiInfoKeyMap = collectionWiseApiInfoKeyMap
         }
     },
     actions: {
@@ -54,9 +53,9 @@ const test_roles = {
                 state.loading = false
             })
         },
-        addTestRoles ({commit}, {roleName, andConditions, orConditions, includedApiList, excludedApiList}) {
+        addTestRoles ({commit}, {roleName, andConditions, orConditions}) {
             state.loading = true
-            api.addTestRoles(roleName, andConditions, orConditions, includedApiList, excludedApiList).then((resp) => {
+            api.addTestRoles(roleName, andConditions, orConditions).then((resp) => {
                 commit('SAVE_SELECTED_ROLE', resp)
                 commit('SAVE_CREATE_NEW', {createNew: false})
                 state.loading = false
@@ -65,22 +64,24 @@ const test_roles = {
                 state.loading = false
             })
         },
-        fetchCollectionWiseApiEndpoints ({commit}, {listOfEndpointsInCollection}) {
-            state.loading = true
-            api.addTestRoles(listOfEndpointsInCollection).then((resp) => {
-                commit('SAVE_LIST_OF_ENDPOINTS_IN_COLLECTION', resp)
-                state.loading = false
-
-            }).catch(() => {
-                state.loading = false
-            })
+        async fetchApiInfoKeyForCollection ({commit}, {collectionId}) {
+            if (!(collectionId in state.collectionWiseApiInfoKeyMap)) {
+                state.loading = true
+                await api.fetchCollectionWiseApiEndpoints(parseInt(collectionId)).then((resp) => {
+                    let collectionWiseApiInfoKeyMap = {}
+                    collectionWiseApiInfoKeyMap[collectionId] = resp['listOfEndpointsInCollection']
+                    commit('SAVE_COLLECTION_WISE_INFO_KEY_MAP', {collectionWiseApiInfoKeyMap})
+                    this.loading=false
+                }).catch(() => {
+                    this.loading = false
+                })
+                }
         }
     },
     getters: {
         getLoading: (state) => state.loading,
         getTestRoles: (state) => state.testRoles,
-        getSelectedRole: (state) => state.selectedRole,
-        getListOfEndpointsInCollection: (state) => state.listOfEndpointsInCollection
+        getSelectedRole: (state) => state.selectedRole
     }
 }
 

@@ -14,13 +14,10 @@
                             click
                         </span>
                     </template>
-                    <v-list v-if="(onlyEqual==false)">
-                        <v-list-item 
-                            v-for="(item, index) in operation_types" 
-                            :key="index"
-                            @click="$emit('conditionTypeChanged', item.value)"
-                        >
-                            <v-list-item-title>{{ item.text}}</v-list-item-title>
+                    <v-list v-if="(onlyEqual == false)">
+                        <v-list-item v-for="(item, index) in operation_types" :key="index"
+                            @click="$emit('conditionTypeChanged', item.value)">
+                            <v-list-item-title>{{ item.text }}</v-list-item-title>
                         </v-list-item>
                     </v-list>
                 </v-menu>
@@ -33,15 +30,31 @@
         </div>
         <div class="inline-block-child" style="padding-left: 20px"
             v-else-if="requireMapInputForTypeArray && requireMapInputForTypeArray.includes(condition.type)">
+
+            <!-- Collection menu  -->
             <v-menu offset-y>
                 <template v-slot:activator="{ on, attrs }">
                     <v-btn class="filter-button" v-bind="attrs" v-on="on" primary>
-                        <span>{{ selectedStatusName }}</span>
+                        <span>{{getSelectedCollectionName(condition)}}</span>
                         <v-icon>$fas_angle-down</v-icon>
                     </v-btn>
                 </template>
-                <filter-list :title="selectedStatusName" :items="statusItems" @clickedItem="clickedStatusItem($event)"
+                <filter-list :title="getSelectedCollectionName(condition)" :items="getAllCollectionsForFilterList()" 
+                @clickedItem="$emit('collectionSelected', $event)"
                     hideOperators hideListTitle selectExactlyOne />
+            </v-menu>
+
+            <!-- End point menu -->
+            <v-menu offset-y :close-on-content-click="false">
+                <template v-slot:activator="{ on, attrs }">
+                    <v-btn class="filter-button mr-3" :ripple="false" v-bind="attrs" v-on="on" primary>
+                        <span>Api endpoints<v-icon :size="14">$fas_angle-down</v-icon></span>
+                    </v-btn>
+                </template>
+                <filter-list title="Api endpoints" :items="getSelectedCollectionEndpoints(condition)"
+                    @clickedItem="$emit('clickedApiEndpoint', $event)"
+                     hideOperators
+                    @selectedAll="$emit('selectedAllApiEndpoints', $event)" />
             </v-menu>
         </div>
     </div>
@@ -49,6 +62,8 @@
 
 <script>
 import obj from "@/util/obj"
+import FilterList from '@/apps/dashboard/shared/components/FilterList'
+
 
 export default {
     name: "SimpleConditionComponent",
@@ -58,12 +73,13 @@ export default {
         operators: obj.arrR,
         operation_types: obj.arrR,
         requireTextInputForTypeArray: obj.arrR,
-        requireMapInputForTypeArray: obj.arrN
+        requireMapInputForTypeArray: obj.arrN,
         onlyEqual: {
-            type:Boolean
+            type: Boolean
         },
     },
     components: {
+        FilterList
     },
     data() {
         return {
@@ -71,6 +87,24 @@ export default {
         }
     },
     methods: {
+        getSelectedCollectionName (condition) {
+            if (condition.value) {
+                return this.mapCollectionIdToName[Object.keys(condition.value)[0]]
+            }
+            return  'Select collection'
+        },
+        getSelectedCollectionEndpoints(condition) {
+            if (condition.value) {
+                return condition.value[Object.keys(condition.value)[0]]
+            }
+        },
+        getAllCollectionsForFilterList() {
+            let item = []
+            Object.keys(this.mapCollectionIdToName).forEach(element => {
+                item.push({title:this.mapCollectionIdToName[element], value: element})
+            })
+            return item
+        },
         getValueStyle(value) {
             let width = !value ? 6 : value.length + 4
             return { 'width': width + 'ch' }
@@ -96,7 +130,12 @@ export default {
 
     },
     computed: {
-
+        mapCollectionIdToName() {
+            return this.$store.state.collections.apiCollections.reduce((m, e) => {
+                m[e.id] = e.displayName
+                return m
+            }, {})
+        }
     },
     watch: {
 

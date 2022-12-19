@@ -11,19 +11,12 @@ import java.util.regex.PatternSyntaxException;
 public class LogicalGroupTestingEndpoint extends TestingEndpoints{
     private Conditions andConditions;
     private Conditions orConditions;
-    private Map<String, List<ApiInfo.ApiInfoKey>> includedCollectionsApiInfoKey;
-    private Map<String, List<ApiInfo.ApiInfoKey>> excludedCollectionsApiInfoKey;
-
     public LogicalGroupTestingEndpoint() {
         super(Type.LOGICAL_GROUP);
     }
 
-    public LogicalGroupTestingEndpoint(Map<String, List<ApiInfo.ApiInfoKey>> includedCollectionsApiInfoKey
-            , Map<String, List<ApiInfo.ApiInfoKey>> excludedCollectionsApiInfoKey
-            , Conditions andConditions, Conditions orConditions) {
+    public LogicalGroupTestingEndpoint(Conditions andConditions, Conditions orConditions) {
         super(Type.LOGICAL_GROUP);
-        this.includedCollectionsApiInfoKey = includedCollectionsApiInfoKey;
-        this.excludedCollectionsApiInfoKey = excludedCollectionsApiInfoKey;
         this.andConditions = andConditions;
         this.orConditions = orConditions;
     }
@@ -33,10 +26,8 @@ public class LogicalGroupTestingEndpoint extends TestingEndpoints{
         if (key == null) {
             return false;
         }
-        if (containsApiInCollection(excludedCollectionsApiInfoKey,key)) return false;
-        if (containsApiInCollection(includedCollectionsApiInfoKey,key)) return true;
         try {
-            return this.andConditions.validate(key.getUrl()) && this.orConditions.validate(key.getUrl());
+            return this.andConditions.validate(key) && this.orConditions.validate(key);
         } catch (PatternSyntaxException e) {
             return false;
         }
@@ -73,21 +64,5 @@ public class LogicalGroupTestingEndpoint extends TestingEndpoints{
 
     public void setOrConditions(Conditions orConditions) {
         this.orConditions = orConditions;
-    }
-
-    public Map<String, List<ApiInfo.ApiInfoKey>> getIncludedCollectionsApiInfoKey() {
-        return includedCollectionsApiInfoKey;
-    }
-
-    public void setIncludedCollectionsApiInfoKey(Map<String, List<ApiInfo.ApiInfoKey>> includedCollectionsApiInfoKey) {
-        this.includedCollectionsApiInfoKey = includedCollectionsApiInfoKey;
-    }
-
-    public Map<String, List<ApiInfo.ApiInfoKey>> getExcludedCollectionsApiInfoKey() {
-        return excludedCollectionsApiInfoKey;
-    }
-
-    public void setExcludedCollectionsApiInfoKey(Map<String, List<ApiInfo.ApiInfoKey>> excludedCollectionsApiInfoKey) {
-        this.excludedCollectionsApiInfoKey = excludedCollectionsApiInfoKey;
     }
 }

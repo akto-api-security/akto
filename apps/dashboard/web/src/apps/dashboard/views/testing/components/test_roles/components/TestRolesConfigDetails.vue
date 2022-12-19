@@ -1,14 +1,14 @@
 <template>
-    <div style="padding: 24px; height: 100%" v-if="(createNew || !isSelectedRoleEmpty)">
+    <div style="padding: 24px; height: 100%" v-if="(!isSelectedRoleEmpty || createNew)">
         <v-container>
             <div style=" display: flex">
                 <div class="form-text">
                     Role Name
                 </div>
                 <div style="padding-top: 0px">
-                    <v-text-field :placeholder="(selectedRole.name ? selectedRole.name : 'Define role name')" flat solo class="form-value" v-model="roleName"
-                        :rules="name_rules" hide-details :readonly="!(createNew)"
-                         />
+                    <v-text-field :placeholder="(selectedRole.name ? selectedRole.name : 'Define role name')" flat solo
+                        class="form-value" v-model="roleName" :rules="name_rules" hide-details
+                        :readonly="!(createNew)" />
                 </div>
             </div>
             <div v-if="!isSelectedRoleEmpty">
@@ -42,22 +42,8 @@
                     <test-role-conditions-table initial_string="endpoint" :selectedRole="selectedRole"
                         table_header="Role endpoint conditions" :operators="operators"
                         :requireTextInputForTypeArray="requireTextInputForTypeArray"
-                        :requireMapInputForTypeArray="requireMapInputForTypeArray"
-                        :operation_types="operation_types" />
+                        :requireMapInputForTypeArray="requireMapInputForTypeArray" :operation_types="operation_types" />
                 </v-row>
-                <!-- <v-row style="padding: 36px 12px 12px 12px">
-                    <div class='condition-row first'>
-                        <div style="display: flex; justify-content: space-between">
-                            <div style="display: flex">
-                                <div style="padding-right: 20px">
-                                    endpoint contains
-                                </div>
-                                <v-text-field height="15px" placeholder="value" flat v-model="regex"
-                                    class="value_predicate" />
-                            </div>
-                        </div>
-                    </div>
-                </v-row> -->
             </div>
             <v-row style="padding-top: 30px">
                 <div style="padding: 12px">
@@ -90,6 +76,8 @@ import ReviewTable from "@/apps/dashboard/views/settings/components/data_types/c
 import TestRoleConditionsTable from "./TestRoleConditionsTable.vue"
 import { mapState } from "vuex";
 import func from "@/util/func";
+import api from "../api"
+
 export default {
     name: "TestRolesConfigDetails",
     props: {
@@ -123,7 +111,6 @@ export default {
             saveLoading: false,
             reviewLoading: false,
             roleName: "",
-            isValuePresent: false,
             name_rules: [
                 value => {
                     if (!value) return "Required"
@@ -135,28 +122,59 @@ export default {
         }
     },
     methods: {
-        fillConditionsFromSelectedRole () {
-
-        },
         computeLastUpdated(timestamp) {
-          let t = timestamp
-          if (t) {
-              return func.prettifyEpoch(t)
-          } else if (t===0) {
-            return func.prettifyEpoch(1667413800)
-          }
+            let t = timestamp
+            if (t) {
+                return func.prettifyEpoch(t)
+            } else if (t === 0) {
+                return func.prettifyEpoch(1667413800)
+            }
         },
+
         filterContainsConditions(operator) {//operator is string as 'OR' or 'AND'
-        debugger
+            debugger
             let filteredCondition = {}
             let found = false
             filteredCondition['operator'] = operator
             filteredCondition['predicates'] = []
             this.conditions.forEach(element => {
-                if (element.type === 'CONTAINS' && element.operator === operator && element.value !== null) {
-                    filteredCondition['predicates'].push({ type: 'CONTAINS', value: element.value })
-                    this.isValuePresent = true
-                    found = true
+                if (element.value && element.operator === operator) {
+                    if (element.type === 'CONTAINS') {
+                        filteredCondition['predicates'].push({ type: element.type, value: element.value })
+                        found = true
+                    } else if (element.type === 'BELONGS_TO') {
+                        let collectionMap = element.value
+                        let collectionId = Object.keys(collectionMap)[0]
+
+                        if (collectionMap[collectionId]) {
+                            let apiKeyInfoList = []
+                            collectionMap[collectionId].forEach(apiKeyInfo => {
+                                if (apiKeyInfo['checked']) {
+                                    apiKeyInfoList.push({ 'url': apiKeyInfo['url'], 'method': apiKeyInfo['method'], 'apiCollectionId': apiKeyInfo['apiCollectionId'] })
+                                    found = true
+                                }
+                            })
+                            if (apiKeyInfoList.length > 0) {
+                                filteredCondition['predicates'].push({ type: element.type, value: apiKeyInfoList })
+                            }
+                        }
+                    } else if (element.type === 'NOT_BELONGS_TO') { //Not belongs condition
+                        let collectionMap = element.value
+                        let collectionId = Object.keys(collectionMap)[0]
+
+                        if (collectionMap[collectionId]) {
+                            let apiKeyInfoList = []
+                            collectionMap[collectionId].forEach(apiKeyInfo => {
+                                if (apiKeyInfo['checked']) {
+                                    apiKeyInfoList.push({ 'url': apiKeyInfo['url'], 'method': apiKeyInfo['method'], 'apiCollectionId': apiKeyInfo['apiCollectionId'] })
+                                    found = true
+                                }
+                            })
+                            if (apiKeyInfoList.length > 0) {
+                                filteredCondition['predicates'].push({ type: element.type, value: apiKeyInfoList })
+                            }
+                        }
+                    }
                 }
             });
             if (found) {
@@ -168,25 +186,21 @@ export default {
             let roleName = this.roleName
             let andConditions = this.filterContainsConditions('AND')
             let orConditions = this.filterContainsConditions('OR')
-            let includedApiList = {}
-            let excludeApiList = {}
 
             debugger
-            if (this.isValuePresent) {
+            if (andConditions || orConditions) {
                 this.saveLoading = true
                 await this.$store.dispatch('test_roles/addTestRoles', {
                     roleName,
                     andConditions,
-                    orConditions,
-                    includedApiList,
-                    excludeApiList
+                    orConditions
                 })
                     .then((resp) => {
                         this.saveLoading = false
 
                         window._AKTO.$emit('SHOW_SNACKBAR', {
                             show: true,
-                            text: `Role with name` + `${resp.roleName} ` + `activated successfully!`,
+                            text: `Role saved successfully!`,
                             color: 'green'
                         })
                     }).catch((err) => {
@@ -194,10 +208,10 @@ export default {
                     })
             } else {
                 window._AKTO.$emit('SHOW_SNACKBAR', {
-                            show: true,
-                            text: `All values are empty`,
-                            color: 'red'
-                        })
+                    show: true,
+                    text: `All values are empty`,
+                    color: 'red'
+                })
             }
         }
     },

@@ -333,9 +333,7 @@
         <action name="api/fetchCollectionWiseApiEndpoints" class="com.akto.action.observe.InventoryAction" method="fetchCollectionWiseApiEndpoints">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS"   type="json">
-                <param name="root">response</param>
-            </result>
+            <result name="SUCCESS"   type="json"/>
             <result name="ERROR" type="httpheader">
                 <param name="status">401</param>
             </result>

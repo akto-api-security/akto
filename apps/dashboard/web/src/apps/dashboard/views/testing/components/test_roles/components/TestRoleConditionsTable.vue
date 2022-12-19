@@ -7,11 +7,12 @@
             <v-icon @click="addNewRow" class="addRowIcon">
                 $fas_plus
             </v-icon>
-        </div>
+        </div>        
         <div v-if="conditions">
             <div v-for="(condition, index) in conditions" :key="index"
                 :class="index == 0 ? 'condition-row first' : 'condition-row'">
-                <v-hover v-slot="{ hover }">
+                <spinner v-if="loading"></spinner>
+                <v-hover v-else v-slot="{ hover }">
                     <div style="display: flex; justify-content: space-between">
                         <div style="display: flex">
                             <div style="padding-right: 20px" v-if="index !== 0">
@@ -19,10 +20,14 @@
                                     :operators="getOperatorsForCondition(condition)"
                                     @operatorChanged="(item) => {operatorChanged(item, index)}" />
                             </div>
+                            
                             <simple-condition-component :requireTextInputForTypeArray="requireTextInputForTypeArray"
                                 :requireMapInputForTypeArray="requireMapInputForTypeArray"
                                 :operators="getOperatorsForCondition(condition)" :operation_types="operation_types"
                                 :initial_string="initial_string" :condition="condition"
+                                @collectionSelected="(event) => {fetchAllEndpointsForCollection(event, index)}"
+                                @clickedApiEndpoint="(event) => {changeCheckedStatus(event, index)}"
+                                @selectedAllApiEndpoints="(event) => {changeGlobalCheckedStatus(event, index)}"
                                 @conditionTypeChanged="(value) => {conditionTypeChanged(value, index)}" />
                         </div>
                         <div v-if="hover">
@@ -41,8 +46,10 @@
 
 <script>
 import obj from "@/util/obj"
+import Spinner from '@/apps/dashboard/shared/components/Spinner'
 import SimpleConditionComponent from '../../../../settings/components/data_types/components/SimpleConditionComponent.vue'
 import OperatorComponent from '../../../../settings/components/data_types/components/OperatorComponent.vue'
+import api from '../api'
 export default {
     name: "TestRoleConditionsTable",
     props: {
@@ -54,11 +61,57 @@ export default {
         requireMapInputForTypeArray: obj.arrR,
         operation_types: obj.arrR
     },
+    data() {
+        return {
+            loading: false
+        }
+    },
     components: {
         SimpleConditionComponent,
-        OperatorComponent
+        OperatorComponent,
+        Spinner
     },
     methods: {
+        async fetchAllEndpointsForCollection(event, index) {
+            this.loading = true
+            let collectionId = event.item.value
+            await api.fetchCollectionWiseApiEndpoints(parseInt(collectionId)).then((resp) => {
+                let listOfEndpointsInCollection = resp['listOfEndpointsInCollection']
+                listOfEndpointsInCollection.forEach(element => {
+                    element['title'] = element['method'] + ' ' + element['url']
+                    element['value'] = element['method'] + ' ' + element['url']
+                    element['checked'] = false
+                })
+                this.conditions[index]['value']={}
+                this.conditions[index]['value'][collectionId] =  listOfEndpointsInCollection
+                this.loading=false
+            }).catch(() => {
+                this.loading = false
+            })
+        },
+        changeCheckedStatus(event, index) {
+            if (this.conditions[index].value) {
+                let collectionId = Object.keys(this.conditions[index].value)[0]
+                this.conditions[index].value[collectionId].forEach((element, i) => {
+                    if (element['url'] === event.item['url'] && element['method'] === event.item['method']) {
+                        this.conditions[index].value[collectionId][i]['checked'] = event['checked']
+                    }
+                })
+            }
+        },
+        changeGlobalCheckedStatus(event, index) {
+            if (this.conditions[index].value) {
+                debugger
+                let collectionId = Object.keys(this.conditions[index].value)[0]
+                this.conditions[index].value[collectionId].forEach((element, i) => {
+                    event.items.forEach(e => {
+                        if (element['url'] === e['url'] && element['method'] === e['method']) {
+                            this.conditions[index].value[collectionId][i]['checked'] = event['checked']
+                    }
+                    })
+                })
+            }
+        },
         conditionTypeChanged(value, index) {
             this.conditions[index].type = value
             let operators = this.getOperatorsForCondition(this.conditions[index])
@@ -104,9 +157,16 @@ export default {
                 return this.$store.state.test_roles.conditions
             },
             set(newValue) {
+                debugger
                 this.$store.commit('test_roles/SAVE_CONDITIONS', {conditions:newValue})
             }
         },
+        mapCollectionIdToName() {
+            return this.$store.state.collections.apiCollections.reduce((m, e) => {
+                m[e.id] = e.displayName
+                return m
+            }, {})
+        }
     },
     watch: {
     }

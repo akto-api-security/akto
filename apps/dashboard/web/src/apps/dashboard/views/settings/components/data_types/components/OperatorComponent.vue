@@ -42,7 +42,7 @@ export default {
     name: "OperatorComponent",
     props: {
         operator: obj.strR,
-        operators: obj.arrR
+        operators: obj.arrR,
         onlyEqual: {
             type:Boolean
         },

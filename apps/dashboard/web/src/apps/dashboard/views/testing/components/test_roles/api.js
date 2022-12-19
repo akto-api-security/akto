@@ -10,12 +10,12 @@ export default {
             return resp
         })
     },
-    addTestRoles (roleName, andConditions, orConditions, includedApiList, excludedApiList) {
+    addTestRoles (roleName, andConditions, orConditions) {
         debugger
         return request({
             url: '/api/addTestRoles',
             method: 'post',
-            data: {roleName, andConditions, orConditions, includedApiList, excludedApiList}
+            data: {roleName, andConditions, orConditions}
         }).then((resp) => {
             return resp
         })        
@@ -29,5 +29,4 @@ export default {
             return resp
         })        
     }
-
 }

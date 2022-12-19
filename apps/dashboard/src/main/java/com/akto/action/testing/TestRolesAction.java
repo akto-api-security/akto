@@ -3,23 +3,45 @@ package com.akto.action.testing;
 import com.akto.action.UserAction;
 import com.akto.dao.testing.EndpointLogicalGroupDao;
 import com.akto.dao.testing.TestRolesDao;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.data_types.Conditions;
+import com.akto.dto.data_types.Conditions.Operator;
+import com.akto.dto.data_types.Predicate;
+import com.akto.dto.data_types.Predicate.Type;
 import com.akto.dto.testing.EndpointLogicalGroup;
 import com.akto.dto.testing.TestRoles;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 public class TestRolesAction extends UserAction {
     private List<TestRoles> testRoles;
     private TestRoles selectedRole;
-    private Map<String, List<ApiInfo.ApiInfoKey>> includeCollectionApiList;
-    private Map<String, List<ApiInfo.ApiInfoKey>> excludeCollectionApiList;
-    private Conditions andConditions;
-    private Conditions orConditions;
+    private RolesConditionUtils andConditions;
+    private RolesConditionUtils orConditions;
     private String roleName;
+
+    public static class RolesConditionUtils {
+        private Operator operator;
+        private List<BasicDBObject> predicates;
+        public RolesConditionUtils(){}
+        public Operator getOperator() {
+            return operator;
+        }
+
+        public void setOperator(Operator operator) {
+            this.operator = operator;
+        }
+
+        public List<BasicDBObject> getPredicates() {
+            return predicates;
+        }
+
+        public void setPredicates(List<BasicDBObject> predicates) {
+            this.predicates = predicates;
+        }
+    }
 
     public String fetchAllRolesAndLogicalGroups() {
         testRoles = TestRolesDao.instance.findAll(Filters.empty());
@@ -46,14 +68,38 @@ public class TestRolesAction extends UserAction {
             addActionError("Role already exists");
             return ERROR.toUpperCase();
         }
+
+        Conditions orConditions = null;
+        if (this.orConditions != null) {
+            orConditions = new Conditions();
+            orConditions.setOperator(this.orConditions.getOperator());
+            orConditions.setPredicates(getPredicatesFromPredicatesObject(this.orConditions.getPredicates()));
+        }
+        Conditions andConditions = null;
+        if (this.andConditions != null) {
+            andConditions = new Conditions();
+            andConditions.setOperator(this.andConditions.getOperator());
+            andConditions.setPredicates(getPredicatesFromPredicatesObject(this.andConditions.getPredicates()));
+        }
         //Valid role name and regex
         String logicalGroupName = roleName + EndpointLogicalGroup.GROUP_NAME_SUFFIX;
         EndpointLogicalGroup logicalGroup = EndpointLogicalGroupDao.instance.
-                createLogicalGroup(logicalGroupName, andConditions,orConditions,this.getSUser().getLogin(), includeCollectionApiList, excludeCollectionApiList);
+                createLogicalGroup(logicalGroupName, andConditions,orConditions,this.getSUser().getLogin());
         selectedRole = TestRolesDao.instance.createTestRole(roleName, logicalGroup.getId(), this.getSUser().getLogin());
         selectedRole.setEndpointLogicalGroup(logicalGroup);
         return SUCCESS.toUpperCase();
     }
+
+    private List<Predicate> getPredicatesFromPredicatesObject(List<BasicDBObject> predicates) {
+        List<Predicate> arrayList = new ArrayList<>();
+        for (int index = 0; index < predicates.size(); index++) {
+            Type type = Type.valueOf(predicates.get(index).getString(Predicate.TYPE));
+            Predicate predicate = Predicate.generatePredicate(type, predicates.get(index));
+            arrayList.add(predicate);
+        }
+        return arrayList;
+    }
+
     public List<TestRoles> getTestRoles() {
         return testRoles;
     }
@@ -68,19 +114,19 @@ public class TestRolesAction extends UserAction {
     public void setRoleName(String roleName) {
         this.roleName = roleName;
     }
-    public Conditions getAndConditions() {
+    public RolesConditionUtils getAndConditions() {
         return andConditions;
     }
 
-    public void setAndConditions(Conditions andConditions) {
+    public void setAndConditions(RolesConditionUtils andConditions) {
         this.andConditions = andConditions;
     }
 
-    public Conditions getOrConditions() {
+    public RolesConditionUtils getOrConditions() {
         return orConditions;
     }
 
-    public void setOrConditions(Conditions orConditions) {
+    public void setOrConditions(RolesConditionUtils orConditions) {
         this.orConditions = orConditions;
     }
 
@@ -90,21 +136,5 @@ public class TestRolesAction extends UserAction {
 
     public void setSelectedRole(TestRoles selectedRole) {
         this.selectedRole = selectedRole;
-    }
-
-    public Map<String, List<ApiInfo.ApiInfoKey>> getIncludeCollectionApiList() {
-        return includeCollectionApiList;
-    }
-
-    public void setIncludeCollectionApiList(Map<String, List<ApiInfo.ApiInfoKey>> includeCollectionApiList) {
-        this.includeCollectionApiList = includeCollectionApiList;
-    }
-
-    public Map<String, List<ApiInfo.ApiInfoKey>> getExcludeCollectionApiList() {
-        return excludeCollectionApiList;
-    }
-
-    public void setExcludeCollectionApiList(Map<String, List<ApiInfo.ApiInfoKey>> excludeCollectionApiList) {
-        this.excludeCollectionApiList = excludeCollectionApiList;
     }
 }
