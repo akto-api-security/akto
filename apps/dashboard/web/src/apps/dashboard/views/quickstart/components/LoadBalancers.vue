@@ -52,7 +52,7 @@
                 do the
                 following steps:</div>
             <div class="steps">
-                <b>Step 1</b>: Grab the policy JSON below and navigate to Akto Dashboard's current role by clicking <a target="_blank" class="clickable-docs" href="https://us-east-1.console.aws.amazon.com/iam/home#/roles/AktoDashboardRole$createPolicy?step=edit">here</a>
+                <b>Step 1</b>: Grab the policy JSON below and navigate to Akto Dashboard's current role by clicking <a target="_blank" class="clickable-docs" :href="getAktoDashboardRoleUpdateUrl()">here</a>
                 <code-block :lines="quick_start_policy_lines" onCopyBtnClickText="Policy copied to clipboard"></code-block>
             </div>
             <div class="steps">
@@ -339,12 +339,16 @@ export default {
                 `    ]`,
                 `}`
             ],
+            aktoDashboardRoleName: null
         }
     },
     mounted() {
         this.fetchLBs();
     },
     methods: {
+        getAktoDashboardRoleUpdateUrl(){
+            return "https://us-east-1.console.aws.amazon.com/iam/home#/roles/" + this.aktoDashboardRoleName  + "$createPolicy?step=edit";
+        },
         fetchLBs() {
             api.fetchLBs().then((resp) => {
                 if (!resp.dashboardHasNecessaryRole) {
@@ -370,6 +374,7 @@ export default {
                 this.availableLBs = resp.availableLBs;
                 this.existingSelectedLBs = resp.selectedLBs;
                 this.initialLBCount = this.selectedLBs.length;
+                this.aktoDashboardRoleName = resp.aktoDashboardRoleName;
                 this.checkStackState()
             })
         },

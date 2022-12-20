@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.*;
 
+import com.akto.util.Constants;
 import com.akto.utils.cloud.stack.dto.StackState;
 import org.bson.conversions.Bson;
 
@@ -44,6 +45,7 @@ public class QuickStartAction extends UserAction {
     private List<String> configuredItems;
     private String awsRegion;
     private String awsAccountId;
+    private String aktoDashboardRoleName;
 
     private final Stack stack = new AwsStack();
     private final ServerlessFunction serverlessFunction = new Lambda();
@@ -99,10 +101,11 @@ public class QuickStartAction extends UserAction {
             e.printStackTrace();
             this.dashboardHasNecessaryRole = false;
         }
-        this.awsRegion = System.getenv("AWS_REGION");
-        this.awsAccountId = System.getenv("AWS_ACCOUNT_ID");
+        this.awsRegion = System.getenv(Constants.AWS_REGION);
+        this.awsAccountId = System.getenv(Constants.AWS_ACCOUNT_ID);
         this.selectedLBs = selectedLBs;
         this.availableLBs = availableLBs;
+        this.aktoDashboardRoleName = System.getenv(Constants.AKTO_DASHBOARD_ROLE_NAME);
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -226,6 +229,14 @@ public class QuickStartAction extends UserAction {
 
     public void setConfiguredItems(List<String> configuredItems) {
         this.configuredItems = configuredItems;
+    }
+
+    public String getAktoDashboardRoleName() {
+        return aktoDashboardRoleName;
+    }
+
+    public void setAktoDashboardRoleName(String aktoDashboardRoleName) {
+        this.aktoDashboardRoleName = aktoDashboardRoleName;
     }
 
     // Convert a stream into a single, newline separated string
