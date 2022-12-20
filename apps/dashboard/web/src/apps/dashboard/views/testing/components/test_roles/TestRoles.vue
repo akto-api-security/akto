@@ -28,18 +28,18 @@ export default {
     },
     methods: {
         async fetchAllEndpointsForCollection(collectionId) {
-            await this.$store.dispatch('test_roles/fetchApiInfoKeyForCollection', collectionId)
+            await this.$store.dispatch('test_roles/fetchApiInfoKeyForCollection', {collectionId})
             let collectionsMap = this.$store.state.test_roles.collectionWiseApiInfoKeyMap
             let collection = {}
             collection[collectionId] = collectionsMap[collectionId]
             return collection
 
         },
-        fillConditions(conditions, predicates, operator) {
+        async fillConditions(conditions, predicates, operator) {
             predicates.forEach(async (e, i) => {
                 let valueFromPredicate = e.value
-                let valueForCondition = {}
                 if (Array.isArray(valueFromPredicate) && valueFromPredicate.length > 0) {
+                    let valueForCondition = {}
                     let collectionId = valueFromPredicate[0]['apiCollectionId']
                     await this.fetchAllEndpointsForCollection(collectionId).then((value) => {
                         let collectionMap = value
@@ -75,12 +75,11 @@ export default {
                             }
                         })
                         valueForCondition[collectionId] = apiInfoKeyList
+                        conditions.push({ operator: operator, type: e.type, value: valueForCondition })
+
                     })
                 } else {
-                    valueForCondition = valueFromPredicate
-                }
-                if (valueForCondition) {
-                    conditions.push({ operator: operator, type: e.type, value: valueForCondition })
+                    conditions.push({ operator: operator, type: e.type, value: valueFromPredicate })
                 }
             })
         },
@@ -97,7 +96,7 @@ export default {
             this.$store.commit('test_roles/SAVE_CONDITIONS', { conditions })
 
         },
-        entryUpdated(item) {
+        async entryUpdated(item) {
             this.$store.commit('test_roles/SAVE_CREATE_NEW', { createNew: false })
             this.$store.commit('test_roles/SAVE_SELECTED_ROLE', { selectedRole: item })
             this.updateConditionsOnRoleSelection(this.$store.state.test_roles.selectedRole)
@@ -105,6 +104,7 @@ export default {
         openCreateRoleDialog() {
             //When create dialog opens, create new is true, and selected is empty
             this.$store.commit('test_roles/SAVE_CREATE_NEW', { createNew: true })
+            this.$store.commit('test_roles/SAVE_CONDITIONS', { conditions: [] })
             this.$store.commit('test_roles/SAVE_SELECTED_ROLE', { selectedRole: {} })
         },
     }

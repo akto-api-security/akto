@@ -101,7 +101,6 @@ export default {
         },
         changeGlobalCheckedStatus(event, index) {
             if (this.conditions[index].value) {
-                debugger
                 let collectionId = Object.keys(this.conditions[index].value)[0]
                 this.conditions[index].value[collectionId].forEach((element, i) => {
                     event.items.forEach(e => {

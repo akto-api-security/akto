@@ -5,8 +5,11 @@ import com.akto.dao.context.Context;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.testing.EndpointLogicalGroup;
 import com.akto.dto.testing.LogicalGroupTestingEndpoint;
+import com.akto.util.Constants;
 import com.akto.util.enums.MongoDBEnums;
 import com.mongodb.MongoException;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.result.UpdateResult;
 import org.bson.types.ObjectId;
 
 public class EndpointLogicalGroupDao extends AccountsContextDao<EndpointLogicalGroup> {
@@ -33,6 +36,13 @@ public class EndpointLogicalGroupDao extends AccountsContextDao<EndpointLogicalG
             getLogger().info("Error while inserting endpoint logical group for name :{}", name);
             return null;
         }
+    }
+
+    public UpdateResult updateLogicalGroup (EndpointLogicalGroup group, Conditions andConditions, Conditions orConditions) {
+        int updateTs = Context.now();
+        group.setTestingEndpoints(new LogicalGroupTestingEndpoint(andConditions,orConditions));
+        group.setUpdatedTs(updateTs);
+        return this.replaceOne(Filters.eq(Constants.ID, group.getId()), group);
     }
 
     private EndpointLogicalGroupDao() {

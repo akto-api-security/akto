@@ -17,6 +17,7 @@ public class TestRoles {
     private EndpointLogicalGroup endpointLogicalGroup;
     private String createdBy;
     private int createdTs;
+    public static final String LAST_UPDATED_TS = "lastUpdatedTs";
     private int lastUpdatedTs;
     public TestRoles(){}
     public TestRoles(ObjectId id, String name, ObjectId endpointLogicalGroupId, AuthMechanism authMechanism, String createdBy, int createdTs, int lastUpdatedTs) {

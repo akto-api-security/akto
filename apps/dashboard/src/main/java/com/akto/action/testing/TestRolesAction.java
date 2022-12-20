@@ -1,6 +1,7 @@
 package com.akto.action.testing;
 
 import com.akto.action.UserAction;
+import com.akto.dao.context.Context;
 import com.akto.dao.testing.EndpointLogicalGroupDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.data_types.Conditions;
@@ -9,8 +10,10 @@ import com.akto.dto.data_types.Predicate;
 import com.akto.dto.data_types.Predicate.Type;
 import com.akto.dto.testing.EndpointLogicalGroup;
 import com.akto.dto.testing.TestRoles;
+import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -58,6 +61,41 @@ public class TestRolesAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String updateTestRoles() {
+        if (roleName == null) {
+            addActionError("Test role id is empty");
+            return ERROR.toUpperCase();
+        }
+
+        TestRoles role = TestRolesDao.instance.findOne(Filters.eq(TestRoles.NAME, roleName));
+        System.out.println("selected Role name : " + roleName);
+        if (role == null) {//Role doesn't exists
+            addActionError("Role doesn't exists");
+            return ERROR.toUpperCase();
+        }
+
+        Conditions orConditions = null;
+        if (this.orConditions != null) {
+            orConditions = new Conditions();
+            orConditions.setOperator(this.orConditions.getOperator());
+            orConditions.setPredicates(getPredicatesFromPredicatesObject(this.orConditions.getPredicates()));
+        }
+        Conditions andConditions = null;
+        if (this.andConditions != null) {
+            andConditions = new Conditions();
+            andConditions.setOperator(this.andConditions.getOperator());
+            andConditions.setPredicates(getPredicatesFromPredicatesObject(this.andConditions.getPredicates()));
+        }
+        //Valid role name and regex
+        EndpointLogicalGroup logicalGroup = EndpointLogicalGroupDao.instance.findOne(Filters.eq(Constants.ID, role.getEndpointLogicalGroupId()));
+
+        if (logicalGroup != null) {
+            EndpointLogicalGroupDao.instance.updateLogicalGroup(logicalGroup, andConditions, orConditions);
+        }
+        role.setLastUpdatedTs(Context.now());
+        TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, role.getId()), Updates.set(TestRoles.LAST_UPDATED_TS, Context.now()));
+        return SUCCESS.toUpperCase();
+    }
     public String createTestRole () {
         if (roleName == null || roleName.isEmpty()) {
             addActionError("Test role name is empty");

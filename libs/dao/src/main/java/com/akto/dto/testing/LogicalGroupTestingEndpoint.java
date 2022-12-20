@@ -27,7 +27,19 @@ public class LogicalGroupTestingEndpoint extends TestingEndpoints{
             return false;
         }
         try {
-            return this.andConditions.validate(key) && this.orConditions.validate(key);
+            if (this.andConditions == null && this.orConditions == null) {
+                return false;
+            }
+
+            boolean contains = true;
+            if (this.andConditions != null) {
+                contains = this.andConditions.validate(key);
+            }
+            if (this.orConditions != null) {
+                contains = contains && this.orConditions.validate(key);
+            }
+
+            return contains;
         } catch (PatternSyntaxException e) {
             return false;
         }

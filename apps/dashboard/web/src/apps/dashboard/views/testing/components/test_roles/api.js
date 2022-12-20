@@ -11,9 +11,17 @@ export default {
         })
     },
     addTestRoles (roleName, andConditions, orConditions) {
-        debugger
         return request({
             url: '/api/addTestRoles',
+            method: 'post',
+            data: {roleName, andConditions, orConditions}
+        }).then((resp) => {
+            return resp
+        })        
+    },
+    updateTestRoles (roleName, andConditions, orConditions) {
+        return request({
+            url: '/api/updateTestRoles',
             method: 'post',
             data: {roleName, andConditions, orConditions}
         }).then((resp) => {

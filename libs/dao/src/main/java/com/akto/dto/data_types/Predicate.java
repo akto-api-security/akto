@@ -1,10 +1,10 @@
 package com.akto.dto.data_types;
 
 import com.akto.dto.ApiInfo;
+import com.akto.dto.type.URLMethods;
 import com.mongodb.BasicDBObject;
 
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public abstract class Predicate {
     private Type type;
@@ -69,17 +69,37 @@ public abstract class Predicate {
                 return new ContainsPredicate((String) contain);
             case BELONGS_TO:
                 Object belongsTo = valueMap.get(VALUE);
-                if (! (belongsTo instanceof List)) return null;
-
-                return new BelongsToPredicate((List<BasicDBObject>) belongsTo);
+                Set<ApiInfo.ApiInfoKey> set = createApiInfoSetFromMap(belongsTo);
+                if (set == null) return null;
+                return new BelongsToPredicate(set);
             case NOT_BELONGS_TO:
                 Object notBelongTo = valueMap.get(VALUE);
-                if (! (notBelongTo instanceof List)) return null;
-                return new NotBelongsToPredicate((List<BasicDBObject>) notBelongTo);
+                Set<ApiInfo.ApiInfoKey> setNotBelong = createApiInfoSetFromMap(notBelongTo);
+                return new NotBelongsToPredicate(setNotBelong);
 
             default:
                 return null;
         }
+    }
+    private static Set<ApiInfo.ApiInfoKey> createApiInfoSetFromMap(Object value) {
+        if (!(value instanceof List)) {
+            return null;
+        }
+        HashSet<ApiInfo.ApiInfoKey> set = new HashSet<>();
+        List listOfValues = (List) value;
+        for (Object obj : listOfValues) {
+            if (obj instanceof HashMap) {
+                HashMap map = (HashMap) obj;
+                BasicDBObject item = new BasicDBObject();
+                item.putAll(map);
+                ApiInfo.ApiInfoKey infoKey = new ApiInfo.ApiInfoKey(
+                        item.getInt(ApiInfo.ApiInfoKey.API_COLLECTION_ID),
+                        item.getString(ApiInfo.ApiInfoKey.URL),
+                        URLMethods.Method.fromString(item.getString(ApiInfo.ApiInfoKey.METHOD)));
+                set.add(infoKey);
+            }
+        }
+        return set;
     }
     public void setType(Type type) {
         this.type = type;

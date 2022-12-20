@@ -29,11 +29,13 @@ const test_roles = {
         SAVE_SELECTED_ROLE(state, {selectedRole}) {
             state.selectedRole = selectedRole
         },
+        updateTestRoleWithNewRole(state, {selectedRole}) {
+            state.testRoles.push(selectedRole)
+        },
         SAVE_CREATE_NEW(state, {createNew}) {
             state.createNew = createNew;
         },
         SAVE_CONDITIONS (state, {conditions}) {
-            debugger
             state.conditions = conditions
         },
         SAVE_COLLECTION_WISE_INFO_KEY_MAP(state, {collectionWiseApiInfoKeyMap}) {
@@ -57,7 +59,17 @@ const test_roles = {
             state.loading = true
             api.addTestRoles(roleName, andConditions, orConditions).then((resp) => {
                 commit('SAVE_SELECTED_ROLE', resp)
+                commit('updateTestRoleWithNewRole', resp)
                 commit('SAVE_CREATE_NEW', {createNew: false})
+                state.loading = false
+
+            }).catch(() => {
+                state.loading = false
+            })
+        },
+        updateTestRoles ({commit}, {roleName, andConditions, orConditions}) {
+            state.loading = true
+            api.updateTestRoles(roleName, andConditions, orConditions).then((resp) => {
                 state.loading = false
 
             }).catch(() => {

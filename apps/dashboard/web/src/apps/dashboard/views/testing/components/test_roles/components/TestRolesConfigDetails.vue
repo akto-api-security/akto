@@ -132,7 +132,6 @@ export default {
         },
 
         filterContainsConditions(operator) {//operator is string as 'OR' or 'AND'
-            debugger
             let filteredCondition = {}
             let found = false
             filteredCondition['operator'] = operator
@@ -183,35 +182,63 @@ export default {
         },
 
         async save() {
-            let roleName = this.roleName
             let andConditions = this.filterContainsConditions('AND')
             let orConditions = this.filterContainsConditions('OR')
+            if (this.selectedRole && !this.isSelectedRoleEmpty) {// Update case
+                let roleName = this.selectedRole.name
 
-            debugger
-            if (andConditions || orConditions) {
-                this.saveLoading = true
-                await this.$store.dispatch('test_roles/addTestRoles', {
-                    roleName,
-                    andConditions,
-                    orConditions
-                })
-                    .then((resp) => {
-                        this.saveLoading = false
-
-                        window._AKTO.$emit('SHOW_SNACKBAR', {
-                            show: true,
-                            text: `Role saved successfully!`,
-                            color: 'green'
-                        })
-                    }).catch((err) => {
-                        this.saveLoading = false
+                if (andConditions || orConditions) {
+                    this.saveLoading = true
+                    await this.$store.dispatch('test_roles/updateTestRoles', {
+                        roleName,
+                        andConditions,
+                        orConditions
                     })
-            } else {
-                window._AKTO.$emit('SHOW_SNACKBAR', {
-                    show: true,
-                    text: `All values are empty`,
-                    color: 'red'
-                })
+                        .then((resp) => {
+                            this.saveLoading = false
+
+                            window._AKTO.$emit('SHOW_SNACKBAR', {
+                                show: true,
+                                text: `Role updated successfully!`,
+                                color: 'green'
+                            })
+                        }).catch((err) => {
+                            this.saveLoading = false
+                        })
+                } else {
+                    window._AKTO.$emit('SHOW_SNACKBAR', {
+                        show: true,
+                        text: `All values are empty`,
+                        color: 'red'
+                    })
+                }
+            } else {//Create new case
+                let roleName = this.roleName
+                if (andConditions || orConditions) {
+                    this.saveLoading = true
+                    await this.$store.dispatch('test_roles/addTestRoles', {
+                        roleName,
+                        andConditions,
+                        orConditions
+                    })
+                        .then((resp) => {
+                            this.saveLoading = false
+
+                            window._AKTO.$emit('SHOW_SNACKBAR', {
+                                show: true,
+                                text: `Role saved successfully!`,
+                                color: 'green'
+                            })
+                        }).catch((err) => {
+                            this.saveLoading = false
+                        })
+                } else {
+                    window._AKTO.$emit('SHOW_SNACKBAR', {
+                        show: true,
+                        text: `All values are empty`,
+                        color: 'red'
+                    })
+                }
             }
         }
     },
