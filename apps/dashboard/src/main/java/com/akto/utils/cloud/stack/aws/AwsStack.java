@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.concurrent.Future;
 
 import com.akto.util.Constants;
+import com.akto.util.StairwayUtils;
 import com.akto.utils.cloud.stack.dto.StackState;
 import com.amazonaws.services.cloudformation.AmazonCloudFormation;
 import com.amazonaws.services.cloudformation.AmazonCloudFormationAsync;
@@ -44,7 +45,7 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
     public String createStack(Map<String, String> parameters) throws Exception {
         try {
             CreateStackRequest createRequest = new CreateStackRequest();
-            createRequest.setStackName(getMirroringStackName());
+            createRequest.setStackName(StairwayUtils.getMirroringStackName());
             createRequest.setTimeoutInMinutes(STACK_CREATION_TIMEOUT_MINS);
             createRequest.setParameters(fetchParamters(parameters));
             createRequest.setCapabilities(STACK_CREATION_CAPABILITIES);
@@ -64,14 +65,6 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
         }
     }
 
-    private String getMirroringStackName() {
-        String dashboardStackName = System.getenv(Constants.AWS_DASHBOARD_STACK_NAME);
-        if(dashboardStackName == null){
-            return "akto-mirroring";
-        }
-        return dashboardStackName + "-mirroring";
-    }
-
     private Collection<Parameter> fetchParamters(Map<String, String> parametersMap) {
         List<Parameter> parameters = new ArrayList<>();
         for (Map.Entry<String, String> entry : parametersMap.entrySet()) {
@@ -86,7 +79,7 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
     @Override
     public StackState fetchStackStatus() {
         DescribeStacksRequest describeStackRequest = new DescribeStacksRequest();
-        describeStackRequest.setStackName(getMirroringStackName());
+        describeStackRequest.setStackName(StairwayUtils.getMirroringStackName());
         try {
             DescribeStacksResult result = CLOUD_FORMATION_SYNC.describeStacks(describeStackRequest);
             Stack stack = result.getStacks().get(0);
@@ -112,7 +105,7 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
 
     public String fetchResourcePhysicalIdByLogicalId(String logicalId) throws Exception {
         DescribeStackResourcesRequest req = new DescribeStackResourcesRequest();
-        req.setStackName(getMirroringStackName());
+        req.setStackName(StairwayUtils.getMirroringStackName());
         req.setLogicalResourceId(logicalId);
         try {
             DescribeStackResourcesResult res = CLOUD_FORMATION_SYNC.describeStackResources(req);

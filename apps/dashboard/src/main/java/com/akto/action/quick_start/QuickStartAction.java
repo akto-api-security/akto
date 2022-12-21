@@ -6,6 +6,7 @@ import java.io.InputStreamReader;
 import java.util.*;
 
 import com.akto.util.Constants;
+import com.akto.util.StairwayUtils;
 import com.akto.utils.cloud.stack.dto.StackState;
 import org.bson.conversions.Bson;
 
@@ -46,6 +47,7 @@ public class QuickStartAction extends UserAction {
     private String awsRegion;
     private String awsAccountId;
     private String aktoDashboardRoleName;
+    private String aktoMirroringStackName;
 
     private final Stack stack = new AwsStack();
     private final ServerlessFunction serverlessFunction = new Lambda();
@@ -105,7 +107,8 @@ public class QuickStartAction extends UserAction {
         this.awsAccountId = System.getenv(Constants.AWS_ACCOUNT_ID);
         this.selectedLBs = selectedLBs;
         this.availableLBs = availableLBs;
-        this.aktoDashboardRoleName = System.getenv(Constants.AKTO_DASHBOARD_ROLE_NAME);
+        this.aktoDashboardRoleName = StairwayUtils.getAktoDashboardRoleName();
+        this.aktoMirroringStackName = StairwayUtils.getMirroringStackName();
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -237,6 +240,14 @@ public class QuickStartAction extends UserAction {
 
     public void setAktoDashboardRoleName(String aktoDashboardRoleName) {
         this.aktoDashboardRoleName = aktoDashboardRoleName;
+    }
+
+    public String getAktoMirroringStackName() {
+        return aktoMirroringStackName;
+    }
+
+    public void setAktoMirroringStackName(String aktoMirroringStackName) {
+        this.aktoMirroringStackName = aktoMirroringStackName;
     }
 
     // Convert a stream into a single, newline separated string
