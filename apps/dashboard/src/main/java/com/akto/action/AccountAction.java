@@ -30,7 +30,7 @@ public class AccountAction extends UserAction {
     private final ServerlessFunction serverlessFunction = new Lambda();
     private final Stack stack = new AwsStack();
 
-    public static final int MAX_NUM_OF_LAMBDAS_TO_FETCH = 50;
+    public static final int MAX_NUM_OF_LAMBDAS_TO_FETCH = 2;
 
     @Override
     public String execute() {
