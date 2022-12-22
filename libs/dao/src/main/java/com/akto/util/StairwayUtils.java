@@ -9,7 +9,7 @@ public class StairwayUtils {
     public static final String AKTO_DASHBOARD_STACK_NAME = "AKTO_DASHBOARD_STACK_NAME";
 
     public static String getDashboardStackName(){
-        return System.getenv(AKTO_DASHBOARD_ROLE_NAME);
+        return System.getenv(AKTO_DASHBOARD_STACK_NAME);
     }
 
     public static String getMirroringStackName(){

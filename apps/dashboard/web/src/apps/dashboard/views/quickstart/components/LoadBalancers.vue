@@ -129,11 +129,7 @@ export default {
                 `                "autoscaling:CreateAutoScalingGroup"`,
                 `            ],`,
                 `            "Resource": [`,
-                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/AktoAutoScalingGroup",`,
-                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/AktoTargetTrackingNetworkPolicy",`,
-                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/AktoASGLaunchConfiguration",`,
-                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/AktoContextAnalyzerAutoScalingGroup",`,
-                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/AktoContextAnalyzerASGLaunchConfiguration",`,
+                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/DASHBOARD_STACK_NAME*"`,
                 `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/MIRRORING_STACK_NAME*"`,
                 `            ]`,
                 `        },`,
@@ -143,7 +139,10 @@ export default {
                 `            "Action": [`,
                 `                "autoscaling:CreateLaunchConfiguration"`,
                 `            ],`,
-                `            "Resource": "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:launchConfiguration:*:launchConfigurationName/MIRRORING_STACK_NAME*"`,
+                `            "Resource": [`,
+                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:launchConfiguration:*:launchConfigurationName/MIRRORING_STACK_NAME*",`,
+                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:launchConfiguration:*:launchConfigurationName/DASHBOARD_STACK_NAME*"`,
+                `             ]`,
                 `        },`,
                 `        {`,
                 `            "Sid": "4",`,
@@ -155,6 +154,7 @@ export default {
                 `            ],`,
                 `            "Resource": [`,
                 `                "arn:aws:cloudformation:AWS_REGION:AWS_ACCOUNT_ID:stack/MIRRORING_STACK_NAME/*"`,
+                `                "arn:aws:cloudformation:AWS_REGION:AWS_ACCOUNT_ID:stack/DASHBOARD_STACK_NAME/*"`,
                 `            ]`,
                 `        },`,
                 `        {`,
@@ -237,7 +237,7 @@ export default {
                 `                "elasticloadbalancing:CreateLoadBalancer"`,
                 `            ], `,
                 `            "Resource": [`,
-                `                "arn:aws:elasticloadbalancing:AWS_REGION:AWS_ACCOUNT_ID:loadbalancer/net/AktoNLB/*"`,
+                `                "arn:aws:elasticloadbalancing:AWS_REGION:AWS_ACCOUNT_ID:loadbalancer/net/*akto*/*"`,
                 `            ]`,
                 `        }, `,
                 `        {`,
@@ -247,8 +247,8 @@ export default {
                 `                "elasticloadbalancing:CreateTargetGroup"`,
                 `            ], `,
                 `            "Resource": [`,
-                `                "arn:aws:elasticloadbalancing:AWS_REGION:AWS_ACCOUNT_ID:targetgroup/AktoKafkaTargetGroup/*", `,
-                `                "arn:aws:elasticloadbalancing:AWS_REGION:AWS_ACCOUNT_ID:targetgroup/AktoTrafficMirroringTargetGroup/*"`,
+                `                "arn:aws:elasticloadbalancing:AWS_REGION:AWS_ACCOUNT_ID:targetgroup/*akto*/*", `,
+                `                "arn:aws:elasticloadbalancing:AWS_REGION:AWS_ACCOUNT_ID:targetgroup/*akto*/*"`,
                 `            ]`,
                 `        }, `,
                 `        {`,
@@ -357,6 +357,7 @@ export default {
                         line = line.replaceAll('AWS_REGION', resp.awsRegion);
                         line = line.replaceAll('AWS_ACCOUNT_ID', resp.awsAccountId);
                         line = line.replaceAll('MIRRORING_STACK_NAME', resp.aktoMirroringStackName);
+                        line = line.replaceAll('DASHBOARD_STACK_NAME', resp.aktoDashboardStackName);
                         this.quick_start_policy_lines[i] = line;
                     }
                 }
