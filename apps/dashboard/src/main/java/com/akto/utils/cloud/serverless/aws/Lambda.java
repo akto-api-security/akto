@@ -1,19 +1,28 @@
 package com.akto.utils.cloud.serverless.aws;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.akto.utils.cloud.serverless.ServerlessFunction;
 import com.akto.utils.cloud.serverless.UpdateFunctionRequest;
 import com.amazonaws.services.lambda.AWSLambda;
 import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
+import com.amazonaws.services.lambda.model.AWSLambdaException;
 import com.amazonaws.services.lambda.model.Environment;
 import com.amazonaws.services.lambda.model.EnvironmentResponse;
 import com.amazonaws.services.lambda.model.FunctionConfiguration;
 import com.amazonaws.services.lambda.model.GetFunctionRequest;
 import com.amazonaws.services.lambda.model.GetFunctionResult;
+import com.amazonaws.services.lambda.model.InvokeRequest;
+import com.amazonaws.services.lambda.model.InvokeResult;
 import com.amazonaws.services.lambda.model.UpdateFunctionConfigurationRequest;
 
 public class Lambda implements ServerlessFunction {
+
+    private static final Logger logger = LoggerFactory.getLogger(ServerlessFunction.class);
 
     private static final AWSLambda awsLambda = AWSLambdaClientBuilder.standard().build();
 
@@ -70,7 +79,22 @@ public class Lambda implements ServerlessFunction {
 
     @Override
     public void invokeFunction(String functionName) throws Exception {
-        // TODO Auto-generated method stub
+
+        InvokeRequest invokeRequest = new InvokeRequest()
+            .withFunctionName(functionName)
+            .withPayload("{}");
+        InvokeResult invokeResult = null;
+        try {
+
+            System.out.println("Invoke lambda "+functionName);
+            invokeResult = awsLambda.invoke(invokeRequest);
+
+            String resp = new String(invokeResult.getPayload().array(), StandardCharsets.UTF_8);
+            logger.info("Function: {}, response: {}", functionName, resp);
+        } catch (AWSLambdaException e) {
+            logger.error(String.format("Error while invoking Lambda: %s", functionName), e);
+        }
+
 
     }
 

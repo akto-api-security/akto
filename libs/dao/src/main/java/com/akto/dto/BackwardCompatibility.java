@@ -26,9 +26,12 @@ public class BackwardCompatibility {
     public static final String AUTH_MECHANISM_DATA  = "authMechanismData";
     private int authMechanismData;
 
+    public static final String MIRRORING_LAMBDA_TRIGGERED = "mirroringLambdaTriggered";
+    private boolean mirroringLambdaTriggered;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
-                                 int authMechanismData) {
+                                 int authMechanismData, boolean mirroringLambdaTriggered) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -36,6 +39,7 @@ public class BackwardCompatibility {
         this.readyForNewTestingFramework = readyForNewTestingFramework;
         this.addAktoDataTypes = addAktoDataTypes;
         this.deploymentStatusUpdated = deploymentStatusUpdated;
+        this.mirroringLambdaTriggered = mirroringLambdaTriggered;
         this.authMechanismData = authMechanismData;
     }
 
@@ -104,6 +108,14 @@ public class BackwardCompatibility {
 
     public void setDeploymentStatusUpdated(boolean deploymentStatusUpdated) {
         this.deploymentStatusUpdated = deploymentStatusUpdated;
+    }
+
+    public boolean isMirroringLambdaTriggered() {
+        return mirroringLambdaTriggered;
+    }
+
+    public void setMirroringLambdaTriggered(boolean mirroringLambdaTriggered) {
+        this.mirroringLambdaTriggered = mirroringLambdaTriggered;
     }
 
     public int getAuthMechanismData() {
