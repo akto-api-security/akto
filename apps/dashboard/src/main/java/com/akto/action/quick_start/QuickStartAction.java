@@ -49,6 +49,8 @@ public class QuickStartAction extends UserAction {
     private String aktoDashboardRoleName;
     private String aktoMirroringStackName;
 
+    private String aktoDashboardStackName;
+
     private final Stack stack = new AwsStack();
     private final ServerlessFunction serverlessFunction = new Lambda();
 
@@ -109,6 +111,7 @@ public class QuickStartAction extends UserAction {
         this.availableLBs = availableLBs;
         this.aktoDashboardRoleName = StairwayUtils.getAktoDashboardRoleName();
         this.aktoMirroringStackName = StairwayUtils.getMirroringStackName();
+        this.aktoDashboardStackName = StairwayUtils.getDashboardStackName();
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -250,6 +253,13 @@ public class QuickStartAction extends UserAction {
         this.aktoMirroringStackName = aktoMirroringStackName;
     }
 
+    public String getAktoDashboardStackName() {
+        return aktoDashboardStackName;
+    }
+
+    public void setAktoDashboardStackName(String aktoDashboardStackName) {
+        this.aktoDashboardStackName = aktoDashboardStackName;
+    }
     // Convert a stream into a single, newline separated string
     private static String convertStreamToString(InputStream in) throws Exception {
 
