@@ -77,7 +77,25 @@ public class TestExecutor {
         }
 
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
-        apiWorkflowExecutor.init(workflowTest, testingRun.getId());
+        try {
+            apiWorkflowExecutor.init(workflowTest, testingRun.getId(), summaryId);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        Map<String, Integer> totalCountIssues = new HashMap<>();
+        totalCountIssues.put("HIGH", 0);
+        totalCountIssues.put("MEDIUM", 0);
+        totalCountIssues.put("LOW", 0);
+
+        TestingRunResultSummariesDao.instance.updateOne(
+                Filters.eq("_id", summaryId),
+                Updates.combine(
+                        Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
+                        Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
+                        Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)
+                )
+        );
     }
 
     public void  apiWiseInit(TestingRun testingRun, ObjectId summaryId) {

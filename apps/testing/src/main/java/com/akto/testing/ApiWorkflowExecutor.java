@@ -42,10 +42,10 @@ public class ApiWorkflowExecutor {
         TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq("_id", new ObjectId("631cac6b09119467be6a1640")));
         WorkflowTestingEndpoints workflowTestingEndpoints = (WorkflowTestingEndpoints) testingRun.getTestingEndpoints();
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
-        apiWorkflowExecutor.init(workflowTestingEndpoints.getWorkflowTest(), testingRun.getId());
+        apiWorkflowExecutor.init(workflowTestingEndpoints.getWorkflowTest(), testingRun.getId(), null);
     }
 
-    public void init(WorkflowTest workflowTest, ObjectId testingRunId) {
+    public void init(WorkflowTest workflowTest, ObjectId testingRunId, ObjectId testingRunSummaryId) {
         Graph graph = new Graph();
         graph.buildGraph(workflowTest);
 
@@ -53,7 +53,7 @@ public class ApiWorkflowExecutor {
         Map<String, Object> valuesMap = new HashMap<>();
 
         int id = Context.now();
-        WorkflowTestResult workflowTestResult = new WorkflowTestResult(id, workflowTest.getId(), new HashMap<>(), testingRunId);
+        WorkflowTestResult workflowTestResult = new WorkflowTestResult(id, workflowTest.getId(), new HashMap<>(), testingRunId, testingRunSummaryId);
         Map<String, WorkflowTestResult.NodeResult> testResultMap = workflowTestResult.getNodeResultMap();
         for (Node node: nodes) {
             WorkflowTestResult.NodeResult nodeResult;
