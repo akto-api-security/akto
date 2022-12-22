@@ -10,23 +10,14 @@ import com.akto.utils.cloud.serverless.aws.Lambda;
 import com.akto.utils.cloud.stack.Stack;
 import com.akto.utils.cloud.stack.aws.AwsStack;
 import com.akto.utils.cloud.stack.dto.StackState;
+import com.amazonaws.services.lambda.model.*;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
-import com.amazonaws.auth.profile.ProfileCredentialsProvider;
-import com.amazonaws.regions.Regions;
 import com.amazonaws.services.lambda.AWSLambda;
 import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
-import com.amazonaws.services.lambda.model.AWSLambdaException;
-import com.amazonaws.services.lambda.model.FunctionConfiguration;
-import com.amazonaws.services.lambda.model.InvokeRequest;
-import com.amazonaws.services.lambda.model.InvokeResult;
-import com.amazonaws.services.lambda.model.ListFunctionsResult;
-import com.amazonaws.services.lambda.model.ServiceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.nio.charset.StandardCharsets;
-import java.util.Iterator;
 import java.util.List;
 
 import static com.mongodb.client.model.Filters.eq;
@@ -38,6 +29,8 @@ public class AccountAction extends UserAction {
     private static final Logger logger = LoggerFactory.getLogger(AccountAction.class);
     private final ServerlessFunction serverlessFunction = new Lambda();
     private final Stack stack = new AwsStack();
+
+    public static final int MAX_NUM_OF_LAMBDAS_TO_FETCH = 50;
 
     @Override
     public String execute() {
@@ -66,18 +59,34 @@ public class AccountAction extends UserAction {
     private void listMatchingLambda(String functionName) {
         AWSLambda awsLambda = AWSLambdaClientBuilder.standard().build();
         try {
-            ListFunctionsResult functionResult = awsLambda.listFunctions();
+            ListFunctionsRequest request = new ListFunctionsRequest();
+            request.setMaxItems(MAX_NUM_OF_LAMBDAS_TO_FETCH);
 
-            List<FunctionConfiguration> list = functionResult.getFunctions();
+            boolean done = false;
+            while(!done){
+                ListFunctionsResult functionResult = awsLambda
+                        .listFunctions(request);
+                List<FunctionConfiguration> list = functionResult.getFunctions();
+                logger.info("Found {} functions", list.size());
 
-            for (FunctionConfiguration config: list) {
-                logger.info("Found function: {}",config.getFunctionName());
+                for (FunctionConfiguration config: list) {
+                    logger.info("Found function: {}",config.getFunctionName());
 
-                if(config.getFunctionName().contains(functionName)) {
-                    logger.info("Invoking function: {}", config.getFunctionName());
-                    invokeExactLambda(config.getFunctionName(), awsLambda);
+                    if(config.getFunctionName().contains(functionName)) {
+                        logger.info("Invoking function: {}", config.getFunctionName());
+                        invokeExactLambda(config.getFunctionName(), awsLambda);
+                    }
                 }
+
+                if(functionResult.getNextMarker() == null){
+                    done = true;
+                }
+                request = new ListFunctionsRequest();
+                request.setMaxItems(MAX_NUM_OF_LAMBDAS_TO_FETCH);
+                request.setMarker(functionResult.getNextMarker());
             }
+
+
         } catch (AWSLambdaException e) {
             logger.error("Error while updating Akto",e);
         }
