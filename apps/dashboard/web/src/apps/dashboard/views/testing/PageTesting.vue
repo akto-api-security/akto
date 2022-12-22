@@ -1,5 +1,5 @@
 <template>
-    <layout-with-tabs title="API Testing" class="page-testing" :tabs='["Test results", "User config"]'>
+    <layout-with-tabs title="API Testing" class="page-testing" :tabs='["User config", "Test results"]'>
         <template slot="Test results">
             <div class="py-8">
                 <div>                
@@ -224,95 +224,6 @@ export default {
             console.log('got db state event')
             this.fetchAuthMechanismData()
         },
-        testLoginStep(data) {
-          let updatedData = data["updatedData"]
-
-          let url = updatedData["url"]
-          if (!url) {
-              func.showErrorSnackBar("Invalid URL")
-              return
-          }
-
-          let queryParams = updatedData["queryParams"]
-
-          let method = updatedData["method"]
-          method = this.validateMethod(method)
-          if (!method) {
-              func.showErrorSnackBar("Invalid HTTP method")
-              return
-          }
-
-          let headerString =  updatedData["headerString"]
-
-          let body = updatedData["body"]
-
-          let key = updatedData["authKey"]
-
-          let authTokenPath = updatedData["authTokenPath"]
-
-
-        let result = api.triggerLoginSteps(key, "", "HEADER", "SINGLE_REQUEST", authTokenPath, [{
-                "url": url,
-                "body": body,
-                "headers": headerString,
-                "queryParams": queryParams,
-                "method": method
-            }
-        ])
-
-          result.then((resp) => {
-              this.showLoginSaveOption = true
-              func.showSuccessSnackBar("Login Flow Ran Successfully!")
-          }).catch((err) => {
-              this.showLoginSaveOption = false
-              console.log(err);
-          })
-
-      },
-
-        saveLoginStep(data) {
-          let updatedData = data["updatedData"]
-
-          let url = updatedData["url"]
-          if (!url) {
-              func.showErrorSnackBar("Invalid URL")
-              return
-          }
-
-          let queryParams = updatedData["queryParams"]
-
-          let method = updatedData["method"]
-          method = this.validateMethod(method)
-          if (!method) {
-              func.showErrorSnackBar("Invalid HTTP method")
-              return
-          }
-
-          let headerString =  updatedData["headerString"]
-
-          let body = updatedData["body"]
-
-          let key = updatedData["authKey"]
-
-          let authTokenPath = updatedData["authTokenPath"]
-
-          let result = api.addAuthMechanism(key, "", "HEADER", "SINGLE_REQUEST", authTokenPath, [{
-                "url": url,
-                "body": body,
-                "headers": headerString,
-                "queryParams": queryParams,
-                "method": method
-            }
-        ])
-
-          result.then((resp) => {
-              func.showSuccessSnackBar("Login Flow saved successfully!")
-          }).catch((err) => {
-              console.log(err);
-          })
-
-
-      },
       validateMethod(methodName) {
           let m = methodName.toUpperCase()
           let allowedMethods = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "TRACE", "PATCH"]

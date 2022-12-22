@@ -137,6 +137,9 @@ public class DaoInit {
                 .build();
         ClassModel<AktoDataType> AktoDataTypeClassModel = ClassModel.builder(AktoDataType.class).enableDiscriminator(true).build();
 
+        ClassModel<LoginFlowStepsData> loginFlowStepsData = ClassModel.builder(LoginFlowStepsData.class)
+        .enableDiscriminator(true).build();
+
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(queueEntryClassModel,
                 configClassModel,
                 signupInfoClassModel, contentClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -154,7 +157,7 @@ public class DaoInit {
                 workflowTestingEndpointsClassModel, workflowTestResultClassModel,
                 cappedSetClassModel, CustomWebhookClassModel, CustomWebhookResultClassModel,
                 nodeResultClassModel, awsResourcesModel, AktoDataTypeClassModel, testingRunIssuesClassModel,
-                testingIssuesIdClassModel).automatic(true).build());
+                testingIssuesIdClassModel, loginFlowStepsData).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),

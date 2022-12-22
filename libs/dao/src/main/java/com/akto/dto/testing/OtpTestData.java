@@ -7,13 +7,13 @@ public class OtpTestData {
 
     private String otpText;
 
-    private Boolean usedInLoginFlow;
+    private int createdAtEpoch;
 
     public OtpTestData() { }
-    public OtpTestData(String otpText, Boolean usedInLoginFlow) {
-        this.uuid = UUID.randomUUID().toString();;
+    public OtpTestData(String otpText, int createdAtEpoch) {
+        this.uuid = UUID.randomUUID().toString();
         this.otpText = otpText;
-        this.usedInLoginFlow = usedInLoginFlow;
+        this.createdAtEpoch = createdAtEpoch;
     }
 
     public String getUuid() {
@@ -24,8 +24,8 @@ public class OtpTestData {
         return this.otpText;
     }
 
-    public Boolean getUsedInLoginFlow() {
-        return this.usedInLoginFlow;
+    public int getCreatedAtEpoch() {
+        return this.createdAtEpoch;
     }
 
     public void setUuid(String uuid) {
@@ -36,7 +36,7 @@ public class OtpTestData {
         this.otpText = otpText;
     }
 
-    public void setUsedInLoginFlow(Boolean usedInLoginFlow) {
-        this.usedInLoginFlow = usedInLoginFlow;
+    public void setCreatedAtEpoch(int createdAtEpoch) {
+        this.createdAtEpoch = createdAtEpoch;
     }
 }

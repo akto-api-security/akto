@@ -8,7 +8,7 @@
 
           <icon-menu v-if="!this.tabData.data" icon="$fas_caret-down" :items="dropDownItems"/>
 
-          <div v-if="this.showOtpForm">
+          <div :style='this.showOtpForm ? "" : "display: none"'>
 
               <div class="input-value">
                           <v-text-field 
@@ -26,15 +26,27 @@
                           />
                       </div>
                 
+              <v-btn dark outlined primary color="#6200EA" @click="pollOtpResponse">
+                  Zapier Setup Done
+              </v-btn>
+
                <div class="request-title">Regex</div>
                   <template-string-editor
                     :defaultText="this.updatedData['regex']"
                     :onChange=onChangeRegex
                   />
+                 
+              <v-btn :disabled="!finishedWebhookSetup" dark outlined primary color="#6200EA" @click="testRegex">
+                  Test Regex
+              </v-btn>
+
+              <v-btn :disabled="disableOtpSave" dark outlined primary color="#6200EA" @click="testSingleStep">
+                Save
+             </v-btn>
             
           </div>
 
-          <div v-else>
+          <div  :style='this.showOtpForm ? "display: none" : ""'>
 
             <div class="request-title">URL</div>
             <template-string-editor
@@ -44,7 +56,7 @@
 
             <div class="request-title">Query params</div>
             <template-string-editor
-              :defaultText="this.updatedData['queryParams']"
+              :defaultText="this.updatedData['queryParams'] || ' '"
               :onChange=onChangeQueryParams
             />
 
@@ -66,15 +78,15 @@
               :onChange=onChangeBody
             />
 
+            <v-btn dark outlined primary color="#6200EA" @click="testSingleStep">
+                Test
+            </v-btn>
+
           </div>
 
           </div>  
         </div>
 
-
-        <v-btn dark outlined primary color="#6200EA" @click="testLoginStep">
-            Test
-        </v-btn>
       </div>
 
       <div class="response-data pr-2">
@@ -113,7 +125,9 @@ export default {
     },
     props: {
       tabName: obj.strR,
-      tabData: obj.objR
+      tabData: obj.objR,
+      finishedWebhookSetup: obj.boolR,
+      disableOtpSave: obj.boolR
     },
     data () {
       return {
@@ -128,20 +142,21 @@ export default {
         showAuthParams: false,
         authParamData: [],
         showLoginSaveOption: false,
-        showOtpForm: false,
+        showOtpForm: this.tabData.data ? this.tabData.data.type == "OTP_VERIFICATION" : false,
         dropDownItems: [
           {
               label: "OTP VERIFICATION",
-              click: this.toggleShowOtpForm
+              click: () => this.toggleShowOtpForm("OTP_VERIFICATION")
           },
           {
               label: "LOGIN FORM",
-              click: this.toggleShowOtpForm
+              click:() => this.toggleShowOtpForm("LOGIN_FORM")
           }
         ],
-        stepType: "OTP_VERIFICATION",
+        stepType: this.tabData.data ? this.tabData.data.type : "LOGIN_FORM",
         webhookUrl: "",
-        defaultRegex: ""
+        defaultRegex: "",
+        otpRefUuid: ""
       }
     },
     methods: {
@@ -173,21 +188,26 @@ export default {
         },
         onChange(key, newData) {
             this.updatedData[key] = newData
+            console.log(key, newData)
         },
-        testLoginStep() {
-          this.$emit('testLoginStep', this.updatedData, this.tabName)
+        testSingleStep() {
+          this.$emit('testSingleStep', this.updatedData, this.tabName) 
         },
-        toggleShowOtpForm() {
-          this.showOtpForm = !this.showOtpForm
-          if(this.showOtpForm) {
-            this.stepType = "OTP_VERIFICATION"
-          } else {
-            this.stepType = "LOGIN_FORM"
-          }
+        toggleShowOtpForm(stepType) {
+          this.stepType = stepType
+          this.showOtpForm = (stepType == "OTP_VERIFICATION" ? true: false)
         },
         webhookUrlGenerator() {
           let uuid = uuidv4();
-          this.webhookUrl = window.location.origin + "/xyz/fetchOtpData/5e1aaeff-115a-4c36-8026-2fa3e552b106"
+          this.otpRefUuid = '5e1aaeff-115a-4c36-8026-2fa3e552b106'
+          this.webhookUrl = window.location.origin + "/api/fetchOtpData/5e1aaeff-115a-4c36-8026-2fa3e552b106"
+        },
+        pollOtpResponse() {
+          this.$emit('pollOtpResponse', this.webhookUrl, this.tabName)
+        },
+        testRegex() {
+          let data = {"regex": this.updatedData['regex'], "otpRefUuid": this.otpRefUuid, "type": this.stepType}
+          this.$emit('testRegex', this.tabName, data)
         }
     },
       computed: {

@@ -2,6 +2,7 @@ package com.akto.action.testing;
 
 import com.akto.action.UserAction;
 import com.akto.dao.AuthMechanismsDao;
+import com.akto.dao.testing.LoginFlowStepsDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dto.testing.*;
@@ -16,6 +17,7 @@ import org.bson.types.ObjectId;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -36,6 +38,8 @@ public class AuthMechanismAction extends UserAction {
     private String uuid;
 
     private ArrayList<Object> responses;
+
+    private String nodeId;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AuthMechanismAction.class);
 
@@ -94,7 +98,32 @@ public class AuthMechanismAction extends UserAction {
 
         TestExecutor testExecutor = new TestExecutor();
         try {
-            LoginFlowResponse loginFlowResponse = testExecutor.executeLoginFlow(authMechanism);
+            LoginFlowResponse loginFlowResponse = testExecutor.executeLoginFlow(authMechanism, null);
+            responses = loginFlowResponse.getResponses();
+            if (!loginFlowResponse.getSuccess()) {
+                throw new Exception(loginFlowResponse.getError());
+            }
+        } catch(Exception e) {
+            addActionError(e.getMessage());
+            return ERROR.toUpperCase();
+        }
+        return SUCCESS.toUpperCase();
+    }
+
+    public String triggerSingleLoginFlowStep() {
+        List<AuthParam> authParams = new ArrayList<>();
+
+        if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
+            addActionError("Invalid Type Value");
+            return ERROR.toUpperCase();
+        }
+
+        AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type);
+
+        TestExecutor testExecutor = new TestExecutor();
+        try {
+            LoginFlowParams loginFlowParams = new LoginFlowParams(getSUser().getId(), true, nodeId);
+            LoginFlowResponse loginFlowResponse = testExecutor.executeLoginFlow(authMechanism, loginFlowParams);
             responses = loginFlowResponse.getResponses();
             if (!loginFlowResponse.getSuccess()) {
                 throw new Exception(loginFlowResponse.getError());
@@ -152,6 +181,10 @@ public class AuthMechanismAction extends UserAction {
         return this.uuid;
     }
 
+    public String getNodeId() {
+        return this.nodeId;
+    }
+
     public ArrayList<Object> getResponses() {
         return this.responses;
     }
@@ -184,4 +217,9 @@ public class AuthMechanismAction extends UserAction {
     public void setUuid(String uuid) {
         this.uuid = uuid;
     }
+
+    public void setNodeId(String nodeId) {
+        this.nodeId = nodeId;
+    }
+    
 }

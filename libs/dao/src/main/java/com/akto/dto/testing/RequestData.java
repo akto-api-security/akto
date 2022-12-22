@@ -16,8 +16,10 @@ public class RequestData {
 
     private String regex;
 
+    private String otpRefUuid;
+
     public RequestData() { }
-    public RequestData(String body, String headers, String queryParams, String url, String method, String type, String regex) {
+    public RequestData(String body, String headers, String queryParams, String url, String method, String type, String regex, String otpRefUuid) {
         this.body = body;
         this.headers = headers;
         this.queryParams = queryParams;
@@ -25,6 +27,7 @@ public class RequestData {
         this.method = method;
         this.type = type;
         this.regex = regex;
+        this.otpRefUuid = otpRefUuid;
     }
 
     public String getBody() {
@@ -55,6 +58,10 @@ public class RequestData {
         return this.regex;
     }
 
+    public String getOtpRefUuid() {
+        return this.otpRefUuid;
+    }
+
     public void setBody(String body) {
         this.body = body;
     }
@@ -79,5 +86,9 @@ public class RequestData {
 
     public void setRegex(String regex) {
         this.regex = regex;
+    }
+
+    public void setOtpRefUuid(String otpRefUuid) {
+        this.otpRefUuid = otpRefUuid;
     }
 }

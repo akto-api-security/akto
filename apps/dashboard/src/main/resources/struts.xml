@@ -1335,7 +1335,7 @@
             </result>
         </action>
 
-        <action name="api/saveOtpData/{uuid}" class="com.akto.action.testing.OtpTestDataAction" method="saveOtpData">
+        <action name="saveOtpData/{uuid}" class="com.akto.action.testing.OtpTestDataAction" method="saveOtpData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
@@ -1346,10 +1346,12 @@
             </result>
         </action>
 
-        <action name="xyz/fetchOtpData/{uuid}" class="com.akto.action.testing.OtpTestDataAction" method="fetchOtpData">
+        <action name="api/fetchOtpData/{uuid}" class="com.akto.action.testing.OtpTestDataAction" method="fetchOtpData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^otp.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -1365,6 +1367,17 @@
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/triggerSingleLoginFlow" class="com.akto.action.testing.AuthMechanismAction" method="triggerSingleLoginFlowStep">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
             </result>
         </action>
 

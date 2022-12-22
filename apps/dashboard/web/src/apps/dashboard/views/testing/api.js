@@ -127,9 +127,29 @@ export default {
         })
     },
 
+    triggerSingleStep(type, nodeId, requestData) {
+        return request({
+            url: 'api/triggerSingleLoginFlow',
+            method: 'post',
+            data: {type, nodeId, requestData}
+        }).then((resp) => {
+            return resp
+        })
+    },
+
     fetchAuthMechanismData() {
         return request({
             url: '/api/fetchAuthMechanismData',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
+    },
+
+    fetchOtpData(url) {
+        return request({
+            url: url,
             method: 'post',
             data: {}
         }).then((resp) => {
