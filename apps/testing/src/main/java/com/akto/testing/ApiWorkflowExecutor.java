@@ -265,7 +265,6 @@ public class ApiWorkflowExecutor {
         OriginalHttpRequest request;
         try {
             request = buildHttpRequest(updatedSampleData, valuesMap);
-            System.out.println(request);
             if (request == null) throw new Exception();
         } catch (Exception e) {
             e.printStackTrace();
