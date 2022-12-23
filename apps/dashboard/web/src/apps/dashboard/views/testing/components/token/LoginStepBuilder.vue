@@ -245,7 +245,8 @@ export default {
           this.webhookUrl = window.location.origin + "/saveOtpData/5e1aaeff-115a-4c36-8026-2fa3e552b106"
         },
         pollOtpResponse() {
-          this.$emit('pollOtpResponse', this.webhookUrl, this.tabName)
+          let fetchUrl = window.location.origin + "/api/fetchOtpData/5e1aaeff-115a-4c36-8026-2fa3e552b106"
+          this.$emit('pollOtpResponse', fetchUrl, this.tabName)
         },
         testRegex() {
           let data = {"regex": this.updatedData['regex'], "otpRefUuid": this.otpRefUuid, "type": this.stepType}
