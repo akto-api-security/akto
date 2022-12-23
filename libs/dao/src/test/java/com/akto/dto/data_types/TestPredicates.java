@@ -160,6 +160,8 @@ public class TestPredicates {
         );
         result = containsPredicate.validate(value);
         assertFalse(result);
+        result = containsPredicate.validate(null);
+        assertFalse(result);
     }
 
     @Test
@@ -215,6 +217,8 @@ public class TestPredicates {
         );
         result = belongsToPredicate.validate(value);
         assertFalse(result);
+        result = belongsToPredicate.validate(null);
+        assertFalse(result);
     }
 
     @Test
@@ -269,6 +273,8 @@ public class TestPredicates {
                 URLMethods.Method.GET
         );
         result = notBelongsToPredicate.validate(value);
+        assertTrue(result);
+        result = notBelongsToPredicate.validate(null);
         assertTrue(result);
     }
 }
