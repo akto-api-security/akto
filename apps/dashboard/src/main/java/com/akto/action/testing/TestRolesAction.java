@@ -29,6 +29,9 @@ public class TestRolesAction extends UserAction {
         private Operator operator;
         private List<BasicDBObject> predicates;
         public RolesConditionUtils(){}
+        /*
+        *This constructor is empty because struts 2 needs empty constructors to make objects and assign values via getters and setters
+        * */
         public Operator getOperator() {
             return operator;
         }
