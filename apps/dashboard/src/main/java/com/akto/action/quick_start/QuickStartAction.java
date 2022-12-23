@@ -85,7 +85,7 @@ public class QuickStartAction extends UserAction {
                     .describeLoadBalancers(new DescribeLoadBalancersRequest());
             Map<String, AwsResource> lbInfo = new HashMap<>();
             for (LoadBalancer lb : result.getLoadBalancers()) {
-                if (lb.getLoadBalancerName().equals("AktoLBDashboard") || lb.getLoadBalancerName().equals("AktoNLB")) {
+                if (lb.getLoadBalancerName().toLowerCase().contains("akto") ) {
                     continue;
                 }
                 lbInfo.put(lb.getLoadBalancerArn(), new AwsResource(lb.getLoadBalancerName(), lb.getLoadBalancerArn()));
