@@ -27,9 +27,6 @@
                 <v-btn primary icon color="#6200EA" @click='addNewAuthParamElem' >
                     <v-icon> $fas_plus </v-icon>
                 </v-btn>
-                <v-btn primary plain color="#6200EA" @click='testLoginStep' >
-                    Test
-                </v-btn>
                 <v-btn primary plain color="#6200EA" @click='saveLoginStep' >
                     Done
                 </v-btn>

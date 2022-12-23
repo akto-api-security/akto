@@ -242,7 +242,7 @@ export default {
           let uuid = uuidv4();
           this.otpRefUuid = '5e1aaeff-115a-4c36-8026-2fa3e552b106'
           this.updatedData.otpRefUuid = this.otpRefUuid
-          this.webhookUrl = window.location.origin + "/api/fetchOtpData/5e1aaeff-115a-4c36-8026-2fa3e552b106"
+          this.webhookUrl = window.location.origin + "/saveOtpData/5e1aaeff-115a-4c36-8026-2fa3e552b106"
         },
         pollOtpResponse() {
           this.$emit('pollOtpResponse', this.webhookUrl, this.tabName)
