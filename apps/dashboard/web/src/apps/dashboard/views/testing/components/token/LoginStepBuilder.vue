@@ -10,7 +10,7 @@
 
           <div :style='this.showOtpForm ? "" : "display: none"'>
 
-              <div class="input-value">
+              <div class="input-value input-style">
                           <v-text-field 
                               value="Connect with zapier to send data to webhook url"
                               style="width: 700px"
@@ -18,7 +18,7 @@
                           />
                       </div>
 
-              <div class="input-value">
+              <div class="input-value input-style">
                           <v-text-field 
                               :value="this.webhookUrl"
                               style="width: 700px"
@@ -55,10 +55,12 @@
             />
 
             <div class="request-title">Query params</div>
-            <template-string-editor
-              :defaultText="this.updatedData['queryParams'] || ' '"
-              :onChange=onChangeQueryParams
-            />
+                <template-string-editor
+                  :defaultText="this.updatedData['queryParams']"
+                  :onChange=onChangeQueryParams
+                />
+               
+
 
             <div class="request-title">Method</div>
             <template-string-editor
@@ -125,24 +127,47 @@ export default {
     },
     props: {
       tabName: obj.strR,
-      tabData: obj.objR,
+      tabData: obj.objR, 
       finishedWebhookSetup: obj.boolR,
       disableOtpSave: obj.boolR
     },
     data () {
-      return {
+
+      let defaults = {
         defaultUrl: "https://juice-shop.herokuapp.com/rest/user/login",
         defaultQueryParams: "",
         defaultMethod: "POST",
         defaultHeaderString: "{'content-type': 'application/json'}",
         defaultBody: "{\"email\": \"sdf@gmail.com\", \"password\": \"qw@12345\"}",
         defaultAuthKey: "",
-        defaultAuthTokenPath: "",
-        stepData: [],
-        showAuthParams: false,
-        authParamData: [],
-        showLoginSaveOption: false,
-        showOtpForm: this.tabData.data ? this.tabData.data.type == "OTP_VERIFICATION" : false,
+        defaultAuthTokenPath: ""
+      }
+
+      let updatedData = this.tabData.data
+      let showOtpForm = this.tabData.data ? this.tabData.data.type == "OTP_VERIFICATION" : false
+
+      if (!updatedData) {
+        
+        updatedData = {
+            "url": defaults.defaultUrl,
+            "queryParams": defaults.defaultQueryParams,
+            "method": defaults.defaultMethod,
+            "headers": defaults.defaultHeaderString,
+            "body": defaults.defaultBody,
+            "authKey": defaults.defaultAuthKey,
+            "authTokenPath": defaults.defaultAuthTokenPath,
+            "type": "LOGIN_FORM",
+            "otpRefUuid": "",
+            "regex": ""
+        }
+        
+      }
+
+
+      return {
+        ...defaults,
+        showOtpForm,
+        updatedData,
         dropDownItems: [
           {
               label: "OTP VERIFICATION",
@@ -191,15 +216,23 @@ export default {
             console.log(key, newData)
         },
         testSingleStep() {
-          this.$emit('testSingleStep', this.updatedData, this.tabName) 
+          this.$emit('testSingleStep', this.updatedData, this.tabName)
         },
         toggleShowOtpForm(stepType) {
           this.stepType = stepType
-          this.showOtpForm = (stepType == "OTP_VERIFICATION" ? true: false)
+          this.updatedData.type = stepType
+          this.showOtpForm = stepType == "OTP_VERIFICATION"
+
+          if (this.showOtpForm) {
+            this.updatedData.url = this.webhookUrl
+          } else {
+            this.updatedData.url = this.tabData.data ? this.tabData.data.url : this.defaultUrl
+          }
         },
         webhookUrlGenerator() {
           let uuid = uuidv4();
           this.otpRefUuid = '5e1aaeff-115a-4c36-8026-2fa3e552b106'
+          this.updatedData.otpRefUuid = this.otpRefUuid
           this.webhookUrl = window.location.origin + "/api/fetchOtpData/5e1aaeff-115a-4c36-8026-2fa3e552b106"
         },
         pollOtpResponse() {
@@ -208,35 +241,11 @@ export default {
         testRegex() {
           let data = {"regex": this.updatedData['regex'], "otpRefUuid": this.otpRefUuid, "type": this.stepType}
           this.$emit('testRegex', this.tabName, data)
+        },
+        calcUpdatedData(defaults) {
         }
     },
       computed: {
-          updatedData() {
-              this.showOtpForm;
-              if (this.tabData.data) return {...this.tabData.data}
-              if (this.showOtpForm) {
-                return {
-                  "url": this.webhookUrl,
-                  "queryParams": "",
-                  "method": "POST",
-                  "type": this.stepType,
-                  "regex": this.defaultRegex
-                }
-
-              } else {
-                return {
-                    "url": this.defaultUrl,
-                    "queryParams": this.defaultQueryParams,
-                    "method": this.defaultMethod,
-                    "headers": this.defaultHeaderString,
-                    "body": this.defaultBody,
-                    "authKey": this.defaultAuthKey,
-                    "authTokenPath": this.defaultAuthTokenPath,
-                    "type": this.stepType,
-                    "regex": this.defaultRegex
-                }
-              }
-          },
           hasResponseData() {
             return this.tabData.responseHeaders != null || this.tabData.responsePayload != null
           }
@@ -266,5 +275,11 @@ export default {
 .login-builder-container > div
   flex: 0 0 50%
 
+.input-style
+  text-decoration: none !important
+  outline: none
+  border: none
+  border-bottom: none!important
+  color: red!important
 
 </style>

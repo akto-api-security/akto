@@ -58,8 +58,11 @@ public class OtpTestDataAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        int timeFilterVal = Context.now() - 5 * 60 * 1000;
+
         Bson filters = Filters.and(
-            Filters.eq("uuid", uuid)
+            Filters.eq("uuid", uuid),
+            Filters.gte("createdAtEpoch", timeFilterVal)
         );
         OtpTestData otpTestData = null;
         try {

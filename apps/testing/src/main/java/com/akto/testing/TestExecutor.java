@@ -187,14 +187,14 @@ public class TestExecutor {
             return new LoginFlowResponse(null, null, true);
         }
 
-        WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData());
+        WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData(), loginFlowParams);
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         LoginFlowResponse loginFlowResp;
         loginFlowResp = apiWorkflowExecutor.runLoginFlow(workflowObj, authMechanism, loginFlowParams);
         return loginFlowResp;
     }
 
-    public WorkflowTest convertToWorkflowGraph(ArrayList<RequestData> requestData) {
+    public WorkflowTest convertToWorkflowGraph(ArrayList<RequestData> requestData, LoginFlowParams loginFlowParams) {
 
         String source, target;
         List<String> edges = new ArrayList<>();
@@ -226,7 +226,9 @@ public class TestExecutor {
             WorkflowNodeDetails.Type nodeType = WorkflowNodeDetails.Type.API;
             if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.OTP_VERIFICATION.toString())) {
                 nodeType = WorkflowNodeDetails.Type.OTP;
-                waitTime = 100;
+                if (loginFlowParams == null || !loginFlowParams.getFetchValueMap()) {
+                    waitTime = 100;
+                }
             }
             WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(0, data.getUrl(),
                     URLMethods.Method.fromString(data.getMethod()), "", sampleData,

@@ -179,6 +179,16 @@ public class ApiWorkflowExecutor {
 
     //todo: make this generic
     public WorkflowTestResult.NodeResult processOtpNode(Node node, Map<String, Object> valuesMap) {
+        try {
+            int waitInSeconds = Math.min(node.getWorkflowNodeDetails().getWaitInSeconds(),100);
+            if (waitInSeconds > 0) {
+                System.out.println("WAITING: " + waitInSeconds + " seconds");
+                Thread.sleep(waitInSeconds*1000);
+                System.out.println("DONE WAITING!!!!");
+            }
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         String uuid = node.getWorkflowNodeDetails().getOtpRefUuid();
         List<String> testErrors = new ArrayList<>();
         Bson filters = Filters.and(
@@ -255,6 +265,7 @@ public class ApiWorkflowExecutor {
         OriginalHttpRequest request;
         try {
             request = buildHttpRequest(updatedSampleData, valuesMap);
+            System.out.println(request);
             if (request == null) throw new Exception();
         } catch (Exception e) {
             e.printStackTrace();
@@ -407,11 +418,21 @@ public class ApiWorkflowExecutor {
         }
 
         for (String headerName: headers.keySet()) {
+            List<String> headerValues = headers.get(headerName);
+            String key = nodeId + "." + reqOrResp + "." + "header" + "." + headerName;
 
-            for (String val: headers.get(headerName)) {
-                String key = nodeId + "." + reqOrResp + "." + "header" + "." + headerName;
-                valuesMap.put(key, val);
+            switch (headerValues.size()) {
+                case 0: 
+                    continue;
+                case 1: 
+                    valuesMap.put(key, headerValues.get(0));
+                    continue;
+                default: 
+                    String val =  String.join(";", headers.get(headerName));
+                    valuesMap.put(key, val);
             }
+            
+            
         }
     }
 
@@ -522,7 +543,7 @@ public class ApiWorkflowExecutor {
 
     // todo: test invalid cases
     public String replaceVariables(String payload, Map<String, Object> valuesMap) throws Exception {
-        String regex = "\\$\\{(x\\d+\\.[\\w\\[\\].]+|AKTO\\.changes_info\\..*?)\\}"; // todo: integer inside brackets
+        String regex = "\\$\\{(x\\d+\\.[\\w\\-\\[\\].]+|AKTO\\.changes_info\\..*?)\\}"; // todo: integer inside brackets
         Pattern p = Pattern.compile(regex);
 
         // replace with values

@@ -156,6 +156,17 @@
     letter-spacing: unset !important;
     line-height: 23px !important;
     word-wrap: break-word !important;
+    display: inline-block;
+    min-height: 23px;
+}
+
+
+.text-summary:hover::after {
+    content: "Click on edit";
+    font-size: 10px !important;
+    font-family: monospace !important;
+    color: #47466A9d;
+    padding-left: 8px;    
 }
 
 .workflow-button {

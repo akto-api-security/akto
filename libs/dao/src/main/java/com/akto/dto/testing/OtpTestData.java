@@ -11,7 +11,7 @@ public class OtpTestData {
 
     public OtpTestData() { }
     public OtpTestData(String otpText, int createdAtEpoch) {
-        this.uuid = UUID.randomUUID().toString();
+        this.uuid = "5e1aaeff-115a-4c36-8026-2fa3e552b106";
         this.otpText = otpText;
         this.createdAtEpoch = createdAtEpoch;
     }
