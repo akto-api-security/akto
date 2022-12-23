@@ -4,43 +4,49 @@
     
       <div>
         <div style="display: flex; padding-bottom: 24px;">
-          <div style="width: 100%">
+          <div style="width: 100%; position: relative">
 
-          <icon-menu v-if="!this.tabData.data" icon="$fas_caret-down" :items="dropDownItems"/>
+          <div class="top-right-btn">
+            <icon-menu v-if="!this.tabData.data" icon="$fas_cog" :items="dropDownItems"/>
+          </div>
+          
 
           <div :style='this.showOtpForm ? "" : "display: none"'>
+              <div class="request-title">Steps to setup webhook</div>
+              <div class="steps">
+                  <b>Step 1</b>: Connect with zapier to send data to the following webhook url - <span style="text-decoration: underline"> {{this.webhookUrl}} </span>
+              </div>
+              <div class="steps">
+                  <b>Step 2</b>: After finishing setup, click on "Webhook Setup Done" button for fetching OTP content
+              </div>
+              <div class="steps">
+                  <b>Step 3</b>: Specify a regex for extracting the OTP code from the content
+              </div>
+              <div class="steps">
+                  <b>Step 4</b>: Verify the extracted OTP value and click on "SAVE"
+              </div>
 
-              <div class="input-value input-style">
-                          <v-text-field 
-                              value="Connect with zapier to send data to webhook url"
-                              style="width: 700px"
-                              readonly
-                          />
-                      </div>
-
-              <div class="input-value input-style">
-                          <v-text-field 
-                              :value="this.webhookUrl"
-                              style="width: 700px"
-                              readonly
-                          />
-                      </div>
+              <div class="primary--text fs-12" >
                 
-              <v-btn dark outlined primary color="#6200EA" @click="pollOtpResponse">
+              </div>
+
+              <v-btn dark outlined primary color="#6200EA" @click="pollOtpResponse" class="mt-2">
                   Zapier Setup Done
               </v-btn>
 
-               <div class="request-title">Regex</div>
+               <div class="request-title mt-3">Regex</div>
                   <template-string-editor
                     :defaultText="this.updatedData['regex']"
                     :onChange=onChangeRegex
                   />
+
+                <div :disabled="disableOtpSave" class="request-title">Extracted Otp : <b>{{tabData.responsePayload ? tabData.responsePayload.otp : ''}} </b></div>
                  
-              <v-btn :disabled="!finishedWebhookSetup" dark outlined primary color="#6200EA" @click="testRegex">
+              <v-btn :disabled="!finishedWebhookSetup" dark outlined primary color="#6200EA" @click="testRegex"  class="mt-2">
                   Test Regex
               </v-btn>
 
-              <v-btn :disabled="disableOtpSave" dark outlined primary color="#6200EA" @click="testSingleStep">
+              <v-btn :disabled="disableOtpSave" dark outlined primary color="#6200EA" @click="testSingleStep"   class="mt-2 ml-2">
                 Save
              </v-btn>
             
@@ -48,39 +54,42 @@
 
           <div  :style='this.showOtpForm ? "display: none" : ""'>
 
-            <div class="request-title">URL</div>
-            <template-string-editor
-              :defaultText="this.updatedData['url']"
-              :onChange=onChangeURL
-            />
+            <div class="url-form-container">
+              <div class="request-title">URL</div>
+              <template-string-editor
+                :defaultText="this.updatedData['url']"
+                :onChange=onChangeURL
+              />
 
-            <div class="request-title">Query params</div>
-                <template-string-editor
-                  :defaultText="this.updatedData['queryParams']"
-                  :onChange=onChangeQueryParams
-                />
-               
+              <div class="request-title">Query params</div>
+                  <template-string-editor
+                    :defaultText="this.updatedData['queryParams']"
+                    :onChange=onChangeQueryParams
+                  />
+                
 
 
-            <div class="request-title">Method</div>
-            <template-string-editor
-              :defaultText="this.updatedData['method']"
-              :onChange=onChangeMethod
-            />
+              <div class="request-title">Method</div>
+              <template-string-editor
+                :defaultText="this.updatedData['method']"
+                :onChange=onChangeMethod
+              />
 
-            <div class="request-title">Headers</div>
-            <template-string-editor
-              :defaultText="this.updatedData['headers']"
-              :onChange=onChangeHeaders
-            />
+              <div class="request-title">Headers</div>
+              <template-string-editor
+                :defaultText="this.updatedData['headers']"
+                :onChange=onChangeHeaders
+              />
 
-            <div class="request-title">Body</div>
-            <template-string-editor
-              :defaultText="this.updatedData['body']"
-              :onChange=onChangeBody
-            />
+              <div class="request-title">Body</div>
+              <template-string-editor
+                :defaultText="this.updatedData['body']"
+                :onChange=onChangeBody
+              />
 
-            <v-btn dark outlined primary color="#6200EA" @click="testSingleStep">
+            </div>
+
+            <v-btn dark outlined primary color="#6200EA" @click="testSingleStep" class="mt-8">
                 Test
             </v-btn>
 
@@ -170,12 +179,12 @@ export default {
         updatedData,
         dropDownItems: [
           {
-              label: "OTP VERIFICATION",
-              click: () => this.toggleShowOtpForm("OTP_VERIFICATION")
+              label: "Call API",
+              click:() => this.toggleShowOtpForm("LOGIN_FORM")
           },
           {
-              label: "LOGIN FORM",
-              click:() => this.toggleShowOtpForm("LOGIN_FORM")
+              label: "Receive OTP",
+              click: () => this.toggleShowOtpForm("OTP_VERIFICATION")
           }
         ],
         stepType: this.tabData.data ? this.tabData.data.type : "LOGIN_FORM",
@@ -271,9 +280,10 @@ export default {
 .login-builder-container
   display: flex
   overflow: scroll
+  gap: 40px
 
 .login-builder-container > div
-  flex: 0 0 50%
+  flex: 1 0 40%
 
 .input-style
   text-decoration: none !important
@@ -281,5 +291,21 @@ export default {
   border: none
   border-bottom: none!important
   color: red!important
+
+.url-form-container
+  overflow-y: scroll
+  max-height: 380px
+
+
+.top-right-btn
+  position: absolute
+  top: 10px
+  right: 0px  
+
+.steps
+    margin-top: 6px
+    color: #47466A
+    font-size: 13px
+
 
 </style>

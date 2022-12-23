@@ -162,7 +162,7 @@
 
 
 .text-summary:hover::after {
-    content: "Click on edit";
+    content: "Click to edit";
     font-size: 10px !important;
     font-family: monospace !important;
     color: #47466A9d;

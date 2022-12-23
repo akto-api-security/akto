@@ -35,7 +35,7 @@
         </template>
         <template slot="User config">
             <div class="pa-8">
-                <v-btn primary dark color="#6200EA" @click="stopAllTests" :loading="stopAllTestsLoading" style="float:right">
+                <v-btn outlined color="#6200EA" @click="stopAllTests" :loading="stopAllTestsLoading" style="float:right">
                     Stop all tests
                 </v-btn>
 
@@ -111,10 +111,18 @@
                             </div>
                         </div>
 
-                        <v-btn primary dark color="#6200EA" @click="toggleLoginStepBuilder">
-                            <span v-if="originalDbState">Edit</span>
-                            <span v-else>Create</span>
-                        </v-btn>
+                        <template v-if="originalDbState">
+                            <v-btn icon color="#6200EA" @click="toggleLoginStepBuilder">
+                                <v-icon>$fas_pen</v-icon>
+                            </v-btn>                        
+                        </template>
+
+                        <template v-else>
+                            <v-btn primary dark color="#6200EA" @click="toggleLoginStepBuilder">
+                                Create
+                            </v-btn>                            
+                        </template>
+
                     </div>
 
                 </div>

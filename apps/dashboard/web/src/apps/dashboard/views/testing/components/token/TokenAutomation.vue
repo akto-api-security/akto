@@ -1,5 +1,5 @@
 <template>
-    <div class="pa-4" style="background-color: #FFFFFF; height: 550px">
+    <div class="pa-4 automation-container">
         <div v-if="showAuthParams">
               <div v-for="(key, index) in authParamsList" :key="index">
                 <div class="input-value d-flex">
@@ -53,10 +53,10 @@
                             Remove Step
                         </v-btn>
                         <div class="float-right ma-2">
-                            <v-btn dark :disabled="!stepData[apiTabName].testedSuccessfully" primary color="#6200EA" @click="addTab(apiTabName)">
-                                Next step
+                            <v-btn :disabled="!stepData[apiTabName].testedSuccessfully" class="token-automation-primary-btn" @click="addTab(apiTabName)"  style="background-color:  #6200EA !important; color: #FFFFFF !important">
+                                Add step
                             </v-btn>
-                            <v-btn dark :disabled="!stepData[apiTabName].showAddStepOption" primary color="#6200EA" @click="toggleShowAuthParams(apiTabName)" >
+                            <v-btn :disabled="!stepData[apiTabName].showAddStepOption" class="token-automation-primary-btn" @click="toggleShowAuthParams(apiTabName)"  style="background-color:  #6200EA !important; color: #FFFFFF !important">
                                 Extract
                             </v-btn>
                         </div>
@@ -337,5 +337,19 @@ export default {
   position: absolute
   top: 10px
   right: 0px  
+
+.automation-container
+    background-color: #FFFFFF 
+    height: 550px
+    overflow-y: scroll
+    color: #47466A
+
+.token-automation-primary-btn
+    background-color: #6200EA !important
+    color: #FFFFFF !important
+    margin-left: 12px
+
+    &.v-btn--disabled
+        opacity: 0.3 !important
 
 </style>

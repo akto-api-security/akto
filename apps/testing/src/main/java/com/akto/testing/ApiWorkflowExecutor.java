@@ -191,8 +191,10 @@ public class ApiWorkflowExecutor {
         }
         String uuid = node.getWorkflowNodeDetails().getOtpRefUuid();
         List<String> testErrors = new ArrayList<>();
+        int curTime = Context.now() - 5 * 60;
         Bson filters = Filters.and(
-            Filters.eq("uuid", uuid)
+            Filters.eq("uuid", uuid),
+            Filters.gte("createdAtEpoch", curTime)
         );
         BasicDBObject resp = new BasicDBObject();
         BasicDBObject body = new BasicDBObject();

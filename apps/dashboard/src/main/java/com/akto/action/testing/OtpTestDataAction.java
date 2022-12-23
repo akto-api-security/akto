@@ -58,7 +58,7 @@ public class OtpTestDataAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        int timeFilterVal = Context.now() - 5 * 60 * 1000;
+        int timeFilterVal = Context.now() - 5 * 60;
 
         Bson filters = Filters.and(
             Filters.eq("uuid", uuid),
