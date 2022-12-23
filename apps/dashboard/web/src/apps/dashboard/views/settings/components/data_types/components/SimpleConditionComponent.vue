@@ -3,7 +3,7 @@
         <span class="inline-block-child" style="color: #6200EA">
             {{ initial_string }}
         </span>
-        <div class="inline-block-child" style="padding-left: 20px">
+        <div class="inline-block-child pl-5">
             <div class="text-center">
                 <v-menu offset-y>
                     <template v-slot:activator="{ on, attrs }">
@@ -23,18 +23,18 @@
                 </v-menu>
             </div>
         </div>
-        <div class="inline-block-child" style="padding-left: 20px"
+        <div class="inline-block-child pl-5 mr-4"
             v-if="requireTextInputForTypeArray.includes(condition.type)">
-            <v-text-field height="15px" placeholder="value" flat :style="getValueStyle(condition.value)"
-                v-model="condition.value" class="value_predicate" :rules="[value => !!value || 'Required']" />
+            <v-text-field placeholder="value" flat :style="getValueStyle(condition.value)"
+                v-model="condition.value" class="value_predicate ma-0 pa-0" hide-details :rules="[value => !!value || 'Required']" />
         </div>
-        <div class="inline-block-child" style="padding-left: 20px"
+        <div class="inline-block-child pl-5"
             v-else-if="requireMapInputForTypeArray && requireMapInputForTypeArray.includes(condition.type)">
 
             <!-- Collection menu  -->
             <v-menu offset-y>
                 <template v-slot:activator="{ on, attrs }">
-                    <v-btn class="filter-button" v-bind="attrs" v-on="on" primary>
+                    <v-btn class="filter-button ml-2" v-bind="attrs" v-on="on" primary>
                         <span>{{getSelectedCollectionName(condition)}}</span>
                         <v-icon>$fas_angle-down</v-icon>
                     </v-btn>
@@ -47,7 +47,7 @@
             <!-- End point menu -->
             <v-menu offset-y :close-on-content-click="false">
                 <template v-slot:activator="{ on, attrs }">
-                    <v-btn class="filter-button mr-3" :ripple="false" v-bind="attrs" v-on="on" primary>
+                    <v-btn class="filter-button mr-3 ml-4" :ripple="false" v-bind="attrs" v-on="on" primary>
                         <span>Api endpoints<v-icon :size="14">$fas_angle-down</v-icon></span>
                     </v-btn>
                 </template>
@@ -149,12 +149,13 @@ export default {
 .condition-block
     background: #edecf0 
     width: fit-content
-    padding: 0px 10px 10px 10px
-    height: 40px
-    line-height: 47px
+    height: fit-content
 
-.inline-block-child 
-  display: inline-block
+.inline-block-child
+    margin-top: 12px
+    margin-bottom: 12px
+    margin-left: 16px
+    display: inline-block
 
 
 </style>

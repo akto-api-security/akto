@@ -117,6 +117,7 @@ export default {
             if (!operators.includes(this.conditions[index].operator)) {
                 this.conditions[index].operator=operators[0]
             }
+            this.conditions[index].value = null
         },
         getOperatorsForCondition(condition) {
             let finalValue = null
@@ -192,12 +193,6 @@ export default {
     color: #6200EA
     width: 100%
     height: 100%
-
-.condition-block
-    background: #edecf0 
-    width: fit-content
-    padding: 0px 10px 10px 10px
-
 
 .v-icon.v-icon:after
     background-color: transparent

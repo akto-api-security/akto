@@ -145,12 +145,6 @@ export default {
     width: 100%
     height: 100%
 
-.condition-block
-    background: #edecf0 
-    width: fit-content
-    padding: 0px 10px 10px 10px
-
-
 .v-icon.v-icon:after
     background-color: transparent
 

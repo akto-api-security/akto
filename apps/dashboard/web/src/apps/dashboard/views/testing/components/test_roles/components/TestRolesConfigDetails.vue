@@ -31,15 +31,9 @@
                     </div>
                 </div>
             </div>
-            <div style=" display: flex">
-                <div class="form-text">
-                    Where
-                </div>
-            </div>
-
             <div>
                 <v-row style="padding: 36px 12px 12px 12px">
-                    <test-role-conditions-table initial_string="endpoint" :selectedRole="selectedRole"
+                    <test-role-conditions-table initial_string="Endpoint" :selectedRole="selectedRole"
                         table_header="Role endpoint conditions" :operators="operators"
                         :requireTextInputForTypeArray="requireTextInputForTypeArray"
                         :requireMapInputForTypeArray="requireMapInputForTypeArray" :operation_types="operation_types" />
@@ -52,18 +46,6 @@
                         Save
                     </v-btn>
                 </div>
-                <!-- <div v-if="selectedRole_copy.id || selectedRole_copy.createNew" style="padding: 12px">
-                    <v-btn @click="reviewCustomDataType" color="#white" class="review-btn" height="40px" width="100px"
-                        :loading="reviewLoading">
-                        Review
-                        <span slot="loader">
-                            <v-progress-circular :rotate="360" :size="30" :width="5" :value="computeLoading"
-                                color="#6200EA">
-                            </v-progress-circular>
-                            {{ computeLoading + "%" }}
-                        </span>
-                    </v-btn>
-                </div> -->
             </v-row>
             <!-- <review-table v-if="reviewData" :review-data="reviewData" /> -->
         </v-container>
@@ -263,6 +245,7 @@ export default {
 </script>
 
 <style lang="sass" scoped>
+
     .condition-row
         width: 100%
         border-style: solid
@@ -276,7 +259,7 @@ export default {
             border-top-width: 1px 
 
     .sensitive-text
-        font-size: 16px
+        font-size: 16px !important
         font-weight: bold
         align-items: center
         display: flex
@@ -303,7 +286,7 @@ export default {
 
     .save-btn
         background-color: #6200EA !important
-        font-size: 16px
+        font-size: 16px !important
         font-weight: 600
         vertical-align: middle
         border-radius: 4px
@@ -318,7 +301,7 @@ export default {
             opacity: 0.3
 
     .review-btn
-        font-size: 16px
+        font-size: 16px !important
         font-weight: 600
         vertical-align: middle
         border-radius: 4px
@@ -332,11 +315,11 @@ export default {
 
     .form-text
         color: grey
-        font-size: 16px
-        width: 200px
+        font-size: 16px !important
+        width: 200px 
         align-items: center
         display: flex
-
+    
     .inline-block-child .value_predicate .v-text-field__slot input 
         color: #00f !important
     
