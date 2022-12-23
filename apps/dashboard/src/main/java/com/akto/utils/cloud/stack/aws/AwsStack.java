@@ -33,7 +33,7 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
     private static final String STACK_NAME = "akto-mirroring";
     private static final Set<String> ACCEPTABLE_STACK_STATUSES = new HashSet<String>(
             Arrays.asList(StackStatus.CREATE_IN_PROGRESS.toString(), StackStatus.CREATE_COMPLETE.toString()));
-    private static final int STACK_CREATION_TIMEOUT_MINS = 15;
+    private static final int STACK_CREATION_TIMEOUT_MINS = 20;
     private static final List<String> STACK_CREATION_CAPABILITIES = Arrays.asList("CAPABILITY_IAM");
     private static final AmazonCloudFormationAsync CLOUD_FORMATION_ASYNC = AmazonCloudFormationAsyncClientBuilder
             .standard().build();

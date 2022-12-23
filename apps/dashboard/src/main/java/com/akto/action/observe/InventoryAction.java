@@ -1,45 +1,28 @@
 package com.akto.action.observe;
 
-import java.net.URI;
-import java.util.*;
-
-import javax.net.ssl.HostnameVerifier;
-
 import com.akto.action.UserAction;
-import com.akto.dao.APISpecDao;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.ApiInfoDao;
-import com.akto.dao.SensitiveParamInfoDao;
-import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dao.TagConfigsDao;
+import com.akto.dao.*;
 import com.akto.dao.context.Context;
-import com.akto.dto.APISpec;
-import com.akto.dto.ApiCollection;
-import com.akto.dto.ApiInfo;
-import com.akto.dto.SensitiveParamInfo;
-import com.akto.dto.TagConfig;
+import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
-import com.fasterxml.jackson.databind.introspect.TypeResolutionContext.Basic;
+import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
-import com.mongodb.client.model.Accumulators;
-import com.mongodb.client.model.Aggregates;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.*;
 import com.opensymphony.xwork2.Action;
-
-import io.swagger.v3.oas.models.Operation;
-import io.swagger.v3.oas.models.PathItem;
-import io.swagger.v3.oas.models.servers.Server;
-import org.bson.conversions.Bson;
-
 import io.swagger.parser.OpenAPIParser;
 import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.Operation;
+import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.Paths;
+import io.swagger.v3.oas.models.servers.Server;
 import io.swagger.v3.parser.core.models.SwaggerParseResult;
+import org.bson.conversions.Bson;
+
+import java.net.URI;
+import java.util.*;
 
 public class InventoryAction extends UserAction {
 
@@ -169,6 +152,32 @@ public class InventoryAction extends UserAction {
 
         return Action.SUCCESS.toUpperCase();
     }
+
+    private List<ApiInfoKey> listOfEndpointsInCollection;
+    public String fetchCollectionWiseApiEndpoints () {
+        listOfEndpointsInCollection = new ArrayList<>();
+        List<BasicDBObject> list = null;
+        if (apiCollectionId > -1) {
+            list = fetchEndpointsInCollectionUsingHost(apiCollectionId);
+        }
+        if (list != null && !list.isEmpty()) {
+            list.forEach(element -> {
+                BasicDBObject item = (BasicDBObject) element.get(Constants.ID);
+                    if (item == null) {
+                        return;
+                    }
+                ApiInfoKey apiInfoKey = new ApiInfoKey(
+                        apiCollectionId,
+                        item.getString(ApiInfoKey.URL),
+                        Method.fromString(item.getString(ApiInfoKey.METHOD)));
+                if (!listOfEndpointsInCollection.contains(apiInfoKey)) {
+                    listOfEndpointsInCollection.add(apiInfoKey);
+                }
+            });
+        }
+        return SUCCESS.toUpperCase();
+    }
+
 
     public static List<SingleTypeInfo> fetchHostSTI(int apiCollectionId, int skip) {
         Bson filterQ = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, true);
@@ -648,5 +657,13 @@ public class InventoryAction extends UserAction {
 
     public List<BasicDBObject> getEndpoints() {
         return endpoints;
+    }
+
+    public List<ApiInfoKey> getListOfEndpointsInCollection() {
+        return listOfEndpointsInCollection;
+    }
+
+    public void setListOfEndpointsInCollection(List<ApiInfoKey> listOfEndpointsInCollection) {
+        this.listOfEndpointsInCollection = listOfEndpointsInCollection;
     }
 }

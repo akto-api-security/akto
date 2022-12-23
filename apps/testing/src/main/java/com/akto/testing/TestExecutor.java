@@ -19,6 +19,7 @@ import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.rules.*;
 import com.akto.store.SampleMessageStore;
+import com.akto.store.TestingUtil;
 import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.util.enums.LoginFlowEnums;
 import com.akto.util.JSONUtils;
@@ -86,8 +87,10 @@ public class TestExecutor {
 
         Map<String, SingleTypeInfo> singleTypeInfoMap = SampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
         Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = SampleMessageStore.fetchSampleMessages();
-
+        List<TestRoles> testRoles = SampleMessageStore.fetchTestRoles();
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
+
+        TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessages, singleTypeInfoMap, testRoles);
 
         try {
             LoginFlowResponse loginFlowResponse = executeLoginFlow(authMechanism, null);
@@ -115,7 +118,11 @@ public class TestExecutor {
         List<Future<List<TestingRunResult>>> futureTestingRunResults = new ArrayList<>();
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
             try {
-                 Future<List<TestingRunResult>> future = threadPool.submit(() -> startWithLatch(apiInfoKey, testingRun.getTestIdConfig(), testingRun.getId(), singleTypeInfoMap, sampleMessages, authMechanism, summaryId, accountId, latch));
+                 Future<List<TestingRunResult>> future = threadPool.submit(
+                         () -> startWithLatch(
+                                 apiInfoKey, testingRun.getTestIdConfig(), testingRun.getId(), testingUtil, summaryId, accountId, latch
+                         )
+                 );
                  futureTestingRunResults.add(future);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error in API " + apiInfoKey + " : " + e.getMessage());
@@ -296,15 +303,15 @@ public class TestExecutor {
 
     public List<TestingRunResult> startWithLatch(
             ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId,
-            Map<String, SingleTypeInfo> singleTypeInfoMap, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages,
-            AuthMechanism authMechanism, ObjectId testRunResultSummaryId, int accountId,
-            CountDownLatch latch) {
+            TestingUtil testingUtil, ObjectId testRunResultSummaryId, int accountId, CountDownLatch latch) {
 
         Context.accountId.set(accountId);
         List<TestingRunResult> testingRunResults = new ArrayList<>();
 
         try {
-            testingRunResults = start(apiInfoKey, testIdConfig, testRunId, singleTypeInfoMap, sampleMessages, authMechanism, testRunResultSummaryId);
+            testingRunResults = start(
+                    apiInfoKey, testIdConfig, testRunId, testingUtil, testRunResultSummaryId
+            );
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -313,9 +320,7 @@ public class TestExecutor {
         return testingRunResults;
     }
 
-    public List<TestingRunResult> start(ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId,
-                                      Map<String, SingleTypeInfo> singleTypeInfoMap, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages,
-                                      AuthMechanism authMechanism, ObjectId testRunResultSummaryId) {
+    public List<TestingRunResult> start(ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId, TestingUtil testingUtil, ObjectId testRunResultSummaryId) {
 
         if (testIdConfig != 0) {
             loggerMaker.errorAndAddToDb("Test id config is not 0 but " + testIdConfig);
@@ -331,34 +336,43 @@ public class TestExecutor {
         ParameterPollutionTest parameterPollutionTest = new ParameterPollutionTest();
         OldApiVersionTest oldApiVersionTest = new OldApiVersionTest();
         JWTNoneAlgoTest  jwtNoneAlgoTest = new JWTNoneAlgoTest();
+        BFLATest bflaTest = new BFLATest();
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
-        TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+        TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
         if (noAuthTestResult != null) testingRunResults.add(noAuthTestResult);
         if (noAuthTestResult != null && !noAuthTestResult.isVulnerable()) {
-            TestingRunResult bolaTestResult = runTest(bolaTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
-            if (bolaTestResult != null) testingRunResults.add(bolaTestResult);
 
-            TestingRunResult addUserIdTestResult = runTest(addUserIdTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+            TestPlugin.TestRoleMatcher testRoleMatcher = new TestPlugin.TestRoleMatcher(testingUtil.getTestRoles(), apiInfoKey);
+
+            if (testRoleMatcher.shouldDoBFLA()) {
+                TestingRunResult bflaTestResult = runTest(bflaTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                if (bflaTestResult != null) testingRunResults.add(bflaTestResult);
+            } else {
+                TestingRunResult bolaTestResult = runTest(bolaTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                if (bolaTestResult != null) testingRunResults.add(bolaTestResult);
+            }
+
+            TestingRunResult addUserIdTestResult = runTest(addUserIdTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
             if (addUserIdTestResult != null) testingRunResults.add(addUserIdTestResult);
 
-            TestingRunResult parameterPollutionTestResult = runTest(parameterPollutionTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+            TestingRunResult parameterPollutionTestResult = runTest(parameterPollutionTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
             if (parameterPollutionTestResult != null) testingRunResults.add(parameterPollutionTestResult);
 
-            TestingRunResult oldApiVersionTestResult = runTest(oldApiVersionTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+            TestingRunResult oldApiVersionTestResult = runTest(oldApiVersionTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
             if (oldApiVersionTestResult != null) testingRunResults.add(oldApiVersionTestResult);
 
-            TestingRunResult jwtNoneAlgoTestResult = runTest(jwtNoneAlgoTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+            TestingRunResult jwtNoneAlgoTestResult = runTest(jwtNoneAlgoTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
             if (jwtNoneAlgoTestResult != null) testingRunResults.add(jwtNoneAlgoTestResult);
         }
 
-        TestingRunResult addMethodInParameterTestResult = runTest(addMethodInParameterTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+        TestingRunResult addMethodInParameterTestResult = runTest(addMethodInParameterTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
         if (addMethodInParameterTestResult != null) testingRunResults.add(addMethodInParameterTestResult);
 
-        TestingRunResult addMethodOverrideHeadersTestResult = runTest(addMethodOverrideHeadersTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+        TestingRunResult addMethodOverrideHeadersTestResult = runTest(addMethodOverrideHeadersTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
         if (addMethodOverrideHeadersTestResult != null) testingRunResults.add(addMethodOverrideHeadersTestResult);
 
-        TestingRunResult changeHttpMethodTestResult = runTest(changeHttpMethodTest, apiInfoKey, authMechanism, sampleMessages, singleTypeInfoMap, testRunId, testRunResultSummaryId);
+        TestingRunResult changeHttpMethodTestResult = runTest(changeHttpMethodTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
         if (changeHttpMethodTestResult != null) testingRunResults.add(changeHttpMethodTestResult);
 
 
@@ -366,11 +380,10 @@ public class TestExecutor {
         return testingRunResults;
     }
 
-    public TestingRunResult runTest(TestPlugin testPlugin, ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages,
-                        Map<String, SingleTypeInfo> singleTypeInfos, ObjectId testRunId, ObjectId testRunResultSummaryId) {
+    public TestingRunResult runTest(TestPlugin testPlugin, ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil, ObjectId testRunId, ObjectId testRunResultSummaryId) {
 
         int startTime = Context.now();
-        TestPlugin.Result result = testPlugin.start(apiInfoKey, authMechanism, sampleMessages, singleTypeInfos);
+        TestPlugin.Result result = testPlugin.start(apiInfoKey, testingUtil);
         if (result == null) return null;
         int endTime = Context.now();
 

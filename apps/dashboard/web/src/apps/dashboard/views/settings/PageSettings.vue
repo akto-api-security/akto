@@ -1,11 +1,21 @@
 <template>
-    <layout-with-tabs title="Settings" :tabs="['Data types', 'Tags', 'Account', 'Users', 'Health', 'Integrations']">
+    <layout-with-tabs title="Settings" :tabs="['Data types','Auth types', 'Tags', 'Account', 'Users', 'Health', 'Integrations']">
         <template slot="Data types">
             <data-types title="Data types" :data_types="data_types" :toggleActivateFieldFunc='toggleActivateDataTypes'
                 :createNewDataType="createNewDataType" @selectedEntry="selectedDataType">
                 <template #details-container="{}">
                     <a-card title="Details" color="rgba(33, 150, 243)" style="min-height: 600px">
                         <data-type-details :data_type="data_type" />
+                    </a-card>
+                </template>
+            </data-types>
+        </template>
+        <template slot="Auth types">
+            <data-types title="Auth types" :data_types="auth_types" :toggleActivateFieldFunc='toggleActivateAuthTypes'
+                :createNewDataType="createNewAuthType" @selectedEntry="selectedAuthType">
+                <template #details-container="{}">
+                    <a-card title="Details" color="rgba(33, 150, 243)" style="min-height: 600px">
+                        <auth-type-details :auth_type_copy="auth_type" />
                     </a-card>
                 </template>
             </data-types>
@@ -69,6 +79,7 @@ import TagSettings from './components/tag_configs/TagSettings.vue'
 import TagConfigDetails from './components/tag_configs/TagConfigDetails.vue'
 import ACard from '@/apps/dashboard/shared/components/ACard'
 import IntegrationCenter from './components/integrations/IntegrationCenter'
+import AuthTypeDetails from './components/auth_types/AuthTypeDetails.vue'
 
 import { mapState } from 'vuex'
 export default {
@@ -84,11 +95,13 @@ export default {
         TagSettings,
         TagConfigDetails,
         DataTypeDetails,
+        AuthTypeDetails,
         ACard
     },
     mounted() {
         this.$store.dispatch("data_types/fetchDataTypes")
         this.$store.dispatch("tag_configs/fetchTagConfigs")
+        this.$store.dispatch("auth_types/fetchCustomAuthTypes")
     },
     data() {
         return {
@@ -114,6 +127,15 @@ export default {
         selectedTagConfig(item) {
             this.$store.state.tag_configs.tag_config = item
         },
+        createNewAuthType() {
+            return this.$store.dispatch('auth_types/setNewAuthType')
+        },
+        toggleActivateAuthTypes(item) {
+            return this.$store.dispatch('auth_types/toggleActivateAuthType',item)
+        },
+        selectedAuthType(item) {
+            this.$store.state.auth_types.auth_type = item
+        },
         getActiveAccount() {
             return this.$store.state.auth.activeAccount
         },
@@ -125,7 +147,8 @@ export default {
     },
     computed: {
         ...mapState('data_types', ['data_types', 'data_type']),
-        ...mapState('tag_configs', ['tag_configs', 'tag_config'])
+        ...mapState('tag_configs', ['tag_configs', 'tag_config']),
+        ...mapState('auth_types', ['auth_types', 'auth_type'])
     }
 }
 </script>

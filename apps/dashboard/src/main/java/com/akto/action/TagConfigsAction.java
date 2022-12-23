@@ -71,7 +71,7 @@ public class TagConfigsAction extends UserAction {
         if (keyConditionFromUsers != null) {
             List<Predicate> predicates = new ArrayList<>();
             for (ConditionFromUser conditionFromUser: keyConditionFromUsers) {
-                Predicate predicate = CustomDataTypeAction.generatePredicate(conditionFromUser.type, conditionFromUser.valueMap);
+                Predicate predicate = Predicate.generatePredicate(conditionFromUser.type, conditionFromUser.valueMap);
                 if (predicate == null) {
                     throw new AktoCustomException("Invalid key conditions");
                 } else {

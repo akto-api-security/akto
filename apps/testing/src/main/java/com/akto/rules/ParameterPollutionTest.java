@@ -4,6 +4,7 @@ import com.akto.dto.*;
 import com.akto.dto.testing.*;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.store.SampleMessageStore;
+import com.akto.store.TestingUtil;
 import com.akto.types.CappedSet;
 
 import java.util.*;
@@ -14,10 +15,10 @@ public class ParameterPollutionTest extends TestPlugin {
 
 
     @Override
-    public Result start(ApiInfo.ApiInfoKey apiInfoKey, AuthMechanism authMechanism, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages, Map<String, SingleTypeInfo> singleTypeInfoMap) {
-        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleMessages);
+    public Result start(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) {
+        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
         if (messages.isEmpty()) return null;
-        List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, authMechanism);
+        List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, testingUtil.getAuthMechanism());
         if (filteredMessages.size() < 2) return addWithoutRequestError(null, TestResult.TestError.INSUFFICIENT_MESSAGES);
 
         RawApi message1 = filteredMessages.get(0).copy();
@@ -26,7 +27,7 @@ public class ParameterPollutionTest extends TestPlugin {
         OriginalHttpRequest testRequest1 = message1.getRequest();
         OriginalHttpRequest testRequest2 = message2.getRequest();
 
-        ContainsPrivateResourceResult containsPrivateResourceResult2 = containsPrivateResource(testRequest2, apiInfoKey, singleTypeInfoMap);
+        ContainsPrivateResourceResult containsPrivateResourceResult2 = containsPrivateResource(testRequest2, apiInfoKey, testingUtil.getSingleTypeInfoMap());
 
         boolean atLeastOneParam = false;
         for (SingleTypeInfo singleTypeInfo: containsPrivateResourceResult2.findPrivateOnes()) {
@@ -52,13 +53,13 @@ public class ParameterPollutionTest extends TestPlugin {
         try {
             apiExecutionDetails = executeApiAndReturnDetails(testRequest1, true, message1.getResponse());
         } catch (Exception e) {
-            return addWithRequestError( message1.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest1);
+            return addWithRequestError( message1.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest1, null);
         }
 
         boolean vulnerable = isStatusGood(apiExecutionDetails.statusCode) && apiExecutionDetails.percentageMatch < 80;
 
         TestResult testResult = buildTestResult(
-                testRequest1, apiExecutionDetails.testResponse, message1.getOriginalMessage(), apiExecutionDetails.percentageMatch, vulnerable
+                testRequest1, apiExecutionDetails.testResponse, message1.getOriginalMessage(), apiExecutionDetails.percentageMatch, vulnerable, null
         );
         return addTestSuccessResult(
                 vulnerable, Collections.singletonList(testResult), new ArrayList<>(), TestResult.Confidence.HIGH

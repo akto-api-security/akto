@@ -58,7 +58,7 @@
                     style="padding: 12px 12px 12px 12px"
                     v-if="showMainOperator" 
                 >
-                    <operator-component :operator="data_type_copy.operator" @operatorChanged="operatorChanged"/>
+                    <operator-component :operators="operators" :operator="data_type_copy.operator" @operatorChanged="operatorChanged"/>
                 </v-row>
 
                 <v-row style="padding: 12px; padding-bottom: 50px"  >
@@ -167,10 +167,17 @@ export default {
         ReviewTable
     },
     data() {
+        var operators = [
+                "OR", "AND"
+            ]
+
         return {
             data_type_copy: null,
+            reqToggle: null,
+            resToggle: null,
             saveLoading: false,
             reviewLoading: false,
+            operators,
             name_rules: [
                     value => {
                         if (!value) return "Required"
@@ -191,8 +198,6 @@ export default {
                 if (this.data_type_copy.sensitiveAlways || this.data_type_copy.sensitivePosition.includes("RESPONSE_PAYLOAD")) temp.push("RESPONSE_PAYLOAD")
                 if (this.data_type_copy.sensitiveAlways || this.data_type_copy.sensitivePosition.includes("RESPONSE_HEADER")) temp.push("RESPONSE_HEADER")
                 this.data_type_copy.sensitivePosition = temp
-                console.log(this.data_type_copy.sensitivePosition)
-
                 this.data_type_copy.sensitiveAlways = this.data_type_copy.sensitivePosition.length == 4 ? true : false
                 if(this.data_type_copy.sensitivePosition.length==4) this.data_type_copy.sensitivePosition=[]
             }
@@ -206,8 +211,6 @@ export default {
                 if (!this.data_type_copy.sensitiveAlways && !this.data_type_copy.sensitivePosition.includes("RESPONSE_PAYLOAD")) temp.push("RESPONSE_PAYLOAD")
                 if (!this.data_type_copy.sensitiveAlways && !this.data_type_copy.sensitivePosition.includes("RESPONSE_HEADER")) temp.push("RESPONSE_HEADER")
                 this.data_type_copy.sensitivePosition = temp
-                console.log(this.data_type_copy.sensitivePosition)
-
                 this.data_type_copy.sensitiveAlways = this.data_type_copy.sensitivePosition.length == 4 ? true : false
                 if(this.data_type_copy.sensitivePosition.length==4) this.data_type_copy.sensitivePosition=[]
             }

@@ -56,6 +56,7 @@ public class TestingIssuesHandlerTest extends MongoBasedTest {
 
     @Test
     public void testHandler() {
+        TestingRunIssuesDao.instance.getMCollection().drop();
         List<TestingRunResult> testingRunResultList = new ArrayList<>();
         Random random = new Random();
         for (int i = 0; i < 100; i++) {

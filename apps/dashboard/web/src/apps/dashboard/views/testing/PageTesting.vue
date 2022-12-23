@@ -1,22 +1,16 @@
 <template>
-    <layout-with-tabs title="API Testing" class="page-testing" :tabs='["User config", "Test results"]'>
+    <layout-with-tabs title="API Testing" class="page-testing" :tabs='["Test results", "User config", "Roles"]'>
         <template slot="Test results">
             <div class="py-8">
-                <div>                
+                <div>
                     <layout-with-left-pane title="Run test">
                         <div>
-                            <router-view :key="$route.fullPath"/>
+                            <router-view :key="$route.fullPath" />
                         </div>
                         <template #leftPane>
-                            <v-navigation-drawer
-                                v-model="drawer"
-                                floating
-                                width="250px"
-                            >
+                            <v-navigation-drawer v-model="drawer" floating width="250px">
                                 <div class="nav-section">
-                                    <api-collection-group
-                                        :items=leftNavItems
-                                    >
+                                    <api-collection-group :items=leftNavItems>
                                         <!-- <template #prependItem>
                                             <v-btn primary dark color="#6200EA" tile style="width: -webkit-fill-available" class="mt-8 mb-8">
                                                 <div style="width: 100%">
@@ -55,61 +49,40 @@
 
                     <div class="d-flex">
                         <div class="input-value">
-                            <v-text-field 
-                                v-model="newKey"
-                                style="width: 200px"
-                            >
+                            <v-text-field v-model="newKey" style="width: 200px">
                                 <template slot="label">
                                     <div class="d-flex">
                                         Auth header key
-                                        <help-tooltip :size="12" text="Please enter name of the header which contains your auth token. This field is case-sensitive. eg Authorization"/>
+                                        <help-tooltip :size="12"
+                                            text="Please enter name of the header which contains your auth token. This field is case-sensitive. eg Authorization" />
                                     </div>
                                 </template>
                             </v-text-field>
-                            
+
                         </div>
                         <div class="input-value">
-                            <v-text-field 
-                                v-model="newVal"
-                                style="width: 500px"
-                            >              
+                            <v-text-field v-model="newVal" style="width: 500px">
                                 <template slot="label">
                                     <div class="d-flex">
                                         Auth header value
-                                        <help-tooltip :size="12" text="Please enter the value of the auth token."/>
+                                        <help-tooltip :size="12" text="Please enter the value of the auth token." />
                                     </div>
                                 </template>
 
                             </v-text-field>
                         </div>
 
-                    <v-btn primary dark color="#3366ff" @click="saveAuthMechanism" v-if="someAuthChanged">
-                        Save changes
-                    </v-btn>
-                </div>
-
-
-                <div class="di-flex-bottom">
-
-                        <div class="col_1">
-                            <p> 2 </p>
-                        </div>
-                        
-                        <div>
-                            <h3> Automate auth token generation </h3>
-                        </div>
+                        <v-btn primary dark color="#3366ff" @click="saveAuthMechanism" v-if="someAuthChanged">
+                            Save changes
+                        </v-btn>
                     </div>
-                    
-                    <div class="di-flex">
-                        <div class="input-value">
-                            <div  v-if="authTokenUrl != null && authTokenDate != null">
-                                <span class="auth-token-title">URL: </span>
-                                <span class="auth-token-text">{{authTokenUrl}}</span>
-                                <br/>
-                                <span class="auth-token-title">Created on: </span>
-                                <span class="auth-token-text">{{authTokenDate}}</span>
-                            </div>
-                        </div>
+
+
+                    <!--                <div class="di-flex-bottom">-->
+
+                    <!--                        <div class="col_1">-->
+                    <!--                            <p> 2 </p>-->
+                    <!--                        </div>-->
 
                         <template v-if="originalDbState">
                             <v-btn icon color="#6200EA" @click="toggleLoginStepBuilder">
@@ -132,8 +105,16 @@
                 </v-dialog>    
                 
             </div>
-            
-        </template>        
+        </template>
+        <template slot="Roles">
+            <test-roles title="Roles" :testRoles="testRoles">
+                <template #details-container="{}">
+                    <a-card title="Details" color="rgba(33, 150, 243)" style="min-height: 600px">
+                        <test-roles-config-details></test-roles-config-details>
+                    </a-card>
+                </template>
+            </test-roles>
+        </template>
     </layout-with-tabs>
 </template>
 
@@ -144,6 +125,9 @@ import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChip
 import ACard from '@/apps/dashboard/shared/components/ACard'
 import SampleData from '@/apps/dashboard/shared/components/SampleData'
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
+import TestRoles from './components/test_roles/TestRoles'
+import TestRolesConfigDetails from './components/test_roles/components/TestRolesConfigDetails'
+
 
 import func from '@/util/func'
 import testing from '@/util/testing'
@@ -166,6 +150,8 @@ export default {
         LayoutWithLeftPane,
         ApiCollectionGroup,
         LoginStepBuilder,
+        TestRoles,
+        TestRolesConfigDetails,
         TokenAutomation,
         HelpTooltip
     },
@@ -173,15 +159,17 @@ export default {
 
     },
     data() {
-        return  {
+        return {
             originalDbState: null,
             stepBuilder: false,
             newKey: this.nonNullAuth ? this.nonNullAuth.key : null,
-            newVal: this.nonNullAuth ? this.nonNullAuth.value: null,
+            newVal: this.nonNullAuth ? this.nonNullAuth.value : null,
             stopAllTestsLoading: false,
             drawer: null,
             showLoginSaveOption: false,
             authMechanismData: {},
+            testRoleName: "",
+            testLogicalGroupRegex: "",
             showTokenAutomation: false
         }
     },
@@ -195,13 +183,22 @@ export default {
             this.saveAuth()
         },
         saveAuthMechanism() {
-            this.$store.dispatch('testing/addAuthMechanism', {type: "HARDCODED", requestData: [], authParamData: [{
-                "key": this.newKey,
-                "value": this.newVal,
-                "where": "HEADER"
-            }]})
+            this.$store.dispatch('testing/addAuthMechanism', {
+                type: "HARDCODED", requestData: [], authParamData: [{
+                    "key": this.newKey,
+                    "value": this.newVal,
+                    "where": "HEADER"
+                }]
+            })
         },
-        prepareItemForTable(x){
+        async saveTestRoles() {
+            debugger
+            if (this.testRoleName && this.testLogicalGroupRegex) {
+                await this.$store.dispatch('testing/addTestRoles', { roleName: this.testRoleName, regex: this.testLogicalGroupRegex })
+                this.$store.dispatch('testing/loadTestRoles')
+            }
+        },
+        prepareItemForTable(x) {
             return {
                 url: x.apiInfoKey.url,
                 method: x.apiInfoKey.method,
@@ -239,22 +236,23 @@ export default {
           if (idx === -1) return null
           return allowedMethods[idx]
         },
-      fetchAuthMechanismData() {
-        api.fetchAuthMechanismData().then((resp) => {
-          this.authMechanismData = resp.authMechanism;
-          if (!this.authMechanismData) return
-            let requestData = this.authMechanismData["requestData"]
-            let str = JSON.stringify(this.authMechanismData);
-            if (!requestData || requestData.length === 0) return
+        fetchAuthMechanismData() {
+            api.fetchAuthMechanismData().then((resp) => {
+                this.authMechanismData = resp.authMechanism;
+                if (!this.authMechanismData) return
+                let requestData = this.authMechanismData["requestData"]
+                let str = JSON.stringify(this.authMechanismData);
+                if (!requestData || requestData.length === 0) return
 
-            let authParamData = this.authMechanismData["authParams"]
-            if (!authParamData || authParamData.length === 0) return
+                let authParamData = this.authMechanismData["authParams"]
+                if (!authParamData || authParamData.length === 0) return
 
-            this.originalDbState = this.authMechanismData
-        })
-      }
+                this.originalDbState = this.authMechanismData
+            })
+        }
     },
     computed: {
+        ...mapState('test_roles', ['testRoles', 'loading', 'selectedRole']),
         ...mapState('testing', ['testingRuns', 'authMechanism', 'testingRunResults', 'pastTestingRuns']),
         mapCollectionIdToName() {
             return this.$store.state.collections.apiCollections.reduce((m, e) => {
@@ -265,12 +263,10 @@ export default {
         nonNullAuth() {
             return this.authMechanism && this.authMechanism.authParams && this.authMechanism.type == "HARDCODED" && this.authMechanism.authParams[0]
         },
-        someAuthChanged () {
+        someAuthChanged() {
             let nonNullData = this.newKey != null && this.newVal != null && this.newKey != "" && this.newVal != ""
             if (this.nonNullAuth) {
-                
                 return nonNullData && (this.authMechanism.authParams[0].key !== this.newKey || this.authMechanism.authParams[0].value !== this.newVal)
-
             } else {
                 return nonNullData
             }
@@ -305,7 +301,7 @@ export default {
                         ...(this.testingRuns || []).map(x => {
                             return {
                                 title: testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
-                                link: "/dashboard/testing/"+x.hexId+"/results",
+                                link: "/dashboard/testing/" + x.hexId + "/results",
                                 active: true
                             }
                         })
@@ -328,7 +324,7 @@ export default {
                         ...(this.pastTestingRuns || []).map(x => {
                             return {
                                 title: testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
-                                link: "/dashboard/testing/"+x.hexId+"/results",
+                                link: "/dashboard/testing/" + x.hexId + "/results",
                                 active: true
                             }
                         })
@@ -336,13 +332,13 @@ export default {
                 }
             ]
         },
-        authTokenUrl: function() {
+        authTokenUrl: function () {
             if (!this.authMechanismData) return null
             let requestData = this.authMechanismData["requestData"]
             if (!requestData || requestData.length === 0) return null
             return requestData[0]["url"]
         },
-        authTokenDate: function() {
+        authTokenDate: function () {
             if (!this.authMechanismData) return null
             let id = this.authMechanismData["id"]
             if (!id) return null
@@ -355,18 +351,19 @@ export default {
             let dayStr = func.toDateStr(new Date(dayStartEpochMs), false)
 
             return dayStr + " " + date.slice(11)
-        }        
+        }
     },
     mounted() {
         this.fetchAuthMechanismData()
         let now = func.timeNow()
-        this.$store.dispatch('testing/loadTestingDetails', {startTimestamp: now - func.recencyPeriod, endTimestamp: now})
+        this.$store.dispatch('test_roles/loadTestRoles')
+        this.$store.dispatch('testing/loadTestingDetails', { startTimestamp: now - func.recencyPeriod, endTimestamp: now })
     },
     watch: {
         authMechanism: {
             handler() {
                 this.newKey = this.nonNullAuth ? this.nonNullAuth.key : null
-                this.newVal = this.nonNullAuth ? this.nonNullAuth.value: null
+                this.newVal = this.nonNullAuth ? this.nonNullAuth.value : null
             }
         }
     }
@@ -386,15 +383,15 @@ export default {
 </style>
 
 <style scoped>
-.page-testing >>> .v-label {
-  font-size: 12px;
-  color: #6200EA;
-  font-weight: 400;
+.page-testing>>>.v-label {
+    font-size: 12px;
+    color: #6200EA;
+    font-weight: 400;
 }
 
-.page-testing >>> input {
-  font-size: 12px;
-  font-weight: 400;
+.page-testing>>>input {
+    font-size: 12px;
+    font-weight: 400;
 }
 
 .col_1 {
@@ -432,7 +429,7 @@ export default {
 }
 
 .token-automation-modal {
-    width: 600px; 
+    width: 600px;
     height: 400px
 }
 
@@ -444,5 +441,4 @@ export default {
 .auth-token-text {
     font-size: 14px;
 }
-
 </style>

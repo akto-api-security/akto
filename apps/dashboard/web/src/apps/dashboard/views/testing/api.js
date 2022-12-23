@@ -10,7 +10,6 @@ export default {
             return resp
         })
     },
-
     fetchPastTestingDetails({startTimestamp, endTimestamp}) {
         return request({
             url: '/api/retrieveAllCollectionTests',

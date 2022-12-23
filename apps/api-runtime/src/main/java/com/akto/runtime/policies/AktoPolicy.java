@@ -7,6 +7,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.RequestTemplate;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLStatic;
 import com.akto.dto.type.URLTemplate;
 import com.akto.runtime.APICatalogSync;
@@ -318,7 +319,7 @@ public class AktoPolicy {
 
     public void process(HttpResponseParams httpResponseParams) throws Exception {
         // logger.info("processing....");
-
+        List<CustomAuthType> customAuthTypes = SingleTypeInfo.activeCustomAuthTypes;
         ApiInfo.ApiInfoKey apiInfoKey = ApiInfo.ApiInfoKey.generateFromHttpResponseParams(httpResponseParams);
         PolicyCatalog policyCatalog = getApiInfoFromMap(apiInfoKey);
         boolean addToReserve = false;
@@ -344,7 +345,7 @@ public class AktoPolicy {
             boolean saveSample = false;
             switch (useCase) {
                 case AUTH_TYPE:
-                    saveSample = AuthPolicy.findAuthType(httpResponseParams, apiInfo, filter);
+                    saveSample = AuthPolicy.findAuthType(httpResponseParams, apiInfo, filter, customAuthTypes);
                     break;
                 case SET_CUSTOM_FIELD:
                     saveSample = SetFieldPolicy.setField(httpResponseParams, apiInfo, filter);
