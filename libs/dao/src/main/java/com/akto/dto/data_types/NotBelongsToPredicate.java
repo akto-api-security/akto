@@ -20,7 +20,7 @@ public class NotBelongsToPredicate extends Predicate{
     @Override
     public boolean validate(Object value) {
         if (this.value != null) {//Replacing instance for generic type
-            return this.value.contains(value);
+            return !this.value.contains(value);
         }
         return true;
     }
