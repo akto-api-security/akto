@@ -1,6 +1,9 @@
 package com.akto.testing;
 
+import com.akto.dao.testing.LoginFlowStepsDao;
 import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.testing.LoginFlowParams;
+import com.akto.dto.testing.LoginFlowStepsData;
 import com.akto.dto.testing.WorkflowUpdatedSampleData;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.runtime.URLAggregator;
@@ -197,4 +200,19 @@ public class ApiWorkflowExecutorTest {
         assertEquals(3, basicDBList.size());
 
     }
+
+    @Test
+    public void testConstructValueMapWithLoginParams() {
+        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
+        Map<String, Object> valuemap = apiWorkflowExecutor.constructValueMap(null);
+        assertEquals(0, valuemap.size());
+    }
+
+    @Test
+    public void testConstructValueMapFetchValueMapFalse() {
+        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
+        Map<String, Object> valuemap = apiWorkflowExecutor.constructValueMap(new LoginFlowParams(23, false, "x1"));
+        assertEquals(0, valuemap.size());
+    }
+
 }

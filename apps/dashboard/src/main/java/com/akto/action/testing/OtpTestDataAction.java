@@ -38,16 +38,7 @@ public class OtpTestDataAction extends UserAction {
                 Updates.set("createdAtEpoch", curTime)
         );
 
-        Bson filters = Filters.and(
-            Filters.eq("uuid", uuid)
-        );
-        OtpTestData otpTestData = OtpTestDataDao.instance.findOne(filters);
-        if (otpTestData == null) {
-            otpTestData = new OtpTestData(uuid, otpText, curTime);
-            OtpTestDataDao.instance.insertOne(otpTestData);
-        } else {
-            OtpTestDataDao.instance.updateOne(Filters.eq("uuid", uuid), updates); 
-        }
+        OtpTestDataDao.instance.updateOne(Filters.eq("uuid", uuid), updates); 
         return SUCCESS.toUpperCase();
     }
 
