@@ -153,9 +153,10 @@ public class InventoryAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    private List<ApiInfoKey> listOfEndpointsInCollection;
-    public String fetchCollectionWiseApiEndpoints () {
-        listOfEndpointsInCollection = new ArrayList<>();
+    private Set<ApiInfoKey> listOfEndpointsInCollection;
+
+    public String fetchCollectionWiseApiEndpoints() {
+        listOfEndpointsInCollection = new HashSet<>();
         List<BasicDBObject> list = null;
         if (apiCollectionId > -1) {
             list = fetchEndpointsInCollectionUsingHost(apiCollectionId);
@@ -170,9 +171,7 @@ public class InventoryAction extends UserAction {
                         apiCollectionId,
                         item.getString(ApiInfoKey.URL),
                         Method.fromString(item.getString(ApiInfoKey.METHOD)));
-                if (!listOfEndpointsInCollection.contains(apiInfoKey)) {
-                    listOfEndpointsInCollection.add(apiInfoKey);
-                }
+                listOfEndpointsInCollection.add(apiInfoKey);
             });
         }
         return SUCCESS.toUpperCase();
@@ -659,11 +658,11 @@ public class InventoryAction extends UserAction {
         return endpoints;
     }
 
-    public List<ApiInfoKey> getListOfEndpointsInCollection() {
+    public Set<ApiInfoKey> getListOfEndpointsInCollection() {
         return listOfEndpointsInCollection;
     }
 
-    public void setListOfEndpointsInCollection(List<ApiInfoKey> listOfEndpointsInCollection) {
+    public void setListOfEndpointsInCollection(Set<ApiInfoKey> listOfEndpointsInCollection) {
         this.listOfEndpointsInCollection = listOfEndpointsInCollection;
     }
 }

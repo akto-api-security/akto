@@ -157,7 +157,6 @@ export default {
                 return this.$store.state.test_roles.conditions
             },
             set(newValue) {
-                debugger
                 this.$store.commit('test_roles/SAVE_CONDITIONS', {conditions:newValue})
             }
         },

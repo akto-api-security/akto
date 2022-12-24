@@ -197,7 +197,6 @@ export default {
             })
         },
         async saveTestRoles() {
-            debugger
             if (this.testRoleName && this.testLogicalGroupRegex) {
                 await this.$store.dispatch('testing/addTestRoles', { roleName: this.testRoleName, regex: this.testLogicalGroupRegex })
                 this.$store.dispatch('testing/loadTestRoles')
