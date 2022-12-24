@@ -361,10 +361,10 @@ public class TestExecutor {
             if (jwtNoneAlgoTestResult != null) testingRunResults.add(jwtNoneAlgoTestResult);
 
             TestingRunResult jwtInvalidSignatureTestResult = runTest(jwtInvalidSignatureTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-            if (jwtNoneAlgoTestResult != null) testingRunResults.add(jwtInvalidSignatureTestResult);
+            if (jwtInvalidSignatureTestResult != null) testingRunResults.add(jwtInvalidSignatureTestResult);
 
             TestingRunResult addJkuToJwtTestResult = runTest(addJkuToJwtTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-            if (jwtNoneAlgoTestResult != null) testingRunResults.add(addJkuToJwtTestResult);
+            if (addJkuToJwtTestResult != null) testingRunResults.add(addJkuToJwtTestResult);
         }
 
         TestingRunResult addMethodInParameterTestResult = runTest(addMethodInParameterTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
