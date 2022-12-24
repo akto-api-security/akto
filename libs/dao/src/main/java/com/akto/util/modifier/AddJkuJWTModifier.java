@@ -5,7 +5,7 @@ import java.util.Map;
 
 public class AddJkuJWTModifier extends JwtModifier{
 
-    public static final String JKU_VALUE = "https://raw.githubusercontent.com/akto-api-security/pii-types/master/private_key.pem";
+    public static final String JKU_VALUE = "https://raw.githubusercontent.com/akto-api-security/pii-types/master/public_key.pem";
     public static final String JKU_HEADER = "jku";
 
     @Override
