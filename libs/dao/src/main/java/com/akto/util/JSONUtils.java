@@ -155,6 +155,7 @@ public class JSONUtils {
 
 
     public static Map<String, List<String>> modifyHeaderValues(Map<String, List<String>> headers, PayloadModifier payloadModifier) {
+        if (headers == null) return null;
         boolean flag = false;
         Map<String, List<String>> modifiedHeaders = new HashMap<>(headers);
         for (String header: modifiedHeaders.keySet()) {
