@@ -326,10 +326,14 @@ export default {
         
 </style>
 
-<style>
+<style scoped>
 .v-input,
 .v-input input,
 .v-input textarea {
     color: #47466a !important
+}
+
+.v-text-field >>> input {
+    font-size: 16px
 }
 </style>
