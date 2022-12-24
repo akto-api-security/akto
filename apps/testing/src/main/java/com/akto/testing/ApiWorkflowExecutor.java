@@ -543,7 +543,7 @@ public class ApiWorkflowExecutor {
 
 
     // todo: test invalid cases
-    public String replaceVariables(String payload, Map<String, Object> valuesMap) throws Exception {
+    public String replaceVariables(String payload, Map<String, Object> valuesMap, boolean escapeString) throws Exception {
         String regex = "\\$\\{(x\\d+\\.[\\w\\-\\[\\].]+|AKTO\\.changes_info\\..*?)\\}"; // todo: integer inside brackets
         Pattern p = Pattern.compile(regex);
 

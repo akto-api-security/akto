@@ -10,8 +10,8 @@ public class OtpTestData {
     private int createdAtEpoch;
 
     public OtpTestData() { }
-    public OtpTestData(String otpText, int createdAtEpoch) {
-        this.uuid = "5e1aaeff-115a-4c36-8026-2fa3e552b106";
+    public OtpTestData(String uuid, String otpText, int createdAtEpoch) {
+        this.uuid = uuid;
         this.otpText = otpText;
         this.createdAtEpoch = createdAtEpoch;
     }

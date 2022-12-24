@@ -43,7 +43,7 @@ public class OtpTestDataAction extends UserAction {
         );
         OtpTestData otpTestData = OtpTestDataDao.instance.findOne(filters);
         if (otpTestData == null) {
-            otpTestData = new OtpTestData(otpText, curTime);
+            otpTestData = new OtpTestData(uuid, otpText, curTime);
             OtpTestDataDao.instance.insertOne(otpTestData);
         } else {
             OtpTestDataDao.instance.updateOne(Filters.eq("uuid", uuid), updates); 

@@ -188,9 +188,9 @@ export default {
           }
         ],
         stepType: this.tabData.data ? this.tabData.data.type : "LOGIN_FORM",
-        webhookUrl: "",
-        defaultRegex: "",
-        otpRefUuid: ""
+        otpRefUuid: this.tabData.data ? this.tabData.data.otpRefUuid : uuidv4(),
+        webhookUrl: window.location.origin + "/saveOtpData/" + this.otpRefUuid, 
+        defaultRegex: this.tabData.data ? this.tabData.data.regex : ""
       }
     },
     methods: {
@@ -239,13 +239,11 @@ export default {
           }
         },
         webhookUrlGenerator() {
-          let uuid = uuidv4();
-          this.otpRefUuid = '5e1aaeff-115a-4c36-8026-2fa3e552b106'
           this.updatedData.otpRefUuid = this.otpRefUuid
-          this.webhookUrl = window.location.origin + "/saveOtpData/5e1aaeff-115a-4c36-8026-2fa3e552b106"
+          this.webhookUrl = window.location.origin + "/saveOtpData/" + this.otpRefUuid
         },
         pollOtpResponse() {
-          let fetchUrl = window.location.origin + "/api/fetchOtpData/5e1aaeff-115a-4c36-8026-2fa3e552b106"
+          let fetchUrl = window.location.origin + "/api/fetchOtpData/" + this.otpRefUuid
           this.$emit('pollOtpResponse', fetchUrl, this.tabName)
         },
         testRegex() {
