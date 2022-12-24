@@ -143,11 +143,11 @@ export default {
     data () {
 
       let defaults = {
-        defaultUrl: "https://juice-shop.herokuapp.com/rest/user/login",
+        defaultUrl: "https://xyz.com",
         defaultQueryParams: "",
         defaultMethod: "POST",
         defaultHeaderString: "{'content-type': 'application/json'}",
-        defaultBody: "{\"email\": \"sdf@gmail.com\", \"password\": \"qw@12345\"}",
+        defaultBody: "{\"email\": \"abc@mail.com\"}",
         defaultAuthKey: "",
         defaultAuthTokenPath: ""
       }
@@ -190,7 +190,7 @@ export default {
         stepType: this.tabData.data ? this.tabData.data.type : "LOGIN_FORM",
         otpRefUuid: this.tabData.data ? this.tabData.data.otpRefUuid : uuidv4(),
         webhookUrl: window.location.origin + "/saveOtpData/" + this.otpRefUuid, 
-        defaultRegex: this.tabData.data ? this.tabData.data.regex : ""
+        defaultRegex: this.tabData.data ? this.tabData.data.regex : "(\d+){1,6}"
       }
     },
     methods: {
