@@ -1,9 +1,6 @@
 package com.akto.util;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.type.RequestTemplate;
@@ -156,6 +153,29 @@ public class JSONUtils {
         }
     }
 
+
+    public static Map<String, List<String>> modifyHeaderValues(Map<String, List<String>> headers, PayloadModifier payloadModifier) {
+        boolean flag = false;
+        Map<String, List<String>> modifiedHeaders = new HashMap<>(headers);
+        for (String header: modifiedHeaders.keySet()) {
+            List<String> values = modifiedHeaders.get(header);
+            List<String> newValues = new ArrayList<>();
+            for (String value: values) {
+                Object modifiedHeader = payloadModifier.modify(header, value);
+                if (modifiedHeader != null) {
+                    newValues.add(modifiedHeader.toString());
+                    flag = true;
+                } else {
+                    newValues.add(value);
+                }
+            }
+            modifiedHeaders.put(header, newValues);
+        }
+
+        if (!flag) return null;
+
+        return modifiedHeaders;
+    }
 
 
 }
