@@ -2,6 +2,7 @@ package com.akto.action.testing;
 
 import com.akto.action.UserAction;
 import com.akto.dao.AuthMechanismsDao;
+import com.akto.dao.testing.LoginFlowStepsDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dto.testing.*;
@@ -16,6 +17,7 @@ import org.bson.types.ObjectId;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -33,11 +35,11 @@ public class AuthMechanismAction extends UserAction {
 
     private ArrayList<AuthParamData> authParamData;
 
-    private String verificationCodeBody;
-
     private String uuid;
 
     private ArrayList<Object> responses;
+
+    private String nodeId;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AuthMechanismAction.class);
 
@@ -96,7 +98,36 @@ public class AuthMechanismAction extends UserAction {
 
         TestExecutor testExecutor = new TestExecutor();
         try {
-            responses = testExecutor.executeLoginFlow(authMechanism, responses);
+            LoginFlowResponse loginFlowResponse = testExecutor.executeLoginFlow(authMechanism, null);
+            responses = loginFlowResponse.getResponses();
+            if (!loginFlowResponse.getSuccess()) {
+                throw new Exception(loginFlowResponse.getError());
+            }
+        } catch(Exception e) {
+            addActionError(e.getMessage());
+            return ERROR.toUpperCase();
+        }
+        return SUCCESS.toUpperCase();
+    }
+
+    public String triggerSingleLoginFlowStep() {
+        List<AuthParam> authParams = new ArrayList<>();
+
+        if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
+            addActionError("Invalid Type Value");
+            return ERROR.toUpperCase();
+        }
+
+        AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type);
+
+        TestExecutor testExecutor = new TestExecutor();
+        try {
+            LoginFlowParams loginFlowParams = new LoginFlowParams(getSUser().getId(), true, nodeId);
+            LoginFlowResponse loginFlowResponse = testExecutor.executeLoginFlow(authMechanism, loginFlowParams);
+            responses = loginFlowResponse.getResponses();
+            if (!loginFlowResponse.getSuccess()) {
+                throw new Exception(loginFlowResponse.getError());
+            }
         } catch(Exception e) {
             addActionError(e.getMessage());
             return ERROR.toUpperCase();
@@ -108,68 +139,6 @@ public class AuthMechanismAction extends UserAction {
 
         authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
         return SUCCESS.toUpperCase();
-    }
-
-    // fix and use this for dynamic otp
-    public String saveOtpData() {
-
-        // fetch from url param
-        Bson filters = Filters.eq("uuid", uuid);
-        try {
-            authMechanism = AuthMechanismsDao.instance.findOne(filters);
-        } catch(Exception e) {
-            loggerMaker.errorAndAddToDb("error extracting verification code for auth Id " + uuid);
-            return ERROR.toUpperCase();
-        }
-
-        for (RequestData data : authMechanism.getRequestData()) {
-            if (!(data.getType().equals("EMAIL_CODE_VERIFICATION") || data.getType().equals("MOBILE_CODE_VERIFICATION"))) {
-                continue;
-            }
-            LoginVerificationCodeData verificationCodeData = data.getVerificationCodeData();
-
-            String key = verificationCodeData.getKey();
-            String body = data.getBody();
-            String verificationCode;
-            try {
-                verificationCode = extractVerificationCode(verificationCodeBody, verificationCodeData.getRegexString());
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("error parsing regex string " + verificationCodeData.getRegexString() +
-                        "for auth Id " + uuid);
-                return ERROR.toUpperCase();
-            }
-
-            if (verificationCode == null) {
-                loggerMaker.errorAndAddToDb("error extracting verification code for auth Id " + uuid);
-                return ERROR.toUpperCase();
-            }
-
-            Gson gson = new Gson();
-            Map<String, Object> json = gson.fromJson(body, Map.class);
-            json.put(key, verificationCode);
-
-            JSONObject jsonBody = new JSONObject();
-            for (Map.Entry<String, Object> entry : json.entrySet()) {
-                jsonBody.put(entry.getKey(), entry.getValue());
-            }
-            data.setBody(jsonBody.toString());
-        }
-
-        AuthMechanismsDao.instance.replaceOne(filters, authMechanism);
-        return SUCCESS.toUpperCase();
-    }
-
-    private String extractVerificationCode(String text, String regex) {
-        return "346";
-//        System.out.println(regex);
-//        System.out.println(regex.replace("\\", "\\\\"));
-//        Pattern pattern = Pattern.compile(regex.replace("\\", "\\\\"));
-//        Matcher matcher = pattern.matcher(text);
-//        String verificationCode = null;
-//        if (matcher.find()) {
-//            verificationCode = matcher.group(1);
-//        }
-//        return verificationCode;
     }
 
     private int workflowTestId;
@@ -208,12 +177,12 @@ public class AuthMechanismAction extends UserAction {
         return this.authParamData;
     }
 
-    public String getVerificationCodeBody() {
-        return this.verificationCodeBody;
-    }
-
     public String getUuid() {
         return this.uuid;
+    }
+
+    public String getNodeId() {
+        return this.nodeId;
     }
 
     public ArrayList<Object> getResponses() {
@@ -245,11 +214,12 @@ public class AuthMechanismAction extends UserAction {
         this.authParamData = authParamData;
     }
 
-    public void setVerificationCodeBody(String verificationCodeBody) {
-        this.verificationCodeBody = verificationCodeBody;
-    }
-
     public void setUuid(String uuid) {
         this.uuid = uuid;
     }
+
+    public void setNodeId(String nodeId) {
+        this.nodeId = nodeId;
+    }
+    
 }

@@ -3,6 +3,7 @@ package com.akto.testing;
 import com.akto.DaoInit;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.LoginFlowStepsDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
@@ -92,7 +93,10 @@ public class TestExecutor {
         TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessages, singleTypeInfoMap, testRoles);
 
         try {
-            executeLoginFlow(authMechanism, null);
+            LoginFlowResponse loginFlowResponse = executeLoginFlow(authMechanism, null);
+            if (!loginFlowResponse.getSuccess()) {
+                throw new Exception("login flow failed");
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e.getMessage());
             return;
@@ -184,25 +188,20 @@ public class TestExecutor {
 
     }
 
-    public ArrayList<Object> executeLoginFlow(AuthMechanism authMechanism, ArrayList<Object> resp) throws Exception {
+    public LoginFlowResponse executeLoginFlow(AuthMechanism authMechanism, LoginFlowParams loginFlowParams) throws Exception {
 
         if (!authMechanism.getType().equals(LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString())) {
-            return new ArrayList<Object>();
+            return new LoginFlowResponse(null, null, true);
         }
 
-        WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData());
+        WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData(), loginFlowParams);
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
-        ArrayList<Object> responses = new ArrayList<Object>();
-        try {
-            resp = apiWorkflowExecutor.runLoginFlow(workflowObj, authMechanism);
-        } catch(Exception e){
-            loggerMaker.errorAndAddToDb("Login call failed {}" + e.getMessage());
-            throw new Exception("Login Flow Failed");
-        }
-        return resp;
+        LoginFlowResponse loginFlowResp;
+        loginFlowResp = apiWorkflowExecutor.runLoginFlow(workflowObj, authMechanism, loginFlowParams);
+        return loginFlowResp;
     }
 
-    public WorkflowTest convertToWorkflowGraph(ArrayList<RequestData> requestData) {
+    public WorkflowTest convertToWorkflowGraph(ArrayList<RequestData> requestData, LoginFlowParams loginFlowParams) {
 
         String source, target;
         List<String> edges = new ArrayList<>();
@@ -230,9 +229,17 @@ public class TestExecutor {
             WorkflowUpdatedSampleData sampleData = new WorkflowUpdatedSampleData(json.toString(), data.getQueryParams(),
                     data.getHeaders(), data.getBody(), data.getUrl());
 
+            int waitTime = 0;
+            WorkflowNodeDetails.Type nodeType = WorkflowNodeDetails.Type.API;
+            if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.OTP_VERIFICATION.toString())) {
+                nodeType = WorkflowNodeDetails.Type.OTP;
+                if (loginFlowParams == null || !loginFlowParams.getFetchValueMap()) {
+                    waitTime = 100;
+                }
+            }
             WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(0, data.getUrl(),
                     URLMethods.Method.fromString(data.getMethod()), "", sampleData,
-                    WorkflowNodeDetails.Type.API, true, data.getWaitTime());
+                    nodeType, true, waitTime, 0, 0, data.getRegex(), data.getOtpRefUuid());
 
             mapNodeIdToWorkflowNodeDetails.put(target, workflowNodeDetails);
         }

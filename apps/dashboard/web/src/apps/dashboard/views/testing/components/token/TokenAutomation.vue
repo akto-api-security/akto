@@ -1,5 +1,5 @@
 <template>
-    <div class="pa-4" style="background-color: #FFFFFF; height: 550px">
+    <div class="pa-4 automation-container">
         <div v-if="showAuthParams">
               <div v-for="(key, index) in authParamsList" :key="index">
                 <div class="input-value d-flex">
@@ -21,14 +21,17 @@
 
                 </div>
               </div>
-              <v-btn primary icon color="#6200EA" @click='addNewAuthParamElem' >
-                  <v-icon> $fas_plus </v-icon>
-              </v-btn>
-              <v-btn primary plain color="#6200EA" @click='saveLoginStep' >
-                  Done
-              </v-btn>
+              <v-btn primary icon color="#6200EA" @click='toggleShowAuthParamsAuthTab' >
+                    <v-icon> $fas_arrow-left </v-icon>
+                </v-btn>
+                <v-btn primary icon color="#6200EA" @click='addNewAuthParamElem' >
+                    <v-icon> $fas_plus </v-icon>
+                </v-btn>
+                <v-btn primary plain color="#6200EA" @click='saveLoginStep' >
+                    Done
+                </v-btn>
 
-        </div>
+            </div>
 
         <layout-with-tabs :tabs='apiTabs' :defaultTabName='currTabName' v-else>
             <template v-for="(apiTabName, index) in apiTabs" v-slot:[apiTabName]>
@@ -37,16 +40,20 @@
                         <login-step-builder
                             :tabName="apiTabName"
                             :tabData="stepData[apiTabName]"
-                            @testLoginStep=testLoginStep
+                            :finishedWebhookSetup="finishedWebhookSetup"
+                            :disableOtpSave="disableOtpSave"
+                            @testSingleStep=testSingleStep
+                            @pollOtpResponse=pollOtpResponse
+                            @testRegex=testRegex
                         />
                         <v-btn plain color="#6200EA" @click="removeTab(apiTabName)" class="top-right-btn">
                             Remove Step
                         </v-btn>
                         <div class="float-right ma-2">
-                            <v-btn dark  primary color="#6200EA" @click="addTab(apiTabName)">
-                                Next step
+                            <v-btn :disabled="!stepData[apiTabName].testedSuccessfully" class="token-automation-primary-btn" @click="addTab(apiTabName)"  style="background-color:  #6200EA !important; color: #FFFFFF !important">
+                                Add step
                             </v-btn>
-                            <v-btn dark  primary color="#6200EA" @click="toggleShowAuthParams(apiTabName)" >
+                            <v-btn :disabled="!stepData[apiTabName].showAddStepOption" class="token-automation-primary-btn" @click="toggleShowAuthParams(apiTabName)"  style="background-color:  #6200EA !important; color: #FFFFFF !important">
                                 Extract
                             </v-btn>
                         </div>
@@ -66,7 +73,7 @@ import api from '../../api'
 import {mapState} from 'vuex'
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import LoginStepBuilder from './LoginStepBuilder'
-import IconMenu from '@/apps/dashboard/shared/components/IconMenu'
+import store from "@/apps/main/store/module";
 
 export default {
     name: "TokenAutomation",
@@ -113,7 +120,9 @@ export default {
             showLoginSaveOption: false,
             addNewDataToTestReq: true,
             testedDataButNotSaved: null,
-            authParamsList: paramList
+            authParamsList: paramList,
+            finishedWebhookSetup: false,
+            disableOtpSave: true
         }
     },
     methods: {
@@ -129,73 +138,126 @@ export default {
 
         toggleShowAuthParams(tabName) {
           this.showAuthParams = true
-          this.saveTabInfo(tabName)
         },
 
-        testLoginStep(updatedData, tabString) {
-          this.testedDataButNotSaved = updatedData
+        toggleShowAuthParamsAuthTab() {
+            this.showAuthParams = !this.showAuthParams
+        },
 
-          
-          let currentTabPushed = false
-
-          if (!this.stepData[tabString]) {
-            this.stepData[tabString] = {}
+        async pollOtpResponse(webhookUrl, tabString) {
+            let pollAttempts = 20
+            let pollSleepDuration = 10000
+            let success = false
+            let errResp;
+            for (let i=0; i<pollAttempts; i++) {
+                if (success) {
+                    break
+                } else {
+                  await this.sleep((i) * pollSleepDuration);
+                }
+                let result = api.fetchOtpData(webhookUrl)
+                result.then((resp) => {
+                    console.log("polled otp text")
+                    let stepDataCopy = JSON.parse(JSON.stringify(this.stepData[tabString]));
+                    stepDataCopy.responsePayload = resp
+                    this.$set(this.stepData, tabString, stepDataCopy);
+                    success = true
+                    this.finishedWebhookSetup = true
+                }).catch((err) => {
+                    console.log("polling otp text err")
+                    errResp = err
+                })
+            }
+            if (!success) {
+                let stepDataCopy = JSON.parse(JSON.stringify(this.stepData[tabString]));
+                stepDataCopy.responsePayload = errResp.response.data.actionErrors
+                this.$set(this.stepData, tabString, stepDataCopy);
+            }
+        },
+        sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        },
+        testRegex(tabString, data) {
+          let regexp = new RegExp(data.regex, "g");
+          let matches = regexp.exec(this.stepData[tabString].responsePayload.otpText);
+          if (matches == null || matches.length < 2) {
+            this.disableOtpSave = true
+            return
           }
+          let stepDataCopy = JSON.parse(JSON.stringify(this.stepData[tabString]));
+          stepDataCopy.responsePayload.otp = matches[1]
+          stepDataCopy.data = data
+          this.$set(this.stepData, tabString, stepDataCopy);
+          this.disableOtpSave = false
+        },
 
-          this.stepData[tabString]["data"] = updatedData
-          this.stepData = {...this.stepData}
+        testSingleStep(updatedData, tabString) {
 
-          this.stepData[tabString]["data"] = updatedData
+            let indexTab = this.apiTabs.indexOf(tabString)
+            let nodeId = "x" + ((indexTab * 2) + 1)
+            let result = api.triggerSingleStep("LOGIN_REQUEST", nodeId, [updatedData])
 
+            result.then((resp) => {
+                func.showSuccessSnackBar("Login flow ran successfully!")
 
-          let reqData = Object.values(this.stepData).filter(x => x.data != null).map(x => x.data)
-          let result = api.triggerLoginSteps("LOGIN_REQUEST", reqData, [])
-
-           result.then((resp) => {
-              this.showLoginSaveOption = true
-              func.showSuccessSnackBar("Login flow ran successfully!")
-              let index = 0;
-
-              let stepDataCopyObj = {}
-
-              for (let key in this.stepData) {
-                
-                // if (this.stepData[key]["data"]==null) {
-                //     break
-                // }
-               //let stepDataCopy = this.stepData[key]
-                let stepDataCopy = JSON.parse(JSON.stringify(this.stepData[key]));
-                let respData = resp.responses[index]
+                let stepDataCopy = JSON.parse(JSON.stringify(this.stepData[tabString]));
+                let respData = resp.responses[0]
                 let myobj = JSON.parse(respData);
                 stepDataCopy.responseHeaders = myobj.headers
                 stepDataCopy.responsePayload = myobj.body
-                if (key == tabString) {
-                    stepDataCopy.showAddStepOption = true
-                    stepDataCopy.testedSuccessfully = true
+                stepDataCopy.showAddStepOption = true
+                stepDataCopy.testedSuccessfully = true
+                stepDataCopy.data = updatedData
+                this.$set(this.stepData, tabString, stepDataCopy);
+
+            }).catch((err) => {
+                
+                console.log(err);
+                let errResp = err.response.data.responses
+                if (errResp == null || errResp.length == 0) return
+
+                let stepDataCopy = JSON.parse(JSON.stringify(this.stepData[tabString]));
+                let respData = errResp[0]
+                let myobj = JSON.parse(respData);
+                stepDataCopy.responseHeaders = myobj.headers
+                stepDataCopy.responsePayload = myobj.body
+                stepDataCopy.showAddStepOption = false
+                stepDataCopy.testedSuccessfully = false
+                this.$set(this.stepData, tabString, stepDataCopy);
+            })
+        },
+        testLoginStep() {
+
+          let reqData = Object.values(this.stepData).filter(x => x.data != null).map(x => x.data)
+
+          let result = api.triggerLoginSteps("LOGIN_REQUEST", reqData, this.authParamsList)
+
+           result.then((resp) => {
+              func.showSuccessSnackBar("Login flow ran successfully!")
+          }).catch((err) => {
+              console.log(err);
+              let errResp = err.response.data.responses
+              if (errResp == null || errResp.length == 0) return
+              let index = 0;
+              let stepDataCopyObj = {}
+
+              for (let key in this.stepData) {
+                let stepDataCopy = JSON.parse(JSON.stringify(this.stepData[key]));
+                if (index < errResp.length) {
+                    let respData = errResp[index]
+                    let myobj = JSON.parse(respData);
+                    stepDataCopy.responseHeaders = myobj.headers
+                    stepDataCopy.responsePayload = myobj.body
+                    stepDataCopy.showAddStepOption = false
+                    stepDataCopy.testedSuccessfully = false
+                } else {
+                    stepDataCopy.responseHeaders = null
+                    stepDataCopy.responsePayload = null
                 }
-                //this.$set(this.stepData, key, this.stepData[key])
-                //Vue.set(this.stepData, key, stepDataCopy)
                 stepDataCopyObj[key] = stepDataCopy
                 index++
-            }
-
-            this.stepData = Object.assign({}, this.stepData, stepDataCopyObj)
-
-            //   let this.stepData = Object.keys(this.stepData).sort().reduce(
-            //     (obj, key) => { 
-            //         obj[key] = this.stepData[key]; 
-            //         return obj;
-            //     }, 
-            //     {}
-            //   );      
-          }).catch((err) => {
-              this.showLoginSaveOption = false
-              this.testedSuccessfully = false
-              let r = this.stepData[tabString]
-              r.showAddStepOption = false
-              r.testedSuccessfully = false
-              this.stepData[tabString].showAddStepOption = false
-              console.log(err);
+                }
+              this.stepData = Object.assign({}, this.stepData, stepDataCopyObj)
           })
         },
         saveLoginStep() {
@@ -213,6 +275,7 @@ export default {
 
           result.then((resp) => {
               func.showSuccessSnackBar("Login Flow saved successfully!")
+              this.$emit('toggleOriginalStateDb')
           }).catch((err) => {
               console.log(err);
           })
@@ -221,10 +284,6 @@ export default {
           this.$emit('closeLoginStepBuilder')
         },
         addTab(tabString) {
-            let updatedData = this.testedDataButNotSaved
-            this.addNewDataToTestReq = true
-            this.stepData[tabString] = {"data": updatedData, "showAddStepOption": false,
-             "testedSuccessfully": true}
             this.counter++
             let newTabName = "API-"+this.counter
             let apiTabsCopy = [...this.apiTabs]
@@ -256,12 +315,13 @@ export default {
             let indexTab = this.apiTabs.indexOf(tabName)
             this.currTabName = this.apiTabs[Math.min(0, indexTab-1)]
             this.apiTabs.splice(indexTab, 1)
-            Vue.delete(this.stepData, tabName);
+            this.$delete(this.stepData, tabName)
         }
     },
 
     mounted () {
     },
+
     
     computed: {
 
@@ -274,5 +334,19 @@ export default {
   position: absolute
   top: 10px
   right: 0px  
+
+.automation-container
+    background-color: #FFFFFF 
+    height: 550px
+    overflow-y: scroll
+    color: #47466A
+
+.token-automation-primary-btn
+    background-color: #6200EA !important
+    color: #FFFFFF !important
+    margin-left: 12px
+
+    &.v-btn--disabled
+        opacity: 0.3 !important
 
 </style>

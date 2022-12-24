@@ -29,8 +29,7 @@
         </template>
         <template slot="User config">
             <div class="pa-8">
-                <v-btn primary dark color="#6200EA" @click="stopAllTests" :loading="stopAllTestsLoading"
-                    style="float:right">
+                <v-btn outlined color="#6200EA" @click="stopAllTests" :loading="stopAllTestsLoading" style="float:right">
                     Stop all tests
                 </v-btn>
 
@@ -78,41 +77,38 @@
                         </v-btn>
                     </div>
 
-
-                    <!--                <div class="di-flex-bottom">-->
-
-                    <!--                        <div class="col_1">-->
-                    <!--                            <p> 2 </p>-->
-                    <!--                        </div>-->
-
-                    <!--                        <div>-->
-                    <!--                            <h3> Automate auth token generation </h3>-->
-                    <!--                        </div>-->
-                    <!--                    </div>-->
-
-                    <!--                    <div class="di-flex">-->
-                    <!--                        <div class="input-value">-->
-                    <!--                            <div  v-if="authTokenUrl != null && authTokenDate != null">-->
-                    <!--                                <span class="auth-token-title">URL: </span>-->
-                    <!--                                <span class="auth-token-text">{{authTokenUrl}}</span>-->
-                    <!--                                <br/>-->
-                    <!--                                <span class="auth-token-title">Created on: </span>-->
-                    <!--                                <span class="auth-token-text">{{authTokenDate}}</span>-->
-                    <!--                            </div>-->
-                    <!--                        </div>-->
-
-                    <!--                        <v-btn primary dark color="#6200EA" @click="toggleLoginStepBuilder">-->
-                    <!--                            <span v-if="originalDbState">Edit</span>-->
-                    <!--                            <span v-else>Create</span>-->
-                    <!--                        </v-btn>-->
-                    <!--                    </div>-->
-
+                    <div class="di-flex-bottom">
+                        <div class="col_1">
+                            <p> 2 </p>
+                        </div>
+                        
+                        <div>
+                            <h3> Automate auth token generation </h3>
+                        </div>
+                    </div>
+                    
+                    <div class="di-flex">
+                        <div class="input-value">
+                            <div  v-if="authTokenUrl != null && authTokenDate != null">
+                                <span class="auth-token-title">URL: </span>
+                                <span class="auth-token-text">{{authTokenUrl}}</span>
+                                <br/>
+                                <span class="auth-token-title">Created on: </span>
+                                <span class="auth-token-text">{{authTokenDate}}</span>
+                            </div>
+                        </div>
+                        <v-btn primary dark color="#6200EA" @click="toggleLoginStepBuilder">
+                            <span v-if="originalDbState">Edit</span>
+                            <span v-else>Create</span>
+                        </v-btn>
+                    </div>
                 </div>
 
-<!--                <v-dialog v-model="showTokenAutomation" class="token-automation-modal">-->
-<!--                    <token-automation :originalDbState="originalDbState" @closeLoginStepBuilder=toggleLoginStepBuilder />-->
-<!--                </v-dialog>-->
 
+                <v-dialog v-model="showTokenAutomation" class="token-automation-modal">
+                    <token-automation :originalDbState="originalDbState" @closeLoginStepBuilder=toggleLoginStepBuilder @toggleOriginalStateDb=toggleOriginalStateDb />
+                </v-dialog>    
+                
             </div>
         </template>
         <template slot="Roles">
@@ -234,102 +230,16 @@ export default {
         toggleLoginStepBuilder() {
             this.showTokenAutomation = !this.showTokenAutomation
         },
-        testLoginStep(data) {
-            let updatedData = data["updatedData"]
-
-            let url = updatedData["url"]
-            if (!url) {
-                func.showErrorSnackBar("Invalid URL")
-                return
-            }
-
-            let queryParams = updatedData["queryParams"]
-
-            let method = updatedData["method"]
-            method = this.validateMethod(method)
-            if (!method) {
-                func.showErrorSnackBar("Invalid HTTP method")
-                return
-            }
-
-            let headerString = updatedData["headerString"]
-
-            let body = updatedData["body"]
-
-            let key = updatedData["authKey"]
-
-            let authTokenPath = updatedData["authTokenPath"]
-
-
-            let result = api.triggerLoginSteps(key, "", "HEADER", "SINGLE_REQUEST", authTokenPath, [{
-                "url": url,
-                "body": body,
-                "headers": headerString,
-                "queryParams": queryParams,
-                "method": method
-            }
-            ])
-
-            result.then((resp) => {
-                this.showLoginSaveOption = true
-                func.showSuccessSnackBar("Login Flow Ran Successfully!")
-            }).catch((err) => {
-                this.showLoginSaveOption = false
-                console.log(err);
-            })
-
+        toggleOriginalStateDb() {
+            console.log('got db state event')
+            this.fetchAuthMechanismData()
         },
-
-        saveLoginStep(data) {
-            let updatedData = data["updatedData"]
-
-            let url = updatedData["url"]
-            if (!url) {
-                func.showErrorSnackBar("Invalid URL")
-                return
-            }
-
-            let queryParams = updatedData["queryParams"]
-
-            let method = updatedData["method"]
-            method = this.validateMethod(method)
-            if (!method) {
-                func.showErrorSnackBar("Invalid HTTP method")
-                return
-            }
-
-            let headerString = updatedData["headerString"]
-
-            let body = updatedData["body"]
-
-            let key = updatedData["authKey"]
-
-            let authTokenPath = updatedData["authTokenPath"]
-
-            let result = api.addAuthMechanism(key, "", "HEADER", "SINGLE_REQUEST", authTokenPath, [{
-                "url": url,
-                "body": body,
-                "headers": headerString,
-                "queryParams": queryParams,
-                "method": method
-            }
-            ])
-
-            result.then((resp) => {
-                func.showSuccessSnackBar("Login Flow saved successfully!")
-            }).catch((err) => {
-                console.log(err);
-            })
-
-
-        },
-
-        validateMethod(methodName) {
-            let m = methodName.toUpperCase()
-            let allowedMethods = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "TRACE", "PATCH"]
-            let idx = allowedMethods.indexOf(m);
-            if (idx === -1) return null
-            return allowedMethods[idx]
+      validateMethod(methodName) {
+          let m = methodName.toUpperCase()
+          let allowedMethods = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "TRACE", "PATCH"]
+          let idx = allowedMethods.indexOf(m);
+          if (idx === -1) return null
+          return allowedMethods[idx]
         },
         fetchAuthMechanismData() {
             api.fetchAuthMechanismData().then((resp) => {
