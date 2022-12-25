@@ -136,7 +136,7 @@ public class DailyUpdate {
         BasicDBList sectionsList = new BasicDBList();
         BasicDBObject ret = new BasicDBObject("blocks", sectionsList);
 
-        sectionsList.add(createHeader("Summary for today: "));        
+        sectionsList.add(createHeader("API Inventory Summary For Today :ledger: :"));        
         // sectionsList.add(createNumberSection("Total Sensitive Endpoints", totalSensitiveEndpoints, "Total Endpoints", totalEndpoints));
 
         // int end = Context.now();

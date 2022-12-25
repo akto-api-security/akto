@@ -40,7 +40,7 @@ public class TestSummaryGenerator {
         BasicDBList sectionsList = new BasicDBList();
         BasicDBObject ret = new BasicDBObject("blocks", sectionsList);
 
-        sectionsList.add(createHeader("Testing summary for today:"));
+        sectionsList.add(createHeader("API Testing Summary For Today :testing: :"));
 
         String mainTestingLink = dashboardLink + "/dashboard/testing/active";
 
@@ -50,7 +50,7 @@ public class TestSummaryGenerator {
         }
 
         BasicDBObject automatedTestStatsSection= createNumberSection(
-                "Automated tests ran",
+                "Automated test runs",
                 generateResult.automatedTestingResultSummary.size(),
                 mainTestingLink,
                 "Total APIs tested",
@@ -72,15 +72,17 @@ public class TestSummaryGenerator {
         if (!linkWithDescriptionList.isEmpty()) {
             sectionsList.add(createSimpleBlockText("*Issues found:* \n"));
             sectionsList.addAll(createLinksSection(linkWithDescriptionList));
+        } else {
+            sectionsList.add(createSimpleBlockText("_No issues found!!_:partying_face:"));
+        }
+
+        if (generateResult.workflowTestResults.isEmpty()) {
+            return ret.toJson();
         }
 
         int workflowAPIs = 0;
         for (WorkflowTestResult workflowTestResult: generateResult.workflowTestResults) {
             workflowAPIs += workflowTestResult.getNodeResultMap().size();
-        }
-
-        if (generateResult.workflowTestResults.isEmpty()) {
-            ret.toJson();
         }
 
         BasicDBObject workflowTestStatsSection= createNumberSection(
@@ -134,11 +136,15 @@ public class TestSummaryGenerator {
         if (!vulnerableWorkflowTestResults.isEmpty()) {
             sectionsList.add(createSimpleBlockText("*Vulnerable workflow tests:* \n"));
             sectionsList.addAll(createLinksSection(vulnerableWorkflowTestResults));
+        } else {
+            sectionsList.add(createSimpleBlockText("_No vulnerable workflow tests_:partying_face:"));
         }
 
         if (!errorWorkflowTestResults.isEmpty()) {
             sectionsList.add(createSimpleBlockText("*Error workflows tests:* \n"));
             sectionsList.addAll(createLinksSection(errorWorkflowTestResults));
+        } else {
+            sectionsList.add(createSimpleBlockText("_No error in workflow tests_:partying_face:"));
         }
 
         return ret.toJson();
@@ -185,7 +191,7 @@ public class TestSummaryGenerator {
         }
 
         workflowTestResults = WorkflowTestResultsDao.instance.findAll(Filters.in(WorkflowTestResult.TESTING_RUN_RESULT_SUMMARY_ID, workflowTestingResultSummaryIds));
-        List<Integer> workflowIds = new ArrayList<>();
+        Set<Integer> workflowIds = new HashSet<>();
         for (WorkflowTestResult workflowTestResult: workflowTestResults) {
             workflowIds.add(workflowTestResult.getWorkflowTestId());
         }
