@@ -11,6 +11,7 @@
             :editWorkflowNodeDetails="editWorkflowNodeDetails"
             :runWorkflowTest="runWorkflowTest"
             :fetchWorkflowResult="fetchWorkflowResult"
+            :defaultOpenResult="defaultOpenResult"
         />
     </div>
 </template>
@@ -28,7 +29,8 @@ export default {
     props: {
         apiCollectionId: obj.numR,
         endpointsList: obj.arrR,
-        originalStateFromDb: obj.objN
+        originalStateFromDb: obj.objN,
+        defaultOpenResult: obj.ObjN
     },
     data() {
         let defNodes = [

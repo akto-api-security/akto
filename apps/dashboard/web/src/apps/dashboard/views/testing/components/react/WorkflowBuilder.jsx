@@ -25,7 +25,7 @@ const theme = createTheme({
   }
 });
 
-const WorkflowBuilder = ({endpointsList, originalStateFromDb, fetchSampleDataFunc, createWorkflowTest, editWorkflowTest, editWorkflowNodeDetails, apiCollectionId, runWorkflowTest, fetchWorkflowResult}) => {
+const WorkflowBuilder = ({endpointsList, originalStateFromDb, fetchSampleDataFunc, createWorkflowTest, editWorkflowTest, editWorkflowNodeDetails, apiCollectionId, runWorkflowTest, fetchWorkflowResult, defaultOpenResult}) => {
   const setOriginalState = useStore((state) => state.setOriginalState);
   const setEndpointsList = useStore((state) => state.setEndpointsList);
   const setUtilityFuncs = useStore((state) => state.setUtilityFuncs);
@@ -49,7 +49,7 @@ const WorkflowBuilder = ({endpointsList, originalStateFromDb, fetchSampleDataFun
 
   if (renderNow) {
     return (
-      <Workflow theme={theme} apiCollectionId={apiCollectionId}/>
+      <Workflow theme={theme} apiCollectionId={apiCollectionId} defaultOpenResult={defaultOpenResult}/>
     )
   } else {
     return (
