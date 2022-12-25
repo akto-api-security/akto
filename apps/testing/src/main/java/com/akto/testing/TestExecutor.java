@@ -336,6 +336,8 @@ public class TestExecutor {
         ParameterPollutionTest parameterPollutionTest = new ParameterPollutionTest();
         OldApiVersionTest oldApiVersionTest = new OldApiVersionTest();
         JWTNoneAlgoTest  jwtNoneAlgoTest = new JWTNoneAlgoTest();
+        JWTInvalidSignatureTest jwtInvalidSignatureTest = new JWTInvalidSignatureTest();
+        AddJkuToJwtTest addJkuToJwtTest = new AddJkuToJwtTest();
         BFLATest bflaTest = new BFLATest();
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
@@ -364,6 +366,12 @@ public class TestExecutor {
 
             TestingRunResult jwtNoneAlgoTestResult = runTest(jwtNoneAlgoTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
             if (jwtNoneAlgoTestResult != null) testingRunResults.add(jwtNoneAlgoTestResult);
+
+            TestingRunResult jwtInvalidSignatureTestResult = runTest(jwtInvalidSignatureTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            if (jwtInvalidSignatureTestResult != null) testingRunResults.add(jwtInvalidSignatureTestResult);
+
+            TestingRunResult addJkuToJwtTestResult = runTest(addJkuToJwtTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            if (addJkuToJwtTestResult != null) testingRunResults.add(addJkuToJwtTestResult);
         }
 
         TestingRunResult addMethodInParameterTestResult = runTest(addMethodInParameterTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
