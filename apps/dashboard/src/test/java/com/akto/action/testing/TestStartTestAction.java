@@ -6,6 +6,7 @@ import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.type.URLMethods;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -65,6 +66,8 @@ public class TestStartTestAction extends MongoBasedTest {
 
         List<TestingRunResultSummary> testingRunResultSummaryList = new ArrayList<>();
         ObjectId testingRunId = new ObjectId();
+        TestingRun testingRun = new TestingRun(0, "avneesh@akto.io", new CollectionWiseTestingEndpoints(0), 0,  State.COMPLETED, 0);
+        testingRun.setId(testingRunId);
         for (int startTimestamp=0; startTimestamp < 30; startTimestamp++) {
             TestingRunResultSummary testingRunResultSummary = new TestingRunResultSummary(
                 startTimestamp, startTimestamp+10, new HashMap<>(), 10, testingRunId, testingRunId.toHexString(), 10
@@ -73,6 +76,7 @@ public class TestStartTestAction extends MongoBasedTest {
             testingRunResultSummaryList.add(testingRunResultSummary);
         }
 
+        TestingRunDao.instance.insertOne(testingRun);
         TestingRunResultSummariesDao.instance.insertMany(testingRunResultSummaryList);
 
         StartTestAction startTestAction = new StartTestAction();
