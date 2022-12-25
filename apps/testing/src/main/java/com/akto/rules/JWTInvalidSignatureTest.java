@@ -20,6 +20,6 @@ public class JWTInvalidSignatureTest extends ModifyAuthTokenTestPlugin {
 
     @Override
     public String subTestName() {
-        return "JWT_NONE_SIGNATURE";
+        return "JWT_INVALID_SIGNATURE";
     }
 }

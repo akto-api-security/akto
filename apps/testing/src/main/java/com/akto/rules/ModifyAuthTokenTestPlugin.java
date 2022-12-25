@@ -22,8 +22,9 @@ public abstract class ModifyAuthTokenTestPlugin extends AuthRequiredTestPlugin {
         OriginalHttpRequest testRequest = rawApi.getRequest();
         OriginalHttpResponse originalHttpResponse = rawApi.getResponse();
 
-        Map<String, List<String>> headers = modifyHeaders(testRequest.getHeaders());
-        if (headers == null || headers.isEmpty()) return null;
+        Map<String, List<String>> modifiedHeaders = modifyHeaders(testRequest.getHeaders());
+        if (modifiedHeaders == null || modifiedHeaders.isEmpty()) return null;
+        testRequest.setHeaders(modifiedHeaders);
 
         ApiExecutionDetails apiExecutionDetails;
         try {
