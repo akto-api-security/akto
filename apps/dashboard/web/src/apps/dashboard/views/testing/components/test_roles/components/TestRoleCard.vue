@@ -1,23 +1,17 @@
 <template>
     <div style="padding: 6px">
         <v-hover v-slot="{ hover }">
-            <tr class="table-row d-flex" >
-                <td
-                    class="table-column"
-                    :style="{'background-color': item.color, 'padding' : '0px !important', 'min-width':'6px'}"
-                />
-                <td
-                    class="table-column clickable"
-                    @click="dataTypeSelected(item)"
-                    style="width: 100%"
-                >
+            <tr class="table-row d-flex">
+                <td class="table-column"
+                    :style="{ 'background-color': item.color, 'padding': '0px !important', 'min-width': '6px' }" />
+                <td class="table-column clickable" @click="dataTypeSelected(item)" style="width: 100%">
                     <div class="table-entry">
-                        <span style="font-weight: bold">{{item.name}}</span>
+                        <span style="font-weight: bold">{{ item.name }}</span>
                     </div>
                 </td>
             </tr>
         </v-hover>
-        
+
     </div>
 </template>
         
@@ -25,7 +19,7 @@
 import obj from "@/util/obj"
 import ActionsTray from "@/apps/dashboard/shared/components/ActionsTray";
 export default {
-    name: "DataTypes",
+    name: "TestRoleCard",
     props: {
         item: obj.ObjR
     },
@@ -40,9 +34,9 @@ export default {
     created() {
     },
     methods: {
-      dataTypeSelected(item) {
-        this.$emit("selectedEntry", item)
-      }
+        dataTypeSelected(item) {
+            this.$emit("selectedEntry", item)
+        }
     }
 
 }

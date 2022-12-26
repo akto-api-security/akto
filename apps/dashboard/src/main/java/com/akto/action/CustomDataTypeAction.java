@@ -428,7 +428,7 @@ public class CustomDataTypeAction extends UserAction{
 
             List<Predicate> predicates = new ArrayList<>();
             for (ConditionFromUser conditionFromUser: keyConditionFromUsers) {
-                Predicate predicate = generatePredicate(conditionFromUser.type, conditionFromUser.valueMap);
+                Predicate predicate = Predicate.generatePredicate(conditionFromUser.type, conditionFromUser.valueMap);
                 if (predicate == null) {
                     throw new AktoCustomException("Invalid key conditions");
                 } else {
@@ -452,7 +452,7 @@ public class CustomDataTypeAction extends UserAction{
 
             List<Predicate> predicates = new ArrayList<>();
             for (ConditionFromUser conditionFromUser: valueConditionFromUsers) {
-                Predicate predicate = generatePredicate(conditionFromUser.type, conditionFromUser.valueMap);
+                Predicate predicate = Predicate.generatePredicate(conditionFromUser.type, conditionFromUser.valueMap);
                 if (predicate == null) {
                     throw new AktoCustomException("Invalid value conditions");
                 } else {
@@ -488,52 +488,6 @@ public class CustomDataTypeAction extends UserAction{
         return new CustomDataType(name, sensitiveAlways, sensitivePositions, userId,
                 true,keyConditions,valueConditions, mainOperator);
     }
-
-    public static Predicate generatePredicate(Predicate.Type type, Map<String,Object> valueMap) {
-        if (valueMap == null || type == null) return null;
-        Predicate predicate;
-        String value;
-        switch (type) {
-            case REGEX:
-                Object regex = valueMap.get("value");
-                if (!(regex instanceof String)) return null;
-                value = regex.toString();
-                if (value.length() == 0) return null;
-                if (value.startsWith("/")) {
-                    value = value.substring(1, value.lastIndexOf("/"));
-                }
-                predicate = new RegexPredicate(value);
-                return predicate;
-            case STARTS_WITH:
-                Object prefix = valueMap.get("value");
-                if (!(prefix instanceof String)) return null;
-                value = prefix.toString();
-                if (value.length() == 0) return null;
-                predicate = new StartsWithPredicate(value);
-                return predicate;
-            case ENDS_WITH:
-                Object suffix = valueMap.get("value");
-                if (!(suffix instanceof String)) return null;
-                value = suffix.toString();
-                if (value.length() == 0) return null;
-                predicate = new EndsWithPredicate(value);
-                return predicate;
-            case EQUALS_TO:
-                Object v = valueMap.get("value");
-                if (!(v instanceof String)) return null;
-                value = v.toString();
-                if (value.length() == 0) return null;
-                predicate = new EqualsToPredicate(value);
-                return predicate;
-            case IS_NUMBER:
-                return new IsNumberPredicate();
-
-            default:
-                return null;
-        }
-
-    }
-
 
     public void setCreateNew(boolean createNew) {
         this.createNew = createNew;

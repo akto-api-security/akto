@@ -58,7 +58,7 @@
                     style="padding: 12px 12px 12px 12px"
                     v-if="showMainOperator" 
                 >
-                    <operator-component :operator="data_type_copy.operator" @operatorChanged="operatorChanged"/>
+                    <operator-component :operators="operators" :operator="data_type_copy.operator" @operatorChanged="operatorChanged"/>
                 </v-row>
 
                 <v-row style="padding: 12px; padding-bottom: 50px"  >
@@ -167,12 +167,17 @@ export default {
         ReviewTable
     },
     data() {
+        var operators = [
+                "OR", "AND"
+            ]
+
         return {
             data_type_copy: null,
             reqToggle: null,
             resToggle: null,
             saveLoading: false,
             reviewLoading: false,
+            operators,
             name_rules: [
                     value => {
                         if (!value) return "Required"

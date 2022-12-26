@@ -17,9 +17,14 @@
                     <div style="display: flex; justify-content: space-between">
                         <div style="display: flex">
                             <div style="padding-right: 20px" v-if="index !== 0">
-                                <operator-component :operator="conditions.operator" @operatorChanged="operatorChanged" :onlyEqual="onlyEqual ? onlyEqual : false"/>
+                                <operator-component :operators="operators" :operator="conditions.operator" @operatorChanged="operatorChanged" :onlyEqual="onlyEqual ? onlyEqual : false"/>
                             </div>
-                            <simple-condition-component :initial_string="initial_string" :condition="condition" :onlyEqual="onlyEqual ? onlyEqual : false"/>
+                            <simple-condition-component :initial_string="initial_string" :condition="condition"
+                                :requireTextInputForTypeArray="requireTextInputForTypeArray"
+                                :operators="operators"
+                                :operation_types="operation_types"
+                                :onlyEqual="onlyEqual ? onlyEqual : false"
+                                @conditionTypeChanged="(value) => {condition.type=value}"/>
                         </div>
                         <div v-if="hover">
                             <v-icon 
@@ -55,8 +60,38 @@ export default {
         OperatorComponent
     },
     data() {
-        return {
+        var requireTextInputForTypeArray = ['EQUALS_TO','REGEX', 'STARTS_WITH', 'ENDS_WITH']
+        var operators = [
+                "OR", "AND"
+            ]
+        var operation_types = [
+                {
+                    "text": "equals to",
+                    "value": "EQUALS_TO"
+                },
+                {
+                  "text": "starts with",
+                  "value": "STARTS_WITH"
+                },
+                {
+                    "text": "ends with",
+                    "value": "ENDS_WITH"
+                },
+                {
+                    "text": "matches regex",
+                    "value": "REGEX"
+                },
+                {
+                    "text": "is number",
+                    "value": "IS_NUMBER"
+                }
 
+            ]
+
+        return {
+            requireTextInputForTypeArray,
+            operators,
+            operation_types
         }
     },
     methods: {
@@ -109,12 +144,6 @@ export default {
     color: #6200EA
     width: 100%
     height: 100%
-
-.condition-block
-    background: #edecf0 
-    width: fit-content
-    padding: 0px 10px 10px 10px
-
 
 .v-icon.v-icon:after
     background-color: transparent

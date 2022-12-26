@@ -10,13 +10,31 @@ export default {
             return resp
         })
     },
-    addTestRoles (roleName, regex, includedApiList, excludedApiList) {
+    addTestRoles (roleName, andConditions, orConditions) {
         return request({
             url: '/api/addTestRoles',
             method: 'post',
-            data: {roleName, regex, includedApiList, excludedApiList}
+            data: {roleName, andConditions, orConditions}
         }).then((resp) => {
             return resp
         })        
     },
+    updateTestRoles (roleName, andConditions, orConditions) {
+        return request({
+            url: '/api/updateTestRoles',
+            method: 'post',
+            data: {roleName, andConditions, orConditions}
+        }).then((resp) => {
+            return resp
+        })        
+    },
+    fetchCollectionWiseApiEndpoints (apiCollectionId) {
+        return request({
+            url: '/api/fetchCollectionWiseApiEndpoints',
+            method: 'post',
+            data: {apiCollectionId}
+        }).then((resp) => {
+            return resp
+        })        
+    }
 }
