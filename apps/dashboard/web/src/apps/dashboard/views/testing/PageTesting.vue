@@ -1,6 +1,5 @@
 <template>
-    <layout-with-tabs title="API Testing" class="page-testing"
-        :tabs='["Test results", "User config"]'>
+    <layout-with-tabs title="API Testing" class="page-testing" :tabs='["Test results", "User config", "Roles"]'>
         <template slot="Test results">
             <div class="py-8">
                 <div>
@@ -30,8 +29,7 @@
         </template>
         <template slot="User config">
             <div class="pa-8">
-                <v-btn primary dark color="#6200EA" @click="stopAllTests" :loading="stopAllTestsLoading"
-                    style="float:right">
+                <v-btn outlined color="#6200EA" @click="stopAllTests" :loading="stopAllTestsLoading" style="float:right">
                     Stop all tests
                 </v-btn>
 
@@ -51,106 +49,77 @@
 
                     <div class="d-flex">
                         <div class="input-value">
-                            <v-text-field 
-                                v-model="newKey"
-                                style="width: 200px"
-                            >
+                            <v-text-field v-model="newKey" style="width: 200px">
                                 <template slot="label">
                                     <div class="d-flex">
                                         Auth header key
-                                        <help-tooltip :size="12" text="Please enter name of the header which contains your auth token. This field is case-sensitive. eg Authorization"/>
+                                        <help-tooltip :size="12"
+                                            text="Please enter name of the header which contains your auth token. This field is case-sensitive. eg Authorization" />
                                     </div>
                                 </template>
                             </v-text-field>
-                            
+
                         </div>
                         <div class="input-value">
-                            <v-text-field 
-                                v-model="newVal"
-                                style="width: 500px"
-                            >              
+                            <v-text-field v-model="newVal" style="width: 500px">
                                 <template slot="label">
                                     <div class="d-flex">
                                         Auth header value
-                                        <help-tooltip :size="12" text="Please enter the value of the auth token."/>
+                                        <help-tooltip :size="12" text="Please enter the value of the auth token." />
                                     </div>
                                 </template>
 
                             </v-text-field>
                         </div>
 
-                    <v-btn primary dark color="#3366ff" @click="saveAuthMechanism" v-if="someAuthChanged">
-                        Save changes
-                    </v-btn>
+                        <v-btn primary dark color="#3366ff" @click="saveAuthMechanism" v-if="someAuthChanged">
+                            Save changes
+                        </v-btn>
+                    </div>
+
+                    <div class="di-flex-bottom">
+                        <div class="col_1">
+                            <p> 2 </p>
+                        </div>
+                        
+                        <div>
+                            <h3> Automate auth token generation </h3>
+                        </div>
+                    </div>
+                    
+                    <div class="di-flex">
+                        <div class="input-value">
+                            <div  v-if="authTokenUrl != null && authTokenDate != null">
+                                <span class="auth-token-title">URL: </span>
+                                <span class="auth-token-text">{{authTokenUrl}}</span>
+                                <br/>
+                                <span class="auth-token-title">Created on: </span>
+                                <span class="auth-token-text">{{authTokenDate}}</span>
+                            </div>
+                        </div>
+                        <v-btn primary dark color="#6200EA" @click="toggleLoginStepBuilder">
+                            <span v-if="originalDbState">Edit</span>
+                            <span v-else>Create</span>
+                        </v-btn>
+                    </div>
                 </div>
 
 
-<!--                <div class="di-flex-bottom">-->
-
-<!--                        <div class="col_1">-->
-<!--                            <p> 2 </p>-->
-<!--                        </div>-->
-
-<!--                        <div>-->
-<!--                            <h3> Automate auth token generation </h3>-->
-<!--                        </div>-->
-<!--                    </div>-->
-
-<!--                    <div class="di-flex">-->
-<!--                        <div class="input-value">-->
-<!--                            <div  v-if="authTokenUrl != null && authTokenDate != null">-->
-<!--                                <span class="auth-token-title">URL: </span>-->
-<!--                                <span class="auth-token-text">{{authTokenUrl}}</span>-->
-<!--                                <br/>-->
-<!--                                <span class="auth-token-title">Created on: </span>-->
-<!--                                <span class="auth-token-text">{{authTokenDate}}</span>-->
-<!--                            </div>-->
-<!--                        </div>-->
-
-<!--                        <v-btn primary dark color="#6200EA" @click="toggleLoginStepBuilder">-->
-<!--                            <span v-if="originalDbState">Edit</span>-->
-<!--                            <span v-else>Create</span>-->
-<!--                        </v-btn>-->
-<!--                    </div>-->
-
-                </div>
-
-<!--                <v-dialog v-model="showTokenAutomation" class="token-automation-modal">-->
-<!--                    <token-automation :originalDbState="originalDbState" @closeLoginStepBuilder=toggleLoginStepBuilder />-->
-<!--                </v-dialog>-->
+                <v-dialog v-model="showTokenAutomation" class="token-automation-modal">
+                    <token-automation :originalDbState="originalDbState" @closeLoginStepBuilder=toggleLoginStepBuilder @toggleOriginalStateDb=toggleOriginalStateDb />
+                </v-dialog>    
                 
             </div>
         </template>
-
-        <!-- <template slot="Roles">
-            <div> -->
-                <!-- <div>
-                    <span v-if="(testRoles.length === 0)">No role exists</span>
-                    <div v-else>
-                        <span v-for="(testRole, index) in testRoles" :key="index">
-                            <span> role Name : {{testRole['name']}}</span>
-                            <span> logical group id : {{testRole['endpointLogicalGroupId']}}</span>
-                            <span> logical group regex : {{testRole['endpointLogicalGroup']['testingEndpoints']['regex']}}</span>
-                        </span>
-                    </div>
-                </div>
-                <div>
-                    <v-btn primary class="white--text ignore-button" color="var(--v-themeColor-base)"
-                        @click="saveTestRoles">Create role</v-btn>
-                    <v-text-field v-model="testRoleName" placeholder="Role name"></v-text-field>
-                    <v-text-field v-model="testLogicalGroupRegex" placeholder="regex"></v-text-field>
-                </div>
-                 -->
-                <!-- <test-roles title="Roles" :testRoles="testRoles" :createNewRole="createNewRole">
-                    <template #details-container="{}">
-                        <a-card title="Details" color="rgba(33, 150, 243)" style="min-height: 600px">
-                            <test-roles-config-details></test-roles-config-details>
-                        </a-card>
-                    </template>
-                </test-roles>
-            </div>
-        </template> -->
-
+        <template slot="Roles">
+            <test-roles title="Roles" :testRoles="testRoles">
+                <template #details-container="{}">
+                    <a-card title="Details" color="rgba(33, 150, 243)" style="min-height: 600px">
+                        <test-roles-config-details></test-roles-config-details>
+                    </a-card>
+                </template>
+            </test-roles>
+        </template>
     </layout-with-tabs>
 </template>
 
@@ -210,9 +179,6 @@ export default {
         }
     },
     methods: {
-        createNewRole() {
-            this.$store.commit('test_roles/SET_NEW_SELECTED_ROLE')
-        },
         setAuthHeaderKey(newKey) {
             this.newKey = newKey
             this.saveAuth()
@@ -222,18 +188,19 @@ export default {
             this.saveAuth()
         },
         saveAuthMechanism() {
-            this.$store.dispatch('testing/addAuthMechanism', {type: "HARDCODED", requestData: [], authParamData: [{
-                "key": this.newKey,
-                "value": this.newVal,
-                "where": "HEADER"
-            }]})
+            this.$store.dispatch('testing/addAuthMechanism', {
+                type: "HARDCODED", requestData: [], authParamData: [{
+                    "key": this.newKey,
+                    "value": this.newVal,
+                    "where": "HEADER"
+                }]
+            })
         },
         async saveTestRoles() {
-            debugger
             if (this.testRoleName && this.testLogicalGroupRegex) {
                 await this.$store.dispatch('testing/addTestRoles', { roleName: this.testRoleName, regex: this.testLogicalGroupRegex })
                 this.$store.dispatch('testing/loadTestRoles')
-            } 
+            }
         },
         prepareItemForTable(x) {
             return {
@@ -262,107 +229,21 @@ export default {
         toggleLoginStepBuilder() {
             this.showTokenAutomation = !this.showTokenAutomation
         },
-        testLoginStep(data) {
-            let updatedData = data["updatedData"]
-
-            let url = updatedData["url"]
-            if (!url) {
-                func.showErrorSnackBar("Invalid URL")
-                return
-            }
-
-            let queryParams = updatedData["queryParams"]
-
-            let method = updatedData["method"]
-            method = this.validateMethod(method)
-            if (!method) {
-                func.showErrorSnackBar("Invalid HTTP method")
-                return
-            }
-
-            let headerString = updatedData["headerString"]
-
-            let body = updatedData["body"]
-
-            let key = updatedData["authKey"]
-
-            let authTokenPath = updatedData["authTokenPath"]
-
-
-            let result = api.triggerLoginSteps(key, "", "HEADER", "SINGLE_REQUEST", authTokenPath, [{
-                "url": url,
-                "body": body,
-                "headers": headerString,
-                "queryParams": queryParams,
-                "method": method
-            }
-            ])
-
-            result.then((resp) => {
-                this.showLoginSaveOption = true
-                func.showSuccessSnackBar("Login Flow Ran Successfully!")
-            }).catch((err) => {
-                this.showLoginSaveOption = false
-                console.log(err);
-            })
-
-      },
-
-        saveLoginStep(data) {
-            let updatedData = data["updatedData"]
-
-            let url = updatedData["url"]
-            if (!url) {
-                func.showErrorSnackBar("Invalid URL")
-                return
-            }
-
-            let queryParams = updatedData["queryParams"] 
-
-            let method = updatedData["method"]
-            method = this.validateMethod(method)
-            if (!method) {
-                func.showErrorSnackBar("Invalid HTTP method")
-                return
-            }
-
-            let headerString = updatedData["headerString"]
-
-            let body = updatedData["body"]
-
-            let key = updatedData["authKey"]
-
-            let authTokenPath = updatedData["authTokenPath"]
-
-            let result = api.addAuthMechanism(key, "", "HEADER", "SINGLE_REQUEST", authTokenPath, [{
-                "url": url,
-                "body": body,
-                "headers": headerString,
-                "queryParams": queryParams,
-                "method": method
-            }
-            ])
-
-            result.then((resp) => {
-                func.showSuccessSnackBar("Login Flow saved successfully!")
-            }).catch((err) => {
-                console.log(err);
-            })
-
-
+        toggleOriginalStateDb() {
+            console.log('got db state event')
+            this.fetchAuthMechanismData()
         },
-
-        validateMethod(methodName) {
-            let m = methodName.toUpperCase()
-            let allowedMethods = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "TRACE", "PATCH"]
-            let idx = allowedMethods.indexOf(m);
-            if (idx === -1) return null
-            return allowedMethods[idx]
+      validateMethod(methodName) {
+          let m = methodName.toUpperCase()
+          let allowedMethods = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "TRACE", "PATCH"]
+          let idx = allowedMethods.indexOf(m);
+          if (idx === -1) return null
+          return allowedMethods[idx]
         },
         fetchAuthMechanismData() {
             api.fetchAuthMechanismData().then((resp) => {
-            this.authMechanismData = resp.authMechanism;
-            if (!this.authMechanismData) return
+                this.authMechanismData = resp.authMechanism;
+                if (!this.authMechanismData) return
                 let requestData = this.authMechanismData["requestData"]
                 let str = JSON.stringify(this.authMechanismData);
                 if (!requestData || requestData.length === 0) return
@@ -455,13 +336,13 @@ export default {
                 }
             ]
         },
-        authTokenUrl: function() {
+        authTokenUrl: function () {
             if (!this.authMechanismData) return null
             let requestData = this.authMechanismData["requestData"]
             if (!requestData || requestData.length === 0) return null
             return requestData[0]["url"]
         },
-        authTokenDate: function() {
+        authTokenDate: function () {
             if (!this.authMechanismData) return null
             let id = this.authMechanismData["id"]
             if (!id) return null
@@ -474,7 +355,7 @@ export default {
             let dayStr = func.toDateStr(new Date(dayStartEpochMs), false)
 
             return dayStr + " " + date.slice(11)
-        }        
+        }
     },
     mounted() {
         this.fetchAuthMechanismData()
@@ -552,7 +433,7 @@ export default {
 }
 
 .token-automation-modal {
-    width: 600px; 
+    width: 600px;
     height: 400px
 }
 
@@ -564,5 +445,4 @@ export default {
 .auth-token-text {
     font-size: 14px;
 }
-
 </style>

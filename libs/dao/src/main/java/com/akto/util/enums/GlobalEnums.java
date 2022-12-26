@@ -55,8 +55,10 @@ public class GlobalEnums {
         REMOVE_TOKENS("REMOVE_TOKENS", TestCategory.NO_AUTH, "API doesn't validate the authenticity of token. Attacker can remove the auth token and access the endpoint."),
         PARAMETER_POLLUTION("PARAMETER_POLLUTION", TestCategory.BOLA, "Attacker can access resources of any user by introducing multiple parameters with same name."),
         REPLACE_AUTH_TOKEN_OLD_VERSION("REPLACE_AUTH_TOKEN_OLD_VERSION", TestCategory.BOLA, "Attacker can access resources of any user by changing the auth token in request and using older version of an API"),
-        JWT_NONE_ALGO("JWT_NONE_ALGO", TestCategory.NO_AUTH, "Attacker can tamper with the payload of JWT and access protected resources."),
-        BFLA("BFLA", TestCategory.BFLA, "Less privileged attacker can access admin resources");
+        JWT_NONE_ALGO("JWT_NONE_ALGO", TestCategory.NO_AUTH, "Since NONE Algorithm JWT is accepted by the server the attacker can tamper with the payload of JWT and access protected resources."),
+        BFLA("BFLA", TestCategory.BFLA, "Less privileged attacker can access admin resources"),
+        JWT_INVALID_SIGNATURE("JWT_INVALID_SIGNATURE", TestCategory.NO_AUTH, "Since server is not validating the JWT signature the attacker can tamper with the payload of JWT and access protected resources"),
+        ADD_JKU_TO_JWT("ADD_JKU_TO_JWT", TestCategory.NO_AUTH, "Since Host server is using the JKU field of the JWT without validating, attacker can tamper with the payload of JWT and access protected resources.");
 
         private final String name;
         private final TestCategory superCategory;

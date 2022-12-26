@@ -1,5 +1,6 @@
 package com.akto.notifications.slack;
 
+import java.util.List;
 import java.util.Map;
 
 import com.akto.dao.context.Context;
@@ -7,11 +8,16 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
 public class DailyUpdate {
-    private static BasicDBObject createHeader(String title) {
-        BasicDBObject textObj = new BasicDBObject("type", "mrkdwn").append("text", title+"\n");
-        BasicDBObject ret = new BasicDBObject("type", "section").append("text", textObj);
-        return ret;
+    public static BasicDBObject createHeader(String title) {
+        BasicDBObject textObj = new BasicDBObject("type", "plain_text").append("text", title+"\n");
+        return new BasicDBObject("type", "header").append("text", textObj);
     }
+
+    public static BasicDBObject createSimpleBlockText(String text) {
+        BasicDBObject textObj = new BasicDBObject("type", "mrkdwn").append("text",text+"\n");
+        return new BasicDBObject("type", "section").append("text", textObj);
+    }
+
 
     private static BasicDBObject createNumberSection(String title, int number, String link) {
         BasicDBList fieldsList = new BasicDBList();
@@ -21,7 +27,7 @@ public class DailyUpdate {
         return ret;
     }
 
-    private static BasicDBObject createNumberSection(String title1, int number1, String link1, String title2, int number2, String link2) {
+    public static BasicDBObject createNumberSection(String title1, int number1, String link1, String title2, int number2, String link2) {
         BasicDBList fieldsList = new BasicDBList();
         BasicDBObject ret = new BasicDBObject("type", "section").append("fields", fieldsList);
 
@@ -34,7 +40,43 @@ public class DailyUpdate {
         return ret;
     }
 
-    private static BasicDBList createApiListSection(Map<String, String> mapEndpointToSubtypes, String dashboardLink) {
+    public static class LinkWithDescription {
+        String header;
+        String link;
+        String description;
+
+        public LinkWithDescription(String header, String link, String description) {
+            this.header = header;
+            this.link = link;
+            this.description = description;
+        }
+    }
+
+    public static BasicDBList createLinksSection(List<LinkWithDescription> linkWithDescriptionList) {
+        BasicDBList ret = new BasicDBList();
+
+        int counter = 0;
+        for(LinkWithDescription linkWithDescription: linkWithDescriptionList) {
+            counter ++ ;
+            if (counter == 5) {
+                break;
+            }
+            String completeText = "><"+linkWithDescription.link+"|"+linkWithDescription.header+">";
+            if (linkWithDescription.description != null) completeText += "\n>"+linkWithDescription.description;
+            ret.add(new BasicDBObject("type", "section").append("text", new BasicDBObject("type", "mrkdwn").append("text", completeText)));
+        }
+
+        if (linkWithDescriptionList.size() > 4) {
+            String text = ("> and "+ (linkWithDescriptionList.size() - 4)  +" more...");
+            ret.add(new BasicDBObject("type", "section").append("text", new BasicDBObject("type", "mrkdwn").append("text", text)));
+
+        }
+
+
+        return ret;
+    }
+
+    public static BasicDBList createApiListSection(Map<String, String> mapEndpointToSubtypes, String dashboardLink) {
         BasicDBList ret = new BasicDBList();
 
         int counter = 0;
@@ -94,7 +136,7 @@ public class DailyUpdate {
         BasicDBList sectionsList = new BasicDBList();
         BasicDBObject ret = new BasicDBObject("blocks", sectionsList);
 
-        sectionsList.add(createHeader("Summary for today: "));        
+        sectionsList.add(createHeader("API Inventory Summary For Today :ledger: :"));        
         // sectionsList.add(createNumberSection("Total Sensitive Endpoints", totalSensitiveEndpoints, "Total Endpoints", totalEndpoints));
 
         // int end = Context.now();

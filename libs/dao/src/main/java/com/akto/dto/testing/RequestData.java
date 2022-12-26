@@ -14,21 +14,20 @@ public class RequestData {
 
     private String type;
 
-    private LoginVerificationCodeData verificationCodeData;
+    private String regex;
 
-    private int waitTime;
+    private String otpRefUuid;
 
     public RequestData() { }
-    public RequestData(String body, String headers, String queryParams, String url, String method, String type,
-                       LoginVerificationCodeData verificationCodeData, int waitTime) {
+    public RequestData(String body, String headers, String queryParams, String url, String method, String type, String regex, String otpRefUuid) {
         this.body = body;
         this.headers = headers;
         this.queryParams = queryParams;
         this.url = url;
         this.method = method;
         this.type = type;
-        this.verificationCodeData = verificationCodeData;
-        this.waitTime = waitTime;
+        this.regex = regex;
+        this.otpRefUuid = otpRefUuid;
     }
 
     public String getBody() {
@@ -55,12 +54,12 @@ public class RequestData {
         return this.type;
     }
 
-    public int getWaitTime() {
-        return this.waitTime;
+    public String getRegex() {
+        return this.regex;
     }
 
-    public LoginVerificationCodeData getVerificationCodeData() {
-        return this.verificationCodeData;
+    public String getOtpRefUuid() {
+        return this.otpRefUuid;
     }
 
     public void setBody(String body) {
@@ -85,10 +84,11 @@ public class RequestData {
         this.type = type;
     }
 
-    public void setWaitTime(int waitTime) {
-        this.waitTime = waitTime;
+    public void setRegex(String regex) {
+        this.regex = regex;
     }
-    public void setVerificationCodeData(LoginVerificationCodeData verificationCodeData) {
-        this.verificationCodeData = verificationCodeData;
+
+    public void setOtpRefUuid(String otpRefUuid) {
+        this.otpRefUuid = otpRefUuid;
     }
 }

@@ -1,7 +1,9 @@
 package com.akto.testing;
 
 import com.akto.DaoInit;
+import com.akto.dao.OtpTestDataDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.LoginFlowStepsDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dto.HttpResponseParams;
@@ -17,7 +19,11 @@ import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.common.protocol.types.Field.Str;
+import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -42,10 +48,10 @@ public class ApiWorkflowExecutor {
         TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq("_id", new ObjectId("631cac6b09119467be6a1640")));
         WorkflowTestingEndpoints workflowTestingEndpoints = (WorkflowTestingEndpoints) testingRun.getTestingEndpoints();
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
-        apiWorkflowExecutor.init(workflowTestingEndpoints.getWorkflowTest(), testingRun.getId());
+        apiWorkflowExecutor.init(workflowTestingEndpoints.getWorkflowTest(), testingRun.getId(), null);
     }
 
-    public void init(WorkflowTest workflowTest, ObjectId testingRunId) {
+    public void init(WorkflowTest workflowTest, ObjectId testingRunId, ObjectId testingRunSummaryId) {
         Graph graph = new Graph();
         graph.buildGraph(workflowTest);
 
@@ -53,7 +59,7 @@ public class ApiWorkflowExecutor {
         Map<String, Object> valuesMap = new HashMap<>();
 
         int id = Context.now();
-        WorkflowTestResult workflowTestResult = new WorkflowTestResult(id, workflowTest.getId(), new HashMap<>(), testingRunId);
+        WorkflowTestResult workflowTestResult = new WorkflowTestResult(id, workflowTest.getId(), new HashMap<>(), testingRunId, testingRunSummaryId);
         Map<String, WorkflowTestResult.NodeResult> testResultMap = workflowTestResult.getNodeResultMap();
         for (Node node: nodes) {
             WorkflowTestResult.NodeResult nodeResult;
@@ -74,14 +80,19 @@ public class ApiWorkflowExecutor {
         WorkflowTestResultsDao.instance.insertOne(workflowTestResult);
     }
 
-    public ArrayList<Object> runLoginFlow(WorkflowTest workflowTest, AuthMechanism authMechanism) throws Exception {
+    public LoginFlowResponse runLoginFlow(WorkflowTest workflowTest, AuthMechanism authMechanism, LoginFlowParams loginFlowParams) throws Exception {
         Graph graph = new Graph();
         graph.buildGraph(workflowTest);
 
         ArrayList<Object> responses = new ArrayList<Object>();
 
         List<Node> nodes = graph.sort();
-        Map<String, Object> valuesMap = new HashMap<>();
+
+        if (loginFlowParams != null && loginFlowParams.getFetchValueMap()) {
+            nodes.get(0).setId(loginFlowParams.getNodeId());
+        }
+        
+        Map<String, Object> valuesMap = constructValueMap(loginFlowParams);
 
         for (Node node: nodes) {
             WorkflowTestResult.NodeResult nodeResult;
@@ -94,34 +105,156 @@ public class ApiWorkflowExecutor {
                 nodeResult = new WorkflowTestResult.NodeResult("{}", false, testErrors);
             }
 
-            if (nodeResult.getErrors().size() > 0)  throw new Exception("Error Processing Node In Login Flow " + node.getId());
-
             JSONObject respString = new JSONObject();
-            
-            
-            Map<String, Object> json = gson.fromJson(nodeResult.getMessage(), Map.class);
+            Map<String, Map<String, Object>> json = gson.fromJson(nodeResult.getMessage(), Map.class);
 
-            respString.put("headers", valuesMap.get(node.getId() + ".response.header"));
-            respString.put("body", valuesMap.get(node.getId() + ".response.body"));
+            respString.put("headers", json.get("response").get("headers"));
+            respString.put("body", json.get("response").get("body"));
             responses.add(respString.toString());
+            
+            if (nodeResult.getErrors().size() > 0) {
+                return new LoginFlowResponse(responses, "Failed to process node " + node.getId(), false);
+            } else {
+                if (loginFlowParams != null && loginFlowParams.getFetchValueMap()) {
+                    saveValueMapData(loginFlowParams, valuesMap);
+                }
+            }
+
         }
 
         for (AuthParam param : authMechanism.getAuthParams()) {
             try {
                 String value = executeCode(param.getValue(), valuesMap);
                 if (!param.getValue().equals(value) && value == null) {
-                    throw new Exception("auth param not found at specified path " + param.getValue());
+                    return new LoginFlowResponse(responses, "auth param not found at specified path " + 
+                    param.getValue(), false);
                 }
                 param.setValue(value);
             } catch(Exception e) {
-                throw new Exception("error resolving auth param " + param.getValue());
+                return new LoginFlowResponse(responses, "error resolving auth param " + param.getValue(), false);
             }
         }
-        return responses;
+        return new LoginFlowResponse(responses, null, true);
+    }
+
+    public Map<String, Object> constructValueMap(LoginFlowParams loginFlowParams) {
+        Map<String, Object> valuesMap = new HashMap<>();
+        if (loginFlowParams == null || !loginFlowParams.getFetchValueMap()) {
+            return valuesMap;
+        }
+        Bson filters = Filters.and(
+            Filters.eq("userId", loginFlowParams.getUserId())
+        );
+        LoginFlowStepsData loginFlowStepData = LoginFlowStepsDao.instance.findOne(filters);
+
+        if (loginFlowStepData == null || loginFlowStepData.getValuesMap() == null) {
+            return valuesMap;
+        }
+
+        valuesMap = loginFlowStepData.getValuesMap();
+
+        Set<String> keysToRemove = new HashSet<String>();
+        for(String key : valuesMap.keySet()){
+            if(key.startsWith(loginFlowParams.getNodeId())){
+                keysToRemove.add(key);
+            }
+        }
+
+        valuesMap.keySet().removeAll(keysToRemove);
+
+        return valuesMap;
+    }
+
+    public Map<String, Object> saveValueMapData(LoginFlowParams loginFlowParams, Map<String, Object> valuesMap) {
+
+        Integer userId = loginFlowParams.getUserId();
+
+        Bson filter = Filters.and(
+            Filters.eq("userId", loginFlowParams.getUserId())
+        );
+        Bson update = Updates.set("valuesMap", valuesMap);
+        LoginFlowStepsDao.instance.updateOne(filter, update);
+        return valuesMap;
+    }
+
+    //todo: make this generic
+    public WorkflowTestResult.NodeResult processOtpNode(Node node, Map<String, Object> valuesMap) {
+        try {
+            int waitInSeconds = Math.min(node.getWorkflowNodeDetails().getWaitInSeconds(),100);
+            if (waitInSeconds > 0) {
+                System.out.println("WAITING: " + waitInSeconds + " seconds");
+                Thread.sleep(waitInSeconds*1000);
+                System.out.println("DONE WAITING!!!!");
+            }
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        String uuid = node.getWorkflowNodeDetails().getOtpRefUuid();
+        List<String> testErrors = new ArrayList<>();
+        int curTime = Context.now() - 5 * 60;
+        Bson filters = Filters.and(
+            Filters.eq("uuid", uuid),
+            Filters.gte("createdAtEpoch", curTime)
+        );
+        BasicDBObject resp = new BasicDBObject();
+        BasicDBObject body = new BasicDBObject();
+        BasicDBObject data = new BasicDBObject();
+        String message;
+        OtpTestData otpTestData = null;
+        otpTestData = OtpTestDataDao.instance.findOne(filters);
+        if (otpTestData == null) {
+            message = "otp data not received for uuid " + uuid;
+            data.put("error", message);
+            body.put("body", data);
+            resp.put("response", body);
+            testErrors.add(message);
+            return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
+        }
+        try {
+            String otp = extractOtpCode(otpTestData.getOtpText(), node.getWorkflowNodeDetails().getOtpRegex());
+            if (otp == null) {
+                data.put("error", "unable to extract otp for provided regex");
+                testErrors.add("unable to extract otp for provided regex");
+            } else {
+                data.put("otp", otp);
+                data.put("otpText", otpTestData.getOtpText());
+            }
+            body.put("body", data);
+            resp.put("response", body);
+            valuesMap.put(node.getId() + ".response.body.otp", otp);
+        } catch(Exception e) {
+            message ="Error extracting otp data for uuid " + uuid + " error " + e.getMessage();
+            data.put("error", message);
+            body.put("body", data);
+            resp.put("response", body);
+            testErrors.add(message);
+            return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
+        }
+        return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
+    }
+
+    private String extractOtpCode(String text, String regex) {
+        System.out.println(regex);
+
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(text);
+        String verificationCode = null;
+        if (matcher.find()) {
+            verificationCode = matcher.group(1);
+        }
+
+        return verificationCode;
+    }
+
+    public WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes) {
+        if (node.getWorkflowNodeDetails().getType() == WorkflowNodeDetails.Type.OTP) {
+            return processOtpNode(node, valuesMap);
+        }
+        return processApiNode(node, valuesMap, allowAllStatusCodes);
     }
 
 
-    public WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes) {
+    public WorkflowTestResult.NodeResult processApiNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes) {
         System.out.println("\n");
         System.out.println("NODE: " + node.getId());
         List<String> testErrors = new ArrayList<>();
@@ -147,7 +280,7 @@ public class ApiWorkflowExecutor {
                 true, request.getQueryParams());
 
         OriginalHttpResponse response = null;
-        int maxRetries = type.equals(WorkflowNodeDetails.Type.POLL) ? 20 : 1;
+        int maxRetries = type.equals(WorkflowNodeDetails.Type.POLL) ? node.getWorkflowNodeDetails().getMaxPollRetries() : 1;
 
         try {
             int waitInSeconds = Math.min(workflowNodeDetails.getWaitInSeconds(),60);
@@ -163,7 +296,7 @@ public class ApiWorkflowExecutor {
         for (int i = 0; i < maxRetries; i++) {
             try {
                 if (i > 0) {
-                    int sleep = 6000;
+                    int sleep = node.getWorkflowNodeDetails().getPollRetryDuration();
                     logger.info("Waiting "+ (sleep/1000) +" before sending another request......");
                     Thread.sleep(sleep);
                 }
@@ -172,13 +305,13 @@ public class ApiWorkflowExecutor {
 
                 int statusCode = response.getStatusCode();
 
-                if (!allowAllStatusCodes && (statusCode >= 400)) {
-                    testErrors.add("process node failed with status code " + statusCode);
-                }
                 String statusKey =   nodeId + "." + "response" + "." + "status_code";
                 valuesMap.put(statusKey, statusCode);
 
                 populateValuesMap(valuesMap, response.getBody(), nodeId, response.getHeaders(), false, null);
+                if (!allowAllStatusCodes && (statusCode >= 400)) {
+                    testErrors.add("process node failed with status code " + statusCode);
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } catch (Exception e) {
@@ -285,19 +418,23 @@ public class ApiWorkflowExecutor {
             }
         }
 
-        JSONObject headerString = new JSONObject();
         for (String headerName: headers.keySet()) {
+            List<String> headerValues = headers.get(headerName);
+            String key = nodeId + "." + reqOrResp + "." + "header" + "." + headerName;
 
-            headerString.put(headerName, headers.get(headerName));
-
-            for (String val: headers.get(headerName)) {
-                String key = nodeId + "." + reqOrResp + "." + "header" + "." + headerName;
-                valuesMap.put(key, val);
+            switch (headerValues.size()) {
+                case 0: 
+                    continue;
+                case 1: 
+                    valuesMap.put(key, headerValues.get(0));
+                    continue;
+                default: 
+                    String val =  String.join(";", headers.get(headerName));
+                    valuesMap.put(key, val);
             }
+            
+            
         }
-
-        String fullHeadersKey = nodeId + "." + reqOrResp + "." + "header";
-        valuesMap.put(fullHeadersKey, headerString.toString());
     }
 
 
@@ -407,7 +544,7 @@ public class ApiWorkflowExecutor {
 
     // todo: test invalid cases
     public String replaceVariables(String payload, Map<String, Object> valuesMap, boolean escapeString) throws Exception {
-        String regex = "\\$\\{(x\\d+\\.[\\w\\[\\].]+|AKTO\\.changes_info\\..*?)\\}"; // todo: integer inside brackets
+        String regex = "\\$\\{(x\\d+\\.[\\w\\-\\[\\].]+|AKTO\\.changes_info\\..*?)\\}"; // todo: integer inside brackets
         Pattern p = Pattern.compile(regex);
 
         // replace with values
