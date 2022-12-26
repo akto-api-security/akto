@@ -12,21 +12,12 @@ import './start-node.css';
 const TemplateStringEditor = ({defaultText, onChange, usePureJs=false}) => {
 
     const [toggle, setToggle] = useState(true);
-    const toggleChecked = (event) => { 
+    const toggleChecked = () => { 
       if (!toggle) {
         onChange(text)
       }
-      setToggle(toggle => true);
-      event.stopPropagation();
+      setToggle(toggle => !toggle);
     }
-
-
-    const forceChecked = (event) => {
-      setToggle(toggle => false);
-    }
-
-
-
     let [text, setText] = React.useState(defaultText);
 
     const onChangeInputBase = (a, b) => {
@@ -34,14 +25,14 @@ const TemplateStringEditor = ({defaultText, onChange, usePureJs=false}) => {
     }
 
     return (
-       <div style={{position: "relative"}} onClick={forceChecked} className={toggle && "text-summary"}>
-          {toggle && <TextFieldCloseable text={text} usePureJs={usePureJs} /> }
+       <div style={{position: "relative"}}>
+          {toggle && <TextFieldCloseable text={text} usePureJs={usePureJs}/> }
           {!toggle && <InputBase value={text} onChange={onChangeInputBase} fullWidth multiline inputProps={{className: 'request-editor'}} variant="standard"/>}
-          {!toggle && <div style={{position: "absolute", top: "4px", right: "10px"}}>
+          <div style={{position: "absolute", top: "4px", right: "10px"}}>
             <IconButton onClick={toggleChecked}>
                 <FontAwesomeIcon icon={toggle ? faEdit : faCheckSquare} className="primary-btn" />
             </IconButton>
-          </div>}
+          </div>
        </div>
     );
   }

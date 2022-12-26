@@ -294,6 +294,7 @@ export default {
 .url-form-container
   overflow-y: scroll
   max-height: 380px
+  padding-bottom: 5px
 
 
 .top-right-btn
