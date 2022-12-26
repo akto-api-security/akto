@@ -1,22 +1,32 @@
 package com.akto.testing;
 
+import com.akto.MongoBasedTest;
+import com.akto.dao.OtpTestDataDao;
+import com.akto.dao.context.Context;
 import com.akto.dao.testing.LoginFlowStepsDao;
 import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.api_workflow.Node;
 import com.akto.dto.testing.LoginFlowParams;
 import com.akto.dto.testing.LoginFlowStepsData;
+import com.akto.dto.testing.WorkflowNodeDetails;
 import com.akto.dto.testing.WorkflowUpdatedSampleData;
+import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.runtime.URLAggregator;
 import com.akto.types.BasicDBListL;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+
+import org.bson.conversions.Bson;
 import org.junit.Test;
 
 import java.util.*;
 
 import static org.junit.Assert.*;
 
-public class ApiWorkflowExecutorTest {
+public class ApiWorkflowExecutorTest extends MongoBasedTest {
 
 
     @Test
@@ -215,4 +225,34 @@ public class ApiWorkflowExecutorTest {
         assertEquals(0, valuemap.size());
     }
 
+    @Test
+    public void testProcessOtpNodeOtpDataMissing() {
+        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
+        WorkflowNodeDetails nodeDetails = new WorkflowNodeDetails(0, "", null, "", null, null, false,
+        0, 0, 0, "(/d+){1,6}", "123");
+        Map<String, Object> valuemap = new HashMap<>();
+        Node node = new Node("x1", nodeDetails);
+        NodeResult result = apiWorkflowExecutor.processOtpNode(node, valuemap);
+        assertEquals("{\"response\": {\"body\": {\"error\": \"otp data not received for uuid 123\"}}}", result.getMessage());
+    }
+
+    @Test
+    public void testProcessOtpNodeDataStaleData() {
+        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
+        WorkflowNodeDetails nodeDetails = new WorkflowNodeDetails(0, "", null, "", null, null, false,
+        0, 0, 0, "(/d+){1,6}", "123");
+        Map<String, Object> valuemap = new HashMap<>();
+        Node node = new Node("x1", nodeDetails);
+
+        int curTime = Context.now() - 10 * 60;
+        Bson updates = Updates.combine(
+                Updates.set("otpText", "Your otp is 123456"),
+                Updates.set("createdAtEpoch", curTime)
+        );
+
+        OtpTestDataDao.instance.updateOne(Filters.eq("uuid", "123"), updates); 
+        
+        NodeResult result = apiWorkflowExecutor.processOtpNode(node, valuemap);
+        assertEquals("{\"response\": {\"body\": {\"error\": \"otp data not received for uuid 123\"}}}", result.getMessage());
+    }
 }
