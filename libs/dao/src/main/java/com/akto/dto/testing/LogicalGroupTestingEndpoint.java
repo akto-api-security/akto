@@ -1,73 +1,63 @@
 package com.akto.dto.testing;
 
 import com.akto.dto.ApiInfo;
+import com.akto.dto.data_types.Conditions;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
 
-public class LogicalGroupTestingEndpoint extends TestingEndpoints{
-    private String regex;
-    private List<ApiInfo.ApiInfoKey> includedApiInfoKey;
-    private List<ApiInfo.ApiInfoKey> excludedApiInfoKey;
+public class LogicalGroupTestingEndpoint extends TestingEndpoints {
+    private Conditions andConditions;
+    private Conditions orConditions;
 
     public LogicalGroupTestingEndpoint() {
         super(Type.LOGICAL_GROUP);
     }
 
-    public LogicalGroupTestingEndpoint(String regex, List<ApiInfo.ApiInfoKey> includedApiInfoKey, List<ApiInfo.ApiInfoKey> excludedApiInfoKey) {
+    public LogicalGroupTestingEndpoint(Conditions andConditions, Conditions orConditions) {
         super(Type.LOGICAL_GROUP);
-        this.regex = regex;
-        this.includedApiInfoKey = includedApiInfoKey;
-        this.excludedApiInfoKey = excludedApiInfoKey;
+        this.andConditions = andConditions;
+        this.orConditions = orConditions;
     }
 
     @Override
-    public boolean containsApi (ApiInfo.ApiInfoKey key) {
+    public boolean containsApi(ApiInfo.ApiInfoKey key) {
         if (key == null) {
             return false;
         }
-        if (excludedApiInfoKey != null && excludedApiInfoKey.contains(key)) {
+        if (this.andConditions == null && this.orConditions == null) {
             return false;
         }
-        if (includedApiInfoKey != null && includedApiInfoKey.contains(key)) {
-            return true;
+
+        boolean contains = true;
+        if (this.andConditions != null) {
+            contains = this.andConditions.validate(key);
         }
-        try {
-            return Pattern.matches(regex, key.getUrl());
-        } catch (PatternSyntaxException e) {
-            return false;
+        if (this.orConditions != null) {
+            contains = contains && this.orConditions.validate(key);
         }
-    }
-
-    public String getRegex() {
-        return regex;
-    }
-
-    public void setRegex(String regex) {
-        this.regex = regex;
-    }
-
-    public List<ApiInfo.ApiInfoKey> getIncludedApiInfoKey() {
-        return includedApiInfoKey;
-    }
-
-    public void setIncludedApiInfoKey(List<ApiInfo.ApiInfoKey> includedApiInfoKey) {
-        this.includedApiInfoKey = includedApiInfoKey;
-    }
-
-    public List<ApiInfo.ApiInfoKey> getExcludedApiInfoKey() {
-        return excludedApiInfoKey;
-    }
-
-    public void setExcludedApiInfoKey(List<ApiInfo.ApiInfoKey> excludedApiInfoKey) {
-        this.excludedApiInfoKey = excludedApiInfoKey;
+        return contains;
     }
 
     @Override
     public List<ApiInfo.ApiInfoKey> returnApis() {
 
         return new ArrayList<>();
+    }
+
+    public Conditions getAndConditions() {
+        return andConditions;
+    }
+
+    public void setAndConditions(Conditions andConditions) {
+        this.andConditions = andConditions;
+    }
+
+    public Conditions getOrConditions() {
+        return orConditions;
+    }
+
+    public void setOrConditions(Conditions orConditions) {
+        this.orConditions = orConditions;
     }
 }

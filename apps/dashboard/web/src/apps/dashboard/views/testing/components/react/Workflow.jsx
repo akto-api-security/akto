@@ -41,7 +41,7 @@ const useStyles = makeStyles({
   }
 });
 
-const Workflow = ({apiCollectionId}) => {
+const Workflow = ({apiCollectionId, defaultOpenResult}) => {
   const nodes = useStore((state) => state.nodes)
   const originalState = useStore((state) => state.originalState)
   const edges = useStore((state) => state.edges)
@@ -72,7 +72,7 @@ const Workflow = ({apiCollectionId}) => {
   const incrementCounter = useStore(state => state.incrementCounter)
 
 
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpenResult);
   const [height, setHeight] = useState(0);
   const [workflowTestResult, setWorkflowTestResult] = useState(null)
   const [workflowTestingRun, setWorkflowTestingRun] = useState(null);

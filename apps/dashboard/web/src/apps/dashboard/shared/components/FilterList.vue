@@ -91,7 +91,11 @@ export default {
     data () {
         return {
             checkedMap: this.items.reduce((m, i) => {
-                m[i.value] = false
+                if (i.checked) {
+                    m[i.value] = true
+                } else {
+                    m[i.value] = false
+                }
                 return m
             }, {}),
             searchText: "",
