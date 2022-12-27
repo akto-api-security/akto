@@ -111,7 +111,7 @@ public class TestExecutor {
         TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessages, singleTypeInfoMap, testRoles);
 
         try {
-            LoginFlowResponse loginFlowResponse = executeLoginFlow(authMechanism, null);
+            LoginFlowResponse loginFlowResponse = triggerLoginFlow(authMechanism, 3);
             if (!loginFlowResponse.getSuccess()) {
                 throw new Exception("login flow failed");
             }
@@ -206,6 +206,21 @@ public class TestExecutor {
 
     }
 
+    private LoginFlowResponse triggerLoginFlow(AuthMechanism authMechanism, int retries) {
+        LoginFlowResponse loginFlowResponse = null;
+        for (int i=0; i<retries; i++) {
+            try {
+                loginFlowResponse = executeLoginFlow(authMechanism, null);
+                if (loginFlowResponse.getSuccess()) {
+                    break;
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e.getMessage());
+            }
+        }
+        return loginFlowResponse;
+    }
+
     public LoginFlowResponse executeLoginFlow(AuthMechanism authMechanism, LoginFlowParams loginFlowParams) throws Exception {
 
         if (!authMechanism.getType().equals(LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString())) {
@@ -252,7 +267,7 @@ public class TestExecutor {
             if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.OTP_VERIFICATION.toString())) {
                 nodeType = WorkflowNodeDetails.Type.OTP;
                 if (loginFlowParams == null || !loginFlowParams.getFetchValueMap()) {
-                    waitTime = 100;
+                    waitTime = 60;
                 }
             }
             WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(0, data.getUrl(),
