@@ -10,9 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.security.KeyFactory;
 import java.security.spec.PKCS8EncodedKeySpec;
-import java.util.Base64;
-import java.util.Calendar;
-import java.util.Map;
+import java.util.*;
 
 public abstract class JwtModifier extends PayloadModifier {
 
@@ -21,12 +19,28 @@ public abstract class JwtModifier extends PayloadModifier {
 
     @Override
     public Object modify(String key, Object value) {
-        if (value == null || !KeyTypes.isJWT(value.toString())) return null;
-        try {
-            return jwtModify(key, value.toString());
-        } catch (Exception e) {
-            return null;
+        if (value == null) return null;
+
+        String[] splitValue = value.toString().split(" ");
+        List<String> finalValue = new ArrayList<>();
+        boolean flag = false;
+
+        for (String x: splitValue) {
+            if (KeyTypes.isJWT(x)) {
+                try {
+                    String modifiedString = jwtModify(key, x);
+                    finalValue.add(modifiedString);
+                    flag = true;
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    return null;
+                }
+            } else {
+                finalValue.add(x);
+            }
         }
+
+        return flag ? String.join( " ", finalValue) : null;
     }
 
     public static String manipulateJWTHeader(String jwt, Map<String, String> extraHeaders) throws Exception {
