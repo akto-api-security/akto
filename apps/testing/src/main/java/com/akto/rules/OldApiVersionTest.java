@@ -53,12 +53,6 @@ public class OldApiVersionTest extends AuthRequiredTestPlugin{
                 continue;
             }
 
-            boolean isStatusGood = isStatusGood(originalHttpResponse.getStatusCode());
-            if (!isStatusGood) {
-                oldVersionUrl = decrementUrlVersion(oldVersionUrl, 1, 1);
-                continue;
-            }
-
             // try BOLA
             BOLATest bolaTest = new BOLATest();
             RawApi dummy = new RawApi(testRequest, originalHttpResponse, rawApi.getOriginalMessage());

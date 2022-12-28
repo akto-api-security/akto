@@ -255,4 +255,45 @@ public class ApiWorkflowExecutorTest extends MongoBasedTest {
         NodeResult result = apiWorkflowExecutor.processOtpNode(node, valuemap);
         assertEquals("{\"response\": {\"body\": {\"error\": \"otp data not received for uuid 123\"}}}", result.getMessage());
     }
+
+    @Test
+    public void testProcessOtpNodeDataInvalidRegex() {
+        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
+        WorkflowNodeDetails nodeDetails = new WorkflowNodeDetails(0, "", null, "", null, null, false,
+        0, 0, 0, "(/d+){1,6}", "124");
+        Map<String, Object> valuemap = new HashMap<>();
+        Node node = new Node("x1", nodeDetails);
+
+        int curTime = Context.now();
+        Bson updates = Updates.combine(
+                Updates.set("otpText", "Your otp is 123456"),
+                Updates.set("createdAtEpoch", curTime)
+        );
+
+        OtpTestDataDao.instance.updateOne(Filters.eq("uuid", "124"), updates); 
+        
+        NodeResult result = apiWorkflowExecutor.processOtpNode(node, valuemap);
+        assertEquals("{\"response\": {\"body\": {\"error\": \"unable to extract otp for provided regex\"}}}", result.getMessage());
+    }
+
+    @Test
+    public void testProcessOtpNodeData() {
+        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
+        WorkflowNodeDetails nodeDetails = new WorkflowNodeDetails(0, "", null, "", null, null, false,
+        0, 0, 0, "(\\d+){1,6}", "125");
+        Map<String, Object> valuemap = new HashMap<>();
+        Node node = new Node("x1", nodeDetails);
+
+        int curTime = Context.now();
+        Bson updates = Updates.combine(
+                Updates.set("otpText", "Your otp is 123456"),
+                Updates.set("createdAtEpoch", curTime)
+        );
+
+        OtpTestDataDao.instance.updateOne(Filters.eq("uuid", "125"), updates); 
+        
+        NodeResult result = apiWorkflowExecutor.processOtpNode(node, valuemap);
+        assertEquals(0, result.getErrors().size());
+        assertEquals("{\"response\": {\"body\": {\"otp\": \"123456\", \"otpText\": \"Your otp is 123456\"}}}", result.getMessage());
+    }
 }
