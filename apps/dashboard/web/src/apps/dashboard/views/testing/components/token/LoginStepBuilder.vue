@@ -167,7 +167,7 @@ export default {
             "authTokenPath": defaults.defaultAuthTokenPath,
             "type": "LOGIN_FORM",
             "otpRefUuid": "",
-            "regex": "(\d+){1,6}"
+            "regex": "(\\d+){1,6}"
         }
         
       }
