@@ -9,6 +9,9 @@ public class WorkflowTestResult {
     private int workflowTestId;
     public static final String _TEST_RUN_ID = "testRunId";
     private ObjectId testRunId;
+    public static final String TESTING_RUN_RESULT_SUMMARY_ID = "testingRunResultSummaryId";
+
+    private ObjectId testingRunResultSummaryId;
     Map<String, NodeResult> nodeResultMap;
 
     public static class NodeResult {
@@ -52,11 +55,12 @@ public class WorkflowTestResult {
     public WorkflowTestResult() {
     }
 
-    public WorkflowTestResult(int id, int workflowTestId, Map<String, NodeResult> nodeResultMap, ObjectId testRunId) {
+    public WorkflowTestResult(int id, int workflowTestId, Map<String, NodeResult> nodeResultMap, ObjectId testRunId, ObjectId testingRunResultSummaryId) {
         this.id = id;
         this.workflowTestId = workflowTestId;
         this.nodeResultMap = nodeResultMap;
         this.testRunId = testRunId;
+        this.testingRunResultSummaryId = testingRunResultSummaryId;
     }
 
     public void addNodeResult(String nodeId, String message, List<String> testErrors) {
@@ -95,5 +99,13 @@ public class WorkflowTestResult {
 
     public void setTestRunId(ObjectId testRunId) {
         this.testRunId = testRunId;
+    }
+
+    public ObjectId getTestingRunResultSummaryId() {
+        return testingRunResultSummaryId;
+    }
+
+    public void setTestingRunResultSummaryId(ObjectId testingRunResultSummaryId) {
+        this.testingRunResultSummaryId = testingRunResultSummaryId;
     }
 }

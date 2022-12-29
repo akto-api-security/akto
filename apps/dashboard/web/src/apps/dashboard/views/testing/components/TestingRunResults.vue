@@ -19,7 +19,7 @@
             </span>
         </div>
 
-        <div class="testing-runs-history">
+        <div class="testing-runs-history" v-if="!isWorkflow">
             <div class="d-flex jc-end">
                 <date-range v-model="dateRange"/>
             </div>
@@ -83,6 +83,9 @@
                 </div>
             </v-dialog>
         </div>
+        <div v-else>
+            <workflow-test-builder :endpointsList="[]" apiCollectionId=0 :originalStateFromDb="originalStateFromDb" :defaultOpenResult="true" class="white-background"/>
+        </div>
     </div>
 </template>
 
@@ -93,6 +96,7 @@ import StackedChart from '@/apps/dashboard/shared/components/charts/StackedChart
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
 import TestResultsDialog from "./TestResultsDialog";
+import WorkflowTestBuilder from '../../observe/inventory/components/WorkflowTestBuilder'
 
 import api from '../api'
 
@@ -115,7 +119,8 @@ export default {
         StackedChart,
         SimpleTable,
         SensitiveChipGroup,
-        TestResultsDialog
+        TestResultsDialog,
+        WorkflowTestBuilder
     },
     data () {
         let endTimestamp = this.defaultEndTimestamp || func.timeNow()
@@ -154,7 +159,9 @@ export default {
                 }
             ],
             testingRunResult: null,
-            openDetailsDialog: false
+            openDetailsDialog: false,
+            isWorkflow: false,
+            originalStateFromDb: null
         }
     },
     methods: {
@@ -217,6 +224,10 @@ export default {
         },
         refreshSummaries() {
             api.fetchTestingRunResultSummaries(this.startTimestamp, this.endTimestamp, this.testingRunHexId).then(resp => {
+                if (resp.testingRun.testIdConfig == 1) {
+                    this.isWorkflow = true
+                    this.originalStateFromDb = resp.workflowTest
+                }
                 this.testingRunResultSummaries = resp.testingRunResultSummaries
                 this.selectedDate = Math.max(...this.testingRunResultSummaries.map(o => o.startTimestamp))
             })

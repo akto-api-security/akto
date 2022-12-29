@@ -1,5 +1,6 @@
 package com.akto.calendar;
 
+import com.akto.dao.context.Context;
 import com.akto.util.DateUtils.TrackingPeriod;
 
 import java.time.DayOfWeek;
@@ -13,6 +14,21 @@ public class DateUtils {
     public static int date(LocalDate of) {
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyyMMdd");
         return Integer.parseInt(dtf.format(of));
+    }
+
+    public static String prettifyDelta(int epochInSeconds) {
+        int diff = Context.now() - epochInSeconds;
+        if (diff < 120) {
+            return "1 minute ago";
+        } else if (diff < 3600) {
+            return diff/60 + " minutes ago";
+        } else if (diff < 7200) {
+            return "1 hour ago";
+        } else if (diff < 86400) {
+            return diff/3600 + " hours ago";
+        }
+
+        return "couple of days ago";
     }
 
     public static LocalDate getStartLocalDate(TrackingPeriod period, int date) {

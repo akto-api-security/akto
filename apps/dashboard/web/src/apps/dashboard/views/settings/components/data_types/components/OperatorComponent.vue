@@ -42,6 +42,7 @@ export default {
     name: "OperatorComponent",
     props: {
         operator: obj.strR,
+        operators: obj.arrR,
         onlyEqual: {
             type:Boolean
         },
@@ -50,9 +51,6 @@ export default {
     },
     data() {
         return {
-            operators: [
-                "OR", "AND"
-            ],
         }
     },
     methods: {
