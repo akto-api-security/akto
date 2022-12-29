@@ -10,14 +10,16 @@ public class HardcodedAuthParam extends AuthParam {
     private Location where;
     private String key;
     private String value;
+    private Boolean showHeader;
 
 
     public HardcodedAuthParam() { }
 
-    public HardcodedAuthParam(Location where, String key, String value) {
+    public HardcodedAuthParam(Location where, String key, String value, Boolean showHeader) {
         this.where = where;
         this.key = key;
         this.value = value;
+        this.showHeader = showHeader;
     }
 
     @Override
@@ -93,5 +95,13 @@ public class HardcodedAuthParam extends AuthParam {
 
     public void setValue(String value) {
         this.value = value;
+    }
+
+    public Boolean getShowHeader() {
+        return showHeader;
+    }
+
+    public void setShowHeader(Boolean showHeader) {
+        this.showHeader = showHeader;
     }
 }

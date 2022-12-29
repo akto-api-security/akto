@@ -13,12 +13,15 @@ public class LoginRequestAuthParam extends AuthParam {
 
     private String key;
     private String value;
+    private Boolean showHeader;
+
     public LoginRequestAuthParam() { }
 
-    public LoginRequestAuthParam(Location where, String key, String value) {
+    public LoginRequestAuthParam(Location where, String key, String value, Boolean showHeader) {
         this.key = key;
         this.value = value;
         this.where = where;
+        this.showHeader = showHeader;
     }
 
     @Override
@@ -94,5 +97,13 @@ public class LoginRequestAuthParam extends AuthParam {
 
     public void setValue(String value) {
         this.value = value;
+    }
+
+    public Boolean getShowHeader() {
+        return showHeader;
+    }
+
+    public void setShowHeader(Boolean showHeader) {
+        this.showHeader = showHeader;
     }
 }

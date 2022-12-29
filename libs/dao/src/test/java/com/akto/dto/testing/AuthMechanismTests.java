@@ -14,7 +14,7 @@ public class AuthMechanismTests {
         String value = "Value";
         String finalKey = key.toLowerCase().trim();
         AuthMechanism authMechanism = new AuthMechanism();
-        authMechanism.setAuthParams(Collections.singletonList(new HardcodedAuthParam(AuthParam.Location.HEADER, key, value)));
+        authMechanism.setAuthParams(Collections.singletonList(new HardcodedAuthParam(AuthParam.Location.HEADER, key, value, true)));
 
         boolean result = authMechanism.addAuthToRequest(request);
         assertEquals(result, modifiedValue!=null);
@@ -33,9 +33,9 @@ public class AuthMechanismTests {
         String finalKey = key.toLowerCase().trim();
         AuthMechanism authMechanism = new AuthMechanism();
         if (hardcoded) {
-            authMechanism.setAuthParams(Collections.singletonList(new HardcodedAuthParam(AuthParam.Location.BODY, key, value)));
+            authMechanism.setAuthParams(Collections.singletonList(new HardcodedAuthParam(AuthParam.Location.BODY, key, value, false)));
         } else {
-            authMechanism.setAuthParams(Collections.singletonList(new LoginRequestAuthParam(AuthParam.Location.BODY, key, value)));
+            authMechanism.setAuthParams(Collections.singletonList(new LoginRequestAuthParam(AuthParam.Location.BODY, key, value, false)));
         }
 
         boolean result = authMechanism.addAuthToRequest(request);
