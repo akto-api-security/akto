@@ -1,0 +1,108 @@
+package com.akto.action;
+
+import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+import com.akto.dao.AktoDataTypeDao;
+import com.akto.dao.CustomDataTypeDao;
+import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.context.Context;
+import com.akto.dto.IgnoreData;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.SingleTypeInfo.ParamId;
+import com.akto.dto.type.SingleTypeInfo.SubType;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+import com.opensymphony.xwork2.Action;
+
+public class IgnoreFalsePositivesAction extends UserAction{
+    private Map<String,IgnoreData> falsePositives;
+
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
+    private SubType createSubType(String keyType){
+        if(keyType=="CREDIT_CARD" || keyType=="PHONE_NUMBER"){
+            return SingleTypeInfo.INTEGER_64;
+        }
+        return SingleTypeInfo.GENERIC;
+    }
+
+    public String setFalsePositives() {
+        if(falsePositives==null){
+            return Action.ERROR.toUpperCase();
+        }
+        for (String keyType : falsePositives.keySet()) {
+            if (SingleTypeInfo.customDataTypeMap.containsKey(keyType)) {
+                IgnoreData ignoreData = SingleTypeInfo.customDataTypeMap.get(keyType).getIgnoreData();
+                if (ignoreData != null) {
+                    ignoreData.getIgnoredKeysInAllAPIs().addAll(falsePositives.get(keyType).getIgnoredKeysInAllAPIs());
+                    ignoreData.getIgnoredKeysInSelectedAPIs().putAll(falsePositives.get(keyType).getIgnoredKeysInSelectedAPIs());
+                } else {
+                    ignoreData = new IgnoreData();
+                    ignoreData.setIgnoredKeysInAllAPIs(falsePositives.get(keyType).getIgnoredKeysInAllAPIs());
+                    ignoreData.setIgnoredKeysInSelectedAPIs(falsePositives.get(keyType).getIgnoredKeysInSelectedAPIs());
+                }
+                CustomDataTypeDao.instance.updateOne(Filters.eq("name", keyType),
+                            Updates.combine(
+                                    Updates.set("ignoreData", ignoreData),
+                                    Updates.set("timestamp", Context.now())));
+            } else if (SingleTypeInfo.aktoDataTypeMap.containsKey(keyType)) {
+                IgnoreData ignoreData = SingleTypeInfo.aktoDataTypeMap.get(keyType).getIgnoreData();
+                if (ignoreData != null) {
+                    ignoreData.getIgnoredKeysInAllAPIs().addAll(falsePositives.get(keyType).getIgnoredKeysInAllAPIs());
+                    ignoreData.getIgnoredKeysInSelectedAPIs().putAll(falsePositives.get(keyType).getIgnoredKeysInSelectedAPIs());
+                } else {
+                    ignoreData = new IgnoreData();
+                    ignoreData.setIgnoredKeysInAllAPIs(falsePositives.get(keyType).getIgnoredKeysInAllAPIs());
+                    ignoreData.setIgnoredKeysInSelectedAPIs(falsePositives.get(keyType).getIgnoredKeysInSelectedAPIs());
+                }
+                AktoDataTypeDao.instance.updateOne(Filters.eq("name", keyType),
+                Updates.combine(
+                        Updates.set("ignoreData", ignoreData),
+                        Updates.set("timestamp", Context.now())));
+            }
+        }
+
+        int accountId = Context.accountId.get();
+        executorService.schedule( new Runnable() {
+            public void run() {
+                Context.accountId.set(accountId);
+                for (String keyType : falsePositives.keySet()) {
+                    IgnoreData ignoreData = falsePositives.get(keyType);
+                    for (String key : ignoreData.getIgnoredKeysInSelectedAPIs().keySet()) {
+                        for (ParamId paramId : ignoreData.getIgnoredKeysInSelectedAPIs().get(key)) {
+                            SingleTypeInfo sti = new SingleTypeInfo(paramId, null, null, accountId, accountId,
+                                    accountId, null, null, accountId, accountId);
+                                    sti.setSubType(createSubType(keyType));
+                            SingleTypeInfoDao.instance.getMCollection().deleteMany(
+                                    SingleTypeInfoDao.createFilters(sti));
+                            SingleTypeInfoDao.instance.updateMany(
+                                    SingleTypeInfoDao.createFiltersWithoutSubType(sti),
+                                    Updates.set("subType",createSubType(keyType).getName()));
+                        }
+                    }
+                    for (String key : ignoreData.getIgnoredKeysInAllAPIs()) {
+                        SingleTypeInfoDao.instance.getMCollection().deleteMany(
+                            Filters.and(Filters.eq("param", key),
+                                Filters.eq("subType",createSubType(keyType).getName())));
+                        SingleTypeInfoDao.instance.updateMany(
+                            Filters.eq("param", key),
+                            Updates.set("subType", createSubType(keyType).getName()));
+                    }
+                }
+            }
+        }, 5 , TimeUnit.SECONDS);
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public Map<String, IgnoreData> getFalsePositives() {
+        return falsePositives;
+    }
+
+    public void setFalsePositives(Map<String, IgnoreData> falsePositives) {
+        this.falsePositives = falsePositives;
+    }
+}

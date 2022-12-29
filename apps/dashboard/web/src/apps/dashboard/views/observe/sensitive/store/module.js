@@ -67,6 +67,47 @@ const sensitive = {
             }).catch(() => {
                 state.loading = false
             })
+        },
+        ignoreForThisApi({commit},data,options){
+            let falsePositives={}
+            let ignoredKeysInSelectedAPIs = {
+                    [data.apiCollection.name]: [{
+                        "param": data.apiCollection.name,
+                        "url": data.apiCollection.endpoint,
+                        "method": data.apiCollection.method,
+                        "isHeader":data.apiCollection.location=="Headers",
+                        "apiCollectionId":data.apiCollection.apiCollectionId,
+                        "responseCode":data.apiCollection.responseCode,
+                        "subTypeString":data.apiCollection.type,
+                        "isUrlParam":false
+                    }]
+                }
+            let ignoredKeysInAllAPIs = []
+            let ignoreData = {
+                ignoredKeysInSelectedAPIs : ignoredKeysInSelectedAPIs,
+                ignoredKeysInAllAPIs : ignoredKeysInAllAPIs
+            }
+            falsePositives = { [data.apiCollection.type]: ignoreData }
+            return api.setFalsePositives(falsePositives).then((resp)=>{
+                state.loading = false
+            }).catch(() => {
+                state.loading = false
+            })
+        },
+        ignoreForAllApis({commit},data,options){
+            let falsePositives={}
+            let ignoredKeysInSelectedAPIs = {}
+            let ignoredKeysInAllAPIs = [data.apiCollection.name]
+            let ignoreData = {
+                ignoredKeysInSelectedAPIs : ignoredKeysInSelectedAPIs,
+                ignoredKeysInAllAPIs : ignoredKeysInAllAPIs
+            }
+            falsePositives = { [data.apiCollection.type]: ignoreData }
+            return api.setFalsePositives(falsePositives).then((resp)=>{
+                state.loading = false
+            }).catch(() => {
+                state.loading = false
+            })
         }
     },
     getters: {

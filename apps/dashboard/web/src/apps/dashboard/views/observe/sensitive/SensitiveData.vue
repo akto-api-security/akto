@@ -31,6 +31,7 @@
             <template slot="Request">
                 <simple-table 
                     :headers=headers 
+                    :actions=actions
                     :items=sensitiveParamsInRequestForTable 
                     name="Request"
                     @rowClicked="goToEndpoint"
@@ -43,6 +44,7 @@
             <template slot="Response">
                 <simple-table 
                     :headers=headers 
+                    :actions=actions
                     :items=sensitiveParamsInResponseForTable 
                     name="Response"
                     @rowClicked="goToEndpoint"                    
@@ -115,10 +117,60 @@ export default {
                     text: 'Location',
                     value: 'location'
                 }
+            ],
+            actions: [ 
+                {
+                    isValid: item => true,
+                    icon: item => '$fas_trash',
+                    text: item => 'Ignore key for this API',
+                    func: item => this.ignoreForThisAPI(item),
+                    success: (resp, item) => this.successfullyIgnored(resp, item),
+                    failure: (err, item) => this.unsuccessfullyIgnored(err, item)
+                },
+                {
+                    isValid: item => true,
+                    icon: item => '$fas_stop',
+                    text: item => 'Ignore key for all APIs',
+                    func: item => this.ignoreForAllAPIs(item),
+                    success: (resp, item) => this.successfullyIgnored(resp, item),
+                    failure: (err, item) => this.unsuccessfullyIgnored(err, item)
+                }
             ]
         }
     },
     methods: {
+        ignoreForThisAPI(item) {
+            this.ignoredCollection = item.name
+            if(confirm("Ignore key for this API ?")) {
+                const summ = this.$store.dispatch('sensitive/ignoreForThisApi', {apiCollection: item})
+                console.log(summ)
+                return summ
+            }
+        },
+        ignoreForAllAPIs(item) {
+            this.ignoredCollection = item.name
+            if(confirm("Ignore key for all APIs ?")) {
+                const summ = this.$store.dispatch('sensitive/ignoreForAllApis', {apiCollection: item})
+                console.log(summ)
+                return summ
+            }
+        },
+        successfullyIgnored(resp,item) {
+            window._AKTO.$emit('SHOW_SNACKBAR', {
+                show: true,
+                text: `${this.ignoredCollection}` + ` ignored successfully!`,
+                color: 'green'
+            })
+            this.ignoredCollection = null
+        },
+        unsuccessfullyIgnored(resp,item) {
+            window._AKTO.$emit('SHOW_SNACKBAR', {
+                show: true,
+                text: `${this.ignoredCollection}` + ` could not be ignored`,
+                color: 'red'
+            })
+            this.ignoredCollection = null
+        },
         prepareItemForTable(x) {
             return {
                 color: this.$vuetify.theme.themes.dark.redMetric,
@@ -130,6 +182,7 @@ export default {
                 type: x.subType.name || "OTHER",
                 apiCollectionId: x.apiCollectionId,
                 apiCollectionName: this.mapCollectionIdToName[x.apiCollectionId] || '-',
+                responseCode: x.responseCode
             }
         },
         prettifyDate(ts) {

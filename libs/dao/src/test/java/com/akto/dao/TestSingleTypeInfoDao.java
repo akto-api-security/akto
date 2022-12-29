@@ -4,6 +4,7 @@ import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomDataType;
+import com.akto.dto.IgnoreData;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.EndsWithPredicate;
@@ -62,11 +63,12 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         SingleTypeInfoDao.instance.getMCollection().drop();
         CustomDataTypeDao.instance.getMCollection().drop();
         Context.accountId.set(1_000_000);
+        IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
         Conditions keyConditions = new Conditions(Arrays.asList(new StartsWithPredicate("we"), new RegexPredicate("reg")), Conditions.Operator.AND);
         Conditions valueConditions = new Conditions(Collections.singletonList(new EndsWithPredicate("something")), Conditions.Operator.OR);
         CustomDataType customDataType = new CustomDataType(
                 "custom1", false, Arrays.asList(SingleTypeInfo.Position.REQUEST_PAYLOAD, SingleTypeInfo.Position.RESPONSE_PAYLOAD),
-                0,true, keyConditions, valueConditions, Conditions.Operator.OR
+                0,true, keyConditions, valueConditions, Conditions.Operator.OR,ignoreData
         );
 
         CustomDataTypeDao.instance.insertOne(customDataType);
@@ -112,9 +114,9 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         bulkWrites.add(createSingleTypeInfoUpdate("B", "POST", SingleTypeInfo.INTEGER_32, 0,200));
         bulkWrites.add(createSingleTypeInfoUpdate("C", "GET", SingleTypeInfo.JWT, 0,200));
         bulkWrites.add(createSingleTypeInfoUpdate("D", "POST", SingleTypeInfo.JWT, 0,-1));
-
-        CustomDataType customDataType1 = new CustomDataType("CUSTOM_DATA_1", true, Collections.emptyList(), 0,true, null,null, Conditions.Operator.AND);
-        CustomDataType customDataType2 = new CustomDataType("CUSTOM_DATA_2",false, Collections.emptyList(), 0,true, null,null, Conditions.Operator.AND);
+        IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
+        CustomDataType customDataType1 = new CustomDataType("CUSTOM_DATA_1", true, Collections.emptyList(), 0,true, null,null, Conditions.Operator.AND,ignoreData);
+        CustomDataType customDataType2 = new CustomDataType("CUSTOM_DATA_2",false, Collections.emptyList(), 0,true, null,null, Conditions.Operator.AND,ignoreData);
         CustomDataTypeDao.instance.insertMany(Arrays.asList(customDataType1, customDataType2));
 
         bulkWrites.add(createSingleTypeInfoUpdate("E", "POST",customDataType1.toSubType(), 0,200));
