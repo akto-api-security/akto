@@ -29,6 +29,7 @@ public class CustomDataType {
     Conditions valueConditions;
     public static final String OPERATOR = "operator";
     Conditions.Operator operator;
+    public static final String IGNORE_DATA = "ignoreData";
     private IgnoreData ignoreData;
 
     public CustomDataType() { }

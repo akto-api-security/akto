@@ -70,6 +70,9 @@ const sensitive = {
         },
         ignoreForThisApi({commit},data,options){
             let falsePositives={}
+            if(data.apiCollection.isProcessed){
+                data.apiCollection.name = data.apiCollection.name.replaceAll(".","#$#");
+            }
             let ignoredKeysInSelectedAPIs = {
                     [data.apiCollection.name]: [{
                         "param": data.apiCollection.name,

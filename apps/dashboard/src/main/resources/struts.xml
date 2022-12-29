@@ -376,7 +376,7 @@
             </result>
         </action>
 
-        <action name="api/setFalsePositives" class="com.akto.action.IgnoreFalsePositivesAction" method="setFalsePositives">
+        <action name="api/setFalsePositives" class="com.akto.action.IgnoreFalsePositivesAction" method="setFalsePositivesInSensitiveData">
         <interceptor-ref name="json"/>
         <interceptor-ref name="defaultStack" />
         <result name="SUCCESS"  type="json">

@@ -174,6 +174,7 @@ export default {
         prepareItemForTable(x) {
             return {
                 color: this.$vuetify.theme.themes.dark.redMetric,
+                isProcessed: x.param.includes("#$#"),
                 name: x.param.replaceAll("#", ".").replaceAll(".$", ""),
                 endpoint: x.url,
                 method: x.method,

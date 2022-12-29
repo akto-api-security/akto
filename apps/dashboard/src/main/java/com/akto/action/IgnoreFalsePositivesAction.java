@@ -1,5 +1,7 @@
 package com.akto.action;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -9,6 +11,7 @@ import com.akto.dao.AktoDataTypeDao;
 import com.akto.dao.CustomDataTypeDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.CustomDataType;
 import com.akto.dto.IgnoreData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.SingleTypeInfo.ParamId;
@@ -23,45 +26,39 @@ public class IgnoreFalsePositivesAction extends UserAction{
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     private SubType createSubType(String keyType){
-        if(keyType=="CREDIT_CARD" || keyType=="PHONE_NUMBER"){
+        if(keyType.equals(SingleTypeInfo.CREDIT_CARD.getName()) || keyType.equals(SingleTypeInfo.PHONE_NUMBER.getName())){
             return SingleTypeInfo.INTEGER_64;
         }
         return SingleTypeInfo.GENERIC;
     }
 
-    public String setFalsePositives() {
+    public String setFalsePositivesInSensitiveData() {
         if(falsePositives==null){
             return Action.ERROR.toUpperCase();
         }
         for (String keyType : falsePositives.keySet()) {
             if (SingleTypeInfo.customDataTypeMap.containsKey(keyType)) {
                 IgnoreData ignoreData = SingleTypeInfo.customDataTypeMap.get(keyType).getIgnoreData();
-                if (ignoreData != null) {
-                    ignoreData.getIgnoredKeysInAllAPIs().addAll(falsePositives.get(keyType).getIgnoredKeysInAllAPIs());
-                    ignoreData.getIgnoredKeysInSelectedAPIs().putAll(falsePositives.get(keyType).getIgnoredKeysInSelectedAPIs());
-                } else {
-                    ignoreData = new IgnoreData();
-                    ignoreData.setIgnoredKeysInAllAPIs(falsePositives.get(keyType).getIgnoredKeysInAllAPIs());
-                    ignoreData.setIgnoredKeysInSelectedAPIs(falsePositives.get(keyType).getIgnoredKeysInSelectedAPIs());
+                if (ignoreData == null) {
+                    ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
                 }
-                CustomDataTypeDao.instance.updateOne(Filters.eq("name", keyType),
-                            Updates.combine(
-                                    Updates.set("ignoreData", ignoreData),
-                                    Updates.set("timestamp", Context.now())));
+                ignoreData.getIgnoredKeysInAllAPIs().addAll(falsePositives.get(keyType).getIgnoredKeysInAllAPIs());
+                ignoreData.getIgnoredKeysInSelectedAPIs().putAll(falsePositives.get(keyType).getIgnoredKeysInSelectedAPIs());
+                CustomDataTypeDao.instance.updateOne(Filters.eq(CustomDataType.NAME, keyType),
+                    Updates.combine(
+                            Updates.set(CustomDataType.IGNORE_DATA, ignoreData),
+                            Updates.set(CustomDataType.TIMESTAMP, Context.now())));
             } else if (SingleTypeInfo.aktoDataTypeMap.containsKey(keyType)) {
                 IgnoreData ignoreData = SingleTypeInfo.aktoDataTypeMap.get(keyType).getIgnoreData();
-                if (ignoreData != null) {
-                    ignoreData.getIgnoredKeysInAllAPIs().addAll(falsePositives.get(keyType).getIgnoredKeysInAllAPIs());
-                    ignoreData.getIgnoredKeysInSelectedAPIs().putAll(falsePositives.get(keyType).getIgnoredKeysInSelectedAPIs());
-                } else {
-                    ignoreData = new IgnoreData();
-                    ignoreData.setIgnoredKeysInAllAPIs(falsePositives.get(keyType).getIgnoredKeysInAllAPIs());
-                    ignoreData.setIgnoredKeysInSelectedAPIs(falsePositives.get(keyType).getIgnoredKeysInSelectedAPIs());
+                if (ignoreData == null) {
+                    ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
                 }
-                AktoDataTypeDao.instance.updateOne(Filters.eq("name", keyType),
-                Updates.combine(
-                        Updates.set("ignoreData", ignoreData),
-                        Updates.set("timestamp", Context.now())));
+                ignoreData.getIgnoredKeysInAllAPIs().addAll(falsePositives.get(keyType).getIgnoredKeysInAllAPIs());
+                ignoreData.getIgnoredKeysInSelectedAPIs().putAll(falsePositives.get(keyType).getIgnoredKeysInSelectedAPIs());
+                AktoDataTypeDao.instance.updateOne(Filters.eq(CustomDataType.NAME, keyType),
+                    Updates.combine(
+                            Updates.set(CustomDataType.IGNORE_DATA, ignoreData),
+                            Updates.set(CustomDataType.TIMESTAMP, Context.now())));
             }
         }
 
@@ -80,16 +77,16 @@ public class IgnoreFalsePositivesAction extends UserAction{
                                     SingleTypeInfoDao.createFilters(sti));
                             SingleTypeInfoDao.instance.updateMany(
                                     SingleTypeInfoDao.createFiltersWithoutSubType(sti),
-                                    Updates.set("subType",createSubType(keyType).getName()));
+                                    Updates.set(SingleTypeInfo.SUB_TYPE,createSubType(keyType).getName()));
                         }
                     }
                     for (String key : ignoreData.getIgnoredKeysInAllAPIs()) {
                         SingleTypeInfoDao.instance.getMCollection().deleteMany(
-                            Filters.and(Filters.eq("param", key),
-                                Filters.eq("subType",createSubType(keyType).getName())));
+                            Filters.and(Filters.eq(SingleTypeInfo._PARAM, key),
+                                Filters.eq(SingleTypeInfo.SUB_TYPE,createSubType(keyType).getName())));
                         SingleTypeInfoDao.instance.updateMany(
-                            Filters.eq("param", key),
-                            Updates.set("subType", createSubType(keyType).getName()));
+                            Filters.eq(SingleTypeInfo._PARAM, key),
+                            Updates.set(SingleTypeInfo.SUB_TYPE, createSubType(keyType).getName()));
                     }
                 }
             }
