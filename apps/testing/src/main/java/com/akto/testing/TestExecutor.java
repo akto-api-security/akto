@@ -30,6 +30,8 @@ import com.mongodb.client.model.Updates;
 import org.bson.json.JsonObject;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -40,6 +42,7 @@ import java.util.concurrent.*;
 public class TestExecutor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class);
+    private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
 
     public void init(TestingRun testingRun, ObjectId summaryId) {
         if (testingRun.getTestIdConfig() == 0)     {
@@ -113,7 +116,7 @@ public class TestExecutor {
         try {
             LoginFlowResponse loginFlowResponse = triggerLoginFlow(authMechanism, 3);
             if (!loginFlowResponse.getSuccess()) {
-                System.out.println("login flow failed");
+                logger.error("login flow failed");
                 throw new Exception("login flow failed");
             }
         } catch (Exception e) {
@@ -213,11 +216,11 @@ public class TestExecutor {
             try {
                 loginFlowResponse = executeLoginFlow(authMechanism, null);
                 if (loginFlowResponse.getSuccess()) {
-                    System.out.println("login flow success");
+                    logger.info("login flow success");
                     break;
                 }
             } catch (Exception e) {
-                System.out.println("retrying login flow");
+                logger.error("retrying login flow" + e.getMessage());
                 loggerMaker.errorAndAddToDb(e.getMessage());
             }
         }
@@ -227,16 +230,16 @@ public class TestExecutor {
     public LoginFlowResponse executeLoginFlow(AuthMechanism authMechanism, LoginFlowParams loginFlowParams) throws Exception {
 
         if (authMechanism.getType() == null) {
-            System.out.println("auth type value is null");
+            logger.info("auth type value is null");
             return new LoginFlowResponse(null, null, true);
         }
 
         if (!authMechanism.getType().equals(LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString())) {
-            System.out.println("invalid auth type for login flow execution");
+            logger.info("invalid auth type for login flow execution");
             return new LoginFlowResponse(null, null, true);
         }
 
-        System.out.println("login flow execution started");
+        logger.info("login flow execution started");
 
         WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData(), loginFlowParams);
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();

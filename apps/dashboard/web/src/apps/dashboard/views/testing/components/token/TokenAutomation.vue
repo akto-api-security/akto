@@ -384,7 +384,7 @@ export default {
     background-color: #FFFFFF !important
     padding: 0 6px
     height:50px
-    width: 150px
+    width: 86px
     opacity: 1 !important
     &.true
         color: #FFFFFF !important
