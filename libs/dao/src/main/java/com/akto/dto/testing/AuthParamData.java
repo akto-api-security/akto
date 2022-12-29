@@ -6,12 +6,14 @@ public class AuthParamData {
     private String key;
 
     private String value;
+    private Boolean showHeader;
 
     public AuthParamData() { }
-    public AuthParamData(AuthParam.Location where, String key, String value) {
+    public AuthParamData(AuthParam.Location where, String key, String value, Boolean showHeader) {
         this.where = where;
         this.key = key;
         this.value = value;
+        this.showHeader = showHeader;
     }
 
     public AuthParam.Location getWhere() {return this.where;}
@@ -41,6 +43,13 @@ public class AuthParamData {
         return true;
     }
 
+    public Boolean getShowHeader() {
+        return showHeader;
+    }
+
+    public void setShowHeader(Boolean showHeader) {
+        this.showHeader = showHeader;
+    }
 }
 
 
