@@ -113,6 +113,7 @@ public class TestExecutor {
         try {
             LoginFlowResponse loginFlowResponse = triggerLoginFlow(authMechanism, 3);
             if (!loginFlowResponse.getSuccess()) {
+                System.out.println("login flow failed");
                 throw new Exception("login flow failed");
             }
         } catch (Exception e) {
@@ -212,9 +213,11 @@ public class TestExecutor {
             try {
                 loginFlowResponse = executeLoginFlow(authMechanism, null);
                 if (loginFlowResponse.getSuccess()) {
+                    System.out.println("login flow success");
                     break;
                 }
             } catch (Exception e) {
+                System.out.println("retrying login flow");
                 loggerMaker.errorAndAddToDb(e.getMessage());
             }
         }
@@ -223,9 +226,17 @@ public class TestExecutor {
 
     public LoginFlowResponse executeLoginFlow(AuthMechanism authMechanism, LoginFlowParams loginFlowParams) throws Exception {
 
-        if (!authMechanism.getType().equals(LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString())) {
+        if (authMechanism.getType() == null) {
+            System.out.println("auth type value is null");
             return new LoginFlowResponse(null, null, true);
         }
+
+        if (!authMechanism.getType().equals(LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString())) {
+            System.out.println("invalid auth type for login flow execution");
+            return new LoginFlowResponse(null, null, true);
+        }
+
+        System.out.println("login flow execution started");
 
         WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData(), loginFlowParams);
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();

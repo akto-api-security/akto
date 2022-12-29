@@ -1,6 +1,7 @@
 package com.akto.dto.testing;
 
 import com.akto.dto.OriginalHttpRequest;
+import com.akto.util.JsonStringPayloadModifier;
 
 import java.util.Collections;
 import java.util.List;
@@ -23,21 +24,43 @@ public class LoginRequestAuthParam extends AuthParam {
     @Override
     public boolean addAuthTokens(OriginalHttpRequest request) {
         if (this.key == null) return false;
-        Map<String, List<String>> headers = request.getHeaders();
-        String k = this.key.toLowerCase().trim();
-        if (!headers.containsKey(k)) return false;
-        headers.put(k, Collections.singletonList(this.value));
+        if (where.toString().equals("BODY") ) {
+            try {
+                String resp = JsonStringPayloadModifier.jsonStringPayloadModifier(request.getBody(), key, value);
+                request.setBody(resp);
+            } catch(Exception e) {
+                System.out.println("error adding auth param to body" + e.getMessage());
+                return false;
+            }
+        } else {
+            Map<String, List<String>> headers = request.getHeaders();
+            String k = this.key.toLowerCase().trim();
+            if (!headers.containsKey(k)) return false;
+            headers.put(k, Collections.singletonList(this.value));        
+        }
+        
         return true;
     }
-
+    
     @Override
     public boolean removeAuthTokens(OriginalHttpRequest request) {
-        if (this.key == null) return false;
-        Map<String, List<String>> headers = request.getHeaders();
-        String k = this.key.toLowerCase().trim();
-        if (!headers.containsKey(k)) return false;
-        headers.put(k, Collections.singletonList(null));
-        // implement this in the 2nd class as well
+        if (where.toString().equals("BODY")) {
+            try {
+                String resp = JsonStringPayloadModifier.jsonStringPayloadModifier(request.getBody(), key, null);
+                request.setBody(resp);
+            } catch(Exception e) {
+                System.out.println("error adding auth param to body" + e.getMessage());
+                return false;
+            }
+        }
+        else {
+            if (this.key == null) return false;
+            Map<String, List<String>> headers = request.getHeaders();
+            String k = this.key.toLowerCase().trim();
+            if (!headers.containsKey(k)) return false;
+            headers.put(k, Collections.singletonList(null));
+            // implement this in the 2nd class as well
+        }
         return true;
     }
 

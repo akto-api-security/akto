@@ -2,16 +2,32 @@
     <div class="pa-4 automation-container">
         <div v-if="showAuthParams">
               <div v-for="(key, index) in authParamsList" :key="index">
-                <div class="input-value d-flex">
+                <div class="input-value flex-padding">
+
+                   <v-btn-toggle style="margin 20px"
+                        v-model="reqToggle"
+                        mandatory >
+                            <v-btn value="req" :class="authParamsList[index].showHeader ? 'sensitive-text true' : 'sensitive-text inactive'"
+                            @click="toggleShowHeader(index)"
+                            >
+                                Header
+                            </v-btn>
+                            <v-btn value="req" :class="authParamsList[index].showHeader ? 'sensitive-text inactive' : 'sensitive-text true'"
+                            @click="toggleShowHeader(index)"
+                            >
+                                Body
+                            </v-btn>
+                    </v-btn-toggle>
+
                     <v-text-field 
                         label="Header key"
-                        style="width: 200px"
+                        style="max-width: 300px"
                         v-model="authParamsList[index].key"
                     />
 
                     <v-text-field 
                         label="Header"
-                        style="width: 200px"
+                        style="max-width: 300px"
                         v-model="authParamsList[index].value"
                     />       
 
@@ -21,6 +37,7 @@
 
                 </div>
               </div>
+
               <v-btn primary icon color="#6200EA" @click='toggleShowAuthParamsAuthTab' >
                     <v-icon> $fas_arrow-left </v-icon>
                 </v-btn>
@@ -107,7 +124,7 @@ export default {
                     "testedSuccessfully": false
                 }
             }
-            paramList = [{key: "", "where": "HEADER", value: ""}]
+            paramList = [{key: "", "where": "HEADER", value: "", "showHeader": true}]
         }
         
         return {
@@ -132,7 +149,7 @@ export default {
 
         addNewAuthParamElem() {
           let authParamClone = [...this.authParamsList]
-          authParamClone.push({key: "", "where": "HEADER", value:""})
+          authParamClone.push({key: "", "where": "HEADER", value:"", "showHeader": true})
           this.authParamsList = authParamClone
         },
 
@@ -316,6 +333,11 @@ export default {
             this.currTabName = this.apiTabs[Math.min(0, indexTab-1)]
             this.apiTabs.splice(indexTab, 1)
             this.$delete(this.stepData, tabName)
+        },
+        toggleShowHeader (index) {
+            this.authParamsList[index].showHeader = !this.authParamsList[index].showHeader
+            let val = this.authParamsList[index].showHeader ? "HEADER": "BODY"
+            this.$set(this.authParamsList[index], "where", val);
         }
     },
 
@@ -348,5 +370,34 @@ export default {
 
     &.v-btn--disabled
         opacity: 0.3 !important
+
+
+.sensitive-text
+    font-size: 16px
+    font-weight: bold
+    width: 210px
+    align-items: center
+    display: flex
+    padding: 0px
+    padding-left: 12px
+    color: #47466A !important
+    background-color: #FFFFFF !important
+    padding: 0 6px
+    height:50px
+    width: 150px
+    opacity: 1 !important
+    &.true
+        color: #FFFFFF !important
+        background-color: #47466A !important
+    &:hover
+        cursor: pointer
+    &.v-btn:before
+        opacity: 1 !important
+        z-index: -1
+
+.flex-padding
+    display: flex
+    margin: auto
+    gap: 20px
 
 </style>
