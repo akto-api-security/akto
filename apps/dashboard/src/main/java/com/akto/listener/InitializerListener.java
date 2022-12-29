@@ -9,6 +9,7 @@ import com.akto.dao.BackwardCompatibilityDao;
 import com.akto.dao.FilterSampleDataDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.testing.*;
+import com.akto.dao.testing.sources.TestSourcesDao;
 import com.akto.dto.*;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhookResult;
@@ -23,11 +24,15 @@ import com.akto.dto.data_types.RegexPredicate;
 import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
+import com.akto.dto.testing.sources.TestSource;
+import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.notifications.email.WeeklyEmail;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.util.Pair;
 import com.akto.utils.RedactSampleData;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -54,6 +59,8 @@ import com.akto.testing.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -126,16 +133,51 @@ public class InitializerListener implements ServletContextListener {
         }, delayInDays, 7, TimeUnit.DAYS);
 
     }
-    public void setUpPiiScheduler(){
+    public void setUpPiiAndTestSourcesScheduler(){
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 String mongoURI = System.getenv("AKTO_MONGO_CONN");
                 DaoInit.init(new ConnectionString(mongoURI));
                 Context.accountId.set(1_000_000);
+                try {
+                    executePIISourceFetch();
+                } catch (Exception e) {
 
-                executePIISourceFetch();
+                }
+
+                try {
+                    executeTestSourcesFetch();
+                } catch (Exception e) {
+
+                }
             }
         }, 0, 4, TimeUnit.HOURS);
+    }
+
+    static void executeTestSourcesFetch() {
+
+        ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+
+        try {
+            URL resource = InitializerListener.class.getClassLoader().getResource("test_sources.yaml");
+            // String content = FileUtils.readFileToString(new File(resource.getPath()), StandardCharsets.UTF_8);
+            TestSourceConfig testSourceConfig = mapper.readValue(new File(resource.getPath()), TestSourceConfig.class);      
+            System.out.println(testSourceConfig);
+
+            // for(String testSourceFile: testSourceConfig.getSources()) {
+            //     Bson filter = Filters.eq(TestSource.FILE_URL, testSourceFile);
+            //     TestSource found = TestSourcesDao.instance.findOne(filter);
+            //     if (found == null) {
+
+            //     }
+            // }
+        } catch (IOException e) {
+            
+            e.printStackTrace();
+        }
+
+
+
     }
 
     static void executePIISourceFetch() {
@@ -596,6 +638,7 @@ public class InitializerListener implements ServletContextListener {
 
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
+        executeTestSourcesFetch();
         String https = System.getenv("AKTO_HTTPS_FLAG");
         boolean httpsFlag = Objects.equals(https, "true");
         sce.getServletContext().getSessionCookieConfig().setSecure(httpsFlag);
@@ -640,12 +683,12 @@ public class InitializerListener implements ServletContextListener {
                 piiSource.setId("A");
         
                 PIISourceDao.instance.insertOne(piiSource);
-            } 
+            }
 
             setUpWeeklyScheduler();
             setUpDailyScheduler();
             setUpWebhookScheduler();
-            setUpPiiScheduler();
+            setUpPiiAndTestSourcesScheduler();
 
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             dropSampleDataIfEarlierNotDroped(accountSettings);
