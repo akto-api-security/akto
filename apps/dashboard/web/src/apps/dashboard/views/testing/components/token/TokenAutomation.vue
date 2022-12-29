@@ -20,13 +20,13 @@
                     </v-btn-toggle>
 
                     <v-text-field 
-                        label="Header key"
+                        label="Key"
                         style="max-width: 300px"
                         v-model="authParamsList[index].key"
                     />
 
                     <v-text-field 
-                        label="Header"
+                        label="Value"
                         style="max-width: 300px"
                         v-model="authParamsList[index].value"
                     />       
