@@ -50,7 +50,7 @@ public class TestSampleMessageStore extends MongoBasedTest {
     @Test
     public void testFilterMessagesWithAuthToken() {
         AuthMechanism authMechanism = new AuthMechanism(
-                Collections.singletonList(new HardcodedAuthParam(AuthParam.Location.HEADER, "akto", "something")), null, null
+                Collections.singletonList(new HardcodedAuthParam(AuthParam.Location.HEADER, "akto", "something", true)), null, null
         );
 
         List<RawApi> filteredList = SampleMessageStore.filterMessagesWithAuthToken(new ArrayList<>() , authMechanism);
