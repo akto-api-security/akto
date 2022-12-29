@@ -70,12 +70,9 @@ const sensitive = {
         },
         ignoreForThisApi({commit},data,options){
             let falsePositives={}
-            if(data.apiCollection.isProcessed){
-                data.apiCollection.name = data.apiCollection.name.replaceAll(".","#$#");
-            }
             let ignoredKeysInSelectedAPIs = {
-                    [data.apiCollection.name]: [{
-                        "param": data.apiCollection.name,
+                    [data.apiCollection.originalName]: [{
+                        "param": data.apiCollection.originalName,
                         "url": data.apiCollection.endpoint,
                         "method": data.apiCollection.method,
                         "isHeader":data.apiCollection.location=="Headers",
@@ -100,7 +97,7 @@ const sensitive = {
         ignoreForAllApis({commit},data,options){
             let falsePositives={}
             let ignoredKeysInSelectedAPIs = {}
-            let ignoredKeysInAllAPIs = [data.apiCollection.name]
+            let ignoredKeysInAllAPIs = [data.apiCollection.originalName]
             let ignoreData = {
                 ignoredKeysInSelectedAPIs : ignoredKeysInSelectedAPIs,
                 ignoredKeysInAllAPIs : ignoredKeysInAllAPIs
