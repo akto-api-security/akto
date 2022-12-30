@@ -9,6 +9,8 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.store.SampleMessageStore;
 import com.akto.types.CappedSet;
+import com.akto.util.JSONUtils;
+import com.akto.util.modifier.NoneAlgoJWTModifier;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.sendgrid.Method;
@@ -170,15 +172,6 @@ public class TestTestPlugin extends MongoBasedTest {
     }
 
     @Test
-    public void testBuildNoneAlgoToken() throws Exception {
-        String result = TestPlugin.buildNoneAlgoToken("eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MiwiaWF0IjoxNTczMzU4Mzk2fQ.RwNNHvOKZk8p6fICIeezuajDalK8ZSOkEGMhZsRPFSk");
-        assertEquals("eyJ0eXAiOiJKV1QiLCJhbGciOiJub25lIn0.eyJpZCI6MiwiaWF0IjoxNTczMzU4Mzk2fQ.", result);
-
-        result = TestPlugin.buildNoneAlgoToken("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c");
-        assertEquals("eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.", result);
-    }
-
-    @Test
     public void testModifyJwtHeaderToNoneAlgo() {
 
         Map<String, List<String>> headers = new HashMap<>();
@@ -186,16 +179,16 @@ public class TestTestPlugin extends MongoBasedTest {
         headers.put("random", Collections.singletonList("avneesh_is_studddd"));
 
         // no change to headers since it doesn't find any JWT token
-        boolean result = TestPlugin.modifyJwtHeaderToNoneAlgo(headers);
-        assertFalse(result);
+        Map<String, List<String>> result = JSONUtils.modifyHeaderValues(headers, new NoneAlgoJWTModifier());
+        assertNull(result);
         assertEquals(2, headers.size());
         assertEquals("https://www.akto.io", headers.get("origin").get(0));
         assertEquals("avneesh_is_studddd", headers.get("random").get(0));
 
         headers.put("access-token", Collections.singletonList("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"));
-        result = TestPlugin.modifyJwtHeaderToNoneAlgo(headers);
-        assertTrue(result);
-        assertEquals("eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.", headers.get("access-token").get(0));
+        result = JSONUtils.modifyHeaderValues(headers, new NoneAlgoJWTModifier());
+        assertNotNull(result);
+        assertEquals("eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.", result.get("access-token").get(0));
     }
 
     @Test

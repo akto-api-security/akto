@@ -14,8 +14,16 @@ public class WorkflowNodeDetails {
 
     int waitInSeconds;
 
+    int maxPollRetries;
+
+    int pollRetryDuration;
+
+    String otpRegex;
+
+    String otpRefUuid;
+
     public enum Type {
-        POLL, API
+        POLL, API, OTP
     }
 
     // call this function to see if data being passed is legit or not
@@ -33,7 +41,8 @@ public class WorkflowNodeDetails {
     }
 
     public WorkflowNodeDetails(int apiCollectionId, String endpoint, Method method, String testValidatorCode,
-                               WorkflowUpdatedSampleData updatedSampleData, Type type, boolean overrideRedirect, int waitInSeconds) {
+                               WorkflowUpdatedSampleData updatedSampleData, Type type, boolean overrideRedirect,
+                               int waitInSeconds, int maxPollRetries, int pollRetryDuration, String otpRegex, String otpRefUuid) {
         this.apiCollectionId = apiCollectionId;
         this.endpoint = endpoint;
         this.method = method;
@@ -42,6 +51,10 @@ public class WorkflowNodeDetails {
         this.overrideRedirect = overrideRedirect;
         this.testValidatorCode = testValidatorCode;
         this.waitInSeconds = waitInSeconds;
+        this.maxPollRetries = maxPollRetries;
+        this.pollRetryDuration = pollRetryDuration;
+        this.otpRegex = otpRegex;
+        this.otpRefUuid = otpRefUuid;
     }
 
     public int getApiCollectionId() {
@@ -111,6 +124,38 @@ public class WorkflowNodeDetails {
 
     public void setWaitInSeconds(int waitInSeconds) {
         this.waitInSeconds = waitInSeconds;
+    }
+
+    public int getMaxPollRetries() {
+        return maxPollRetries;
+    }
+
+    public void setMaxPollRetries(int maxPollRetries) {
+        this.maxPollRetries = maxPollRetries;
+    }
+
+    public int getPollRetryDuration() {
+        return pollRetryDuration;
+    }
+
+    public void setPollRetryDuration(int pollRetryDuration) {
+        this.pollRetryDuration = pollRetryDuration;
+    }
+
+    public String getOtpRegex() {
+        return otpRegex;
+    }
+
+    public void setOtpRegex(String otpRegex) {
+        this.otpRegex = otpRegex;
+    }
+
+    public String getOtpRefUuid() {
+        return otpRefUuid;
+    }
+
+    public void setOtpRefUuid(String otpRefUuid) {
+        this.otpRefUuid = otpRefUuid;
     }
 
     @Override

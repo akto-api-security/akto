@@ -26,6 +26,7 @@ import com.akto.dto.pii.PIIType;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.notifications.email.WeeklyEmail;
 import com.akto.notifications.slack.DailyUpdate;
+import com.akto.notifications.slack.TestSummaryGenerator;
 import com.akto.util.Pair;
 import com.akto.utils.RedactSampleData;
 import com.google.gson.Gson;
@@ -261,13 +262,25 @@ public class InitializerListener implements ServletContextListener {
                             ci.newSensitiveParams, slackWebhook.getDashboardUrl());
                         
                         slackWebhook.setLastSentTimestamp(now);
-                        SlackWebhooksDao.instance.updateOne(eq("webhook",slackWebhook.getWebhook()), Updates.set("lastSentTimestamp", now)); 
+                        SlackWebhooksDao.instance.updateOne(eq("webhook",slackWebhook.getWebhook()), Updates.set("lastSentTimestamp", now));
 
+                        System.out.println("******************DAILY INVENTORY SLACK******************");
                         String webhookUrl = slackWebhook.getWebhook();
                         String payload = dailyUpdate.toJSON();
                         System.out.println(payload);
                         WebhookResponse response = slack.send(webhookUrl, payload);
-                        System.out.println(response); 
+                        System.out.println(response);
+                        System.out.println("*********************************************************");
+
+                        // slack testing notification
+                        System.out.println("******************TESTING SUMMARY SLACK******************");
+                        TestSummaryGenerator testSummaryGenerator = new TestSummaryGenerator(1_000_000);
+                        payload = testSummaryGenerator.toJson(slackWebhook.getDashboardUrl());
+                        System.out.println(payload);
+                        response = slack.send(webhookUrl, payload);
+                        System.out.println(response);
+                        System.out.println("*********************************************************");
+
                     }
 
                 } catch (Exception ex) {

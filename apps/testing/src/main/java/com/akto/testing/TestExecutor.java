@@ -3,6 +3,7 @@ package com.akto.testing;
 import com.akto.DaoInit;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.LoginFlowStepsDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
@@ -29,6 +30,8 @@ import com.mongodb.client.model.Updates;
 import org.bson.json.JsonObject;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -39,6 +42,7 @@ import java.util.concurrent.*;
 public class TestExecutor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class);
+    private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
 
     public void init(TestingRun testingRun, ObjectId summaryId) {
         if (testingRun.getTestIdConfig() == 0)     {
@@ -77,7 +81,25 @@ public class TestExecutor {
         }
 
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
-        apiWorkflowExecutor.init(workflowTest, testingRun.getId());
+        try {
+            apiWorkflowExecutor.init(workflowTest, testingRun.getId(), summaryId);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        Map<String, Integer> totalCountIssues = new HashMap<>();
+        totalCountIssues.put("HIGH", 0);
+        totalCountIssues.put("MEDIUM", 0);
+        totalCountIssues.put("LOW", 0);
+
+        TestingRunResultSummariesDao.instance.updateOne(
+                Filters.eq("_id", summaryId),
+                Updates.combine(
+                        Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
+                        Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
+                        Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)
+                )
+        );
     }
 
     public void  apiWiseInit(TestingRun testingRun, ObjectId summaryId) {
@@ -92,7 +114,11 @@ public class TestExecutor {
         TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessages, singleTypeInfoMap, testRoles);
 
         try {
-            executeLoginFlow(authMechanism, null);
+            LoginFlowResponse loginFlowResponse = triggerLoginFlow(authMechanism, 3);
+            if (!loginFlowResponse.getSuccess()) {
+                logger.error("login flow failed");
+                throw new Exception("login flow failed");
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e.getMessage());
             return;
@@ -184,25 +210,45 @@ public class TestExecutor {
 
     }
 
-    public ArrayList<Object> executeLoginFlow(AuthMechanism authMechanism, ArrayList<Object> resp) throws Exception {
-
-        if (!authMechanism.getType().equals(LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString())) {
-            return new ArrayList<Object>();
+    private LoginFlowResponse triggerLoginFlow(AuthMechanism authMechanism, int retries) {
+        LoginFlowResponse loginFlowResponse = null;
+        for (int i=0; i<retries; i++) {
+            try {
+                loginFlowResponse = executeLoginFlow(authMechanism, null);
+                if (loginFlowResponse.getSuccess()) {
+                    logger.info("login flow success");
+                    break;
+                }
+            } catch (Exception e) {
+                logger.error("retrying login flow" + e.getMessage());
+                loggerMaker.errorAndAddToDb(e.getMessage());
+            }
         }
-
-        WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData());
-        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
-        ArrayList<Object> responses = new ArrayList<Object>();
-        try {
-            resp = apiWorkflowExecutor.runLoginFlow(workflowObj, authMechanism);
-        } catch(Exception e){
-            loggerMaker.errorAndAddToDb("Login call failed {}" + e.getMessage());
-            throw new Exception("Login Flow Failed");
-        }
-        return resp;
+        return loginFlowResponse;
     }
 
-    public WorkflowTest convertToWorkflowGraph(ArrayList<RequestData> requestData) {
+    public LoginFlowResponse executeLoginFlow(AuthMechanism authMechanism, LoginFlowParams loginFlowParams) throws Exception {
+
+        if (authMechanism.getType() == null) {
+            logger.info("auth type value is null");
+            return new LoginFlowResponse(null, null, true);
+        }
+
+        if (!authMechanism.getType().equals(LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString())) {
+            logger.info("invalid auth type for login flow execution");
+            return new LoginFlowResponse(null, null, true);
+        }
+
+        logger.info("login flow execution started");
+
+        WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData(), loginFlowParams);
+        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
+        LoginFlowResponse loginFlowResp;
+        loginFlowResp = apiWorkflowExecutor.runLoginFlow(workflowObj, authMechanism, loginFlowParams);
+        return loginFlowResp;
+    }
+
+    public WorkflowTest convertToWorkflowGraph(ArrayList<RequestData> requestData, LoginFlowParams loginFlowParams) {
 
         String source, target;
         List<String> edges = new ArrayList<>();
@@ -230,9 +276,17 @@ public class TestExecutor {
             WorkflowUpdatedSampleData sampleData = new WorkflowUpdatedSampleData(json.toString(), data.getQueryParams(),
                     data.getHeaders(), data.getBody(), data.getUrl());
 
+            int waitTime = 0;
+            WorkflowNodeDetails.Type nodeType = WorkflowNodeDetails.Type.API;
+            if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.OTP_VERIFICATION.toString())) {
+                nodeType = WorkflowNodeDetails.Type.OTP;
+                if (loginFlowParams == null || !loginFlowParams.getFetchValueMap()) {
+                    waitTime = 60;
+                }
+            }
             WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(0, data.getUrl(),
                     URLMethods.Method.fromString(data.getMethod()), "", sampleData,
-                    WorkflowNodeDetails.Type.API, true, data.getWaitTime());
+                    nodeType, true, waitTime, 0, 0, data.getRegex(), data.getOtpRefUuid());
 
             mapNodeIdToWorkflowNodeDetails.put(target, workflowNodeDetails);
         }
@@ -329,6 +383,8 @@ public class TestExecutor {
         ParameterPollutionTest parameterPollutionTest = new ParameterPollutionTest();
         OldApiVersionTest oldApiVersionTest = new OldApiVersionTest();
         JWTNoneAlgoTest  jwtNoneAlgoTest = new JWTNoneAlgoTest();
+        JWTInvalidSignatureTest jwtInvalidSignatureTest = new JWTInvalidSignatureTest();
+        AddJkuToJwtTest addJkuToJwtTest = new AddJkuToJwtTest();
         BFLATest bflaTest = new BFLATest();
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
@@ -357,6 +413,12 @@ public class TestExecutor {
 
             TestingRunResult jwtNoneAlgoTestResult = runTest(jwtNoneAlgoTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
             if (jwtNoneAlgoTestResult != null) testingRunResults.add(jwtNoneAlgoTestResult);
+
+            TestingRunResult jwtInvalidSignatureTestResult = runTest(jwtInvalidSignatureTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            if (jwtInvalidSignatureTestResult != null) testingRunResults.add(jwtInvalidSignatureTestResult);
+
+            TestingRunResult addJkuToJwtTestResult = runTest(addJkuToJwtTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            if (addJkuToJwtTestResult != null) testingRunResults.add(addJkuToJwtTestResult);
         }
 
         TestingRunResult addMethodInParameterTestResult = runTest(addMethodInParameterTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);

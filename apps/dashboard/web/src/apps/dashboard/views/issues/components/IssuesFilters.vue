@@ -288,7 +288,6 @@ export default {
                     }
                 }
             } else if (value === "timePeriod") {
-                debugger
                 if ($event.checked) {
                     this.selectedTime[item.value].checked = true;
                 } else {

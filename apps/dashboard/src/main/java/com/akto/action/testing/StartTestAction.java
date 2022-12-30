@@ -116,6 +116,8 @@ public class StartTestAction extends UserAction {
     String testingRunHexId;
     List<TestingRunResultSummary> testingRunResultSummaries;
     final int limitForTestingRunResultSummary = 20;
+    private TestingRun testingRun;
+    private WorkflowTest workflowTest;
     public String fetchTestingRunResultSummaries() {
         ObjectId testingRunId;
         try {
@@ -130,6 +132,12 @@ public class StartTestAction extends UserAction {
         Bson sort = Sorts.descending(TestingRunResultSummary.START_TIMESTAMP) ;
 
         this.testingRunResultSummaries = TestingRunResultSummariesDao.instance.findAll(filterQ, 0, limitForTestingRunResultSummary , sort);
+        this.testingRun = TestingRunDao.instance.findOne(Filters.eq("_id", testingRunId));
+
+        if (this.testingRun.getTestIdConfig() == 1) {
+            WorkflowTestingEndpoints workflowTestingEndpoints = (WorkflowTestingEndpoints) testingRun.getTestingEndpoints();
+            this.workflowTest = WorkflowTestsDao.instance.findOne(Filters.eq("_id", workflowTestingEndpoints.getWorkflowTest().getId()));
+        }
 
         return SUCCESS.toUpperCase();
     }
@@ -275,4 +283,11 @@ public class StartTestAction extends UserAction {
         return testingRunResult;
     }
 
+    public TestingRun getTestingRun() {
+        return testingRun;
+    }
+
+    public WorkflowTest getWorkflowTest() {
+        return workflowTest;
+    }
 }
