@@ -229,7 +229,7 @@ public class QuickStartAction extends UserAction {
                 BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
                 if(!backwardCompatibility.isMirroringLambdaTriggered()){
                     try{
-                        String functionName = stack.fetchResourcePhysicalIdByLogicalId("CreateMirrorSession");
+                        String functionName = stack.fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.CREATE_MIRROR_SESSION_LAMBDA);
                         serverlessFunction.invokeFunction(functionName);
                         BackwardCompatibilityDao.instance.updateOne(
                                 Filters.eq("_id", backwardCompatibility.getId()),
