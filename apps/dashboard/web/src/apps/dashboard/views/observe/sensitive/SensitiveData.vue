@@ -121,7 +121,7 @@ export default {
             actions: [ 
                 {
                     isValid: item => true,
-                    icon: item => '$fas_trash',
+                    icon: item => '$trashSingleTick',
                     text: item => 'Ignore key for this API',
                     func: item => this.ignoreForThisAPI(item),
                     success: (resp, item) => this.successfullyIgnored(resp, item),
@@ -129,7 +129,7 @@ export default {
                 },
                 {
                     isValid: item => true,
-                    icon: item => '$fas_stop',
+                    icon: item => '$trashDoubleTick',
                     text: item => 'Ignore key for all APIs',
                     func: item => this.ignoreForAllAPIs(item),
                     success: (resp, item) => this.successfullyIgnored(resp, item),

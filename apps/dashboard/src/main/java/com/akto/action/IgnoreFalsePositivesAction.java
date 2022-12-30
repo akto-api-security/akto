@@ -90,7 +90,7 @@ public class IgnoreFalsePositivesAction extends UserAction{
                     }
                 }
             }
-        }, 5 , TimeUnit.SECONDS);
+        }, 1 , TimeUnit.SECONDS);
 
         return Action.SUCCESS.toUpperCase();
     }
