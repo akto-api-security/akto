@@ -20,4 +20,8 @@ public class MirroringStackDetails {
 
 
     public static final String AKTO_NLB = "AktoNLB";
+
+    public static final String AKTO_CONTEXT_ANALYZER_UPDATE_LAMBDA = "AktoContextAnalyzerInstanceRefreshHandler";
+    public static final String AKTO_DASHBOARD_UPDATE_LAMBDA = "DashboardInstanceRefreshHandler";
+    public static final String AKTO_RUNTIME_UPDATE_LAMBDA = "TrafficMirroringInstanceRefreshHandler";
 }
