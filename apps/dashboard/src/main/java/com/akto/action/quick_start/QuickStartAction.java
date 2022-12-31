@@ -239,7 +239,7 @@ public class QuickStartAction extends UserAction {
         try {
             JsonNode jsonTemplate = mapper.readValue(template, JsonNode.class);
             JsonNode resources = jsonTemplate.get("Resources");
-            JsonNode contextAnalyzerASG = resources.get("AktoAutoScalingGroup");
+            JsonNode contextAnalyzerASG = resources.get("AktoContextAnalyzerAutoScalingGroup");
             JsonNode properties = contextAnalyzerASG.get("Properties");
             ((ObjectNode)properties).put("Tags", tagsArray);
 
