@@ -11,6 +11,17 @@ import com.akto.utils.platform.DashboardStackDetails;
 import com.akto.utils.platform.MirroringStackDetails;
 import com.akto.utils.cloud.stack.dto.StackState;
 
+import com.amazonaws.services.cloudformation.AmazonCloudFormation;
+import com.amazonaws.services.cloudformation.AmazonCloudFormationClientBuilder;
+import com.amazonaws.services.cloudformation.model.DescribeStacksRequest;
+import com.amazonaws.services.cloudformation.model.DescribeStacksResult;
+import com.amazonaws.services.cloudformation.model.Parameter;
+import com.amazonaws.services.cloudformation.model.Tag;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
@@ -157,13 +168,16 @@ public class QuickStartAction extends UserAction {
             try {
                 Map<String, String> parameters = new HashMap<String, String>() {
                     {
-                        put("MongoIp", System.getenv("AKTO_MONGO_CONN"));
+                        put("MongoIp", System.getenv("AKTO_MONGO_CONN_CFT"));
                         put("KeyPair", System.getenv("EC2_KEY_PAIR"));
                         put("SourceLBs", extractLBs());
                         put("SubnetId", System.getenv("EC2_SUBNET_ID"));
                     }
                 };
-                String stackId = this.stack.createStack(MirroringStackDetails.getStackName(), parameters);
+                String template = convertStreamToString(AwsStack.class
+                        .getResourceAsStream("/cloud_formation_templates/akto_aws_mirroring.template"));
+                template = addTags(template);
+                String stackId = this.stack.createStack(MirroringStackDetails.getStackName(), parameters, template);
                 System.out.println("Started creation of stack with id: " + stackId);
             } catch (Exception e) {
                 e.printStackTrace();
@@ -189,6 +203,55 @@ public class QuickStartAction extends UserAction {
         this.stackState = stack.fetchStackStatus(MirroringStackDetails.getStackName());
         fetchLoadBalancers();
         return Action.SUCCESS.toUpperCase();
+    }
+
+    private String addTags(String template) {
+        DescribeStacksRequest describeStackRequest = new DescribeStacksRequest();
+        describeStackRequest.setStackName(DashboardStackDetails.getStackName());
+        AmazonCloudFormation cloudFormation = AmazonCloudFormationClientBuilder.standard()
+                .build();
+        DescribeStacksResult result = cloudFormation.describeStacks(describeStackRequest);
+        com.amazonaws.services.cloudformation.model.Stack stack = result.getStacks().get(0);
+        List<Parameter> parameters = stack.getParameters();
+
+        ObjectMapper mapper = new ObjectMapper();
+        List<ObjectNode> tags = new ArrayList<>();
+        for(Parameter parameter: parameters){
+            if(parameter.getParameterKey().equalsIgnoreCase("tags")){
+                String tagStr = parameter.getParameterValue();
+                String[] splitTags = tagStr.split(",");
+                for(String tagSplit: splitTags){
+                    String[] split = tagSplit.split("=");
+                    ObjectNode node = mapper.createObjectNode();
+                    node.put("Key", split[0]);
+                    node.put("Value", split[1]);
+                    node.put("PropagateAtLaunch", true);
+                    tags.add(node);
+                }
+                break;
+            }
+        }
+        if(tags.size() == 0){
+            return template;
+        }
+        
+        ArrayNode tagsArray = mapper.valueToTree(tags);
+        try {
+            JsonNode jsonTemplate = mapper.readValue(template, JsonNode.class);
+            JsonNode resources = jsonTemplate.get("Resources");
+            JsonNode contextAnalyzerASG = resources.get("AktoAutoScalingGroup");
+            JsonNode properties = contextAnalyzerASG.get("Properties");
+            ((ObjectNode)properties).put("Tags", tagsArray);
+
+            JsonNode aktoASG = resources.get("AktoAutoScalingGroup");
+            properties = aktoASG.get("Properties");
+            ((ObjectNode)properties).put("Tags", tagsArray);
+
+            template = jsonTemplate.toString();
+        } catch (JsonProcessingException e) {
+            logger.error("Failed to add tags", e);
+        }
+        return template;
     }
 
     public String extractLBs() {
