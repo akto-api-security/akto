@@ -9,7 +9,7 @@ import com.akto.dao.BackwardCompatibilityDao;
 import com.akto.dao.FilterSampleDataDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.testing.*;
-import com.akto.dao.testing.sources.TestSourcesDao;
+import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dto.*;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhookResult;
@@ -31,6 +31,8 @@ import com.akto.notifications.email.WeeklyEmail;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
 import com.akto.util.Pair;
+import com.akto.util.enums.GlobalEnums.Severity;
+import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.utils.RedactSampleData;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -141,13 +143,13 @@ public class InitializerListener implements ServletContextListener {
                 DaoInit.init(new ConnectionString(mongoURI));
                 Context.accountId.set(1_000_000);
                 try {
-                    executePIISourceFetch();
+                    executeTestSourcesFetch();
                 } catch (Exception e) {
 
                 }
 
                 try {
-                    executeTestSourcesFetch();
+                    executePIISourceFetch();
                 } catch (Exception e) {
 
                 }
@@ -155,28 +157,46 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 4, TimeUnit.HOURS);
     }
 
+    static TestCategory findTestCategory(String path) {
+        if (path.contains("BrokenObjectLevelAuthorization")) return TestCategory.BOLA;
+        if (path.contains("ImproperAssetsManagement")) return TestCategory.IAM;
+        if (path.contains("BrokenUserAuthentication")) return TestCategory.NO_AUTH;
+        if (path.contains("BrokenFunctionLevelAuthorization")) return TestCategory.BFLA;
+        return null;
+    }
+
+    static String findTestSubcategory(String path) {
+        String parentPath = path.substring(0, path.lastIndexOf("/"));
+        return parentPath.substring(parentPath.lastIndexOf("/")+1);
+    }
+
     static void executeTestSourcesFetch() {
-
-        ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-
         try {
-            URL resource = InitializerListener.class.getClassLoader().getResource("test_sources.yaml");
-            // String content = FileUtils.readFileToString(new File(resource.getPath()), StandardCharsets.UTF_8);
-            TestSourceConfig testSourceConfig = mapper.readValue(new File(resource.getPath()), TestSourceConfig.class);      
-            System.out.println(testSourceConfig);
+            String testingSourcesRepoTree = "https://api.github.com/repos/akto-api-security/testing_sources/git/trees/master?recursive=1";
+            String tempFilename = "temp_testingSourcesRepoTree.json";
+            FileUtils.copyURLToFile(new URL(testingSourcesRepoTree), new File(tempFilename));
+            String fileContent = FileUtils.readFileToString(new File(tempFilename), StandardCharsets.UTF_8);
+            BasicDBObject fileList = BasicDBObject.parse(fileContent);
+            BasicDBList files = (BasicDBList) (fileList.get("tree"));
 
-            // for(String testSourceFile: testSourceConfig.getSources()) {
-            //     Bson filter = Filters.eq(TestSource.FILE_URL, testSourceFile);
-            //     TestSource found = TestSourcesDao.instance.findOne(filter);
-            //     if (found == null) {
+            if (files == null) return;
+            for (Object fileObj: files) {
+                BasicDBObject fileDetails = (BasicDBObject) fileObj;
+                String filePath = fileDetails.getString("path");
+                if (filePath.endsWith(".yaml")) {
+                    filePath = "https://github.com/akto-api-security/testing_sources/blob/master/" + filePath;
+                    if (TestSourceConfigsDao.instance.findOne("_id", filePath) == null) {
+                        TestCategory testCategory = findTestCategory(filePath);
+                        String subcategory = findTestSubcategory(filePath);
+                        TestSourceConfig testSourceConfig = new TestSourceConfig(filePath, testCategory, subcategory, Severity.HIGH, "", "default", Context.now());
+                        TestSourceConfigsDao.instance.insertOne(testSourceConfig);
+                    }
+                }
+            }
 
-            //     }
-            // }
-        } catch (IOException e) {
-            
-            e.printStackTrace();
+        } catch (IOException e1) {
+            e1.printStackTrace();
         }
-
 
 
     }
@@ -651,7 +671,6 @@ public class InitializerListener implements ServletContextListener {
 
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
-        executeTestSourcesFetch();
         String https = System.getenv("AKTO_HTTPS_FLAG");
         boolean httpsFlag = Objects.equals(https, "true");
         sce.getServletContext().getSessionCookieConfig().setSecure(httpsFlag);
