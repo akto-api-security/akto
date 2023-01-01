@@ -22,7 +22,8 @@ public class GlobalEnums {
     public enum TestCategory {
         BOLA("BOLA", Severity.HIGH, "Broken Object Level Authorization (BOLA)"),
         NO_AUTH("NO_AUTH", Severity.HIGH, "Broken User Authentication (BUA)"),
-        BFLA("BFLA", Severity.HIGH, "Broken Function Level Authorization (BFLA)");
+        BFLA("BFLA", Severity.HIGH, "Broken Function Level Authorization (BFLA)"),
+        IAM("IAM", Severity.HIGH, "Improper Assets Management (IAM)");
         private final String name;
         private final Severity severity;
         private final String displayName;
@@ -58,7 +59,8 @@ public class GlobalEnums {
         JWT_NONE_ALGO("JWT_NONE_ALGO", TestCategory.NO_AUTH, "Since NONE Algorithm JWT is accepted by the server the attacker can tamper with the payload of JWT and access protected resources."),
         BFLA("BFLA", TestCategory.BFLA, "Less privileged attacker can access admin resources"),
         JWT_INVALID_SIGNATURE("JWT_INVALID_SIGNATURE", TestCategory.NO_AUTH, "Since server is not validating the JWT signature the attacker can tamper with the payload of JWT and access protected resources"),
-        ADD_JKU_TO_JWT("ADD_JKU_TO_JWT", TestCategory.NO_AUTH, "Since Host server is using the JKU field of the JWT without validating, attacker can tamper with the payload of JWT and access protected resources.");
+        ADD_JKU_TO_JWT("ADD_JKU_TO_JWT", TestCategory.NO_AUTH, "Since Host server is using the JKU field of the JWT without validating, attacker can tamper with the payload of JWT and access protected resources."),
+        CUSTOM_IAM("CUSTOM_IAM", TestCategory.IAM, "Assets found on the page");
 
         private final String name;
         private final TestCategory superCategory;

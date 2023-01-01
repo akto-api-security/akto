@@ -374,6 +374,9 @@ public class TestExecutor {
             return new ArrayList<>();
         }
 
+
+        FuzzingTest fuzzingTest = new FuzzingTest(testRunId.toHexString(), testRunResultSummaryId.toHexString(), "/Users/ankushjain/akto_code/nuclei-wrapper/templates/", "Swagger file detection");
+
         BOLATest bolaTest = new BOLATest();
         NoAuthTest noAuthTest = new NoAuthTest();
         ChangeHttpMethodTest changeHttpMethodTest = new ChangeHttpMethodTest();
@@ -388,7 +391,9 @@ public class TestExecutor {
         BFLATest bflaTest = new BFLATest();
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
+        TestingRunResult fuzzResult = runTest(fuzzingTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
         TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+        testingRunResults.add(fuzzResult);
         if (noAuthTestResult != null) testingRunResults.add(noAuthTestResult);
         if (noAuthTestResult != null && !noAuthTestResult.isVulnerable()) {
 

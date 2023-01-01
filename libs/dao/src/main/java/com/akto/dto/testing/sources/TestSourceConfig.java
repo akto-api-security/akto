@@ -6,7 +6,7 @@ import com.akto.util.enums.GlobalEnums.Severity;
 
 public class TestSourceConfig {
     public enum TestCategory {
-        BOLA, BUA, BFLA, MA, INJ
+        BOLA, BUA, BFLA, MA, INJ, IAM
     }
 
     public enum TestSourceType {
@@ -23,13 +23,13 @@ public class TestSourceConfig {
     private String subcategory;
     private Severity severity;
 
-    private TestTemplate requests;
+    private Object requests;
 
 
     public TestSourceConfig() {
     }
 
-    public TestSourceConfig(TestSourceType type, List<String> sources, TestCategory category, String subcategory, Severity severity, TestTemplate requests) {
+    public TestSourceConfig(TestSourceType type, List<String> sources, TestCategory category, String subcategory, Severity severity, Object requests) {
         this.type = type;
         this.sources = sources;
         this.category = category;
@@ -78,11 +78,11 @@ public class TestSourceConfig {
         this.severity = severity;
     }
 
-    public TestTemplate getRequests() {
+    public Object getRequests() {
         return this.requests;
     }
 
-    public void setRequests(TestTemplate requests) {
+    public void setRequests(Object requests) {
         this.requests = requests;
     }
 
