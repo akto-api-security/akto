@@ -1,20 +1,14 @@
 package com.akto.rules;
 
-import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
-import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.info.NucleiTestInfo;
-import com.akto.dto.type.SingleTypeInfo;
-import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
-import com.akto.testing.ApiExecutor;
 import com.akto.testing.NucleiExecutor;
 import com.akto.testing.StatusCodeAnalyser;
-import com.akto.types.CappedSet;
 import com.akto.util.Pair;
 import com.google.common.io.Files;
 
@@ -23,20 +17,24 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.*;
 
 public class FuzzingTest extends AuthRequiredTestPlugin {
 
     private String testRunId;
     private String testRunResultSummaryId;
-    private String templatePath;
+    private String origTemplatePath;
+    private String tempTemplatePath;
     private String subcategory;
 
-    public FuzzingTest(String testRunId, String testRunResultSummaryId, String templatePath, String subcategory) {
+    public FuzzingTest(String testRunId, String testRunResultSummaryId, String origTemplatePath, String subcategory) {
         this.testRunId = testRunId;
         this.testRunResultSummaryId = testRunResultSummaryId;
-        this.templatePath = templatePath;
+        this.origTemplatePath = origTemplatePath;
         this.subcategory = subcategory;
+        this.tempTemplatePath = null;
     }
 
     private static File createDirPath(String filePath) {
@@ -68,17 +66,23 @@ public class FuzzingTest extends AuthRequiredTestPlugin {
 
         if (file == null) return null;
         boolean vulnerable = false;
-
-        NucleiTestInfo nucleiTestInfo = new NucleiTestInfo(this.subcategory, this.templatePath);
+        String outputDir = file.getParent();
+        this.tempTemplatePath = outputDir+"/"+subcategory+".yaml";
+        NucleiTestInfo nucleiTestInfo = new NucleiTestInfo(this.subcategory, this.origTemplatePath);
 
         try {
-            System.out.println(filepath);
-            
+            FileUtils.copyURLToFile(new URL(this.origTemplatePath), new File(this.tempTemplatePath));
+        } catch (IOException e1) {
+            return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest, nucleiTestInfo);
+        }
+
+
+        try {            
             ArrayList<Pair<OriginalHttpRequest, OriginalHttpResponse>> attempts = NucleiExecutor.execute(
                 testRequest.getMethod(), 
                 testRequest.getFullUrlWithParams(), 
-                this.templatePath,
-                file.getParent(), 
+                this.tempTemplatePath,
+                outputDir, 
                 testRequest.getBody(), 
                 testRequest.getHeaders()
             );

@@ -375,7 +375,10 @@ public class TestExecutor {
         }
 
 
-        FuzzingTest fuzzingTest = new FuzzingTest(testRunId.toHexString(), testRunResultSummaryId.toHexString(), "/Users/ankushjain/akto_code/nuclei-wrapper/templates/", "Swagger file detection");
+        String origTemplateURL = "https://raw.githubusercontent.com/akto-api-security/testing_sources/master/OWASP_API_Top10_ImproperAssetsManagement/swagger_file_detection/swagger_file_detection.yaml";
+        String subcategory = origTemplateURL.substring(origTemplateURL.lastIndexOf("/")+1).split("\\.")[0];
+
+        FuzzingTest fuzzingTest = new FuzzingTest(testRunId.toHexString(), testRunResultSummaryId.toHexString(), origTemplateURL, subcategory);
 
         BOLATest bolaTest = new BOLATest();
         NoAuthTest noAuthTest = new NoAuthTest();
@@ -392,8 +395,9 @@ public class TestExecutor {
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
         TestingRunResult fuzzResult = runTest(fuzzingTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-        TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
         testingRunResults.add(fuzzResult);
+
+        TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
         if (noAuthTestResult != null) testingRunResults.add(noAuthTestResult);
         if (noAuthTestResult != null && !noAuthTestResult.isVulnerable()) {
 

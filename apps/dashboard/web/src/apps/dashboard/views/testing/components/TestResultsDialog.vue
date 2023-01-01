@@ -89,7 +89,14 @@ export default {
   computed: {
     messagesBasic() {
         let testSubType = this.testingRunResult["testSubType"]
-        return this.testingRunResult["testResults"].map(x => {return {message: x.message, title: testSubType, highlightPaths:[], errors: x.errors}}) 
+        return this.testingRunResult["testResults"].map(x => {
+            return {
+                message: x.message, 
+                title: testSubType + ((x.testInfo && x.testInfo.subcategory) ? ("-" + x.testInfo.subcategory) : ""), 
+                highlightPaths:[], 
+                errors: x.errors
+            }
+        }) 
     },
     messagesAdvance() {
         let testSubType = this.testingRunResult["testSubType"]
