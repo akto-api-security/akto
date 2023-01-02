@@ -30,6 +30,8 @@ import com.mongodb.client.model.Updates;
 import org.bson.json.JsonObject;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -40,6 +42,7 @@ import java.util.concurrent.*;
 public class TestExecutor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class);
+    private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
 
     public void init(TestingRun testingRun, ObjectId summaryId) {
         if (testingRun.getTestIdConfig() == 0)     {
@@ -111,8 +114,9 @@ public class TestExecutor {
         TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessages, singleTypeInfoMap, testRoles);
 
         try {
-            LoginFlowResponse loginFlowResponse = executeLoginFlow(authMechanism, null);
+            LoginFlowResponse loginFlowResponse = triggerLoginFlow(authMechanism, 3);
             if (!loginFlowResponse.getSuccess()) {
+                logger.error("login flow failed");
                 throw new Exception("login flow failed");
             }
         } catch (Exception e) {
@@ -206,11 +210,36 @@ public class TestExecutor {
 
     }
 
+    private LoginFlowResponse triggerLoginFlow(AuthMechanism authMechanism, int retries) {
+        LoginFlowResponse loginFlowResponse = null;
+        for (int i=0; i<retries; i++) {
+            try {
+                loginFlowResponse = executeLoginFlow(authMechanism, null);
+                if (loginFlowResponse.getSuccess()) {
+                    logger.info("login flow success");
+                    break;
+                }
+            } catch (Exception e) {
+                logger.error("retrying login flow" + e.getMessage());
+                loggerMaker.errorAndAddToDb(e.getMessage());
+            }
+        }
+        return loginFlowResponse;
+    }
+
     public LoginFlowResponse executeLoginFlow(AuthMechanism authMechanism, LoginFlowParams loginFlowParams) throws Exception {
 
-        if (!authMechanism.getType().equals(LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString())) {
+        if (authMechanism.getType() == null) {
+            logger.info("auth type value is null");
             return new LoginFlowResponse(null, null, true);
         }
+
+        if (!authMechanism.getType().equals(LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString())) {
+            logger.info("invalid auth type for login flow execution");
+            return new LoginFlowResponse(null, null, true);
+        }
+
+        logger.info("login flow execution started");
 
         WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData(), loginFlowParams);
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
@@ -252,7 +281,7 @@ public class TestExecutor {
             if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.OTP_VERIFICATION.toString())) {
                 nodeType = WorkflowNodeDetails.Type.OTP;
                 if (loginFlowParams == null || !loginFlowParams.getFetchValueMap()) {
-                    waitTime = 100;
+                    waitTime = 60;
                 }
             }
             WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(0, data.getUrl(),
@@ -345,6 +374,12 @@ public class TestExecutor {
             return new ArrayList<>();
         }
 
+
+        String origTemplateURL = "https://raw.githubusercontent.com/akto-api-security/testing_sources/master/OWASP_API_Top10_ImproperAssetsManagement/swagger_file_detection/swagger_file_detection.yaml";
+        String subcategory = origTemplateURL.substring(origTemplateURL.lastIndexOf("/")+1).split("\\.")[0];
+
+        FuzzingTest fuzzingTest = new FuzzingTest(testRunId.toHexString(), testRunResultSummaryId.toHexString(), origTemplateURL, subcategory);
+
         BOLATest bolaTest = new BOLATest();
         NoAuthTest noAuthTest = new NoAuthTest();
         ChangeHttpMethodTest changeHttpMethodTest = new ChangeHttpMethodTest();
@@ -359,6 +394,9 @@ public class TestExecutor {
         BFLATest bflaTest = new BFLATest();
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
+        TestingRunResult fuzzResult = runTest(fuzzingTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+        testingRunResults.add(fuzzResult);
+
         TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
         if (noAuthTestResult != null) testingRunResults.add(noAuthTestResult);
         if (noAuthTestResult != null && !noAuthTestResult.isVulnerable()) {

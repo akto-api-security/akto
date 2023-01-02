@@ -16,6 +16,7 @@ public abstract class AuthParam {
     public abstract void setValue(String value);
 
     public enum Location {
-        HEADER
+        HEADER,
+        BODY
     }
 }

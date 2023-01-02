@@ -43,6 +43,7 @@ import LayoutWithLeftPane from '@/apps/dashboard/layouts/LayoutWithLeftPane'
 import ApiCollectionGroup from '@/apps/dashboard/shared/components/menus/ApiCollectionGroup'
 
 import func from '@/util/func'
+import { mapState } from 'vuex'
 
 export default {
     name: "PageMarketplace",
@@ -52,12 +53,8 @@ export default {
         ApiCollectionGroup
     },
     data() {
-        let defaultCategoryNames = ["XSS", "Input validation", "BOLA", "BUA", "Directory traversal", "Path traversal", "Command Injection", "SQL Injection"]
-        let userCategoryNames = ["Route fuzzing", "NoSQL Command Injection"]
         return {
-            drawer: null,
-            defaultTestCategories: this.nameToKvObj(defaultCategoryNames),
-            userTestCategories:this.nameToKvObj(userCategoryNames)
+            drawer: null
         }
     },
     methods: {
@@ -89,15 +86,20 @@ export default {
             }
         }
     },
+    async mounted() {
+        await this.$store.dispatch('marketplace/fetchAllSubcategories')
+        this.$router.push(this.leftNavItems[0].items[0].link)
+        
+    },
     computed: {
+        ...mapState('marketplace', ['defaultSubcategories', 'userSubcategories', 'loading']),
         leftNavItems() {
             return [
-                this.createCategoryObj(this.defaultTestCategories, "Categories", "default", "This week"),
-                this.createCategoryObj(this.userTestCategories, "Your tests", "custom", "Total")
+                this.createCategoryObj(this.nameToKvObj(this.defaultSubcategories), "Categories", "default", "This week"),
+                this.createCategoryObj(this.nameToKvObj(this.userSubcategories), "Your tests", "custom", "Total")
             ]
         }
     }
-
 }
 </script>
 
