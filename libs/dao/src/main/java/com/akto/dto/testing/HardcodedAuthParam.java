@@ -2,8 +2,10 @@ package com.akto.dto.testing;
 
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.OriginalHttpRequest;
+import com.akto.util.JSONUtils;
 import com.akto.util.JsonStringPayloadModifier;
 import com.akto.util.TokenPayloadModifier;
+import com.mongodb.BasicDBObject;
 
 import java.util.*;
 
@@ -39,8 +41,19 @@ public class HardcodedAuthParam extends AuthParam {
     public boolean authTokenPresent(OriginalHttpRequest request) {
         if (this.key == null) return false;
         String k = this.key.toLowerCase().trim();
-        Map<String, List<String>> headers = request.getHeaders();
-        return headers.containsKey(k);
+
+        System.out.println("where value" + where.toString());
+
+        if (where.toString().equals(AuthParam.Location.BODY.toString())) {
+            String body = request.getBody();
+            System.out.println("print body" + body);
+            BasicDBObject basicDBObject =  BasicDBObject.parse(request.getBody());
+            BasicDBObject data = JSONUtils.flattenWithDots(basicDBObject);
+            return data.keySet().contains(this.key);
+        } else {
+            Map<String, List<String>> headers = request.getHeaders();
+            return headers.containsKey(k);
+        }
     }
 
     public Location getWhere() {
