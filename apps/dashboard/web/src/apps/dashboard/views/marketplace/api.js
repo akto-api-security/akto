@@ -1,9 +1,9 @@
 import request from '@/util/request'
 
 export default {
-    fetchAllSubcategories() {
+    fetchAllMarketplaceSubcategories() {
         return request({
-            url: 'api/fetchAllSubcategories',
+            url: 'api/fetchAllMarketplaceSubcategories',
             method: 'post',
             data: {}
         })

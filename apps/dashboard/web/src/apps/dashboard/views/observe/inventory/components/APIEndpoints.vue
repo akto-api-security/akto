@@ -28,7 +28,6 @@
             <count-box title="Deprecated Endpoints" :count="unusedEndpoints.length" colorTitle="This week"/>
             <count-box title="All Endpoints" :count="allEndpoints.length" colorTitle="Total"/>
         </div>    
-
         <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Unauthenticated', 'Undocumented', 'Deprecated', 'Documented', 'Tests']">
             <template slot="actions-tray">
             </template>
@@ -45,7 +44,9 @@
                         <div style="align-items: center; display: flex;">
                             <v-tooltip>
                                 <template v-slot:activator='{ on, attrs }'>
-                                    <icon-menu icon="$fas_play" :items="runTestItems(filteredItems)" v-bind="attrs" v-on="on"/>                                    
+                                    <v-btn icon primary dark color="#47466A" @click="showScheduleDialog(filteredItems)">
+                                        <v-icon>$fas_play</v-icon>
+                                    </v-btn>
                                 </template>
                                 "Run test"
                             </v-tooltip>
@@ -163,8 +164,8 @@
                 </div>
             </template>
         </layout-with-tabs>
-        <v-dialog v-model="showScheduleTestBox" width="400px">
-            <schedule-box @schedule="startTest"/>
+        <v-dialog v-model="showTestSelectorDialog" width="800px">
+            <tests-selector @testsSelected=startTest />
         </v-dialog>
     </div>
 </template>
@@ -185,8 +186,8 @@ import { saveAs } from 'file-saver'
 import UploadFile from '@/apps/dashboard/shared/components/UploadFile'
 import JsonViewer from "@/apps/dashboard/shared/components/JSONViewer"
 import IconMenu from '@/apps/dashboard/shared/components/IconMenu'
-import ScheduleBox from '@/apps/dashboard/shared/components/ScheduleBox'
 import WorkflowTestBuilder from './WorkflowTestBuilder'
+import TestsSelector from './TestsSelector'
 
 export default {
     name: "ApiEndpoints",
@@ -200,8 +201,8 @@ export default {
         UploadFile,
         JsonViewer,
         IconMenu,
-        ScheduleBox,
-        WorkflowTestBuilder
+        WorkflowTestBuilder,
+        TestsSelector
     },
     props: {
         apiCollectionId: obj.numR
@@ -301,7 +302,7 @@ export default {
                     click: this.downloadData
                 }
             ],
-            showScheduleTestBox: false,
+            showTestSelectorDialog: false,
             filteredItemsForScheduleTest: [],
             workflowTestHeaders: [
                 {
@@ -428,21 +429,8 @@ export default {
 
             this.$emit('mountedView', {type: 1, apiCollectionId: this.apiCollectionId})
         },
-        runTestItems(filteredItems) {
-            return [
-                {
-                    label: 'Run test',
-                    click: this.runTestOnce(filteredItems)
-                },
-                {
-                    label: 'Schedule test',
-                    click: () => this.showScheduleDialog(filteredItems)
-                }
-            ]
-
-        },
         showScheduleDialog(filteredItems) {
-            this.showScheduleTestBox = true
+            this.showTestSelectorDialog = true
             this.filteredItemsForScheduleTest = filteredItems
         },
         toApiInfoKeyList(listEndpoints) {
@@ -454,32 +442,19 @@ export default {
                 }
             })
         },
-        runTestOnce(filteredItems) {
-            let filtersSelected = filteredItems.length === this.allEndpoints.length
-            let apiInfoKeyList = this.toApiInfoKeyList(filteredItems)
-            let store = this.$store
-            let apiCollectionId = this.apiCollectionId
-            return async () => {
-                if (filtersSelected) {
-                    await store.dispatch('testing/startTestForCollection', apiCollectionId)
-                } else {
-                    await store.dispatch('testing/startTestForCustomEndpoints', apiInfoKeyList)
-                }
-            }
-        },
-        async startTest({recurringDaily, startTimestamp}) {
+        async startTest({recurringDaily, startTimestamp, selectedTests}) {
             let apiInfoKeyList = this.toApiInfoKeyList(this.filteredItemsForScheduleTest)
             let filtersSelected = this.filteredItemsForScheduleTest.length === this.allEndpoints.length
             let store = this.$store
             let apiCollectionId = this.apiCollectionId
             
             if (filtersSelected) {
-                await store.dispatch('testing/scheduleTestForCollection', {apiCollectionId, startTimestamp, recurringDaily})
+                await store.dispatch('testing/scheduleTestForCollection', {apiCollectionId, startTimestamp, recurringDaily, selectedTests})
             } else {
-                await store.dispatch('testing/scheduleTestForCustomEndpoints', {apiInfoKeyList, startTimestamp, recurringDaily})
+                await store.dispatch('testing/scheduleTestForCustomEndpoints', {apiInfoKeyList, startTimestamp, recurringDaily, selectedTests})
             }
             
-            this.showScheduleTestBox = false            
+            this.showTestSelectorDialog = false            
         }      
     },
     computed: {

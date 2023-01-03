@@ -1477,7 +1477,7 @@
             </result>
         </action>
 
-        <action name="api/fetchAllSubcategories" class="com.akto.action.testing.MarketplaceAction" method="fetchAllSubcategories">
+        <action name="api/fetchAllMarketplaceSubcategories" class="com.akto.action.testing.MarketplaceAction" method="fetchAllMarketplaceSubcategories">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>

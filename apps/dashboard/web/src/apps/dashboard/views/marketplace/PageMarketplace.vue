@@ -87,7 +87,7 @@ export default {
         }
     },
     async mounted() {
-        await this.$store.dispatch('marketplace/fetchAllSubcategories')
+        await this.$store.dispatch('marketplace/fetchAllMarketplaceSubcategories')
         this.$router.push(this.leftNavItems[0].items[0].link)
         
     },

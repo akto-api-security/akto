@@ -24,15 +24,15 @@ const marketplace = {
         emptyState({ commit }) {
             commit('EMPTY_STATE')
         },
-        fetchAllSubcategories({commit}) {
+        fetchAllMarketplaceSubcategories({commit}) {
             commit('EMPTY_STATE')
-            return api.fetchAllSubcategories().then((resp) => {
-                for(let key in resp.subcategories) {
-                    let creator = resp.subcategories[key]
-                    if (creator === "default") {
-                        state.defaultSubcategories.push(key)
-                    } else {
-                        state.userSubcategories.push(key)
+            return api.fetchAllMarketplaceSubcategories().then((resp) => {
+                for(let index in resp.testSourceConfigs) {
+                    let tsc = resp.testSourceConfigs[index]
+
+                    let subcategoryContainer = tsc.creator === "default" ? state.defaultSubcategories : state.userSubcategories
+                    if (subcategoryContainer.indexOf(tsc.subcategory) == -1) {
+                        subcategoryContainer.push(tsc.subcategory)
                     }
                 }
             })
