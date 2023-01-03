@@ -67,8 +67,8 @@ const testing = {
                 commit('SAVE_TESTING_RUNS', resp)
             })
         },
-        scheduleTestForCollection({commit}, {apiCollectionId, startTimestamp, recurringDaily} ) {
-            return api.scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily).then((resp) => {
+        scheduleTestForCollection({commit}, {apiCollectionId, startTimestamp, recurringDaily, selectedTests} ) {
+            return api.scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests).then((resp) => {
                 commit('SAVE_TESTING_RUNS', resp)
             })
         },
@@ -77,8 +77,8 @@ const testing = {
                 commit('SAVE_TESTING_RUNS', resp)
             })
         },
-        scheduleTestForCustomEndpoints({commit}, {apiInfoKeyList, startTimestamp, recurringDaily} ) {
-            return api.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily).then((resp) => {
+        scheduleTestForCustomEndpoints({commit}, {apiInfoKeyList, startTimestamp, recurringDaily, selectedTests} ) {
+            return api.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests).then((resp) => {
                 commit('SAVE_TESTING_RUNS', resp)
             })
         },

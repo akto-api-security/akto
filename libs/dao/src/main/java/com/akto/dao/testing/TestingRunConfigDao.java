@@ -12,7 +12,7 @@ public class TestingRunConfigDao extends AccountsContextDao<TestingRunConfig> {
         return MongoDBEnums.Collection.TESTING_RUN_CONFIG.getCollectionName();
     }
 
-    private static final TestingRunConfigDao instance = new TestingRunConfigDao();
+    public static final TestingRunConfigDao instance = new TestingRunConfigDao();
 
     private TestingRunConfigDao() {}
 

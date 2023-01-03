@@ -14,17 +14,26 @@ public class TestingRunConfig {
     @BsonId
     private int id;
     private Map<Integer, List<ApiInfo.ApiInfoKey>> collectionWiseApiInfoKey;
-    private TestCategory testCategory;
+    private List<String> testSubCategoryList;
     private ObjectId authMechanismId;
 
     public TestingRunConfig() {}
+    public TestingRunConfig(int id, Map<Integer, List<ApiInfo.ApiInfoKey>> collectionWiseApiInfoKey,
+                            List<String> testSubCategoryList,
+                            ObjectId authMechanismId) {
 
-    public TestCategory getTestCategory() {
-        return testCategory;
+        this.id = id;
+        this.collectionWiseApiInfoKey = collectionWiseApiInfoKey;
+        this.testSubCategoryList = testSubCategoryList;
+        this.authMechanismId = authMechanismId;
     }
 
-    public void setTestCategory(TestCategory testCategory) {
-        this.testCategory = testCategory;
+    public List<String> getTestSubCategoryList() {
+        return testSubCategoryList;
+    }
+
+    public void setTestSubCategoryList(List<String> testSubCategoryList) {
+        this.testSubCategoryList = testSubCategoryList;
     }
 
     public int getId() {

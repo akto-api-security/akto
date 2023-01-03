@@ -22,6 +22,8 @@ public class TestingRun {
 
     @BsonIgnore
     private String hexId;
+    @BsonIgnore
+    private TestingRunConfig testingRunConfig;
 
     public TestingRun() { }
 
@@ -34,6 +36,14 @@ public class TestingRun {
         this.testIdConfig = testIdConfig;
         this.state = state;
         this.periodInSeconds = periodInSeconds;
+    }
+
+    public TestingRunConfig getTestingRunConfig() {
+        return testingRunConfig;
+    }
+
+    public void setTestingRunConfig(TestingRunConfig testingRunConfig) {
+        this.testingRunConfig = testingRunConfig;
     }
 
     // if u r adding anything here make sure to add to stopAllTests() method too
