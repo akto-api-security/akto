@@ -53,7 +53,7 @@ export default {
         },
         schedule() {
             let dayStart = +func.dayStart(+new Date());
-            let startTimestamp = parseInt(dayStart/1000) + hourOfDay * 60 * 60
+            let startTimestamp = parseInt(dayStart/1000) + this.hourOfDay * 60 * 60
             return this.$emit("schedule", {recurringDaily: this.recurringDaily, startTimestamp})
         }
     }

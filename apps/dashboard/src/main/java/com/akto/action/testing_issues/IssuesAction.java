@@ -80,7 +80,7 @@ public class IssuesAction extends UserAction {
 
     private TestSubCategory[] subCategories;
     public String fetchAllSubCategories() {
-        this.subCategories = GlobalEnums.TestSubCategory.values();
+        this.subCategories = GlobalEnums.TestSubCategory.getValuesArray();
         return SUCCESS.toUpperCase();
     }
 
