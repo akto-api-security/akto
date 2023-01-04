@@ -176,7 +176,7 @@ public class QuickStartAction extends UserAction {
                 };
                 String template = convertStreamToString(AwsStack.class
                         .getResourceAsStream("/cloud_formation_templates/akto_aws_mirroring.template"));
-                template = addTags(template);
+                template = Utils.addTagsToTemplate(template);
                 String stackId = this.stack.createStack(MirroringStackDetails.getStackName(), parameters, template);
                 System.out.println("Started creation of stack with id: " + stackId);
             } catch (Exception e) {
