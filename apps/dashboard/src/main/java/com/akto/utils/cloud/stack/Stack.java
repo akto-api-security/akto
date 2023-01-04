@@ -5,7 +5,7 @@ import com.akto.utils.cloud.stack.dto.StackState;
 import java.util.Map;
 
 public interface Stack {
-    public String createStack(String stackName, Map<String, String> parameters) throws Exception;
+    public String createStack(String stackName, Map<String, String> parameters, String template) throws Exception;
 
     public StackState fetchStackStatus(String stackName);
 
