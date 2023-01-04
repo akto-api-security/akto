@@ -66,35 +66,35 @@ public class Utils {
         try {
             JsonNode jsonTemplate = mapper.readValue(template, JsonNode.class);
             JsonNode resources = jsonTemplate.get("Resources");
-            setupTagsInASG(asgTagsArray, resources, MirroringStackDetails.AKTO_CONTEXT_ANALYZER_AUTO_SCALING_GROUP);
-            setupTagsInASG(asgTagsArray, resources, MirroringStackDetails.AKTO_AUTO_SCALING_GROUP);
+            addTagToResource(asgTagsArray, resources, MirroringStackDetails.AKTO_CONTEXT_ANALYZER_AUTO_SCALING_GROUP);
+            addTagToResource(asgTagsArray, resources, MirroringStackDetails.AKTO_AUTO_SCALING_GROUP);
 
-            setupTagsInASG(tagsArray, resources, MirroringStackDetails.TRAFFIC_MIRROR_TARGET);
-            setupTagsInASG(tagsArray, resources, MirroringStackDetails.LB_TRAFFIC_MIRROR_FILTER);
+            addTagToResource(tagsArray, resources, MirroringStackDetails.TRAFFIC_MIRROR_TARGET);
+            addTagToResource(tagsArray, resources, MirroringStackDetails.LB_TRAFFIC_MIRROR_FILTER);
 
-            setupTagsInASG(tagsArray, resources, MirroringStackDetails.LAMBDA_LOG_GROUP);
-            setupTagsInASG(tagsArray, resources, MirroringStackDetails.LAMBDA_BASIC_EXECUTION_ROLE);
-            setupTagsInASG(tagsArray, resources, MirroringStackDetails.GET_AKTO_SETUP_DETAILS_LAMBDA_BASIC_EXECUTION_ROLE);
-            setupTagsInASG(tagsArray, resources, MirroringStackDetails.GET_AKTO_SETUP_DETAILS_LAMBDA);
-            setupTagsInASG(tagsArray, resources, MirroringStackDetails.CREATE_MIRROR_SESSION_LAMBDA);
-            setupTagsInASG(tagsArray, resources, MirroringStackDetails.LAMBDA_VPC_ACCESS_ROLE);
-            setupTagsInASG(tagsArray, resources, MirroringStackDetails.LAMBDA_SECURITY_GROUP_VPC);
+            addTagToResource(tagsArray, resources, MirroringStackDetails.LAMBDA_LOG_GROUP);
+            addTagToResource(tagsArray, resources, MirroringStackDetails.LAMBDA_BASIC_EXECUTION_ROLE);
+            addTagToResource(tagsArray, resources, MirroringStackDetails.GET_AKTO_SETUP_DETAILS_LAMBDA_BASIC_EXECUTION_ROLE);
+            addTagToResource(tagsArray, resources, MirroringStackDetails.GET_AKTO_SETUP_DETAILS_LAMBDA);
+            addTagToResource(tagsArray, resources, MirroringStackDetails.CREATE_MIRROR_SESSION_LAMBDA);
+            addTagToResource(tagsArray, resources, MirroringStackDetails.LAMBDA_VPC_ACCESS_ROLE);
+            addTagToResource(tagsArray, resources, MirroringStackDetails.LAMBDA_SECURITY_GROUP_VPC);
 
-            setupTagsInASG(tagsArray, resources, MirroringStackDetails.SAVE_COLLECTION_NAMES_LAMBDA);
-            setupTagsInASG(tagsArray, resources, MirroringStackDetails.GET_VPC_DETAILS_LAMBDA_ROLE);
-            setupTagsInASG(tagsArray, resources, MirroringStackDetails.GET_VPC_DETAILS_LAMBDA);
+            addTagToResource(tagsArray, resources, MirroringStackDetails.SAVE_COLLECTION_NAMES_LAMBDA);
+            addTagToResource(tagsArray, resources, MirroringStackDetails.GET_VPC_DETAILS_LAMBDA_ROLE);
+            addTagToResource(tagsArray, resources, MirroringStackDetails.GET_VPC_DETAILS_LAMBDA);
 
-            setupTagsInASG(tagsArray, resources, MirroringStackDetails.AKTO_CONTEXT_ANALYZER_SECURITY_GROUP);
-            setupTagsInASG(tagsArray, resources, MirroringStackDetails.AKTO_CONTEXT_ANALYZER_INSTANCE_REFRESH_HANDLER_LAMBDA);
-            setupTagsInASG(tagsArray, resources, MirroringStackDetails.REFRESH_HANDLER_LAMBDA_BASIC_EXECUTION_ROLE);
-            setupTagsInASG(tagsArray, resources, MirroringStackDetails.AKTO_SECURITY_GROUP);
+            addTagToResource(tagsArray, resources, MirroringStackDetails.AKTO_CONTEXT_ANALYZER_SECURITY_GROUP);
+            addTagToResource(tagsArray, resources, MirroringStackDetails.AKTO_CONTEXT_ANALYZER_INSTANCE_REFRESH_HANDLER_LAMBDA);
+            addTagToResource(tagsArray, resources, MirroringStackDetails.REFRESH_HANDLER_LAMBDA_BASIC_EXECUTION_ROLE);
+            addTagToResource(tagsArray, resources, MirroringStackDetails.AKTO_SECURITY_GROUP);
 
-            setupTagsInASG(tagsArray, resources, MirroringStackDetails.AKTO_NLB);
-            setupTagsInASG(tagsArray, resources, MirroringStackDetails.AKTO_TRAFFIC_MIRRORING_TARGET_GROUP);
-            setupTagsInASG(tagsArray, resources, MirroringStackDetails.AKTO_KAFKA_TARGET_GROUP);
-            setupTagsInASG(tagsArray, resources, MirroringStackDetails.DASHBOARD_INSTANCE_REFRESH_HANDLER_LAMBDA);
-            setupTagsInASG(tagsArray, resources, MirroringStackDetails.TRAFFIC_MIRRORING_INSTANCE_REFRESH_HANDLER_LAMBDA);
-            setupTagsInASG(tagsArray, resources, MirroringStackDetails.INSTANCE_REFRESH_HANDLER_LAMBDA_ROLE);
+            addTagToResource(tagsArray, resources, MirroringStackDetails.AKTO_NLB);
+            addTagToResource(tagsArray, resources, MirroringStackDetails.AKTO_TRAFFIC_MIRRORING_TARGET_GROUP);
+            addTagToResource(tagsArray, resources, MirroringStackDetails.AKTO_KAFKA_TARGET_GROUP);
+            addTagToResource(tagsArray, resources, MirroringStackDetails.DASHBOARD_INSTANCE_REFRESH_HANDLER_LAMBDA);
+            addTagToResource(tagsArray, resources, MirroringStackDetails.TRAFFIC_MIRRORING_INSTANCE_REFRESH_HANDLER_LAMBDA);
+            addTagToResource(tagsArray, resources, MirroringStackDetails.INSTANCE_REFRESH_HANDLER_LAMBDA_ROLE);
 
             template = jsonTemplate.toString();
             logger.info("Updated template: {}", template);
@@ -104,7 +104,7 @@ public class Utils {
         return template;
     }
 
-    private static void setupTagsInASG(ArrayNode tagsArray, JsonNode resources, String asgName) {
+    private static void addTagToResource(ArrayNode tagsArray, JsonNode resources, String asgName) {
         JsonNode contextAnalyzerASG = resources.get(asgName);
         JsonNode properties = contextAnalyzerASG.get("Properties");
         ((ObjectNode)properties).put("Tags", tagsArray);
