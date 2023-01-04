@@ -25,7 +25,8 @@ public class TestResult extends GenericTestResult {
         SOMETHING_WENT_WRONG("OOPS! Something went wrong"),
         FAILED_TO_CONVERT_TEST_REQUEST_TO_STRING("Failed to store test"),
         INSUFFICIENT_MESSAGES("Insufficient messages"),
-        NO_AUTH_TOKEN_FOUND("No authentication token found");
+        NO_AUTH_TOKEN_FOUND("No authentication token found"),
+        FAILED_BUILDING_NUCLEI_TEMPLATE("Failed building nuclei template");
 
         private final String message;
 

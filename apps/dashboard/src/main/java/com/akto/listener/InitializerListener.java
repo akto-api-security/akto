@@ -24,7 +24,6 @@ import com.akto.dto.data_types.RegexPredicate;
 import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
-import com.akto.dto.testing.sources.TestSource;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.notifications.email.WeeklyEmail;
