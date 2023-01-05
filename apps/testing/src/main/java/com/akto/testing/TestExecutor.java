@@ -19,8 +19,8 @@ import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.util.JSONUtils;
-import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.LoginFlowEnums;
+import com.akto.util.enums.GlobalEnums.TestSubCategory;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -367,12 +367,7 @@ public class TestExecutor {
             return new ArrayList<>();
         }
 
-        Set<GlobalEnums.TestSubCategory> testSubCategories = getSubCategoriesFromTestingRunConfig(testingRunConfig);
-
-        String origTemplateURL = "https://raw.githubusercontent.com/akto-api-security/testing_sources/master/OWASP_API_Top10_ImproperAssetsManagement/swagger_file_detection/swagger_file_detection.yaml";
-        String subcategory = origTemplateURL.substring(origTemplateURL.lastIndexOf("/")+1).split("\\.")[0];
-
-        FuzzingTest fuzzingTest = new FuzzingTest(testRunId.toHexString(), testRunResultSummaryId.toHexString(), origTemplateURL, subcategory);
+        List<String> testSubCategories = testingRunConfig == null ? null : testingRunConfig.getTestSubCategoryList();
 
         BOLATest bolaTest = new BOLATest();//REPLACE_AUTH_TOKEN
         NoAuthTest noAuthTest = new NoAuthTest();//REMOVE_TOKENS
@@ -388,88 +383,87 @@ public class TestExecutor {
         BFLATest bflaTest = new BFLATest();//BFLA
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
-        TestingRunResult fuzzResult = runTest(fuzzingTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-        testingRunResults.add(fuzzResult);
 
-        if (testSubCategories == null || testSubCategories.contains(GlobalEnums.TestSubCategory.REMOVE_TOKENS)) {
-            TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-            if (noAuthTestResult != null) testingRunResults.add(noAuthTestResult);
-            if (noAuthTestResult != null && !noAuthTestResult.isVulnerable()) {
+        TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+        if (noAuthTestResult != null) testingRunResults.add(noAuthTestResult);
+        if (noAuthTestResult != null && !noAuthTestResult.isVulnerable()) {
 
-                TestPlugin.TestRoleMatcher testRoleMatcher = new TestPlugin.TestRoleMatcher(testingUtil.getTestRoles(), apiInfoKey);
-                if ((testSubCategories == null || testSubCategories.contains(GlobalEnums.TestSubCategory.BFLA)) && testRoleMatcher.shouldDoBFLA())  {
-                    TestingRunResult bflaTestResult = runTest(bflaTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-                    if (bflaTestResult != null) testingRunResults.add(bflaTestResult);
-                } else if (testSubCategories == null || testSubCategories.contains(GlobalEnums.TestSubCategory.REPLACE_AUTH_TOKEN)){
-                    TestingRunResult bolaTestResult = runTest(bolaTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-                    if (bolaTestResult != null) testingRunResults.add(bolaTestResult);
-                }
+            TestPlugin.TestRoleMatcher testRoleMatcher = new TestPlugin.TestRoleMatcher(testingUtil.getTestRoles(), apiInfoKey);
+            if ((testSubCategories == null || testSubCategories.contains(TestSubCategory.BFLA.name())) && testRoleMatcher.shouldDoBFLA())  {
+                TestingRunResult bflaTestResult = runTest(bflaTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                if (bflaTestResult != null) testingRunResults.add(bflaTestResult);
+            } else if (testSubCategories == null || testSubCategories.contains(TestSubCategory.REPLACE_AUTH_TOKEN.name())){
+                TestingRunResult bolaTestResult = runTest(bolaTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                if (bolaTestResult != null) testingRunResults.add(bolaTestResult);
+            }
 
-                if (testSubCategories == null || testSubCategories.contains(GlobalEnums.TestSubCategory.ADD_USER_ID)) {
-                    TestingRunResult addUserIdTestResult = runTest(addUserIdTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-                    if (addUserIdTestResult != null) testingRunResults.add(addUserIdTestResult);
-                }
+            if (testSubCategories == null || testSubCategories.contains(TestSubCategory.ADD_USER_ID.name())) {
+                TestingRunResult addUserIdTestResult = runTest(addUserIdTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                if (addUserIdTestResult != null) testingRunResults.add(addUserIdTestResult);
+            }
 
-                if (testSubCategories == null || testSubCategories.contains(GlobalEnums.TestSubCategory.PARAMETER_POLLUTION)) {
-                    TestingRunResult parameterPollutionTestResult = runTest(parameterPollutionTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-                    if (parameterPollutionTestResult != null) testingRunResults.add(parameterPollutionTestResult);
-                }
+            if (testSubCategories == null || testSubCategories.contains(TestSubCategory.PARAMETER_POLLUTION.name())) {
+                TestingRunResult parameterPollutionTestResult = runTest(parameterPollutionTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                if (parameterPollutionTestResult != null) testingRunResults.add(parameterPollutionTestResult);
+            }
 
-                if (testSubCategories == null || testSubCategories.contains(GlobalEnums.TestSubCategory.REPLACE_AUTH_TOKEN_OLD_VERSION)) {
-                    TestingRunResult oldApiVersionTestResult = runTest(oldApiVersionTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-                    if (oldApiVersionTestResult != null) testingRunResults.add(oldApiVersionTestResult);
-                }
+            if (testSubCategories == null || testSubCategories.contains(TestSubCategory.REPLACE_AUTH_TOKEN_OLD_VERSION.name())) {
+                TestingRunResult oldApiVersionTestResult = runTest(oldApiVersionTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                if (oldApiVersionTestResult != null) testingRunResults.add(oldApiVersionTestResult);
+            }
 
-                if (testSubCategories == null || testSubCategories.contains(GlobalEnums.TestSubCategory.JWT_NONE_ALGO)) {
-                    TestingRunResult jwtNoneAlgoTestResult = runTest(jwtNoneAlgoTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-                    if (jwtNoneAlgoTestResult != null) testingRunResults.add(jwtNoneAlgoTestResult);
-                }
+            if (testSubCategories == null || testSubCategories.contains(TestSubCategory.JWT_NONE_ALGO.name())) {
+                TestingRunResult jwtNoneAlgoTestResult = runTest(jwtNoneAlgoTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                if (jwtNoneAlgoTestResult != null) testingRunResults.add(jwtNoneAlgoTestResult);
+            }
 
-                if (testSubCategories == null || testSubCategories.contains(GlobalEnums.TestSubCategory.JWT_INVALID_SIGNATURE)) {
-                    TestingRunResult jwtInvalidSignatureTestResult = runTest(jwtInvalidSignatureTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-                    if (jwtInvalidSignatureTestResult != null) testingRunResults.add(jwtInvalidSignatureTestResult);
-                }
+            if (testSubCategories == null || testSubCategories.contains(TestSubCategory.JWT_INVALID_SIGNATURE.name())) {
+                TestingRunResult jwtInvalidSignatureTestResult = runTest(jwtInvalidSignatureTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                if (jwtInvalidSignatureTestResult != null) testingRunResults.add(jwtInvalidSignatureTestResult);
+            }
 
-                if (testSubCategories == null || testSubCategories.contains(GlobalEnums.TestSubCategory.ADD_JKU_TO_JWT)) {
-                    TestingRunResult addJkuToJwtTestResult = runTest(addJkuToJwtTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-                    if (addJkuToJwtTestResult != null) testingRunResults.add(addJkuToJwtTestResult);
-                }
+            if (testSubCategories == null || testSubCategories.contains(TestSubCategory.ADD_JKU_TO_JWT.name())) {
+                TestingRunResult addJkuToJwtTestResult = runTest(addJkuToJwtTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                if (addJkuToJwtTestResult != null) testingRunResults.add(addJkuToJwtTestResult);
             }
         }
 
-        if (testSubCategories == null || testSubCategories.contains(GlobalEnums.TestSubCategory.ADD_METHOD_IN_PARAMETER)) {
+        if (testSubCategories == null || testSubCategories.contains(TestSubCategory.ADD_METHOD_IN_PARAMETER.name())) {
             TestingRunResult addMethodInParameterTestResult = runTest(addMethodInParameterTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
             if (addMethodInParameterTestResult != null) testingRunResults.add(addMethodInParameterTestResult);
         }
 
-        if (testSubCategories == null || testSubCategories.contains(GlobalEnums.TestSubCategory.ADD_METHOD_OVERRIDE_HEADERS)) {
+        if (testSubCategories == null || testSubCategories.contains(TestSubCategory.ADD_METHOD_OVERRIDE_HEADERS.name())) {
             TestingRunResult addMethodOverrideHeadersTestResult = runTest(addMethodOverrideHeadersTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
             if (addMethodOverrideHeadersTestResult != null) testingRunResults.add(addMethodOverrideHeadersTestResult);
         }
 
-        if (testSubCategories == null || testSubCategories.contains(GlobalEnums.TestSubCategory.CHANGE_METHOD)) {
+        if (testSubCategories == null || testSubCategories.contains(TestSubCategory.CHANGE_METHOD.name())) {
             TestingRunResult changeHttpMethodTestResult = runTest(changeHttpMethodTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
             if (changeHttpMethodTestResult != null) testingRunResults.add(changeHttpMethodTestResult);
         }
-        return testingRunResults;
-    }
 
-    private Set<GlobalEnums.TestSubCategory> getSubCategoriesFromTestingRunConfig(TestingRunConfig testingRunConfig) {
-        if (testingRunConfig == null) {
-            return null;
-        }
-        Set<GlobalEnums.TestSubCategory> subCategories = new HashSet<>();
-        List<String> subCategoriesList = testingRunConfig.getTestSubCategoryList() != null
-                ? testingRunConfig.getTestSubCategoryList() : new ArrayList<>();
+        if (testSubCategories != null) {
+            for (String testSubCategory: testSubCategories) {
+                if (testSubCategory.startsWith("http://") || testSubCategory.startsWith("https://")) {
+                    try {
+                        String origTemplateURL = testSubCategory;
 
-        for (String subcategory: subCategoriesList) {
-            try {
-                GlobalEnums.TestSubCategory testSubCategory = GlobalEnums.TestSubCategory.getTestCategory(subcategory);
-                subCategories.add(testSubCategory);
-            } catch (IllegalStateException ignored) {
+                        origTemplateURL = origTemplateURL.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/");
+
+                        String subcategory = origTemplateURL.substring(origTemplateURL.lastIndexOf("/")+1).split("\\.")[0];
+                        FuzzingTest fuzzingTest = new FuzzingTest(testRunId.toHexString(), testRunResultSummaryId.toHexString(), origTemplateURL, subcategory);
+                        TestingRunResult fuzzResult = runTest(fuzzingTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                        testingRunResults.add(fuzzResult);        
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("unable to execute fuzzing for " + testSubCategory);
+                        e.printStackTrace();
+                    }
+                }
             }
         }
-        return subCategories;
+
+        return testingRunResults;
     }
 
     public TestingRunResult runTest(TestPlugin testPlugin, ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil, ObjectId testRunId, ObjectId testRunResultSummaryId) {

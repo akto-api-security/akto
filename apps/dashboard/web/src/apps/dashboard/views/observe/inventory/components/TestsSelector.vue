@@ -98,9 +98,8 @@ export default {
         emitTestSelection({recurringDaily, startTimestamp}) {
             this.recurringDaily = recurringDaily
             this.startTimestamp = startTimestamp
-            let selectedTests = Object.values(this.mapCategoryToSubcategory).map(x => x.selected)
+            let selectedTests = Object.values(this.mapCategoryToSubcategory).map(x => x.selected).flat().map(x => x.value)
             let ret = {recurringDaily: this.recurringDaily, startTimestamp: this.startTimestamp, selectedTests}
-            console.log('testsSelected', ret)
             return this.$emit('testsSelected', ret)
         },
         populateMapCategoryToSubcategory() {
