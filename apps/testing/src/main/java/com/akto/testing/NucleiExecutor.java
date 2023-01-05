@@ -52,8 +52,8 @@ public class NucleiExecutor {
             baseURL += "/";
         }
 
-        String configPath = pwd+"/.templates-config.json";
-        File file = new File(configPath);
+        String configDirectory = pwd;
+        File file = new File(configDirectory+"/.templates-config.json");
         try {
             FileUtils.writeStringToFile(file, "{}", Charsets.UTF_8);
         } catch (IOException e) {
@@ -90,7 +90,7 @@ public class NucleiExecutor {
         baseCmdTokens.add(outputDirCalls);
 
         baseCmdTokens.add("-template-dir");
-        baseCmdTokens.add(configPath);
+        baseCmdTokens.add(configDirectory);
 
         baseCmdTokens.add("-v");
         baseCmdTokens.add("Method="+method);
