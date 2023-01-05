@@ -1,11 +1,12 @@
 <template>
     <div class="show-schedule-box">
+      <div class="d-flex jc-sb">
         <div class="d-flex" style="gap: 20px">
             <div>Select time: </div>
             <div>
                 <simple-menu :items="hourlyTimes">
                     <template v-slot:activator2>
-                        <div class="clickable">{{hourOfDay}}:00</div>
+                        <div class="clickable-line">{{hourOfDay}}:00</div>
                     </template>
 
                 </simple-menu>
@@ -18,12 +19,12 @@
                 class="run-daily-box"
                 :ripple="false"
             />
-
-        </div>
-
-        <v-btn primary dark color="#6200EA" @click="schedule" class="my-2">
-            Schedule {{recurringDaily ? "daily" : "today"}} at {{hourOfDay}}:00
+        </div>  
+        <v-btn primary dark color="#6200EA" @click="schedule">
+            Run {{recurringDaily ? "daily" : "once"}} at {{hourOfDay}}:00
         </v-btn>
+
+      </div>
     </div>
 </template>
 
@@ -53,7 +54,7 @@ export default {
         },
         schedule() {
             let dayStart = +func.dayStart(+new Date());
-            let startTimestamp = parseInt(dayStart/1000) + hourOfDay * 60 * 60
+            let startTimestamp = parseInt(dayStart/1000) + this.hourOfDay * 60 * 60
             return this.$emit("schedule", {recurringDaily: this.recurringDaily, startTimestamp})
         }
     }
@@ -64,6 +65,7 @@ export default {
 .show-schedule-box
     background: #FFFFFF
     color: #47466A
+    margin-top: 16px
 </style>
 
 <style scoped>
