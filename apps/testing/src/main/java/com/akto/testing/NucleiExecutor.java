@@ -27,33 +27,18 @@ public class NucleiExecutor {
         }
     }
 
-    public static void main1(String[] args) throws IOException {
-        String outputDirFiles = "/Users/avneesh/.config/nucleit";
-        String path = outputDirFiles+"/logs.txt";
-        FuzzingTest.createDirPath(path);
-        File file = new File(path);
-        FileUtils.writeStringToFile(file, "{}", Charsets.UTF_8);
-    }
-
-    public static void main(String[] args) throws IOException {
-        System.out.println(new File("/").getAbsolutePath());;
-    }
-
 
     public static NucleiResult execute(
         String method, String baseURL, String templatePath, String outputDir, String body, Map<String, List<String>> headers,
         String pwd
-    ) throws FileNotFoundException {
-        System.out.println(pwd);
+    )  {
 
         File outputDirFile = new File(outputDir);
-        String pathEnv = System.getenv("PATH");
         if (!baseURL.endsWith("/")) {
             baseURL += "/";
         }
 
-        String configDirectory = pwd;
-        File file = new File(configDirectory+"/.templates-config.json");
+        File file = new File( pwd+"/.templates-config.json");
         try {
             FileUtils.writeStringToFile(file, "{}", Charsets.UTF_8);
         } catch (IOException e) {
@@ -61,17 +46,13 @@ public class NucleiExecutor {
             return null;
         }
 
-
         String outputDirCalls = outputDirFile.getAbsolutePath()+"/calls";
         String outputDirFiles = outputDirFile.getAbsolutePath()+"/files";
 
         FuzzingTest.createDirPath(outputDirFiles+"/logs.txt");
 
         String path = baseURL;
-        if (baseURL.contains("?")) {
-            path = baseURL.substring(0, baseURL.indexOf("?"));
-        }
-
+        if (baseURL.contains("?")) path = baseURL.substring(0, baseURL.indexOf("?"));
         String fullUrl = path.startsWith("http") ? path : "https://" + path;
 
         List<String> baseCmdTokens = new ArrayList<>();
@@ -90,7 +71,7 @@ public class NucleiExecutor {
         baseCmdTokens.add(outputDirCalls);
 
         baseCmdTokens.add("-template-dir");
-        baseCmdTokens.add(configDirectory);
+        baseCmdTokens.add(pwd);
 
         baseCmdTokens.add("-v");
         baseCmdTokens.add("Method="+method);
@@ -109,7 +90,7 @@ public class NucleiExecutor {
             baseCmdTokens.add(headerName + ":\"" + headerValue + "\"");
         }
 
-        System.out.println(String.join(" ",baseCmdTokens));
+        System.out.println("Command: " + String.join(" ",baseCmdTokens));
         Process process;
 
         try {
@@ -133,14 +114,22 @@ public class NucleiExecutor {
                 }
 
             int s = process.waitFor();
-            System.out.println("((((((((((((");
+            System.out.println("***********OUTPUT*************");
             System.out.println(output);
-            System.out.println("((((((((((((");
+            System.out.println("***********OUTPUT*************");
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
 
-        List<BasicDBObject> metaData = readMetaData(outputDirFiles);
+        List<BasicDBObject> metaData;
+        try {
+             metaData = readMetaData(outputDirFiles);
+        } catch (Exception e) {
+            System.out.println("ERROR reading meta data: ");
+            e.printStackTrace();
+            return null;
+        }
+
         ArrayList<Pair<OriginalHttpRequest, OriginalHttpResponse>> attempts = readResponses(outputDirCalls);
 
         return new NucleiResult(attempts, metaData);

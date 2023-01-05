@@ -28,11 +28,11 @@ import java.util.*;
 
 public class FuzzingTest extends TestPlugin {
 
-    private String testRunId;
-    private String testRunResultSummaryId;
-    private String origTemplatePath;
+    private final String testRunId;
+    private final String testRunResultSummaryId;
+    private final String origTemplatePath;
     private String tempTemplatePath;
-    private String subcategory;
+    private final String subcategory;
 
     public FuzzingTest(String testRunId, String testRunResultSummaryId, String origTemplatePath, String subcategory) {
         this.testRunId = testRunId;
@@ -125,14 +125,17 @@ public class FuzzingTest extends TestPlugin {
         return addTestSuccessResult(vulnerable, testResults, new ArrayList<>(), TestResult.Confidence.HIGH);
     }
 
-    private static void downloadLinks(String templatePath, String outputDir) throws IOException {
+    public static void downloadLinks(String templatePath, String outputDir) throws IOException {
         List<String> urlsToDownload = new ArrayList<>();
         Yaml yaml = new Yaml();
         InputStream inputStream = java.nio.file.Files.newInputStream(new File(templatePath).toPath());
         Map<String, Object> data = yaml.load(inputStream);
+        if (data == null) data = new HashMap<>();
         List<Map<String, Object>> requests = (List<Map<String, Object>>) data.get("requests");
+        if (requests == null) requests = new ArrayList<>();
         for (Map<String,Object> request: requests) {
             Map<String, Object> payloads = (Map<String, Object>) request.get("payloads");
+            if (payloads == null) payloads = new HashMap<>();
             for (Object payload: payloads.values()) {
                 if (payload.getClass().equals(String.class)) {
                     String payloadString = (String) payload;
