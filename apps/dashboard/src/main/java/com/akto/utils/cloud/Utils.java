@@ -43,12 +43,13 @@ public class Utils {
         for(Parameter parameter: parameters){
             if(parameter.getParameterKey().equalsIgnoreCase("tags")){
                 String tagStr = parameter.getParameterValue();
+                tagStr = tagStr.trim();
                 String[] splitTags = tagStr.split(",");
                 for(String tagSplit: splitTags){
                     String[] split = tagSplit.split("=");
                     ObjectNode node = mapper.createObjectNode();
-                    node.put("Key", split[0]);
-                    node.put("Value", split[1]);
+                    node.put("Key", split[0].trim());
+                    node.put("Value", split[1].trim());
                     tags.add(node);
                     ObjectNode asgNode = node.deepCopy();
                     asgNode.put("PropagateAtLaunch", true);
