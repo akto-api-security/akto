@@ -1,78 +1,100 @@
 package com.akto.testing;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
+import java.io.*;
+import java.nio.charset.Charset;
+import java.util.*;
 
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.rules.FuzzingTest;
 import com.akto.util.Pair;
 
+import com.google.gson.Gson;
+import com.mongodb.BasicDBObject;
+import kotlin.text.Charsets;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 
 public class NucleiExecutor {
-    
-    public static ArrayList<Pair<OriginalHttpRequest, OriginalHttpResponse>> execute(
-        String method, String baseURL, String templatePath, String outputDir, String body, Map<String, List<String>> headers
-    ) {
+
+    public static class NucleiResult {
+        public ArrayList<Pair<OriginalHttpRequest, OriginalHttpResponse>> attempts;
+        public List<BasicDBObject> metaData;
+
+        public NucleiResult(ArrayList<Pair<OriginalHttpRequest, OriginalHttpResponse>> attempts, List<BasicDBObject> metaData) {
+            this.attempts = attempts;
+            this.metaData = metaData;
+        }
+    }
+
+
+    public static NucleiResult execute(
+        String method, String baseURL, String templatePath, String outputDir, String body, Map<String, List<String>> headers,
+        String pwd
+    )  {
+
         File outputDirFile = new File(outputDir);
-        String pathEnv = System.getenv("PATH");
         if (!baseURL.endsWith("/")) {
             baseURL += "/";
         }
 
-        String outputDirCalls = outputDirFile.getAbsolutePath()+"/calls";
-
-        String path = baseURL;
-        if (baseURL.contains("?")) {
-            path = baseURL.substring(0, baseURL.indexOf("?"));
+        File file = new File( pwd+"/.templates-config.json");
+        try {
+            FileUtils.writeStringToFile(file, "{}", Charsets.UTF_8);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
         }
 
-        String[] baseCmdTokens = new String[]{
-            "/Users/ankushjain/go/bin/nuclei",
-            "-u", baseURL,
-            "-templates", templatePath,
-            "--store-resp", 
-            "-o", outputDirFile.getAbsolutePath()+"/logs.txt",
-            "-store-resp-dir", outputDirCalls,
-            "-V", "\"Method="+method+"\"",
-            "-V", "\"Path="+path+"\""
-        };
+        String outputDirCalls = outputDirFile.getAbsolutePath()+"/calls";
+        String outputDirFiles = outputDirFile.getAbsolutePath()+"/files";
 
-        String baseCmd = StringUtils.join(baseCmdTokens, " ");
+        FuzzingTest.createDirPath(outputDirFiles+"/logs.txt");
+
+        String path = baseURL;
+        if (baseURL.contains("?")) path = baseURL.substring(0, baseURL.indexOf("?"));
+        String fullUrl = path.startsWith("http") ? path : "https://" + path;
+
+        List<String> baseCmdTokens = new ArrayList<>();
+        baseCmdTokens.add("/app/nuclei_linux");
+
+        baseCmdTokens.add("-u");
+        baseCmdTokens.add(fullUrl);
+
+        baseCmdTokens.add("-t");
+        baseCmdTokens.add(templatePath);
+
+        baseCmdTokens.add("-output-files-dir");
+        baseCmdTokens.add(outputDirFiles);
+
+        baseCmdTokens.add("-store-resp-dir");
+        baseCmdTokens.add(outputDirCalls);
+
+        baseCmdTokens.add("-template-dir");
+        baseCmdTokens.add(pwd);
+
+        baseCmdTokens.add("-v");
+        baseCmdTokens.add("Method="+method);
+
+        baseCmdTokens.add("-v");
+        baseCmdTokens.add("Path="+path);
 
         if (StringUtils.isNotEmpty(body)) {
-            baseCmd += " -V \"Body=" + body.replaceAll("\"","\\\\\"") + "\"";
+            baseCmdTokens.add("-v");
+            baseCmdTokens.add("Body=\"" + body.replaceAll("\"","\\\\\"") + "\"");
         }
 
         for (String headerName: headers.keySet()) {
             String headerValue = StringUtils.join(headers.get(headerName), ",").replaceAll("\"","\\\\\"");
-            baseCmd += " -H \"" + headerName + ":" + headerValue + "\"";
+            baseCmdTokens.add("-h");
+            baseCmdTokens.add(headerName + ":\"" + headerValue + "\"");
         }
 
-        baseCmd += " -debug\n";
-
+        System.out.println("Command: " + String.join(" ",baseCmdTokens));
         Process process;
 
-        File file = new File(outputDir, "script.sh");
-
         try {
-            FileUtils.writeStringToFile(file, baseCmd, StandardCharsets.UTF_8);
-        } catch (IOException e1) {
-            return null;
-        }
-
-        try {
-            process = Runtime.getRuntime().exec("sh " + file.getAbsolutePath(), new String[]{"PATH="+pathEnv}, new File("/Users/ankushjain/akto_code/nuclei-wrapper"));
+            process = Runtime.getRuntime().exec(baseCmdTokens.toArray(new String[0]));
             StringBuilder output = new StringBuilder();
 
             BufferedReader reader = new BufferedReader(
@@ -90,18 +112,49 @@ public class NucleiExecutor {
                 while ((line2= reader2.readLine()) != null) {
                     output.append(line2 + "\n");
                 }
-    
-            int s = process.waitFor();        
-            
-        } catch (IOException e) {
 
-            e.printStackTrace();
-        } catch (InterruptedException e) {
+            int s = process.waitFor();
+            System.out.println("***********OUTPUT*************");
+            System.out.println(output);
+            System.out.println("***********OUTPUT*************");
+        } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
+
+        List<BasicDBObject> metaData;
+        try {
+             metaData = readMetaData(outputDirFiles);
+        } catch (Exception e) {
+            System.out.println("ERROR reading meta data: ");
+            e.printStackTrace();
+            return null;
+        }
+
+        ArrayList<Pair<OriginalHttpRequest, OriginalHttpResponse>> attempts = readResponses(outputDirCalls);
+
+        return new NucleiResult(attempts, metaData);
         
-        return readResponses(outputDirCalls);
-        
+    }
+
+    public static List<BasicDBObject> readMetaData(String nucleiOutputDir) throws FileNotFoundException {
+
+        FileReader fileReader = new FileReader(nucleiOutputDir+"/main.txt");
+        BufferedReader reader = new BufferedReader(fileReader);
+        Gson gson = new Gson();
+
+        List<BasicDBObject> result = new ArrayList<>();
+        String line = "";
+
+        try {
+            while ((line = reader.readLine()) != null) {
+                BasicDBObject value = gson.fromJson(line, BasicDBObject.class);
+                result.add(value);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        return result;
     }
 
     private final static String dumpReqRegex = "^(\\[.*\\]) Dumped \\w+ request for [^ \\n]+";
@@ -180,7 +233,7 @@ public class NucleiExecutor {
                         }
             
                     } catch (IOException e) {
-
+                        e.printStackTrace();
                     } finally {
 
                         try {
