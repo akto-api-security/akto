@@ -11,6 +11,17 @@ import com.akto.utils.platform.DashboardStackDetails;
 import com.akto.utils.platform.MirroringStackDetails;
 import com.akto.utils.cloud.stack.dto.StackState;
 
+import com.amazonaws.services.cloudformation.AmazonCloudFormation;
+import com.amazonaws.services.cloudformation.AmazonCloudFormationClientBuilder;
+import com.amazonaws.services.cloudformation.model.DescribeStacksRequest;
+import com.amazonaws.services.cloudformation.model.DescribeStacksResult;
+import com.amazonaws.services.cloudformation.model.Parameter;
+import com.amazonaws.services.cloudformation.model.Tag;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
@@ -163,7 +174,10 @@ public class QuickStartAction extends UserAction {
                         put("SubnetId", System.getenv("EC2_SUBNET_ID"));
                     }
                 };
-                String stackId = this.stack.createStack(MirroringStackDetails.getStackName(), parameters);
+                String template = convertStreamToString(AwsStack.class
+                        .getResourceAsStream("/cloud_formation_templates/akto_aws_mirroring.template"));
+                template = Utils.addTagsToTemplate(template);
+                String stackId = this.stack.createStack(MirroringStackDetails.getStackName(), parameters, template);
                 System.out.println("Started creation of stack with id: " + stackId);
             } catch (Exception e) {
                 e.printStackTrace();

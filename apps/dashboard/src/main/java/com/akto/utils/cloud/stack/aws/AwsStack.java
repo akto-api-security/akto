@@ -44,16 +44,14 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
             .build();
 
     @Override
-    public String createStack(String stackName, Map<String, String> parameters) throws Exception {
+    public String createStack(String stackName, Map<String, String> parameters, String template) throws Exception {
         try {
             CreateStackRequest createRequest = new CreateStackRequest();
             createRequest.setStackName(stackName);
             createRequest.setTimeoutInMinutes(STACK_CREATION_TIMEOUT_MINS);
             createRequest.setParameters(fetchParamters(parameters));
             createRequest.setCapabilities(STACK_CREATION_CAPABILITIES);
-            createRequest.setTemplateBody(
-                    convertStreamToString(AwsStack.class
-                            .getResourceAsStream("/cloud_formation_templates/akto_aws_mirroring.template")));
+            createRequest.setTemplateBody(template);
             Future<CreateStackResult> future = CLOUD_FORMATION_ASYNC.createStackAsync(createRequest);
             CreateStackResult createStackResult = future.get();
             System.out.println("Stack Id: " + createStackResult.getStackId());
@@ -118,19 +116,6 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
             logger.error("Failed to fetch physical id of resource with logical id {}", logicalId, e);
             return "";
         }
-    }
-
-    // Convert a stream into a single, newline separated string
-    private static String convertStreamToString(InputStream in) throws Exception {
-
-        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-        StringBuilder stringbuilder = new StringBuilder();
-        String line = null;
-        while ((line = reader.readLine()) != null) {
-            stringbuilder.append(line + "\n");
-        }
-        in.close();
-        return stringbuilder.toString();
     }
 
     @Override
