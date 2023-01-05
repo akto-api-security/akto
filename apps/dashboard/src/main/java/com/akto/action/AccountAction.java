@@ -10,6 +10,7 @@ import com.akto.utils.cloud.serverless.aws.Lambda;
 import com.akto.utils.cloud.stack.Stack;
 import com.akto.utils.cloud.stack.aws.AwsStack;
 import com.akto.utils.cloud.stack.dto.StackState;
+import com.akto.utils.platform.MirroringStackDetails;
 import com.amazonaws.services.lambda.model.*;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
@@ -97,14 +98,14 @@ public class AccountAction extends UserAction {
             logger.info("This is a stairway installation, invoking lambdas now");
             String lambda;
             try {
-                lambda = stack.fetchResourcePhysicalIdByLogicalId("AktoContextAnalyzerInstanceRefreshHandler");
+                lambda = stack.fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.AKTO_CONTEXT_ANALYZER_UPDATE_LAMBDA);
                 this.serverlessFunction.invokeFunction(lambda);
                 logger.info("Successfully invoked lambda {}", lambda);
             } catch (Exception e) {
                 logger.error("Failed to update Akto Context Analyzer", e);
             }
             try{
-                lambda = stack.fetchResourcePhysicalIdByLogicalId("DashboardInstanceRefreshHandler");
+                lambda = stack.fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(),MirroringStackDetails.AKTO_DASHBOARD_UPDATE_LAMBDA);
                 this.serverlessFunction.invokeFunction(lambda);
                 logger.info("Successfully invoked lambda {}", lambda);
             } catch (Exception e) {
@@ -112,7 +113,7 @@ public class AccountAction extends UserAction {
             }
                 
             try{
-                lambda = stack.fetchResourcePhysicalIdByLogicalId("TrafficMirroringInstanceRefreshHandler");
+                lambda = stack.fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.AKTO_RUNTIME_UPDATE_LAMBDA);
                 this.serverlessFunction.invokeFunction(lambda);
                 logger.info("Successfully invoked lambda {}", lambda);
             } catch (Exception e) {
@@ -127,7 +128,7 @@ public class AccountAction extends UserAction {
     }
 
     private boolean checkIfStairwayInstallation() {
-        StackState stackStatus = stack.fetchStackStatus();
+        StackState stackStatus = stack.fetchStackStatus(MirroringStackDetails.getStackName());
         return "CREATE_COMPLETE".equalsIgnoreCase(stackStatus.getStatus().toString());
     }
 

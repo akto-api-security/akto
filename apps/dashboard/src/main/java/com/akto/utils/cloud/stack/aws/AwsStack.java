@@ -27,10 +27,13 @@ import com.amazonaws.services.cloudformation.model.DescribeStacksResult;
 import com.amazonaws.services.cloudformation.model.Parameter;
 import com.amazonaws.services.cloudformation.model.Stack;
 import com.amazonaws.services.cloudformation.model.StackResource;
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AwsStack implements com.akto.utils.cloud.stack.Stack {
 
-    private static final String STACK_NAME = "akto-mirroring";
+    private static final Logger logger = LoggerFactory.getLogger(AwsStack.class);
     private static final Set<String> ACCEPTABLE_STACK_STATUSES = new HashSet<String>(
             Arrays.asList(StackStatus.CREATE_IN_PROGRESS.toString(), StackStatus.CREATE_COMPLETE.toString()));
     private static final int STACK_CREATION_TIMEOUT_MINS = 20;
@@ -41,10 +44,10 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
             .build();
 
     @Override
-    public String createStack(Map<String, String> parameters) throws Exception {
+    public String createStack(String stackName, Map<String, String> parameters) throws Exception {
         try {
             CreateStackRequest createRequest = new CreateStackRequest();
-            createRequest.setStackName(STACK_NAME);
+            createRequest.setStackName(stackName);
             createRequest.setTimeoutInMinutes(STACK_CREATION_TIMEOUT_MINS);
             createRequest.setParameters(fetchParamters(parameters));
             createRequest.setCapabilities(STACK_CREATION_CAPABILITIES);
@@ -52,9 +55,6 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
                     convertStreamToString(AwsStack.class
                             .getResourceAsStream("/cloud_formation_templates/akto_aws_mirroring.template")));
             Future<CreateStackResult> future = CLOUD_FORMATION_ASYNC.createStackAsync(createRequest);
-            while (!future.isDone()) {
-
-            }
             CreateStackResult createStackResult = future.get();
             System.out.println("Stack Id: " + createStackResult.getStackId());
             return createStackResult.getStackId();
@@ -76,9 +76,9 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
     }
 
     @Override
-    public StackState fetchStackStatus() {
+    public StackState fetchStackStatus(String stackName) {
         DescribeStacksRequest describeStackRequest = new DescribeStacksRequest();
-        describeStackRequest.setStackName(STACK_NAME);
+        describeStackRequest.setStackName(stackName);
         try {
             DescribeStacksResult result = CLOUD_FORMATION_SYNC.describeStacks(describeStackRequest);
             Stack stack = result.getStacks().get(0);
@@ -102,9 +102,12 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
         }
     }
 
-    public String fetchResourcePhysicalIdByLogicalId(String logicalId) throws Exception {
+    public String fetchResourcePhysicalIdByLogicalId(String stackName, String logicalId){
+        if(StringUtils.isEmpty(stackName) || StringUtils.isEmpty(logicalId)){
+            return "";
+        }
         DescribeStackResourcesRequest req = new DescribeStackResourcesRequest();
-        req.setStackName(STACK_NAME);
+        req.setStackName(stackName);
         req.setLogicalResourceId(logicalId);
         try {
             DescribeStackResourcesResult res = CLOUD_FORMATION_SYNC.describeStackResources(req);
@@ -112,9 +115,8 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
             System.out.println(resources);
             return resources.get(0).getPhysicalResourceId();
         } catch (Exception e) {
-            // TODO: handle exception
-            e.printStackTrace();
-            throw e;
+            logger.error("Failed to fetch physical id of resource with logical id {}", logicalId, e);
+            return "";
         }
     }
 
@@ -132,8 +134,8 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
     }
 
     @Override
-    public boolean checkIfStackExists() {
-        String stackStatus = fetchStackStatus().getStatus();
+    public boolean checkIfStackExists(String stackName) {
+        String stackStatus = fetchStackStatus(stackName).getStatus();
         return stackStatus.equals("CREATE_COMPLETE");
     }
 }

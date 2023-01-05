@@ -3,10 +3,7 @@ package com.akto.action.testing;
 import com.akto.action.UserAction;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.TestingRunDao;
-import com.akto.dao.testing.TestingRunResultDao;
-import com.akto.dao.testing.TestingRunResultSummariesDao;
-import com.akto.dao.testing.WorkflowTestsDao;
+import com.akto.dao.testing.*;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
 import com.akto.dto.testing.*;
@@ -67,13 +64,16 @@ public class StartTestAction extends UserAction {
                 addActionError("Invalid APIs type");
                 return null;
         }
+        if (this.selectedTests != null) {
+            TestingRunConfig testingRunConfig = new TestingRunConfig(Context.now(), null, this.selectedTests,authMechanism.getId());
+            this.testIdConfig = testingRunConfig.getId();
+            TestingRunConfigDao.instance.insertOne(testingRunConfig);
+        }
 
-        TestingRun testingRun = new TestingRun(
-            scheduleTimestamp, user.getLogin(), testingEndpoints, testIdConfig, TestingRun.State.SCHEDULED, periodInSeconds
-        );
-
-        return testingRun;   
+        return new TestingRun(scheduleTimestamp, user.getLogin(),
+                testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds);
     }
+    private List<String> selectedTests;
 
     public String startTest() {
         int scheduleTimestamp = this.startTimestamp == 0 ? Context.now()  : this.startTimestamp;
@@ -289,5 +289,13 @@ public class StartTestAction extends UserAction {
 
     public WorkflowTest getWorkflowTest() {
         return workflowTest;
+    }
+
+    public List<String> getSelectedTests() {
+        return selectedTests;
+    }
+
+    public void setSelectedTests(List<String> selectedTests) {
+        this.selectedTests = selectedTests;
     }
 }

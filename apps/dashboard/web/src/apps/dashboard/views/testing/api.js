@@ -54,21 +54,21 @@ export default {
         })        
     },
 
-    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily) {
+    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily}
+            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests}
         }).then((resp) => {
             return resp
         })        
     },
 
-    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily) {
+    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily}
+            data: {apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests}
         }).then((resp) => {
             return resp
         })        
