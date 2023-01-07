@@ -27,7 +27,8 @@
             <count-box title="Undocumented Endpoints" :count="shadowEndpoints.length" colorTitle="Pending"/>
             <count-box title="Deprecated Endpoints" :count="unusedEndpoints.length" colorTitle="This week"/>
             <count-box title="All Endpoints" :count="allEndpoints.length" colorTitle="Total"/>
-        </div>    
+        </div> 
+        
         <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Unauthenticated', 'Undocumented', 'Deprecated', 'Documented', 'Tests']">
             <template slot="actions-tray">
             </template>
@@ -164,8 +165,9 @@
                 </div>
             </template>
         </layout-with-tabs>
-        <v-dialog v-model="showTestSelectorDialog" width="800px">
-            <tests-selector @testsSelected=startTest />
+        
+        <v-dialog v-model="showTestSelectorDialog" width="800px"> 
+            <tests-selector :collectionName="apiCollectionName" @testsSelected=startTest />
         </v-dialog>
     </div>
 </template>
@@ -442,23 +444,26 @@ export default {
                 }
             })
         },
-        async startTest({recurringDaily, startTimestamp, selectedTests}) {
+        async startTest({recurringDaily, startTimestamp, selectedTests, testName}) {
             let apiInfoKeyList = this.toApiInfoKeyList(this.filteredItemsForScheduleTest)
             let filtersSelected = this.filteredItemsForScheduleTest.length === this.allEndpoints.length
             let store = this.$store
             let apiCollectionId = this.apiCollectionId
             
             if (filtersSelected) {
-                await store.dispatch('testing/scheduleTestForCollection', {apiCollectionId, startTimestamp, recurringDaily, selectedTests})
+                await store.dispatch('testing/scheduleTestForCollection', {apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName})
             } else {
-                await store.dispatch('testing/scheduleTestForCustomEndpoints', {apiInfoKeyList, startTimestamp, recurringDaily, selectedTests})
+                await store.dispatch('testing/scheduleTestForCustomEndpoints', {apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName})
             }
             
             this.showTestSelectorDialog = false            
         }      
     },
     computed: {
-        ...mapState('inventory', ['apiCollection', 'apiCollectionName', 'endpointsLoading', 'swaggerContent', 'apiInfoList', 'filters', 'lastFetched', 'unusedEndpoints']),
+        ...mapState('inventory', ['apiCollection', 'endpointsLoading', 'swaggerContent', 'apiInfoList', 'filters', 'lastFetched', 'unusedEndpoints']),
+        apiCollectionName() {
+            return this.$store.state.collections.apiCollections.find(x => x.id === this.apiCollectionId).name
+        },
         openEndpoints() {
           return this.allEndpoints.filter(x => x.open)
         },

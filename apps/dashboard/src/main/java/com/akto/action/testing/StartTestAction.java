@@ -29,6 +29,7 @@ public class StartTestAction extends UserAction {
     private List<TestingRun> testingRuns;
     private AuthMechanism authMechanism;
     private int endTimestamp;
+    private String testName;
 
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds) {
         User user = getSUser();
@@ -71,7 +72,7 @@ public class StartTestAction extends UserAction {
         }
 
         return new TestingRun(scheduleTimestamp, user.getLogin(),
-                testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds);
+                testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName);
     }
     private List<String> selectedTests;
 
@@ -297,5 +298,13 @@ public class StartTestAction extends UserAction {
 
     public void setSelectedTests(List<String> selectedTests) {
         this.selectedTests = selectedTests;
+    }
+
+    public String getTestName() {
+        return this.testName;
+    }
+
+    public void setTestName(String testName) {
+        this.testName = testName;
     }
 }

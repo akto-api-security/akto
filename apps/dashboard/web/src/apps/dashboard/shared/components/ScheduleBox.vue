@@ -70,7 +70,7 @@ export default {
             this.label = "Now"
         },
         schedule() {
-            return this.$emit("schedule", {recurringDaily: this.recurringDaily, startTimestamp})
+            return this.$emit("schedule", {recurringDaily: this.recurringDaily, startTimestamp: this.startTimestamp})
         }
     },
     computed: {

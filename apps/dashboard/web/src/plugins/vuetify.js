@@ -13,6 +13,7 @@ import Swagger from "../apps/dashboard/shared/icons/Swagger"
 import Restapi from "../apps/dashboard/shared/icons/Restapi"
 import CustomWebhooks from "../apps/dashboard/shared/icons/CustomWebhooks"
 import AktoWhite from "../apps/dashboard/shared/icons/AktoWhite"
+import BookBookmark from "../apps/dashboard/shared/icons/BookBookmark"
 
 Vue.component('font-awesome-icon', FontAwesomeIcon)
 
@@ -166,6 +167,10 @@ const ctTheme = {
 }
 
 const faIconsOpts = {}
+
+faIconsOpts.bookBookmark = {
+  component: BookBookmark
+}
 
 faIconsOpts.aktoWhite = {
   component: AktoWhite

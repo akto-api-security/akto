@@ -1,5 +1,5 @@
 <template>
-    <simple-layout title="Library">
+    <simple-layout title="Tests Library">
         <template>
             <div class="pa-8">
                 <div>                

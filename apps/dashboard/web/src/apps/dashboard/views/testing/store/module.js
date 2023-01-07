@@ -62,23 +62,23 @@ const testing = {
                 state.loading = false
             })
         },
-        startTestForCollection({commit}, apiCollectionId) {
-            return api.startTestForCollection(apiCollectionId).then((resp) => {
+        startTestForCollection({commit}, {apiCollectionId, testName}) {
+            return api.startTestForCollection(apiCollectionId, testName).then((resp) => {
                 commit('SAVE_TESTING_RUNS', resp)
             })
         },
-        scheduleTestForCollection({commit}, {apiCollectionId, startTimestamp, recurringDaily, selectedTests} ) {
-            return api.scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests).then((resp) => {
+        scheduleTestForCollection({commit}, {apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName} ) {
+            return api.scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName).then((resp) => {
                 commit('SAVE_TESTING_RUNS', resp)
             })
         },
-        startTestForCustomEndpoints({commit}, apiInfoKeyList) {
-            return api.startTestForCustomEndpoints(apiInfoKeyList).then((resp) => {
+        startTestForCustomEndpoints({commit}, {apiInfoKeyList, testName}) {
+            return api.startTestForCustomEndpoints(apiInfoKeyList, testName).then((resp) => {
                 commit('SAVE_TESTING_RUNS', resp)
             })
         },
-        scheduleTestForCustomEndpoints({commit}, {apiInfoKeyList, startTimestamp, recurringDaily, selectedTests} ) {
-            return api.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests).then((resp) => {
+        scheduleTestForCustomEndpoints({commit}, {apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName} ) {
+            return api.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName).then((resp) => {
                 commit('SAVE_TESTING_RUNS', resp)
             })
         },

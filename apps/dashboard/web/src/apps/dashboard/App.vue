@@ -148,8 +148,8 @@ export default {
         link: '/dashboard/issues'
       },
       {
-        title: 'Library',
-        icon: '$fas_laptop-house',
+        title: 'Tests Library',
+        icon: '$bookBookmark',
         link: '/dashboard/library'
       }
     ]

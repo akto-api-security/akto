@@ -34,41 +34,41 @@ export default {
             }
         })
     },
-    startTestForCustomEndpoints(apiInfoKeyList) {
+    startTestForCustomEndpoints(apiInfoKeyList, testName) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiInfoKeyList, type: "CUSTOM"}
+            data: {apiInfoKeyList, type: "CUSTOM", testName}
         }).then((resp) => {
             return resp
         })
     },
 
-    startTestForCollection(apiCollectionId) {
+    startTestForCollection(apiCollectionId, testName) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiCollectionId, type: "COLLECTION_WISE"}
+            data: {apiCollectionId, type: "COLLECTION_WISE", testName}
         }).then((resp) => {
             return resp
         })        
     },
 
-    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests) {
+    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests}
+            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests, testName}
         }).then((resp) => {
             return resp
         })        
     },
 
-    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests) {
+    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests}
+            data: {apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests, testName}
         }).then((resp) => {
             return resp
         })        

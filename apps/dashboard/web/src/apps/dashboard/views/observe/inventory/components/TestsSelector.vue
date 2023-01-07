@@ -2,6 +2,10 @@
     <spinner v-if="loading"/>
     <a-card  v-else title="Configure test" icon="$fas_cog" class="tests-selector-container">
         <div class="mx-8 my-4">
+            <div class="d-flex">
+                <div class="name-div">Name: </div>
+                <name-input :defaultName="collectionName" :defaultSuffixes="nameSuffixes" @changed="setTestName" />
+            </div>
             <div class="d-flex brda">
                 <div class="category-list-container">
                     <v-list-item class="brdr">
@@ -66,14 +70,20 @@ import issuesApi from '../../../issues/api'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
 import ScheduleBox from '@/apps/dashboard/shared/components/ScheduleBox'
 import func from '@/util/func'
+import obj from '@/util/obj'
 import ACard from '@/apps/dashboard/shared/components/ACard'
+import NameInput from '@/apps/dashboard/shared/components/inputs/NameInput'
 
 export default {
     name: "TestsSelector",
+    props: {
+        collectionName: obj.strR
+    },
     components: {
         ScheduleBox,
         Spinner,
-        ACard
+        ACard,
+        NameInput
     },
     data () {
         return {
@@ -84,7 +94,8 @@ export default {
             recurringDaily: false,
             startTimestamp: func.timeNow(),
             selectedCategory: null,
-            globalCheckbox: false
+            globalCheckbox: false,
+            testName: ""
         }
     },
     mounted() {
@@ -101,6 +112,9 @@ export default {
         
     },
     methods: {
+        setTestName(testName) {
+            this.testName = testName
+        },
         globalCheckboxClicked() {
             this.globalCheckbox = !this.globalCheckbox
             let currObj = this.mapCategoryToSubcategory[this.selectedCategory]
@@ -110,7 +124,12 @@ export default {
             this.recurringDaily = recurringDaily
             this.startTimestamp = startTimestamp
             let selectedTests = Object.values(this.mapCategoryToSubcategory).map(x => x.selected).flat().map(x => x.value)
-            let ret = {recurringDaily: this.recurringDaily, startTimestamp: this.startTimestamp, selectedTests}
+            let ret = {
+                recurringDaily: this.recurringDaily, 
+                startTimestamp: this.startTimestamp, 
+                selectedTests, 
+                testName: this.testName
+            }
             return this.$emit('testsSelected', ret)
         },
         populateMapCategoryToSubcategory() {
@@ -144,8 +163,12 @@ export default {
             this.selectedCategory = Object.keys(ret)[0]
             return ret
         }
+    },
+    computed: {
+        nameSuffixes() {
+            return Object.entries(this.mapCategoryToSubcategory).filter(x => x[1].selected.length > 0).map(x => x[0])
+        }
     }
-    
 }
 </script>
 
@@ -202,4 +225,9 @@ export default {
 
 .selected-category
     background-color: #F4F4F4
+
+.name-div
+    margin: auto 8px auto 0
+    font-size: 14px
+    font-weight: 500
 </style>

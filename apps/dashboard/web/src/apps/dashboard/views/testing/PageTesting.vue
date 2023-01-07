@@ -304,7 +304,7 @@ export default {
                         },
                         ...(this.testingRuns || []).map(x => {
                             return {
-                                title: testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
+                                title: x.name || testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
                                 link: "/dashboard/testing/" + x.hexId + "/results",
                                 active: true
                             }
@@ -327,7 +327,7 @@ export default {
                         },
                         ...(this.pastTestingRuns || []).map(x => {
                             return {
-                                title: testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
+                                title: x.name || testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
                                 link: "/dashboard/testing/" + x.hexId + "/results",
                                 active: true
                             }

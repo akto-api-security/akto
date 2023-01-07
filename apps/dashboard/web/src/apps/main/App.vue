@@ -222,6 +222,9 @@
 .fs-12
     font-size: 12px
 
+.fs-14
+    font-size: 14px
+
 .text-primary    
     color: #47466A
 
