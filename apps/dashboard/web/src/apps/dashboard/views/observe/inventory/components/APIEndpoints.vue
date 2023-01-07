@@ -462,7 +462,7 @@ export default {
     computed: {
         ...mapState('inventory', ['apiCollection', 'endpointsLoading', 'swaggerContent', 'apiInfoList', 'filters', 'lastFetched', 'unusedEndpoints']),
         apiCollectionName() {
-            return this.$store.state.collections.apiCollections.find(x => x.id === this.apiCollectionId).name
+            return this.$store.state.collections.apiCollections.find(x => x.id === this.apiCollectionId).displayName
         },
         openEndpoints() {
           return this.allEndpoints.filter(x => x.open)
