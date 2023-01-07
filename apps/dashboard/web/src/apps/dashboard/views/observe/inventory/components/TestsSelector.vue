@@ -121,6 +121,14 @@ export default {
             currObj.selected = this.globalCheckbox ? [...currObj.all] : []
         },
         emitTestSelection({recurringDaily, startTimestamp}) {
+            if (!this.testName) {
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: "Please enter a test name",
+                    color: 'red'
+                });
+                return;
+            }
             this.recurringDaily = recurringDaily
             this.startTimestamp = startTimestamp
             let selectedTests = Object.values(this.mapCategoryToSubcategory).map(x => x.selected).flat().map(x => x.value)

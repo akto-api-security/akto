@@ -167,7 +167,7 @@
         </layout-with-tabs>
         
         <v-dialog v-model="showTestSelectorDialog" width="800px"> 
-            <tests-selector :collectionName="apiCollectionName" @testsSelected=startTest />
+            <tests-selector :collectionName="apiCollectionName" @testsSelected=startTest v-if="showTestSelectorDialog"/>
         </v-dialog>
     </div>
 </template>
