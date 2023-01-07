@@ -188,8 +188,8 @@ const router =  new Router({
                     ]
                 },
                 {
-                    path: 'marketplace',
-                    name: 'marketplace',
+                    path: 'library',
+                    name: 'library',
                     components: {
                         default: PageMarketplace
                     },

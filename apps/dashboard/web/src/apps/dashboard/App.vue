@@ -148,9 +148,9 @@ export default {
         link: '/dashboard/issues'
       },
       {
-        title: 'Marketplace',
+        title: 'Library',
         icon: '$fas_laptop-house',
-        link: '/dashboard/marketplace'
+        link: '/dashboard/library'
       }
     ]
 

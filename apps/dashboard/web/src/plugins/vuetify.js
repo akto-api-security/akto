@@ -12,6 +12,7 @@ import GCP from "../apps/dashboard/shared/icons/GCP"
 import Swagger from "../apps/dashboard/shared/icons/Swagger"
 import Restapi from "../apps/dashboard/shared/icons/Restapi"
 import CustomWebhooks from "../apps/dashboard/shared/icons/CustomWebhooks"
+import AktoWhite from "../apps/dashboard/shared/icons/AktoWhite"
 
 Vue.component('font-awesome-icon', FontAwesomeIcon)
 
@@ -117,7 +118,8 @@ import {
 
 import {
   faSalesforce as fabSalesforce,
-  faHubspot as fabHubspot
+  faHubspot as fabHubspot,
+  faGithub as fabGithub
 } from '@fortawesome/free-brands-svg-icons'
 
 const faIcons = [
@@ -129,7 +131,7 @@ const faIcons = [
   faCreditCard,faAddressCard,faChalkboard,faFilter,faKey,faAngleDoubleDown,faAngleDoubleUp,faUpload,faRedo,faGlobe,faAngleDown,
   faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faCaretSquareUp,
   faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faThumbsUp,faCaretUp,faShareAlt,faUserPlus,faCaretDown,
-  faLaptopHouse,faAnchor,
+  faLaptopHouse,faAnchor,fabGithub,
   
   farComments,farCalendar, farHandPointRight, farBuilding, farStar,farSquare, farCheckSquare,farFolder,farFolderOpen,farClock,
   farQuestionCircle,
@@ -164,6 +166,10 @@ const ctTheme = {
 }
 
 const faIconsOpts = {}
+
+faIconsOpts.aktoWhite = {
+  component: AktoWhite
+}
 
 faIconsOpts.curlyBraces = {
   component: CurlyBraces

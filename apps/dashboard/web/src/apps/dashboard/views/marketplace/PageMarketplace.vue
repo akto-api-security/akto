@@ -1,5 +1,5 @@
 <template>
-    <simple-layout title="Marketplace">
+    <simple-layout title="Library">
         <template>
             <div class="pa-8">
                 <div>                
@@ -70,14 +70,14 @@ export default {
             return {
                 icon: "$fas_plus",
                 title: creatorTitle,
-                group: "/dashboard/marketplace/"+creatorType,
+                group: "/dashboard/library/"+creatorType,
                 color: func.actionItemColors()[colorType],
                 active: true,
                 items: [
                     ...arrCategoryKv.map(category => {
                         return {
                             title: category.text,
-                            link: "/dashboard/marketplace/"+creatorType+"/"+category.value,
+                            link: "/dashboard/library/"+creatorType+"/"+category.value,
                             icon: "$fas_plus",
                             active: false
                         }

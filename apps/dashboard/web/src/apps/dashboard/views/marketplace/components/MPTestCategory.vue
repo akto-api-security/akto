@@ -9,7 +9,7 @@
         <spinner v-if="loading"/>
         <div v-else class="testcases-layout">
             <div v-for="(item, index) in testSourceConfigs" :key="index" class="testcase-container">
-                <v-icon size="20" color="#D3CD28" class="icon-border">$fas_anchor</v-icon>
+                <v-icon size="20" color="#24292F" class="icon-border">$fab_github</v-icon>
                 <div>
                     <div class="testcase-title">{{getName(item.id)}}</div>
                     <div>
@@ -90,7 +90,7 @@ export default {
 
 .icon-border
     border-radius: 50%
-    border: 1px solid rgba(45, 44, 87, 0.1)
+    box-shadow: 0px 2px 4px rgb(45 44 87 / 10%)
     min-width: 40px    
     min-height: 40px
     margin-right: 8px

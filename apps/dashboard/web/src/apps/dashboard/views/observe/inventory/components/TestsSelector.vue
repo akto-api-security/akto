@@ -10,7 +10,7 @@
                         </div>
                     </v-list-item>
                     <v-list dense class="category-list pa-0 fd-column js-sb">
-                        <v-list-item v-for="(value, category, index) in mapCategoryToSubcategory" :key="index"  :class="['clickable', 'brdt', 'brdr' ,'category-item', selectedCategory == category ?  'selected-category' : '']"  @click="selectedCategory = category">
+                        <v-list-item v-for="(value, category, index) in mapCategoryToSubcategory" :key="index"  :class="['clickable', 'brdt', 'brdr' ,'category-item', selectedCategory == category ?  'selected-category' : '']"  @click="selectedCategory = category; globalCheckbox = false">
                             <div class="d-flex jc-sb" style="width: 100%">
                                 <div>
                                     <div class="fw-500">{{category}}</div>
@@ -23,7 +23,10 @@
                 </div>
                 <div class="test-list-container">
                     <v-list-item class="brdb">
-                        <div class="column-title">
+                        <div class="pa-0 column-title">
+                            <v-btn icon plain color="#47466A" size="12" @click="globalCheckboxClicked()" :ripple="false">
+                                <v-icon>{{globalCheckbox? '$far_check-square' : '$far_square'}}</v-icon>
+                            </v-btn>
                             Tests
                         </div>
                     </v-list-item>
@@ -32,6 +35,7 @@
                             <v-btn icon plain size="12" color="#47466A" @click="mapCategoryToSubcategory[selectedCategory].selected.splice(index, 1);" :ripple="false">
                                 <v-icon>$far_check-square</v-icon>
                             </v-btn> 
+                            <v-icon color="#47466A" size="12">{{item.icon}}</v-icon>
                             {{item.label}}
                         </v-list-item>
                         <v-list-item 
@@ -42,6 +46,7 @@
                                 <v-btn icon plain size="12" color="#47466A" @click="mapCategoryToSubcategory[selectedCategory].selected.push(item)" :ripple="false">
                                     <v-icon>$far_square</v-icon>
                                 </v-btn> 
+                                <v-icon color="#47466A" size="12">{{item.icon}}</v-icon>
                                 {{item.label}}
                         </v-list-item>
                     </v-list>
@@ -78,7 +83,8 @@ export default {
             mapCategoryToSubcategory: {},
             recurringDaily: false,
             startTimestamp: func.timeNow(),
-            selectedCategory: null
+            selectedCategory: null,
+            globalCheckbox: false
         }
     },
     mounted() {
@@ -95,6 +101,11 @@ export default {
         
     },
     methods: {
+        globalCheckboxClicked() {
+            this.globalCheckbox = !this.globalCheckbox
+            let currObj = this.mapCategoryToSubcategory[this.selectedCategory]
+            currObj.selected = this.globalCheckbox ? [...currObj.all] : []
+        },
         emitTestSelection({recurringDaily, startTimestamp}) {
             this.recurringDaily = recurringDaily
             this.startTimestamp = startTimestamp
@@ -109,14 +120,26 @@ export default {
                     ret[x.category] = {selected: [], all: []}
                 }
 
-                ret[x.category].all.push({label: x.id.substring(x.id.lastIndexOf("/")+1, x.id.lastIndexOf(".")), value: x.id});
+                let obj = {
+                    label: x.id.substring(x.id.lastIndexOf("/")+1, x.id.lastIndexOf(".")), 
+                    value: x.id,
+                    icon: "$fab_github"
+                }
+                ret[x.category].all.push(obj);
             })
 
             this.businessLogicCategories.forEach(x => {
                 if (!ret[x.superCategory.name]) {
                     ret[x.superCategory.name] = {selected: [], all: []}
                 }
-                ret[x.superCategory.name].all.push({label: x.name.toLowerCase(), value: x.name})
+
+                let obj = {
+                    label: x.name.toLowerCase().replaceAll("_", " "),
+                    value: x.name,
+                    icon: "$aktoWhite"
+                }
+                ret[x.superCategory.name].all.push(obj)
+                ret[x.superCategory.name].selected.push(obj)
             })
             this.selectedCategory = Object.keys(ret)[0]
             return ret
