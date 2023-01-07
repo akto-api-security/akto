@@ -284,6 +284,9 @@ public class TestExecutor {
                     waitTime = 60;
                 }
             }
+            if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.RECORDED_FLOW.toString())) {
+                nodeType = WorkflowNodeDetails.Type.RECORDED;
+            }
             WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(0, data.getUrl(),
                     URLMethods.Method.fromString(data.getMethod()), "", sampleData,
                     nodeType, true, waitTime, 0, 0, data.getRegex(), data.getOtpRefUuid());

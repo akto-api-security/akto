@@ -23,7 +23,7 @@ public class WorkflowNodeDetails {
     String otpRefUuid;
 
     public enum Type {
-        POLL, API, OTP
+        POLL, API, OTP, RECORDED
     }
 
     // call this function to see if data being passed is legit or not

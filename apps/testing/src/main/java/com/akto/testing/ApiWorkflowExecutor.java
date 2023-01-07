@@ -2,6 +2,7 @@ package com.akto.testing;
 
 import com.akto.DaoInit;
 import com.akto.dao.OtpTestDataDao;
+import com.akto.dao.RecordedLoginInputDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.LoginFlowStepsDao;
 import com.akto.dao.testing.TestingRunDao;
@@ -9,11 +10,13 @@ import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.api_workflow.Node;
 import com.akto.dto.testing.*;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.util.JSONUtils;
+import com.akto.util.RecordedLoginFlowUtil;
 import com.akto.utils.RedactSampleData;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
@@ -260,11 +263,72 @@ public class ApiWorkflowExecutor {
         return verificationCode;
     }
 
+    public WorkflowTestResult.NodeResult processRecorderNode(Node node, Map<String, Object> valuesMap) {
+
+        List<String> testErrors = new ArrayList<>();
+        BasicDBObject resp = new BasicDBObject();
+        BasicDBObject body = new BasicDBObject();
+        BasicDBObject data = new BasicDBObject();
+        String message;
+
+        RecordedLoginFlowInput recordedLoginFlowInput = RecordedLoginInputDao.instance.findOne(new BasicDBObject());
+        
+        String token = fetchToken(recordedLoginFlowInput, 5);
+
+        if (token == null){
+            message = "error processing reorder node";
+            data.put("error", message);
+            body.put("body", data);
+            resp.put("response", body);
+            testErrors.add(message);
+            return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
+        }
+
+        valuesMap.put(node.getId() + ".response.body.token", token);
+        
+        data.put("token", token);
+        body.put("body", data);
+        resp.put("response", body);
+        return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
+    }
+
+    private String fetchToken(RecordedLoginFlowInput recordedLoginFlowInput, int retries) {
+
+        String token = null;
+        for (int i=0; i<retries; i++) {
+            
+            String payload = recordedLoginFlowInput.getContent().toString();
+            try {
+                RecordedLoginFlowUtil.triggerFlow(recordedLoginFlowInput.getTokenFetchCommand(), payload);
+            } catch (Exception e) {
+                logger.error("error running recorded flow, retrying " + e.getMessage());
+                continue;
+            }
+
+            try {
+                token = RecordedLoginFlowUtil.fetchToken();
+            } catch(Exception e) {
+                logger.error("error fetching token, retrying " + e.getMessage());
+                continue;
+            }
+            if (token != null) {
+                break;
+            }
+        }
+
+        return token;
+    }
+
     public WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes) {
-        if (node.getWorkflowNodeDetails().getType() == WorkflowNodeDetails.Type.OTP) {
+        if (node.getWorkflowNodeDetails().getType() == WorkflowNodeDetails.Type.RECORDED) {
+            return processRecorderNode(node, valuesMap);
+        }
+        else if (node.getWorkflowNodeDetails().getType() == WorkflowNodeDetails.Type.OTP) {
             return processOtpNode(node, valuesMap);
         }
-        return processApiNode(node, valuesMap, allowAllStatusCodes);
+        else {
+            return processApiNode(node, valuesMap, allowAllStatusCodes);
+        }
     }
 
 

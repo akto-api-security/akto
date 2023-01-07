@@ -52,7 +52,54 @@
             
           </div>
 
-          <div  :style='this.showOtpForm ? "display: none" : ""'>
+          <div :style='this.showRecordedFlow ? "" : "display: none"'>
+
+            <div class="d-flex">
+              <div class="request-title mr-2">Upload recording file here</div>
+              <div>
+                <upload-file 
+                  fileFormat=".json" 
+                  @fileChanged="handleFileChange" 
+                  tooltipText="Upload recording (.json)" 
+                  label="" 
+                  type="uploadRecordedLoginFlow"
+                />              
+              </div>
+            </div>
+            
+            <div class="request-title mt-3">Token Fetch Command</div>
+                  <template-string-editor
+                    :defaultText="this.updatedData['tokenFetchCommand']"
+                    :onChange=onChangeTokenFetchCommand
+                  />
+
+            <div class="request-title">Steps To Add Recording</div>
+              <div class="steps">
+                  <b>Step 1</b>: Please Open your browser and click on open chrome dev tools
+              </div>
+              <div class="steps">
+                  <b>Step 2</b>: Open recorder tab and click on "Start a New Recording"
+              </div>
+              <div class="steps">
+                  <b>Step 3</b>: Run the complete login flow, and stop the recording once done.
+              </div>
+              <div class="steps">
+                  <b>Step 4</b>: Click on the download icon just above, and select "Export as a json file"
+              </div>
+
+              <div class="steps">
+                  <b>Step 4</b>: Go to akto dashboard and specify the token fetch command, which will be used by AKTO to extract the token
+              </div>
+
+              <div class="steps">
+                  <b>Step 5</b>: Specify the json script in AKTO Dashboard, and wait for couple of minutes for verifying the extracted token
+              </div>
+        
+
+          </div>
+          
+
+          <div  :style='this.showOtpForm || this.showRecordedFlow ? "display: none" : ""'>
 
             <div class="url-form-container">
               <div class="request-title">URL</div>
@@ -127,12 +174,14 @@ import obj from "@/util/obj";
 import func from '@/util/func'
 import IconMenu from '../../../../shared/components/IconMenu'
 import { v4 as uuidv4 } from 'uuid';
+import UploadFile from '@/apps/dashboard/shared/components/UploadFile'
 
 export default {
     name: "LoginStepBuilder",
     components: {
       'template-string-editor' : TemplateStringEditor,
-      'icon-menu' : IconMenu
+      'icon-menu' : IconMenu,
+      'upload-file': UploadFile
     },
     props: {
       tabName: obj.strR,
@@ -149,11 +198,14 @@ export default {
         defaultHeaderString: "{'content-type': 'application/json'}",
         defaultBody: "{\"email\": \"abc@mail.com\"}",
         defaultAuthKey: "",
-        defaultAuthTokenPath: ""
+        defaultAuthTokenPath: "",
+        defaultTokenFetchCommand: "\"Bearer \" + JSON.parse(Object.values(window.localStorage).find(x => x.indexOf(\"access_token\")> -1)).body.access_token"
       }
 
       let updatedData = this.tabData.data
       let showOtpForm = this.tabData.data ? this.tabData.data.type == "OTP_VERIFICATION" : false
+      let showRecordedFlow = this.tabData.data ? this.tabData.data.type == "RECORDED_FLOW" : false
+      let fileUploaded = false
 
       if (!updatedData) {
         
@@ -167,7 +219,8 @@ export default {
             "authTokenPath": defaults.defaultAuthTokenPath,
             "type": "LOGIN_FORM",
             "otpRefUuid": "",
-            "regex": "(\\d+){1,6}"
+            "regex": "(\\d+){1,6}",
+            "tokenFetchCommand": defaults.defaultTokenFetchCommand
         }
         
       }
@@ -176,7 +229,9 @@ export default {
       return {
         ...defaults,
         showOtpForm,
+        showRecordedFlow,
         updatedData,
+        fileUploaded,
         dropDownItems: [
           {
               label: "Call API",
@@ -185,6 +240,10 @@ export default {
           {
               label: "Receive OTP",
               click: () => this.toggleShowOtpForm("OTP_VERIFICATION")
+          },
+          {
+              label: "Upload Json Recording",
+              click: () => this.toggleShowOtpForm("RECORDED_FLOW")
           }
         ],
         stepType: this.tabData.data ? this.tabData.data.type : "LOGIN_FORM",
@@ -220,6 +279,9 @@ export default {
             let output = parts.join('\\');
             this.onChange("regex", output)
         },
+        onChangeTokenFetchCommand(newData) {
+            this.onChange("tokenFetchCommand", newData)
+        },
         onChange(key, newData) {
             this.updatedData[key] = newData
             console.log(key, newData)
@@ -231,6 +293,7 @@ export default {
           this.stepType = stepType
           this.updatedData.type = stepType
           this.showOtpForm = stepType == "OTP_VERIFICATION"
+          this.showRecordedFlow = stepType == "RECORDED_FLOW"
 
           if (this.showOtpForm) {
             this.updatedData.url = this.webhookUrl
@@ -251,6 +314,28 @@ export default {
           this.$emit('testRegex', this.tabName, data)
         },
         calcUpdatedData(defaults) {
+        },
+        handleFileChange({file}) {
+            var reader = new FileReader();    
+            reader.readAsText(file)
+            var success = false;
+            let callbackFunc = (success) => {
+              console.log(success)
+              if(success) {
+                let data = {"type": this.stepType, "tokenFetchCommand": this.updatedData.tokenFetchCommand}
+                this.$emit('triggerRecordedFlowPolling', data)
+              }
+            }
+            reader.onload = () => {
+                let result = api.uploadRecordedLoginFlow(reader.result, this.updatedData.tokenFetchCommand)
+                result.then((resp) => {
+                    console.log("recording uploaded")
+                    success = true
+                    callbackFunc(success)
+                }).catch((err) => {
+                    console.log("recording upload failed ", err)
+                })
+            }
         }
     },
       computed: {

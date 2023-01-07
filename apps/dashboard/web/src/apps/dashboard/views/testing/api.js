@@ -155,4 +155,24 @@ export default {
             return resp
         })
     },
+
+    uploadRecordedLoginFlow(content, tokenFetchCommand) {
+        return request({
+            url: '/api/uploadRecordedFlow',
+            method: 'post',
+            data: {content, tokenFetchCommand}
+        }).then((resp) => {
+            return resp
+        })
+    },
+
+    fetchRecordedLoginFlow(nodeId) {
+        return request({
+            url: '/api/fetchRecordedFlowOutput',
+            method: 'post',
+            data: {nodeId}
+        }).then((resp) => {
+            return resp
+        })
+    }
 }
