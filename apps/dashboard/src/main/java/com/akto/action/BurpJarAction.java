@@ -1,8 +1,13 @@
 package com.akto.action;
 
 import com.akto.dao.ApiTokensDao;
+import com.akto.dao.BurpPluginInfoDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiToken;
+import com.akto.dto.BurpPluginInfo;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+
 import kotlin.text.Charsets;
 import org.apache.commons.io.FileUtils;
 import org.apache.struts2.interceptor.ServletRequestAware;
@@ -55,6 +60,8 @@ public class BurpJarAction extends UserAction implements ServletResponseAware, S
 
         String collectionName = "Burp";
 
+        int version = 111; // todo:
+
         File tmpJarFile = File.createTempFile("temp", "jar");
         URL url = this.getClass().getResource("/Akto.jar");
 
@@ -67,7 +74,7 @@ public class BurpJarAction extends UserAction implements ServletResponseAware, S
         boolean jarUpdated = false;
 
         File credFile = File.createTempFile("creds", "txt"); // todo: remove
-        FileUtils.writeStringToFile(credFile,host + "\n" + token + "\n" + collectionName, Charsets.UTF_8);
+        FileUtils.writeStringToFile(credFile,host + "\n" + token + "\n" + collectionName + "\n" + version, Charsets.UTF_8);
 
         try {
             try (JarOutputStream tempJarOutputStream = new JarOutputStream(Files.newOutputStream(tmpJarFile.toPath()))) {
@@ -117,10 +124,43 @@ public class BurpJarAction extends UserAction implements ServletResponseAware, S
 
         System.out.println("done");
 
-        credFile.delete();
-        tmpJarFile.delete();
+        boolean credFileDeleted = credFile.delete();
+        boolean tmpJarFileDeleted = tmpJarFile.delete();
+
+        System.out.println("cred file deleted: " + credFileDeleted);
+        System.out.println("tmp jar file deleted: " + tmpJarFileDeleted);
+
+        BurpPluginInfoDao.instance.updateLastDownloadedTimestamp(getSUser().getLogin());
 
         return null;
+    }
+
+    private BurpPluginInfo burpPluginInfo;
+    public String fetchBurpPluginInfo() {
+        burpPluginInfo = BurpPluginInfoDao.instance.findByUsername(this.getSUser().getLogin());
+        return SUCCESS.toUpperCase();
+    }
+
+
+    public String version;
+    public String sendBootupSignalBurp() {
+        int versionInt;
+         try {
+            versionInt = Integer.parseInt(this.version);
+         } catch (Exception e) {
+            e.printStackTrace();
+            versionInt = -1;
+         }
+
+        BurpPluginInfoDao.instance.updateOne(
+            BurpPluginInfoDao.filterByUsername(this.getSUser().getLogin()),
+            Updates.combine(
+                Updates.set(BurpPluginInfo.LAST_BOOT_UP_TIMESTAMP, Context.now()),
+                Updates.set(BurpPluginInfo.VERSION, versionInt)
+            )
+        );
+
+        return SUCCESS.toUpperCase();
     }
 
     protected HttpServletResponse servletResponse;
@@ -135,4 +175,16 @@ public class BurpJarAction extends UserAction implements ServletResponseAware, S
     public void setServletRequest(HttpServletRequest request) {
         this.servletRequest = request;
     }
+
+    public BurpPluginInfo getBurpPluginInfo() {
+        return burpPluginInfo;
+    }
+
+    public void setVersion(String version) {
+        this.version = version;
+    }
+
+    
+
+    
 }

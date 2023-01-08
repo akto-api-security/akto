@@ -10,6 +10,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiToken;
 import com.akto.dto.SignupUserInfo;
 import com.akto.dto.User;
+import com.akto.dto.ApiToken.Utility;
 import com.akto.utils.JWT;
 import com.akto.utils.Token;
 import com.mongodb.BasicDBObject;
@@ -79,6 +80,7 @@ public class UserDetailsFilter implements Filter {
         // if api key present then check if valid api key or not and generate access token
         // else find access token from request header
         boolean apiKeyFlag = apiKey != null;
+        Utility utility = null;
         if (apiKeyFlag) {
             if (endPointBlockedForApiToken(requestURI)) {
                 httpServletResponse.sendError(403);
@@ -98,6 +100,7 @@ public class UserDetailsFilter implements Filter {
                 }
             }
             Context.accountId.set(apiToken.getAccountId());
+            utility = apiToken.getUtility();
 
             // convert apiKey to accessToken
             try {
@@ -192,6 +195,7 @@ public class UserDetailsFilter implements Filter {
         }
 
         session.setAttribute(AccessTokenAction.ACCESS_TOKEN_HEADER_NAME, accessToken);
+        if (utility != null) session.setAttribute("utility", utility+""); // todo: replace with enum (here and haraction)
 
         User user = (User) session.getAttribute("user");
         boolean isSignedUp = "true".equalsIgnoreCase(signedUp);

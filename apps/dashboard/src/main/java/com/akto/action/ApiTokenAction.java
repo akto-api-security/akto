@@ -34,7 +34,7 @@ public class ApiTokenAction extends UserAction implements ServletRequestAware {
         if (apiKey == null || apiKey.length() != keyLength) return ERROR.toUpperCase();
 
         ApiToken apiToken = new ApiToken(Context.now(),Context.accountId.get(),"burp_key",apiKey, Context.now(), username, ApiToken.Utility.BURP,
-                Arrays.asList("/api/uploadHar", "/api/importInBurp"));
+                Arrays.asList("/api/uploadHar", "/api/importInBurp", "/api/sendBootupSignalBurp"));
         ApiTokensDao.instance.insertOne(apiToken);
         apiTokenList = new ArrayList<>();
         apiTokenList.add(apiToken);

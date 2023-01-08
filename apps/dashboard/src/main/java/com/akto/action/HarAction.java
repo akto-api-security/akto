@@ -3,6 +3,7 @@ package com.akto.action;
 import com.akto.DaoInit;
 import com.akto.analyser.ResourceAnalyser;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.BurpPluginInfoDao;
 import com.akto.dao.RuntimeFilterDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
@@ -12,6 +13,7 @@ import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.policies.AktoPolicy;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
@@ -78,6 +80,10 @@ public class HarAction extends UserAction {
         if (harString == null) {
             addActionError("Empty content");
             return ERROR.toUpperCase();
+        }
+
+        if (getSession().getOrDefault("utility","").equals(Utility.BURP.toString())) {
+            BurpPluginInfoDao.instance.updateLastDataSentTimestamp(getSUser().getLogin());
         }
 
         try {
