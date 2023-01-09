@@ -55,8 +55,15 @@ public class NucleiExecutor {
         if (baseURL.contains("?")) path = baseURL.substring(0, baseURL.indexOf("?"));
         String fullUrl = path.startsWith("http") ? path : "https://" + path;
 
+        String arch = System.getProperty("os.arch");
+        String nucleiFileSuffix = "linux";
+
+        if (arch != null && arch.equals("aarch64")) {
+            nucleiFileSuffix = "m1";
+        }
+
         List<String> baseCmdTokens = new ArrayList<>();
-        baseCmdTokens.add("/app/nuclei_linux");
+        baseCmdTokens.add("/app/nuclei_"+nucleiFileSuffix);
 
         baseCmdTokens.add("-u");
         baseCmdTokens.add(fullUrl);

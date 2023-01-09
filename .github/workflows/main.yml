@@ -126,9 +126,7 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY-runtime:$IMAGE_TAG
           echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-runtime:$IMAGE_TAG"       
           cd ../testing
-          docker build -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG .
-          echo "Pushing image to ECR..."
-          docker push $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG . --push
           echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"       
           cd ../api-analyser
           docker build -t $ECR_REGISTRY/akto-api-context-analyzer:$IMAGE_TAG .
