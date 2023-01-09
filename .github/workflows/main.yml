@@ -114,6 +114,7 @@ jobs:
           ECR_REPOSITORY: akto-api-security
           IMAGE_TAG: ${{ github.event.inputs.Tag }}
         run: |
+          docker buildx create --use
           # Build a docker container and push it to DockerHub 
           cd apps/dashboard
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG .
