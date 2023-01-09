@@ -20,14 +20,10 @@ page.setDefaultNavigationTimeout(20000);
 class Extension extends PuppeteerRunnerExtension {
   async beforeEachStep(step, flow) {
     await super.beforeEachStep(step, flow);
-    //console.log("before", step)
-    //fs.appendFileSync('/Users/admin/akto_code/mono/apps/dashboard/src/main/java/com/akto/action/testing/recordedLoginFlowScript/beforestep.json', ","+JSON.stringify(step));
   }
 
   async afterEachStep(step, flow) {
     await super.afterEachStep(step, flow);
-   // console.log("after", step)
-    //fs.appendFileSync('/Users/admin/akto_code/mono/apps/dashboard/src/main/java/com/akto/action/testing/recordedLoginFlowScript/afterstep.json', ","+JSON.stringify(step));
 
     let pages = await browser.pages()
     pages.forEach(_page => {
@@ -41,9 +37,7 @@ class Extension extends PuppeteerRunnerExtension {
             tokenMap[tokenKey] = tokenVal
           }
         }
-      
-        //const response_json = {};//await resp.json()
-       // console.log(resp.url(), headers, response_json)
+
       })
       
       
@@ -52,28 +46,24 @@ class Extension extends PuppeteerRunnerExtension {
 
   async afterAllSteps(flow) {
 
+    var currentDir = process.cwd()
     await super.afterAllSteps(flow);
     
     await page.waitForNavigation({waitUntil: 'networkidle0'})
     
     const href = await page.evaluate(() =>  window.location.href);
 
-    // console.log("tokenMap value")
-    // console.log(tokenMap)
-
     page.evaluate((x) => cookieMap = x, tokenMap);
 
     let command = process.argv[2];
     const localStorageValues = await page.evaluate((x) => eval(x), command);
-    console.log("localStorageValues")
-    console.log(localStorageValues)
 
     var token = String(localStorageValues)
     var createdAt = Math.floor(Date.now()/1000)
     var output = `{"token": "${token}", "created_at": ${createdAt}}`
 
-    // todo: recheck file url
-    fs.writeFileSync('/Users/admin/akto_code/mono/apps/dashboard/src/main/java/com/akto/action/testing/recordedLoginFlowScript/output.json', output);
+    var outputFilePath = currentDir + '/output.json'
+    fs.writeFileSync(outputFilePath, output);
 
     await browser.close();
   }
