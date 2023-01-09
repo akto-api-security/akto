@@ -35,6 +35,8 @@ import org.slf4j.LoggerFactory;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
+
+import java.io.File;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -298,15 +300,19 @@ public class ApiWorkflowExecutor {
         for (int i=0; i<retries; i++) {
             
             String payload = recordedLoginFlowInput.getContent().toString();
+            File tmpOutputFile;
+            File tmpErrorFile;
             try {
-                RecordedLoginFlowUtil.triggerFlow(recordedLoginFlowInput.getTokenFetchCommand(), payload);
+                tmpOutputFile = File.createTempFile("output", ".json");
+                tmpErrorFile = File.createTempFile("recordedFlowOutput", ".txt");
+                RecordedLoginFlowUtil.triggerFlow(recordedLoginFlowInput.getTokenFetchCommand(), payload, tmpOutputFile.getPath(), tmpErrorFile.getPath(), 0);
             } catch (Exception e) {
                 logger.error("error running recorded flow, retrying " + e.getMessage());
                 continue;
             }
 
             try {
-                token = RecordedLoginFlowUtil.fetchToken();
+                token = RecordedLoginFlowUtil.fetchToken(tmpOutputFile.getPath(), tmpErrorFile.getPath());
             } catch(Exception e) {
                 logger.error("error fetching token, retrying " + e.getMessage());
                 continue;

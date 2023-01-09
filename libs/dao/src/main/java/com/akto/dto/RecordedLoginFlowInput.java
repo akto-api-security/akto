@@ -4,10 +4,14 @@ public class RecordedLoginFlowInput {
     
     private String content;
     private String tokenFetchCommand;
+    private String outputFilePath;
+    private String errorFilePath;
 
-    public RecordedLoginFlowInput(String content, String tokenFetchCommand, String message, int timestamp) {
+    public RecordedLoginFlowInput(String content, String tokenFetchCommand, String outputFilePath, String errorFilePath) {
         this.content = content;
         this.tokenFetchCommand = tokenFetchCommand;
+        this.outputFilePath = outputFilePath;
+        this.errorFilePath = errorFilePath;
     }
 
     public RecordedLoginFlowInput() { }
@@ -26,6 +30,22 @@ public class RecordedLoginFlowInput {
 
     public void setTokenFetchCommand(String tokenFetchCommand) {
         this.tokenFetchCommand = tokenFetchCommand;
+    }
+
+    public String getOutputFilePath() {
+        return outputFilePath;
+    }
+
+    public void setOutputFilePath(String outputFilePath) {
+        this.outputFilePath = outputFilePath;
+    }
+
+    public String getErrorFilePath() {
+        return errorFilePath;
+    }
+
+    public void setErrorFilePath(String errorFilePath) {
+        this.errorFilePath = errorFilePath;
     }
 
 }

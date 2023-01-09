@@ -9,14 +9,19 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
 import org.apache.commons.io.FileUtils;
+import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.akto.dao.RecordedLoginInputDao;
 import com.akto.dao.context.Context;
 import com.google.gson.Gson;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 
 public class RecordedLoginFlowUtil {
 
@@ -24,16 +29,14 @@ public class RecordedLoginFlowUtil {
 
     private static final Logger logger = LoggerFactory.getLogger(RecordedLoginFlowUtil.class);
 
-    public static void triggerFlow(String tokenFetchCommand, String payload) throws Exception {
-        String filePath = new File("").getAbsolutePath();
-        String fileUrl = filePath.concat("/apps/dashboard/src/main/java/com/akto/action/testing/recordedLoginFlowScript/recordedFlowScript.mjs");
+    public static void triggerFlow(String tokenFetchCommand, String payload, String outputFilePath, String errorFilePath, int userId) throws Exception {
 
-        ProcessBuilder pb = new ProcessBuilder("node", fileUrl, tokenFetchCommand, payload);
+        URL url = RecordedLoginFlowUtil.class.getResource("/recordedFlowScript.mjs");
+
+        ProcessBuilder pb = new ProcessBuilder("node", url.getPath(), tokenFetchCommand, outputFilePath, payload);
 
         try {
             Process process = pb.start();
-            filePath = new File("").getAbsolutePath();
-            fileUrl = filePath.concat("/apps/dashboard/src/main/java/com/akto/action/testing/recordedLoginFlowScript/recordedFlowOutput.txt");
 
             BufferedReader reader = 
                 new BufferedReader(new InputStreamReader(process.getErrorStream()));
@@ -46,8 +49,23 @@ public class RecordedLoginFlowUtil {
             String result = builder.toString();
             logger.info(result);
             
-            FileUtils.writeStringToFile(new File(fileUrl), result, (String) null);
+            FileUtils.writeStringToFile(new File(errorFilePath), result, (String) null);
 
+            if (userId != 0) {
+                Bson filter = Filters.and(
+                    Filters.eq("userId", userId)
+                );
+                Bson update = Updates.combine(
+                    Updates.set("content", payload),
+                    Updates.set("tokenFetchCommand", tokenFetchCommand),
+                    Updates.setOnInsert("createdAt", Context.now()),
+                    Updates.set("updatedAt", Context.now()),
+                    Updates.set("outputFilePath", outputFilePath),
+                    Updates.set("errorFilePath", errorFilePath)
+                );
+                RecordedLoginInputDao.instance.updateOne(filter, update);
+            }
+            
         } catch (IOException e) {
             logger.error("error processing file operations " + e.getMessage());
             throw new Exception("error processing file operations " + e.getMessage());
@@ -58,16 +76,13 @@ public class RecordedLoginFlowUtil {
         }
     }
 
-    public static String fetchToken() throws Exception {
+    public static String fetchToken(String outputFilePath, String errorFilePath) throws Exception {
 
         String fileContent;
         Double createdAt;
 
         try {
-            String filePath = new File("").getAbsolutePath();
-            String fileUrl = filePath.concat("/apps/dashboard/src/main/java/com/akto/action/testing/recordedLoginFlowScript/recordedFlowOutput.txt");
-            
-            FileInputStream fstream = new FileInputStream(fileUrl);
+            FileInputStream fstream = new FileInputStream(errorFilePath);
 
             String error = null;
 
@@ -90,9 +105,7 @@ public class RecordedLoginFlowUtil {
             throw new Exception("error fetching token data, " + e.getMessage());
         }
         try {
-            String filePath = new File("").getAbsolutePath();
-            String fileUrl = filePath.concat("/apps/dashboard/src/main/java/com/akto/action/testing/recordedLoginFlowScript/output.json");
-            fileContent = FileUtils.readFileToString(new File(fileUrl), StandardCharsets.UTF_8);
+            fileContent = FileUtils.readFileToString(new File(outputFilePath), StandardCharsets.UTF_8);
 
             Map<String, Object> json = gson.fromJson(fileContent, Map.class);
 

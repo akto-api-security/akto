@@ -1,10 +1,12 @@
 package com.akto.action.testing;
 
+import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.io.File;
 
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
@@ -14,6 +16,7 @@ import com.akto.action.UserAction;
 import com.akto.dao.RecordedLoginInputDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.LoginFlowStepsDao;
+import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.util.RecordedLoginFlowUtil;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -35,32 +38,26 @@ public class LoginRecorderAction extends UserAction {
 
     public String uploadRecordedFlow() {
 
-        Integer userId = getSUser().getId();
-
-        Bson filter = Filters.and(
-            Filters.eq("userId", userId)
-        );
-        Bson update = Updates.combine(
-            Updates.set("content", content),
-            Updates.set("tokenFetchCommand", tokenFetchCommand),
-            Updates.setOnInsert("createdAt", Context.now()),
-            Updates.set("updatedAt", Context.now())
-        );
-        RecordedLoginInputDao.instance.updateOne(filter, update);
-
         String payload = this.content.toString();
 
-        // try {
-        //     RecordedLoginFlowUtil.triggerFlow(tokenFetchCommand, payload);
-        // } catch (Exception e) {
-        //     logger.error("error running recorded flow " + e.getMessage());
-        //     return ERROR.toUpperCase();
-        // }
+        try {
+            File tmpOutputFile = File.createTempFile("output", ".json");
+            File tmpErrorFile = File.createTempFile("recordedFlowOutput", ".txt");
+            RecordedLoginFlowUtil.triggerFlow(tokenFetchCommand, payload, tmpOutputFile.getPath(), tmpErrorFile.getPath(), getSUser().getId());
+        } catch (Exception e) {
+            logger.error("error running recorded flow " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
 
+        int accountId = Context.accountId.get();
+        
         executorService.schedule( new Runnable() {
             public void run() {
                 try {
-                    RecordedLoginFlowUtil.triggerFlow(tokenFetchCommand, payload);
+                    Context.accountId.set(accountId);
+                    File tmpOutputFile = File.createTempFile("output", ".json");
+                    File tmpErrorFile = File.createTempFile("recordedFlowOutput", ".txt");
+                    RecordedLoginFlowUtil.triggerFlow(tokenFetchCommand, payload, tmpOutputFile.getPath(), tmpErrorFile.getPath(), getSUser().getId());
                 } catch (Exception e) {
                     logger.error("error running recorded flow " + e.getMessage());
                 }
@@ -72,8 +69,10 @@ public class LoginRecorderAction extends UserAction {
 
     public String fetchRecordedFlowOutput() {
 
+        RecordedLoginFlowInput recordedLoginInput = RecordedLoginInputDao.instance.findOne(Filters.eq("userId", getSUser().getId()));
+
         try {
-            token = RecordedLoginFlowUtil.fetchToken();
+            token = RecordedLoginFlowUtil.fetchToken(recordedLoginInput.getOutputFilePath(), recordedLoginInput.getErrorFilePath());
         } catch(Exception e) {
             addActionError(e.getMessage());
             return ERROR.toUpperCase();
