@@ -30,9 +30,12 @@ const marketplace = {
                 for(let index in resp.testSourceConfigs) {
                     let tsc = resp.testSourceConfigs[index]
 
-                    let subcategoryContainer = tsc.creator === "default" ? state.defaultSubcategories : state.userSubcategories
-                    if (subcategoryContainer.indexOf(tsc.subcategory) == -1) {
-                        subcategoryContainer.push(tsc.subcategory)
+                    if (state.defaultSubcategories.indexOf(tsc.subcategory) == -1) {
+                        state.defaultSubcategories.push(tsc.subcategory)
+                    }
+
+                    if( tsc.creator !== "default"  && state.userSubcategories.indexOf(tsc.subcategory) == -1) {
+                        state.userSubcategories.push(tsc.subcategory)
                     }
                 }
             })
