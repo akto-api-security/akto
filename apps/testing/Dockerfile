@@ -1,12 +1,11 @@
 FROM amazoncorretto:8
 WORKDIR /app
 COPY ./target/testing-1.0-SNAPSHOT-jar-with-dependencies.jar /app/testing-1.0-SNAPSHOT-jar-with-dependencies.jar
-ENV NODE_VERSION=16.13.0
-RUN apt install -y curl
-RUN curl -fsSL https://deb.nodesource.com/setup_16.x | bash
-RUN apt-get install nodejs
+RUN yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+RUN yum install libuv --disableplugin=priorities
+RUN yum install nodejs npm --enablerepo=epel-testing
 RUN node --version
 RUN npm --version
-RUN npm install puppeteer -g --unsafe-perm=true --allow-root
+RUN npm install puppeteer
 RUN npm install @puppeteer/replay
 CMD "java" "-XX:+ExitOnOutOfMemoryError" "-jar" "/app/testing-1.0-SNAPSHOT-jar-with-dependencies.jar"
