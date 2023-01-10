@@ -3,11 +3,21 @@ package com.akto.action.testing;
 import com.akto.action.UserAction;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestingRunDao;
+import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dao.testing.WorkflowTestsDao;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.testing.*;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
+import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
+import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
@@ -167,6 +177,19 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private TestingRunIssues runIssues;
+    public String fetchIssueFromTestRunResultDetails() {
+        ObjectId testingRunResultId = new ObjectId(testingRunResultHexId);
+        TestingRunResult result = TestingRunResultDao.instance.findOne(Constants.ID, testingRunResultId);
+        try {
+            GlobalEnums.TestSubCategory category = GlobalEnums.TestSubCategory.getTestCategory(result.getTestSubType());
+            TestingIssuesId issuesId = new TestingIssuesId(result.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING, category);
+            runIssues = TestingRunIssuesDao.instance.findOne(Filters.eq(Constants.ID, issuesId));
+        }catch (Exception ignore) {}
+
+        return SUCCESS.toUpperCase();
+    }
+
     public String fetchWorkflowTestingRun() {
         Bson filterQ = Filters.and(
             Filters.eq("testingEndpoints.workflowTest._id", workflowTestId),
@@ -292,6 +315,13 @@ public class StartTestAction extends UserAction {
         return workflowTest;
     }
 
+    public TestingRunIssues getRunIssues() {
+        return runIssues;
+    }
+
+    public void setRunIssues(TestingRunIssues runIssues) {
+        this.runIssues = runIssues;
+    }
     public List<String> getSelectedTests() {
         return selectedTests;
     }

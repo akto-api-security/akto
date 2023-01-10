@@ -65,7 +65,12 @@
                             </v-btn>
                         </template>
                         <div class="pa-4">
-                            <test-results-dialog :testingRunResult="testingRunResult"/>
+                            <test-results-dialog 
+                                :similarlyAffectedIssues="similarlyAffectedIssues"
+                                :testingRunResult="testingRunResult"
+                                :subCatogoryMap="subCatogoryMap"
+                                :issuesDetails="dialogBoxIssue"
+                                :mapCollectionIdToName="mapCollectionIdToName"/>
                         </div>
                     </a-card>
                 </div>
@@ -87,6 +92,7 @@ import TestResultsDialog from "./TestResultsDialog";
 import WorkflowTestBuilder from '../../observe/inventory/components/WorkflowTestBuilder'
 
 import api from '../api'
+import issuesApi from '../../issues/api'
 
 import obj from "@/util/obj"
 import func from "@/util/func"
@@ -149,7 +155,9 @@ export default {
             testingRunResult: null,
             openDetailsDialog: false,
             isWorkflow: false,
-            originalStateFromDb: null
+            originalStateFromDb: null,
+            dialogBoxIssue: {},
+            similarlyAffectedIssues: []
         }
     },
     methods: {
@@ -228,19 +236,33 @@ export default {
             }
         },
         async openDetails(row) {
-            api.fetchTestRunResultDetails(row["hexId"]).then(resp => {
+            await api.fetchTestRunResultDetails(row["hexId"]).then(async resp => {
                 this.testingRunResult = resp["testingRunResult"]
                 if (this.testingRunResult) {
+                    await api.fetchIssueFromTestRunResultDetails(row["hexId"]).then(async respIssue => {
+                        this.dialogBoxIssue = respIssue['runIssues']
+                        if (this.dialogBoxIssue) {
+                            await issuesApi.fetchAffectedEndpoints(this.dialogBoxIssue.id).then(affectedResp => {
+                                this.similarlyAffectedIssues = affectedResp['similarlyAffectedIssues']
+                            })
+                        }
+                    })
                     this.openDetailsDialog = true
                 }
             })
         },
     },
-    mounted() {
+    async mounted() {
         this.refreshSummaries()
+        await this.$store.dispatch('issues/fetchAllSubCategories')
     },
     computed: {
         ...mapState('testing', ['testingRuns', 'pastTestingRuns']),
+        subCatogoryMap: {
+            get() {
+                return this.$store.state.issues.subCatogoryMap
+            }
+        },
         mapCollectionIdToName() {
             return this.$store.state.collections.apiCollections.reduce((m, e) => {
                 m[e.id] = e.displayName
