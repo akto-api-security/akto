@@ -22,10 +22,14 @@ public class TestingRun {
 
     @BsonIgnore
     private String hexId;
+    @BsonIgnore
+    private TestingRunConfig testingRunConfig;
+
+    private String name;
 
     public TestingRun() { }
 
-    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds) {
+    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name) {
         this.scheduleTimestamp = scheduleTimestamp;
         this.endTimestamp = -1;
         this.pickedUpTimestamp = -1;
@@ -34,6 +38,15 @@ public class TestingRun {
         this.testIdConfig = testIdConfig;
         this.state = state;
         this.periodInSeconds = periodInSeconds;
+        this.name = name;
+    }
+
+    public TestingRunConfig getTestingRunConfig() {
+        return testingRunConfig;
+    }
+
+    public void setTestingRunConfig(TestingRunConfig testingRunConfig) {
+        this.testingRunConfig = testingRunConfig;
     }
 
     // if u r adding anything here make sure to add to stopAllTests() method too
@@ -117,6 +130,14 @@ public class TestingRun {
         return this.id.toHexString();
     }
 
+    public String getName() {
+        return this.name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
     @Override
     public String toString() {
         return "{" +
@@ -129,6 +150,7 @@ public class TestingRun {
             ", testingEndpoints='" + getTestingEndpoints() + "'" +
             ", testIdConfig='" + getTestIdConfig() + "'" +
             ", periodInSeconds='" + getPeriodInSeconds() + "'" +
+            ", name='" + getName() + "'" +
             "}";
     }
 

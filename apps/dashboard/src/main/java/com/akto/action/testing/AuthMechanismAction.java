@@ -58,7 +58,7 @@ public class AuthMechanismAction extends UserAction {
                     return ERROR.toUpperCase();
                 }
                 authParams.add(new HardcodedAuthParam(authParamData.get(0).getWhere(), authParamData.get(0).getKey(),
-                    authParamData.get(0).getValue()));
+                    authParamData.get(0).getValue(), true));
             }
             
         } else {
@@ -69,7 +69,7 @@ public class AuthMechanismAction extends UserAction {
                     return ERROR.toUpperCase();
                 }
 
-                authParams.add(new LoginRequestAuthParam(param.getWhere(), param.getKey(), param.getValue()));
+                authParams.add(new LoginRequestAuthParam(param.getWhere(), param.getKey(), param.getValue(), param.getShowHeader()));
             }
         }
         AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type);
@@ -91,7 +91,7 @@ public class AuthMechanismAction extends UserAction {
                 addActionError("Key, Value, Location can't be empty");
                 return ERROR.toUpperCase();
             }
-            authParams.add(new LoginRequestAuthParam(param.getWhere(), param.getKey(), param.getValue()));
+            authParams.add(new LoginRequestAuthParam(param.getWhere(), param.getKey(), param.getValue(), param.getShowHeader()));
         }
 
         AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type);

@@ -3,14 +3,11 @@ package com.akto.testing;
 import com.akto.DaoInit;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.LoginFlowStepsDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.OriginalHttpRequest;
-import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.type.RequestTemplate;
@@ -21,28 +18,28 @@ import com.akto.rules.*;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.testing_issues.TestingIssuesHandler;
-import com.akto.util.enums.LoginFlowEnums;
 import com.akto.util.JSONUtils;
+import com.akto.util.enums.LoginFlowEnums;
+import com.akto.util.enums.GlobalEnums.TestSubCategory;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
-import org.bson.json.JsonObject;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.*;
 
 public class TestExecutor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class);
+    private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
 
     public void init(TestingRun testingRun, ObjectId summaryId) {
-        if (testingRun.getTestIdConfig() == 0)     {
+        if (testingRun.getTestIdConfig() != 1) {
             apiWiseInit(testingRun, summaryId);
         } else {
             workflowInit(testingRun, summaryId);
@@ -111,8 +108,9 @@ public class TestExecutor {
         TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessages, singleTypeInfoMap, testRoles);
 
         try {
-            LoginFlowResponse loginFlowResponse = executeLoginFlow(authMechanism, null);
+            LoginFlowResponse loginFlowResponse = triggerLoginFlow(authMechanism, 3);
             if (!loginFlowResponse.getSuccess()) {
+                logger.error("login flow failed");
                 throw new Exception("login flow failed");
             }
         } catch (Exception e) {
@@ -138,7 +136,7 @@ public class TestExecutor {
             try {
                  Future<List<TestingRunResult>> future = threadPool.submit(
                          () -> startWithLatch(
-                                 apiInfoKey, testingRun.getTestIdConfig(), testingRun.getId(), testingUtil, summaryId, accountId, latch
+                                 apiInfoKey, testingRun.getTestIdConfig(), testingRun.getId(),testingRun.getTestingRunConfig(), testingUtil, summaryId, accountId, latch
                          )
                  );
                  futureTestingRunResults.add(future);
@@ -206,11 +204,36 @@ public class TestExecutor {
 
     }
 
+    private LoginFlowResponse triggerLoginFlow(AuthMechanism authMechanism, int retries) {
+        LoginFlowResponse loginFlowResponse = null;
+        for (int i=0; i<retries; i++) {
+            try {
+                loginFlowResponse = executeLoginFlow(authMechanism, null);
+                if (loginFlowResponse.getSuccess()) {
+                    logger.info("login flow success");
+                    break;
+                }
+            } catch (Exception e) {
+                logger.error("retrying login flow" + e.getMessage());
+                loggerMaker.errorAndAddToDb(e.getMessage());
+            }
+        }
+        return loginFlowResponse;
+    }
+
     public LoginFlowResponse executeLoginFlow(AuthMechanism authMechanism, LoginFlowParams loginFlowParams) throws Exception {
 
-        if (!authMechanism.getType().equals(LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString())) {
+        if (authMechanism.getType() == null) {
+            logger.info("auth type value is null");
             return new LoginFlowResponse(null, null, true);
         }
+
+        if (!authMechanism.getType().equals(LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString())) {
+            logger.info("invalid auth type for login flow execution");
+            return new LoginFlowResponse(null, null, true);
+        }
+
+        logger.info("login flow execution started");
 
         WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData(), loginFlowParams);
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
@@ -252,7 +275,7 @@ public class TestExecutor {
             if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.OTP_VERIFICATION.toString())) {
                 nodeType = WorkflowNodeDetails.Type.OTP;
                 if (loginFlowParams == null || !loginFlowParams.getFetchValueMap()) {
-                    waitTime = 100;
+                    waitTime = 60;
                 }
             }
             WorkflowNodeDetails workflowNodeDetails = new WorkflowNodeDetails(0, data.getUrl(),
@@ -320,16 +343,14 @@ public class TestExecutor {
     }
 
     public List<TestingRunResult> startWithLatch(
-            ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId,
+            ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId, TestingRunConfig testingRunConfig,
             TestingUtil testingUtil, ObjectId testRunResultSummaryId, int accountId, CountDownLatch latch) {
 
         Context.accountId.set(accountId);
         List<TestingRunResult> testingRunResults = new ArrayList<>();
 
         try {
-            testingRunResults = start(
-                    apiInfoKey, testIdConfig, testRunId, testingUtil, testRunResultSummaryId
-            );
+            testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -338,70 +359,109 @@ public class TestExecutor {
         return testingRunResults;
     }
 
-    public List<TestingRunResult> start(ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId, TestingUtil testingUtil, ObjectId testRunResultSummaryId) {
+    public List<TestingRunResult> start(ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId,
+                                        TestingRunConfig testingRunConfig, TestingUtil testingUtil, ObjectId testRunResultSummaryId) {
 
-        if (testIdConfig != 0) {
-            loggerMaker.errorAndAddToDb("Test id config is not 0 but " + testIdConfig);
+        if (testIdConfig == 1) {
+            loggerMaker.errorAndAddToDb("Test id config is 1");
             return new ArrayList<>();
         }
 
-        BOLATest bolaTest = new BOLATest();
-        NoAuthTest noAuthTest = new NoAuthTest();
-        ChangeHttpMethodTest changeHttpMethodTest = new ChangeHttpMethodTest();
-        AddMethodInParameterTest addMethodInParameterTest = new AddMethodInParameterTest();
-        AddMethodOverrideHeadersTest addMethodOverrideHeadersTest = new AddMethodOverrideHeadersTest();
-        AddUserIdTest addUserIdTest = new AddUserIdTest();
-        ParameterPollutionTest parameterPollutionTest = new ParameterPollutionTest();
-        OldApiVersionTest oldApiVersionTest = new OldApiVersionTest();
-        JWTNoneAlgoTest  jwtNoneAlgoTest = new JWTNoneAlgoTest();
-        JWTInvalidSignatureTest jwtInvalidSignatureTest = new JWTInvalidSignatureTest();
-        AddJkuToJwtTest addJkuToJwtTest = new AddJkuToJwtTest();
-        BFLATest bflaTest = new BFLATest();
+        List<String> testSubCategories = testingRunConfig == null ? null : testingRunConfig.getTestSubCategoryList();
+
+        BOLATest bolaTest = new BOLATest();//REPLACE_AUTH_TOKEN
+        NoAuthTest noAuthTest = new NoAuthTest();//REMOVE_TOKENS
+        ChangeHttpMethodTest changeHttpMethodTest = new ChangeHttpMethodTest();//CHANGE_METHOD
+        AddMethodInParameterTest addMethodInParameterTest = new AddMethodInParameterTest();//ADD_METHOD_IN_PARAMETER
+        AddMethodOverrideHeadersTest addMethodOverrideHeadersTest = new AddMethodOverrideHeadersTest();//ADD_METHOD_OVERRIDE_HEADERS
+        AddUserIdTest addUserIdTest = new AddUserIdTest();//ADD_USER_ID
+        ParameterPollutionTest parameterPollutionTest = new ParameterPollutionTest();//PARAMETER_POLLUTION
+        OldApiVersionTest oldApiVersionTest = new OldApiVersionTest();//REPLACE_AUTH_TOKEN_OLD_VERSION
+        JWTNoneAlgoTest  jwtNoneAlgoTest = new JWTNoneAlgoTest();//JWT_NONE_ALGO
+        JWTInvalidSignatureTest jwtInvalidSignatureTest = new JWTInvalidSignatureTest();//JWT_INVALID_SIGNATURE
+        AddJkuToJwtTest addJkuToJwtTest = new AddJkuToJwtTest();//ADD_JKU_TO_JWT
+        BFLATest bflaTest = new BFLATest();//BFLA
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
+
         TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
         if (noAuthTestResult != null) testingRunResults.add(noAuthTestResult);
         if (noAuthTestResult != null && !noAuthTestResult.isVulnerable()) {
 
             TestPlugin.TestRoleMatcher testRoleMatcher = new TestPlugin.TestRoleMatcher(testingUtil.getTestRoles(), apiInfoKey);
-
-            if (testRoleMatcher.shouldDoBFLA()) {
+            if ((testSubCategories == null || testSubCategories.contains(TestSubCategory.BFLA.name())) && testRoleMatcher.shouldDoBFLA())  {
                 TestingRunResult bflaTestResult = runTest(bflaTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
                 if (bflaTestResult != null) testingRunResults.add(bflaTestResult);
-            } else {
+            } else if (testSubCategories == null || testSubCategories.contains(TestSubCategory.REPLACE_AUTH_TOKEN.name())){
                 TestingRunResult bolaTestResult = runTest(bolaTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
                 if (bolaTestResult != null) testingRunResults.add(bolaTestResult);
             }
 
-            TestingRunResult addUserIdTestResult = runTest(addUserIdTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-            if (addUserIdTestResult != null) testingRunResults.add(addUserIdTestResult);
+            if (testSubCategories == null || testSubCategories.contains(TestSubCategory.ADD_USER_ID.name())) {
+                TestingRunResult addUserIdTestResult = runTest(addUserIdTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                if (addUserIdTestResult != null) testingRunResults.add(addUserIdTestResult);
+            }
 
-            TestingRunResult parameterPollutionTestResult = runTest(parameterPollutionTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-            if (parameterPollutionTestResult != null) testingRunResults.add(parameterPollutionTestResult);
+            if (testSubCategories == null || testSubCategories.contains(TestSubCategory.PARAMETER_POLLUTION.name())) {
+                TestingRunResult parameterPollutionTestResult = runTest(parameterPollutionTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                if (parameterPollutionTestResult != null) testingRunResults.add(parameterPollutionTestResult);
+            }
 
-            TestingRunResult oldApiVersionTestResult = runTest(oldApiVersionTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-            if (oldApiVersionTestResult != null) testingRunResults.add(oldApiVersionTestResult);
+            if (testSubCategories == null || testSubCategories.contains(TestSubCategory.REPLACE_AUTH_TOKEN_OLD_VERSION.name())) {
+                TestingRunResult oldApiVersionTestResult = runTest(oldApiVersionTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                if (oldApiVersionTestResult != null) testingRunResults.add(oldApiVersionTestResult);
+            }
 
-            TestingRunResult jwtNoneAlgoTestResult = runTest(jwtNoneAlgoTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-            if (jwtNoneAlgoTestResult != null) testingRunResults.add(jwtNoneAlgoTestResult);
+            if (testSubCategories == null || testSubCategories.contains(TestSubCategory.JWT_NONE_ALGO.name())) {
+                TestingRunResult jwtNoneAlgoTestResult = runTest(jwtNoneAlgoTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                if (jwtNoneAlgoTestResult != null) testingRunResults.add(jwtNoneAlgoTestResult);
+            }
 
-            TestingRunResult jwtInvalidSignatureTestResult = runTest(jwtInvalidSignatureTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-            if (jwtInvalidSignatureTestResult != null) testingRunResults.add(jwtInvalidSignatureTestResult);
+            if (testSubCategories == null || testSubCategories.contains(TestSubCategory.JWT_INVALID_SIGNATURE.name())) {
+                TestingRunResult jwtInvalidSignatureTestResult = runTest(jwtInvalidSignatureTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                if (jwtInvalidSignatureTestResult != null) testingRunResults.add(jwtInvalidSignatureTestResult);
+            }
 
-            TestingRunResult addJkuToJwtTestResult = runTest(addJkuToJwtTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-            if (addJkuToJwtTestResult != null) testingRunResults.add(addJkuToJwtTestResult);
+            if (testSubCategories == null || testSubCategories.contains(TestSubCategory.ADD_JKU_TO_JWT.name())) {
+                TestingRunResult addJkuToJwtTestResult = runTest(addJkuToJwtTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                if (addJkuToJwtTestResult != null) testingRunResults.add(addJkuToJwtTestResult);
+            }
         }
 
-        TestingRunResult addMethodInParameterTestResult = runTest(addMethodInParameterTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-        if (addMethodInParameterTestResult != null) testingRunResults.add(addMethodInParameterTestResult);
+        if (testSubCategories == null || testSubCategories.contains(TestSubCategory.ADD_METHOD_IN_PARAMETER.name())) {
+            TestingRunResult addMethodInParameterTestResult = runTest(addMethodInParameterTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            if (addMethodInParameterTestResult != null) testingRunResults.add(addMethodInParameterTestResult);
+        }
 
-        TestingRunResult addMethodOverrideHeadersTestResult = runTest(addMethodOverrideHeadersTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-        if (addMethodOverrideHeadersTestResult != null) testingRunResults.add(addMethodOverrideHeadersTestResult);
+        if (testSubCategories == null || testSubCategories.contains(TestSubCategory.ADD_METHOD_OVERRIDE_HEADERS.name())) {
+            TestingRunResult addMethodOverrideHeadersTestResult = runTest(addMethodOverrideHeadersTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            if (addMethodOverrideHeadersTestResult != null) testingRunResults.add(addMethodOverrideHeadersTestResult);
+        }
 
-        TestingRunResult changeHttpMethodTestResult = runTest(changeHttpMethodTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-        if (changeHttpMethodTestResult != null) testingRunResults.add(changeHttpMethodTestResult);
+        if (testSubCategories == null || testSubCategories.contains(TestSubCategory.CHANGE_METHOD.name())) {
+            TestingRunResult changeHttpMethodTestResult = runTest(changeHttpMethodTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            if (changeHttpMethodTestResult != null) testingRunResults.add(changeHttpMethodTestResult);
+        }
 
+        if (testSubCategories != null) {
+            for (String testSubCategory: testSubCategories) {
+                if (testSubCategory.startsWith("http://") || testSubCategory.startsWith("https://")) {
+                    try {
+                        String origTemplateURL = testSubCategory;
 
+                        origTemplateURL = origTemplateURL.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/");
+
+                        String subcategory = origTemplateURL.substring(origTemplateURL.lastIndexOf("/")+1).split("\\.")[0];
+                        FuzzingTest fuzzingTest = new FuzzingTest(testRunId.toHexString(), testRunResultSummaryId.toHexString(), origTemplateURL, subcategory);
+                        TestingRunResult fuzzResult = runTest(fuzzingTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                        if (fuzzResult != null) testingRunResults.add(fuzzResult);        
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("unable to execute fuzzing for " + testSubCategory);
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
 
         return testingRunResults;
     }

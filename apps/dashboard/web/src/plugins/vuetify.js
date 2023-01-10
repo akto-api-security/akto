@@ -14,6 +14,8 @@ import Restapi from "../apps/dashboard/shared/icons/Restapi"
 import CustomWebhooks from "../apps/dashboard/shared/icons/CustomWebhooks"
 import TrashSingleTick from "../apps/dashboard/shared/icons/TrashSingleTick"
 import TrashDoubleTick from "../apps/dashboard/shared/icons/TrashDoubleTick"
+import AktoWhite from "../apps/dashboard/shared/icons/AktoWhite"
+import BookBookmark from "../apps/dashboard/shared/icons/BookBookmark"
 
 Vue.component('font-awesome-icon', FontAwesomeIcon)
 
@@ -98,7 +100,9 @@ import {
   faCaretUp,
   faCaretDown,
   faShareAlt,
-  faUserPlus
+  faUserPlus,
+  faLaptopHouse,
+  faAnchor
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -117,7 +121,8 @@ import {
 
 import {
   faSalesforce as fabSalesforce,
-  faHubspot as fabHubspot
+  faHubspot as fabHubspot,
+  faGithub as fabGithub
 } from '@fortawesome/free-brands-svg-icons'
 
 const faIcons = [
@@ -129,6 +134,7 @@ const faIcons = [
   faCreditCard,faAddressCard,faChalkboard,faFilter,faKey,faAngleDoubleDown,faAngleDoubleUp,faUpload,faRedo,faGlobe,faAngleDown,
   faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faCaretSquareUp,
   faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faThumbsUp,faCaretUp,faShareAlt,faUserPlus,faCaretDown,
+  faLaptopHouse,faAnchor,fabGithub,
   
   farComments,farCalendar, farHandPointRight, farBuilding, farStar,farSquare, farCheckSquare,farFolder,farFolderOpen,farClock,
   farQuestionCircle,
@@ -163,6 +169,14 @@ const ctTheme = {
 }
 
 const faIconsOpts = {}
+
+faIconsOpts.bookBookmark = {
+  component: BookBookmark
+}
+
+faIconsOpts.aktoWhite = {
+  component: AktoWhite
+}
 
 faIconsOpts.curlyBraces = {
   component: CurlyBraces

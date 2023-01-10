@@ -52,7 +52,7 @@
                 do the
                 following steps:</div>
             <div class="steps">
-                <b>Step 1</b>: Grab the policy JSON below and navigate to Akto Dashboard's current role by clicking <a target="_blank" class="clickable-docs" href="https://us-east-1.console.aws.amazon.com/iam/home#/roles/AktoDashboardRole$createPolicy?step=edit">here</a>
+                <b>Step 1</b>: Grab the policy JSON below and navigate to Akto Dashboard's current role by clicking <a target="_blank" class="clickable-docs" :href="getAktoDashboardRoleUpdateUrl()">here</a>
                 <code-block :lines="quick_start_policy_lines" onCopyBtnClickText="Policy copied to clipboard"></code-block>
             </div>
             <div class="steps">
@@ -129,12 +129,8 @@ export default {
                 `                "autoscaling:CreateAutoScalingGroup"`,
                 `            ],`,
                 `            "Resource": [`,
-                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/AktoAutoScalingGroup",`,
-                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/AktoTargetTrackingNetworkPolicy",`,
-                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/AktoASGLaunchConfiguration",`,
-                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/AktoContextAnalyzerAutoScalingGroup",`,
-                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/AktoContextAnalyzerASGLaunchConfiguration",`,
-                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/akto-mirroring*"`,
+                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/DASHBOARD_STACK_NAME*",`,
+                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/MIRRORING_STACK_NAME*"`,
                 `            ]`,
                 `        },`,
                 `        {`,
@@ -143,7 +139,10 @@ export default {
                 `            "Action": [`,
                 `                "autoscaling:CreateLaunchConfiguration"`,
                 `            ],`,
-                `            "Resource": "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:launchConfiguration:*:launchConfigurationName/akto-mirroring*"`,
+                `            "Resource": [`,
+                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:launchConfiguration:*:launchConfigurationName/MIRRORING_STACK_NAME*",`,
+                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:launchConfiguration:*:launchConfigurationName/DASHBOARD_STACK_NAME*"`,
+                `             ]`,
                 `        },`,
                 `        {`,
                 `            "Sid": "4",`,
@@ -154,7 +153,8 @@ export default {
                 `                "cloudformation:DescribeStacks"`,
                 `            ],`,
                 `            "Resource": [`,
-                `                "arn:aws:cloudformation:AWS_REGION:AWS_ACCOUNT_ID:stack/akto-mirroring/*"`,
+                `                "arn:aws:cloudformation:AWS_REGION:AWS_ACCOUNT_ID:stack/MIRRORING_STACK_NAME/*",`,
+                `                "arn:aws:cloudformation:AWS_REGION:AWS_ACCOUNT_ID:stack/DASHBOARD_STACK_NAME/*"`,
                 `            ]`,
                 `        },`,
                 `        {`,
@@ -234,21 +234,23 @@ export default {
                 `            "Action": [`,
                 `                "elasticloadbalancing:CreateListener", `,
                 `                "elasticloadbalancing:ModifyLoadBalancerAttributes", `,
+                `                "elasticloadbalancing:AddTags", `,
                 `                "elasticloadbalancing:CreateLoadBalancer"`,
                 `            ], `,
                 `            "Resource": [`,
-                `                "arn:aws:elasticloadbalancing:AWS_REGION:AWS_ACCOUNT_ID:loadbalancer/net/AktoNLB/*"`,
+                `                "arn:aws:elasticloadbalancing:AWS_REGION:AWS_ACCOUNT_ID:loadbalancer/net/*akto*/*"`,
                 `            ]`,
                 `        }, `,
                 `        {`,
                 `            "Sid": "12", `,
                 `            "Effect": "Allow", `,
                 `            "Action": [`,
+                `                "elasticloadbalancing:AddTags", `,
                 `                "elasticloadbalancing:CreateTargetGroup"`,
                 `            ], `,
                 `            "Resource": [`,
-                `                "arn:aws:elasticloadbalancing:AWS_REGION:AWS_ACCOUNT_ID:targetgroup/AktoKafkaTargetGroup/*", `,
-                `                "arn:aws:elasticloadbalancing:AWS_REGION:AWS_ACCOUNT_ID:targetgroup/AktoTrafficMirroringTargetGroup/*"`,
+                `                "arn:aws:elasticloadbalancing:AWS_REGION:AWS_ACCOUNT_ID:targetgroup/*akto*/*", `,
+                `                "arn:aws:elasticloadbalancing:AWS_REGION:AWS_ACCOUNT_ID:targetgroup/*akto*/*"`,
                 `            ]`,
                 `        }, `,
                 `        {`,
@@ -263,10 +265,11 @@ export default {
                 `                "lambda:GetFunctionCodeSigningConfig", `,
                 `                "lambda:InvokeFunction", `,
                 `                "lambda:ListFunctions", `,
+                `                "lambda:TagResource", `,
                 `                "lambda:AddPermission"`,
                 `            ], `,
                 `            "Resource": [`,
-                `                "arn:aws:lambda:AWS_REGION:AWS_ACCOUNT_ID:function:akto-mirroring*"`,
+                `                "arn:aws:lambda:AWS_REGION:AWS_ACCOUNT_ID:function:*akto*"`,
                 `            ]`,
                 `        }, `,
                 `        {`,
@@ -285,11 +288,12 @@ export default {
                 `            "Action": [`,
                 `                "logs:CreateLogStream", `,
                 `                "logs:PutRetentionPolicy", `,
+                `                "logs:TagResource", `,
                 `                "logs:CreateLogGroup"`,
                 `            ], `,
                 `            "Resource": [`,
-                `                "arn:aws:logs:AWS_REGION:AWS_ACCOUNT_ID:log-group:/aws/lambda/akto-mirroring*", `,
-                `                "arn:aws:logs:AWS_REGION:AWS_ACCOUNT_ID:log-group:/aws/lambda/akto-mirroring*:log-stream:"`,
+                `                "arn:aws:logs:AWS_REGION:AWS_ACCOUNT_ID:log-group:/aws/lambda/MIRRORING_STACK_NAME*", `,
+                `                "arn:aws:logs:AWS_REGION:AWS_ACCOUNT_ID:log-group:/aws/lambda/MIRRORING_STACK_NAME*:log-stream:"`,
                 `            ]`,
                 `        }, `,
                 `        {`,
@@ -300,11 +304,12 @@ export default {
                 `                "iam:PutRolePolicy", `,
                 `                "iam:GetRole", `,
                 `                "iam:GetRolePolicy", `,
+                `                "iam:TagRole", `,
                 `                "iam:PassRole"`,
                 `            ], `,
                 `            "Resource": [`,
-                `                "arn:aws:iam::AWS_ACCOUNT_ID:role/service-role/akto-mirroring-*", `,
-                `                "arn:aws:iam::AWS_ACCOUNT_ID:role/akto-mirroring-*"`,
+                `                "arn:aws:iam::AWS_ACCOUNT_ID:role/service-role/*akto*", `,
+                `                "arn:aws:iam::AWS_ACCOUNT_ID:role/*akto*"`,
                 `            ]`,
                 `        }, `,
                 `        {`,
@@ -314,7 +319,7 @@ export default {
                 `                "iam:CreateInstanceProfile", `,
                 `                "iam:GetInstanceProfile"`,
                 `            ], `,
-                `            "Resource": "arn:aws:iam::AWS_ACCOUNT_ID:instance-profile/akto-mirroring*"`,
+                `            "Resource": "arn:aws:iam::AWS_ACCOUNT_ID:instance-profile/MIRRORING_STACK_NAME*"`,
                 `        }, `,
                 `        {`,
                 `            "Sid": "18", `,
@@ -322,7 +327,7 @@ export default {
                 `            "Action": [`,
                 `                "iam:AddRoleToInstanceProfile"`,
                 `            ], `,
-                `            "Resource": ["arn:aws:iam::AWS_ACCOUNT_ID:instance-profile/akto-mirroring*", "arn:aws:iam::AWS_ACCOUNT_ID:role/akto-mirroring-*"]`,
+                `            "Resource": ["arn:aws:iam::AWS_ACCOUNT_ID:instance-profile/MIRRORING_STACK_NAME*", "arn:aws:iam::AWS_ACCOUNT_ID:role/MIRRORING_STACK_NAME-*"]`,
                 `        }, `,
                 `        {`,
                 `            "Sid": "19", `,
@@ -343,18 +348,22 @@ export default {
                 `                "events:PutTargets"`,
                 `            ], `,
                 `            "Resource": [`,
-                `                "arn:aws:events:AWS_REGION:AWS_ACCOUNT_ID:rule/akto-mirroring-PeriodicRule"`,
+                `                "arn:aws:events:AWS_REGION:AWS_ACCOUNT_ID:rule/MIRRORING_STACK_NAME-PeriodicRule"`,
                 `            ]`,
                 `        } `,
                 `    ]`,
                 `}`
             ],
+            aktoDashboardRoleName: null
         }
     },
     mounted() {
         this.fetchLBs();
     },
     methods: {
+        getAktoDashboardRoleUpdateUrl(){
+            return "https://us-east-1.console.aws.amazon.com/iam/home#/roles/" + this.aktoDashboardRoleName  + "$createPolicy?step=edit";
+        },
         fetchLBs() {
             api.fetchLBs().then((resp) => {
                 if (!resp.dashboardHasNecessaryRole) {
@@ -362,6 +371,8 @@ export default {
                         let line = this.quick_start_policy_lines[i];
                         line = line.replaceAll('AWS_REGION', resp.awsRegion);
                         line = line.replaceAll('AWS_ACCOUNT_ID', resp.awsAccountId);
+                        line = line.replaceAll('MIRRORING_STACK_NAME', resp.aktoMirroringStackName);
+                        line = line.replaceAll('DASHBOARD_STACK_NAME', resp.aktoDashboardStackName);
                         this.quick_start_policy_lines[i] = line;
                     }
                 }
@@ -380,6 +391,7 @@ export default {
                 this.availableLBs = resp.availableLBs;
                 this.existingSelectedLBs = resp.selectedLBs;
                 this.initialLBCount = this.selectedLBs.length;
+                this.aktoDashboardRoleName = resp.aktoDashboardRoleName;
                 this.checkStackState()
             })
         },

@@ -179,29 +179,16 @@ public class ApiWorkflowExecutor {
 
     //todo: make this generic
     public WorkflowTestResult.NodeResult processOtpNode(Node node, Map<String, Object> valuesMap) {
-        try {
-            int waitInSeconds = Math.min(node.getWorkflowNodeDetails().getWaitInSeconds(),100);
-            if (waitInSeconds > 0) {
-                System.out.println("WAITING: " + waitInSeconds + " seconds");
-                Thread.sleep(waitInSeconds*1000);
-                System.out.println("DONE WAITING!!!!");
-            }
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-        String uuid = node.getWorkflowNodeDetails().getOtpRefUuid();
+
         List<String> testErrors = new ArrayList<>();
-        int curTime = Context.now() - 5 * 60;
-        Bson filters = Filters.and(
-            Filters.eq("uuid", uuid),
-            Filters.gte("createdAtEpoch", curTime)
-        );
         BasicDBObject resp = new BasicDBObject();
         BasicDBObject body = new BasicDBObject();
         BasicDBObject data = new BasicDBObject();
         String message;
-        OtpTestData otpTestData = null;
-        otpTestData = OtpTestDataDao.instance.findOne(filters);
+
+        OtpTestData otpTestData = fetchOtpTestData(node, 4);
+        String uuid = node.getWorkflowNodeDetails().getOtpRefUuid();
+
         if (otpTestData == null) {
             message = "otp data not received for uuid " + uuid;
             data.put("error", message);
@@ -231,6 +218,33 @@ public class ApiWorkflowExecutor {
             return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
         }
         return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
+    }
+
+    private OtpTestData fetchOtpTestData(Node node, int retries) {
+        OtpTestData otpTestData = null;
+        for (int i=0; i<retries; i++) {
+            try {
+                int waitInSeconds = Math.min(node.getWorkflowNodeDetails().getWaitInSeconds(), 60);
+                if (waitInSeconds > 0) {
+                    System.out.println("WAITING: " + waitInSeconds + " seconds");
+                    Thread.sleep(waitInSeconds*1000);
+                    System.out.println("DONE WAITING!!!!");
+                }
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            String uuid = node.getWorkflowNodeDetails().getOtpRefUuid();
+            int curTime = Context.now() - 5 * 60;
+            Bson filters = Filters.and(
+                Filters.eq("uuid", uuid),
+                Filters.gte("createdAtEpoch", curTime)
+            );
+            otpTestData = OtpTestDataDao.instance.findOne(filters);
+            if (otpTestData != null) {
+                break;
+            }
+        }
+        return otpTestData;
     }
 
     private String extractOtpCode(String text, String regex) {
