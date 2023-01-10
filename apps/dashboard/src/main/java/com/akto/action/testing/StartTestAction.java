@@ -321,6 +321,7 @@ public class StartTestAction extends UserAction {
 
     public void setRunIssues(TestingRunIssues runIssues) {
         this.runIssues = runIssues;
+    }
     public List<String> getSelectedTests() {
         return selectedTests;
     }
