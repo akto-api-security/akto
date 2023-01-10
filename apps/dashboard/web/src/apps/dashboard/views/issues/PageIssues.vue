@@ -10,6 +10,8 @@
             <issues-dialog 
                 :openDetailsDialog="dialogBox"
                 :testingRunResult="testingRunResult"
+                :subCatogoryMap="subCatogoryMap"
+                :issue="dialogBoxIssue"
                 @closeDialogBox="(dialogBox = false)"
             >
             </issues-dialog>
@@ -55,7 +57,8 @@ export default {
             currentPageIndex: 1,
             dialogBox: false,
             issuesCategories: [],
-            categoryToSubCategories: {}
+            categoryToSubCategories: {},
+            dialogBoxIssue: {}
         }
     },
     watch: {
@@ -67,7 +70,7 @@ export default {
     computed: {
         ...mapState('issues', ['issues', 'loading', 'currentPage', 'limit'
             , 'totalIssuesCount', 'filterStatus', 'filterCollectionsId', 'filterSeverity'
-            , 'filterSubCategory1', 'startEpoch', 'selectedIssueIds','testingRunResult']),
+            , 'filterSubCategory1', 'startEpoch', 'selectedIssueIds','testingRunResult', 'subCatogoryMap']),
 
         totalPages() {
             if (!this.totalIssuesCount && this.totalIssuesCount === 0) {
@@ -104,6 +107,11 @@ export default {
     methods: {
         async openDialogBox({issueId}) {
             await this.$store.dispatch('issues/loadTestingResult',{issueId})
+            this.issues.forEach((item) => {
+                if (issueId === item.id) {
+                    this.dialogBoxIssue = item
+                }
+            })
             this.dialogBox = true
         },
         updateSelectedIssueIds({issueId, checked}) {
