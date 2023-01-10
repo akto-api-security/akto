@@ -9,13 +9,14 @@ var bodyObj = JSON.parse(body);
 
 const browser = await puppeteer.launch({
   headless: false,
+  args: ['--no-sandbox']
 });
 
 const tokenMap = {};
 
 const page = await browser.newPage();
 
-page.setDefaultNavigationTimeout(20000);
+page.setDefaultNavigationTimeout(0);
 
 class Extension extends PuppeteerRunnerExtension {
   async beforeEachStep(step, flow) {
