@@ -274,7 +274,8 @@ export default {
             data: {
                 "testIdConfig" : 1,
                 "workflowTestId": id,
-                "type": "WORKFLOW"
+                "type": "WORKFLOW",
+                testName: id
             }
         })
     },
@@ -288,7 +289,8 @@ export default {
                 "workflowTestId": id,
                 "type": "WORKFLOW",
                 "recurringDaily": recurringDaily,
-                "startTimestamp": startTimestamp
+                "startTimestamp": startTimestamp,
+                testName: id
             }
         })
     },

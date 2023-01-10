@@ -22,7 +22,8 @@ public class GlobalEnums {
     public enum TestCategory {
         BOLA("BOLA", Severity.HIGH, "Broken Object Level Authorization (BOLA)"),
         NO_AUTH("NO_AUTH", Severity.HIGH, "Broken User Authentication (BUA)"),
-        BFLA("BFLA", Severity.HIGH, "Broken Function Level Authorization (BFLA)");
+        BFLA("BFLA", Severity.HIGH, "Broken Function Level Authorization (BFLA)"),
+        IAM("IAM", Severity.HIGH, "Improper Assets Management (IAM)");
         private final String name;
         private final Severity severity;
         private final String displayName;
@@ -318,7 +319,23 @@ public class GlobalEnums {
                 IssueTags.BL,
                 IssueTags.OWASPTOP10,
                 IssueTags.HACKERONETOP10,
+        }),
+
+        CUSTOM_IAM(
+                "CUSTOM_IAM",
+                TestCategory.IAM,
+                "Assets found on the page",
+                "Fuzzing",
+                        "Fuzzing",
+                        "Fuzzing",
+                new String[]{
+                        "fuzzing"
+                }, new IssueTags[]{
+                IssueTags.BL,
+                IssueTags.OWASPTOP10,
+                IssueTags.HACKERONETOP10,
         });
+
 
         private final String name;
         private final TestCategory superCategory;

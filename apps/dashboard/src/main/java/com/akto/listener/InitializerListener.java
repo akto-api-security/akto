@@ -4,32 +4,35 @@ import com.akto.DaoInit;
 import com.akto.action.AdminSettingsAction;
 import com.akto.action.observe.InventoryAction;
 import com.akto.dao.*;
-import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.BackwardCompatibilityDao;
-import com.akto.dao.FilterSampleDataDao;
-import com.akto.dao.UsersDao;
+import com.akto.dao.context.Context;
+import com.akto.dao.notifications.CustomWebhooksDao;
+import com.akto.dao.notifications.CustomWebhooksResultDao;
+import com.akto.dao.notifications.SlackWebhooksDao;
+import com.akto.dao.pii.PIISourceDao;
 import com.akto.dao.testing.*;
+import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dto.*;
-import com.akto.dto.notifications.CustomWebhook;
-import com.akto.dto.notifications.CustomWebhookResult;
-import com.akto.dto.notifications.SlackWebhook;
-import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
-import com.akto.dto.AccountSettings;
-import com.akto.dto.BackwardCompatibility;
-import com.akto.dto.CustomDataType;
 import com.akto.dto.data_types.Conditions;
+import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.data_types.Predicate;
 import com.akto.dto.data_types.RegexPredicate;
-import com.akto.dto.data_types.Conditions.Operator;
+import com.akto.dto.notifications.CustomWebhook;
+import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
+import com.akto.dto.notifications.CustomWebhookResult;
+import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
+import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.notifications.email.WeeklyEmail;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
+import com.akto.testing.ApiExecutor;
+import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.util.Pair;
+import com.akto.util.enums.GlobalEnums.Severity;
+import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.utils.RedactSampleData;
-import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
@@ -38,21 +41,13 @@ import com.mongodb.client.model.Updates;
 import com.sendgrid.helpers.mail.Mail;
 import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.akto.dao.context.Context;
-import com.akto.dao.notifications.CustomWebhooksDao;
-import com.akto.dao.notifications.CustomWebhooksResultDao;
-import com.akto.dao.notifications.SlackWebhooksDao;
-import com.akto.dao.pii.PIISourceDao;
-
-import com.akto.testing.*;
-
+import javax.servlet.ServletContextListener;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -62,10 +57,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import javax.servlet.ServletContextListener;
-
 import static com.mongodb.client.model.Filters.eq;
-import static com.mongodb.client.model.Filters.in;
 
 public class InitializerListener implements ServletContextListener {
     private static final Logger logger = LoggerFactory.getLogger(InitializerListener.class);
@@ -127,16 +119,69 @@ public class InitializerListener implements ServletContextListener {
         }, delayInDays, 7, TimeUnit.DAYS);
 
     }
-    public void setUpPiiScheduler(){
+    public void setUpPiiAndTestSourcesScheduler(){
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 String mongoURI = System.getenv("AKTO_MONGO_CONN");
                 DaoInit.init(new ConnectionString(mongoURI));
                 Context.accountId.set(1_000_000);
+                try {
+                    executeTestSourcesFetch();
+                } catch (Exception e) {
 
-                executePIISourceFetch();
+                }
+
+                try {
+                    executePIISourceFetch();
+                } catch (Exception e) {
+
+                }
             }
         }, 0, 4, TimeUnit.HOURS);
+    }
+
+    static TestCategory findTestCategory(String path) {
+        if (path.contains("BrokenObjectLevelAuthorization")) return TestCategory.BOLA;
+        if (path.contains("ImproperAssetsManagement")) return TestCategory.IAM;
+        if (path.contains("BrokenUserAuthentication")) return TestCategory.NO_AUTH;
+        if (path.contains("BrokenFunctionLevelAuthorization")) return TestCategory.BFLA;
+        return null;
+    }
+
+    static String findTestSubcategory(String path) {
+        String parentPath = path.substring(0, path.lastIndexOf("/"));
+        return parentPath.substring(parentPath.lastIndexOf("/")+1);
+    }
+
+    static void executeTestSourcesFetch() {
+        try {
+            String testingSourcesRepoTree = "https://api.github.com/repos/akto-api-security/testing_sources/git/trees/master?recursive=1";
+            String tempFilename = "temp_testingSourcesRepoTree.json";
+            FileUtils.copyURLToFile(new URL(testingSourcesRepoTree), new File(tempFilename));
+            String fileContent = FileUtils.readFileToString(new File(tempFilename), StandardCharsets.UTF_8);
+            BasicDBObject fileList = BasicDBObject.parse(fileContent);
+            BasicDBList files = (BasicDBList) (fileList.get("tree"));
+
+            if (files == null) return;
+            for (Object fileObj: files) {
+                BasicDBObject fileDetails = (BasicDBObject) fileObj;
+                String filePath = fileDetails.getString("path");
+                if (filePath.endsWith(".yaml")) {
+                    filePath = "https://github.com/akto-api-security/testing_sources/blob/master/" + filePath;
+                    if (TestSourceConfigsDao.instance.findOne("_id", filePath) == null) {
+                        TestCategory testCategory = findTestCategory(filePath);
+                        String subcategory = findTestSubcategory(filePath);
+                        TestSourceConfig testSourceConfig = new TestSourceConfig(filePath, testCategory, subcategory, Severity.HIGH, "", "default", Context.now());
+                        TestSourceConfigsDao.instance.insertOne(testSourceConfig);
+                    }
+                }
+            }
+
+        } catch (IOException e1) {
+            e1.printStackTrace();
+        }
+
+
     }
 
     static void executePIISourceFetch() {
@@ -653,12 +698,12 @@ public class InitializerListener implements ServletContextListener {
                 piiSource.setId("A");
         
                 PIISourceDao.instance.insertOne(piiSource);
-            } 
+            }
 
             setUpWeeklyScheduler();
             setUpDailyScheduler();
             setUpWebhookScheduler();
-            setUpPiiScheduler();
+            setUpPiiAndTestSourcesScheduler();
 
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             dropSampleDataIfEarlierNotDroped(accountSettings);

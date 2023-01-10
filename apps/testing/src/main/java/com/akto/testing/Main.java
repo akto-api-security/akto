@@ -3,18 +3,21 @@ package com.akto.testing;
 import com.akto.DaoInit;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestingRunConfigDao;
+import com.akto.dao.testing.TestingRunDao;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.AccountSettings;
-import com.akto.dto.testing.*;
-import com.akto.dao.testing.*;
+import com.akto.dto.testing.TestingRun;
+import com.akto.dto.testing.TestingRunConfig;
+import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.log.LoggerMaker;
+import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.concurrent.Executors;
@@ -42,6 +45,12 @@ public class Main {
             StatusCodeAnalyser.run();
         }
 
+        System.out.println("*********************RESULT******************************************");
+        System.out.println(System.getProperty("sun.arch.data.model"));
+        System.out.println(System.getProperty("os.arch"));
+        System.out.println(System.getProperty("os.version"));
+        System.out.println("***************************************************************");
+
         TestExecutor testExecutor = new TestExecutor();
 
         while (true) {
@@ -62,8 +71,8 @@ public class Main {
             );
 
             TestingRun testingRun = TestingRunDao.instance.getMCollection().findOneAndUpdate(
-                    Filters.or(filter1,filter2), update
-            );
+                    Filters.or(filter1,filter2), update);
+
 
             // TODO: find a better solution than wait
             if (testingRun == null) {
@@ -76,8 +85,16 @@ public class Main {
             }
 
             loggerMaker.infoAndAddToDb("Found one + " + testingRun.getId().toHexString());
+            if (testingRun.getTestIdConfig() > 1) {
+                TestingRunConfig testingRunConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
+                if (testingRunConfig != null) {
+                    loggerMaker.infoAndAddToDb("Found testing run config with id :" + testingRunConfig.getId());
+                    testingRun.setTestingRunConfig(testingRunConfig);
+                }
+            }
 
-            TestingRunResultSummary summary = new TestingRunResultSummary(start, 0, new HashMap<>(), 0, testingRun.getId(), testingRun.getId().toHexString(), 0);
+            TestingRunResultSummary summary = new TestingRunResultSummary(start, 0, new HashMap<>(),
+                    0, testingRun.getId(), testingRun.getId().toHexString(), 0);
 
             ObjectId summaryId = TestingRunResultSummariesDao.instance.insertOne(summary).getInsertedId().asObjectId().getValue();
 

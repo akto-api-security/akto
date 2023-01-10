@@ -1,22 +1,10 @@
 <template>
     <div class="testing-run-results-container">
         <div class="testing-run-header">
-            <span class="testing-run-title">{{title}}</span>
+            <span class="testing-run-title">{{(testingRun && testingRun.name) || "Tests"}}</span>
             <span>({{endpoints}})</span> | 
             <span>{{getScheduleStr()}}</span> | 
-            <span
-                v-for="(testType, index) in testTypes"
-                :key="'chip_'+index"            
-            >
-                <v-chip
-                    color="#6200EA19"
-                    class="mx-2"
-                    small
-                >
-                    <span class="primary--text">{{testType.toLowerCase()}}</span>
-                </v-chip>
-                <span v-if="index != testTypes.length - 1"  class="primary--text">+ </span>
-            </span>
+            <span>{{collectionName}}</span>
         </div>
 
         <div class="testing-runs-history" v-if="!isWorkflow">
@@ -131,7 +119,7 @@ export default {
     data () {
         let endTimestamp = this.defaultEndTimestamp || func.timeNow()
         return {
-            title: "Unauthenticated",
+            title: "Test",
             testTypes: ["Bola", "Workflow", "Bua"],
             startTimestamp: this.defaultStartTimestamp || (func.timeNow() - func.recencyPeriod/9),
             endTimestamp: endTimestamp,
@@ -286,6 +274,13 @@ export default {
         },
         endpoints() {
             return this.testingRun ? testing.getEndpoints(this.testingRun.testingEndpoints) : "-"
+        },
+        collectionName() {
+            if (this.testingRun) {
+                return testing.getCollectionName(this.testingRun.testingEndpoints, this.mapCollectionIdToName)
+            } else {
+                return ""
+            }
         },
         dateRange: {
             get () {

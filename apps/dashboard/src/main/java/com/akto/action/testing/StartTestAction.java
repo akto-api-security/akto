@@ -8,6 +8,7 @@ import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dao.testing.*;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
 import com.akto.dto.test_run_findings.TestingIssuesId;
@@ -38,6 +39,7 @@ public class StartTestAction extends UserAction {
     private List<TestingRun> testingRuns;
     private AuthMechanism authMechanism;
     private int endTimestamp;
+    private String testName;
 
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds) {
         User user = getSUser();
@@ -73,13 +75,16 @@ public class StartTestAction extends UserAction {
                 addActionError("Invalid APIs type");
                 return null;
         }
+        if (this.selectedTests != null) {
+            TestingRunConfig testingRunConfig = new TestingRunConfig(Context.now(), null, this.selectedTests,authMechanism.getId());
+            this.testIdConfig = testingRunConfig.getId();
+            TestingRunConfigDao.instance.insertOne(testingRunConfig);
+        }
 
-        TestingRun testingRun = new TestingRun(
-            scheduleTimestamp, user.getLogin(), testingEndpoints, testIdConfig, TestingRun.State.SCHEDULED, periodInSeconds
-        );
-
-        return testingRun;   
+        return new TestingRun(scheduleTimestamp, user.getLogin(),
+                testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName);
     }
+    private List<String> selectedTests;
 
     public String startTest() {
         int scheduleTimestamp = this.startTimestamp == 0 ? Context.now()  : this.startTimestamp;
@@ -316,5 +321,19 @@ public class StartTestAction extends UserAction {
 
     public void setRunIssues(TestingRunIssues runIssues) {
         this.runIssues = runIssues;
+    public List<String> getSelectedTests() {
+        return selectedTests;
+    }
+
+    public void setSelectedTests(List<String> selectedTests) {
+        this.selectedTests = selectedTests;
+    }
+
+    public String getTestName() {
+        return this.testName;
+    }
+
+    public void setTestName(String testName) {
+        this.testName = testName;
     }
 }
