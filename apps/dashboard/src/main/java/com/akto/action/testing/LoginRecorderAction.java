@@ -40,17 +40,7 @@ public class LoginRecorderAction extends UserAction {
 
         String payload = this.content.toString();
 
-        try {
-            File tmpOutputFile = File.createTempFile("output", ".json");
-            File tmpErrorFile = File.createTempFile("recordedFlowOutput", ".txt");
-            RecordedLoginFlowUtil.triggerFlow(tokenFetchCommand, payload, tmpOutputFile.getPath(), tmpErrorFile.getPath(), getSUser().getId());
-        } catch (Exception e) {
-            logger.error("error running recorded flow " + e.getMessage());
-            return ERROR.toUpperCase();
-        }
-
         int accountId = Context.accountId.get();
-        
         executorService.schedule( new Runnable() {
             public void run() {
                 try {
