@@ -17,5 +17,14 @@ export default {
                 subcategory
             }
         })
+    },
+    addCustomTest({url, category, subcategory, severity, description}) {
+        return request({
+            url: "api/addCustomTest",
+            method: "post",
+            data: {
+                url, category, subcategory, severity, description
+            }
+        })
     }
 }
