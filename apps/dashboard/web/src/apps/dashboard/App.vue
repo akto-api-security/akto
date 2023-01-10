@@ -112,7 +112,7 @@ export default {
   data() {
     const myItems = [
       {
-        title: 'Quick Start',
+        title: 'Quick start',
         icon: '$fas_thumbs-up',
         link: '/dashboard/quick-start'
       },
@@ -146,6 +146,11 @@ export default {
         title: 'Issues',
         icon: '$fas_exclamation-triangle',
         link: '/dashboard/issues'
+      },
+      {
+        title: 'Tests library',
+        icon: '$bookBookmark',
+        link: '/dashboard/library'
       }
     ]
 
