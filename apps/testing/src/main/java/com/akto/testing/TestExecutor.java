@@ -454,7 +454,7 @@ public class TestExecutor {
                         String subcategory = origTemplateURL.substring(origTemplateURL.lastIndexOf("/")+1).split("\\.")[0];
                         FuzzingTest fuzzingTest = new FuzzingTest(testRunId.toHexString(), testRunResultSummaryId.toHexString(), origTemplateURL, subcategory);
                         TestingRunResult fuzzResult = runTest(fuzzingTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-                        testingRunResults.add(fuzzResult);        
+                        if (fuzzResult != null) testingRunResults.add(fuzzResult);        
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb("unable to execute fuzzing for " + testSubCategory);
                         e.printStackTrace();
