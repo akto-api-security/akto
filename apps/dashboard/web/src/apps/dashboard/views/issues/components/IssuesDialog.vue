@@ -8,7 +8,13 @@
                     </v-btn>
                 </template>
                 <div class="pa-4">
-                    <test-results-dialog :issuesDetails="issue" :subCatogoryMap="subCatogoryMap" :testingRunResult="testingRunResult" :mapCollectionIdToName="mapCollectionIdToName"/>
+                    <test-results-dialog 
+                        :similarlyAffectedIssues="similarlyAffectedIssues" 
+                        :issuesDetails="issue" 
+                        :subCatogoryMap="subCatogoryMap" 
+                        :testingRunResult="testingRunResult" 
+                        :mapCollectionIdToName="mapCollectionIdToName"
+                        />
                 </div>
             </a-card>
         </div>
@@ -30,7 +36,8 @@ export default {
         openDetailsDialog: obj.boolR,
         testingRunResult : obj.objR,
         issue : obj.objR,
-        subCatogoryMap: obj.objR
+        subCatogoryMap: obj.objR,
+        similarlyAffectedIssues: obj.arrN
         
     },
     data() {

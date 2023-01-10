@@ -78,6 +78,7 @@
                         </template>
                         <div class="pa-4">
                             <test-results-dialog 
+                                :similarlyAffectedIssues="similarlyAffectedIssues"
                                 :testingRunResult="testingRunResult"
                                 :subCatogoryMap="subCatogoryMap"
                                 :issuesDetails="dialogBoxIssue"
@@ -103,6 +104,7 @@ import TestResultsDialog from "./TestResultsDialog";
 import WorkflowTestBuilder from '../../observe/inventory/components/WorkflowTestBuilder'
 
 import api from '../api'
+import issuesApi from '../../issues/api'
 
 import obj from "@/util/obj"
 import func from "@/util/func"
@@ -166,7 +168,8 @@ export default {
             openDetailsDialog: false,
             isWorkflow: false,
             originalStateFromDb: null,
-            dialogBoxIssue: {}
+            dialogBoxIssue: {},
+            similarlyAffectedIssues: []
         }
     },
     methods: {
@@ -248,8 +251,13 @@ export default {
             await api.fetchTestRunResultDetails(row["hexId"]).then(async resp => {
                 this.testingRunResult = resp["testingRunResult"]
                 if (this.testingRunResult) {
-                    await api.fetchIssueFromTestRunResultDetails(row["hexId"]).then(respIssue => {
+                    await api.fetchIssueFromTestRunResultDetails(row["hexId"]).then(async respIssue => {
                         this.dialogBoxIssue = respIssue['runIssues']
+                        if (this.dialogBoxIssue) {
+                            await issuesApi.fetchAffectedEndpoints(this.dialogBoxIssue.id).then(affectedResp => {
+                                this.similarlyAffectedIssues = affectedResp['similarlyAffectedIssues']
+                            })
+                        }
                     })
                     this.openDetailsDialog = true
                 }

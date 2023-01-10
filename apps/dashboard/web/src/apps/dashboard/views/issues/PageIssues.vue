@@ -2,18 +2,15 @@
     <simple-layout title="Issues">
         <issues-filters :filterStatus="filterStatus" :issues="issues" :filterCollectionsId="filterCollectionsId"
             :filterSeverity="filterSeverity" :filterSubCategory1="filterSubCategory1"
-            :selectedIssueIds="selectedIssueIds" :startEpoch="startEpoch" :issuesCategories="issuesCategories" :categoryToSubCategories="categoryToSubCategories">
+            :selectedIssueIds="selectedIssueIds" :startEpoch="startEpoch" :issuesCategories="issuesCategories"
+            :categoryToSubCategories="categoryToSubCategories">
         </issues-filters>
         <spinner v-if="loading">
         </spinner>
         <div v-else>
-            <issues-dialog 
-                :openDetailsDialog="dialogBox"
-                :testingRunResult="testingRunResult"
-                :subCatogoryMap="subCatogoryMap"
-                :issue="dialogBoxIssue"
-                @closeDialogBox="(dialogBox = false)"
-            >
+            <issues-dialog :similarlyAffectedIssues="similarlyAffectedIssues" :openDetailsDialog="dialogBox" :testingRunResult="testingRunResult"
+                :subCatogoryMap="subCatogoryMap" :issue="dialogBoxIssue" 
+                @closeDialogBox="(dialogBox = false)">
             </issues-dialog>
             <issue-box v-for="(issue, index) in issues" :key="index" :creationTime="issue.creationTime"
                 :method="issue.id.apiInfoKey.method" :endpoint="issue.id.apiInfoKey.url" :severity="issue.severity"
@@ -23,8 +20,7 @@
                 :testType="getTestType(issue.id.testErrorSource)" :issueId="issue.id"
                 :issueStatus="issue.testRunIssueStatus" :ignoreReason="issue.ignoreReason"
                 :issueChecked="(selectedIssueIds.indexOf(issue.id) > -1)" :filterStatus="filterStatus"
-                @clickedIssueCheckbox="updateSelectedIssueIds"
-                @openDialogBox="openDialogBox">
+                @clickedIssueCheckbox="updateSelectedIssueIds" @openDialogBox="openDialogBox">
             </issue-box>
             <v-pagination color="var(--v-themeColor-base)" v-model="currentPageIndex" v-if="totalPages > 1"
                 :length="totalPages" prev-icon="$fas_angle-left" next-icon="$fas_angle-right">
@@ -40,6 +36,7 @@ import IssueBox from './components/IssueBox'
 import IssuesFilters from './components/IssuesFilters'
 import IssuesDialog from './components/IssuesDialog'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
+import api from './api'
 
 
 
@@ -58,7 +55,8 @@ export default {
             dialogBox: false,
             issuesCategories: [],
             categoryToSubCategories: {},
-            dialogBoxIssue: {}
+            dialogBoxIssue: {},
+            similarlyAffectedIssues: []
         }
     },
     watch: {
@@ -70,7 +68,7 @@ export default {
     computed: {
         ...mapState('issues', ['issues', 'loading', 'currentPage', 'limit'
             , 'totalIssuesCount', 'filterStatus', 'filterCollectionsId', 'filterSeverity'
-            , 'filterSubCategory1', 'startEpoch', 'selectedIssueIds','testingRunResult', 'subCatogoryMap']),
+            , 'filterSubCategory1', 'startEpoch', 'selectedIssueIds', 'testingRunResult', 'subCatogoryMap']),
 
         totalPages() {
             if (!this.totalIssuesCount && this.totalIssuesCount === 0) {
@@ -94,19 +92,22 @@ export default {
         Object.values(this.$store.state.issues.subCatogoryMap).forEach((x) => {
             let superCategory = x.superCategory
             if (!store[superCategory.name]) {
-                result.push({"title": superCategory.displayName, "value": superCategory.name})
+                result.push({ "title": superCategory.displayName, "value": superCategory.name })
                 store[superCategory.name] = []
             }
             store[superCategory.name].push(x._name);
-        })  
+        })
 
         this.issuesCategories = [].concat(result)
         this.categoryToSubCategories = store
 
     },
     methods: {
-        async openDialogBox({issueId}) {
-            await this.$store.dispatch('issues/loadTestingResult',{issueId})
+        async openDialogBox({ issueId }) {
+            await this.$store.dispatch('issues/loadTestingResult', { issueId })
+            await api.fetchAffectedEndpoints(issueId).then(resp => {
+                this.similarlyAffectedIssues = resp['similarlyAffectedIssues']
+            })
             this.issues.forEach((item) => {
                 if (issueId === item.id) {
                     this.dialogBoxIssue = item
@@ -114,7 +115,7 @@ export default {
             })
             this.dialogBox = true
         },
-        updateSelectedIssueIds({issueId, checked}) {
+        updateSelectedIssueIds({ issueId, checked }) {
             let selectedIssueIds = this.selectedIssueIds
             let index = selectedIssueIds.indexOf(issueId)
             if (checked) {// filter checked case
@@ -153,4 +154,5 @@ export default {
 </script>
 
 <style scoped >
+
 </style>

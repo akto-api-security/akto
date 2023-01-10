@@ -8,9 +8,11 @@
                 </v-btn>
             </div>
             <div>
-                <layout-with-tabs :tabsContent="getTabsContent()" title="" :tabs="['Description', 'Original', 'Attempt']" ref="layoutWithTabs">
+                <layout-with-tabs :tabsContent="getTabsContent()" title=""
+                    :tabs="['Description', 'Original', 'Attempt']" ref="layoutWithTabs">
                     <template slot="Description">
-                        <div class="description-title-font" v-if="issuesDetails === undefined || issuesDetails === null || Object.keys(issuesDetails).length === 0">
+                        <div class="description-title-font"
+                            v-if="issuesDetails === undefined || issuesDetails === null || Object.keys(issuesDetails).length === 0">
                             No vulnerabilities exists
                         </div>
                         <div v-else class="d-flex flex-column">
@@ -53,24 +55,29 @@
                             <div class="d-flex flex-column mt-4">
                                 <span class="description-title-font">Issue Details</span>
                                 <div class="mt-3">
-                                    <span class="description-content-font abc" v-html="replaceTags(subCatogoryMap[issuesDetails.id.testSubCategory].issueDetails)"></span>
+                                    <span class="description-content-font abc"
+                                        v-html="replaceTags(subCatogoryMap[issuesDetails.id.testSubCategory].issueDetails)"></span>
                                 </div>
                             </div>
                             <div class="d-flex flex-column mt-4">
-                                <span class="description-title-font" >Impact</span>
+                                <span class="description-title-font">Impact</span>
                                 <div class="mt-3">
-                                    <span class="description-content-font" v-html="subCatogoryMap[issuesDetails.id.testSubCategory].issueImpact"></span>
+                                    <span class="description-content-font"
+                                        v-html="subCatogoryMap[issuesDetails.id.testSubCategory].issueImpact"></span>
                                 </div>
 
                             </div>
-                            <div class="d-flex flex-column mt-4">
+                            <div v-if="similarlyAffectedIssues || similarlyAffectedIssues.length === 0" class="mt-4">
                                 <span class="description-title-font">Api endpoints affected</span>
-                                <div class="d-flex flex-column mt-3">
-                                    <span class="description-title-font">/admin</span>
-                                    <span class="description-title-font">/billing</span>
-                                    <span class="description-title-font">/campaign</span>
-                                    <span class="description-title-font">/details</span>
-                                </div>
+                                <table :style="{'width': '100%'}" class="mt-3 mb-3">
+                                    <tr class="table-row" v-for="(item, index) in similarlyAffectedIssues" :key="index">
+                                        <td class="table-column clickable">
+                                            <span class="issue-summary-font mr-1 ml-3">{{ item.id.apiInfoKey.method }}</span>
+                                            <span class="issue-url-font">{{ item.id.apiInfoKey.url }}</span>
+                                        </td>
+                                    </tr>
+                                </table>
+                                <!-- <span class="description-title-font clickable-line ml-4" @click="$emit('showAllIssueByCategory', subCatogoryMap[issuesDetails.id.testSubCategory])">Show all endpoints</span> -->
                             </div>
                             <div class="d-flex flex-column mt-4">
                                 <span class="description-title-font">References</span>
@@ -128,7 +135,8 @@ export default {
         testingRunResult: obj.objR,
         issuesDetails: obj.objN,
         subCatogoryMap: obj.objN,
-        mapCollectionIdToName: obj.objN
+        mapCollectionIdToName: obj.objN,
+        similarlyAffectedIssues: obj.arrN
     },
     data() {
         var issueSummaryTable = [
@@ -164,7 +172,7 @@ export default {
     methods: {
         getTabsContent() {
             if (this.messagesBasic.length > 1) {
-                return {'Attempt' : this.messagesBasic.length}
+                return { 'Attempt': this.messagesBasic.length }
             }
             return undefined
         },
@@ -273,6 +281,18 @@ export default {
 <style lang="sass" scoped>
 .test-errors-class
   padding: 24px 0px 0px 24px
+
+.table-column
+  padding: 4px 8px !important
+  color: #47466A
+
+.table-row
+  position: relative
+  background: rgba(71, 70, 106, 0.03)
+  line-height: 32px
+
+  &:hover
+      background-color: #edecf0 !important
 </style>
 
 <style scoped>
@@ -286,12 +306,6 @@ export default {
     font-weight: 400;
 }
 
-.abc ::v-deep .description-bold-font {
-    font-size: 12px !important;
-    font-weight: 600 !important;
-}
-
-
 .issue-summary-border {
     border-width: 1px 0px;
     border-color: #DADAE1;
@@ -303,7 +317,7 @@ export default {
     font-weight: 600;
 }
 
-.issue-method-font {
+.issue-url-font {
     font-size: 12px !important;
     font-weight: 500;
 }
