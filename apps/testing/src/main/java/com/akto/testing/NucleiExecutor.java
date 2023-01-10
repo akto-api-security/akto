@@ -3,7 +3,9 @@ package com.akto.testing;
 import java.io.*;
 import java.nio.charset.Charset;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.rules.FuzzingTest;
@@ -55,8 +57,15 @@ public class NucleiExecutor {
         if (baseURL.contains("?")) path = baseURL.substring(0, baseURL.indexOf("?"));
         String fullUrl = path.startsWith("http") ? path : "https://" + path;
 
+        String arch = System.getProperty("os.arch");
+        String nucleiFileSuffix = "linux";
+
+        if (arch != null && arch.equals("aarch64")) {
+            nucleiFileSuffix = "m1";
+        }
+
         List<String> baseCmdTokens = new ArrayList<>();
-        baseCmdTokens.add("/app/nuclei_linux");
+        baseCmdTokens.add("/app/nuclei_"+nucleiFileSuffix);
 
         baseCmdTokens.add("-u");
         baseCmdTokens.add(fullUrl);
@@ -95,28 +104,25 @@ public class NucleiExecutor {
 
         try {
             process = Runtime.getRuntime().exec(baseCmdTokens.toArray(new String[0]));
-            StringBuilder output = new StringBuilder();
+            // StringBuilder output = new StringBuilder();
 
-            BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getErrorStream()));
+            // BufferedReader reader = new BufferedReader(
+            //         new InputStreamReader(process.getErrorStream()));
 
-            BufferedReader reader2 = new BufferedReader(
-                new InputStreamReader(process.getInputStream()));
+            // BufferedReader reader2 = new BufferedReader(
+            //     new InputStreamReader(process.getInputStream()));
                         
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    output.append(line + "\n");
-                }
+            //     String line;
+            //     while ((line = reader.readLine()) != null) {
+            //         output.append(line + "\n");
+            //     }
     
-                String line2;
-                while ((line2= reader2.readLine()) != null) {
-                    output.append(line2 + "\n");
-                }
+            //     String line2;
+            //     while ((line2= reader2.readLine()) != null) {
+            //         output.append(line2 + "\n");
+            //     }
 
-            int s = process.waitFor();
-            System.out.println("***********OUTPUT*************");
-            System.out.println(output);
-            System.out.println("***********OUTPUT*************");
+            boolean processResult = process.waitFor(5, TimeUnit.MINUTES);
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
