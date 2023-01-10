@@ -77,7 +77,11 @@
                             </v-btn>
                         </template>
                         <div class="pa-4">
-                            <test-results-dialog :testingRunResult="testingRunResult"/>
+                            <test-results-dialog 
+                                :testingRunResult="testingRunResult"
+                                :subCatogoryMap="subCatogoryMap"
+                                :issuesDetails="dialogBoxIssue"
+                                :mapCollectionIdToName="mapCollectionIdToName"/>
                         </div>
                     </a-card>
                 </div>
@@ -161,7 +165,8 @@ export default {
             testingRunResult: null,
             openDetailsDialog: false,
             isWorkflow: false,
-            originalStateFromDb: null
+            originalStateFromDb: null,
+            dialogBoxIssue: {}
         }
     },
     methods: {
@@ -240,19 +245,34 @@ export default {
             }
         },
         async openDetails(row) {
-            api.fetchTestRunResultDetails(row["hexId"]).then(resp => {
+            await api.fetchTestRunResultDetails(row["hexId"]).then(async resp => {
                 this.testingRunResult = resp["testingRunResult"]
                 if (this.testingRunResult) {
+                    await api.fetchIssueFromTestRunResultDetails(row["hexId"]).then(respIssue => {
+                        this.dialogBoxIssue = respIssue['runIssues']
+                    })
                     this.openDetailsDialog = true
                 }
             })
         },
     },
-    mounted() {
+    async mounted() {
         this.refreshSummaries()
+        await this.$store.dispatch('issues/fetchAllSubCategories')
     },
     computed: {
         ...mapState('testing', ['testingRuns', 'pastTestingRuns']),
+        subCatogoryMap: {
+            get() {
+                return this.$store.state.issues.subCatogoryMap
+            }
+        },
+        mapCollectionIdToName() {
+            return this.$store.state.collections.apiCollections.reduce((m, e) => {
+                m[e.id] = e.displayName
+                return m
+            }, {})
+        },
         testingRun() {
             return [...this.testingRuns, ...this.pastTestingRuns].filter(x => x.hexId === this.testingRunHexId)[0]
         },

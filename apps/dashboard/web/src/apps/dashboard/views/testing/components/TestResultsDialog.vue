@@ -10,7 +10,7 @@
             <div>
                 <layout-with-tabs :tabsContent="getTabsContent()" title="" :tabs="['Description', 'Original', 'Attempt']" ref="layoutWithTabs">
                     <template slot="Description">
-                        <div class="description-title-font" v-if="issuesDetails === undefined">
+                        <div class="description-title-font" v-if="issuesDetails === undefined || issuesDetails === null || Object.keys(issuesDetails).length === 0">
                             No vulnerabilities exists
                         </div>
                         <div v-else class="d-flex flex-column">
