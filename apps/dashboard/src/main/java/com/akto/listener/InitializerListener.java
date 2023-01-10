@@ -251,7 +251,7 @@ public class InitializerListener implements ServletContextListener {
         List<Predicate> predicates = new ArrayList<>(); 
         Conditions conditions = new Conditions(predicates, Operator.OR);
         predicates.add(new RegexPredicate(piiType.getRegexPattern()));
-
+        IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
         CustomDataType ret = new CustomDataType(
             piiKey, 
             piiType.getIsSensitive(), 
@@ -260,7 +260,8 @@ public class InitializerListener implements ServletContextListener {
             active, 
             conditions, 
             (piiType.getOnKey() ? null : conditions), 
-            Operator.OR
+            Operator.OR,
+            ignoreData
         );
 
         return ret;
@@ -634,14 +635,15 @@ public class InitializerListener implements ServletContextListener {
         if(backwardCompatibility.getAddAktoDataTypes()==0){
             List<AktoDataType> aktoDataTypes = new ArrayList<>();
             int now = Context.now();
-            aktoDataTypes.add(new AktoDataType("JWT", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER),now));
-            aktoDataTypes.add(new AktoDataType("EMAIL", true, Collections.emptyList(),now));
-            aktoDataTypes.add(new AktoDataType("CREDIT_CARD", true, Collections.emptyList(),now));
-            aktoDataTypes.add(new AktoDataType("SSN", true, Collections.emptyList(),now));
-            aktoDataTypes.add(new AktoDataType("ADDRESS", true, Collections.emptyList(),now));
-            aktoDataTypes.add(new AktoDataType("IP_ADDRESS", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER),now));
-            aktoDataTypes.add(new AktoDataType("PHONE_NUMBER", true, Collections.emptyList(),now));
-            aktoDataTypes.add(new AktoDataType("UUID", false, Collections.emptyList(),now));
+            IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
+            aktoDataTypes.add(new AktoDataType("JWT", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER),now,ignoreData));
+            aktoDataTypes.add(new AktoDataType("EMAIL", true, Collections.emptyList(),now,ignoreData));
+            aktoDataTypes.add(new AktoDataType("CREDIT_CARD", true, Collections.emptyList(),now,ignoreData));
+            aktoDataTypes.add(new AktoDataType("SSN", true, Collections.emptyList(),now,ignoreData));
+            aktoDataTypes.add(new AktoDataType("ADDRESS", true, Collections.emptyList(),now,ignoreData));
+            aktoDataTypes.add(new AktoDataType("IP_ADDRESS", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER),now,ignoreData));
+            aktoDataTypes.add(new AktoDataType("PHONE_NUMBER", true, Collections.emptyList(),now,ignoreData));
+            aktoDataTypes.add(new AktoDataType("UUID", false, Collections.emptyList(),now,ignoreData));
             AktoDataTypeDao.instance.getMCollection().drop();
             AktoDataTypeDao.instance.insertMany(aktoDataTypes);    
             

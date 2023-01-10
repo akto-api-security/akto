@@ -1,11 +1,15 @@
 package com.akto.dto.data_types;
 
 import com.akto.dto.CustomDataType;
+import com.akto.dto.IgnoreData;
+
 import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 
 import static org.junit.Assert.assertFalse;
@@ -28,9 +32,10 @@ public class TestCustomDataType {
 
         List<Predicate> predicateList2 = Collections.singletonList(new StartsWithPredicate("Dope"));
         Conditions conditions2 = new Conditions(predicateList2, Conditions.Operator.AND);
+        IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
 
         CustomDataType customDataType = new CustomDataType("name", true, Collections.emptyList(),
-                0,true, conditions2, conditions1, Conditions.Operator.AND);
+                0,true, conditions2, conditions1, Conditions.Operator.AND,ignoreData);
 
         assertTrue(customDataType.validate("w13rd_something_a55", "Dope_shit"));
         assertFalse(customDataType.validate("w13rd_something_a55", "BDope_shit"));

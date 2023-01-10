@@ -1,5 +1,7 @@
 package com.akto.dto.type;
+import com.akto.dto.AktoDataType;
 import com.akto.dto.CustomDataType;
+import com.akto.dto.IgnoreData;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.StartsWithPredicate;
@@ -8,6 +10,7 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
@@ -15,8 +18,20 @@ import static org.junit.Assert.assertTrue;
 
 public class TestKeyTypes {
 
+public void testInitializer(){
+        SingleTypeInfo.aktoDataTypeMap = new HashMap<>();
+        SingleTypeInfo.aktoDataTypeMap.put("JWT", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("PHONE_NUMBER", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("CREDIT_CARD", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("IP_ADDRESS", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("EMAIL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("SSN", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("UUID", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        }
+
     @Test
     public void testProcess() {
+        testInitializer();
         String url = "url";
         String method = "GET";
         int responseCode = 200;
@@ -28,10 +43,11 @@ public class TestKeyTypes {
 
         KeyTypes keyTypes = new KeyTypes(new HashMap<>(),false);
         SingleTypeInfo.customDataTypeMap = new HashMap<>();
+        IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
         CustomDataType customDataType1 = new CustomDataType("SHIPPING", true, Collections.emptyList(),
-                1, true,new Conditions(Collections.singletonList(new StartsWithPredicate("ship")), Conditions.Operator.AND),null, Conditions.Operator.AND);
+                1, true,new Conditions(Collections.singletonList(new StartsWithPredicate("ship")), Conditions.Operator.AND),null, Conditions.Operator.AND,ignoreData);
         CustomDataType customDataType2 = new CustomDataType("CAPTAIN",false, Collections.emptyList(),
-                1,true,new Conditions(Collections.singletonList(new StartsWithPredicate("captain")), Conditions.Operator.AND),null, Conditions.Operator.AND);
+                1,true,new Conditions(Collections.singletonList(new StartsWithPredicate("captain")), Conditions.Operator.AND),null, Conditions.Operator.AND,ignoreData);
 
         SingleTypeInfo.customDataTypeMap.put("SHIPPING", customDataType1);
         SingleTypeInfo.customDataTypeMap.put("CAPTAIN", customDataType2);

@@ -12,6 +12,8 @@ import GCP from "../apps/dashboard/shared/icons/GCP"
 import Swagger from "../apps/dashboard/shared/icons/Swagger"
 import Restapi from "../apps/dashboard/shared/icons/Restapi"
 import CustomWebhooks from "../apps/dashboard/shared/icons/CustomWebhooks"
+import TrashSingleTick from "../apps/dashboard/shared/icons/TrashSingleTick"
+import TrashDoubleTick from "../apps/dashboard/shared/icons/TrashDoubleTick"
 import AktoWhite from "../apps/dashboard/shared/icons/AktoWhite"
 import BookBookmark from "../apps/dashboard/shared/icons/BookBookmark"
 
@@ -210,6 +212,14 @@ faIconsOpts.restapi = {
 
 faIconsOpts.customwebhooks = {
   component: CustomWebhooks
+}
+
+faIconsOpts.trashSingleTick = {
+  component: TrashSingleTick
+}
+
+faIconsOpts.trashDoubleTick = {
+  component: TrashDoubleTick
 }
 
 faIcons.forEach(x => faIconsOpts[x.prefix+"_"+x.iconName] = {

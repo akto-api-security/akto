@@ -341,6 +341,16 @@ export default {
             method: 'post',
             data: { workflowTestJson, apiCollectionId }
         })
+    },
+
+    setFalsePositives (falsePositives) {
+        return request({
+            url: '/api/setFalsePositives',
+            method: 'post',
+            data: {falsePositives:falsePositives}
+        }).then((resp) => {
+            return resp
+        })
     }
 
 }
