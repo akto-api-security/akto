@@ -16,7 +16,6 @@ import com.akto.dto.api_workflow.Node;
 import com.akto.dto.testing.*;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.util.JSONUtils;
-import com.akto.util.RecordedLoginFlowUtil;
 import com.akto.utils.RedactSampleData;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
@@ -302,24 +301,25 @@ public class ApiWorkflowExecutor {
             String payload = recordedLoginFlowInput.getContent().toString();
             File tmpOutputFile;
             File tmpErrorFile;
-            try {
-                tmpOutputFile = File.createTempFile("output", ".json");
-                tmpErrorFile = File.createTempFile("recordedFlowOutput", ".txt");
-                RecordedLoginFlowUtil.triggerFlow(recordedLoginFlowInput.getTokenFetchCommand(), payload, tmpOutputFile.getPath(), tmpErrorFile.getPath(), 0);
-            } catch (Exception e) {
-                logger.error("error running recorded flow, retrying " + e.getMessage());
-                continue;
-            }
+            // try {
+            //     tmpOutputFile = File.createTempFile("output", ".json");
+            //     tmpErrorFile = File.createTempFile("recordedFlowOutput", ".txt");
+            //     RecordedLoginFlowUtil
+            //      .triggerFlow(recordedLoginFlowInput.getTokenFetchCommand(), payload, tmpOutputFile.getPath(), tmpErrorFile.getPath(), 0);
+            // } catch (Exception e) {
+            //     logger.error("error running recorded flow, retrying " + e.getMessage());
+            //     continue;
+            // }
 
-            try {
-                token = RecordedLoginFlowUtil.fetchToken(tmpOutputFile.getPath(), tmpErrorFile.getPath());
-            } catch(Exception e) {
-                logger.error("error fetching token, retrying " + e.getMessage());
-                continue;
-            }
-            if (token != null) {
-                break;
-            }
+            // try {
+            //     token = RecordedLoginFlowUtil.fetchToken(tmpOutputFile.getPath(), tmpErrorFile.getPath());
+            // } catch(Exception e) {
+            //     logger.error("error fetching token, retrying " + e.getMessage());
+            //     continue;
+            // }
+            // if (token != null) {
+            //     break;
+            // }
         }
 
         return token;

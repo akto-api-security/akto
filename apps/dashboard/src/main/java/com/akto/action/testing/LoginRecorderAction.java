@@ -17,7 +17,7 @@ import com.akto.dao.RecordedLoginInputDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.LoginFlowStepsDao;
 import com.akto.dto.RecordedLoginFlowInput;
-import com.akto.util.RecordedLoginFlowUtil;
+import com.akto.utils.RecordedLoginFlowUtil;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
@@ -41,6 +41,7 @@ public class LoginRecorderAction extends UserAction {
         String payload = this.content.toString();
 
         int accountId = Context.accountId.get();
+
         executorService.schedule( new Runnable() {
             public void run() {
                 try {

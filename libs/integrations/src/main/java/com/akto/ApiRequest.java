@@ -7,13 +7,22 @@ import okhttp3.*;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 public class ApiRequest {
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final OkHttpClient client = new OkHttpClient();
+;
 
     public static JsonNode common(Request request) {
+        OkHttpClient client = new OkHttpClient.Builder()
+        .connectTimeout(300, TimeUnit.SECONDS)
+        .readTimeout(300, TimeUnit.SECONDS)
+        .writeTimeout(300, TimeUnit.SECONDS)
+        .build();
+            
         Call call = client.newCall(request);
+        
         Response response;
         try {
             response = call.execute();
