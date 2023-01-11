@@ -2,8 +2,10 @@ package com.akto.runtime;
 
 import com.akto.MongoBasedTest;
 import com.akto.dao.*;
+import com.akto.dto.AktoDataType;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.FilterSampleData;
+import com.akto.dto.IgnoreData;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.traffic.Key;
@@ -22,9 +24,20 @@ import java.util.*;
 import static org.junit.Assert.assertEquals;
 
 public class TestApiCatalogSync extends MongoBasedTest {
-
+    public void testInitializer(){
+        SingleTypeInfo.aktoDataTypeMap = new HashMap<>();
+        SingleTypeInfo.aktoDataTypeMap.put("JWT", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("PHONE_NUMBER", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("CREDIT_CARD", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("IP_ADDRESS", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("EMAIL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("SSN", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("UUID", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        }
+        
     @Test
     public void testFillUrlParams() {
+        testInitializer();
         RequestTemplate requestTemplate1 = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder());
         validateSubTypeAndMinMax(requestTemplate1, "/api/books/378282246310005", "/api/books/STRING",
                 SingleTypeInfo.CREDIT_CARD, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE, 1,1);

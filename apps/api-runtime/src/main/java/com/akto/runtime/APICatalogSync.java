@@ -654,8 +654,9 @@ public class APICatalogSync {
                         SuperType superType = urlTemplate.getTypes()[i];
                         if (superType == null) continue;
 
-                        SubType subType = KeyTypes.findSubType(i, i+"");
-                        SingleTypeInfo.ParamId stiId = new SingleTypeInfo.ParamId(newTemplateUrl, delMethod.name(), -1, false, i+"", subType, apiCollectionId, true);
+                        SingleTypeInfo.ParamId stiId = new SingleTypeInfo.ParamId(newTemplateUrl, delMethod.name(), -1, false, i+"", SingleTypeInfo.GENERIC, apiCollectionId, true);
+                        SubType subType = KeyTypes.findSubType(i, i+"",stiId);
+                        stiId.setSubType(subType);
                         SingleTypeInfo sti = new SingleTypeInfo(
                             stiId, new HashSet<>(), new HashSet<>(), 0, Context.now(), 0, CappedSet.create(i+""), 
                             SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MIN_VALUE, SingleTypeInfo.ACCEPTED_MAX_VALUE);

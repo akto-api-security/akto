@@ -13,6 +13,7 @@ import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.info.BFLATestInfo;
+import com.akto.dto.testing.info.NucleiTestInfo;
 import com.akto.dto.testing.info.TestInfo;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
@@ -154,6 +155,7 @@ public class DaoInit {
         ClassModel<AktoDataType> AktoDataTypeClassModel = ClassModel.builder(AktoDataType.class).enableDiscriminator(true).build();
         ClassModel<TestInfo> testInfoClassModel = ClassModel.builder(TestInfo.class).enableDiscriminator(true).build();
         ClassModel<BFLATestInfo> bflaTestInfoClassModel = ClassModel.builder(BFLATestInfo.class).enableDiscriminator(true).build();
+        ClassModel<NucleiTestInfo> nucleiTestInfoClassModel = ClassModel.builder(NucleiTestInfo.class).enableDiscriminator(true).build();
 
         ClassModel<LoginFlowStepsData> loginFlowStepsData = ClassModel.builder(LoginFlowStepsData.class)
         .enableDiscriminator(true).build();
@@ -176,7 +178,7 @@ public class DaoInit {
                 cappedSetClassModel, CustomWebhookClassModel, CustomWebhookResultClassModel,
                 nodeResultClassModel, awsResourcesModel, AktoDataTypeClassModel, testingRunIssuesClassModel,
                 testingIssuesIdClassModel, endpointLogicalGroupClassModel, testRolesClassModel,
-                logicalGroupTestingEndpointClassModel, testInfoClassModel , bflaTestInfoClassModel, customAuthTypeModel,
+                logicalGroupTestingEndpointClassModel, testInfoClassModel , bflaTestInfoClassModel, nucleiTestInfoClassModel, customAuthTypeModel,
                 containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
@@ -203,6 +205,7 @@ public class DaoInit {
                 new EnumCodec<>(GlobalEnums.TestErrorSource.class),
                 new EnumCodec<>(GlobalEnums.TestCategory.class),
                 new EnumCodec<>(GlobalEnums.TestSubCategory.class),
+                new EnumCodec<>(GlobalEnums.IssueTags.class),
                 new EnumCodec<>(GlobalEnums.Severity.class));
 
         CodecRegistry codecRegistry = fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,

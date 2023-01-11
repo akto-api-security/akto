@@ -3,6 +3,7 @@ import Router from 'vue-router'
 const PageLogin  = () => import( '@/apps/login/App')
 const PageDashboard  = () => import( '@/apps/dashboard/App')
 const PageToday  = () => import( "@/apps/dashboard/views/today/Today")
+const PageMarketplace  = () => import( "@/apps/dashboard/views/marketplace/PageMarketplace")
 const PageQuickStart  = () => import( "@/apps/dashboard/views/quickstart/PageQuickStart")
 const PageTesting  = () => import( "@/apps/dashboard/views/testing/PageTesting")
 const PageIssues  = () => import( "@/apps/dashboard/views/issues/PageIssues")
@@ -21,6 +22,7 @@ const APICollections = () => import("@/apps/dashboard/views/observe/collections/
 const SensitiveData = () => import("@/apps/dashboard/views/observe/sensitive/SensitiveData")
 const ApiChanges = () => import("@/apps/dashboard/views/observe/changes/Changes")
 const ParamState = () => import("@/apps/dashboard/views/observe/misc/ParamState")
+const MPTestCategory = () => import("@/apps/dashboard/views/marketplace/components/MPTestCategory")
 
 Vue.use(Router)
 
@@ -184,6 +186,33 @@ const router =  new Router({
                             component: ParamState,
                         }
                     ]
+                },
+                {
+                    path: 'library',
+                    name: 'library',
+                    components: {
+                        default: PageMarketplace
+                    },
+                    children: [
+                        {
+                            path: 'custom/:category_id',
+                            name: 'customCategory',
+                            component: MPTestCategory,
+                            props: route => ({
+                                categoryType: "custom",
+                                categoryId: route.params.category_id
+                            })
+                        },
+                        {
+                            path: 'default/:category_id',
+                            name: 'defaultCategory',
+                            component: MPTestCategory,
+                            props: route => ({
+                                categoryType: "default",
+                                categoryId: route.params.category_id
+                            })
+                        }
+                    ]                    
                 }
             ]
         },

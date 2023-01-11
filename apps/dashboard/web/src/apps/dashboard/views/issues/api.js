@@ -29,6 +29,13 @@ export default {
             data: {issueId}
         })
     },
+    fetchAffectedEndpoints (issueId) {
+        return request({
+            url: 'api/fetchAffectedEndpoints',
+            method: 'post',
+            data: {issueId}
+        })
+    },
     fetchAllSubCategories () {
         return request({
             url: 'api/fetchAllSubCategories',

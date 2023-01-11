@@ -7,10 +7,17 @@ import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.WorkflowTestsDao;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dao.testing.*;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
+import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
+import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
@@ -32,6 +39,7 @@ public class StartTestAction extends UserAction {
     private List<TestingRun> testingRuns;
     private AuthMechanism authMechanism;
     private int endTimestamp;
+    private String testName;
 
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds) {
         User user = getSUser();
@@ -67,13 +75,16 @@ public class StartTestAction extends UserAction {
                 addActionError("Invalid APIs type");
                 return null;
         }
+        if (this.selectedTests != null) {
+            TestingRunConfig testingRunConfig = new TestingRunConfig(Context.now(), null, this.selectedTests,authMechanism.getId());
+            this.testIdConfig = testingRunConfig.getId();
+            TestingRunConfigDao.instance.insertOne(testingRunConfig);
+        }
 
-        TestingRun testingRun = new TestingRun(
-            scheduleTimestamp, user.getLogin(), testingEndpoints, testIdConfig, TestingRun.State.SCHEDULED, periodInSeconds
-        );
-
-        return testingRun;   
+        return new TestingRun(scheduleTimestamp, user.getLogin(),
+                testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName);
     }
+    private List<String> selectedTests;
 
     public String startTest() {
         int scheduleTimestamp = this.startTimestamp == 0 ? Context.now()  : this.startTimestamp;
@@ -163,6 +174,21 @@ public class StartTestAction extends UserAction {
     public String fetchTestRunResultDetails() {
         ObjectId testingRunResultId = new ObjectId(testingRunResultHexId);
         this.testingRunResult = TestingRunResultDao.instance.findOne("_id", testingRunResultId);
+        return SUCCESS.toUpperCase();
+    }
+
+    private TestingRunIssues runIssues;
+    public String fetchIssueFromTestRunResultDetails() {
+        ObjectId testingRunResultId = new ObjectId(testingRunResultHexId);
+        TestingRunResult result = TestingRunResultDao.instance.findOne(Constants.ID, testingRunResultId);
+        try {
+            if (result.isVulnerable()) {
+                GlobalEnums.TestSubCategory category = GlobalEnums.TestSubCategory.getTestCategory(result.getTestSubType());
+                TestingIssuesId issuesId = new TestingIssuesId(result.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING, category);
+                runIssues = TestingRunIssuesDao.instance.findOne(Filters.eq(Constants.ID, issuesId));
+            }
+        }catch (Exception ignore) {}
+
         return SUCCESS.toUpperCase();
     }
 
@@ -289,5 +315,28 @@ public class StartTestAction extends UserAction {
 
     public WorkflowTest getWorkflowTest() {
         return workflowTest;
+    }
+
+    public TestingRunIssues getRunIssues() {
+        return runIssues;
+    }
+
+    public void setRunIssues(TestingRunIssues runIssues) {
+        this.runIssues = runIssues;
+    }
+    public List<String> getSelectedTests() {
+        return selectedTests;
+    }
+
+    public void setSelectedTests(List<String> selectedTests) {
+        this.selectedTests = selectedTests;
+    }
+
+    public String getTestName() {
+        return this.testName;
+    }
+
+    public void setTestName(String testName) {
+        this.testName = testName;
     }
 }

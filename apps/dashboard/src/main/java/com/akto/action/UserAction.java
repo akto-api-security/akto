@@ -6,7 +6,6 @@ import org.apache.struts2.interceptor.SessionAware;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Calendar;
 import java.util.Map;
 
 public abstract class UserAction extends ActionSupport implements SessionAware {
