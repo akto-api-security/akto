@@ -65,12 +65,15 @@ public class SingleTypeInfo {
             customDataTypesSortedBySensitivity = new ArrayList<>(sensitiveCustomDataType);
 
             List<AktoDataType> aktoDataTypes = AktoDataTypeDao.instance.findAll(new BasicDBObject());
+            Map<String,AktoDataType> newAktoMap = new HashMap<>();
             for(AktoDataType aktoDataType:aktoDataTypes){
                 if(subTypeMap.containsKey(aktoDataType.getName())){
+                    newAktoMap.put(aktoDataType.getName(), aktoDataType);
                     subTypeMap.get(aktoDataType.getName()).setSensitiveAlways(aktoDataType.getSensitiveAlways());
                     subTypeMap.get(aktoDataType.getName()).setSensitivePosition(aktoDataType.getSensitivePosition());
                 }
             }
+            aktoDataTypeMap = newAktoMap;
         } catch (Exception ex) {
             ex.printStackTrace(); // or logger would be better
         }
@@ -423,6 +426,7 @@ public class SingleTypeInfo {
     public static final Map<String, SubType> subTypeMap = new HashMap<>();
     public static Map<String, CustomDataType> customDataTypeMap = new HashMap<>();
     public static List<CustomDataType> customDataTypesSortedBySensitivity = new ArrayList<>();
+    public static Map<String, AktoDataType> aktoDataTypeMap = new HashMap<>();
     static {
         subTypeMap.put("TRUE", TRUE);
         subTypeMap.put("FALSE", FALSE);

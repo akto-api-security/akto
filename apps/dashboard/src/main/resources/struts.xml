@@ -376,6 +376,17 @@
             </result>
         </action>
 
+        <action name="api/setFalsePositives" class="com.akto.action.IgnoreFalsePositivesAction" method="setFalsePositivesInSensitiveData">
+        <interceptor-ref name="json"/>
+        <interceptor-ref name="defaultStack" />
+        <result name="SUCCESS"  type="json">
+            <param name="root">response</param>
+        </result>
+        <result name="ERROR" type="httpheader">
+            <param name="status">401</param>
+        </result>
+    </action>
+
         <action name="middleware/config" class="com.akto.action.MiddlewareConfigAction" method="getMiddlewareConfig">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -1030,6 +1041,15 @@
             </result>
         </action>
 
+        <action name="api/fetchAffectedEndpoints" class="com.akto.action.testing_issues.IssuesAction" method="fetchAffectedEndpoints">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
         <action name="api/fetchAllSubCategories" class="com.akto.action.testing_issues.IssuesAction" method="fetchAllSubCategories">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -1374,6 +1394,18 @@
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
                 <param name="enumAsBean">true</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchIssueFromTestRunResultDetails" class="com.akto.action.testing.StartTestAction" method="fetchIssueFromTestRunResultDetails">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>

@@ -5,8 +5,10 @@ import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.AktoDataType;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.IgnoreData;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
 import com.akto.runtime.APICatalogSync;
@@ -24,8 +26,20 @@ import static org.junit.Assert.*;
 
 public class TestMergingNew extends MongoBasedTest {
 
+    public void testInitializer(){
+        SingleTypeInfo.aktoDataTypeMap = new HashMap<>();
+        SingleTypeInfo.aktoDataTypeMap.put("JWT", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("PHONE_NUMBER", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("CREDIT_CARD", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("IP_ADDRESS", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("EMAIL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("SSN", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("UUID", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("URL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+    }
     @Test
     public void testMultipleIntegerMerging() {
+        testInitializer();
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
         HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
@@ -68,6 +82,7 @@ public class TestMergingNew extends MongoBasedTest {
 
     @Test
     public void testmultipleUUIDForceMerge(){
+        testInitializer();
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
         HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1,true);
@@ -174,6 +189,7 @@ public class TestMergingNew extends MongoBasedTest {
 
     @Test
     public void testParameterizedURLsTestString() {
+        testInitializer();
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
         HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
@@ -275,6 +291,7 @@ public class TestMergingNew extends MongoBasedTest {
 
     @Test
     public void testStrictIntoTemplate() {
+        testInitializer();
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
         HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
@@ -312,6 +329,7 @@ public class TestMergingNew extends MongoBasedTest {
 
     @Test
     public void test20percentCondition() {
+        testInitializer();
         SingleTypeInfoDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.getMCollection().drop();
         HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, true);
@@ -710,6 +728,7 @@ public class TestMergingNew extends MongoBasedTest {
     // testing if new endpoints are getting their sample data synced immediately or not
     @Test
     public void testSampleDataUpdate() throws Exception {
+        testInitializer();
         SingleTypeInfoDao.instance.getMCollection().drop();
         SampleDataDao.instance.getMCollection().drop();
 

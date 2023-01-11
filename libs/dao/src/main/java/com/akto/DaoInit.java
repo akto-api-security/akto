@@ -205,6 +205,7 @@ public class DaoInit {
                 new EnumCodec<>(GlobalEnums.TestErrorSource.class),
                 new EnumCodec<>(GlobalEnums.TestCategory.class),
                 new EnumCodec<>(GlobalEnums.TestSubCategory.class),
+                new EnumCodec<>(GlobalEnums.IssueTags.class),
                 new EnumCodec<>(GlobalEnums.Severity.class));
 
         CodecRegistry codecRegistry = fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
