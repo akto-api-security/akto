@@ -165,7 +165,6 @@ public class TestExecutor {
             }
         }
 
-        TestingRunResultDao.instance.insertMany(testingRunResults);
         loggerMaker.infoAndAddToDb("Finished adding " + testingRunResults.size() + " testingRunResults");
 
         TestingRunResultSummariesDao.instance.updateOne(
@@ -351,6 +350,7 @@ public class TestExecutor {
 
         try {
             testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId);
+            TestingRunResultDao.instance.insertMany(testingRunResults);
         } catch (Exception e) {
             e.printStackTrace();
         }
