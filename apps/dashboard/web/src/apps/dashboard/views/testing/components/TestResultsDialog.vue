@@ -78,7 +78,7 @@
                                         </td>
                                     </tr>
                                 </table>
-                                <span v-if="!isTestingPage" class="issue-summary clickable-line ml-4" @click="$emit('showAllIssueByCategory', subCatogoryMap[issuesDetails.id.testSubCategory])">Show all endpoints</span>
+                                <!-- <span v-if="!isTestingPage" class="issue-summary clickable-line ml-4" @click="$emit('showAllIssueByCategory', subCatogoryMap[issuesDetails.id.testSubCategory])">Show all endpoints</span> -->
                             </div>
                             <div class="d-flex flex-column mt-4">
                                 <span class="description-title">References</span>
