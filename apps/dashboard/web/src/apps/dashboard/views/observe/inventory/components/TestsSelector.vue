@@ -17,7 +17,7 @@
                         <v-list-item v-for="(value, category, index) in mapCategoryToSubcategory" :key="index"  :class="['clickable', 'brdt', 'brdr' ,'category-item', selectedCategory == category ?  'selected-category' : '']"  @click="selectedCategory = category; globalCheckbox = false">
                             <div class="d-flex jc-sb" style="width: 100%">
                                 <div>
-                                    <div class="fw-500">{{category}}</div>
+                                    <div class="fw-500">{{getCategoryName(category)}}</div>
                                     <div class="grey-text fs-12">{{mapCategoryToSubcategory[category].selected.length}} of {{mapCategoryToSubcategory[category].all.length}} selected</div>
                                 </div>
                                 <v-icon v-if="mapCategoryToSubcategory[category].selected.length > 0" size="16" color="#6200EA">$fas_check</v-icon>
@@ -112,6 +112,9 @@ export default {
         
     },
     methods: {
+        getCategoryName(category) {
+            return this.businessLogicCategories.find(x => x.superCategory.name === category).superCategory.displayName
+        },
         setTestName(testName) {
             this.testName = testName
         },
@@ -161,7 +164,7 @@ export default {
                 }
 
                 let obj = {
-                    label: x.name.toLowerCase().replaceAll("_", " "),
+                    label: x.testName,
                     value: x.name,
                     icon: "$aktoWhite"
                 }
