@@ -80,9 +80,16 @@ public class FuzzingTest extends TestPlugin {
 
         try {
             FileUtils.copyURLToFile(new URL(this.origTemplatePath), new File(this.tempTemplatePath));
-            downloadLinks(this.tempTemplatePath, outputDir);
         } catch (IOException e1) {
-            return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest, nucleiTestInfo);
+            e1.printStackTrace();
+            return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.FAILED_DOWNLOADING_NUCLEI_TEMPLATE, testRequest, nucleiTestInfo);
+        }
+
+        try {
+            downloadLinks(this.tempTemplatePath, outputDir);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.FAILED_DOWNLOADING_PAYLOAD_FILES, testRequest, nucleiTestInfo);
         }
 
         try {
@@ -98,14 +105,16 @@ public class FuzzingTest extends TestPlugin {
 
             if (nucleiResult == null) return addWithoutRequestError(rawApi.getOriginalMessage(), TestResult.TestError.FAILED_BUILDING_NUCLEI_TEMPLATE);
 
-            int index = 0;
-            for (Pair<OriginalHttpRequest, OriginalHttpResponse> pair: nucleiResult.attempts) {
+            int totalCount = Math.min(Math.min(nucleiResult.attempts.size(), nucleiResult.metaData.size()), 100);
+
+            for (int idx=0; idx < totalCount; idx++) {
+                Pair<OriginalHttpRequest, OriginalHttpResponse> pair = nucleiResult.attempts.get(idx);
                 OriginalHttpResponse testResponse = pair.getSecond();
 
                 int statusCode = StatusCodeAnalyser.getStatusCode(testResponse.getBody(), testResponse.getStatusCode());
                 double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), testResponse.getBody());
 
-                vulnerable = nucleiResult.metaData.get(index).getBoolean("matcher-status"); // todo:
+                vulnerable = nucleiResult.metaData.get(idx).getBoolean("matcher-status");
 
                 apiExecutionDetails = new ApiExecutionDetails(statusCode, percentageMatch, testResponse);
 
@@ -114,7 +123,6 @@ public class FuzzingTest extends TestPlugin {
                 );
         
                 testResults.add(testResult);
-                index+=1;
 
             }
         } catch (Exception e) {

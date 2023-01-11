@@ -45,6 +45,12 @@ public class Main {
             StatusCodeAnalyser.run();
         }
 
+        System.out.println("*********************RESULT******************************************");
+        System.out.println(System.getProperty("sun.arch.data.model"));
+        System.out.println(System.getProperty("os.arch"));
+        System.out.println(System.getProperty("os.version"));
+        System.out.println("***************************************************************");
+
         TestExecutor testExecutor = new TestExecutor();
 
         while (true) {
