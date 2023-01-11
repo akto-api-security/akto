@@ -182,9 +182,11 @@ public class StartTestAction extends UserAction {
         ObjectId testingRunResultId = new ObjectId(testingRunResultHexId);
         TestingRunResult result = TestingRunResultDao.instance.findOne(Constants.ID, testingRunResultId);
         try {
-            GlobalEnums.TestSubCategory category = GlobalEnums.TestSubCategory.getTestCategory(result.getTestSubType());
-            TestingIssuesId issuesId = new TestingIssuesId(result.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING, category);
-            runIssues = TestingRunIssuesDao.instance.findOne(Filters.eq(Constants.ID, issuesId));
+            if (result.isVulnerable()) {
+                GlobalEnums.TestSubCategory category = GlobalEnums.TestSubCategory.getTestCategory(result.getTestSubType());
+                TestingIssuesId issuesId = new TestingIssuesId(result.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING, category);
+                runIssues = TestingRunIssuesDao.instance.findOne(Filters.eq(Constants.ID, issuesId));
+            }
         }catch (Exception ignore) {}
 
         return SUCCESS.toUpperCase();

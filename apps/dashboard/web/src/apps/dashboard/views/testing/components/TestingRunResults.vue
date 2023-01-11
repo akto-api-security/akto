@@ -70,6 +70,7 @@
                                 :testingRunResult="testingRunResult"
                                 :subCatogoryMap="subCatogoryMap"
                                 :issuesDetails="dialogBoxIssue"
+                                isTestingPage
                                 :mapCollectionIdToName="mapCollectionIdToName"/>
                         </div>
                     </a-card>

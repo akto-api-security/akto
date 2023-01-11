@@ -11,39 +11,41 @@
                 <layout-with-tabs :tabsContent="getTabsContent()" title=""
                     :tabs="['Description', 'Original', 'Attempt']" ref="layoutWithTabs">
                     <template slot="Description">
-                        <div class="description-title-font"
+                        <div class="description-title mt-4" :style="{'height':'500px'}"
                             v-if="issuesDetails === undefined || issuesDetails === null || Object.keys(issuesDetails).length === 0">
                             No vulnerabilities exists
                         </div>
                         <div v-else class="d-flex flex-column">
                             <div class="d-flex flex-column">
-                                <span class="description-title-font mt-4">Issue summary</span>
+                                <span class="description-title mt-4">Issue summary</span>
                                 <div class="mt-3 issue-summary-border">
-                                    <v-container fluid class="ml-4 mt-0 mb-0 mr-0 pa-0">
-                                        <v-row align-self="start" :style="{ 'margin-top': '10px' }"
+                                    <v-container fluid class="ma-0 pa-0">
+                                        <v-row :style="{ 'margin-top': '10px' }"
                                             v-for="(item, index) in issueSummaryTable" :key="index"
-                                            class="ml-0 mr-0 mb-0 pa-0">
-                                            <v-col class="ma-0 pa-0">
-                                                <span class="description-title-font">{{ item.title }}</span>
+                                            class="mx-0 mb-0 pa-0">
+
+                                            <v-col cols="2" class="ma-0 pa-0">
+                                                <span class="description-content">{{ item.title }}</span>
                                             </v-col>
-                                            <v-col v-if="item.title === 'Endpoint'" class="ma-0 pa-0">
-                                                <span class="issue-summary-font">{{ item.description.method }}</span>
-                                                <span class="description-title-font">{{ item.description.url }}</span>
+
+                                            <v-col v-if="item.title === 'Endpoint'" class="my-0 mr-0 ml-7 pa-0">
+                                                <span class="issue-summary">{{ item.description.method }}</span>
+                                                <span class="issue-summary">{{ item.description.url }}</span>
                                             </v-col>
-                                            <v-col v-else class="ma-0 pa-0">
-                                                <span class="issue-summary-font">
+                                            <v-col v-else class="my-0 mr-0 ml-7 pa-0">
+                                                <span class="issue-summary">
                                                     {{ item.description }}
                                                 </span>
                                             </v-col>
                                         </v-row>
-                                        <v-row align-self="start" class="ml-0 mr-0 pa-0"
+                                        <v-row class="mx-0 pa-0"
                                             :style="{ 'margin-top': '10px', 'margin-bottom': '10px' }">
-                                            <v-col class="ma-0 pa-0">
-                                                <span class="description-title-font">Tags</span>
+                                            <v-col cols="2" class="ma-0 pa-0">
+                                                <span class="description-content">Tags</span>
                                             </v-col>
-                                            <v-col class="ma-0 pa-0">
-                                                <v-chip :style="{ 'height': '24px !important' }" color="#6A6985"
-                                                    class="description-title-font mr-2" text-color="#FFFFFF"
+                                            <v-col class="my-0 mr-0 ml-7 pa-0">
+                                                <v-chip :style="{ 'height': '24px !important' }" color="#47466AB2"
+                                                    class="issue-summary mr-2" text-color="#FFFFFF"
                                                     v-for="chipItem in subCatogoryMap[issuesDetails.id.testSubCategory].issueTags">
                                                     {{ chipItem.name }}
                                                 </v-chip>
@@ -53,38 +55,37 @@
                                 </div>
                             </div>
                             <div class="d-flex flex-column mt-4">
-                                <span class="description-title-font">Issue Details</span>
+                                <span class="description-title">Issue Details</span>
                                 <div class="mt-3">
-                                    <span class="description-content-font abc"
+                                    <span class="description-content"
                                         v-html="replaceTags(subCatogoryMap[issuesDetails.id.testSubCategory].issueDetails)"></span>
                                 </div>
                             </div>
                             <div class="d-flex flex-column mt-4">
-                                <span class="description-title-font">Impact</span>
+                                <span class="description-title">Impact</span>
                                 <div class="mt-3">
-                                    <span class="description-content-font"
+                                    <span class="description-content"
                                         v-html="subCatogoryMap[issuesDetails.id.testSubCategory].issueImpact"></span>
                                 </div>
-
                             </div>
                             <div v-if="similarlyAffectedIssues || similarlyAffectedIssues.length === 0" class="mt-4">
-                                <span class="description-title-font">Api endpoints affected</span>
-                                <table :style="{'width': '100%'}" class="mt-3 mb-3">
+                                <span class="description-title">Api endpoints affected</span>
+                                <table :style="{ 'width': '100%' }" class="mt-3 mb-3">
                                     <tr class="table-row" v-for="(item, index) in similarlyAffectedIssues" :key="index">
                                         <td class="table-column clickable">
-                                            <span class="issue-summary-font mr-1 ml-3">{{ item.id.apiInfoKey.method }}</span>
-                                            <span class="issue-url-font">{{ item.id.apiInfoKey.url }}</span>
+                                            <span class="description-content mr-1 ml-3">{{item.id.apiInfoKey.method}}</span>
+                                            <span class="description-content">{{ item.id.apiInfoKey.url }}</span>
                                         </td>
                                     </tr>
                                 </table>
-                                <!-- <span class="description-title-font clickable-line ml-4" @click="$emit('showAllIssueByCategory', subCatogoryMap[issuesDetails.id.testSubCategory])">Show all endpoints</span> -->
+                                <span v-if="!isTestingPage" class="issue-summary clickable-line ml-4" @click="$emit('showAllIssueByCategory', subCatogoryMap[issuesDetails.id.testSubCategory])">Show all endpoints</span>
                             </div>
                             <div class="d-flex flex-column mt-4">
-                                <span class="description-title-font">References</span>
+                                <span class="description-title">References</span>
                                 <ul class="mt-3">
-                                    <li class="description-title-font mt-2 clickable-line"
+                                    <li class="description-content mt-2 "
                                         v-for="item in subCatogoryMap[issuesDetails.id.testSubCategory].references">
-                                        <a :href="item" target="_blank">{{ item }}</a>
+                                        <span ><a :href="item" target="_blank" class="clickable-line">{{ item }}</a></span>
                                     </li>
                                 </ul>
                             </div>
@@ -136,39 +137,40 @@ export default {
         issuesDetails: obj.objN,
         subCatogoryMap: obj.objN,
         mapCollectionIdToName: obj.objN,
-        similarlyAffectedIssues: obj.arrN
+        similarlyAffectedIssues: obj.arrN,
+        isTestingPage: obj.boolN
     },
     data() {
         var issueSummaryTable = [
-            {
-                title: 'Issue category',
-                description: this.subCatogoryMap[this.issuesDetails.id.testSubCategory].superCategory.displayName
-            },
-            {
-                title: 'Test run',
-                description: this.subCatogoryMap[this.issuesDetails.id.testSubCategory].testName
-            },
-            {
-                title: 'Severity',
-                description: this.subCatogoryMap[this.issuesDetails.id.testSubCategory].superCategory.severity._name
-            },
-            {
-                title: 'Endpoint',
-                description: {
-                    method: this.issuesDetails.id.apiInfoKey.method,
-                    url: this.issuesDetails.id.apiInfoKey.url
-                }
-            },
-            {
-                title: 'Collection',
-                description: this.mapCollectionIdToName[this.issuesDetails.id.apiInfoKey.apiCollectionId]
-            }
-        ]
+                    {
+                        title: 'Issue category',
+                        description: this.subCatogoryMap[this.issuesDetails.id.testSubCategory].superCategory.displayName
+                    },
+                    {
+                        title: 'Test run',
+                        description: this.subCatogoryMap[this.issuesDetails.id.testSubCategory].testName
+                    },
+                    {
+                        title: 'Severity',
+                        description: this.subCatogoryMap[this.issuesDetails.id.testSubCategory].superCategory.severity._name
+                    },
+                    {
+                        title: 'Endpoint',
+                        description: {
+                            method: this.issuesDetails.id.apiInfoKey.method,
+                            url: this.issuesDetails.id.apiInfoKey.url
+                        }
+                    },
+                    {
+                        title: 'Collection',
+                        description: this.mapCollectionIdToName[this.issuesDetails.id.apiInfoKey.apiCollectionId]
+                    }
+                ]
         return {
             currentIndex: 0,
             issueSummaryTable
-        }
-    },
+            }
+        },
     methods: {
         getTabsContent() {
             if (this.messagesBasic.length > 1) {
@@ -296,14 +298,22 @@ export default {
 </style>
 
 <style scoped>
-.description-title-font {
-    font-size: 12px !important;
+.description-title {
+    font-size: 14px !important;
     font-weight: 500;
+    color: #47466A;
 }
 
-.description-content-font {
+.description-content {
     font-size: 12px !important;
     font-weight: 400;
+    color: #47466A;
+}
+
+.issue-summary {
+    font-size: 12px !important;
+    font-weight: 500;
+    color: #47466A;
 }
 
 .issue-summary-border {
@@ -312,13 +322,4 @@ export default {
     border-style: solid;
 }
 
-.issue-summary-font {
-    font-size: 12px !important;
-    font-weight: 600;
-}
-
-.issue-url-font {
-    font-size: 12px !important;
-    font-weight: 500;
-}
 </style>

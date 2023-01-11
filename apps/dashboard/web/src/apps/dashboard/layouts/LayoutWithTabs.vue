@@ -25,7 +25,7 @@
                             <v-tab class="right-pane-tab" v-for="tab in tabs" :key="tab">
                                 {{tab}}
                                 <v-chip v-if="tabsContent && tabsContent[tab]" :style="{ 'height': '18px !important' }"
-                                 class="ml-2 mr-2" color="#6A6985" text-color="#FFFFFF">
+                                 class="ml-2 mr-2" color="#47466AB2" text-color="#FFFFFF">
                                         {{ tabsContent[tab] }}
                                 </v-chip>
                             </v-tab>
