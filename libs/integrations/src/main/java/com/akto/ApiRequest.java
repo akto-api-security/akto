@@ -15,14 +15,7 @@ public class ApiRequest {
 ;
 
     public static JsonNode common(Request request) {
-        OkHttpClient client = new OkHttpClient.Builder()
-        .connectTimeout(300, TimeUnit.SECONDS)
-        .readTimeout(300, TimeUnit.SECONDS)
-        .writeTimeout(300, TimeUnit.SECONDS)
-        .build();
-            
         Call call = client.newCall(request);
-        
         Response response;
         try {
             response = call.execute();
@@ -30,6 +23,49 @@ public class ApiRequest {
             // TODO: logger
             e.printStackTrace();
             return null;
+        }
+        ResponseBody responseBody = response.body();
+        if (responseBody == null) {
+            return null;
+        }
+        String body;
+        try {
+            body = responseBody.string();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+
+        try {
+            return mapper.readValue(body, JsonNode.class);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public static JsonNode processWithTimeout(Request request, TimeoutObject timeoutObj) throws Exception {
+
+        OkHttpClient clientWithTimeout;
+        Call call;
+
+        if (timeoutObj != null) {
+            clientWithTimeout = new OkHttpClient.Builder()
+            .connectTimeout(timeoutObj.getConnectTimeout(), TimeUnit.SECONDS)
+            .readTimeout(timeoutObj.getReadTimeout(), TimeUnit.SECONDS)
+            .writeTimeout(timeoutObj.getWriteTimeout(), TimeUnit.SECONDS)
+            .build();
+            call = clientWithTimeout.newCall(request);
+        } else {
+            call = client.newCall(request);
+        }
+                
+        Response response;
+        try {
+            response = call.execute();
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new Exception(e.getMessage());
         }
         ResponseBody responseBody = response.body();
         if (responseBody == null) {
@@ -72,6 +108,18 @@ public class ApiRequest {
         Request request = builder.build();
 
         return common(request);
+    }
+
+    public static JsonNode postRequestWithTimeout(Map<String, String> headersMap, String url, String json, TimeoutObject timeoutObj) throws Exception {
+        RequestBody body = RequestBody.create( json, MediaType.parse("application/json; charset=utf-8"));
+
+        Request.Builder builder = new Request.Builder().post(body).url(url);
+        for (String key: headersMap.keySet()) {
+            builder.addHeader(key, headersMap.get(key));
+        }
+        Request request = builder.build();
+
+        return processWithTimeout(request, timeoutObj);
     }
 
     public static JsonNode putRequest(Map<String, String> headersMap, String url, String json) {

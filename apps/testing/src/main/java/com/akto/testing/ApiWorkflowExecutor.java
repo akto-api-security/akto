@@ -22,6 +22,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
+import com.akto.util.RecordedLoginFlowUtil;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.common.protocol.types.Field.Str;
@@ -301,25 +302,25 @@ public class ApiWorkflowExecutor {
             String payload = recordedLoginFlowInput.getContent().toString();
             File tmpOutputFile;
             File tmpErrorFile;
-            // try {
-            //     tmpOutputFile = File.createTempFile("output", ".json");
-            //     tmpErrorFile = File.createTempFile("recordedFlowOutput", ".txt");
-            //     RecordedLoginFlowUtil
-            //      .triggerFlow(recordedLoginFlowInput.getTokenFetchCommand(), payload, tmpOutputFile.getPath(), tmpErrorFile.getPath(), 0);
-            // } catch (Exception e) {
-            //     logger.error("error running recorded flow, retrying " + e.getMessage());
-            //     continue;
-            // }
+            try {
+                tmpOutputFile = File.createTempFile("output", ".json");
+                tmpErrorFile = File.createTempFile("recordedFlowOutput", ".txt");
+                RecordedLoginFlowUtil.triggerFlow(recordedLoginFlowInput.getTokenFetchCommand(), payload, 
+                tmpOutputFile.getPath(), tmpErrorFile.getPath(), 0);
+            } catch (Exception e) {
+                logger.error("error running recorded flow, retrying " + e.getMessage());
+                continue;
+            }
 
-            // try {
-            //     token = RecordedLoginFlowUtil.fetchToken(tmpOutputFile.getPath(), tmpErrorFile.getPath());
-            // } catch(Exception e) {
-            //     logger.error("error fetching token, retrying " + e.getMessage());
-            //     continue;
-            // }
-            // if (token != null) {
-            //     break;
-            // }
+            try {
+                token = RecordedLoginFlowUtil.fetchToken(tmpOutputFile.getPath(), tmpErrorFile.getPath());
+            } catch(Exception e) {
+                logger.error("error fetching token, retrying " + e.getMessage());
+                continue;
+            }
+            if (token != null) {
+                break;
+            }
         }
 
         return token;
