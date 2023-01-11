@@ -71,7 +71,6 @@ public class AuthPolicy {
             BasicDBObject basicDBObject =  BasicDBObject.parse(httpResponseParams.getRequestParams().getPayload());
             flattenedPayload = JSONUtils.flattenWithDots(basicDBObject);
         } catch (Exception e){
-            e.printStackTrace();
         }
         for (CustomAuthType customAuthType : customAuthTypes) {
 

@@ -255,6 +255,35 @@ public class OriginalHttpRequest {
         return headers;
     }
 
+    public void addHeaderFromLine(String line) {
+        if (this.headers == null || this.headers.isEmpty()) {
+            this.headers = new HashMap<>();
+        } 
+
+        int separator = line.indexOf(":");
+        if (separator < 0 || separator > line.length()-2) {
+            return;
+        }
+        String headerKey = line.substring(0, separator);
+        List<String> headerValues = this.headers.get(headerKey);
+        if (headerValues == null) {
+            headerValues = new ArrayList<>();
+            this.headers.put(headerKey, headerValues);
+        }
+                
+        String headerValue = line.substring(separator+2);
+
+        headerValues.add(headerValue);
+    }
+
+    public void appendToPayload(String line) {
+        if (this.body == null) {
+            this.body = "";
+        }
+
+        this.body += line;
+    }
+
     public String getBody() {
         return body;
     }
@@ -301,5 +330,28 @@ public class OriginalHttpRequest {
 
     public void setType(String type) {
         this.type = type;
+    }
+
+    public boolean setMethodAndQP(String line) {
+        String[] tokens = line.split(" ");
+        if (tokens.length != 3) {
+            return false;
+        }
+
+        this.method = tokens[0];
+        String fullUrl = tokens[1];
+
+        int qpIndex = fullUrl.indexOf("?");
+        if (qpIndex > -1 && qpIndex <= fullUrl.length()) {
+            this.url = fullUrl.substring(0, qpIndex);
+            this.queryParams = fullUrl.substring(qpIndex+1);
+        } else {
+            this.url = fullUrl;
+            this.queryParams = "";
+        }
+
+        this.type = tokens[2];
+
+        return true;
     }
 }

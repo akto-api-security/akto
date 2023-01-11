@@ -9,12 +9,15 @@ public class AktoDataType {
     private boolean sensitiveAlways;
     private List<SingleTypeInfo.Position> sensitivePosition;
     private int timestamp;
+    private IgnoreData ignoreData;
+
     public AktoDataType() {
     }
-    public AktoDataType(String name, boolean sensitiveAlways, List<SingleTypeInfo.Position> sensitivePosition,int timestamp) {
+    public AktoDataType(String name, boolean sensitiveAlways, List<SingleTypeInfo.Position> sensitivePosition,int timestamp, IgnoreData ignoreData) {
         this.name = name;
         this.sensitiveAlways = sensitiveAlways;
         this.sensitivePosition = sensitivePosition;
+        this.ignoreData = ignoreData;
     }
     public String getName() {
         return name;
@@ -42,5 +45,11 @@ public class AktoDataType {
     }
     public void setTimestamp(int timestamp) {
         this.timestamp = timestamp;
+    }
+    public IgnoreData getIgnoreData() {
+        return ignoreData;
+    }
+    public void setIgnoreData(IgnoreData ignoreData) {
+        this.ignoreData = ignoreData;
     }
 }

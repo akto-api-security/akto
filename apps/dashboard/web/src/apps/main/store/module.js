@@ -13,6 +13,7 @@ import tag_configs from '@/apps/dashboard/views/settings/components/tag_configs/
 import auth_types from '../../dashboard/views/settings/components/auth_types/store/module'
 import issues from '@/apps/dashboard/views/issues/store/module'
 import test_roles from '@/apps/dashboard/views/testing/components/test_roles/store/module'
+import marketplace from '@/apps/dashboard/views/marketplace/store/module'
 
 Vue.use(Vuex)
 
@@ -31,7 +32,8 @@ const store = new Vuex.Store({
         auth_types,
         testing,
         issues,
-        test_roles
+        test_roles,
+        marketplace
     }
 })
 

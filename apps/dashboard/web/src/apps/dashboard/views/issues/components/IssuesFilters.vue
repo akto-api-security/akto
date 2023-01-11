@@ -26,7 +26,7 @@
                         <filter-list :title="filterMenu.text" :items="filterMenu.items"
                             @clickedItem="appliedFilter(filterMenu.value, $event)"
                             @operatorChanged="operatorChanged(filterMenu.value, $event)" hideOperators hideListTitle
-                            @selectedAll="selectedAll(filterMenu.value, $event)" />
+                            @selectedAll="selectedAll(filterMenu.value, $event)" ref="issueFilterReference"/>
                     </v-menu>
                 </div>
                 <div>
@@ -38,7 +38,7 @@
                             </v-btn>
                         </template>
                         <filter-list :title="selectedTimeName" :items="selectedTime"
-                            @clickedItem="clickedTimePeriod($event)" hideOperators hideListTitle selectExactlyOne />
+                            @clickedItem="clickedTimePeriod($event)" hideOperators hideListTitle selectExactlyOne/>
                     </v-menu>
                 </div>
             </div>
@@ -208,7 +208,7 @@ export default {
             this.filterMenus[1].items = newValue
         }
     },
-    async mounted() {
+    mounted() {
         this.filterMenus[2].items = this.getCollections1()
     },
     methods: {
@@ -240,8 +240,6 @@ export default {
             this.$store.dispatch('issues/loadIssues')
         },
         appliedFilter(value, $event) {
-            console.log(value, $event)
-
             let filterCollectionsId = this.filterCollectionsId
             let filterSeverity = this.filterSeverity
             let filterSubCategory1 = this.filterSubCategory1
@@ -306,8 +304,6 @@ export default {
             this.$store.dispatch('issues/loadIssues')
         },
         selectedAll(value, $event) {
-            console.log(value, $event)
-
             let filterStatus = this.filterStatus
             let filterCollectionsId = this.filterCollectionsId
             let filterSeverity = this.filterSeverity

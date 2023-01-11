@@ -16,6 +16,8 @@ import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.IgnoreData;
+import com.akto.dto.AktoDataType;
 import com.akto.dto.HttpRequestParams;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
@@ -26,7 +28,17 @@ import org.junit.Test;
 
 public class TestDump2 {
 
-
+    public void testInitializer(){
+        SingleTypeInfo.aktoDataTypeMap = new HashMap<>();
+        SingleTypeInfo.aktoDataTypeMap.put("JWT", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("PHONE_NUMBER", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("CREDIT_CARD", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("IP_ADDRESS", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("EMAIL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("SSN", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("UUID", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("URL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+    }
     public static String createSimpleResponsePayload() {
         BasicDBObject ret = new BasicDBObject();
 
@@ -145,6 +157,7 @@ public class TestDump2 {
 
     @Test
     public void simpleTest() {
+        testInitializer();
         APICatalogSync sync = new APICatalogSync("access-token", 5);
         simpleTestForSingleCollection(0, sync);
         simpleTestForSingleCollection(1, sync);
