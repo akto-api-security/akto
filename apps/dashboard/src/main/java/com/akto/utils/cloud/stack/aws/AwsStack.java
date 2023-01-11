@@ -18,15 +18,7 @@ import com.amazonaws.services.cloudformation.AmazonCloudFormation;
 import com.amazonaws.services.cloudformation.AmazonCloudFormationAsync;
 import com.amazonaws.services.cloudformation.AmazonCloudFormationAsyncClientBuilder;
 import com.amazonaws.services.cloudformation.AmazonCloudFormationClientBuilder;
-import com.amazonaws.services.cloudformation.model.CreateStackRequest;
-import com.amazonaws.services.cloudformation.model.CreateStackResult;
-import com.amazonaws.services.cloudformation.model.DescribeStackResourcesRequest;
-import com.amazonaws.services.cloudformation.model.DescribeStackResourcesResult;
-import com.amazonaws.services.cloudformation.model.DescribeStacksRequest;
-import com.amazonaws.services.cloudformation.model.DescribeStacksResult;
-import com.amazonaws.services.cloudformation.model.Parameter;
-import com.amazonaws.services.cloudformation.model.Stack;
-import com.amazonaws.services.cloudformation.model.StackResource;
+import com.amazonaws.services.cloudformation.model.*;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,7 +36,7 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
             .build();
 
     @Override
-    public String createStack(String stackName, Map<String, String> parameters, String template) throws Exception {
+    public String createStack(String stackName, Map<String, String> parameters, String template, List<Tag> tags) throws Exception {
         try {
             CreateStackRequest createRequest = new CreateStackRequest();
             createRequest.setStackName(stackName);
@@ -52,6 +44,9 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
             createRequest.setParameters(fetchParamters(parameters));
             createRequest.setCapabilities(STACK_CREATION_CAPABILITIES);
             createRequest.setTemplateBody(template);
+            if(tags != null && !tags.isEmpty()) {
+                createRequest.setTags(tags);
+            }
             Future<CreateStackResult> future = CLOUD_FORMATION_ASYNC.createStackAsync(createRequest);
             CreateStackResult createStackResult = future.get();
             System.out.println("Stack Id: " + createStackResult.getStackId());
