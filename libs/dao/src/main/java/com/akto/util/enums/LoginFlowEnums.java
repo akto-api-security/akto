@@ -11,6 +11,7 @@ public class LoginFlowEnums {
         LOGIN_FORM,
         MOBILE_CODE_VERIFICATION,
         EMAIL_CODE_VERIFICATION,
-        OTP_VERIFICATION
+        OTP_VERIFICATION,
+        RECORDED_FLOW
     }
 }
