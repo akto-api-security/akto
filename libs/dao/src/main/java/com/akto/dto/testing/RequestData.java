@@ -18,8 +18,10 @@ public class RequestData {
 
     private String otpRefUuid;
 
+    private String tokenFetchCommand;
+
     public RequestData() { }
-    public RequestData(String body, String headers, String queryParams, String url, String method, String type, String regex, String otpRefUuid) {
+    public RequestData(String body, String headers, String queryParams, String url, String method, String type, String regex, String otpRefUuid, String tokenFetchCommand) {
         this.body = body;
         this.headers = headers;
         this.queryParams = queryParams;
@@ -28,6 +30,7 @@ public class RequestData {
         this.type = type;
         this.regex = regex;
         this.otpRefUuid = otpRefUuid;
+        this.tokenFetchCommand = tokenFetchCommand;
     }
 
     public String getBody() {
@@ -62,6 +65,10 @@ public class RequestData {
         return this.otpRefUuid;
     }
 
+    public String getTokenFetchCommand() {
+        return this.tokenFetchCommand;
+    }
+
     public void setBody(String body) {
         this.body = body;
     }
@@ -90,5 +97,9 @@ public class RequestData {
 
     public void setOtpRefUuid(String otpRefUuid) {
         this.otpRefUuid = otpRefUuid;
+    }
+
+    public void setTokenFetchCommand(String tokenFetchCommand) {
+        this.tokenFetchCommand = tokenFetchCommand;
     }
 }
