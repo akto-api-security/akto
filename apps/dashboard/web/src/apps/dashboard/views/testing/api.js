@@ -34,41 +34,41 @@ export default {
             }
         })
     },
-    startTestForCustomEndpoints(apiInfoKeyList) {
+    startTestForCustomEndpoints(apiInfoKeyList, testName) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiInfoKeyList, type: "CUSTOM"}
+            data: {apiInfoKeyList, type: "CUSTOM", testName}
         }).then((resp) => {
             return resp
         })
     },
 
-    startTestForCollection(apiCollectionId) {
+    startTestForCollection(apiCollectionId, testName) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiCollectionId, type: "COLLECTION_WISE"}
+            data: {apiCollectionId, type: "COLLECTION_WISE", testName}
         }).then((resp) => {
             return resp
         })        
     },
 
-    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily) {
+    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily}
+            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests, testName}
         }).then((resp) => {
             return resp
         })        
     },
 
-    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily) {
+    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily}
+            data: {apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests, testName}
         }).then((resp) => {
             return resp
         })        
@@ -109,6 +109,16 @@ export default {
     fetchTestRunResultDetails(testingRunResultHexId) {
         return request({
             url: '/api/fetchTestRunResultDetails',
+            method: 'post',
+            data: {
+                testingRunResultHexId
+            }
+        })
+    },
+
+    fetchIssueFromTestRunResultDetails(testingRunResultHexId) {
+        return request({
+            url: '/api/fetchIssueFromTestRunResultDetails',
             method: 'post',
             data: {
                 testingRunResultHexId

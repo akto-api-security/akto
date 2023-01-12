@@ -12,6 +12,7 @@ import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.AktoDataType;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.User;
@@ -24,6 +25,7 @@ import com.akto.dto.type.URLTemplate;
 import com.akto.dto.type.SingleTypeInfo.ParamId;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.HttpResponseParams.Source;
+import com.akto.dto.IgnoreData;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
 import com.mongodb.BasicDBObject;
@@ -44,9 +46,21 @@ public class TestDBSync extends MongoBasedTest {
         currAccountId += 1;
     }
 
+    public void testInitializer(){
+        SingleTypeInfo.aktoDataTypeMap = new HashMap<>();
+        SingleTypeInfo.aktoDataTypeMap.put("JWT", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("PHONE_NUMBER", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("CREDIT_CARD", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("IP_ADDRESS", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("EMAIL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("SSN", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("UUID", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+        SingleTypeInfo.aktoDataTypeMap.put("URL", new AktoDataType(null, false, null, 0, new IgnoreData(new HashMap<>(), new HashSet<>())));
+    }
+
     @Test
     public void testMongo() {
-
+        testInitializer();
         long u = UsersDao.instance.getMCollection().countDocuments();
         UsersDao.instance.insertOne(new User("Abc", "abc@def.gmail", new HashMap<>(), new HashMap<>(), Mode.EMAIL));
 
@@ -61,6 +75,7 @@ public class TestDBSync extends MongoBasedTest {
 
     @Test
     public void testParameterizedURL() {
+        testInitializer();
         String url = "link/";
         HttpResponseParams resp = TestDump2.createSampleParams("user1", url+1);
         URLAggregator aggr = new URLAggregator();
@@ -94,6 +109,7 @@ public class TestDBSync extends MongoBasedTest {
 
     @Test
     public void testImmediateSync() {
+        testInitializer();
         String url = "immediate/";
 
         List<HttpResponseParams> responseParams = new ArrayList<>();
@@ -127,6 +143,7 @@ public class TestDBSync extends MongoBasedTest {
 
     @Test
     public void testAllPaths() {
+        testInitializer();
         String url = "link/";
 
         List<HttpResponseParams> responseParams = new ArrayList<>();
@@ -177,6 +194,7 @@ public class TestDBSync extends MongoBasedTest {
 
     @Test
     public void testInvalidMergeParameterizedURL() {
+        testInitializer();
         URLAggregator aggr = new URLAggregator();
         APICatalogSync sync = new APICatalogSync("access-token", 1);
 
@@ -208,6 +226,7 @@ public class TestDBSync extends MongoBasedTest {
 
     @Test
     public void testInitialiseFilters() throws InterruptedException {
+        testInitializer();
         Context.accountId.set(10000);
         int totalFilters = 2;
         RuntimeFilterDao.instance.initialiseFilters();

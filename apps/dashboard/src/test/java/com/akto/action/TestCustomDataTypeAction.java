@@ -7,6 +7,7 @@ import com.akto.dao.SampleDataDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.CustomDataType;
+import com.akto.dto.IgnoreData;
 import com.akto.dto.User;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Predicate;
@@ -177,17 +178,18 @@ public class TestCustomDataTypeAction extends MongoBasedTest {
 
     @Test
     public void testFetchDataTypes() {
-        CustomDataType customDataType1 = new CustomDataType("name1", true, Collections.emptyList(), 1, true, null,null, Conditions.Operator.AND);
+        IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
+        CustomDataType customDataType1 = new CustomDataType("name1", true, Collections.emptyList(), 1, true, null,null, Conditions.Operator.AND,ignoreData);
         User user1 = new User();
         user1.setId(1);
         user1.setName("user1");
 
-        CustomDataType customDataType2 = new CustomDataType("name2", true, Collections.emptyList(), 2,false, null,null, Conditions.Operator.AND);
+        CustomDataType customDataType2 = new CustomDataType("name2", true, Collections.emptyList(), 2,false, null,null, Conditions.Operator.AND,ignoreData);
         User user2 = new User();
         user2.setId(2);
         user2.setName("user1");
 
-        CustomDataType customDataType3 = new CustomDataType("name3", true, Collections.emptyList(), 3, true, null,null, Conditions.Operator.AND);
+        CustomDataType customDataType3 = new CustomDataType("name3", true, Collections.emptyList(), 3, true, null,null, Conditions.Operator.AND,ignoreData);
         User user3 = new User();
         user3.setId(3);
         user3.setName("user1");
@@ -223,7 +225,8 @@ public class TestCustomDataTypeAction extends MongoBasedTest {
     public void testToggleDataTypeActiveParam() {
         Context.accountId.set(1_000_000);
         CustomDataTypeDao.instance.getMCollection().drop();
-        CustomDataType customDataType = new CustomDataType("NAME1", true, Collections.emptyList(), 1, true, null,null, Conditions.Operator.AND);
+        IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
+        CustomDataType customDataType = new CustomDataType("NAME1", true, Collections.emptyList(), 1, true, null,null, Conditions.Operator.AND,ignoreData);
         CustomDataTypeDao.instance.insertOne(customDataType);
 
         CustomDataTypeAction customDataTypeAction = new CustomDataTypeAction();

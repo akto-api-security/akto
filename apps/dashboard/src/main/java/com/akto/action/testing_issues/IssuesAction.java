@@ -14,6 +14,7 @@ import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static com.akto.util.Constants.ID;
@@ -33,6 +34,7 @@ public class IssuesAction extends UserAction {
     private List<Integer> filterCollectionsId;
     private List<Severity> filterSeverity;
     private List<TestSubCategory> filterSubCategory;
+    private List<TestingRunIssues> similarlyAffectedIssues;
     private int startEpoch;
     private Bson createFilters () {
         Bson filters = Filters.empty();
@@ -56,6 +58,25 @@ public class IssuesAction extends UserAction {
         }
         return filters;
     }
+
+    public String fetchAffectedEndpoints() {
+        Bson sort = Sorts.orderBy(Sorts.descending(TestingRunIssues.TEST_RUN_ISSUES_STATUS),
+                Sorts.descending(TestingRunIssues.CREATION_TIME));
+        TestCategory superCategory = issueId.getTestSubCategory().getSuperCategory();
+
+        List<TestSubCategory> subCategoryList = new ArrayList<>();
+        for (TestSubCategory subCategory : TestSubCategory.getValuesArray()) {
+            if (subCategory.getSuperCategory() == superCategory) {
+                subCategoryList.add(subCategory);
+            }
+        }
+        Bson filters = Filters.and(
+                Filters.in(ID + "." + TestingIssuesId.TEST_SUB_CATEGORY, subCategoryList),
+                Filters.ne(ID, issueId));
+        similarlyAffectedIssues = TestingRunIssuesDao.instance.findAll(filters, 0,3, sort);
+        return SUCCESS.toUpperCase();
+    }
+
     public String fetchAllIssues() {
         Bson sort = Sorts.orderBy(Sorts.descending(TestingRunIssues.TEST_RUN_ISSUES_STATUS),
                 Sorts.descending(TestingRunIssues.CREATION_TIME));
@@ -80,7 +101,7 @@ public class IssuesAction extends UserAction {
 
     private TestSubCategory[] subCategories;
     public String fetchAllSubCategories() {
-        this.subCategories = GlobalEnums.TestSubCategory.values();
+        this.subCategories = GlobalEnums.TestSubCategory.getValuesArray();
         return SUCCESS.toUpperCase();
     }
 
@@ -252,5 +273,13 @@ public class IssuesAction extends UserAction {
 
     public TestSubCategory[] getSubCategories() {
         return this.subCategories;
+    }
+
+    public List<TestingRunIssues> getSimilarlyAffectedIssues() {
+        return similarlyAffectedIssues;
+    }
+
+    public void setSimilarlyAffectedIssues(List<TestingRunIssues> similarlyAffectedIssues) {
+        this.similarlyAffectedIssues = similarlyAffectedIssues;
     }
 }

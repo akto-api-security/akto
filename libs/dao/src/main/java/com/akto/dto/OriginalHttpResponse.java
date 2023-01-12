@@ -2,6 +2,9 @@ package com.akto.dto;
 
 import com.google.gson.Gson;
 
+import org.apache.commons.lang3.math.NumberUtils;
+
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +38,35 @@ public class OriginalHttpResponse {
         this.statusCode = Integer.parseInt(json.get("statusCode").toString());
     }
 
+    public void addHeaderFromLine(String line) {
+        if (this.headers == null || this.headers.isEmpty()) {
+            this.headers = new HashMap<>();
+        } 
+
+        int separator = line.indexOf(":");
+        if (separator < 0 || separator > line.length()-2) {
+            return;
+        }
+        String headerKey = line.substring(0, separator);
+        List<String> headerValues = this.headers.get(headerKey);
+        if (headerValues == null) {
+            headerValues = new ArrayList<>();
+            this.headers.put(headerKey, headerValues);
+        }
+                
+        String headerValue = line.substring(separator+2);
+
+        headerValues.add(headerValue);
+    }
+
+    public void appendToPayload(String line) {
+        if (this.body == null) {
+            this.body = "";
+        }
+
+        this.body += line;
+    }
+
     public String getBody() {
         return body;
     }
@@ -57,5 +89,20 @@ public class OriginalHttpResponse {
 
     public void setStatusCode(int statusCode) {
         this.statusCode = statusCode;
+    }
+
+    public boolean setStatusFromLine(String line) {
+        String[] tokens = line.split(" ");
+        if (tokens.length < 3) {
+            return false;
+        } 
+
+        String statusStr = tokens[1];
+        if (NumberUtils.isDigits(statusStr)) {
+            this.statusCode = Integer.parseInt(statusStr);
+            return true;
+        } else {
+            return false;
+        }
     }
 }

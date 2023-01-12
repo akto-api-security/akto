@@ -9,6 +9,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.AktoDataType;
 import com.akto.dto.CustomDataType;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.IgnoreData;
 import com.akto.dto.User;
 import com.akto.dto.data_types.*;
 import com.akto.dto.traffic.Key;
@@ -485,8 +486,9 @@ public class CustomDataTypeAction extends UserAction{
             throw new AktoCustomException("Invalid positions for sensitive data");
         }
 
+        IgnoreData ignoreData = new IgnoreData();
         return new CustomDataType(name, sensitiveAlways, sensitivePositions, userId,
-                true,keyConditions,valueConditions, mainOperator);
+                true,keyConditions,valueConditions, mainOperator,ignoreData);
     }
 
     public void setCreateNew(boolean createNew) {
