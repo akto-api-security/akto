@@ -102,7 +102,7 @@ public class RecordedLoginFlowUtil {
             try (BufferedReader br = new BufferedReader(new InputStreamReader(fstream))) {
                 String line;
                 while ((line = br.readLine()) != null) {
-                if((line.toLowerCase().contains("error") || line.toLowerCase().contains("failed")) || line.toLowerCase().contains("timeout"))){
+                if((line.toLowerCase().contains("error") || line.toLowerCase().contains("failed")) || line.toLowerCase().contains("timeout")){
                         error = line;
                         break;
                 }
