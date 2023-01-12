@@ -15,7 +15,11 @@
                 @click="item.click"
             >
                 <v-list-item-content class="content-nav-drawer">
-                    <v-list-item-title class="title-nav-drawer">{{item.label}}</v-list-item-title>
+          
+                    <v-list-item-title class="title-nav-drawer">
+                      <v-icon v-if="item.icon" size="12" color="#fff">{{ item.icon }}</v-icon>
+                      {{item.label}}
+                    </v-list-item-title>
                 </v-list-item-content>
             </v-list-item>
         </v-list>
@@ -31,7 +35,7 @@ export default {
     name: "SimpleMenu",
     props: {
         items: obj.arrR
-    }
+    },
 }
 </script>
 
@@ -72,6 +76,7 @@ export default {
     text-decoration-color: #FFFFFF      
   
 .title-nav-drawer
+  cursor: pointer
   color:  #FFFFFF
   margin-left: 0px !important
   font-weight: 400 !important

@@ -1,5 +1,5 @@
 <template>
-    <div>
+    <div>        
         <v-data-table
             :headers="headers"
             :items="filteredItems"
@@ -9,25 +9,88 @@
             :sort-desc="sortDesc"
             :custom-sort="sortFunc"
             :items-per-page="rowsPerPage"
-            :footer-props="{
-                showFirstLastPage: true,
-                prevIcon: '$fas_angle-left',
-                nextIcon: '$fas_angle-right',
-                'items-per-page-options': itemsPerPage
-                
-            }"
-            :hide-default-footer="!enablePagination"
+            hide-default-footer
             hide-default-header
+            :fillInitial="fillInitial"
         >
             <template v-slot:top="{ pagination, options, updateOptions }" v-if="items && items.length > 0">
-                <div class="d-flex jc-sb">
-                    <div v-if="showName" class="table-name">
-                      {{name}}
-                    </div>                 
-                    <div>
-                        <slot name="massActions"/>
+                <div class="headerContainer">
+                    <div class="headerDiv">
+                        <div v-if="showName" class="table-name">
+                            {{name}}
+                        </div>                 
+                        <div>
+                            <slot name="massActions"/>
+                        </div>
+
+                        <v-menu offset-y :close-on-content-click="false" v-if="headers.length > 4">
+                            <template v-slot:activator="{ on, attrs }">
+                                <v-btn class = "showEnd" v-bind= "attrs" v-on = "on" plain>
+                                    <span class="filterHeaderSpan">
+                                        More Filters
+                                    </span>
+                                </v-btn>     
+                            </template>
+
+                            <filter-list
+                                :title="headers[1].text"
+                                hideOperators
+                                hideListTitle
+                                :items="convertHeadersList()"
+                                @clickedItem = "pushIntoNew($event)"
+                                @selectedAll = "selectAllHeaders($event)"
+                            />
+                        
+                        </v-menu>
+
+                        <template v-for = "(header,index) in selectedHeaders">
+                            <span>
+                                <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.value]"> 
+                                    <template v-slot:activator="{ on, attrs }">
+                                        <v-btn class = "showButtons" v-bind = "attrs" v-on = "on">
+                                            <span class="filterHeaderSpan">
+                                                {{header.text}}
+                                                <v-icon :size="14">$fas_angle-down</v-icon>
+                                            </span>
+                                        </v-btn>     
+                                    </template>
+                                    <filter-list 
+                                        :title="header.text" 
+                                        :items="columnValueList[header.value]"                                         
+                                        @clickedItem="appliedFilter(header.value, $event)" 
+                                        @operatorChanged="operatorChanged(header.value, $event)"
+                                        @selectedAll="selectedAll(header.value, $event)"
+                                    />
+                                </v-menu>
+                            </span> 
+                        
+                        </template>
                     </div>
-                    <div class="d-flex jc-end">
+
+                    <div class="headerDiv">
+
+                        <v-btn-toggle
+                            v-model="toggle_exclusive"
+                            mandatory
+                        >
+                            <template v-for="(item,index) in arrayItems">
+                                <v-tooltip bottom :key="index">
+                                    <template v-slot:activator="{on, attrs}">
+                                        <v-btn 
+                                            v-on="on"
+                                            v-bind="attrs" 
+                                            :value = item.value
+                                            icon
+                                            plain
+                                        >
+                                            <v-icon>{{item.icon}}</v-icon>
+                                        </v-btn>
+                                    </template>
+                                    {{item.toolTipText}}
+                                </v-tooltip>
+                            </template>
+                        </v-btn-toggle>
+
                         <div class="d-flex board-table-cards jc-end">
                             <div class="clickable download-csv ma-1">
                                 <v-tooltip bottom>
@@ -35,8 +98,9 @@
                                         <v-btn 
                                             v-on="on"
                                             v-bind="attrs" 
-                                            icon color="#47466A" @click="downloadData" v-if="!hideDownloadCSVIcon">
-                                                <v-icon>$fas_file-csv</v-icon>
+                                            class="showButtons"
+                                            @click="downloadData" v-if="!hideDownloadCSVIcon">
+                                            Export
                                         </v-btn>
                                     </template>
                                     Download as CSV
@@ -56,64 +120,37 @@
                                     </template>
                                     Show all
                                 </v-tooltip>
-                                        <v-btn
-                                            icon
-                                            color="#47466A"
-                                            @click="itemsPerPage = [rowsPerPage]"
-                                            v-if="enablePagination && itemsPerPage[0] == -1"
-                                        >
-                                            <v-icon>$fas_angle-double-up</v-icon>
-                                        </v-btn>
+                                <v-btn
+                                    icon
+                                    color="#47466A"
+                                    @click="itemsPerPage = [rowsPerPage]"
+                                    v-if="enablePagination && itemsPerPage[0] == -1"
+                                >
+                                    <v-icon>$fas_angle-double-up</v-icon>
+                                </v-btn>
                             </div>
                             <slot name="add-new-row-btn" :filteredItems=filteredItems />
                         </div>
                     </div>
                 </div>
             </template>
-            <template v-slot:footer.prepend="{}">
-                <v-spacer/>
-            </template>
-            <template v-slot:header="{}" v-if="items && items.length > 0">
+
+            <template v-slot:header="{}" >
                 <template v-for="(header, index) in headers">
-                    <v-hover v-slot="{ hover }" :key="index">
-                        <th
-                                class='table-header'
-                                :style="index == 0 ? {'padding': '2px !important'} : {}"
-                        >
-                            <div v-if="index > 0">
-                                    <span class="table-sub-header">
-                                        <span class="clickable"  @click="setSortOrInvertOrder(header)">
-                                            {{header.text}} 
-                                        </span>
-                                        <span>
-                                            <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.value]"> 
-                                                <template v-slot:activator="{ on, attrs }">                         
-                                                    <v-btn 
-                                                        :ripple="false" 
-                                                        v-bind="attrs" 
-                                                        v-on="on"
-                                                        primary 
-                                                        icon
-                                                        class="filter-icon" 
-                                                        :style="{display: hover || showFilterMenu[header.value] || filters[header.value].size > 0 ? '' : 'none'}"
-                                                    >
-                                                        <v-icon :size="14">$fas_filter</v-icon>
-                                                    </v-btn>
-                                                </template>
-                                                <filter-list 
-                                                    :title="header.text" 
-                                                    :items="columnValueList[header.value]" 
-                                                    @clickedItem="appliedFilter(header.value, $event)" 
-                                                    @operatorChanged="operatorChanged(header.value, $event)"
-                                                    @selectedAll="selectedAll(header.value, $event)"
-                                                />
-                                            </v-menu>
-                                        </span>                                        
-                                    </span>
-                                
-                            </div>
-                        </th>
-                    </v-hover>
+                    <th
+                            class='table-header'
+                            :style="index == 0 ? {'padding': '2px !important'} : {}" 
+                            :key="index"
+                    >
+                        <div v-if="index > 0">
+                                <span class="table-sub-header">
+                                    <span class="clickable"  @click="setSortOrInvertOrder(header)">
+                                        {{header.text}} 
+                                    </span>                                    
+                                </span>
+                            
+                        </div>
+                    </th>
                 </template>
                 <template>
                         <tr class="table-row" >
@@ -123,30 +160,37 @@
 
             </template>
             <template v-slot:item="{item}">
-                <v-hover
-                    v-slot="{ hover }"
-                >
-                    <tr class="table-row" >
-                        <td
-                            class="table-column"
-                            :style="{'background-color':item.color, 'padding' : '0px !important'}"
-                        />
-                        <td 
-                            v-for="(header, index) in headers.slice(1)"
-                            :key="index"
-                            class="table-column clickable"
-                            @click="$emit('rowClicked', item)"
-                        >
-                            <slot :name="[`item.${header.value}`]" :item="item">
-                                <div class="table-entry">{{item[header.value]}}</div>
-                            </slot>
-                        </td>
+               
+                <tr class="table-row" >
+                    <td
+                        class="table-column high-dense"
+                        :style="{'background-color':item.color, 'padding' : '0px !important'}"
+                    />
+                    <td
+                        v-for="(header, index) in headers.slice(1)"
+                        :key="index"
+                        class="table-column clickable"
+                        @click="$emit('rowClicked', item)"
+                        :style="adjustHeight"
+                    >
+                        <slot :name="[`item.${header.value}`]" :item="item">
+                            <div class="table-entry">{{item[header.value]}}</div>
+                        </slot>
+                    </td>
 
-                        <div v-if="actions && hover && actions.length > 0" class="table-row-actions">
-                            <actions-tray :actions="actions || []" :subject=item></actions-tray>
-                        </div>
-                    </tr>
-                </v-hover>
+                    <td v-if="actions && actions.length > 0" class="table-column" :style="adjustHeight">
+                        <simple-menu :items="actionsFunction(item)">
+                            <template v-slot:activator2>
+                                <v-icon
+                                    size=16
+                                    color="#424242"
+                                >
+                                    $fas_ellipsis-v
+                                </v-icon>
+                            </template>
+                        </simple-menu>
+                    </td>
+                </tr>
             </template>
         </v-data-table>
     </div>
@@ -156,16 +200,17 @@
 
 import obj from "@/util/obj"
 import { saveAs } from 'file-saver'
-import ActionsTray from './ActionsTray'
 import FilterList from './FilterList'
+import SimpleMenu from './SimpleMenu.vue'
 import SimpleTextField from '@/apps/dashboard/shared/components/SimpleTextField.vue'
+
 
 export default {
     name: "SimpleTable",
     components: {
-        ActionsTray,
+        SimpleMenu,
         FilterList,
-        SimpleTextField
+        SimpleTextField,
     },
     props: {
         headers: obj.arrR,
@@ -176,11 +221,12 @@ export default {
         actions: obj.arrN,
         allowNewRow: obj.boolN,
         hideDownloadCSVIcon: obj.boolN,
-        showName: obj.boolN
+        showName: obj.boolN,
     },
     data () {
         let rowsPerPage = 50
         return {
+            selectedHeaders: [],
             rowsPerPage: rowsPerPage,
             itemsPerPage: [rowsPerPage],
             search: null,
@@ -188,10 +234,86 @@ export default {
             sortDesc: this.sortDescDefault || false,
             filters: this.headers.reduce((map, e) => {map[e.value] = new Set(); return map}, {}),
             showFilterMenu: this.headers.reduce((map, e) => {map[e.value] = false; return map}, {}),
-            filterOperators: this.headers.reduce((map, e) => {map[e.value] = 'OR'; return map}, {})
+            filterOperators: this.headers.reduce((map, e) => {map[e.value] = 'OR'; return map}, {}),
+            toggle_exclusive: 48,
+            arrayItems:[
+                {
+                    value: 48,
+                    icon: '$fas_grip-lines',
+                    toolTipText:'Default'
+                },
+                {
+                    value: 36,
+                    icon: '$fas_bars',
+                    toolTipText:'Comfortable'
+                },
+                {
+                    value: 24,
+                    icon: '$fas_align-justify',
+                    toolTipText:'Compact'
+                }
+            ],
         }
     },
     methods: {
+        actionsFunction(item){
+            let arrayActions = []
+            this.actions.forEach(action => {
+                if(action.isValid(item)){
+                    arrayActions.push({label:action.text(item) ,icon:action.icon(item), click:action.func})
+                }
+            })
+
+            return arrayActions
+        },
+        convertHeadersList(){
+            let headerItems = []
+
+            let ind = 4
+            if(this.headers[0].value == 'color'){
+                ind++
+            }
+
+            while(ind < this.headers.length){
+                headerItems.push({title:this.headers[ind].text, value:this.headers[ind].value})
+                ind++
+            }
+
+            return headerItems
+
+        },
+
+        selectAllHeaders({checked}){
+            if(checked){
+                this.selectedHeaders = []
+                this.headers.forEach(element =>{
+                    if(element.value !== 'color'){
+                        this.selectedHeaders.push({text:element.text, value: element.value})
+                    }
+                })
+            }
+
+            else{
+                this.selectedHeaders = []
+            }
+        },
+
+        pushIntoNew({item , checked}){
+            if(checked){
+                this.selectedHeaders.push({text:item.title,value:item.value})
+            }
+
+            else{
+                var index = 0 ;
+                while(index < this.selectedHeaders.length){
+                    if(this.selectedHeaders[index].text === item.title){
+                        this.selectedHeaders.splice(index , 1)
+                    }else{
+                        index++
+                    }
+                }
+            }
+        },
         selectedAll (hValue, {items, checked}) {
             for(var index in items) {
                 if (checked) {
@@ -298,7 +420,8 @@ export default {
                         return !selectedValues.has(itemValue)
                 }
             }
-        }
+        },
+        
     },
     computed: {
         columnValueList: {
@@ -333,9 +456,29 @@ export default {
         },
         enablePagination() {
             return this.items && this.items.length > this.rowsPerPage
-        } 
-    }
-
+        } ,
+        fillInitial(){
+            if(this.selectedHeaders.length < 1){
+                var index = 0
+                var lim = 4
+                if(this.headers[0].value == 'color'){
+                    index++
+                    lim++
+                }
+                while(index < lim && index < this.headers.length){
+                    this.selectedHeaders.push({text:this.headers[index].text, value:this.headers[index].value})
+                    index++
+                }
+            }
+        },
+        adjustHeight: function(){
+            var height = this.toggle_exclusive
+            
+            return{
+                height: height + 'px'
+            }
+        }
+    },
 }
 </script>
 
@@ -358,6 +501,12 @@ export default {
 </style>
 
 <style lang="scss">
+
+    .high-dense{
+        min-height: 0px !important;
+        height: 24px !important;
+    }
+
     .keep-scrolling {
         /* Hide scrollbar for Chrome, Safari and Opera */
         ::-webkit-scrollbar {
@@ -421,10 +570,15 @@ export default {
         font-weight: bold
         display: flex
 
-    .table-row-actions
-        position: absolute
-        right: 30px
-        padding: 8px 16px !important
+.showButtons
+    box-sizing: border-box
+    width: fit-content
+    height: 24px
+    background: #FFFFFF
+    border: 1px solid #D0D5DD
+    font-weight: 500
+    box-shadow: 0px 1px 2px rgba(16, 24, 40, 0.05)
+
 
 .table-sub-header
     position: relative
@@ -455,6 +609,40 @@ export default {
   font-weight: 400;
 }
 
+.headerContainer{
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.headerDiv{
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.headerDiv:first-child{
+    /* flex-direction: row-reverse; */
+    max-width: 750px;
+}
+
+.headerDiv:last-child{
+    justify-content: center;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.filterHeaderSpan{
+    min-width: 67px;
+    height: 16px;
+    font-family: 'Poppins';
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+}
+
+.showEnd{
+    order: 99;
+}
 .form-field-text >>> input {
   font-size: 14px;
   color: #6200EA;
@@ -464,7 +652,6 @@ export default {
 .v-data-table >>> .table-entry {
     font-size: 12px !important;
 }
-
 .v-data-table >>> .table-sub-header {
     font-size: 14px !important;
 }
