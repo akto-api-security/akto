@@ -81,14 +81,13 @@ public class FuzzingTest extends TestPlugin {
         try {
             FileUtils.copyURLToFile(new URL(this.origTemplatePath), new File(this.tempTemplatePath));
         } catch (IOException e1) {
-            e1.printStackTrace();
             return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.FAILED_DOWNLOADING_NUCLEI_TEMPLATE, testRequest, nucleiTestInfo);
         }
 
         try {
             downloadLinks(this.tempTemplatePath, outputDir);
         } catch (Exception e) {
-            e.printStackTrace();
+            ;
             return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.FAILED_DOWNLOADING_PAYLOAD_FILES, testRequest, nucleiTestInfo);
         }
 
@@ -126,7 +125,7 @@ public class FuzzingTest extends TestPlugin {
 
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            ;
             return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest, nucleiTestInfo);
         }
 

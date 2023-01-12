@@ -29,21 +29,6 @@ import static com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL;
 public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
     private static final ObjectMapper mapper = new ObjectMapper();
-    public static void main2(String[] args) throws URISyntaxException {
-        Pattern pattern = Pattern.compile("^((((https?|ftps?|gopher|telnet|nntp)://)|(mailto:|news:))(%[0-9A-Fa-f]{2}|[-()_.!~*';/?:@&=+$,A-Za-z0-9])+)([).!';/?:,][[:blank:|:blank:]])?$");
-        String url = "https://petstore.swagger.io/v2/user/STRING";
-        URI uri1 =  new URI("https://www.bb.petstore.swagger.io/v2/user/STRING#gg");
-        System.out.println(uri1.getPath());
-        System.out.println(uri1.getHost());
-        System.out.println();
-//        Matcher a = pattern.matcher(url);
-//        System.out.println(a.matches());
-//        if (a.matches()) {
-//            URI uri =  new URI(url);
-//            System.out.println(uri.getPath());
-//        }
-
-    }
 
 
     public static OpenAPI init(String info,Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList, boolean includeHeaders, String serverUrl) throws Exception {
@@ -159,7 +144,7 @@ public class Main {
                     newPaths.put(newPath, pathItem);
                     pathItem.setServers(Collections.singletonList(pathServer));
                 } catch (URISyntaxException e) {
-                    e.printStackTrace();
+                    ;
                 }
             } else {
                 newPaths.put(path, pathItem);

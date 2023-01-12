@@ -63,7 +63,7 @@ public abstract class TestPlugin {
             try {
                 version = Integer.parseInt(code);
             } catch (Exception e) {
-                e.printStackTrace();
+                ;
                 return null;
             }
             int newVersion = version - decrementValue;
@@ -138,7 +138,7 @@ public abstract class TestPlugin {
         try {
             message = RedactSampleData.convertOriginalReqRespToString(request, null);
         } catch (Exception e) {
-            e.printStackTrace();
+            ;
         }
 
         return new TestResult(message, originalMessage, Collections.singletonList(testError), 0, false, TestResult.Confidence.HIGH, testInfo);
@@ -159,7 +159,6 @@ public abstract class TestPlugin {
         try {
             message = RedactSampleData.convertOriginalReqRespToString(request, response);
         } catch (Exception e) {
-            // TODO:
             logger.error("Error while converting OriginalHttpRequest to string", e);
             message = RedactSampleData.convertOriginalReqRespToString(new OriginalHttpRequest(), new OriginalHttpResponse());
             errors.add(TestResult.TestError.FAILED_TO_CONVERT_TEST_REQUEST_TO_STRING);

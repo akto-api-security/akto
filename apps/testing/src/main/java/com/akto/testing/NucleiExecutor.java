@@ -44,7 +44,7 @@ public class NucleiExecutor {
         try {
             FileUtils.writeStringToFile(file, "{}", Charsets.UTF_8);
         } catch (IOException e) {
-            e.printStackTrace();
+            ;
             return null;
         }
 
@@ -99,7 +99,6 @@ public class NucleiExecutor {
             baseCmdTokens.add(headerName + ":\"" + headerValue + "\"");
         }
 
-        System.out.println("Command: " + String.join(" ",baseCmdTokens));
         Process process;
 
         try {
@@ -124,15 +123,14 @@ public class NucleiExecutor {
 
             boolean processResult = process.waitFor(5, TimeUnit.MINUTES);
         } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
+            ;
         }
 
         List<BasicDBObject> metaData;
         try {
              metaData = readMetaData(outputDirFiles);
         } catch (Exception e) {
-            System.out.println("ERROR reading meta data: ");
-            e.printStackTrace();
+            ;
             return null;
         }
 
@@ -239,7 +237,7 @@ public class NucleiExecutor {
                         }
             
                     } catch (IOException e) {
-                        e.printStackTrace();
+                        ;
                     } finally {
 
                         try {

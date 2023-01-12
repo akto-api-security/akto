@@ -339,7 +339,6 @@ public class TestMergingNew extends MongoBasedTest {
         for (int i=0; i< 50; i++) {
             urls.add(url + "a"+i);
         }
-        System.out.println("urls:" + urls);
         for (String c: urls) {
             HttpResponseParams resp = createSampleParams("user1", c);
             responseParams.add(resp);

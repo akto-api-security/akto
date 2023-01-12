@@ -32,7 +32,7 @@ import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
 
 // Validates user from the supplied username and password
 // Generates refresh token jwt using the username if valid user
-// Saves the refresh token to db (TODO)
+// Saves the refresh token to db
 // Generates access token jwt using the refresh token
 // Adds the refresh token to http-only cookie
 // Adds the access token to header
@@ -51,7 +51,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
     BasicDBObject loginResult = new BasicDBObject();
     @Override
     public String execute() throws IOException {
-        System.out.println("LoginAction Hit");
+        logger.info("LoginAction Hit");
 
         if (username == null) {
             return Action.ERROR.toUpperCase();
@@ -84,7 +84,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                 }
             }
 
-            System.out.println("Auth Failed");
+            logger.info("Auth Failed");
             return "ERROR";
         }
         String result = loginUser(user, servletResponse, true, servletRequest);
@@ -93,7 +93,6 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
     }
 
     private void decideFirstPage(BasicDBObject loginResult){
-        //TODO get this reviewed
         Context.accountId.set(1_000_000);
         long count = SingleTypeInfoDao.instance.getEstimatedCount();
         if(count == 0){
@@ -152,7 +151,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             }
             return Action.SUCCESS.toUpperCase();
         } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
-            e.printStackTrace();
+            ;
         }
 
         return Action.ERROR.toUpperCase();

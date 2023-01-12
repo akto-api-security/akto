@@ -55,7 +55,6 @@ public class TagConfigsAction extends UserAction {
 
 
     public TagConfig generateTagConfig(int userId) throws AktoCustomException {
-        // TODO: handle errors
         if (name == null || name.length() == 0) throw new AktoCustomException("Name cannot be empty");
         if (name.split(" ").length > 1) throw new AktoCustomException("Name has to be single word");
         name = name.trim();

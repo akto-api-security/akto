@@ -24,8 +24,6 @@ public class ParseHar extends MongoBasedTest{
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
 
         action.execute();
-
-        System.out.println(ApiCollectionsDao.instance.findOne("_id", 123));
     }
 
 

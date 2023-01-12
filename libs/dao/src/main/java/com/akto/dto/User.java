@@ -1,7 +1,6 @@
 package com.akto.dto;
 
 import com.akto.dao.context.Context;
-import com.akto.dto.messaging.Message;
 import com.mongodb.BasicDBObject;
 
 import java.util.ArrayList;
@@ -17,26 +16,23 @@ public class User {
 
     private Map<String, UserAccountEntry> accounts;
 
-    private Message.Mode preferredChannel;
     private Map<String, SignupInfo> signupInfoMap;
 
     public User() {}
 
-    public User(String name, String login, Map<String, UserAccountEntry> accounts, Map<String, SignupInfo> signupInfoMap,
-                Message.Mode preferredChannel) {
+    public User(String name, String login, Map<String, UserAccountEntry> accounts, Map<String, SignupInfo> signupInfoMap) {
         this.name = name;
         this.login = login;
         this.id = Context.getId();
         this.accounts = accounts;
         this.signupInfoMap = signupInfoMap;
-        this.preferredChannel = preferredChannel;
         this.refreshTokens = new ArrayList<>();
     }
 
     public static User create(String name, String login, SignupInfo info, Map<String, UserAccountEntry> accountEntryMap) {
         Map<String, SignupInfo> infoMap = new HashMap<>();
         infoMap.put(info.getKey(), info);
-        return new User(name, login, accountEntryMap, infoMap, Message.Mode.EMAIL);
+        return new User(name, login, accountEntryMap, infoMap);
     }
 
     public static BasicDBObject convertUserToUserDetails(User user) {
@@ -83,14 +79,6 @@ public class User {
 
     public void setAccounts(Map<String, UserAccountEntry> accounts) {
         this.accounts = accounts;
-    }
-
-    public Message.Mode getPreferredChannel() {
-        return Message.Mode.SLACK;
-    }
-
-    public void setPreferredChannel(Message.Mode preferredChannel) {
-        this.preferredChannel = preferredChannel;
     }
 
     public Map<String, SignupInfo> getSignupInfoMap() {

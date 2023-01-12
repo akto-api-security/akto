@@ -26,7 +26,6 @@ import java.util.regex.Pattern;
 
 public class AuthMechanismAction extends UserAction {
 
-    //todo: rename requestData, also add len check
     private ArrayList<RequestData> requestData;
 
     private String type;
@@ -44,7 +43,6 @@ public class AuthMechanismAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(AuthMechanismAction.class);
 
     public String addAuthMechanism() {
-        // todo: add more validations
         List<AuthParam> authParams = new ArrayList<>();
 
         type = type != null ? type : LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString();

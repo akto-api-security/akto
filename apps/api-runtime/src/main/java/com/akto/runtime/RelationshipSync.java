@@ -212,7 +212,6 @@ public class RelationshipSync {
 
 
     public static void extractAllValuesFromPayload(JsonNode node, List<String> params, Map<String, Set<String>> values) {
-        // TODO: null values remove
         if (node == null) return;
         if (node.isValueNode()) {
             String textValue = node.asText();

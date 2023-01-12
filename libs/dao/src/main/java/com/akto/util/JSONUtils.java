@@ -120,7 +120,7 @@ public class JSONUtils {
             }
             return new Gson().toJson(modifiedPayload);
         } catch (Exception e) {
-            e.printStackTrace();
+            ;
             return null;
         }
     }

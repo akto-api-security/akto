@@ -71,7 +71,6 @@ public class TestRolesAction extends UserAction {
         }
 
         TestRoles role = TestRolesDao.instance.findOne(Filters.eq(TestRoles.NAME, roleName));
-        System.out.println("selected Role name : " + roleName);
         if (role == null) {//Role doesn't exists
             addActionError("Role doesn't exists");
             return ERROR.toUpperCase();

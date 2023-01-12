@@ -113,7 +113,7 @@ public class SampleDataToSTI {
             httpResponseParams = HttpCallParser.parseKafkaMessage(dataString);
         } catch (Exception e) {
             flag = true;
-            System.out.println(e);
+
         }
 
         if (flag) {

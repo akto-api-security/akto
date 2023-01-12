@@ -96,11 +96,7 @@ public class ApiCollectionsAction extends UserAction {
         ApiCollectionsDao.instance.deleteAll(Filters.in("_id", apiCollectionIds));
         SingleTypeInfoDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
         APISpecDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
-        SensitiveParamInfoDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));      
-        // TODO : Markov and Relationship
-        // MarkovDao.instance.deleteAll()
-        // RelationshipDao.instance.deleteAll();
-              
+        SensitiveParamInfoDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));                    
 
         return SUCCESS.toUpperCase();
     }

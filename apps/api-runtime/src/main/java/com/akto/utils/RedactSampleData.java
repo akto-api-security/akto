@@ -175,7 +175,7 @@ public class RedactSampleData {
         try {
             return mapper.writeValueAsString(headerMap);
         } catch (JsonProcessingException e) {
-            e.printStackTrace();
+            ;
             return "{}";
         }
     }

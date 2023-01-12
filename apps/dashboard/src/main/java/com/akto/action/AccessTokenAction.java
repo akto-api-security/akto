@@ -65,7 +65,7 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
         Token token ;
         try {
             token = new Token(refreshToken);
-        } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
+        } catch (Exception e) {
             return null;
         }
 
@@ -83,7 +83,7 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
         if (refreshTokens != null && refreshTokens.contains(refreshToken)) {
             return token;
         } else {
-            System.out.println("NOT FOUND");
+
             return null;
         }
 

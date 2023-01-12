@@ -18,8 +18,7 @@ public class ApiRequest {
         try {
             response = call.execute();
         } catch (IOException e) {
-            // TODO: logger
-            e.printStackTrace();
+            ;
             return null;
         }
         ResponseBody responseBody = response.body();
@@ -30,14 +29,14 @@ public class ApiRequest {
         try {
             body = responseBody.string();
         } catch (IOException e) {
-            e.printStackTrace();
+            ;
             return null;
         }
 
         try {
             return mapper.readValue(body, JsonNode.class);
         } catch (JsonProcessingException e) {
-            e.printStackTrace();
+            ;
             return null;
         }
     }

@@ -4,7 +4,6 @@ import com.akto.dto.*;
 import com.akto.dto.data_types.*;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhookResult;
-import com.akto.dto.notifications.content.Content;
 import com.akto.dto.runtime_filters.FieldExistsFilter;
 import com.akto.dto.FilterSampleData;
 import com.akto.dto.runtime_filters.ResponseCodeRuntimeFilter;
@@ -42,12 +41,9 @@ import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 public class DaoInit {
 
     public static void init(ConnectionString connectionString) {
-        ClassModel<MessageQueueEntry> queueEntryClassModel = ClassModel.builder(MessageQueueEntry.class)
-                .enableDiscriminator(true).build();
         ClassModel<Config> configClassModel = ClassModel.builder(Config.class).enableDiscriminator(true).build();
         ClassModel<SignupInfo> signupInfoClassModel = ClassModel.builder(SignupInfo.class).enableDiscriminator(true)
                 .build();
-        ClassModel<Content> contentClassModel = ClassModel.builder(Content.class).enableDiscriminator(true).build();
         ClassModel<APIAuth> apiAuthClassModel = ClassModel.builder(APIAuth.class).enableDiscriminator(true).build();
         ClassModel<AttemptResult> attempResultModel = ClassModel.builder(AttemptResult.class).enableDiscriminator(true)
                 .build();
@@ -160,9 +156,9 @@ public class DaoInit {
         ClassModel<LoginFlowStepsData> loginFlowStepsData = ClassModel.builder(LoginFlowStepsData.class)
         .enableDiscriminator(true).build();
 
-        CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(queueEntryClassModel,
+        CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel,
-                signupInfoClassModel, contentClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
+                signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel, singleTypeInfoClassModel,
                 thirdPartyAccessClassModel, credentialClassModel, apiTokenClassModel, apiInfoClassModel,
                 apiInfoKeyClassModel, customFilterClassModel, runtimeFilterClassModel, filterSampleDataClassModel,

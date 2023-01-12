@@ -64,17 +64,12 @@ public class StatusCodeAnalyser {
                     logger.info("count: " + count);
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                ;
             }
-            if (inc % 10 == 0) System.out.println(inc);
             inc += 1;
         }
 
         calculateResult(frequencyMap, 5);
-
-        System.out.println("*********************");
-        System.out.println(result);
-        System.out.println("*********************");
     }
 
     public static void calculateResult(Map<Set<String>, Map<String,Integer>> frequencyMap, int threshold) {

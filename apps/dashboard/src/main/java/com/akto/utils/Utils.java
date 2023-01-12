@@ -1,6 +1,5 @@
 package com.akto.utils;
 
-import com.akto.analyser.ResourceAnalyser;
 import com.akto.dao.ThirdPartyAccessDao;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.third_party_access.Credential;
@@ -212,12 +211,6 @@ public class Utils {
             APICatalogSync apiCatalogSync = parser.syncFunction(responses, true, false);
             AktoPolicy aktoPolicy = new AktoPolicy(parser.apiCatalogSync, false);
             aktoPolicy.main(responses, apiCatalogSync, false);
-            ResourceAnalyser resourceAnalyser = new ResourceAnalyser(300_000, 0.01, 100_000, 0.01);
-            for (HttpResponseParams responseParams: responses)  {
-                responseParams.requestParams.getHeaders().put("x-forwarded-for", Collections.singletonList("127.0.0.1"));
-                resourceAnalyser.analyse(responseParams);
-            }
-            resourceAnalyser.syncWithDb();
         }
     }
 

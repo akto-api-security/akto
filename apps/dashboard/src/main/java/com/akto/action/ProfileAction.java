@@ -53,7 +53,6 @@ public class ProfileAction extends UserAction {
         if (sessionAccId == 0) {
             throw new IllegalStateException("user has no accounts associated");
         } else {
-            System.out.println("setting session: " + sessionAccId);
             request.getSession().setAttribute("accountId", sessionAccId);
             Context.accountId.set(sessionAccId);
         }

@@ -48,7 +48,7 @@ public class OldApiVersionTest extends AuthRequiredTestPlugin{
             try {
                 originalHttpResponse = ApiExecutor.sendRequest(testRequest, true);
             } catch (Exception e) {
-                e.printStackTrace();
+                ;
                 oldVersionUrl = decrementUrlVersion(oldVersionUrl, 1, 1);
                 continue;
             }

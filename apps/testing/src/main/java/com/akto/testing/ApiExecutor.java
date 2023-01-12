@@ -38,11 +38,9 @@ public class ApiExecutor {
             try {
                 body = responseBody.string();
             } catch (IOException e) {
-                System.out.println(e.getMessage());
                 body = "{}";
             }
         } catch (IOException e) {
-            System.out.println(e.getMessage());
             throw new Exception("Api Call failed");
         } finally {
             if (response != null) {

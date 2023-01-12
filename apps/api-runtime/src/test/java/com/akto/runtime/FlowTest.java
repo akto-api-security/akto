@@ -23,7 +23,7 @@ public class FlowTest {
         try {
             u = Flow.getUserIdentifier(name, requestParams);
         } catch (Exception e) {
-            e.printStackTrace();
+            ;
         }
 
         assertEquals(value, u);

@@ -104,7 +104,7 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
                 int count = basicDBObject.getInt("count");
                 countMap.put(apiCollectionId, count);
             } catch (Exception e) {
-                e.printStackTrace();
+                ;
             }
         }
 

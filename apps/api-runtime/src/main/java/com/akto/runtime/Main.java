@@ -43,7 +43,7 @@ public class Main {
     private static void printL(Object o) {
         if (debugPrintCounter > 0) {
             debugPrintCounter--;
-            System.out.println(o);
+            logger.info(o.toString());
         }
     }   
 
@@ -95,7 +95,6 @@ public class Main {
 
     public static Kafka kafkaProducer = null;
     private static void buildKafka(int accountId) {
-        System.out.println("Building kafka...................");
         Context.accountId.set(accountId);
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter(accountId));
         if (accountSettings != null && accountSettings.getCentralKafkaIp()!= null) {
@@ -106,8 +105,6 @@ public class Main {
                 kafkaProducer = new Kafka(centralKafkaBrokerUrl, centralKafkaLingerMS, centralKafkaBatchSize);
                 logger.info("Connected to central kafka @ " + Context.now());
             }
-        } else {
-            System.out.println(accountSettings);
         }
     }
 
@@ -186,7 +183,7 @@ public class Main {
                 try {
                     mainThread.join();
                 } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    ;
                 }
             }
         });
@@ -208,7 +205,6 @@ public class Main {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 main.consumer.commitSync();
 
-                // TODO: what happens if exception
                 Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
                 for (ConsumerRecord<String,String> r: records) {
                     HttpResponseParams httpResponseParams;
@@ -218,7 +214,7 @@ public class Main {
                         lastSyncOffset++;
 
                         if (lastSyncOffset % 100 == 0) {
-                            System.out.println("Committing offset at position: " + lastSyncOffset);
+                            logger.info("Committing offset at position: " + lastSyncOffset);
                         }
 
                         if (tryForCollectionName(r.value())) {
@@ -243,7 +239,6 @@ public class Main {
                     try {
                         accountIdInt = Integer.parseInt(accountId);
                     } catch (Exception ignored) {
-                        // TODO:
                         logger.info("Account id not string");
                         continue;
                     }
@@ -308,7 +303,7 @@ public class Main {
           // nothing to catch. This exception is called from the shutdown hook.
         } catch (Exception e) {
             printL(e);
-            e.printStackTrace();
+            ;
         } finally {
             main.consumer.close();
         }

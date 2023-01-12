@@ -45,12 +45,6 @@ public class Main {
             StatusCodeAnalyser.run();
         }
 
-        System.out.println("*********************RESULT******************************************");
-        System.out.println(System.getProperty("sun.arch.data.model"));
-        System.out.println(System.getProperty("os.arch"));
-        System.out.println(System.getProperty("os.version"));
-        System.out.println("***************************************************************");
-
         TestExecutor testExecutor = new TestExecutor();
 
         while (true) {
@@ -74,7 +68,6 @@ public class Main {
                     Filters.or(filter1,filter2), update);
 
 
-            // TODO: find a better solution than wait
             if (testingRun == null) {
                 try {
                     Thread.sleep(10 * 1000L);
@@ -101,7 +94,7 @@ public class Main {
             try {
                 testExecutor.init(testingRun, summaryId);
             } catch (Exception e) {
-                e.printStackTrace();
+                ;
             }
 
             Bson completedUpdate = Updates.combine(

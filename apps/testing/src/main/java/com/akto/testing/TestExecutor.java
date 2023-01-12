@@ -78,7 +78,7 @@ public class TestExecutor {
         try {
             apiWorkflowExecutor.init(workflowTest, testingRun.getId(), summaryId);
         } catch (Exception e) {
-            e.printStackTrace();
+            ;
         }
 
         Map<String, Integer> totalCountIssues = new HashMap<>();
@@ -120,7 +120,7 @@ public class TestExecutor {
 
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
-        System.out.println("APIs: " + apiInfoKeyList.size());
+        
         loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size());
 
         TestingRunResultSummariesDao.instance.updateOne(
@@ -161,7 +161,7 @@ public class TestExecutor {
             try {
                 testingRunResults.addAll(future.get());
             } catch (InterruptedException | ExecutionException e) {
-                e.printStackTrace();
+                ;
             }
         }
 
@@ -326,15 +326,11 @@ public class TestExecutor {
 
 
         for (String param: flattened.keySet()) {
-            System.out.println(param);
-            System.out.println(flattened.get(param));
             respMap.put(param, flattened.get(param));
         }
 
         for (String headerName: headers.keySet()) {
             for (String val: headers.get(headerName)) {
-                System.out.println(headerName);
-                System.out.println(val);
                 respMap.put(headerName, val);
             }
         }
@@ -352,7 +348,7 @@ public class TestExecutor {
             testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId);
             TestingRunResultDao.instance.insertMany(testingRunResults);
         } catch (Exception e) {
-            e.printStackTrace();
+            ;
         }
 
         latch.countDown();
@@ -457,7 +453,7 @@ public class TestExecutor {
                         if (fuzzResult != null) testingRunResults.add(fuzzResult);        
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb("unable to execute fuzzing for " + testSubCategory);
-                        e.printStackTrace();
+                        ;
                     }
                 }
             }

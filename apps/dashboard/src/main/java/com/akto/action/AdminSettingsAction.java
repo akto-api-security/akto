@@ -79,7 +79,6 @@ public class AdminSettingsAction extends UserAction {
     }
 
     private static void dropCollectionsInitial(int accountId) {
-        System.out.println("Dropping collection initial");
         Context.accountId.set(accountId);
         SampleDataDao.instance.getMCollection().drop();
         FilterSampleDataDao.instance.getMCollection().drop();
@@ -88,7 +87,6 @@ public class AdminSettingsAction extends UserAction {
     }
 
     public static void dropCollections(int accountId) {
-        System.out.println("CALLED: " + Context.now());
         dropCollectionsInitial(accountId);
         AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(), Updates.set(AccountSettings.SAMPLE_DATA_COLLECTION_DROPPED, true), new UpdateOptions().upsert(true)

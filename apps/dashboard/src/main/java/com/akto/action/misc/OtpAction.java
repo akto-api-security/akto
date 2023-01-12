@@ -9,6 +9,9 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -23,6 +26,7 @@ import java.util.regex.Pattern;
 
 public class OtpAction extends UserAction {
 
+    private static final Logger logger = LoggerFactory.getLogger(OtpAction.class);
 
     private String from;
     private String text;
@@ -30,13 +34,13 @@ public class OtpAction extends UserAction {
     public String execute() {
         Context.accountId.set(1_000_000);
 
-        System.out.println(text);
+        logger.info(text);
         if (text == null || !text.contains("OTP")) {
-            System.out.println("But doesn't contain the word 'OTP' ");
+            logger.info("But doesn't contain the word 'OTP' ");
             return SUCCESS.toUpperCase();
         }
 
-        System.out.println("And contains OTP");
+        logger.info("And contains OTP");
         OTPMessage otpMessage = new OTPMessage(Context.now(), from, text, Context.now());
         OtpMessagesDao.instance.insertOne(otpMessage);
         return SUCCESS.toUpperCase();
@@ -54,7 +58,7 @@ public class OtpAction extends UserAction {
         if (val == null || val.isEmpty()) return ERROR.toUpperCase();
 
         otp = val;
-        System.out.println("found otp: " + otp);
+        logger.info("found otp: " + otp);
 
         return SUCCESS.toUpperCase();
     }
@@ -75,16 +79,12 @@ public class OtpAction extends UserAction {
 
     private Integer latestMessageId = null;
     public String fetchLatestMessageId() {
-        System.out.println(apiKey);
-        System.out.println(authToken);
-        System.out.println(address);
+        logger.info(apiKey);
+        logger.info(authToken);
+        logger.info(address);
         BasicDBObject result;
         try {
             result = makeRequestToMySms();
-            System.out.println("****");
-            System.out.println(result);
-            System.out.println("****");
-
             List<Map> messages = (List<Map>) result.get("messages");
             if (messages.size() == 0) return SUCCESS.toUpperCase();
 
@@ -101,10 +101,6 @@ public class OtpAction extends UserAction {
         try {
             BasicDBObject result = makeRequestToMySms();
 
-            System.out.println("((((");
-            System.out.println(result);
-            System.out.println("((((");
-
             List<Map> messages = (List<Map>) result.get("messages");
 
             Integer messageId = (Integer) messages.get(0).get("messageId");
@@ -116,7 +112,7 @@ public class OtpAction extends UserAction {
             if (val == null || val.isEmpty()) return ERROR.toUpperCase();
 
             otp = val;
-            System.out.println("found otp: " + otp);
+            logger.info("found otp: " + otp);
 
         } catch (Exception e) {
             return ERROR.toUpperCase();
@@ -150,7 +146,6 @@ public class OtpAction extends UserAction {
             os.write(json.getBytes(StandardCharsets.UTF_8));
         }
 
-        System.out.println(http.getResponseCode());
         InputStream inputStream = http.getInputStream();
 
 

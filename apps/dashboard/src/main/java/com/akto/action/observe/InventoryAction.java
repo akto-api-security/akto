@@ -247,7 +247,6 @@ public class InventoryAction extends UserAction {
         return prependPath;
     }
 
-    // todo: handle null
     public static Set<String> fetchSwaggerData(List<BasicDBObject> endpoints, OpenAPI openAPI) {
         List<Server> servers = openAPI.getServers();
 
@@ -358,7 +357,7 @@ public class InventoryAction extends UserAction {
                 unused = fetchSwaggerData(list, openAPI);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            ;
         }
 
         attachTagsInAPIList(list);

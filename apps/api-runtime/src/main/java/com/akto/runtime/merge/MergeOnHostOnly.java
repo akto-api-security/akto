@@ -53,7 +53,7 @@ public class MergeOnHostOnly {
             try{
                 ApiInfoDao.instance.getMCollection().insertMany(apiInfos,options);
             } catch(Exception e){
-                System.out.println(e.getMessage());
+
             }
             ApiInfoDao.instance.getMCollection().deleteMany(Filters.eq("_id.apiCollectionId", oldId));
         }
@@ -64,7 +64,7 @@ public class MergeOnHostOnly {
             try{
                 SampleDataDao.instance.getMCollection().insertMany(sampleDatas,options);
             } catch(Exception e){
-                System.out.println(e.getMessage());
+
             }
             SampleDataDao.instance.getMCollection().deleteMany(Filters.eq("_id.apiCollectionId", oldId));
         }
@@ -75,7 +75,7 @@ public class MergeOnHostOnly {
             try{
                 SensitiveSampleDataDao.instance.getMCollection().insertMany(sensitiveSampleDatas,options);
             } catch(Exception e){
-                System.out.println(e.getMessage());
+
             }
             SensitiveSampleDataDao.instance.getMCollection().deleteMany(Filters.eq("_id.apiCollectionId", oldId));
         }
@@ -86,7 +86,7 @@ public class MergeOnHostOnly {
             try{
                 TrafficInfoDao.instance.getMCollection().insertMany(trafficInfos,options);
             } catch(Exception e){
-                System.out.println(e.getMessage());
+
             }
             TrafficInfoDao.instance.getMCollection().deleteMany(Filters.eq("_id.apiCollectionId", oldId));
         }
@@ -181,7 +181,8 @@ public class MergeOnHostOnly {
             }
 
         } catch (Exception e) {
-            System.out.println("unable to update apiCollectionId, trying again with" + newApiCollectionId);
+            
+            
         }
 
     }

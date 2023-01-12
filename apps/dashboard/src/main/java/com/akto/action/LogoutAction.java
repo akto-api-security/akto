@@ -22,7 +22,6 @@ public class LogoutAction extends UserAction implements ServletRequestAware,Serv
     @Override
     public String execute() throws Exception {
         User user = getSUser();
-        System.out.println(user.getId());
         UsersDao.instance.updateOne(
                 Filters.eq("_id", user.getId()),
                 Updates.set("refreshTokens", new ArrayList<>())
@@ -37,7 +36,7 @@ public class LogoutAction extends UserAction implements ServletRequestAware,Serv
             servletResponse.sendRedirect(LOGIN_URI);
             return null;
         } catch (IOException e) {
-            e.printStackTrace();
+            ;
         }
         return Action.SUCCESS.toUpperCase();
     }

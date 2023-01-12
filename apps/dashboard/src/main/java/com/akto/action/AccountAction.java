@@ -47,7 +47,7 @@ public class AccountAction extends UserAction {
         InvokeResult invokeResult = null;
         try {
 
-            System.out.println("Invoke lambda "+functionName);
+            logger.info("Invoke lambda "+functionName);
             invokeResult = awsLambda.invoke(invokeRequest);
 
             String resp = new String(invokeResult.getPayload().array(), StandardCharsets.UTF_8);
@@ -134,7 +134,7 @@ public class AccountAction extends UserAction {
 
     public String createNewAccount() {
         newAccountId = Context.getId();
-        System.out.println(AccountsDao.instance.insertOne(new Account(newAccountId, newAccountName)));
+        AccountsDao.instance.insertOne(new Account(newAccountId, newAccountName));
 
         UserAccountEntry uae = new UserAccountEntry();
         uae.setAccountId(newAccountId);

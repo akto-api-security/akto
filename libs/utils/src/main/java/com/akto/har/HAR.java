@@ -88,13 +88,13 @@ public class HAR {
         }
 
 
-        String akto_account_id = 1_000_000 + ""; // TODO:
+        String akto_account_id = 1_000_000 + "";
         String path = getPath(request);
         String requestHeaders = mapper.writeValueAsString(requestHeaderMap);
         String responseHeaders = mapper.writeValueAsString(responseHeaderMap);
         String method = request.getMethod().toString();
         String responsePayload = response.getContent().getText();;
-        String ip = "null"; // TODO:
+        String ip = "null"; 
         String time = (int) (dateTime.getTime() / 1000) + "";
         String statusCode = response.getStatus() + "";
         String type = request.getHttpVersion();
@@ -150,7 +150,6 @@ public class HAR {
      }
 
     public static void addQueryStringToMap(List<HarQueryParam> params, Map<String,Object> paramsMap) {
-        // TODO: which will take preference querystring or post value
         for (HarQueryParam param: params) {
             paramsMap.put(param.getName(), param.getValue());
         }

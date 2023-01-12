@@ -1,7 +1,6 @@
 package com.akto.action;
 
 import com.akto.DaoInit;
-import com.akto.analyser.ResourceAnalyser;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.RuntimeFilterDao;
 import com.akto.dao.context.Context;
@@ -35,15 +34,6 @@ public class HarAction extends UserAction {
 
     private boolean skipKafka;
     private byte[] tcpContent;
-
-    public static void main(String[] args) {
-        // messages.add("{\"method\":\"POST\",\"requestPayload\":\"{\\\"petId\\\":1,\\\"quantity\\\":0,\\\"id\\\":0,\\\"shipDate\\\":\\\"2022-01-04T20:10:16.578Z\\\",\\\"complete\\\":true,\\\"status\\\":\\\"avnebbesh@akto.io\\\"}\",\"responsePayload\":\"{\\\"id\\\":9223372036854772476,\\\"petId\\\":0,\\\"quantity\\\":0,\\\"shipDate\\\":\\\"2022-01-04T20:10:16.578+0000\\\",\\\"status\\\":\\\"av@gmail.com\\\",\\\"complete\\\":true, \\\"avav\\\": \\\"eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoicmVmcmVzaFRva2VuIiwic2lnbmVkVXAiOiJ0cnVlIiwidXNlcm5hbWUiOiJhbmtpdGFAZ21haWwuY29tIiwiaWF0IjoxNjM0OTcxMTMxLCJleHAiOjE2MzUwNTc1MzF9.Ph4Jv-fdggwvnbdVViD9BWUReYL0dVfVGuMRz4d2oZNnYzWV0JCmjpB68p6k0yyPPua_yagIWVZf_oYH9PUgS7EuaPYR-Vg6uxKR1HuXRA6wb8Xf4RPoFjJYkhWoYmv38V9Cz2My9U85wgGHGZXEufu8ubrFmIfOP6-A39M4meNGw48f5oOz8V337SX45uPc6jE0EfmM4l9EbqFFCF0lRXbMMzn-ijsyXxLkI5npWnqtW3PAHC2Rs3FV40tkRqHYF-WM6SzyHLBh6bVeyeOsFRBoEjv-zFh8yrYnT6OvCa6jII2A6uj4MQ2k11-5bDBhfVPVc4hEQz37H_DWwtf23g\\\"}\",\"ip\":\"null\",\"source\":\"HAR\",\"type\":\"HTTP/2\",\"akto_vxlan_id\":\"0\",\"path\":\"https://petstore.swagger.io/v2/store/order/1\",\"requestHeaders\":\"{\\\"Origin\\\":\\\"avneesh@gmail.com\\\",\\\"Accept\\\":\\\"application/json\\\",\\\"User-Agent\\\":\\\"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:95.0) Gecko/20100101 Firefox/95.0\\\",\\\"Referer\\\":\\\"https://petstore.swagger.io/\\\",\\\"Connection\\\":\\\"keep-alive\\\",\\\"Sec-Fetch-Dest\\\":\\\"empty\\\",\\\"Sec-Fetch-Site\\\":\\\"same-origin\\\",\\\"Host\\\":\\\"petstore.swagger.io\\\",\\\"Accept-Encoding\\\":\\\"gzip, deflate, br\\\",\\\"Sec-Fetch-Mode\\\":\\\"cors\\\",\\\"TE\\\":\\\"trailers\\\",\\\"Accept-Language\\\":\\\"en-US,en;q=0.5\\\",\\\"Content-Length\\\":\\\"128\\\",\\\"Content-Type\\\":\\\"application/json\\\"}\",\"responseHeaders\":\"{\\\"date\\\":\\\"+917021916328\\\",\\\"access-control-allow-origin\\\":\\\"*\\\",\\\"server\\\":\\\"Jetty(9.2.9.v20150224)\\\",\\\"access-control-allow-headers\\\":\\\"Content-Type, api_key, Authorization\\\",\\\"X-Firefox-Spdy\\\":\\\"h2\\\",\\\"content-type\\\":\\\"application/json\\\",\\\"access-control-allow-methods\\\":\\\"GET, POST, DELETE, PUT\\\"}\",\"time\":\"1641327021\",\"contentType\":\"application/json\",\"akto_account_id\":\"1000000\",\"statusCode\":\"200\",\"status\":\"OK\"}");
-        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
-        Context.accountId.set(1_000_000);
-        RuntimeFilterDao.instance.initialiseFilters();
-        System.out.println(RuntimeFilterDao.instance.findAll(new BasicDBObject()));
-        ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), new HashSet<>(), null,0));
-    }
 
     @Override
     public String execute() throws IOException {
@@ -86,7 +76,7 @@ public class HarAction extends UserAction {
             harErrors = har.getErrors();
             Utils.pushDataToKafka(apiCollectionId, topic, messages, harErrors, skipKafka);
         } catch (Exception e) {
-            e.printStackTrace();
+            ;
             return SUCCESS.toUpperCase();
         }
         return SUCCESS.toUpperCase();
@@ -146,8 +136,7 @@ public class HarAction extends UserAction {
     
             return Action.SUCCESS.toUpperCase();            
         } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            ;
             return Action.ERROR.toUpperCase();        
         }
 

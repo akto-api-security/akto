@@ -162,7 +162,6 @@ public class AktoPolicy {
         ApiInfo.ApiInfoKey apiInfoKey = filterSampleData.getId().getApiInfoKey();
         ApiInfoCatalog apiInfoCatalog = apiInfoCatalogMap.get(apiInfoKey.getApiCollectionId());
         if (apiInfoCatalog == null) {
-            // TODO: should delete from db??
             return;
         }
         Map<URLStatic, PolicyCatalog> strictURLToMethods = apiInfoCatalog.getStrictURLToMethods();
@@ -229,7 +228,6 @@ public class AktoPolicy {
         ApiInfo.ApiInfoKey apiInfoKey = apiInfo.getId();
         ApiInfoCatalog apiInfoCatalog = apiInfoCatalogMap.get(apiInfoKey.getApiCollectionId());
         if (apiInfoCatalog == null) {
-            // TODO: should delete from db??
             return;
         }
 
@@ -293,7 +291,7 @@ public class AktoPolicy {
                 process(httpResponseParams);
             } catch (Exception e) {
                 logger.error(e.toString());
-                e.printStackTrace();
+                ;
             }
             currentBatchSize += 1;
         }

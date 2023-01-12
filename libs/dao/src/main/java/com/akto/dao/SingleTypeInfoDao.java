@@ -291,7 +291,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
                 );
                 endpoints.add(apiInfoKey);
             } catch (Exception e) {
-                e.printStackTrace();
+                ;
 
             }
         }

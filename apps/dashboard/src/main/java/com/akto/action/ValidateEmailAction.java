@@ -14,14 +14,10 @@ public class ValidateEmailAction implements Action{
 
     @Override
     public String execute() {
-        System.out.println("ValidEmailAction Hit");
-        System.out.println(emailToken);
 
         try {
             Jws<Claims> jws = JWT.parseJwt(emailToken, "/home/avneesh/Desktop/akto/dashboard/public.pem");
             String email= jws.getBody().get("email").toString();
-
-            System.out.println("valid Token");
 
             User user = UsersDao.validateEmail(email);
 
@@ -30,11 +26,9 @@ public class ValidateEmailAction implements Action{
             }
 
         } catch (NoSuchAlgorithmException | IOException | InvalidKeySpecException e) {
-            System.out.println(e);
             return "ERROR";
         }
 
-        System.out.println("Email Validation Done");
         return "SUCCESS";
     }
 

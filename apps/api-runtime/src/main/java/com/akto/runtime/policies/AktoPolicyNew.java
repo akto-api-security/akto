@@ -130,7 +130,7 @@ public class AktoPolicyNew {
                 process(httpResponseParams);
             } catch (Exception e) {
                 logger.error(e.toString());
-                e.printStackTrace();
+                ;
             }
         }
 
@@ -152,7 +152,7 @@ public class AktoPolicyNew {
         }
 
         int statusCode = httpResponseParams.getStatusCode();
-        if (!HttpResponseParams.validHttpResponseCode(statusCode)) return; //todo: why?
+        if (!HttpResponseParams.validHttpResponseCode(statusCode)) return; 
 
         for (RuntimeFilter filter: filters) {
             boolean filterResult = filter.process(httpResponseParams);
