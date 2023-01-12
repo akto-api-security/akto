@@ -240,6 +240,7 @@ export default {
             this.$store.dispatch('issues/loadIssues')
         },
         appliedFilter(value, $event) {
+
             let filterCollectionsId = this.filterCollectionsId
             let filterSeverity = this.filterSeverity
             let filterSubCategory1 = this.filterSubCategory1
@@ -304,6 +305,7 @@ export default {
             this.$store.dispatch('issues/loadIssues')
         },
         selectedAll(value, $event) {
+
             let filterStatus = this.filterStatus
             let filterCollectionsId = this.filterCollectionsId
             let filterSeverity = this.filterSeverity
