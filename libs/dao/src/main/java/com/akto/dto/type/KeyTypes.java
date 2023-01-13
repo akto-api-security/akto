@@ -100,6 +100,7 @@ public class KeyTypes {
     }
 
     private static boolean checkForSubtypesTest(ParamId paramId, IgnoreData ignoreData) {
+        if (ignoreData == null) return true;
         if ((paramId != null && paramId.getParam() != null)
                 && (ignoreData.getIgnoredKeysInAllAPIs().contains(paramId.getParam()) ||
                         (ignoreData.getIgnoredKeysInSelectedAPIs().containsKey(paramId.getParam()) &&
