@@ -1,22 +1,10 @@
 <template>
     <div class="testing-run-results-container">
         <div class="testing-run-header">
-            <span class="testing-run-title">{{title}}</span>
+            <span class="testing-run-title">{{(testingRun && testingRun.name) || "Tests"}}</span>
             <span>({{endpoints}})</span> | 
             <span>{{getScheduleStr()}}</span> | 
-            <span
-                v-for="(testType, index) in testTypes"
-                :key="'chip_'+index"            
-            >
-                <v-chip
-                    color="#6200EA19"
-                    class="mx-2"
-                    small
-                >
-                    <span class="primary--text">{{testType.toLowerCase()}}</span>
-                </v-chip>
-                <span v-if="index != testTypes.length - 1"  class="primary--text">+ </span>
-            </span>
+            <span>{{collectionName}}</span>
         </div>
 
         <div class="testing-runs-history" v-if="!isWorkflow">
@@ -77,7 +65,13 @@
                             </v-btn>
                         </template>
                         <div class="pa-4">
-                            <test-results-dialog :testingRunResult="testingRunResult"/>
+                            <test-results-dialog 
+                                :similarlyAffectedIssues="similarlyAffectedIssues"
+                                :testingRunResult="testingRunResult"
+                                :subCatogoryMap="subCatogoryMap"
+                                :issuesDetails="dialogBoxIssue"
+                                isTestingPage
+                                :mapCollectionIdToName="mapCollectionIdToName"/>
                         </div>
                     </a-card>
                 </div>
@@ -99,6 +93,7 @@ import TestResultsDialog from "./TestResultsDialog";
 import WorkflowTestBuilder from '../../observe/inventory/components/WorkflowTestBuilder'
 
 import api from '../api'
+import issuesApi from '../../issues/api'
 
 import obj from "@/util/obj"
 import func from "@/util/func"
@@ -125,7 +120,7 @@ export default {
     data () {
         let endTimestamp = this.defaultEndTimestamp || func.timeNow()
         return {
-            title: "Unauthenticated",
+            title: "Test",
             testTypes: ["Bola", "Workflow", "Bua"],
             startTimestamp: this.defaultStartTimestamp || (func.timeNow() - func.recencyPeriod/9),
             endTimestamp: endTimestamp,
@@ -161,7 +156,9 @@ export default {
             testingRunResult: null,
             openDetailsDialog: false,
             isWorkflow: false,
-            originalStateFromDb: null
+            originalStateFromDb: null,
+            dialogBoxIssue: {},
+            similarlyAffectedIssues: []
         }
     },
     methods: {
@@ -240,24 +237,51 @@ export default {
             }
         },
         async openDetails(row) {
-            api.fetchTestRunResultDetails(row["hexId"]).then(resp => {
+            await api.fetchTestRunResultDetails(row["hexId"]).then(async resp => {
                 this.testingRunResult = resp["testingRunResult"]
                 if (this.testingRunResult) {
+                    await api.fetchIssueFromTestRunResultDetails(row["hexId"]).then(async respIssue => {
+                        this.dialogBoxIssue = respIssue['runIssues']
+                        if (this.dialogBoxIssue) {
+                            await issuesApi.fetchAffectedEndpoints(this.dialogBoxIssue.id).then(affectedResp => {
+                                this.similarlyAffectedIssues = affectedResp['similarlyAffectedIssues']
+                            })
+                        }
+                    })
                     this.openDetailsDialog = true
                 }
             })
         },
     },
-    mounted() {
+    async mounted() {
         this.refreshSummaries()
+        await this.$store.dispatch('issues/fetchAllSubCategories')
     },
     computed: {
         ...mapState('testing', ['testingRuns', 'pastTestingRuns']),
+        subCatogoryMap: {
+            get() {
+                return this.$store.state.issues.subCatogoryMap
+            }
+        },
+        mapCollectionIdToName() {
+            return this.$store.state.collections.apiCollections.reduce((m, e) => {
+                m[e.id] = e.displayName
+                return m
+            }, {})
+        },
         testingRun() {
             return [...this.testingRuns, ...this.pastTestingRuns].filter(x => x.hexId === this.testingRunHexId)[0]
         },
         endpoints() {
             return this.testingRun ? testing.getEndpoints(this.testingRun.testingEndpoints) : "-"
+        },
+        collectionName() {
+            if (this.testingRun) {
+                return testing.getCollectionName(this.testingRun.testingEndpoints, this.mapCollectionIdToName)
+            } else {
+                return ""
+            }
         },
         dateRange: {
             get () {

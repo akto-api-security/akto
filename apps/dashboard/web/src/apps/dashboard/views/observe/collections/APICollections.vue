@@ -191,10 +191,10 @@ export default {
                 return false;
         },
         isValidForTest(item) {
-            return !this.isRunning(item)
+            return false
         },
         isValidForSchedule (item) {
-            return !this.isScheduled(item)
+            return false
         },
         isRunning(item) {
             let latestRun = this.testingRuns.find(x => x.testingEndpoints.apiCollectionId === item.id)

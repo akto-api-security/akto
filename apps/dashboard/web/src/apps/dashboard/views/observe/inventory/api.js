@@ -274,7 +274,8 @@ export default {
             data: {
                 "testIdConfig" : 1,
                 "workflowTestId": id,
-                "type": "WORKFLOW"
+                "type": "WORKFLOW",
+                testName: id
             }
         })
     },
@@ -288,7 +289,8 @@ export default {
                 "workflowTestId": id,
                 "type": "WORKFLOW",
                 "recurringDaily": recurringDaily,
-                "startTimestamp": startTimestamp
+                "startTimestamp": startTimestamp,
+                testName: id
             }
         })
     },
@@ -338,6 +340,16 @@ export default {
             url: '/api/uploadWorkflowJson',
             method: 'post',
             data: { workflowTestJson, apiCollectionId }
+        })
+    },
+
+    setFalsePositives (falsePositives) {
+        return request({
+            url: '/api/setFalsePositives',
+            method: 'post',
+            data: {falsePositives:falsePositives}
+        }).then((resp) => {
+            return resp
         })
     }
 

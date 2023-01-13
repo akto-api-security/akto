@@ -5,6 +5,7 @@ import java.util.regex.Pattern;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.CustomDataType;
+import com.akto.dto.IgnoreData;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.type.SingleTypeInfo.ParamId;
 import com.akto.dto.type.SingleTypeInfo.SubType;
@@ -53,7 +54,8 @@ public class KeyTypes {
         String key = param.replaceAll("#", ".").replaceAll("\\.\\$", "");
         String[] keyArr = key.split("\\.");
         String lastField = keyArr[keyArr.length - 1];
-        SubType subType = findSubType(object,lastField);
+        ParamId paramId = new ParamId(url, method, responseCode, isHeader, param, SingleTypeInfo.GENERIC, apiCollectionId, isUrlParam);
+        SubType subType = findSubType(object,lastField,paramId);
 
         SingleTypeInfo singleTypeInfo = occurrences.get(subType);
         if (singleTypeInfo == null) {
@@ -65,8 +67,7 @@ public class KeyTypes {
 
             Set<String> userIds = new HashSet<>();
             userIds.add(userId);
-            
-            ParamId paramId = new ParamId(url, method, responseCode, isHeader, param, subType, apiCollectionId, isUrlParam);
+            paramId.setSubType(subType);
             singleTypeInfo = new SingleTypeInfo(paramId, examples, userIds, 0, Context.now(), 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
 
             occurrences.put(subType, singleTypeInfo);
@@ -98,7 +99,29 @@ public class KeyTypes {
         singleTypeInfo.incr();
     }
 
-    public static SubType findSubType(Object o,String key) {
+    private static boolean checkForSubtypesTest(ParamId paramId, IgnoreData ignoreData) {
+        if (ignoreData == null) return true;
+        if ((paramId != null && paramId.getParam() != null)
+                && (ignoreData.getIgnoredKeysInAllAPIs().contains(paramId.getParam()) ||
+                        (ignoreData.getIgnoredKeysInSelectedAPIs().containsKey(paramId.getParam()) &&
+                                ignoreData.getIgnoredKeysInSelectedAPIs().get(paramId.getParam()).contains(paramId)))) {
+            return false;
+        }
+        return true;
+    }
+
+    public static SubType findSubType(Object o,String key, ParamId paramId) {
+
+        boolean checkForSubtypes = true ;
+        for (String keyType : SingleTypeInfo.customDataTypeMap.keySet()) {
+            IgnoreData ignoreData = SingleTypeInfo.customDataTypeMap.get(keyType).getIgnoreData();
+            checkForSubtypes = checkForSubtypesTest(paramId, ignoreData);
+        }
+        for (String keyType : SingleTypeInfo.aktoDataTypeMap.keySet()) {
+            IgnoreData ignoreData = SingleTypeInfo.aktoDataTypeMap.get(keyType).getIgnoreData();
+            checkForSubtypes = checkForSubtypesTest(paramId, ignoreData);
+        }
+
         if (o == null) {
             return SingleTypeInfo.NULL;
         }
@@ -108,13 +131,15 @@ public class KeyTypes {
             return bool ? SingleTypeInfo.TRUE : SingleTypeInfo.FALSE;
         }
 
-        for (CustomDataType customDataType: SingleTypeInfo.customDataTypesSortedBySensitivity) {
-            if (!customDataType.isActive()) continue;
-            boolean result = customDataType.validate(o,key);
-            if (result) return customDataType.toSubType();
+        if(checkForSubtypes){
+            for (CustomDataType customDataType: SingleTypeInfo.customDataTypesSortedBySensitivity) {
+                if (!customDataType.isActive()) continue;
+                boolean result = customDataType.validate(o,key);
+                if (result) return customDataType.toSubType();
+            }
         }
 
-        if (isCreditCard(o.toString())) {
+        if (checkForSubtypes && isCreditCard(o.toString())) {
             return SingleTypeInfo.CREDIT_CARD;
         }
 
@@ -150,19 +175,19 @@ public class KeyTypes {
             String str = o.toString();
             for(SubType subType: patternToSubType.keySet()) {
                 Pattern pattern = patternToSubType.get(subType);
-                if(pattern.matcher(str).matches()) {
+                if( ( checkForSubtypes || subType.getName().equals("URL") ) && pattern.matcher(str).matches()) {
                     return subType;
                 }
             }
-            if (isJWT(str)) {
+            if (checkForSubtypes && isJWT(str)) {
                 return SingleTypeInfo.JWT;
             }
 
-            if (isPhoneNumber(str)) {
+            if (checkForSubtypes && isPhoneNumber(str)) {
                 return SingleTypeInfo.PHONE_NUMBER;
             }
 
-            if (isIP(str)) {
+            if (checkForSubtypes && isIP(str)) {
                 return SingleTypeInfo.IP_ADDRESS;
             }
 

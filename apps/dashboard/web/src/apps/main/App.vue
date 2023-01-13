@@ -135,8 +135,20 @@
     letter-spacing: normal
     padding: 0
 
+.brda
+  border: 1px solid rgba(71, 70, 106, 0.2) !important
+
 .brdb
   border-bottom: 1px solid rgba(71, 70, 106, 0.2) !important
+
+.brdt
+  border-top: 1px solid rgba(71, 70, 106, 0.2) !important
+
+.brdl
+  border-left: 1px solid rgba(71, 70, 106, 0.2) !important
+
+.brdr
+  border-right: 1px solid rgba(71, 70, 106, 0.2) !important
 
 .highcharts-credits
   display: none
@@ -205,10 +217,17 @@
     color: #949597
 
 .white-background
-    background-color: #FFFFFF    
+    background-color: #FFFFFF   
+     
 .fs-12
     font-size: 12px
 
+.fs-14
+    font-size: 14px
+
 .text-primary    
     color: #47466A
+
+.fw-500   
+    font-weight: 500
 </style>
