@@ -52,6 +52,30 @@ public class HarAction extends UserAction {
         ApiCollection apiCollection = null;
         if (apiCollectionName != null) {
             apiCollection =  ApiCollectionsDao.instance.findByName(apiCollectionName);
+            if (apiCollection == null) {
+                ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
+                apiCollectionsAction.setSession(this.getSession());
+                apiCollectionsAction.setCollectionName(apiCollectionName);
+                String result = apiCollectionsAction.createCollection();
+                if (result.equalsIgnoreCase(Action.SUCCESS)) {
+                    List<ApiCollection> apiCollections = apiCollectionsAction.getApiCollections();
+                    if (apiCollections != null && apiCollections.size() > 0) {
+                        apiCollection = apiCollections.get(0);
+                    } else {
+                        addActionError("Couldn't create api collection " +  apiCollectionName);
+                        return ERROR.toUpperCase();
+                    }
+                } else {
+                    Collection<String> actionErrors = apiCollectionsAction.getActionErrors(); 
+                    if (actionErrors != null && actionErrors.size() > 0) {
+                        for (String actionError: actionErrors) {
+                            addActionError(actionError);
+                        }
+                    }
+                    return ERROR.toUpperCase();
+                }
+            }
+
             apiCollectionId = apiCollection.getId();
         } else {
             apiCollection =  ApiCollectionsDao.instance.findOne(Filters.eq("_id", apiCollectionId));
