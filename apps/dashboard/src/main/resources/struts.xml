@@ -1520,7 +1520,7 @@
             </result>
         </action>
 
-        <action name="api/sendBootupSignalBurp" class="com.akto.action.BurpJarAction" method="sendBootupSignalBurp">
+        <action name="api/sendHealthCheck" class="com.akto.action.BurpJarAction" method="sendHealthCheck">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">

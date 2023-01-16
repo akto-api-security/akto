@@ -42,6 +42,7 @@ import com.sendgrid.helpers.mail.Mail;
 import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
@@ -50,12 +51,15 @@ import org.slf4j.LoggerFactory;
 import javax.servlet.ServletContextListener;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 
 import static com.mongodb.client.model.Filters.eq;
 
@@ -718,6 +722,37 @@ public class InitializerListener implements ServletContextListener {
         } catch (Exception e) {
             logger.error("error while updating dashboard version: " + e.getMessage());
         }
+
+        try {
+            readAndSaveBurpPluginVersion();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+
+
+    public static int burpPluginVersion = -1;
+
+    public void readAndSaveBurpPluginVersion() {
+        URL url = this.getClass().getResource("/Akto.jar");
+        if (url == null) return;
+
+        try (JarFile jarFile = new JarFile(url.getPath())) {
+            Enumeration<JarEntry> jarEntries = jarFile.entries();
+
+            while (jarEntries.hasMoreElements()) {
+                JarEntry entry = jarEntries.nextElement();
+                if (entry.getName().contains("AktoVersion.txt")) {
+                    InputStream inputStream = jarFile.getInputStream(entry);
+                    String result = IOUtils.toString(inputStream, StandardCharsets.UTF_8);
+                    burpPluginVersion = Integer.parseInt(result.trim());
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
     }
 
     public void updateDeploymentStatus(BackwardCompatibility backwardCompatibility) {

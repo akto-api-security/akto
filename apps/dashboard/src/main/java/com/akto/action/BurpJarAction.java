@@ -5,6 +5,7 @@ import com.akto.dao.BurpPluginInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiToken;
 import com.akto.dto.BurpPluginInfo;
+import com.akto.listener.InitializerListener;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
@@ -143,14 +144,15 @@ public class BurpJarAction extends UserAction implements ServletResponseAware, S
 
 
     public String version;
-    public String sendBootupSignalBurp() {
+    public int latestVersion;
+    public String sendHealthCheck() {
         int versionInt;
-         try {
+        try {
             versionInt = Integer.parseInt(this.version);
-         } catch (Exception e) {
+        } catch (Exception e) {
             e.printStackTrace();
             versionInt = -1;
-         }
+        }
 
         BurpPluginInfoDao.instance.updateOne(
             BurpPluginInfoDao.filterByUsername(this.getSUser().getLogin()),
@@ -159,6 +161,8 @@ public class BurpJarAction extends UserAction implements ServletResponseAware, S
                 Updates.set(BurpPluginInfo.VERSION, versionInt)
             )
         );
+
+        latestVersion = InitializerListener.burpPluginVersion;
 
         return SUCCESS.toUpperCase();
     }
@@ -184,7 +188,7 @@ public class BurpJarAction extends UserAction implements ServletResponseAware, S
         this.version = version;
     }
 
-    
-
-    
+    public int getLatestVersion() {
+        return latestVersion;
+    }
 }
