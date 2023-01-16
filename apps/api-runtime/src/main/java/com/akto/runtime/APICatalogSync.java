@@ -310,7 +310,7 @@ public class APICatalogSync {
         for(String rawURLPlusMethod: catalog.keySet()) {
             String[] rawUrlPlusMethodSplit = rawURLPlusMethod.split(" ");
             String rawURL = rawUrlPlusMethodSplit.length > 1 ? rawUrlPlusMethodSplit[1] : rawUrlPlusMethodSplit[0];
-            Set<String> reqTemplate = catalog.get(rawURL);
+            Set<String> reqTemplate = catalog.get(rawURLPlusMethod);
             String url = APICatalogSync.trim(rawURL);
             String[] tokens = url.split("/");
             Map<String, Set<String>> urlSet = sizeToURL.get(tokens.length);
