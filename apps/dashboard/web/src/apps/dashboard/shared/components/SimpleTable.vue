@@ -8,7 +8,7 @@
             :sort-by="sortKey"
             :sort-desc="sortDesc"
             :custom-sort="sortFunc"
-            :items-per-page="rowsPerPage"
+            :items-per-page.sync="itemsPerPage"
             hide-default-footer
             hide-default-header
             :fillInitial="fillInitial"
@@ -91,6 +91,48 @@
                             </template>
                         </v-btn-toggle>
 
+                        <span>
+                            <v-menu offset-y>
+                                <template v-slot:activator="{ on, attrs }">
+                                    <v-btn
+                                    dark
+                                    text
+                                    color="primary"
+                                    v-bind="attrs"
+                                    v-on="on"
+                                    >
+                                    <span v-if ="itemsPerPage > 0">
+                                        {{ itemsPerPage }}
+                                    </span>
+
+                                    <span v-else>
+                                        Choose Rows Per Page
+                                    </span>
+                                        <v-icon :size="14">$fas_angle-down</v-icon>
+                                    </v-btn>
+                                </template>
+                                <v-list>
+                                    <v-list-item
+                                    v-for="(val, index) in itemsPerPageArray"
+                                    :key="index"
+                                    @click="updateItemsPerPage(val)"
+                                    >
+                                        <v-list-item-title v-if="val > 0">{{ val }}</v-list-item-title>
+                                        <v-list-item-title v-else>Show All</v-list-item-title>
+                                    </v-list-item>
+                                </v-list>
+                            </v-menu>
+                        </span>
+
+                        <v-data-footer 
+                            v-if="enablePagination && itemsPerPage > 0"
+                            :pagination="pagination" 
+                            :options="options"
+                            @update:options="updateOptions"
+                            prevIcon= '$fas_angle-left'
+                            nextIcon= '$fas_angle-right'
+                            items-per-page-text="$vuetify.dataTable.itemsPerPageText"/>
+
                         <div class="d-flex board-table-cards jc-end">
                             <div class="clickable download-csv ma-1">
                                 <v-tooltip bottom>
@@ -105,29 +147,6 @@
                                     </template>
                                     Download as CSV
                                 </v-tooltip>
-                                <v-tooltip bottom>
-                                    <template v-slot:activator="{on, attrs}">
-                                        <v-btn
-                                            v-on="on"
-                                            v-bind="attrs"
-                                            icon
-                                            color="#47466A"
-                                            @click="itemsPerPage = [-1]"
-                                            v-if="enablePagination && itemsPerPage[0] != -1"
-                                        >
-                                            <v-icon>$fas_angle-double-down</v-icon>
-                                        </v-btn>
-                                    </template>
-                                    Show all
-                                </v-tooltip>
-                                <v-btn
-                                    icon
-                                    color="#47466A"
-                                    @click="itemsPerPage = [rowsPerPage]"
-                                    v-if="enablePagination && itemsPerPage[0] == -1"
-                                >
-                                    <v-icon>$fas_angle-double-up</v-icon>
-                                </v-btn>
                             </div>
                             <slot name="add-new-row-btn" :filteredItems=filteredItems />
                         </div>
@@ -135,7 +154,11 @@
                 </div>
             </template>
 
-            <template v-slot:header="{}" >
+            <template v-slot:footer.prepend="{}">
+                <v-spacer/>
+            </template>
+
+            <template v-slot:header="{}">
                 <template v-for="(header, index) in headers">
                     <th
                             class='table-header'
@@ -159,9 +182,12 @@
                 </template>
 
             </template>
-            <template v-slot:item="{item}">
-               
-                <tr class="table-row" >
+            <template v-slot:item="{item}" >
+                <tr class="table-row" 
+                    @click="rowSelected(item)"
+                    :class="currentRow.indexOf(item) > -1 ? 'grey' : ''"
+                
+                >
                     <td
                         class="table-column high-dense"
                         :style="{'background-color':item.color, 'padding' : '0px !important'}"
@@ -224,11 +250,12 @@ export default {
         showName: obj.boolN,
     },
     data () {
-        let rowsPerPage = 50
         return {
             selectedHeaders: [],
-            rowsPerPage: rowsPerPage,
-            itemsPerPage: [rowsPerPage],
+            currentRow: [],
+            x:1,
+            itemsPerPage: 20,
+            itemsPerPageArray:[5,10,15,20,25,30,-1],
             search: null,
             sortKey: this.sortKeyDefault || null,
             sortDesc: this.sortDescDefault || false,
@@ -256,6 +283,17 @@ export default {
         }
     },
     methods: {
+        sample(){
+            this.x++
+            console.log(this.x)
+        },
+        rowSelected(item){
+            this.currentRow = []
+            this.currentRow.push(item)
+        },
+        updateItemsPerPage (value) {
+            this.itemsPerPage = value
+        },
         actionsFunction(item){
             let arrayActions = []
             this.actions.forEach(action => {
@@ -307,6 +345,9 @@ export default {
                 var index = 0 ;
                 while(index < this.selectedHeaders.length){
                     if(this.selectedHeaders[index].text === item.title){
+                        this.filters[item.value].clear()
+                        this.filterOperators[item.value] = 'OR'
+                        this.filters = {...this.filters}
                         this.selectedHeaders.splice(index , 1)
                     }else{
                         index++
@@ -323,6 +364,7 @@ export default {
                 }
             }
             this.filters = {...this.filters}
+
         },
         appliedFilter (hValue, {item, checked, operator}) { 
             this.filterOperators[hValue] = operator || 'OR'
@@ -455,7 +497,7 @@ export default {
             });
         },
         enablePagination() {
-            return this.items && this.items.length > this.rowsPerPage
+            return this.items && this.items.length > this.itemsPerPage
         } ,
         fillInitial(){
             if(this.selectedHeaders.length < 1){
@@ -573,7 +615,6 @@ export default {
 .showButtons
     box-sizing: border-box
     width: fit-content
-    height: 24px
     background: #FFFFFF
     border: 1px solid #D0D5DD
     font-weight: 500
@@ -622,13 +663,20 @@ export default {
 
 .headerDiv:first-child{
     /* flex-direction: row-reverse; */
-    max-width: 750px;
+    max-width: 680px;
 }
 
 .headerDiv:last-child{
-    justify-content: center;
     align-items: center;
     justify-content: flex-end;
+}
+
+.v-btn-toggle:not(.v-btn-toggle--dense) .v-btn.v-btn.v-size--default {
+    height: 36px; 
+}
+.v-btn-toggle .v-btn.v-btn.v-size--default {
+    min-width: 0px;
+    min-height: 0;
 }
 
 .filterHeaderSpan{

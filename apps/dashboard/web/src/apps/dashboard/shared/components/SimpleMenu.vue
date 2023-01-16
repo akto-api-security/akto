@@ -6,7 +6,7 @@
             </div>
         </template>
 
-        <v-list class="gray-menu">
+        <v-list class="gray-menu" v-if="items && items.length > 0">
             <v-list-item 
                 v-for="(item, index) in items"
                 :key=index
@@ -49,7 +49,6 @@ export default {
     text-decoration-color: #FFFFFF      
 .content-nav-drawer
   padding: 4px 0
-
 .icon-nav-drawer
   justify-content: center
   align-self: center
@@ -57,17 +56,13 @@ export default {
   margin-bottom: 2px !important
   margin-right: 8px !important
   font-size: 13px
-
   & .v-icon
     color: white
     font-size: 16px
-
   & img
     max-width: 16px
-
 .gray-menu
   background-color: #73728D
-
 .active-item
   &:before
     opacity: 0 !important
@@ -76,10 +71,8 @@ export default {
     text-decoration-color: #FFFFFF      
   
 .title-nav-drawer
-  cursor: pointer
   color:  #FFFFFF
   margin-left: 0px !important
   font-weight: 400 !important
   font-size: 13px
-
 </style>
