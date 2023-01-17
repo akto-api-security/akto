@@ -28,18 +28,7 @@ import com.akto.types.CappedSet;
 import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;
-import com.mongodb.client.model.BulkWriteOptions;
-import com.mongodb.client.model.DeleteManyModel;
-import com.mongodb.client.model.DeleteOneModel;
-import com.mongodb.client.model.DeleteOptions;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.InsertOneModel;
-import com.mongodb.client.model.PushOptions;
-import com.mongodb.client.model.UpdateManyModel;
-import com.mongodb.client.model.UpdateOneModel;
-import com.mongodb.client.model.UpdateOptions;
-import com.mongodb.client.model.Updates;
-import com.mongodb.client.model.WriteModel;
+import com.mongodb.client.model.*;
 
 import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
@@ -239,12 +228,12 @@ public class APICatalogSync {
         }
 
         int offset = 0;
-        int limit = 8_000_000;
+        int limit = 1_000_000;
 
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
         ApiMergerResult finalResult = new ApiMergerResult(new HashMap<>());
         do {
-            singleTypeInfos = SingleTypeInfoDao.instance.findAll(filterQ, offset, limit, null, null);
+            singleTypeInfos = SingleTypeInfoDao.instance.findAll(filterQ, offset, limit, null, Projections.exclude("values"));
             System.out.println(singleTypeInfos.size());
 
             Map<String, Set<String>> staticUrlToSti = new HashMap<>();
@@ -310,7 +299,7 @@ public class APICatalogSync {
         for(String rawURLPlusMethod: catalog.keySet()) {
             String[] rawUrlPlusMethodSplit = rawURLPlusMethod.split(" ");
             String rawURL = rawUrlPlusMethodSplit.length > 1 ? rawUrlPlusMethodSplit[1] : rawUrlPlusMethodSplit[0];
-            Set<String> reqTemplate = catalog.get(rawURL);
+            Set<String> reqTemplate = catalog.get(rawURLPlusMethod);
             String url = APICatalogSync.trim(rawURL);
             String[] tokens = url.split("/");
             Map<String, Set<String>> urlSet = sizeToURL.get(tokens.length);
