@@ -9,6 +9,7 @@
             :sort-desc="sortDesc"
             :custom-sort="sortFunc"
             :items-per-page.sync="itemsPerPage"
+            @current-items="storeCurrentItems"
             hide-default-footer
             hide-default-header
             :fillInitial="fillInitial"
@@ -182,11 +183,10 @@
                 </template>
 
             </template>
-            <template v-slot:item="{item}" >
+            <template v-slot:item="{item}">
                 <tr class="table-row" 
                     @click="rowSelected(item)"
                     :class="currentRow.indexOf(item) > -1 ? 'grey' : ''"
-                
                 >
                     <td
                         class="table-column high-dense"
@@ -251,9 +251,9 @@ export default {
     },
     data () {
         return {
+            initialDisplayedItems:[],
             selectedHeaders: [],
             currentRow: [],
-            x:1,
             itemsPerPage: 20,
             itemsPerPageArray:[5,10,15,20,25,30,-1],
             search: null,
@@ -283,9 +283,40 @@ export default {
         }
     },
     methods: {
-        sample(){
-            this.x++
-            console.log(this.x)
+        storeCurrentItems(items){
+            this.initialDisplayedItems = items
+        },
+        moveRowsOnKeys(event){
+            if(event.keyCode === 38){
+                if(this.currentRow.length > 0)
+                {
+                    var index = this.initialDisplayedItems.indexOf(this.currentRow[0])
+                    var n = this.initialDisplayedItems.length
+                    index = (index - 1 + n) % n
+                    this.rowSelected(this.initialDisplayedItems[index])
+                    this.$emit('rowClicked',this.initialDisplayedItems[index])
+                }
+                else{
+                    this.rowSelected(this.initialDisplayedItems[0])
+                    this.$emit('rowClicked',this.initialDisplayedItems[0])
+                }
+            }
+
+            else if(event.keyCode === 40){
+                if(this.currentRow.length > 0)
+                {
+                    var index = this.initialDisplayedItems.indexOf(this.currentRow[0])
+                    var n = this.initialDisplayedItems.length
+                    index = (index + 1 + n) % n
+                    this.rowSelected(this.initialDisplayedItems[index])
+                    this.$emit('rowClicked',this.initialDisplayedItems[index])
+                }
+
+                else{
+                    this.rowSelected(this.initialDisplayedItems[0])
+                    this.$emit('rowClicked',this.initialDisplayedItems[0])
+                }
+            }
         },
         rowSelected(item){
             this.currentRow = []
@@ -465,7 +496,11 @@ export default {
         },
         
     },
+    mounted() {
+        window.addEventListener('keydown',this.moveRowsOnKeys,null)
+    },
     computed: {
+
         columnValueList: {
             get () {
                 return this.headers.reduce((m, h) => {
@@ -497,7 +532,7 @@ export default {
             });
         },
         enablePagination() {
-            return this.items && this.items.length > this.itemsPerPage
+            return this.filteredItems && this.filteredItems.length > this.itemsPerPage
         } ,
         fillInitial(){
             if(this.selectedHeaders.length < 1){
@@ -644,6 +679,7 @@ export default {
 </style>
 
 <style scoped>
+
 .form-field-text >>> .v-label {
   font-size: 12px;
   color: #6200EA;
