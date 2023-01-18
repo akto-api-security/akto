@@ -12,11 +12,14 @@ import com.akto.testing.StatusCodeAnalyser;
 import com.akto.util.JSONUtils;
 import com.akto.util.modifier.ConvertToArrayPayloadModifier;
 import com.akto.util.modifier.NestedObjectModifier;
+import com.google.gson.Gson;
 
 import java.util.*;
 
 public class BOLATest extends AuthRequiredRunAllTestPlugin {
 
+    private static final Gson gson = new Gson();
+    
     public BOLATest() { }
 
     @Override
@@ -75,11 +78,24 @@ public class BOLATest extends AuthRequiredRunAllTestPlugin {
                                ContainsPrivateResourceResult containsPrivateResourceResult) {
         ApiExecutionDetails apiExecutionDetails;
         try {
-            apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, originalHttpResponse);
+            OriginalHttpRequest originalHttpRequest = rawApi.getRequest().copy();
+            apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, originalHttpResponse, originalHttpRequest);
         } catch (Exception e) {
             return new ExecutorResult(false, null, new ArrayList<>(), 0, rawApi,
                     TestResult.TestError.API_REQUEST_FAILED, testRequest, null, null);
         }
+
+        RawApi rawApiDuplicate = rawApi.copy();
+
+        String originalMessage = rawApiDuplicate.getOriginalMessage();
+
+        Map<String, Object> json = gson.fromJson(originalMessage, Map.class);
+        if (apiExecutionDetails.baseResponse != null) {
+            json.put("responsePayload", apiExecutionDetails.baseResponse.getBody());
+            originalMessage = gson.toJson(json);
+        }
+
+        rawApiDuplicate.setOriginalMessage(originalMessage);
 
         TestResult.Confidence confidence = containsPrivateResourceResult.findPrivateOnes().size() > 0 ? TestResult.Confidence.HIGH : TestResult.Confidence.LOW;
 
@@ -89,7 +105,7 @@ public class BOLATest extends AuthRequiredRunAllTestPlugin {
         if (!vulnerable) confidence = Confidence.HIGH;
 
         return new ExecutorResult(vulnerable,confidence, containsPrivateResourceResult.singleTypeInfos, apiExecutionDetails.percentageMatch,
-                rawApi, null, testRequest, apiExecutionDetails.testResponse, null);
+            rawApiDuplicate, null, testRequest, apiExecutionDetails.testResponse, null);
 
     }
 
