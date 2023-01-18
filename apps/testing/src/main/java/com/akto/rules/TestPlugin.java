@@ -261,7 +261,12 @@ public abstract class TestPlugin {
             if (singleTypeInfo != null) {
                 Set<Object> valSet = flattened.get(param);
                 Set<String> valStringSet = new HashSet<>();
-                for (Object v: valSet) valStringSet.add(v.toString());
+                for (Object v: valSet) {
+                    if (v == null) {
+                        continue;
+                    }
+                    valStringSet.add(v.toString());
+                }
                 singleTypeInfo.setValues(new CappedSet<>(valStringSet));
                 singleTypeInfoList.add(singleTypeInfo);
                 isPrivate = isPrivate && singleTypeInfo.getIsPrivate();

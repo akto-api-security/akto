@@ -96,6 +96,10 @@
                                 <span class="auth-token-title">Created on: </span>
                                 <span class="auth-token-text">{{authTokenDate}}</span>
                             </div>
+                            <div  v-else-if="authTokenDate != null">
+                                <span class="auth-token-title">Created on: </span>
+                                <span class="auth-token-text">{{authTokenDate}}</span>
+                            </div>
                         </div>
                         <v-btn primary dark color="#6200EA" @click="toggleLoginStepBuilder">
                             <span v-if="originalDbState">Edit</span>
@@ -304,7 +308,7 @@ export default {
                         },
                         ...(this.testingRuns || []).map(x => {
                             return {
-                                title: testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
+                                title: x.displayName || testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
                                 link: "/dashboard/testing/" + x.hexId + "/results",
                                 active: true
                             }
@@ -327,7 +331,7 @@ export default {
                         },
                         ...(this.pastTestingRuns || []).map(x => {
                             return {
-                                title: testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
+                                title: x.displayName || testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
                                 link: "/dashboard/testing/" + x.hexId + "/results",
                                 active: true
                             }
@@ -343,7 +347,7 @@ export default {
             return requestData[0]["url"]
         },
         authTokenDate: function () {
-            if (!this.authMechanismData) return null
+            if (!this.authMechanismData || this.authMechanismData.type == "HARDCODED") return null
             let id = this.authMechanismData["id"]
             if (!id) return null
 

@@ -19,11 +19,12 @@
         name: "SimpleTextField",
         props :{
             readOutsideClick: obj.boolR,
-            placeholder: obj.strR
+            placeholder: obj.strR,
+            defaultName: obj.strN
         },
         data () {
             return {
-                newName: ''
+                newName: this.defaultName || ''
             }
         },
         methods: {

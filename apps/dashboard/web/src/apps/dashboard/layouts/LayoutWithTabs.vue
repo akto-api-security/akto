@@ -22,7 +22,13 @@
                             v-model="tabName"
                             :show-arrows="false"
                         >
-                            <v-tab class="right-pane-tab" v-for="tab in tabs" :key="tab">{{tab}}</v-tab>
+                            <v-tab class="right-pane-tab" v-for="tab in tabs" :key="tab">
+                                {{tab}}
+                                <v-chip v-if="tabsContent && tabsContent[tab]" :style="{ 'height': '18px !important' }"
+                                 class="ml-2 mr-2" color="#47466AB2" text-color="#FFFFFF">
+                                        {{ tabsContent[tab] }}
+                                </v-chip>
+                            </v-tab>
                         </v-tabs>
                     </div>
                     <div>
@@ -50,7 +56,8 @@
             title: obj.strN,
             tabs: obj.arrR,
             description: obj.strN,
-            defaultTabName: obj.strN
+            defaultTabName: obj.strN,
+            tabsContent: obj.objN
         },
         data () {
             return {
@@ -60,6 +67,9 @@
         methods: {
             reset() {
                 this.tabName = 0
+            },
+            setTabWithName(tabName) {
+                this.tabName = this.tabs.indexOf(tabName)
             }
         },
         watch: {

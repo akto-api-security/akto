@@ -29,10 +29,12 @@ public class CustomDataType {
     Conditions valueConditions;
     public static final String OPERATOR = "operator";
     Conditions.Operator operator;
+    public static final String IGNORE_DATA = "ignoreData";
+    private IgnoreData ignoreData;
 
     public CustomDataType() { }
 
-    public CustomDataType(String name, boolean sensitiveAlways, List<SingleTypeInfo.Position> sensitivePosition, int creatorId, boolean active, Conditions keyConditions, Conditions valueConditions, Conditions.Operator operator) {
+    public CustomDataType(String name, boolean sensitiveAlways, List<SingleTypeInfo.Position> sensitivePosition, int creatorId, boolean active, Conditions keyConditions, Conditions valueConditions, Conditions.Operator operator, IgnoreData ignoreData) {
         this.name = name;
         this.sensitiveAlways = sensitiveAlways;
         this.sensitivePosition = sensitivePosition;
@@ -42,6 +44,7 @@ public class CustomDataType {
         this.keyConditions = keyConditions;
         this.valueConditions = valueConditions;
         this.operator = operator;
+        this.ignoreData = ignoreData;
     }
 
     public SingleTypeInfo.SubType toSubType() {
@@ -160,6 +163,13 @@ public class CustomDataType {
         this.active = active;
     }
 
+    public IgnoreData getIgnoreData() {
+        return ignoreData;
+    }
+
+    public void setIgnoreData(IgnoreData ignoreData) {
+        this.ignoreData = ignoreData;
+    }
 
     @Override
     public String toString() {
