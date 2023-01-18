@@ -46,8 +46,6 @@ public abstract class ChangeMethodPlugin extends TestPlugin {
             TestResult testResult;
             try {
                 apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApi);
-                //int statusCode = StatusCodeAnalyser.getStatusCode(apiExecutionDetails.testResponse.getBody(), apiExecutionDetails.testResponse.getStatusCode());
-                //double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), apiExecutionDetails.testResponse.getBody(), new HashMap<>());
                 boolean vulnerable = isVulnerable(apiExecutionDetails.percentageMatch, apiExecutionDetails.statusCode);
                 overallVulnerable = overallVulnerable || vulnerable;
 

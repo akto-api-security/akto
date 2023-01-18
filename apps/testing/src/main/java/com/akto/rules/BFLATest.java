@@ -36,7 +36,7 @@ public class BFLATest extends AuthRequiredRunAllTestPlugin {
             ApiExecutionDetails apiExecutionDetails;
             RawApi rawApiDuplicate = rawApi.copy();
             try {
-                apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApi);
+                apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApiDuplicate);
             } catch (Exception e) {
                 return Collections.singletonList(new ExecutorResult(false, null, new ArrayList<>(), 0, rawApi,
                         TestResult.TestError.API_REQUEST_FAILED, testRequest, null, bflaTestInfo));
