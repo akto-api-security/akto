@@ -79,7 +79,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
 
                 if (passHash.equals(passInfo.getPasshash())) {
                     loginUser(signupUserInfo.getUser(), servletResponse, false, servletRequest);
-                    loginResult.put("redirect", "/dashboard/setup");
+                    loginResult.put("redirect", "/dashboard/quick-start");
                     return "SUCCESS";
                 }
             }

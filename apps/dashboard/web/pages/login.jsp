@@ -52,6 +52,7 @@
                     window.DASHBOARDS = JSON.parse(atob('${requestScope.dashboards}') || '[]');
                     window.ACCOUNTS = JSON.parse('${requestScope.accounts}' || '{}');
                     window.ACTIVE_ACCOUNT = +'${requestScope.activeAccount}';
+                    window.DASHBOARD_MODE = '${requestScope.dashboardMode}';
                     window.ACCESS_TOKEN = '${accessToken}';
                     window.SIGNUP_INVITATION_CODE = '${signupInvitationCode}'
                     window.SIGNUP_EMAIL_ID = '${signupEmailId}'
@@ -75,6 +76,7 @@
                             api_base: "https://api-iam.intercom.io",
                             app_id: "xjvl0z2h",
                             email: window.USER_NAME,
+                            user_hash: '${userHash}',
                             created_at: new Date().getTime()
                         };
                     }

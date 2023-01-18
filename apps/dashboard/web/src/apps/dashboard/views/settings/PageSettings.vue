@@ -1,5 +1,5 @@
 <template>
-    <layout-with-tabs title="Settings" :tabs="['Data types','Auth types', 'Tags', 'Account', 'Users', 'Health', 'Integrations']">
+    <layout-with-tabs title="Settings" :tabs="getTabs()">
         <template slot="Data types">
             <data-types title="Data types" :data_types="data_types" :toggleActivateFieldFunc='toggleActivateDataTypes'
                 :createNewDataType="createNewDataType" @selectedEntry="selectedDataType">
@@ -88,7 +88,6 @@ export default {
         LayoutWithTabs,
         TeamOverview,
         Health,
-        DataTypes,
         Account,
         IntegrationCenter,
         DataTypes,
@@ -143,6 +142,12 @@ export default {
             this.showDialog = false
             api.takeUpdate()
 
+        },
+        getTabs() {
+          if(window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'){
+            return ['Data types','Auth types', 'Tags', 'Users', 'Integrations'];
+          }
+          return ['Data types','Auth types', 'Tags', 'Account', 'Users', 'Health', 'Integrations'];
         }
     },
     computed: {

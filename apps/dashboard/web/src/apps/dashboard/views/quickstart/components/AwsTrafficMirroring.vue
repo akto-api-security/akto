@@ -1,6 +1,5 @@
 <template>
     <div>
-        <div>AWS Mirroring details</div>
         <load-balancers></load-balancers>
     </div>
 </template>

@@ -1,7 +1,10 @@
 <template>
     <div class="pa-4">
+        <div v-if="isLocalDeploy">
+            <banner-vertical class="ma-3"></banner-vertical>
+        </div>
         <a-card title="Members" icon="$fas_users" color="rgba(33, 150, 243)">
-            <div v-if="isAdmin" class="email-invite-container">
+            <div v-if="isAdmin && !isLocalDeploy" class="email-invite-container">
                 <v-combobox
                     v-model="allEmails"
                     :items="[]"
@@ -43,6 +46,7 @@
                 >
                     Invite
                 </v-btn>
+            
             </div>
             <div class="team-overview-card">
                 <template v-for="user in users">
@@ -86,13 +90,15 @@
     import OwnerName from "@/apps/dashboard/shared/components/OwnerName"
     import api from "../api"
     import ActionsTray from '@/apps/dashboard/shared/components/ActionsTray'
+    import BannerVertical from "../../../shared/components/BannerVertical.vue"
 
     export default {
         name: "TeamOverview",
         components: {
             ACard,
             OwnerName,
-            ActionsTray
+            ActionsTray,
+            BannerVertical
         },
         data () {
             let domainName = window.USER_NAME.substr(window.USER_NAME.indexOf("@")+1)
@@ -117,7 +123,8 @@
                         success: (resp, item) => this.removedSuccess(resp, item),
                         failure: (err, item) => this.removedFailure(err, item)
                     }
-                ]
+                ],
+                isLocalDeploy: window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() == 'local_deploy',
             }
         },
         mounted() {

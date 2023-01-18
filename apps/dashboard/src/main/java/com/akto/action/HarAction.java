@@ -13,6 +13,7 @@ import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.policies.AktoPolicy;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.utils.DashboardMode;
 import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
@@ -33,7 +34,7 @@ public class HarAction extends UserAction {
     private int apiCollectionId;
     private String apiCollectionName;
 
-    private boolean skipKafka;
+    private boolean skipKafka = DashboardMode.isLocalDeployment();
     private byte[] tcpContent;
 
     public static void main(String[] args) {
@@ -114,10 +115,6 @@ public class HarAction extends UserAction {
 
     public boolean getSkipKafka() {
         return this.skipKafka;
-    }
-
-    public void setSkipKafka(boolean skipKafka) {
-        this.skipKafka = skipKafka;
     }
 
     public void setTcpContent(byte[] tcpContent) {

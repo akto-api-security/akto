@@ -206,17 +206,7 @@
                 <param name="root">code</param>
             </result>
         </action>
-
-        <action name="dashboard/setup/add-signup-info" class="com.akto.action.SignupAction" method="addSignupInfo">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS"   type="json">
-                <param name="root">shouldLogin</param>
-            </result>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
-            </result>
-        </action>
+        
 
         <action name="api/loadContent" class="com.akto.action.AuditAction" method="loadContent">
             <interceptor-ref name="json"/>

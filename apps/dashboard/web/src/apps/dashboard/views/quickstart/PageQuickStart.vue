@@ -28,6 +28,7 @@
                 <template #icon>
                     <v-icon size="50" class="invert-sideways" color="#6200EA">$fas_user-plus</v-icon>
                 </template>
+                
                 <template #content><team-overview></team-overview></template>
             </detail-expansion-panel>
         </v-expansion-panels>
