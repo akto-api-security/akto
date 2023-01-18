@@ -61,7 +61,7 @@ public class BurpJarAction extends UserAction implements ServletResponseAware, S
 
         String collectionName = "Burp";
 
-        int version = 111; // todo:
+        int version = InitializerListener.burpPluginVersion;
 
         File tmpJarFile = File.createTempFile("temp", "jar");
         URL url = this.getClass().getResource("/Akto.jar");

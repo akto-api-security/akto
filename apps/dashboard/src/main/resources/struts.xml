@@ -1513,9 +1513,7 @@
         <action name="api/sendHealthCheck" class="com.akto.action.BurpJarAction" method="sendHealthCheck">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json">
-                <param name="includeProperties">^token</param>
-            </result>
+            <result name="SUCCESS" type="json"/>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
