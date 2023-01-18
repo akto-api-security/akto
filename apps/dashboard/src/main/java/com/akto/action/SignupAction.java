@@ -163,7 +163,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
         Config.GoogleConfig aktoGoogleConfig = (Config.GoogleConfig) ConfigsDao.instance.findOne("_id", "GOOGLE-ankush");
         if (aktoGoogleConfig == null) {
-            
+
         }
 
 
@@ -305,43 +305,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     String companyName, teamName;
     List<String> allEmails;
     String shouldLogin="false";
-    public String addSignupInfo() throws IOException {
-        String email = ((BasicDBObject) servletRequest.getAttribute("signupInfo")).getString("email");
-        Bson updates =
-            combine(
-                set("companyName", companyName),
-                set("teamName", teamName),
-                set("emailInvitations", allEmails)
-            );
-
-        Bson findQ = eq("user.login", email);
-        SignupDao.instance.updateOne(findQ, updates);
-
-        SignupUserInfo updatedUserInfo = SignupDao.instance.findOne(findQ);
-
-        if (StringUtils.isEmpty(updatedUserInfo.getTeamName())) {
-            shouldLogin = "false";
-        } else {
-            shouldLogin = "true";
-            createUserAndRedirect(email, email, updatedUserInfo.getUser().getSignupInfoMap().entrySet().iterator().next().getValue());            
-        }
-
-        return "SUCCESS";
-    }
-
 
     private void createUserAndRedirect(String userEmail, String username, SignupInfo signupInfo) throws IOException {
-        User user = UsersDao.instance.findOne(eq("login", userEmail));
-        if (user == null && "false".equalsIgnoreCase(shouldLogin)) {
-
-            if (SIGN_IN.equals(state)) {
-                throw new IllegalStateException("The user doesn't exist. Please sign up first");
-            }
-
-            SignupUserInfo signupUserInfo = SignupDao.instance.insertSignUp(userEmail, username, signupInfo);
-            LoginAction.loginUser(signupUserInfo.getUser(), servletResponse, false, servletRequest);
-            servletResponse.sendRedirect("/dashboard/setup");
-        } else {
             String accountName = System.getenv("AKTO_ACCOUNT_NAME");
             if (accountName == null) accountName = "Helios";
             Account account = AccountsDao.instance.findOne("name", accountName);
@@ -353,7 +318,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             }
 
             int accountId = account.getId();
-            user = UsersDao.instance.insertSignUp(userEmail, username, signupInfo, accountId);
+            User user = UsersDao.instance.insertSignUp(userEmail, username, signupInfo, accountId);
             long count = UsersDao.instance.getMCollection().countDocuments();
             // if first user then automatic admin
             // else check if rbac is 0 or not. If 0 then make the user that was created first as admin.
@@ -374,7 +339,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             servletRequest.getSession().setAttribute("user", user);
             new LoginAction().loginUser(user, servletResponse, true, servletRequest);
             servletResponse.sendRedirect("/dashboard/testing");
-        }
+
     }
 
     protected HttpServletResponse servletResponse;

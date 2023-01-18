@@ -96,6 +96,11 @@
             <version>0.11.2</version>
             <scope>runtime</scope>
         </dependency>
+        <dependency>
+            <groupId>com.akto.libs.integrations</groupId>
+            <artifactId>integrations</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
     </dependencies>
     <build>

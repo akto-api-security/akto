@@ -10,6 +10,7 @@ import com.akto.dto.third_party_access.ThirdPartyAccess;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.postman.Main;
+import com.akto.utils.DashboardMode;
 import com.akto.utils.SampleDataToSTI;
 import com.akto.utils.Utils;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -217,7 +218,7 @@ public class PostmanAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    private boolean skipKafka;
+    private boolean skipKafka = DashboardMode.isLocalDeployment();
 
     public String importDataFromPostman() throws Exception {
         PostmanCredential postmanCredential = fetchPostmanCredential();

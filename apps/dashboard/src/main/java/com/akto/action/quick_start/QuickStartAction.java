@@ -7,21 +7,11 @@ import java.util.*;
 import java.util.concurrent.*;
 
 import com.akto.util.Constants;
+import com.akto.utils.DashboardMode;
 import com.akto.utils.platform.DashboardStackDetails;
 import com.akto.utils.platform.MirroringStackDetails;
 import com.akto.utils.cloud.stack.dto.StackState;
-
-import com.amazonaws.services.cloudformation.AmazonCloudFormation;
-import com.amazonaws.services.cloudformation.AmazonCloudFormationClientBuilder;
-import com.amazonaws.services.cloudformation.model.DescribeStacksRequest;
-import com.amazonaws.services.cloudformation.model.DescribeStacksResult;
-import com.amazonaws.services.cloudformation.model.Parameter;
 import com.amazonaws.services.cloudformation.model.Tag;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
@@ -38,7 +28,6 @@ import com.akto.dto.User;
 import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.utils.cloud.CloudType;
 import com.akto.utils.cloud.Utils;
-import com.akto.utils.cloud.serverless.ServerlessFunction;
 import com.akto.utils.cloud.serverless.UpdateFunctionRequest;
 import com.akto.utils.cloud.serverless.aws.Lambda;
 import com.akto.utils.cloud.stack.Stack;
@@ -54,9 +43,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 public class QuickStartAction extends UserAction {
 
     private boolean dashboardHasNecessaryRole;
@@ -72,8 +58,6 @@ public class QuickStartAction extends UserAction {
 
     private String aktoDashboardStackName;
 
-    private final Stack stack = new AwsStack();
-    private final ServerlessFunction serverlessFunction = new Lambda();
 
     private static final Logger logger = LoggerFactory.getLogger(QuickStartAction.class);
 
@@ -82,8 +66,10 @@ public class QuickStartAction extends UserAction {
         configuredItems = new ArrayList<>();
 
         // Fetching cloud integration
-        CloudType type = Utils.getCloudType();
-        configuredItems.add(type.toString());
+        if(DashboardMode.isOnPremDeployment()) {
+            CloudType type = Utils.getCloudType();
+            configuredItems.add(type.toString());
+        }
 
         // Looking if burp is integrated or not
         ApiToken burpToken = ApiTokensDao.instance.findOne(Filters.eq(ApiToken.UTILITY, ApiToken.Utility.BURP));
@@ -103,8 +89,8 @@ public class QuickStartAction extends UserAction {
         List<AwsResource> selectedLBs = new ArrayList<>();
         ExecutorService executorService = Executors.newFixedThreadPool(3);
         try {
-            Future<String> dashboardLBNameFuture = executorService.submit(()-> stack.fetchResourcePhysicalIdByLogicalId(DashboardStackDetails.getStackName(), DashboardStackDetails.AKTO_LB_DASHBOARD));
-            Future<String> aktoNLBNameFuture = executorService.submit(()-> stack.fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.AKTO_NLB));
+            Future<String> dashboardLBNameFuture = executorService.submit(()-> AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(DashboardStackDetails.getStackName(), DashboardStackDetails.AKTO_LB_DASHBOARD));
+            Future<String> aktoNLBNameFuture = executorService.submit(()-> AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.AKTO_NLB));
             AmazonElasticLoadBalancing amazonElasticLoadBalancingClient = AmazonElasticLoadBalancingClientBuilder
                     .defaultClient();
             Future<DescribeLoadBalancersResult> loadBalanersFuture = executorService.submit(() -> amazonElasticLoadBalancingClient
@@ -163,7 +149,7 @@ public class QuickStartAction extends UserAction {
     public String saveLoadBalancers() {
         Bson updates = Updates.set("loadBalancers", this.selectedLBs);
         AwsResourcesDao.instance.updateOne(Filters.eq("_id", Context.accountId.get()), updates);
-        if (!stack.checkIfStackExists(MirroringStackDetails.getStackName())) {
+        if (!AwsStack.getInstance().checkIfStackExists(MirroringStackDetails.getStackName())) {
             this.isFirstSetup = true;
             try {
                 Map<String, String> parameters = new HashMap<String, String>() {
@@ -177,7 +163,7 @@ public class QuickStartAction extends UserAction {
                 String template = convertStreamToString(AwsStack.class
                         .getResourceAsStream("/cloud_formation_templates/akto_aws_mirroring.template"));
                 List<Tag> tags = Utils.fetchTags(DashboardStackDetails.getStackName());
-                String stackId = this.stack.createStack(MirroringStackDetails.getStackName(), parameters, template, tags);
+                String stackId = AwsStack.getInstance().createStack(MirroringStackDetails.getStackName(), parameters, template, tags);
             } catch (Exception e) {
                 ;
             }
@@ -190,14 +176,15 @@ public class QuickStartAction extends UserAction {
                         put("ELB_NAMES", extractLBs());
                     }
                 };
-                String functionName = stack.fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.CREATE_MIRROR_SESSION_LAMBDA);
+                String functionName = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.CREATE_MIRROR_SESSION_LAMBDA);
                 UpdateFunctionRequest ufr = new UpdateFunctionRequest(updatedEnvVars);
-                this.serverlessFunction.updateFunctionConfiguration(functionName, ufr);
+                Lambda.getInstance().updateFunctionConfiguration(functionName, ufr);
+                // invoke lambda
             } catch (Exception e) {
                 ;
             }
         }
-        this.stackState = stack.fetchStackStatus(MirroringStackDetails.getStackName());
+        this.stackState = AwsStack.getInstance().fetchStackStatus(MirroringStackDetails.getStackName());
         fetchLoadBalancers();
         return Action.SUCCESS.toUpperCase();
     }
@@ -214,7 +201,7 @@ public class QuickStartAction extends UserAction {
     }
 
     public String checkStackCreationProgress() {
-        this.stackState = this.stack.fetchStackStatus(MirroringStackDetails.getStackName());
+        this.stackState = AwsStack.getInstance().fetchStackStatus(MirroringStackDetails.getStackName());
         invokeLambdaIfNecessary(stackState);
         if(Stack.StackStatus.CREATION_FAILED.toString().equalsIgnoreCase(this.stackState.getStatus())){
             AwsResourcesDao.instance.getMCollection().deleteOne(Filters.eq("_id", Context.accountId.get()));
@@ -240,8 +227,8 @@ public class QuickStartAction extends UserAction {
                 BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
                 if(!backwardCompatibility.isMirroringLambdaTriggered()){
                     try{
-                        String functionName = stack.fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.CREATE_MIRROR_SESSION_LAMBDA);
-                        serverlessFunction.invokeFunction(functionName);
+                        String functionName = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.CREATE_MIRROR_SESSION_LAMBDA);
+                        Lambda.getInstance().invokeFunction(functionName);
                         BackwardCompatibilityDao.instance.updateOne(
                                 Filters.eq("_id", backwardCompatibility.getId()),
                                 Updates.set(BackwardCompatibility.MIRRORING_LAMBDA_TRIGGERED, true)

@@ -2,73 +2,87 @@
 
     <spinner v-if="loading" />
     <div v-else class="lb_dropdown">
-        <div v-if="hasRequiredAccess">
-                <v-select v-model="selectedLBs" append-icon="$fas_edit" :items="availableLBs" item-text="resourceName" item-value="resourceId"
-                    label="Select Loadbalancer(s)" return-object multiple>
-                    <template v-slot:selection="{ item, index }">
-                        <v-chip v-if="index === 0">
-                            <span>{{ item.resourceName }}</span>
-                        </v-chip>
-                        <span v-if="index === 1" class="grey--text text-caption">
-                            (+{{ selectedLBs.length - 1 }} others)
-                        </span>
-                    </template>
-                    <template v-slot:item="{ active, item, attrs, on }">
-                        <v-list-item :class="item.alreadySelected ? 'disabled_lb' : ''" v-on="on" v-bind="attrs" #default="{ active }">
-                            <v-list-item-action>
-                                <v-checkbox :input-value="active" on-icon="$far_check-square" off-icon="$far_square">
-                                </v-checkbox>
-                            </v-list-item-action>
-                            <v-list-item-content>
-                                <v-list-item-title>
-                                    <v-row no-gutters align="center">
-                                        <span>{{ item.resourceName }}</span>
-                                    </v-row>
-                                </v-list-item-title>
-                            </v-list-item-content>
-                        </v-list-item>
-                    </template>
-
-                    <template slot="append-outer" >
-                        <spinner v-if="progressBar.show"></spinner>
-                        <v-btn v-else primary dark color="#6200EA" @click="saveLBs" :disabled="selectedLBs.length === initialLBCount" class="ml-3">
-                            Apply
-                        </v-btn>
-                    </template>
-                </v-select>
-               
-            <div class="text_msg" v-html="text_msg"></div>
-            <div v-if="progressBar.show">
-                <div class="d-flex">
-                    <v-progress-linear class="mt-2" background-color="rgba(98, 0, 234,0.2)" color="rgb(98, 0, 234)"
-                        :value="progressBar.value">
-                    </v-progress-linear>
-                    <div class="ml-2">{{ progressBar.value }}%</div>
-                </div>
+        <div v-if="isLocalDeploy">
+            <div>
+                Use AWS packet mirroring to send duplicate stream of traffic to Akto. 
+                No performance impact, only mirrored traffic is used to analyze APIs. 
+                <div v-if="!isLocalDeploy"><a  class="clickable-docs" _target="blank" href="https://docs.akto.io/getting-started/quick-start-with-akto-self-hosted/aws-deploy">Know more</a></div>
             </div>
+          <banner-horizontal class="mt-3">
+            <div slot="content">
+              <div>To setup traffic mirroring from AWS, deploy in AWS. Go to <a class="clickable-docs" target="blank" href="https://docs.akto.io/getting-started/quick-start-with-akto-self-hosted/aws-deploy">docs</a>.</div>
+            </div>
+          </banner-horizontal>
         </div>
         <div v-else>
-            <div class="steps">Your dashboard's instance needs relevant access to setup traffic mirroring, please
-                do the
-                following steps:</div>
-            <div class="steps">
-                <b>Step 1</b>: Grab the policy JSON below and navigate to Akto Dashboard's current role by clicking <a target="_blank" class="clickable-docs" :href="getAktoDashboardRoleUpdateUrl()">here</a>
-                <code-block :lines="quick_start_policy_lines" onCopyBtnClickText="Policy copied to clipboard"></code-block>
+            <div v-if="hasRequiredAccess">
+                    <v-select v-model="selectedLBs" append-icon="$fas_edit" :items="availableLBs" item-text="resourceName" item-value="resourceId"
+                        label="Select Loadbalancer(s)" return-object multiple>
+                        <template v-slot:selection="{ item, index }">
+                            <v-chip v-if="index === 0">
+                                <span>{{ item.resourceName }}</span>
+                            </v-chip>
+                            <span v-if="index === 1" class="grey--text text-caption">
+                                (+{{ selectedLBs.length - 1 }} others)
+                            </span>
+                        </template>
+                        <template v-slot:item="{ active, item, attrs, on }">
+                            <v-list-item :class="item.alreadySelected ? 'disabled_lb' : ''" v-on="on" v-bind="attrs" #default="{ active }">
+                                <v-list-item-action>
+                                    <v-checkbox :input-value="active" on-icon="$far_check-square" off-icon="$far_square">
+                                    </v-checkbox>
+                                </v-list-item-action>
+                                <v-list-item-content>
+                                    <v-list-item-title>
+                                        <v-row no-gutters align="center">
+                                            <span>{{ item.resourceName }}</span>
+                                        </v-row>
+                                    </v-list-item-title>
+                                </v-list-item-content>
+                            </v-list-item>
+                        </template>
+
+                        <template slot="append-outer" >
+                            <spinner v-if="progressBar.show"></spinner>
+                            <v-btn v-else primary dark color="#6200EA" @click="saveLBs" :disabled="selectedLBs.length === initialLBCount" class="ml-3">
+                                Apply
+                            </v-btn>
+                        </template>
+                    </v-select>
+                
+                <div class="text_msg" v-html="text_msg"></div>
+                <div v-if="progressBar.show">
+                    <div class="d-flex">
+                        <v-progress-linear class="mt-2" background-color="rgba(98, 0, 234,0.2)" color="rgb(98, 0, 234)"
+                            :value="progressBar.value">
+                        </v-progress-linear>
+                        <div class="ml-2">{{ progressBar.value }}%</div>
+                    </div>
+                </div>
             </div>
-            <div class="steps">
-                <b>Step 2</b>: We will create an inline policy, navigate to JSON tab and paste the copied JSON here.
-            </div>
-            <div class="steps">
-                <b>Step 3</b>: Click on 'Review policy'.
-            </div>
-            <div class="steps">
-                <b>Step 4</b>: Now lets name the policy as 'AktoDashboardPolicy'.
-            </div>
-            <div class="steps">
-                <b>Step 5</b>: Finally create the policy by clicking on 'Create policy'.
-            </div>
-            <div class="steps">
-                <b>Step 6</b>: Click <a class="clickable-docs" href="/dashboard/quick-start">here</a> to refresh.
+            <div v-else>
+                <div class="steps">Your dashboard's instance needs relevant access to setup traffic mirroring, please
+                    do the
+                    following steps:</div>
+                <div class="steps">
+                    <b>Step 1</b>: Grab the policy JSON below and navigate to Akto Dashboard's current role by clicking <a target="_blank" class="clickable-docs" :href="getAktoDashboardRoleUpdateUrl()">here</a>
+                    <code-block :lines="quick_start_policy_lines" onCopyBtnClickText="Policy copied to clipboard"></code-block>
+                </div>
+                <div class="steps">
+                    <b>Step 2</b>: We will create an inline policy, navigate to JSON tab and paste the copied JSON here.
+                </div>
+                <div class="steps">
+                    <b>Step 3</b>: Click on 'Review policy'.
+                </div>
+                <div class="steps">
+                    <b>Step 4</b>: Now lets name the policy as 'AktoDashboardPolicy'.
+                </div>
+                <div class="steps">
+                    <b>Step 5</b>: Finally create the policy by clicking on 'Create policy'.
+                </div>
+                <div class="steps">
+                    <b>Step 6</b>: Click <a class="clickable-docs" href="/dashboard/quick-start">here</a> to refresh.
+                </div>
             </div>
         </div>
     </div>
@@ -80,11 +94,13 @@
 import api from '../api.js'
 import CodeBlock from '@/apps/dashboard/shared/components/CodeBlock'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
+import BannerHorizontal from '../../../shared/components/BannerHorizontal.vue'
 export default {
     name: 'LoadBalancers',
     components: {
         CodeBlock,
         Spinner,
+        BannerHorizontal
     },
     data() {
         return {
@@ -354,7 +370,8 @@ export default {
                 `    ]`,
                 `}`
             ],
-            aktoDashboardRoleName: null
+            aktoDashboardRoleName: null,
+            isLocalDeploy: false,
         }
     },
     mounted() {
@@ -365,35 +382,40 @@ export default {
             return "https://us-east-1.console.aws.amazon.com/iam/home#/roles/" + this.aktoDashboardRoleName  + "$createPolicy?step=edit";
         },
         fetchLBs() {
-            api.fetchLBs().then((resp) => {
-                if (!resp.dashboardHasNecessaryRole) {
-                    for (let i = 0; i < this.quick_start_policy_lines.length; i++) {
-                        let line = this.quick_start_policy_lines[i];
-                        line = line.replaceAll('AWS_REGION', resp.awsRegion);
-                        line = line.replaceAll('AWS_ACCOUNT_ID', resp.awsAccountId);
-                        line = line.replaceAll('MIRRORING_STACK_NAME', resp.aktoMirroringStackName);
-                        line = line.replaceAll('DASHBOARD_STACK_NAME', resp.aktoDashboardStackName);
-                        this.quick_start_policy_lines[i] = line;
-                    }
-                }
-                this.hasRequiredAccess = resp.dashboardHasNecessaryRole
-                this.selectedLBs = resp.selectedLBs;
-                for(let i=0; i<resp.availableLBs.length; i++){
-                    let lb = resp.availableLBs[i];
-                    let alreadySelected = false;
-                    for(let j=0; j<this.selectedLBs.length; j++){
-                        if(this.selectedLBs[j].resourceName === lb.resourceName){
-                            alreadySelected = true;
+            if(window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'){
+                this.loading = false;
+                this.isLocalDeploy = true;
+            } else {
+                api.fetchLBs().then((resp) => {
+                    if (!resp.dashboardHasNecessaryRole) {
+                        for (let i = 0; i < this.quick_start_policy_lines.length; i++) {
+                            let line = this.quick_start_policy_lines[i];
+                            line = line.replaceAll('AWS_REGION', resp.awsRegion);
+                            line = line.replaceAll('AWS_ACCOUNT_ID', resp.awsAccountId);
+                            line = line.replaceAll('MIRRORING_STACK_NAME', resp.aktoMirroringStackName);
+                            line = line.replaceAll('DASHBOARD_STACK_NAME', resp.aktoDashboardStackName);
+                            this.quick_start_policy_lines[i] = line;
                         }
                     }
-                    lb['alreadySelected'] = alreadySelected;
-                }
-                this.availableLBs = resp.availableLBs;
-                this.existingSelectedLBs = resp.selectedLBs;
-                this.initialLBCount = this.selectedLBs.length;
-                this.aktoDashboardRoleName = resp.aktoDashboardRoleName;
-                this.checkStackState()
-            })
+                    this.hasRequiredAccess = resp.dashboardHasNecessaryRole
+                    this.selectedLBs = resp.selectedLBs;
+                    for(let i=0; i<resp.availableLBs.length; i++){
+                        let lb = resp.availableLBs[i];
+                        let alreadySelected = false;
+                        for(let j=0; j<this.selectedLBs.length; j++){
+                            if(this.selectedLBs[j].resourceName === lb.resourceName){
+                                alreadySelected = true;
+                            }
+                        }
+                        lb['alreadySelected'] = alreadySelected;
+                    }
+                    this.availableLBs = resp.availableLBs;
+                    this.existingSelectedLBs = resp.selectedLBs;
+                    this.initialLBCount = this.selectedLBs.length;
+                    this.aktoDashboardRoleName = resp.aktoDashboardRoleName;
+                    this.checkStackState()
+                })
+            }
         },
         saveLBs() {
             api.saveLBs(this.selectedLBs).then((resp) => {

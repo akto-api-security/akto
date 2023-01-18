@@ -35,6 +35,18 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
     private static final AmazonCloudFormation CLOUD_FORMATION_SYNC = AmazonCloudFormationClientBuilder.standard()
             .build();
 
+    private AwsStack(){
+    }
+
+    public static AwsStack instance = null;
+
+    public static AwsStack getInstance() {
+        if(instance == null){
+            instance = new AwsStack();
+        }
+        return instance;
+    }
+
     @Override
     public String createStack(String stackName, Map<String, String> parameters, String template, List<Tag> tags) throws Exception {
         try {

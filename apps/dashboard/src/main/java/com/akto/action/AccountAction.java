@@ -5,7 +5,6 @@ import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
 import com.akto.dto.UserAccountEntry;
-import com.akto.utils.cloud.serverless.ServerlessFunction;
 import com.akto.utils.cloud.serverless.aws.Lambda;
 import com.akto.utils.cloud.stack.Stack;
 import com.akto.utils.cloud.stack.aws.AwsStack;
@@ -28,8 +27,6 @@ public class AccountAction extends UserAction {
     private String newAccountName;
     private int newAccountId;
     private static final Logger logger = LoggerFactory.getLogger(AccountAction.class);
-    private final ServerlessFunction serverlessFunction = new Lambda();
-    private final Stack stack = new AwsStack();
 
     public static final int MAX_NUM_OF_LAMBDAS_TO_FETCH = 50;
 
@@ -98,23 +95,23 @@ public class AccountAction extends UserAction {
             logger.info("This is a stairway installation, invoking lambdas now");
             String lambda;
             try {
-                lambda = stack.fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.AKTO_CONTEXT_ANALYZER_UPDATE_LAMBDA);
-                this.serverlessFunction.invokeFunction(lambda);
+                lambda = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.AKTO_CONTEXT_ANALYZER_UPDATE_LAMBDA);
+                Lambda.getInstance().invokeFunction(lambda);
                 logger.info("Successfully invoked lambda {}", lambda);
             } catch (Exception e) {
                 logger.error("Failed to update Akto Context Analyzer", e);
             }
             try{
-                lambda = stack.fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(),MirroringStackDetails.AKTO_DASHBOARD_UPDATE_LAMBDA);
-                this.serverlessFunction.invokeFunction(lambda);
+                lambda = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(),MirroringStackDetails.AKTO_DASHBOARD_UPDATE_LAMBDA);
+                Lambda.getInstance().invokeFunction(lambda);
                 logger.info("Successfully invoked lambda {}", lambda);
             } catch (Exception e) {
                 logger.error("Failed to update Akto Dashboard", e);
             }
                 
             try{
-                lambda = stack.fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.AKTO_RUNTIME_UPDATE_LAMBDA);
-                this.serverlessFunction.invokeFunction(lambda);
+                lambda = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.AKTO_RUNTIME_UPDATE_LAMBDA);
+                Lambda.getInstance().invokeFunction(lambda);
                 logger.info("Successfully invoked lambda {}", lambda);
             } catch (Exception e) {
                 logger.error("Failed to update Akto Traffic Mirroring Instance", e);
@@ -128,7 +125,7 @@ public class AccountAction extends UserAction {
     }
 
     private boolean checkIfStairwayInstallation() {
-        StackState stackStatus = stack.fetchStackStatus(MirroringStackDetails.getStackName());
+        StackState stackStatus = AwsStack.getInstance().fetchStackStatus(MirroringStackDetails.getStackName());
         return "CREATE_COMPLETE".equalsIgnoreCase(stackStatus.getStatus().toString());
     }
 

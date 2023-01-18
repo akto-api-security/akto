@@ -6,7 +6,7 @@
                 {{ title }} connections
                 <v-icon color="#47466A">$fas_caret-down</v-icon>
             </div>
-            <div v-for="source in sources" :key="source.title + title">
+            <div v-for="source in getSourcesInOrder()" :key="source.title + title">
                 <single-data-source v-if="source.connected === title" :icon=source.icon :title=source.title
                     :detail=source.detail :subtitle=source.subtitle>
                     <template #detail v-if="source.detailComponent">
@@ -40,12 +40,11 @@ export default {
         Spinner
     },
     data() {
-        let isConnected = true
         return {
             loading: true,
-            titles: isConnected ? ["My", "More"] : ["More"],
-            sources: [
-                {
+            titles: ["More"],
+            sources: {
+                "AWS": {
                     icon: "$aws",
                     key: "AWS",
                     title: "AWS Traffic Mirroring",
@@ -53,7 +52,7 @@ export default {
                     detailComponent: 'AwsTrafficMirroring',
                     connected: "More"
                 },
-                {
+                "GCP": {
                     icon: "$gcp",
                     key: "GCP",
                     title: "GCP Traffic Mirroring",
@@ -61,39 +60,51 @@ export default {
                     detailComponent: 'GcpTrafficMirroring',
                     connected: "More"
                 },
-                {
+                "BURP": {
                     icon: "$burpsuite",
                     key: "BURP",
                     title: "Burpsuite",
                     detailComponent: 'BurpsuiteSource',
                     connected: "More"
                 },
-                {
+                "POSTMAN": {
                     icon: "$postman",
                     key: "POSTMAN",
                     title: "Postman",
                     detailComponent: 'PostmanSource',
                     connected: "More"
                 }
-            ]
+            }
         }
     },
     mounted() {
         this.fetchQuickStartPageState();
     },
     methods: {
+        getSourcesInOrder(){
+            let order = []
+            if (window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'){
+                order = ['BURP', 'POSTMAN', 'AWS', 'GCP']
+            } else {
+                order = ['AWS', 'BURP', 'POSTMAN', 'GCP']
+            }
+            let final_order = []
+            order.forEach(item => {
+                final_order.push(this.sources[item]);
+            })
+            return final_order
+        },
         fetchQuickStartPageState() {
             api.fetchQuickStartPageState().then((resp) => {
-                this.loading = false;
                 if (resp.configuredItems) {
+                    if(resp.configuredItems.length > 0) {
+                      this.titles = ['My', 'More']
+                    }
                     resp.configuredItems.forEach(item => {
-                        for (let i = 0; i < this.sources.length; i++) {
-                            if (this.sources[i].key === item) {
-                                this.sources[i].connected = "My";
-                            }
-                        }
+                        this.sources[item].connected = "My";
                     });
                 }
+                this.loading = false;
             })
         }
     }

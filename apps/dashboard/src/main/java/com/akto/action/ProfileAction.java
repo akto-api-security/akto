@@ -5,6 +5,8 @@ import com.akto.dao.AccountsDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
+import com.akto.utils.DashboardMode;
+import com.akto.utils.Intercom;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import org.bson.internal.Base64;
@@ -63,6 +65,8 @@ public class ProfileAction extends UserAction {
                 .append("username",user.getName())
                 .append("avatar", "dummy")
                 .append("activeAccount", sessionAccId)
+                .append("dashboardMode", DashboardMode.getDashboardMode())
+                .append("userHash", Intercom.getUserHash(user.getLogin()))
                 .append("users", UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get()));
 
         for (String k: userDetails.keySet()) {

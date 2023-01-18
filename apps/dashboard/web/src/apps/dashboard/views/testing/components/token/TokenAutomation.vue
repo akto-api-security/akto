@@ -60,6 +60,7 @@
                             :finishedWebhookSetup="finishedWebhookSetup"
                             :disableOtpSave="disableOtpSave"
                             @testSingleStep=testSingleStep
+                            @triggerRecordedFlowPolling=triggerRecordedFlowPolling
                             @pollOtpResponse=pollOtpResponse
                             @testRegex=testRegex
                         />
@@ -338,6 +339,49 @@ export default {
             this.authParamsList[index].showHeader = !this.authParamsList[index].showHeader
             let val = this.authParamsList[index].showHeader ? "HEADER": "BODY"
             this.$set(this.authParamsList[index], "where", val);
+        },
+        triggerRecordedFlowPolling(data) {
+            this.pollRecordedFlowResponse(this.currTabName, data)
+        },
+        async pollRecordedFlowResponse(tabString, data) {
+
+            let initialWaitPeriod = 30000
+            await this.sleep(initialWaitPeriod);
+
+            let pollAttempts = 20
+            let pollSleepDuration = 10000
+            let success = false
+            let errResp;
+            for (let i=0; i<pollAttempts; i++) {
+                if (success) {
+                    break
+                } else {
+                  await this.sleep((i) * pollSleepDuration);
+                }
+                
+                let result = api.fetchRecordedLoginFlow("x1")
+
+                result.then((resp) => {
+                    console.log("polled otp text")
+                    let stepDataCopy = JSON.parse(JSON.stringify(this.stepData[tabString]));
+                    stepDataCopy.responsePayload = resp
+                    stepDataCopy.testedSuccessfully = true
+                    stepDataCopy.showAddStepOption = true
+                    stepDataCopy.data = data
+                    this.$set(this.stepData, tabString, stepDataCopy);
+                    success = true
+                }).catch((err) => {
+                    console.log("polling otp text err")
+                    errResp = err
+                })
+            }
+            if (!success) {
+                let stepDataCopy = JSON.parse(JSON.stringify(this.stepData[tabString]));
+                stepDataCopy.responsePayload = errResp.response.data.actionErrors
+                stepDataCopy.testedSuccessfully = false
+                stepDataCopy.showAddStepOption = false
+                this.$set(this.stepData, tabString, stepDataCopy);
+            }
         }
     },
 

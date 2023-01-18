@@ -22,6 +22,19 @@ import com.amazonaws.services.lambda.model.UpdateFunctionConfigurationRequest;
 
 public class Lambda implements ServerlessFunction {
 
+    private static Lambda instance = null;
+    
+    public static final Lambda getInstance(){
+        if(instance == null){
+            instance = new Lambda();
+        }
+        return instance;
+    }
+
+    private Lambda(){
+
+    }
+
     private static final Logger logger = LoggerFactory.getLogger(ServerlessFunction.class);
 
     private static final AWSLambda awsLambda = AWSLambdaClientBuilder.standard().build();

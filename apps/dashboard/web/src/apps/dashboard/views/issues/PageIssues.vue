@@ -8,8 +8,8 @@
         <spinner v-if="loading">
         </spinner>
         <div v-else>
-            <issues-dialog :similarlyAffectedIssues="similarlyAffectedIssues" :openDetailsDialog="dialogBox" :testingRunResult="testingRunResult"
-                :subCatogoryMap="subCatogoryMap" :issue="dialogBoxIssue" 
+            <issues-dialog :similarlyAffectedIssues="similarlyAffectedIssues" :openDetailsDialog="dialogBox"
+                :testingRunResult="testingRunResult" :subCatogoryMap="subCatogoryMap" :issue="dialogBoxIssue"
                 @closeDialogBox="(dialogBox = false)">
             </issues-dialog>
             <issue-box v-for="(issue, index) in issues" :key="index" :creationTime="issue.creationTime"
@@ -107,13 +107,13 @@ export default {
             await this.$store.dispatch('issues/loadTestingResult', { issueId })
             await api.fetchAffectedEndpoints(issueId).then(resp => {
                 this.similarlyAffectedIssues = resp['similarlyAffectedIssues']
+                this.issues.forEach((item) => {
+                    if (issueId === item.id) {
+                        this.dialogBoxIssue = item
+                    }
+                })
+                this.dialogBox = true
             })
-            this.issues.forEach((item) => {
-                if (issueId === item.id) {
-                    this.dialogBoxIssue = item
-                }
-            })
-            this.dialogBox = true
         },
         updateSelectedIssueIds({ issueId, checked }) {
             let selectedIssueIds = this.selectedIssueIds
