@@ -17,6 +17,7 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +34,7 @@ public abstract class TestPlugin {
     static JsonFactory factory = mapper.getFactory();
 
     private static final Logger logger = LoggerFactory.getLogger(TestPlugin.class);
+    private static final Gson gson = new Gson();
 
     public abstract Result  start(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil);
 
@@ -318,14 +320,27 @@ public abstract class TestPlugin {
         return undocumentedMethods;
     }
 
-    public ApiExecutionDetails executeApiAndReturnDetails(OriginalHttpRequest testRequest, boolean followRedirects, OriginalHttpResponse originalHttpResponse, OriginalHttpRequest originalHttpRequest) throws Exception {
+    public ApiExecutionDetails executeApiAndReturnDetails(OriginalHttpRequest testRequest, boolean followRedirects, RawApi rawApi) throws Exception {
         OriginalHttpResponse testResponse = ApiExecutor.sendRequest(testRequest, followRedirects);;
+
+        OriginalHttpRequest originalHttpRequest = rawApi.getRequest().copy();
+        OriginalHttpResponse originalHttpResponse = rawApi.getResponse().copy();
 
         int statusCode = StatusCodeAnalyser.getStatusCode(testResponse.getBody(), testResponse.getStatusCode());
         PercentageMatchRequest percentMatchReq = getPercentageMatchRequest(originalHttpRequest, 3, followRedirects, originalHttpResponse);
         double percentageMatch = compareWithOriginalResponse(percentMatchReq.getResponse().getBody(), testResponse.getBody(), percentMatchReq.getExcludedKeys());
 
-        return new ApiExecutionDetails(statusCode, percentageMatch, testResponse, percentMatchReq.getResponse());
+        String originalMessage = rawApi.getOriginalMessage();
+
+        Map<String, Object> json = gson.fromJson(originalMessage, Map.class);
+        if (percentMatchReq.getResponse() != null) {
+            json.put("responsePayload", percentMatchReq.getResponse().getBody());
+            json.put("responseHeaders", percentMatchReq.getResponse().getHeaders());
+            originalMessage = gson.toJson(json);
+            rawApi.setOriginalMessage(originalMessage);
+        }
+
+        return new ApiExecutionDetails(statusCode, percentageMatch, testResponse, percentMatchReq.getResponse(), originalMessage);
     }
 
     private PercentageMatchRequest getPercentageMatchRequest(OriginalHttpRequest request, int replayCount, boolean followRedirects, OriginalHttpResponse originalHttpResponse) throws Exception {
@@ -410,12 +425,14 @@ public abstract class TestPlugin {
         public double percentageMatch;
         public OriginalHttpResponse testResponse;
         public OriginalHttpResponse baseResponse;
+        public String originalReqResp;
 
-        public ApiExecutionDetails(int statusCode, double percentageMatch, OriginalHttpResponse testResponse, OriginalHttpResponse baseResponse) {
+        public ApiExecutionDetails(int statusCode, double percentageMatch, OriginalHttpResponse testResponse, OriginalHttpResponse baseResponse, String originalReqResp) {
             this.statusCode = statusCode;
             this.percentageMatch = percentageMatch;
             this.testResponse = testResponse;
             this.baseResponse = baseResponse;
+            this.originalReqResp = originalReqResp;
         }
     }
 

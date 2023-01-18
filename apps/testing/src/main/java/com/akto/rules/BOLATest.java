@@ -12,13 +12,10 @@ import com.akto.testing.StatusCodeAnalyser;
 import com.akto.util.JSONUtils;
 import com.akto.util.modifier.ConvertToArrayPayloadModifier;
 import com.akto.util.modifier.NestedObjectModifier;
-import com.google.gson.Gson;
 
 import java.util.*;
 
 public class BOLATest extends AuthRequiredRunAllTestPlugin {
-
-    private static final Gson gson = new Gson();
     
     public BOLATest() { }
 
@@ -36,7 +33,6 @@ public class BOLATest extends AuthRequiredRunAllTestPlugin {
     @Override
     public List<ExecutorResult> execute(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) {
         OriginalHttpRequest testRequest = rawApi.getRequest().copy();
-        OriginalHttpResponse originalHttpResponse = rawApi.getResponse().copy();
 
         testingUtil.getAuthMechanism().addAuthToRequest(testRequest);
 
@@ -46,7 +42,7 @@ public class BOLATest extends AuthRequiredRunAllTestPlugin {
         //      b) We couldn't find uniqueCount or publicCount for some request params
         // When it comes to case b we still say private resource but with low confidence, hence the below line
 
-        ExecutorResult executorResultSimple = util(testRequest, originalHttpResponse, rawApi, containsPrivateResourceResult);
+        ExecutorResult executorResultSimple = util(testRequest, rawApi, containsPrivateResourceResult);
 
         List<ExecutorResult> executorResults = new ArrayList<>();
         executorResults.add(executorResultSimple);
@@ -57,7 +53,7 @@ public class BOLATest extends AuthRequiredRunAllTestPlugin {
             String modifiedPayload = JSONUtils.modify(testRequestArray.getJsonRequestBody(), privateStiParams, new ConvertToArrayPayloadModifier());
             if (modifiedPayload != null) {
                 testRequestArray.setBody(modifiedPayload);
-                ExecutorResult executorResultArray = util(testRequestArray, originalHttpResponse, rawApi, containsPrivateResourceResult);
+                ExecutorResult executorResultArray = util(testRequestArray, rawApi, containsPrivateResourceResult);
                 executorResults.add(executorResultArray);
             }
 
@@ -65,7 +61,7 @@ public class BOLATest extends AuthRequiredRunAllTestPlugin {
             modifiedPayload = JSONUtils.modify(testRequestJson.getJsonRequestBody(), privateStiParams, new NestedObjectModifier());
             if (modifiedPayload != null) {
                 testRequestJson.setBody(modifiedPayload);
-                ExecutorResult executorResultJson = util(testRequestJson, originalHttpResponse, rawApi, containsPrivateResourceResult);
+                ExecutorResult executorResultJson = util(testRequestJson, rawApi, containsPrivateResourceResult);
                 executorResults.add(executorResultJson);
             }
         }
@@ -74,28 +70,16 @@ public class BOLATest extends AuthRequiredRunAllTestPlugin {
         return executorResults;
     }
 
-    public ExecutorResult util(OriginalHttpRequest testRequest, OriginalHttpResponse originalHttpResponse, RawApi rawApi,
-                               ContainsPrivateResourceResult containsPrivateResourceResult) {
+    public ExecutorResult util(OriginalHttpRequest testRequest, RawApi rawApi, ContainsPrivateResourceResult containsPrivateResourceResult) {
+        
         ApiExecutionDetails apiExecutionDetails;
+        RawApi rawApiDuplicate = rawApi.copy();
         try {
-            OriginalHttpRequest originalHttpRequest = rawApi.getRequest().copy();
-            apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, originalHttpResponse, originalHttpRequest);
+            apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApiDuplicate);
         } catch (Exception e) {
             return new ExecutorResult(false, null, new ArrayList<>(), 0, rawApi,
                     TestResult.TestError.API_REQUEST_FAILED, testRequest, null, null);
         }
-
-        RawApi rawApiDuplicate = rawApi.copy();
-
-        String originalMessage = rawApiDuplicate.getOriginalMessage();
-
-        Map<String, Object> json = gson.fromJson(originalMessage, Map.class);
-        if (apiExecutionDetails.baseResponse != null) {
-            json.put("responsePayload", apiExecutionDetails.baseResponse.getBody());
-            originalMessage = gson.toJson(json);
-        }
-
-        rawApiDuplicate.setOriginalMessage(originalMessage);
 
         TestResult.Confidence confidence = containsPrivateResourceResult.findPrivateOnes().size() > 0 ? TestResult.Confidence.HIGH : TestResult.Confidence.LOW;
 

@@ -6,13 +6,10 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.types.CappedSet;
-import com.google.gson.Gson;
 
 import java.util.*;
 
 public class ParameterPollutionTest extends TestPlugin {
-
-    private static final Gson gson = new Gson();
 
     public ParameterPollutionTest() {}
 
@@ -52,26 +49,17 @@ public class ParameterPollutionTest extends TestPlugin {
 
         if (!atLeastOneParam) return null;
 
-        OriginalHttpRequest originalHttpRequest = message1.getRequest().copy();
         ApiExecutionDetails apiExecutionDetails;
         try {
-            apiExecutionDetails = executeApiAndReturnDetails(testRequest1, true, message1.getResponse(), originalHttpRequest);
+            apiExecutionDetails = executeApiAndReturnDetails(testRequest1, true, message1);
         } catch (Exception e) {
             return addWithRequestError( message1.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest1, null);
         }
 
         boolean vulnerable = isStatusGood(apiExecutionDetails.statusCode) && apiExecutionDetails.percentageMatch < 80;
 
-        String originalMessage = message1.getOriginalMessage();
-
-        Map<String, Object> json = gson.fromJson(originalMessage, Map.class);
-        if (apiExecutionDetails.baseResponse != null) {
-            json.put("responsePayload", apiExecutionDetails.baseResponse.getBody());
-            originalMessage = gson.toJson(json);
-        }
-
         TestResult testResult = buildTestResult(
-                testRequest1, apiExecutionDetails.testResponse, originalMessage, apiExecutionDetails.percentageMatch, vulnerable, null
+                testRequest1, apiExecutionDetails.testResponse, apiExecutionDetails.originalReqResp, apiExecutionDetails.percentageMatch, vulnerable, null
         );
         return addTestSuccessResult(
                 vulnerable, Collections.singletonList(testResult), new ArrayList<>(), TestResult.Confidence.HIGH
