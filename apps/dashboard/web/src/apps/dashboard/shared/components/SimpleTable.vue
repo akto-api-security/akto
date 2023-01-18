@@ -11,6 +11,7 @@
             :items-per-page.sync="itemsPerPage"
             @current-items="storeCurrentItems"
             hide-default-footer
+            :page.sync="pageNum"
             hide-default-header
             :fillInitial="fillInitial"
         >
@@ -132,7 +133,8 @@
                             @update:options="updateOptions"
                             prevIcon= '$fas_angle-left'
                             nextIcon= '$fas_angle-right'
-                            items-per-page-text="$vuetify.dataTable.itemsPerPageText"/>
+                            show-current-page
+                        />
 
                         <div class="d-flex board-table-cards jc-end">
                             <div class="clickable download-csv ma-1">
@@ -251,6 +253,7 @@ export default {
     },
     data () {
         return {
+            pageNum:1,
             initialDisplayedItems:[],
             selectedHeaders: [],
             currentRow: [],
@@ -286,35 +289,69 @@ export default {
         storeCurrentItems(items){
             this.initialDisplayedItems = items
         },
+        selectRow(index){
+            this.rowSelected(this.initialDisplayedItems[index])
+            this.$emit('rowClicked',this.initialDisplayedItems[index])
+        },
         moveRowsOnKeys(event){
-            if(event.keyCode === 38){
+            if(event.keyCode === 40){
                 if(this.currentRow.length > 0)
                 {
                     var index = this.initialDisplayedItems.indexOf(this.currentRow[0])
-                    var n = this.initialDisplayedItems.length
-                    index = (index - 1 + n) % n
-                    this.rowSelected(this.initialDisplayedItems[index])
-                    this.$emit('rowClicked',this.initialDisplayedItems[index])
+                    var n = this.initialDisplayedItems.length - 1
+                    if(index === n){
+                        this.pageNum++
+                        this.selectRow(0)
+                    }
+
+                    else{
+                        index++
+                        this.selectRow(index)
+                    }
                 }
                 else{
-                    this.rowSelected(this.initialDisplayedItems[0])
-                    this.$emit('rowClicked',this.initialDisplayedItems[0])
+                    this.selectRow(0)
                 }
             }
 
-            else if(event.keyCode === 40){
+            else if(event.keyCode === 38){
                 if(this.currentRow.length > 0)
                 {
                     var index = this.initialDisplayedItems.indexOf(this.currentRow[0])
-                    var n = this.initialDisplayedItems.length
-                    index = (index + 1 + n) % n
-                    this.rowSelected(this.initialDisplayedItems[index])
-                    this.$emit('rowClicked',this.initialDisplayedItems[index])
+                    if(index === 0){
+                        if(this.pageNum > 1){
+                            this.pageNum--
+                            this.selectRow((this.initialDisplayedItems.length - 1))
+                        }
+                    }
+                    else{
+                        if(index === -1){
+                            this.selectRow((this.initialDisplayedItems.length - 1))
+                        }
+
+                        else{
+                            index--
+                            this.selectRow(index)
+                        }
+                    }
                 }
 
                 else{
-                    this.rowSelected(this.initialDisplayedItems[0])
-                    this.$emit('rowClicked',this.initialDisplayedItems[0])
+                    this.selectRow(0)
+                }
+            }
+
+            else if(event.keyCode === 39){
+                var totalPages = Math.ceil((this.filteredItems.length / this.itemsPerPage))
+                if(this.pageNum < totalPages){
+                    this.pageNum++
+                }
+            }
+
+            else if(event.keyCode === 37){
+                var totalPages = Math.ceil((this.filteredItems.length / this.itemsPerPage))
+                if(this.pageNum > 1){
+                    this.pageNum--
                 }
             }
         },
@@ -347,7 +384,6 @@ export default {
                 headerItems.push({title:this.headers[ind].text, value:this.headers[ind].value})
                 ind++
             }
-
             return headerItems
 
         },
@@ -741,6 +777,10 @@ export default {
 }
 
 .board-table-cards >>> .v-data-footer__select {
+    display: none;
+}
+
+.board-table-cards >>> .v-data-footer__pagination{
     display: none;
 }
 
