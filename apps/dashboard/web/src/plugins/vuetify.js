@@ -102,7 +102,8 @@ import {
   faShareAlt,
   faUserPlus,
   faLaptopHouse,
-  faAnchor
+  faAnchor,
+  faArrowRight,
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -116,7 +117,7 @@ import {
   faFolder as farFolder,
   faFolderOpen as farFolderOpen,
   faClock as farClock,
-  faQuestionCircle as farQuestionCircle
+  faQuestionCircle as farQuestionCircle,
 } from '@fortawesome/free-regular-svg-icons'
 
 import {
@@ -134,7 +135,7 @@ const faIcons = [
   faCreditCard,faAddressCard,faChalkboard,faFilter,faKey,faAngleDoubleDown,faAngleDoubleUp,faUpload,faRedo,faGlobe,faAngleDown,
   faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faCaretSquareUp,
   faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faThumbsUp,faCaretUp,faShareAlt,faUserPlus,faCaretDown,
-  faLaptopHouse,faAnchor,fabGithub,
+  faLaptopHouse,faAnchor,fabGithub,faArrowRight,
   
   farComments,farCalendar, farHandPointRight, farBuilding, farStar,farSquare, farCheckSquare,farFolder,farFolderOpen,farClock,
   farQuestionCircle,

@@ -170,6 +170,10 @@ export default {
           click: () => this.$router.push('/dashboard/settings')
         },
         {
+          label: "Terms and Policies",
+          click: () => window.open("https://www.akto.io/terms-and-policies", "_blank")
+        },
+        {
           label: "Logout",
           click: () => {
             api.logout().then((resp) => {

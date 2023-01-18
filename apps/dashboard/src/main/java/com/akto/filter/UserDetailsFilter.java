@@ -200,37 +200,7 @@ public class UserDetailsFilter implements Filter {
         User user = (User) session.getAttribute("user");
         boolean isSignedUp = "true".equalsIgnoreCase(signedUp);
 
-        boolean setupPathCondition = requestURI.startsWith("/dashboard/setup");
-        boolean dashboardWithoutSetupCondition = requestURI.startsWith("/dashboard") && !setupPathCondition;
-        if (setupPathCondition && !isSignedUp) {
-            SignupUserInfo signupUserInfo = SignupDao.instance.findOne("user.login", username);
-            if (signupUserInfo == null) {
-                redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
-                return ;
-            }
-            user = signupUserInfo.getUser();
-            session.setAttribute("user", user);
-
-            int step = 1;
-            if (StringUtils.isEmpty(signupUserInfo.getCompanyName())) {
-                step = 1;
-            } else if (StringUtils.isEmpty(signupUserInfo.getTeamName())) {
-                step = 2;
-            } else if (signupUserInfo.getEmailInvitations() == null) {
-                step = 3;
-            }
-            User signupUserInfoUser = signupUserInfo.getUser();
-            BasicDBObject infoObj =
-                    new BasicDBObject("username", signupUserInfoUser.getName())
-                            .append("email", signupUserInfoUser.getLogin())
-                            .append("companyName", signupUserInfo.getCompanyName())
-                            .append("teamName", signupUserInfo.getTeamName())
-                            .append("formVersion", 1)
-                            .append("step", step);
-
-            servletRequest.setAttribute("signupInfo", infoObj);
-
-        } else if ((dashboardWithoutSetupCondition || httpServletRequest.getRequestURI().startsWith("/api")) && isSignedUp) {
+        if ((httpServletRequest.getRequestURI().startsWith("/dashboard") || httpServletRequest.getRequestURI().startsWith("/api")) && isSignedUp) {
 
             // if no user details in the session, ask from DB
             // TODO: if session info is too old, then also fetch from DB

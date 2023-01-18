@@ -11,7 +11,7 @@
           <span style="vertical-align: text-bottom">Sign up for</span>
           <span style="vertical-align: text-bottom; color: #6200EA"> akto </span>
         </div>
-        <div class="subheading">Please use your work email address</div>
+        
 
         <!-- <google-auth @signInCallback="signInCallback" scope="" purpose="signup">
           <v-btn class="sign-up-third-party" plain width="100%">
@@ -39,12 +39,12 @@
 <!--        </v-btn>-->
         <!-- <div class="or">or</div> -->
 
-        <login-fields @fieldsChanged="fieldsChanged" @enterPressed="signupUser" :isSignUp ="true"/>
+        <login-fields @fieldsChanged="fieldsChanged" @enterPressed="signupUser" :isSignUp ="true" class="mt-4"/>
         <v-btn class="signup-btn" :disabled="disableButtons" :loading="signupLoading" @click="signupUser" style="background-color:  #6200EA !important; color: #FFFFFF !important">
           Sign up
         </v-btn>
         <div class="legal-docs">
-          By clicking on "Sign Up" you are agreeing to Akto's Terms of Service, Privacy Policy and Cookie Policy.
+          By clicking on "Sign Up" you are agreeing to Akto's <a class="clickable-docs" href="https://www.akto.io/terms-of-service" target="_blank" >Terms of Service</a>, <a class="clickable-docs" href="https://www.akto.io/privacy" target="_blank">Privacy Policy</a> and <a class="clickable-docs" href="https://www.akto.io/cookie" target="_blank">Cookie Policy</a>.
         </div>
       </div>
     </div>
@@ -122,11 +122,7 @@ export default {
             color: 'red'
           })
         } else {
-          var redirectLink = new URLSearchParams(window.location.search).get('redirect_uri') || '/dashboard/testing'
-          if (!redirectLink.startsWith('/dashboard/')) {
-            redirectLink = '/dashboard/testing'
-          }
-          window.location.href = '/dashboard/setup?redirect_uri=' + redirectLink
+          window.location.href = '/dashboard/quick-start'
         }
       })
     }
@@ -209,4 +205,9 @@ export default {
 
 .legal-docs
   font-size: 12px
+
+.clickable-docs
+  cursor: pointer
+  color: #6200EA !important
+  text-decoration: underline
 </style>
