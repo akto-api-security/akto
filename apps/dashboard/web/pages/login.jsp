@@ -76,7 +76,6 @@
                             api_base: "https://api-iam.intercom.io",
                             app_id: "xjvl0z2h",
                             email: window.USER_NAME,
-                            user_hash: '${userHash}',
                             created_at: new Date().getTime()
                         };
                     }
