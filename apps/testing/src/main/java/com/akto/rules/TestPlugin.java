@@ -19,6 +19,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -96,6 +98,10 @@ public abstract class TestPlugin {
             extractAllValuesFromPayload(currentPayload, currentResponseParamMap);
         } catch (Exception e) {
             return 0.0;
+        }
+
+        if (originalResponseParamMap.keySet().size() == 0 && currentResponseParamMap.keySet().size() == 0) {
+            return 100.0;
         }
 
         Set<String> visited = new HashSet<>();
@@ -335,7 +341,18 @@ public abstract class TestPlugin {
         Map<String, Object> json = gson.fromJson(originalMessage, Map.class);
         if (percentMatchReq.getResponse() != null) {
             json.put("responsePayload", percentMatchReq.getResponse().getBody());
-            json.put("responseHeaders", percentMatchReq.getResponse().getHeaders());
+            try {
+                JSONObject headers = new JSONObject();
+                for (String headerName: percentMatchReq.getResponse().getHeaders().keySet()) {
+                    List<String> headerValues = percentMatchReq.getResponse().getHeaders().get(headerName);
+                    String val =  String.join(";", headerValues);
+                    headers.put(headerName, val);
+                }
+                String responseHeaders = headers.toString();
+                json.put("responseHeaders", responseHeaders);
+            } catch (Exception e) {
+                logger.error("response exracting response header from percent match req");
+            }
             originalMessage = gson.toJson(json);
             rawApi.setOriginalMessage(originalMessage);
         }
