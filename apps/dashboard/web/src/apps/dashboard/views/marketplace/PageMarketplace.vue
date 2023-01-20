@@ -128,6 +128,7 @@ import ACard from '@/apps/dashboard/shared/components/ACard'
 import SimpleTextField from '@/apps/dashboard/shared/components/SimpleTextField'
 
 import api from './api'
+import issuesApi from '../issues/api'
 import func from '@/util/func'
 import { mapState } from 'vuex'
 
@@ -153,6 +154,7 @@ export default {
             allSeverities,
             addNewSubcategory: false,
             showSubcategoriesMenu: false,
+            businessCategories: [],
             newTest: {
                 url: "",
                 category: allCategories[0],
@@ -208,14 +210,19 @@ export default {
     },
     async mounted() {
         await this.$store.dispatch('marketplace/fetchAllMarketplaceSubcategories')
+        let aktoTestTypes = await issuesApi.fetchAllSubCategories()
+        this.businessCategories = aktoTestTypes.subCategories
         this.$router.push(this.leftNavItems[0].items[0].link)
         
     },
     computed: {
         ...mapState('marketplace', ['defaultSubcategories', 'userSubcategories', 'loading']),
+        businessCategoryNames() {
+            return [...new Set(this.businessCategories.map(category => category.superCategory.name))]
+        },
         leftNavItems() {
             return [
-                this.createCategoryObj(this.nameToKvObj(this.defaultSubcategories), "Categories", "default", "This week"),
+                this.createCategoryObj(this.nameToKvObj(this.businessCategoryNames.concat(this.defaultSubcategories)), "Categories", "default", "This week"),
                 this.createCategoryObj(this.nameToKvObj(this.userSubcategories), "Your tests", "custom", "Total")
             ]
         }
