@@ -79,6 +79,58 @@ public class TestTestPlugin extends MongoBasedTest {
     }
 
     @Test
+    public void testGetExcludedKeys() {
+        ArrayList<OriginalHttpResponse> replayedResponses = new ArrayList<>();
+        ArrayList<Map<String, Set<String>>> replayedResponseMap = new ArrayList<>();
+        String originalPayload1 = "{\"name\": \"Ankush\", \"age\": 100, \"friends\": [{\"name\": \"Avneesh\", \"stud\": true}, {\"name\": \"ankita\", \"stud\": true}], \"jobs\": [\"MS\", \"CT\"]}";
+        String originalPayload2 = "{\"name\": \"Ankush\", \"age\": 101, \"friends\": [{\"name\": \"Avneesh\", \"stud\": false}, {\"name\": \"ankita\", \"stud\": true}]}";
+
+        Map<String, Set<String>> originalResponseParamMap1 = new HashMap<>();
+        Map<String, Set<String>> originalResponseParamMap2 = new HashMap<>();
+        try {
+            TestPlugin.extractAllValuesFromPayload(originalPayload1, originalResponseParamMap1);
+            TestPlugin.extractAllValuesFromPayload(originalPayload2, originalResponseParamMap2);
+        } catch(Exception e) {
+            fail("Unexpected Exception " + e.getMessage());
+        }
+        replayedResponseMap.add(originalResponseParamMap1);
+        replayedResponseMap.add(originalResponseParamMap2);
+        replayedResponses.add(new OriginalHttpResponse(originalPayload1, new HashMap<>(), 200));
+        replayedResponses.add(new OriginalHttpResponse(originalPayload2, new HashMap<>(), 200));
+        SampleRequestReplayResponse sampleReplayResp = new SampleRequestReplayResponse();
+        sampleReplayResp.setReplayedResponseMap(replayedResponseMap);
+        sampleReplayResp.setReplayedResponses(replayedResponses);
+        Map<String, Boolean> comparisonExcludedKeys = TestPlugin.getComparisonExcludedKeys(sampleReplayResp, sampleReplayResp.getReplayedResponseMap());
+        assertEquals(comparisonExcludedKeys.size(), 2);
+    }
+
+    @Test
+    public void testGetExcludedKeysOrderChanged() {
+        ArrayList<OriginalHttpResponse> replayedResponses = new ArrayList<>();
+        ArrayList<Map<String, Set<String>>> replayedResponseMap = new ArrayList<>();
+        String originalPayload1 = "{\"name\": \"Ankush\", \"age\": 100, \"friends\": [{\"name\": \"ankita\", \"stud\": true}, {\"name\": \"Avneesh\", \"stud\": true}], \"jobs\": [\"MS\", \"CT\"]}";
+        String originalPayload2 = "{\"name\": \"Ankush\", \"age\": 101, \"friends\": [{\"name\": \"Avneesh\", \"stud\": false}, {\"name\": \"ankita\", \"stud\": true}]}";
+
+        Map<String, Set<String>> originalResponseParamMap1 = new HashMap<>();
+        Map<String, Set<String>> originalResponseParamMap2 = new HashMap<>();
+        try {
+            TestPlugin.extractAllValuesFromPayload(originalPayload1, originalResponseParamMap1);
+            TestPlugin.extractAllValuesFromPayload(originalPayload2, originalResponseParamMap2);
+        } catch(Exception e) {
+            fail("Unexpected Exception " + e.getMessage());
+        }
+        replayedResponseMap.add(originalResponseParamMap1);
+        replayedResponseMap.add(originalResponseParamMap2);
+        replayedResponses.add(new OriginalHttpResponse(originalPayload1, new HashMap<>(), 200));
+        replayedResponses.add(new OriginalHttpResponse(originalPayload2, new HashMap<>(), 200));
+        SampleRequestReplayResponse sampleReplayResp = new SampleRequestReplayResponse();
+        sampleReplayResp.setReplayedResponseMap(replayedResponseMap);
+        sampleReplayResp.setReplayedResponses(replayedResponses);
+        Map<String, Boolean> comparisonExcludedKeys = TestPlugin.getComparisonExcludedKeys(sampleReplayResp, sampleReplayResp.getReplayedResponseMap());
+        assertEquals(comparisonExcludedKeys.size(), 2);
+    }
+
+    @Test
     public void testContainsPrivateResource() {
         Map<String, SingleTypeInfo> singleTypeInfoMap = new HashMap<>();
         BOLATest bolaTest = new BOLATest();

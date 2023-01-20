@@ -333,7 +333,7 @@ public abstract class TestPlugin {
         OriginalHttpResponse originalHttpResponse = rawApi.getResponse().copy();
 
         int statusCode = StatusCodeAnalyser.getStatusCode(testResponse.getBody(), testResponse.getStatusCode());
-        PercentageMatchRequest percentMatchReq = getPercentageMatchRequest(originalHttpRequest, 3, followRedirects, originalHttpResponse);
+        PercentageMatchRequest percentMatchReq = getPercentageMatchRequest(originalHttpRequest, 2, followRedirects, originalHttpResponse);
         double percentageMatch = compareWithOriginalResponse(percentMatchReq.getResponse().getBody(), testResponse.getBody(), percentMatchReq.getExcludedKeys());
 
         String originalMessage = rawApi.getOriginalMessage();
@@ -378,7 +378,7 @@ public abstract class TestPlugin {
         return percentMatchReq; 
      }
 
-    private Map<String, Boolean> getComparisonExcludedKeys(SampleRequestReplayResponse sampleReplayResp, ArrayList<Map<String, Set<String>>> replayedResponseMap) {
+    public static Map<String, Boolean> getComparisonExcludedKeys(SampleRequestReplayResponse sampleReplayResp, ArrayList<Map<String, Set<String>>> replayedResponseMap) {
 
         Map<String, Boolean> comparisonExcludedKeys = new HashMap<>();
         Set<String> keys = new HashSet<>();
