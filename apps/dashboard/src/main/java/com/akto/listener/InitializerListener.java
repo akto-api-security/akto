@@ -31,6 +31,7 @@ import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
+import com.akto.utils.HttpUtils;
 import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -606,9 +607,7 @@ public class InitializerListener implements ServletContextListener {
 
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
-        String https = System.getenv("AKTO_HTTPS_FLAG");
-        boolean httpsFlag = Objects.equals(https, "true");
-        sce.getServletContext().getSessionCookieConfig().setSecure(httpsFlag);
+        sce.getServletContext().getSessionCookieConfig().setSecure(HttpUtils.isHttpsEnabled());
 
         logger.info("context initialized");
 

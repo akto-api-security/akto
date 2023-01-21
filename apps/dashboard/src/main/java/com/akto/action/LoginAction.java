@@ -9,6 +9,7 @@ import com.akto.dto.SignupInfo;
 import com.akto.dto.SignupUserInfo;
 import com.akto.dto.User;
 import com.akto.utils.Token;
+import com.akto.utils.HttpUtils;
 import com.akto.utils.JWT;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -133,10 +134,8 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             cookie.setHttpOnly(true);
             cookie.setPath("/dashboard");
 
-            String https = System.getenv("AKTO_HTTPS_FLAG");
-            if (Objects.equals(https, "true")) {
-                cookie.setSecure(true);
-            }
+            cookie.setSecure(HttpUtils.isHttpsEnabled());
+            
 
             servletResponse.addCookie(cookie);
             HttpSession session = servletRequest.getSession(true);
