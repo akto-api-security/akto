@@ -22,7 +22,6 @@ import static com.akto.util.enums.GlobalEnums.*;
 
 public class IssuesAction extends UserAction {
     private List<TestingRunIssues> issues;
-
     private TestingIssuesId issueId;
     private List<TestingIssuesId> issueIdArray;
     private TestingRunResult testingRunResult;
