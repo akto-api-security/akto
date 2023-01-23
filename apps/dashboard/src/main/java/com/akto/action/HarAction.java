@@ -3,6 +3,7 @@ package com.akto.action;
 import com.akto.DaoInit;
 import com.akto.analyser.ResourceAnalyser;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.BurpPluginInfoDao;
 import com.akto.dao.RuntimeFilterDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
@@ -12,6 +13,7 @@ import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.policies.AktoPolicy;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.utils.DashboardMode;
 import com.akto.utils.Utils;
@@ -51,6 +53,30 @@ public class HarAction extends UserAction {
         ApiCollection apiCollection = null;
         if (apiCollectionName != null) {
             apiCollection =  ApiCollectionsDao.instance.findByName(apiCollectionName);
+            if (apiCollection == null) {
+                ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
+                apiCollectionsAction.setSession(this.getSession());
+                apiCollectionsAction.setCollectionName(apiCollectionName);
+                String result = apiCollectionsAction.createCollection();
+                if (result.equalsIgnoreCase(Action.SUCCESS)) {
+                    List<ApiCollection> apiCollections = apiCollectionsAction.getApiCollections();
+                    if (apiCollections != null && apiCollections.size() > 0) {
+                        apiCollection = apiCollections.get(0);
+                    } else {
+                        addActionError("Couldn't create api collection " +  apiCollectionName);
+                        return ERROR.toUpperCase();
+                    }
+                } else {
+                    Collection<String> actionErrors = apiCollectionsAction.getActionErrors(); 
+                    if (actionErrors != null && actionErrors.size() > 0) {
+                        for (String actionError: actionErrors) {
+                            addActionError(actionError);
+                        }
+                    }
+                    return ERROR.toUpperCase();
+                }
+            }
+
             apiCollectionId = apiCollection.getId();
         } else {
             apiCollection =  ApiCollectionsDao.instance.findOne(Filters.eq("_id", apiCollectionId));
@@ -79,6 +105,10 @@ public class HarAction extends UserAction {
         if (harString == null) {
             addActionError("Empty content");
             return ERROR.toUpperCase();
+        }
+
+        if (getSession().getOrDefault("utility","").equals(Utility.BURP.toString())) {
+            BurpPluginInfoDao.instance.updateLastDataSentTimestamp(getSUser().getLogin());
         }
 
         try {

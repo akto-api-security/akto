@@ -55,8 +55,9 @@ public class ApiCollectionsAction extends UserAction {
             boolean alphabets = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
             boolean numbers = c >= '0' && c <= '9';
             boolean specialChars = c == '-' || c == '.' || c == '_';
+            boolean spaces = c == ' ';
 
-            if (!(alphabets || numbers || specialChars)) {
+            if (!(alphabets || numbers || specialChars || spaces)) {
                 addActionError("Collection names can only be alphanumeric and contain '-','.' and '_'");
                 return ERROR.toUpperCase();
             }
