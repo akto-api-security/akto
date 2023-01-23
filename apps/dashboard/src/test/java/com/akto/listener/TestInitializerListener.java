@@ -57,4 +57,12 @@ public class TestInitializerListener extends MongoBasedTest {
         assertTrue(newSensitiveParams.containsKey("GET /api/bus: EMAIL"));
     }
 
+    @Test
+    public void testReadAndSaveBurpPluginVersion() {
+        assertTrue(InitializerListener.burpPluginVersion < 0);
+        InitializerListener initializerListener = new InitializerListener();
+        initializerListener.readAndSaveBurpPluginVersion();
+        assertTrue(InitializerListener.burpPluginVersion > 0);
+    }
+
 }
