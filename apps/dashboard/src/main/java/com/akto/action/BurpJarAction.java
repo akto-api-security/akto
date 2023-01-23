@@ -34,8 +34,8 @@ public class BurpJarAction extends UserAction implements ServletResponseAware, S
 
 
     @Override
-    public String execute() throws IOException { //todo: remove exception
-        String host = servletRequest.getHeader("Origin"); //todo
+    public String execute() {
+        String host = servletRequest.getHeader("Origin");
 
         ApiToken apiToken = ApiTokensDao.instance.findOne(
                 Filters.and(
@@ -58,24 +58,39 @@ public class BurpJarAction extends UserAction implements ServletResponseAware, S
         }
 
         String token = apiToken.getKey();
-
         String collectionName = "Burp";
-
         int version = InitializerListener.burpPluginVersion;
 
-        File tmpJarFile = File.createTempFile("temp", "jar");
-        URL url = this.getClass().getResource("/Akto.jar");
+        File tmpJarFile;
+        try {
+            tmpJarFile = File.createTempFile("temp", "jar");
+        } catch (IOException e) {
+            addActionError("Failed creating temp file");
+            return ERROR.toUpperCase();
+        }
 
+        URL url = this.getClass().getResource("/Akto.jar");
         if (url == null) {
             addActionError("Akto plugin not found!");
             return ERROR.toUpperCase();
         }
 
-        JarFile jarFile = new JarFile(url.getPath());
-        boolean jarUpdated = false;
+        JarFile jarFile;
+        try {
+            jarFile = new JarFile(url.getPath());
+        } catch (IOException e) {
+            addActionError("Failed creating JAR file");
+            return ERROR.toUpperCase();
+        }
 
-        File credFile = File.createTempFile("creds", "txt"); // todo: remove
-        FileUtils.writeStringToFile(credFile,host + "\n" + token + "\n" + collectionName + "\n" + version, Charsets.UTF_8);
+        File credFile;
+        try {
+            credFile = File.createTempFile("creds", "txt"); // todo: remove
+            FileUtils.writeStringToFile(credFile,host + "\n" + token + "\n" + collectionName + "\n" + version, Charsets.UTF_8);
+        } catch (Exception e) {
+            addActionError("Failed adding credentials");
+            return ERROR.toUpperCase();
+        }
 
         try {
             try (JarOutputStream tempJarOutputStream = new JarOutputStream(Files.newOutputStream(tmpJarFile.toPath()))) {
@@ -108,28 +123,35 @@ public class BurpJarAction extends UserAction implements ServletResponseAware, S
                     tempJarOutputStream.write(buffer, 0, bytesRead);
                 }
 
-                jarUpdated = true;
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
 
         } finally {
-            jarFile.close();
+            if (jarFile != null) {
+                try {
+                    jarFile.close();
+                } catch (Exception ignored) {
+
+                }
+            }
         }
 
         servletResponse.setContentType("application/octet-stream");
         servletResponse.setHeader("Content-Disposition", "filename=\"Akto.jar\"");
         System.out.println("set header done");
         File srcFile = new File(tmpJarFile.getPath());
-        FileUtils.copyFile(srcFile, servletResponse.getOutputStream());
+        try {
+            FileUtils.copyFile(srcFile, servletResponse.getOutputStream());
+        } catch (IOException e) {
+            addActionError("Failed sending jar file");
+            return ERROR.toUpperCase();
+        }
 
         System.out.println("done");
 
-        boolean credFileDeleted = credFile.delete();
-        boolean tmpJarFileDeleted = tmpJarFile.delete();
-
-        System.out.println("cred file deleted: " + credFileDeleted);
-        System.out.println("tmp jar file deleted: " + tmpJarFileDeleted);
+        credFile.delete();
+        tmpJarFile.delete();
 
         BurpPluginInfoDao.instance.updateLastDownloadedTimestamp(getSUser().getLogin());
 
