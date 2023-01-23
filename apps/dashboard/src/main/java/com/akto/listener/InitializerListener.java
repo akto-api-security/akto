@@ -171,7 +171,13 @@ public class InitializerListener implements ServletContextListener {
             List<TestSourceConfig> currConfigs = TestSourceConfigsDao.instance.findAll(systemTestsQuery);
             Map<String, TestSourceConfig> currConfigsMap = new HashMap<>();
             for(TestSourceConfig tsc: currConfigs) {
-                currConfigsMap.put(tsc.getId(), tsc);
+
+                if (tsc.getCategory() == null || tsc.getCategory().equals(TestCategory.UC)) {
+                    Bson deleteQ = Filters.eq("_id", tsc.getId());
+                    TestSourceConfigsDao.instance.getMCollection().deleteOne(deleteQ);
+                } else {
+                    currConfigsMap.put(tsc.getId(), tsc);
+                }
             }
 
             if (files == null) return;
@@ -179,9 +185,10 @@ public class InitializerListener implements ServletContextListener {
                 BasicDBObject fileDetails = (BasicDBObject) fileObj;
                 String filePath = fileDetails.getString("path");
                 if (filePath.endsWith(".yaml") || filePath.endsWith(".yml")) {
+                    String categoryFolder = filePath.split("/")[0];
                     filePath = "https://github.com/akto-api-security/testing_sources/blob/master/" + filePath;
                     if (!currConfigsMap.containsKey(filePath)) {
-                        TestCategory testCategory = findTestCategory(filePath, shortNameToTestCategory);
+                        TestCategory testCategory = findTestCategory(categoryFolder, shortNameToTestCategory);
                         String subcategory = findTestSubcategory(filePath);
                         TestSourceConfig testSourceConfig = new TestSourceConfig(filePath, testCategory, subcategory, Severity.HIGH, "", TestSourceConfig.DEFAULT, Context.now());
                         TestSourceConfigsDao.instance.insertOne(testSourceConfig);

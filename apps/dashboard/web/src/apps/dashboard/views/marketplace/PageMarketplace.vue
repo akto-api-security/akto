@@ -216,11 +216,11 @@ export default {
     computed: {
         ...mapState('marketplace', ['defaultSubcategories', 'userSubcategories', 'loading']),
         businessCategoryNames() {
-            return [...new Set(this.businessCategories.map(category => category.superCategory.name))]
+            return [...new Set(this.businessCategories.map(category => category.superCategory.name))].map(x => {return { text: (x + "/business-logic"), value: x}})
         },
         leftNavItems() {
             return [
-                this.createCategoryObj(this.nameToKvObj(this.businessCategoryNames.concat(this.defaultSubcategories)), "Categories", "default", "This week"),
+                this.createCategoryObj(this.businessCategoryNames.concat(this.nameToKvObj(this.defaultSubcategories)), "Categories", "default", "This week"),
                 this.createCategoryObj(this.nameToKvObj(this.userSubcategories), "Your tests", "custom", "Total")
             ]
         }

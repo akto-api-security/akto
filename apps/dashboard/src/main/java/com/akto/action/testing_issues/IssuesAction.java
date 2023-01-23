@@ -100,8 +100,10 @@ public class IssuesAction extends UserAction {
     }
 
     private TestSubCategory[] subCategories;
+    private TestCategory[] categories;
     public String fetchAllSubCategories() {
         this.subCategories = GlobalEnums.TestSubCategory.getValuesArray();
+        this.categories = GlobalEnums.TestCategory.values();
         return SUCCESS.toUpperCase();
     }
 
@@ -281,5 +283,13 @@ public class IssuesAction extends UserAction {
 
     public void setSimilarlyAffectedIssues(List<TestingRunIssues> similarlyAffectedIssues) {
         this.similarlyAffectedIssues = similarlyAffectedIssues;
+    }
+
+    public TestCategory[] getCategories() {
+        return this.categories;
+    }
+
+    public void setCategories(TestCategory[] categories) {
+        this.categories = categories;
     }
 }
