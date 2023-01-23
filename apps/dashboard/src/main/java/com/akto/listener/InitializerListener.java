@@ -621,6 +621,17 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
+    public void deleteAccessListFromApiToken(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getDeleteAccessListFromApiToken() == 0) {
+            ApiTokensDao.instance.updateMany(new BasicDBObject(),Updates.unset("accessList"));
+        }
+
+        BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.DELETE_ACCESS_LIST_FROM_API_TOKEN, Context.now())
+        );
+    }
+
     public void readyForNewTestingFramework(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getReadyForNewTestingFramework() == 0) {
             TestingRunDao.instance.getMCollection().drop();
@@ -693,6 +704,7 @@ public class InitializerListener implements ServletContextListener {
             addAktoDataTypes(backwardCompatibility);
             updateDeploymentStatus(backwardCompatibility);
             dropAuthMechanismData(backwardCompatibility);
+            deleteAccessListFromApiToken(backwardCompatibility);
 
             SingleTypeInfo.init();
 

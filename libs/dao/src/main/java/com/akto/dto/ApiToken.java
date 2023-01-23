@@ -1,5 +1,7 @@
 package com.akto.dto;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 public class ApiToken {
@@ -13,18 +15,29 @@ public class ApiToken {
     public static final String USER_NAME = "username";
     private Utility utility;
     public static final String UTILITY = "utility";
-    private List<String> accessList;
-    public static final String ACCESS_LIST = "accessList";
 
+    public static final String FULL_STRING_ALLOWED_API = "*";
 
     public enum Utility{
-        BURP, EXTERNAL_API, SLACK
+        BURP(Arrays.asList("/api/uploadHar", "/api/importInBurp", "/api/sendHealthCheck")),
+        EXTERNAL_API(Collections.singletonList(FULL_STRING_ALLOWED_API)),
+        SLACK(Collections.emptyList());
+
+        private final List<String> accessList;
+
+        Utility(List<String> accessList) {
+            this.accessList = accessList;
+        }
+
+        public List<String> getAccessList() {
+            return accessList;
+        }
     }
 
     public ApiToken() {}
 
 
-    public ApiToken(int id,int accountId,String name,String key, int timestamp, String username, Utility utility, List<String> accessList) {
+    public ApiToken(int id,int accountId,String name,String key, int timestamp, String username, Utility utility) {
         this.id = id;
         this.accountId = accountId;
         this.name = name;
@@ -32,7 +45,6 @@ public class ApiToken {
         this.timestamp = timestamp;
         this.username = username;
         this.utility = utility;
-        this.accessList = accessList;
     }
 
     public int getId() {
@@ -73,14 +85,6 @@ public class ApiToken {
 
     public void setUtility(Utility utility) {
         this.utility = utility;
-    }
-
-    public List<String> getAccessList() {
-        return accessList;
-    }
-
-    public void setAccessList(List<String> accessList) {
-        this.accessList = accessList;
     }
 
     public String getName() {

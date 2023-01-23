@@ -92,8 +92,8 @@ public class UserDetailsFilter implements Filter {
                 httpServletResponse.sendError(403);
                 return;
             } else {
-                boolean allCondition = apiToken.getAccessList().contains(ApiTokenAction.FULL_STRING_ALLOWED_API);
-                boolean pathCondition = apiToken.getAccessList().contains(requestURI);
+                boolean allCondition = apiToken.getUtility().getAccessList().contains(ApiToken.FULL_STRING_ALLOWED_API);
+                boolean pathCondition = apiToken.getUtility().getAccessList().contains(requestURI);
                 if (!(allCondition || pathCondition)) {
                     httpServletResponse.sendError(403);
                     return;

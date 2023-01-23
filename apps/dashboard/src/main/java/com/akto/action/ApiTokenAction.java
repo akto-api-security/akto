@@ -33,25 +33,20 @@ public class ApiTokenAction extends UserAction implements ServletRequestAware {
         String apiKey = randomString.nextString();
         if (apiKey == null || apiKey.length() != keyLength) return ERROR.toUpperCase();
 
-        ApiToken apiToken = new ApiToken(Context.now(),Context.accountId.get(),"burp_key",apiKey, Context.now(), username, ApiToken.Utility.BURP,
-                Arrays.asList("/api/uploadHar", "/api/importInBurp", "/api/sendBootupSignalBurp"));
+        ApiToken apiToken = new ApiToken(Context.now(),Context.accountId.get(),"burp_key",apiKey, Context.now(), username, ApiToken.Utility.BURP);
         ApiTokensDao.instance.insertOne(apiToken);
         apiTokenList = new ArrayList<>();
         apiTokenList.add(apiToken);
         return SUCCESS.toUpperCase();
     }
 
-    public static final String FULL_STRING_ALLOWED_API = "*";
     public String addExternalApiToken() {
         String username = getSUser().getLogin();
         String apiKey = randomString.nextString();
         if (apiKey == null || apiKey.length() != keyLength) return ERROR.toUpperCase();
 
-        List<String> allowedApis = new ArrayList<>();
-        allowedApis.add(FULL_STRING_ALLOWED_API);
-
         ApiToken apiToken = new ApiToken(Context.now(),Context.accountId.get(),"external_key",apiKey, Context.now(),
-                username, ApiToken.Utility.EXTERNAL_API, allowedApis);
+                username, ApiToken.Utility.EXTERNAL_API);
         ApiTokensDao.instance.insertOne(apiToken);
         apiTokenList = new ArrayList<>();
         apiTokenList.add(apiToken);
@@ -88,7 +83,7 @@ public class ApiTokenAction extends UserAction implements ServletRequestAware {
         for(SlackWebhook sw: slackWebhooks) {
             ApiToken slackToken = 
                 new ApiToken(sw.getId(), Context.accountId.get(), sw.getWebhook(), sw.getWebhook(), 
-                sw.getId(), sw.getUserEmail(), Utility.SLACK, new ArrayList<>());
+                sw.getId(), sw.getUserEmail(), Utility.SLACK);
                 
             apiTokenList.add(slackToken);
         }
