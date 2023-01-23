@@ -20,18 +20,27 @@ public class GlobalEnums {
 
     /* Category of tests perfomred */
     public enum TestCategory {
-        BOLA("BOLA", Severity.HIGH, "Broken Object Level Authorization (BOLA)"),
-        NO_AUTH("NO_AUTH", Severity.HIGH, "Broken User Authentication (BUA)"),
-        BFLA("BFLA", Severity.HIGH, "Broken Function Level Authorization (BFLA)"),
-        IAM("IAM", Severity.HIGH, "Improper Assets Management (IAM)");
+        BOLA("BOLA", Severity.HIGH, "Broken Object Level Authorization (BOLA)", "BOLA"),
+        NO_AUTH("NO_AUTH", Severity.HIGH, "Broken User Authentication (BUA)", "Broken Authentication"),
+        BFLA("BFLA", Severity.HIGH, "Broken Function Level Authorization (BFLA)", "Broken Function Level Authorization"),
+        IAM("IAM", Severity.HIGH, "Improper Assets Management (IAM)", "Improper Assets Management"),
+        EDE("EDE", Severity.HIGH, "Excessive Data Exposure (EDE)", "Sensitive Data Exposure"),
+        RL("RL", Severity.HIGH, "Lack of Resources & Rate Limiting (RL)", "Lack of Resources and Rate Limiting"),
+        MA("MA", Severity.HIGH, "Mass Assignment (MA)", "Mass Assignment"),
+        INJ("INJ", Severity.HIGH, "Injection (INJ)", "Injection"),
+        ILM("ILM", Severity.HIGH, "Insufficient Logging & Monitoring (ILM)", "Insufficient Logging and Monitoring"),
+        SM("SM", Severity.HIGH, "Security Misconfiguration (SM)", "Misconfiguration"),
+        UC("UC", Severity.HIGH, "Uncategorized (UC)", "Uncategorized");
         private final String name;
         private final Severity severity;
         private final String displayName;
+        private final String shortName;
 
-        TestCategory(String name, Severity severity, String displayName) {
+        TestCategory(String name, Severity severity, String displayName, String shortName) {
             this.name = name;
             this.severity = severity;
             this.displayName = displayName;
+            this.shortName = shortName;
         }
 
         public String getName() {
@@ -44,6 +53,10 @@ public class GlobalEnums {
 
         public String getDisplayName() {
             return displayName;
+        }
+
+        public String getShortName() {
+                return shortName;
         }
     }
 

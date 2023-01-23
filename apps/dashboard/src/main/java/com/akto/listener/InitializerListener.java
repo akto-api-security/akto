@@ -140,12 +140,9 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 4, TimeUnit.HOURS);
     }
 
-    static TestCategory findTestCategory(String path) {
-        if (path.contains("BrokenObjectLevelAuthorization")) return TestCategory.BOLA;
-        if (path.contains("ImproperAssetsManagement")) return TestCategory.IAM;
-        if (path.contains("BrokenUserAuthentication")) return TestCategory.NO_AUTH;
-        if (path.contains("BrokenFunctionLevelAuthorization")) return TestCategory.BFLA;
-        return null;
+    static TestCategory findTestCategory(String path, Map<String, TestCategory> shortNameToTestCategory) {
+        path = path.replaceAll("-", "").replaceAll("_", "").toLowerCase();
+        return shortNameToTestCategory.getOrDefault(path, TestCategory.UC);
     }
 
     static String findTestSubcategory(String path) {
@@ -155,6 +152,14 @@ public class InitializerListener implements ServletContextListener {
 
     static void executeTestSourcesFetch() {
         try {
+
+            TestCategory[] testCategories = TestCategory.values();
+            Map<String, TestCategory> shortNameToTestCategory = new HashMap<>();
+            for(TestCategory tc: testCategories) {
+                String sn = tc.getShortName().replaceAll("-", "").replaceAll("_", "").replaceAll(" ", "").toLowerCase();
+                shortNameToTestCategory.put(sn, tc);
+            }
+
             String testingSourcesRepoTree = "https://api.github.com/repos/akto-api-security/testing_sources/git/trees/master?recursive=1";
             String tempFilename = "temp_testingSourcesRepoTree.json";
             FileUtils.copyURLToFile(new URL(testingSourcesRepoTree), new File(tempFilename));
@@ -162,20 +167,33 @@ public class InitializerListener implements ServletContextListener {
             BasicDBObject fileList = BasicDBObject.parse(fileContent);
             BasicDBList files = (BasicDBList) (fileList.get("tree"));
 
+            BasicDBObject systemTestsQuery = new BasicDBObject(TestSourceConfig.CREATOR, TestSourceConfig.DEFAULT);
+            List<TestSourceConfig> currConfigs = TestSourceConfigsDao.instance.findAll(systemTestsQuery);
+            Map<String, TestSourceConfig> currConfigsMap = new HashMap<>();
+            for(TestSourceConfig tsc: currConfigs) {
+                currConfigsMap.put(tsc.getId(), tsc);
+            }
+
             if (files == null) return;
             for (Object fileObj: files) {
                 BasicDBObject fileDetails = (BasicDBObject) fileObj;
                 String filePath = fileDetails.getString("path");
-                if (filePath.endsWith(".yaml")) {
+                if (filePath.endsWith(".yaml") || filePath.endsWith(".yml")) {
                     filePath = "https://github.com/akto-api-security/testing_sources/blob/master/" + filePath;
-                    if (TestSourceConfigsDao.instance.findOne("_id", filePath) == null) {
-                        TestCategory testCategory = findTestCategory(filePath);
+                    if (!currConfigsMap.containsKey(filePath)) {
+                        TestCategory testCategory = findTestCategory(filePath, shortNameToTestCategory);
                         String subcategory = findTestSubcategory(filePath);
-                        TestSourceConfig testSourceConfig = new TestSourceConfig(filePath, testCategory, subcategory, Severity.HIGH, "", "default", Context.now());
+                        TestSourceConfig testSourceConfig = new TestSourceConfig(filePath, testCategory, subcategory, Severity.HIGH, "", TestSourceConfig.DEFAULT, Context.now());
                         TestSourceConfigsDao.instance.insertOne(testSourceConfig);
                     }
+                    currConfigsMap.remove(filePath);
                 }
             }
+
+            for(String toBeDeleted: currConfigsMap.keySet()) {
+                TestSourceConfigsDao.instance.getMCollection().deleteOne(new BasicDBObject("_id", toBeDeleted));
+            }
+
 
         } catch (IOException e1) {
             e1.printStackTrace();
