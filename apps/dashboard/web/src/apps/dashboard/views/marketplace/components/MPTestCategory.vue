@@ -9,11 +9,17 @@
         <spinner v-if="loading"/>
         <div v-else class="testcases-layout">
             <div v-for="(item, index) in testSourceConfigs" :key="index" class="testcase-container">
-                <v-icon size="20" color="#24292F" class="icon-border">$fab_github</v-icon>
+                <v-icon size="20" color="#24292F" class="icon-border">
+
+                    {{isAktoTest(item) ? '$aktoWhite' : '$fab_github'}}
+                </v-icon>
                 <div>
                     <div class="testcase-title">{{getName(item.id)}}</div>
-                    <div>
+                    <div v-if="!isAktoTest(item)">
                         <a :href='item.id' class="github-link" target="_blank">Contribute in GithHub</a>
+                    </div>
+                    <div v-if="item.description">
+                        <div class="testcase-description">{{item.description}}</div>
                     </div>
                 </div>
             </div>
@@ -24,6 +30,7 @@
 <script>
 import obj from "@/util/obj"
 import api from '../api'
+import issuesApi from '../../issues/api'
 
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
 
@@ -41,18 +48,41 @@ export default {
             githubLink: this.categoryType === "default" ? "https://github.com/akto-api-security/testing_sources" : null,
             testSourceConfigs: [],
             categoryTitle: this.categoryId.replaceAll("_", " "),
-            loading: false
+            loading: false,
+            businessCategories: []
         }
     },
     methods: {
         getName(filePath) {
-            return filePath.substring(filePath.lastIndexOf("/")+1, filePath.lastIndexOf("."))
-        } 
+            if (filePath.indexOf("/") > -1) {
+                return filePath.substring(filePath.lastIndexOf("/")+1, filePath.lastIndexOf("."))
+            } else {
+                return filePath
+            }
+        },
+        isAktoTest(item) {
+            return item.id.indexOf("http") == -1
+        }
     },
-    mounted() {
+    async mounted() {
         this.loading = true
-        api.fetchTestingSources(this.categoryType === "default", this.categoryId).then(resp => {
-            this.testSourceConfigs = resp.testSourceConfigs;
+        let aktoTestTypes = await issuesApi.fetchAllSubCategories()
+        this.businessCategories = aktoTestTypes.subCategories
+        let isDefaultCategory = this.categoryType === "default"
+
+        if (isDefaultCategory) {
+            let businessTests = this.businessCategories.filter(x => x.superCategory.name.toLowerCase() === this.categoryId.toLowerCase())
+            this.testSourceConfigs = [...this.testSourceConfigs, ...businessTests.map(test => {
+                return {
+                    id: test.testName,
+                    description: test.issueDescription
+                }
+            })]
+        }
+        
+
+        api.fetchTestingSources(isDefaultCategory, this.categoryId).then(resp => {
+            this.testSourceConfigs = [...this.testSourceConfigs, ...resp.testSourceConfigs];
             this.loading = false
         }).catch(() => {
             this.loading = false
