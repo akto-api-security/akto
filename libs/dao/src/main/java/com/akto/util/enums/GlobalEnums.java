@@ -123,8 +123,8 @@ public class GlobalEnums {
         }),
         ADD_METHOD_IN_PARAMETER(
                 "ADD_METHOD_IN_PARAMETER",
-                TestCategory.BOLA,
-                "Broken function level authorization by HTTP verb tunneling by adding method param",
+                TestCategory.BFLA,
+                "BFLA by HTTP verb tunneling by adding method param",
                 "Attacker can access resources of any user by replacing method of the endpoint (eg: changemethod from get to post). This way attacker can get access to unauthorized endpoints.",
                 "The endpoint appears to be vulnerable to broken function level authorization attack. The original request was replayed with the addition of request parameter " +
                         "(for example: {method = GET} was added to change it to GET method) in query params." +
@@ -145,8 +145,8 @@ public class GlobalEnums {
 
         ADD_METHOD_OVERRIDE_HEADERS(
                 "ADD_METHOD_OVERRIDE_HEADERS",
-                TestCategory.BOLA,
-                "Broken function level authorization by HTTP method overriding ",
+                TestCategory.BFLA,
+                "BFLA by HTTP method overriding ",
                 "Attacker can access resources of any user by replacing method of the endpoint (eg: changemethod from get to post). This way attacker can get access to unauthorized endpoints.",
                 "The endpoint appears to be vulnerable to broken function level authorization attack.The original request was replayed with addition of alternative headers" +
                         " for HTTP method overriding namely X-HTTP-Method, X-HTTP-Method-Override, X-Method-Override. The application responded with 2XX success codes and less than " +
@@ -168,8 +168,8 @@ public class GlobalEnums {
 
         CHANGE_METHOD(
                 "CHANGE_METHOD",
-                TestCategory.BOLA,
-                "Broken function level authorization by changing HTTP method",
+                TestCategory.BFLA,
+                "BFLA by changing HTTP method",
                 "Attacker can access resources of any user by replacing method of the endpoint (eg: changemethod from get to post). This way attacker can get access to unauthorized endpoints.",
                 "The endpoint appears to be vulnerable to broken function level authorization attack. The original request was modified by changing the HTTP methods and sent to application server. The server responded with 2XX success codes.",
                 "An attacker can perform sensitive actions (e.g., creation, modification, or erasure) that they should not have access to by simply changing the HTTP method.",
