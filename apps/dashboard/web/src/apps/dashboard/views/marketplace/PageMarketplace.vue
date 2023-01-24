@@ -53,7 +53,7 @@
                                 <div>Category</div>
                                 <v-select
                                     class="form-field-select"
-                                    :items="allCategories"
+                                    :items="businessCategoryNames"
                                     v-model="newTest.category"
                                     attach
                                 />
@@ -142,14 +142,12 @@ export default {
         SimpleTextField
     },
     data() {
-        let allCategories = ["BOLA", "BUA", "IAM", "BFLA"]
         let allSubcategories = ["path_traversal", "swagger_file_detection"]
         let allSeverities = ["HIGH", "MEDIUM", "LOW"]
         
         return {
             drawer: null,
             showCreateTestDialog: false,
-            allCategories,
             allSubcategories,
             allSeverities,
             addNewSubcategory: false,
@@ -157,7 +155,7 @@ export default {
             businessCategories: [],
             newTest: {
                 url: "",
-                category: allCategories[0],
+                category: "BOLA",
                 subcategory: allSubcategories[0],
                 severity: allSeverities[0],
                 description: ""
@@ -218,11 +216,11 @@ export default {
     computed: {
         ...mapState('marketplace', ['defaultSubcategories', 'userSubcategories', 'loading']),
         businessCategoryNames() {
-            return [...new Set(this.businessCategories.map(category => category.superCategory.name))]
+            return [...new Set(this.businessCategories.map(category => category.superCategory.name))].map(x => {return { text: (x + "/business-logic"), value: x}})
         },
         leftNavItems() {
             return [
-                this.createCategoryObj(this.nameToKvObj(this.businessCategoryNames.concat(this.defaultSubcategories)), "Categories", "default", "This week"),
+                this.createCategoryObj(this.businessCategoryNames.concat(this.nameToKvObj(this.defaultSubcategories)), "Categories", "default", "This week"),
                 this.createCategoryObj(this.nameToKvObj(this.userSubcategories), "Your tests", "custom", "Total")
             ]
         }
