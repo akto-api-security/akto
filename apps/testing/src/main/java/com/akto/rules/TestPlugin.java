@@ -17,7 +17,10 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,6 +36,7 @@ public abstract class TestPlugin {
     static JsonFactory factory = mapper.getFactory();
 
     private static final Logger logger = LoggerFactory.getLogger(TestPlugin.class);
+    private static final Gson gson = new Gson();
 
     public abstract Result  start(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil);
 
@@ -79,7 +83,7 @@ public abstract class TestPlugin {
         return sb.toString();
     }
 
-    public static double compareWithOriginalResponse(String originalPayload, String currentPayload) {
+    public static double compareWithOriginalResponse(String originalPayload, String currentPayload, Map<String, Boolean> comparisonExcludedKeys) {
         if (originalPayload == null && currentPayload == null) return 100;
         if (originalPayload == null || currentPayload == null) return 0;
 
@@ -96,10 +100,14 @@ public abstract class TestPlugin {
             return 0.0;
         }
 
+        if (originalResponseParamMap.keySet().size() == 0 && currentResponseParamMap.keySet().size() == 0) {
+            return 100.0;
+        }
+
         Set<String> visited = new HashSet<>();
         int matched = 0;
         for (String k1: originalResponseParamMap.keySet()) {
-            if (visited.contains(k1)) continue;
+            if (visited.contains(k1) || comparisonExcludedKeys.containsKey(k1)) continue;
             visited.add(k1);
             Set<String> v1 = originalResponseParamMap.get(k1);
             Set<String> v2 = currentResponseParamMap.get(k1);
@@ -107,7 +115,7 @@ public abstract class TestPlugin {
         }
 
         for (String k1: currentResponseParamMap.keySet()) {
-            if (visited.contains(k1)) continue;
+            if (visited.contains(k1) || comparisonExcludedKeys.containsKey(k1)) continue;
             visited.add(k1);
             Set<String> v1 = originalResponseParamMap.get(k1);
             Set<String> v2 = currentResponseParamMap.get(k1);
@@ -318,25 +326,130 @@ public abstract class TestPlugin {
         return undocumentedMethods;
     }
 
-    public ApiExecutionDetails executeApiAndReturnDetails(OriginalHttpRequest testRequest, boolean followRedirects, OriginalHttpResponse originalHttpResponse) throws Exception {
+    public ApiExecutionDetails executeApiAndReturnDetails(OriginalHttpRequest testRequest, boolean followRedirects, RawApi rawApi) throws Exception {
         OriginalHttpResponse testResponse = ApiExecutor.sendRequest(testRequest, followRedirects);;
 
-        int statusCode = StatusCodeAnalyser.getStatusCode(testResponse.getBody(), testResponse.getStatusCode());
-        double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), testResponse.getBody());
+        OriginalHttpRequest originalHttpRequest = rawApi.getRequest().copy();
+        OriginalHttpResponse originalHttpResponse = rawApi.getResponse().copy();
 
-        return new ApiExecutionDetails(statusCode, percentageMatch, testResponse);
+        int statusCode = StatusCodeAnalyser.getStatusCode(testResponse.getBody(), testResponse.getStatusCode());
+        PercentageMatchRequest percentMatchReq = getPercentageMatchRequest(originalHttpRequest, 2, followRedirects, originalHttpResponse);
+        double percentageMatch = compareWithOriginalResponse(percentMatchReq.getResponse().getBody(), testResponse.getBody(), percentMatchReq.getExcludedKeys());
+
+        String originalMessage = rawApi.getOriginalMessage();
+
+        Map<String, Object> json = gson.fromJson(originalMessage, Map.class);
+        if (percentMatchReq.getResponse() != null) {
+            json.put("responsePayload", percentMatchReq.getResponse().getBody());
+            try {
+                JSONObject headers = new JSONObject();
+                for (String headerName: percentMatchReq.getResponse().getHeaders().keySet()) {
+                    List<String> headerValues = percentMatchReq.getResponse().getHeaders().get(headerName);
+                    String val =  String.join(";", headerValues);
+                    headers.put(headerName, val);
+                }
+                String responseHeaders = headers.toString();
+                json.put("responseHeaders", responseHeaders);
+            } catch (Exception e) {
+                logger.error("response exracting response header from percent match req");
+            }
+            originalMessage = gson.toJson(json);
+            rawApi.setOriginalMessage(originalMessage);
+        }
+
+        return new ApiExecutionDetails(statusCode, percentageMatch, testResponse, percentMatchReq.getResponse(), originalMessage);
     }
 
+    private PercentageMatchRequest getPercentageMatchRequest(OriginalHttpRequest request, int replayCount, boolean followRedirects, OriginalHttpResponse originalHttpResponse) throws Exception {
+
+        Map<String, Boolean> comparisonExcludedKeys = new HashMap<>();
+        PercentageMatchRequest percentMatchReq = new PercentageMatchRequest(originalHttpResponse, comparisonExcludedKeys);        
+        
+        SampleRequestReplayResponse sampleReplayResp = replaySampleReq(request, replayCount, followRedirects, originalHttpResponse);
+        ArrayList<OriginalHttpResponse> replayedResponses = sampleReplayResp.getReplayedResponses();
+        if (replayedResponses.size() < 2) {
+            return percentMatchReq;
+        }
+
+        comparisonExcludedKeys = getComparisonExcludedKeys(sampleReplayResp, sampleReplayResp.getReplayedResponseMap());
+        percentMatchReq.setExcludedKeys(comparisonExcludedKeys);
+        percentMatchReq.setResponse(replayedResponses.get(replayedResponses.size() - 1));
+
+        return percentMatchReq; 
+     }
+
+    public static Map<String, Boolean> getComparisonExcludedKeys(SampleRequestReplayResponse sampleReplayResp, ArrayList<Map<String, Set<String>>> replayedResponseMap) {
+
+        Map<String, Boolean> comparisonExcludedKeys = new HashMap<>();
+        Set<String> keys = new HashSet<>();
+        for (String k1: replayedResponseMap.get(0).keySet()) {
+            keys.add(k1);
+        }
+
+        for (String key : keys) {
+            Set<Set<String>> data = new HashSet<>();
+            for (int i = 0; i < replayedResponseMap.size(); i++) {
+                Set<String> v1 = replayedResponseMap.get(i).get(key);
+                if (v1 == null) {
+                    break;
+                }
+                data.add(v1);
+            }
+            if (data.size() > 1) {
+                comparisonExcludedKeys.put(key, true);
+            }
+        }
+
+        return comparisonExcludedKeys;
+    }
+    
+    private SampleRequestReplayResponse replaySampleReq(OriginalHttpRequest testRequest, int replayCount, boolean followRedirects, OriginalHttpResponse originalHttpResponse) throws Exception {
+        
+        OriginalHttpResponse replayedResponse;
+        ArrayList<OriginalHttpResponse> replayedResponses = new ArrayList<>();
+        ArrayList<Map<String, Set<String>>> replayedResponseMap = new ArrayList<>();
+        
+        SampleRequestReplayResponse sampleReplayResp = new SampleRequestReplayResponse();
+        
+        for (int i = 0; i < replayCount; i++) {
+            try {
+                replayedResponse = ApiExecutor.sendRequest(testRequest, followRedirects);
+            } catch (Exception e) {
+                logger.error("request replay failed with error " + e.getMessage());
+                continue;
+            }
+            int replayedStatusCode = StatusCodeAnalyser.getStatusCode(replayedResponse.getBody(), replayedResponse.getStatusCode());
+            int originalStatusCode = StatusCodeAnalyser.getStatusCode(originalHttpResponse.getBody(), originalHttpResponse.getStatusCode());
+            if (replayedStatusCode == originalStatusCode) {
+                try {
+                    Map<String, Set<String>> originalResponseParamMap = new HashMap<>();
+                    extractAllValuesFromPayload(replayedResponse.getBody(), originalResponseParamMap);
+                    replayedResponseMap.add(originalResponseParamMap);
+                    replayedResponses.add(replayedResponse);
+                } catch (Exception e) {
+                    continue;
+                }
+            }
+        }
+
+        sampleReplayResp.setReplayedResponseMap(replayedResponseMap);
+        sampleReplayResp.setReplayedResponses(replayedResponses);
+        return sampleReplayResp;
+    }
 
     public static class ApiExecutionDetails {
         public int statusCode;
         public double percentageMatch;
         public OriginalHttpResponse testResponse;
+        public OriginalHttpResponse baseResponse;
+        public String originalReqResp;
 
-        public ApiExecutionDetails(int statusCode, double percentageMatch, OriginalHttpResponse testResponse) {
+        public ApiExecutionDetails(int statusCode, double percentageMatch, OriginalHttpResponse testResponse, OriginalHttpResponse baseResponse, String originalReqResp) {
             this.statusCode = statusCode;
             this.percentageMatch = percentageMatch;
             this.testResponse = testResponse;
+            this.baseResponse = baseResponse;
+            this.originalReqResp = originalReqResp;
         }
     }
 
