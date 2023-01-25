@@ -159,7 +159,7 @@ public class TestExecutor {
         for (Future<List<TestingRunResult>> future: futureTestingRunResults) {
             if (!future.isDone()) continue;
             try {
-                if (future.get().size() != 0) {
+                if (!future.get().isEmpty()) {
                     testingRunResults.addAll(future.get());
                 }
             } catch (InterruptedException | ExecutionException e) {
