@@ -19,6 +19,8 @@ public class TestingRun {
     private TestingEndpoints testingEndpoints;
     private int testIdConfig;
     private int periodInSeconds;
+    private int testRunTime;
+    private int maxConcurrentRequests;
 
     @BsonIgnore
     private String hexId;
@@ -31,6 +33,21 @@ public class TestingRun {
 
     public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name) {
         this.scheduleTimestamp = scheduleTimestamp;
+        this.testRunTime = -1;
+        this.maxConcurrentRequests = -1;
+        this.endTimestamp = -1;
+        this.pickedUpTimestamp = -1;
+        this.userEmail = userEmail;
+        this.testingEndpoints = testingEndpoints;
+        this.testIdConfig = testIdConfig;
+        this.state = state;
+        this.periodInSeconds = periodInSeconds;
+        this.name = name;
+    }
+    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, int testRunTime, int maxConcurrentRequests) {
+        this.scheduleTimestamp = scheduleTimestamp;
+        this.testRunTime = testRunTime;
+        this.maxConcurrentRequests = maxConcurrentRequests;
         this.endTimestamp = -1;
         this.pickedUpTimestamp = -1;
         this.userEmail = userEmail;
@@ -47,6 +64,22 @@ public class TestingRun {
 
     public void setTestingRunConfig(TestingRunConfig testingRunConfig) {
         this.testingRunConfig = testingRunConfig;
+    }
+
+    public int getTestRunTime() {
+        return testRunTime;
+    }
+
+    public void setTestRunTime(int testRunTime) {
+        this.testRunTime = testRunTime;
+    }
+
+    public int getMaxConcurrentRequests() {
+        return maxConcurrentRequests;
+    }
+
+    public void setMaxConcurrentRequests(int maxConcurrentRequests) {
+        this.maxConcurrentRequests = maxConcurrentRequests;
     }
 
     // if u r adding anything here make sure to add to stopAllTests() method too

@@ -235,7 +235,7 @@ export default {
                 endpoint: runResult.apiInfoKey.method + " " + runResult.apiInfoKey.url,
                 severity: runResult["vulnerable"] ? "HIGH" : null,
                 testSubType: this.subCatogoryMap[runResult.testSubType].testName,
-                testSuperType: this.subCatogoryMap[runResult.testSubType].superCategory.displayName
+                testSuperType: this.subCatogoryMap[runResult.testSubType].superCategory.shortName
             }
         },
         async openDetails(row) {

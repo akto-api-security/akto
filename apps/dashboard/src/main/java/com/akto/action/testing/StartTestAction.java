@@ -35,6 +35,8 @@ public class StartTestAction extends UserAction {
     private int testIdConfig;
     private int workflowTestId;
     private int startTimestamp;
+    private int testRunTime;
+    private int maxConcurrentRequests;
     boolean recurringDaily;
     private List<TestingRun> testingRuns;
     private AuthMechanism authMechanism;
@@ -82,7 +84,7 @@ public class StartTestAction extends UserAction {
         }
 
         return new TestingRun(scheduleTimestamp, user.getLogin(),
-                testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName);
+                testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName, this.testRunTime, this.maxConcurrentRequests);
     }
     private List<String> selectedTests;
 
@@ -338,5 +340,21 @@ public class StartTestAction extends UserAction {
 
     public void setTestName(String testName) {
         this.testName = testName;
+    }
+
+    public int getTestRunTime() {
+        return testRunTime;
+    }
+
+    public void setTestRunTime(int testRunTime) {
+        this.testRunTime = testRunTime;
+    }
+
+    public int getMaxConcurrentRequests() {
+        return maxConcurrentRequests;
+    }
+
+    public void setMaxConcurrentRequests(int maxConcurrentRequests) {
+        this.maxConcurrentRequests = maxConcurrentRequests;
     }
 }

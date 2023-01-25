@@ -46,7 +46,8 @@
                                             <v-col class="my-0 mr-0 ml-7 pa-0">
                                                 <v-chip :style="{ 'height': '24px !important' }" color="#47466AB2"
                                                     class="issue-summary mr-2" text-color="#FFFFFF"
-                                                    v-for="chipItem in subCatogoryMap[issuesDetails.id.testSubCategory].issueTags">
+                                                    :key="index"
+                                                    v-for="(chipItem, index) in subCatogoryMap[issuesDetails.id.testSubCategory].issueTags">
                                                     {{ chipItem.name }}
                                                 </v-chip>
                                             </v-col>
