@@ -12,6 +12,7 @@ import com.akto.store.TestingUtil;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 public class BFLATest extends AuthRequiredRunAllTestPlugin {
 
@@ -22,7 +23,6 @@ public class BFLATest extends AuthRequiredRunAllTestPlugin {
         normalUserTestRole.setAuthMechanism(testingUtil.getAuthMechanism());
         testRoleMatcher.enemies.add(normalUserTestRole);
 
-        OriginalHttpResponse originalHttpResponse = rawApi.getResponse().copy();
         List<ExecutorResult> executorResults = new ArrayList<>();
 
         for (TestRoles testRoles: testRoleMatcher.enemies) {
@@ -34,8 +34,9 @@ public class BFLATest extends AuthRequiredRunAllTestPlugin {
             );
 
             ApiExecutionDetails apiExecutionDetails;
+            RawApi rawApiDuplicate = rawApi.copy();
             try {
-                apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, originalHttpResponse);
+                apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApiDuplicate);
             } catch (Exception e) {
                 return Collections.singletonList(new ExecutorResult(false, null, new ArrayList<>(), 0, rawApi,
                         TestResult.TestError.API_REQUEST_FAILED, testRequest, null, bflaTestInfo));
@@ -45,7 +46,7 @@ public class BFLATest extends AuthRequiredRunAllTestPlugin {
             TestResult.Confidence confidence = vulnerable ? TestResult.Confidence.HIGH : TestResult.Confidence.LOW;
 
             ExecutorResult executorResult = new ExecutorResult(vulnerable,confidence, null, apiExecutionDetails.percentageMatch,
-                    rawApi, null, testRequest, apiExecutionDetails.testResponse, bflaTestInfo);
+            rawApiDuplicate, null, testRequest, apiExecutionDetails.testResponse, bflaTestInfo);
 
             executorResults.add(executorResult);
         }

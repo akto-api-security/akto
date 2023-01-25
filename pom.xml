@@ -93,6 +93,9 @@
 					</execution>
 				</executions>
 				<configuration>
+                    <excludes>
+                        <exclude>Akto.jar</exclude>
+                    </excludes>
                     <destFile>${jacoco.reportPath}</destFile>
                     <dataFile>${jacoco.reportPath}</dataFile>
                     <append>true</append>

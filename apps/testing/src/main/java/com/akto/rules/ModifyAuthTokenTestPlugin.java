@@ -20,7 +20,6 @@ public abstract class ModifyAuthTokenTestPlugin extends AuthRequiredTestPlugin {
         RawApi rawApi = filteredMessages.get(0).copy();
 
         OriginalHttpRequest testRequest = rawApi.getRequest();
-        OriginalHttpResponse originalHttpResponse = rawApi.getResponse();
 
         Map<String, List<String>> modifiedHeaders = modifyHeaders(testRequest.getHeaders());
         if (modifiedHeaders == null || modifiedHeaders.isEmpty()) return null;
@@ -28,7 +27,7 @@ public abstract class ModifyAuthTokenTestPlugin extends AuthRequiredTestPlugin {
 
         ApiExecutionDetails apiExecutionDetails;
         try {
-            apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, originalHttpResponse);
+            apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApi);
         } catch (Exception e) {
             return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest, null);
         }
@@ -36,7 +35,7 @@ public abstract class ModifyAuthTokenTestPlugin extends AuthRequiredTestPlugin {
         boolean vulnerable = isStatusGood(apiExecutionDetails.statusCode);
 
         TestResult testResult = buildTestResult(
-                testRequest, apiExecutionDetails.testResponse, rawApi.getOriginalMessage(), apiExecutionDetails.percentageMatch, vulnerable, null
+                testRequest, apiExecutionDetails.testResponse, apiExecutionDetails.originalReqResp, apiExecutionDetails.percentageMatch, vulnerable, null
         );
 
         return addTestSuccessResult(

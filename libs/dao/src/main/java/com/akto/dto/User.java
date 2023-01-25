@@ -13,6 +13,8 @@ public class User {
     private String login;
     private int id;
     private List<String> refreshTokens;
+    public static final String LAST_LOGIN_TS = "lastLoginTs";
+    private int lastLoginTs;
 
     private Map<String, UserAccountEntry> accounts;
 
@@ -95,5 +97,13 @@ public class User {
 
     public void setRefreshTokens(List<String> refreshTokens) {
         this.refreshTokens = refreshTokens;
+    }
+
+    public int getLastLoginTs() {
+        return lastLoginTs;
+    }
+
+    public void setLastLoginTs(int lastLoginTs) {
+        this.lastLoginTs = lastLoginTs;
     }
 }

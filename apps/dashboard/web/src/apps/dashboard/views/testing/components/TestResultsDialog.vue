@@ -11,7 +11,7 @@
                 <layout-with-tabs :tabsContent="getTabsContent()" title=""
                     :tabs="['Description', 'Original', 'Attempt']" ref="layoutWithTabs">
                     <template slot="Description">
-                        <div class="description-title mt-4" :style="{'height':'500px'}"
+                        <div class="description-title mt-4" :style="{ 'height': '500px' }"
                             v-if="issuesDetails === undefined || issuesDetails === null || Object.keys(issuesDetails).length === 0">
                             No vulnerabilities exists
                         </div>
@@ -74,7 +74,8 @@
                                 <table :style="{ 'width': '100%' }" class="mt-3 mb-3">
                                     <tr class="table-row" v-for="(item, index) in similarlyAffectedIssues" :key="index">
                                         <td class="table-column clickable">
-                                            <span class="description-content mr-1 ml-3">{{item.id.apiInfoKey.method}}</span>
+                                            <span
+                                                class="description-content mr-1 ml-3">{{ item.id.apiInfoKey.method }}</span>
                                             <span class="description-content">{{ item.id.apiInfoKey.url }}</span>
                                         </td>
                                     </tr>
@@ -86,7 +87,9 @@
                                 <ul class="mt-3">
                                     <li class="description-content mt-2 "
                                         v-for="item in subCatogoryMap[issuesDetails.id.testSubCategory].references">
-                                        <span ><a :href="item" target="_blank" class="clickable-line">{{ item }}</a></span>
+                                        <span><a :href="item" target="_blank" class="clickable-line">{{
+                                            item
+                                        }}</a></span>
                                     </li>
                                 </ul>
                             </div>
@@ -99,7 +102,7 @@
                         </div>
                     </template>
                     <template slot="Attempt" v-if="jsonAdvance && jsonAdvance['message']">
-                        <div>
+                        <div :style="{ 'height': '500px' }">
                             <div v-if="jsonBasic['errors']" class="test-errors-class">
                                 {{ this.jsonBasic["errors"] }}
                             </div>
@@ -142,36 +145,11 @@ export default {
         isTestingPage: obj.boolN
     },
     data() {
-        var issueSummaryTable = [
-                    {
-                        title: 'Issue category',
-                        description: this.subCatogoryMap[this.issuesDetails.id.testSubCategory].superCategory.displayName
-                    },
-                    {
-                        title: 'Test run',
-                        description: this.subCatogoryMap[this.issuesDetails.id.testSubCategory].testName
-                    },
-                    {
-                        title: 'Severity',
-                        description: this.subCatogoryMap[this.issuesDetails.id.testSubCategory].superCategory.severity._name
-                    },
-                    {
-                        title: 'Endpoint',
-                        description: {
-                            method: this.issuesDetails.id.apiInfoKey.method,
-                            url: this.issuesDetails.id.apiInfoKey.url
-                        }
-                    },
-                    {
-                        title: 'Collection',
-                        description: this.mapCollectionIdToName[this.issuesDetails.id.apiInfoKey.apiCollectionId]
-                    }
-                ]
         return {
             currentIndex: 0,
-            issueSummaryTable
-            }
-        },
+            issueSummaryTable: []
+        }
+    },
     methods: {
         getTabsContent() {
             if (this.messagesBasic.length > 1) {
@@ -209,31 +187,33 @@ export default {
             this.issueSummaryTable[4].description = newValue[this.issuesDetails.id.apiInfoKey.apiCollectionId]
         },
         issuesDetails(issuesDetails) {
-            this.issueSummaryTable = [
-                {
-                    title: 'Issue category',
-                    description: this.subCatogoryMap[issuesDetails.id.testSubCategory].superCategory.displayName
-                },
-                {
-                    title: 'Test run',
-                    description: this.subCatogoryMap[issuesDetails.id.testSubCategory].testName
-                },
-                {
-                    title: 'Severity',
-                    description: this.subCatogoryMap[issuesDetails.id.testSubCategory].superCategory.severity._name
-                },
-                {
-                    title: 'Endpoint',
-                    description: {
-                        method: issuesDetails.id.apiInfoKey.method,
-                        url: issuesDetails.id.apiInfoKey.url
+            if (issuesDetails) {
+                this.issueSummaryTable = [
+                    {
+                        title: 'Issue category',
+                        description: this.subCatogoryMap[issuesDetails.id.testSubCategory].superCategory.displayName
+                    },
+                    {
+                        title: 'Test run',
+                        description: this.subCatogoryMap[issuesDetails.id.testSubCategory].testName
+                    },
+                    {
+                        title: 'Severity',
+                        description: this.subCatogoryMap[issuesDetails.id.testSubCategory].superCategory.severity._name
+                    },
+                    {
+                        title: 'Endpoint',
+                        description: {
+                            method: issuesDetails.id.apiInfoKey.method,
+                            url: issuesDetails.id.apiInfoKey.url
+                        }
+                    },
+                    {
+                        title: 'Collection',
+                        description: this.mapCollectionIdToName[issuesDetails.id.apiInfoKey.apiCollectionId]
                     }
-                },
-                {
-                    title: 'Collection',
-                    description: this.mapCollectionIdToName[issuesDetails.id.apiInfoKey.apiCollectionId]
-                }
-            ]
+                ]
+            }
         }
     },
     computed: {
@@ -322,5 +302,4 @@ export default {
     border-color: #DADAE1;
     border-style: solid;
 }
-
 </style>

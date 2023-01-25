@@ -40,30 +40,94 @@ public class TestTestPlugin extends MongoBasedTest {
 //        {"name": "Ankush", "age": 100, "friends": [{"name": "Avneesh", "stud": true}, {"name": "ankita", "stud": true}], "jobs": ["MS", "CT"]}
         String originalPayload = "{\"name\": \"Ankush\", \"age\": 100, \"friends\": [{\"name\": \"Avneesh\", \"stud\": true}, {\"name\": \"ankita\", \"stud\": true}], \"jobs\": [\"MS\", \"CT\"]}";
         String currentPayload = "{\"name\": \"Vian\", \"age\": 1, \"friends\": [{\"name\": \"Avneesh\", \"stud\": true}, {\"name\": \"Ankita\", \"stud\": true}, {\"name\": \"Ankush\", \"stud\": true}], \"jobs\": []}";
-        double val = TestPlugin.compareWithOriginalResponse(originalPayload, currentPayload);
+        double val = TestPlugin.compareWithOriginalResponse(originalPayload, currentPayload, new HashMap<>());
         assertEquals(val,20.0, 0.0);
 
         // {"nestedObject": {"keyA":{"keyB":"B", "keyC": ["A", "B"]}}}
         originalPayload = "{\"nestedObject\": {\"keyA\":{\"keyB\":\"B\", \"keyC\": [\"A\", \"B\"]}}}";
         currentPayload = "{\"nestedObject\": {\"keyA\":{\"keyB\":\"B\", \"keyC\": [\"A\"]}}}";
-        val = TestPlugin.compareWithOriginalResponse(originalPayload, currentPayload);
+        val = TestPlugin.compareWithOriginalResponse(originalPayload, currentPayload, new HashMap<>());
         assertEquals(val,50.0, 0.0);
 
         // [{"name": "A", "age": 10},{"name": "B", "age": 10},{"name": "C", "age": 10}]
         originalPayload = "[{\"name\": \"A\", \"age\": 10},{\"name\": \"B\", \"age\": 10},{\"name\": \"C\", \"age\": 10}]";
         currentPayload = "[{\"name\": \"B\", \"age\": 10},{\"name\": \"B\", \"age\": 10},{\"name\": \"C\", \"age\": 10}]";
-        val = TestPlugin.compareWithOriginalResponse(originalPayload, currentPayload);
+        val = TestPlugin.compareWithOriginalResponse(originalPayload, currentPayload, new HashMap<>());
         assertEquals(val,50.0, 0.0);
 
         originalPayload = "{}";
         currentPayload = "{}";
-        val = TestPlugin.compareWithOriginalResponse(originalPayload, currentPayload);
+        val = TestPlugin.compareWithOriginalResponse(originalPayload, currentPayload, new HashMap<>());
         assertEquals(val,100.0, 100.0);
 
         originalPayload = "{\"user\":{}}";
         currentPayload = "{\"user\":{}}";
-        val = TestPlugin.compareWithOriginalResponse(originalPayload, currentPayload);
+        val = TestPlugin.compareWithOriginalResponse(originalPayload, currentPayload, new HashMap<>());
         assertEquals(val,100.0, 100.0);
+    }
+
+    @Test
+    public void testCompareWithExcludedKeys() {
+//        {"name": "Ankush", "age": 100, "friends": [{"name": "Avneesh", "stud": true}, {"name": "ankita", "stud": true}], "jobs": ["MS", "CT"]}
+        String originalPayload = "{\"name\": \"Ankush\", \"age\": 100, \"friends\": [{\"name\": \"Avneesh\", \"stud\": true}, {\"name\": \"ankita\", \"stud\": true}], \"jobs\": [\"MS\", \"CT\"]}";
+        String currentPayload = "{\"name\": \"Vian\", \"age\": 1, \"friends\": [{\"name\": \"Avneesh\", \"stud\": true}, {\"name\": \"Ankita\", \"stud\": true}, {\"name\": \"Ankush\", \"stud\": true}], \"jobs\": []}";
+        Map<String, Boolean> excludedKeys = new HashMap<>();
+        excludedKeys.put("friends#$#name", true);
+        excludedKeys.put("name", true);
+        double val = TestPlugin.compareWithOriginalResponse(originalPayload, currentPayload, excludedKeys);
+        assertEquals(val,33.3, 0.04);
+    }
+
+    @Test
+    public void testGetExcludedKeys() {
+        ArrayList<OriginalHttpResponse> replayedResponses = new ArrayList<>();
+        ArrayList<Map<String, Set<String>>> replayedResponseMap = new ArrayList<>();
+        String originalPayload1 = "{\"name\": \"Ankush\", \"age\": 100, \"friends\": [{\"name\": \"Avneesh\", \"stud\": true}, {\"name\": \"ankita\", \"stud\": true}], \"jobs\": [\"MS\", \"CT\"]}";
+        String originalPayload2 = "{\"name\": \"Ankush\", \"age\": 101, \"friends\": [{\"name\": \"Avneesh\", \"stud\": false}, {\"name\": \"ankita\", \"stud\": true}]}";
+
+        Map<String, Set<String>> originalResponseParamMap1 = new HashMap<>();
+        Map<String, Set<String>> originalResponseParamMap2 = new HashMap<>();
+        try {
+            TestPlugin.extractAllValuesFromPayload(originalPayload1, originalResponseParamMap1);
+            TestPlugin.extractAllValuesFromPayload(originalPayload2, originalResponseParamMap2);
+        } catch(Exception e) {
+            fail("Unexpected Exception " + e.getMessage());
+        }
+        replayedResponseMap.add(originalResponseParamMap1);
+        replayedResponseMap.add(originalResponseParamMap2);
+        replayedResponses.add(new OriginalHttpResponse(originalPayload1, new HashMap<>(), 200));
+        replayedResponses.add(new OriginalHttpResponse(originalPayload2, new HashMap<>(), 200));
+        SampleRequestReplayResponse sampleReplayResp = new SampleRequestReplayResponse();
+        sampleReplayResp.setReplayedResponseMap(replayedResponseMap);
+        sampleReplayResp.setReplayedResponses(replayedResponses);
+        Map<String, Boolean> comparisonExcludedKeys = TestPlugin.getComparisonExcludedKeys(sampleReplayResp, sampleReplayResp.getReplayedResponseMap());
+        assertEquals(comparisonExcludedKeys.size(), 2);
+    }
+
+    @Test
+    public void testGetExcludedKeysOrderChanged() {
+        ArrayList<OriginalHttpResponse> replayedResponses = new ArrayList<>();
+        ArrayList<Map<String, Set<String>>> replayedResponseMap = new ArrayList<>();
+        String originalPayload1 = "{\"name\": \"Ankush\", \"age\": 100, \"friends\": [{\"name\": \"ankita\", \"stud\": true}, {\"name\": \"Avneesh\", \"stud\": true}], \"jobs\": [\"MS\", \"CT\"]}";
+        String originalPayload2 = "{\"name\": \"Ankush\", \"age\": 101, \"friends\": [{\"name\": \"Avneesh\", \"stud\": false}, {\"name\": \"ankita\", \"stud\": true}]}";
+
+        Map<String, Set<String>> originalResponseParamMap1 = new HashMap<>();
+        Map<String, Set<String>> originalResponseParamMap2 = new HashMap<>();
+        try {
+            TestPlugin.extractAllValuesFromPayload(originalPayload1, originalResponseParamMap1);
+            TestPlugin.extractAllValuesFromPayload(originalPayload2, originalResponseParamMap2);
+        } catch(Exception e) {
+            fail("Unexpected Exception " + e.getMessage());
+        }
+        replayedResponseMap.add(originalResponseParamMap1);
+        replayedResponseMap.add(originalResponseParamMap2);
+        replayedResponses.add(new OriginalHttpResponse(originalPayload1, new HashMap<>(), 200));
+        replayedResponses.add(new OriginalHttpResponse(originalPayload2, new HashMap<>(), 200));
+        SampleRequestReplayResponse sampleReplayResp = new SampleRequestReplayResponse();
+        sampleReplayResp.setReplayedResponseMap(replayedResponseMap);
+        sampleReplayResp.setReplayedResponses(replayedResponses);
+        Map<String, Boolean> comparisonExcludedKeys = TestPlugin.getComparisonExcludedKeys(sampleReplayResp, sampleReplayResp.getReplayedResponseMap());
+        assertEquals(comparisonExcludedKeys.size(), 2);
     }
 
     @Test
