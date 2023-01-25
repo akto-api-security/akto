@@ -1,5 +1,5 @@
 <template>
-    <div>        
+    <div class="tableContainer" @click="selectTable">        
         <v-data-table
             :headers="headers"
             :items="filteredItems"
@@ -50,7 +50,7 @@
                                 <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.value]"> 
                                     <template v-slot:activator="{ on, attrs }">
                                         <v-btn class = "showButtons" v-bind = "attrs" v-on = "on">
-                                            <span class="filterHeaderSpan">
+                                            <span class="filterHeaderSpan" :style="filters[header.value].size > 0 ? {'color': '#6200EA'} : {'color':'#47466A'}" >
                                                 {{header.text}}
                                                 <v-icon :size="14">$fas_angle-down</v-icon>
                                             </span>
@@ -133,11 +133,10 @@
                             @update:options="updateOptions"
                             prevIcon= '$fas_angle-left'
                             nextIcon= '$fas_angle-right'
-                            show-current-page
                         />
 
                         <div class="d-flex board-table-cards jc-end">
-                            <div class="clickable download-csv ma-1">
+                            <div class="clickable download-csv">
                                 <v-tooltip bottom>
                                     <template v-slot:activator="{on, attrs}">
                                         <v-btn 
@@ -151,7 +150,9 @@
                                     Download as CSV
                                 </v-tooltip>
                             </div>
-                            <slot name="add-new-row-btn" :filteredItems=filteredItems />
+                            <div>
+                                <slot name="add-new-row-btn" :filteredItems=filteredItems />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -188,7 +189,7 @@
             <template v-slot:item="{item}">
                 <tr class="table-row" 
                     @click="rowSelected(item)"
-                    :class="currentRow.indexOf(item) > -1 ? 'grey' : ''"
+                    :class="currentRow === item ? 'grey' : ''"
                 >
                     <td
                         class="table-column high-dense"
@@ -254,10 +255,11 @@ export default {
     data () {
         return {
             pageNum:1,
+            activeButton:false,
             initialDisplayedItems:[],
             selectedHeaders: [],
-            currentRow: [],
-            itemsPerPage: 20,
+            currentRow: {},
+            itemsPerPage: 15,
             itemsPerPageArray:[5,10,15,20,25,30,-1],
             search: null,
             sortKey: this.sortKeyDefault || null,
@@ -286,6 +288,9 @@ export default {
         }
     },
     methods: {
+        selectTable(){
+            this.$store.state.globalUid = this._uid
+        },
         storeCurrentItems(items){
             this.initialDisplayedItems = items
         },
@@ -294,70 +299,91 @@ export default {
             this.$emit('rowClicked',this.initialDisplayedItems[index])
         },
         moveRowsOnKeys(event){
-            if(event.keyCode === 40){
-                if(this.currentRow.length > 0)
-                {
-                    var index = this.initialDisplayedItems.indexOf(this.currentRow[0])
-                    var n = this.initialDisplayedItems.length - 1
-                    if(index === n){
-                        this.pageNum++
-                        this.selectRow(0)
-                    }
-
-                    else{
-                        index++
-                        this.selectRow(index)
-                    }
-                }
-                else{
-                    this.selectRow(0)
-                }
+            if(this.$store.state.globalUid !== this._uid){
+                // console.log("return")
+                return 
             }
 
-            else if(event.keyCode === 38){
-                if(this.currentRow.length > 0)
-                {
-                    var index = this.initialDisplayedItems.indexOf(this.currentRow[0])
-                    if(index === 0){
-                        if(this.pageNum > 1){
-                            this.pageNum--
-                            this.selectRow((this.initialDisplayedItems.length - 1))
-                        }
-                    }
-                    else{
-                        if(index === -1){
-                            this.selectRow((this.initialDisplayedItems.length - 1))
-                        }
-
-                        else{
-                            index--
-                            this.selectRow(index)
-                        }
-                    }
-                }
-
-                else{
-                    this.selectRow(0)
-                }
+            if(event.keyCode < 37 || event.keyCode > 40){
+                // console.log('return')
+                return
             }
+            
+            switch(event.keyCode){
+                case 37:
+                    this.moveLeft()
+                    break
 
-            else if(event.keyCode === 39){
-                var totalPages = Math.ceil((this.filteredItems.length / this.itemsPerPage))
-                if(this.pageNum < totalPages){
-                    this.pageNum++
-                }
-            }
+                case 38:
+                    this.moveUp()
+                    break
 
-            else if(event.keyCode === 37){
-                var totalPages = Math.ceil((this.filteredItems.length / this.itemsPerPage))
-                if(this.pageNum > 1){
-                    this.pageNum--
-                }
+                case 39:
+                    this.moveRight()
+                    break
+
+                case 40:
+                    this.moveDown()
+                    break
             }
         },
         rowSelected(item){
-            this.currentRow = []
-            this.currentRow.push(item)
+            this.currentRow = {}
+            this.currentRow = item
+        },
+        moveDown(){
+            if(this.currentRow){
+                var index = this.initialDisplayedItems.indexOf(this.currentRow)
+                var n = this.initialDisplayedItems.length - 1
+                if(index === n){
+                    this.pageNum++
+                    this.currentRow = {}
+                }
+
+                else{
+                    index++
+                    this.selectRow(index)
+                }
+            }
+            else{
+                this.selectRow(0)
+            }
+        },
+        moveUp(){
+            if(this.currentRow){
+                var index = this.initialDisplayedItems.indexOf(this.currentRow)
+                if(index === 0){
+                    if(this.pageNum > 1){
+                        this.pageNum--
+                        this.currentRow = {}
+                    }
+                }
+                else{
+                    if(index === -1){
+                        this.selectRow((this.initialDisplayedItems.length - 1))
+                    }
+
+                    else{
+                        index--
+                        this.selectRow(index)
+                    }
+                }
+            }
+
+            else{
+                this.selectRow(0)
+            }
+        },
+        moveLeft(){
+            if(this.pageNum > 1){
+                this.pageNum--
+            }
+        },
+        moveRight(){
+            var totalPages = Math.ceil((this.filteredItems.length / this.itemsPerPage))
+            if(this.pageNum < totalPages){
+                this.pageNum++
+            }
         },
         updateItemsPerPage (value) {
             this.itemsPerPage = value
@@ -387,7 +413,6 @@ export default {
             return headerItems
 
         },
-
         selectAllHeaders({checked}){
             if(checked){
                 this.selectedHeaders = []
@@ -402,7 +427,6 @@ export default {
                 this.selectedHeaders = []
             }
         },
-
         pushIntoNew({item , checked}){
             if(checked){
                 this.selectedHeaders.push({text:item.title,value:item.value})
@@ -431,7 +455,6 @@ export default {
                 }
             }
             this.filters = {...this.filters}
-
         },
         appliedFilter (hValue, {item, checked, operator}) { 
             this.filterOperators[hValue] = operator || 'OR'
@@ -535,8 +558,11 @@ export default {
     mounted() {
         window.addEventListener('keydown',this.moveRowsOnKeys,null)
     },
+    destroyed() {
+        window.removeEventListener('keydown',this.moveRowsOnKeys,null)
+        this.$store.state.globalUid = -1
+    },
     computed: {
-
         columnValueList: {
             get () {
                 return this.headers.reduce((m, h) => {
@@ -584,13 +610,12 @@ export default {
                 }
             }
         },
-        adjustHeight: function(){
+        adjustHeight(){
             var height = this.toggle_exclusive
-            
             return{
                 height: height + 'px'
             }
-        }
+        },
     },
 }
 </script>
@@ -631,6 +656,7 @@ export default {
 <style lang="sass" scoped>
 .board-table-cards
     padding-right: 24px
+    cursor: pointer
     .table-header
         vertical-align: bottom
         text-align: left
@@ -669,8 +695,6 @@ export default {
     .download-csv
         justify-content: end
         font-size: 12px
-        margin-top: 16px
-        align-items: center
         color: var(--v-themeColor-base)
         display: flex
 
@@ -686,9 +710,10 @@ export default {
 .showButtons
     box-sizing: border-box
     width: fit-content
-    background: #FFFFFF
+    background: #FFFFFF !important
     border: 1px solid #D0D5DD
     font-weight: 500
+    margin:0px 5px 5px 5px
     box-shadow: 0px 1px 2px rgba(16, 24, 40, 0.05)
 
 
@@ -711,7 +736,6 @@ export default {
     background: white
     opacity: 1
     font-size: 14px
-
 </style>
 
 <style scoped>
@@ -722,11 +746,10 @@ export default {
   font-weight: 400;
 }
 
-.headerContainer{
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
+.tableContainer{
+    margin-top: 20px;
 }
+
 
 .headerDiv{
     display: flex;
@@ -735,22 +758,28 @@ export default {
 
 .headerDiv:first-child{
     /* flex-direction: row-reverse; */
-    max-width: 680px;
+    max-width: 630px;
 }
 
 .headerDiv:last-child{
-    align-items: center;
     justify-content: flex-end;
 }
 
 .v-btn-toggle:not(.v-btn-toggle--dense) .v-btn.v-btn.v-size--default {
     height: 36px; 
 }
+
+.v-btn:not(.v-btn--round).v-size--default {
+    margin: 0 5px 5px 5px;
+}
 .v-btn-toggle .v-btn.v-btn.v-size--default {
     min-width: 0px;
     min-height: 0;
 }
 
+.theme--light.v-btn-toggle:not(.v-btn-toggle--group) .v-btn.v-btn .v-icon {
+    color: #47466A;
+}
 .filterHeaderSpan{
     min-width: 67px;
     height: 16px;
@@ -777,11 +806,31 @@ export default {
 }
 
 .board-table-cards >>> .v-data-footer__select {
-    display: none;
+    display: none !important;
 }
 
-.board-table-cards >>> .v-data-footer__pagination{
-    display: none;
+.board-table-cards >>> .v-data-footer__pagination {
+    height: 24px;
+    margin: 0 5px 0 5px;
+    line-height: 2;
+    font-size: 0.8rem;
+    order: 1;
+}
+
+.board-table-cards >>> .v-data-footer{
+    border: thin solid rgba(0,0,0,.12);
+    height: 36px;
+}
+
+.board-table-cards >>> .v-data-footer__icons-after {
+    order: 2;
+}
+
+
+.board-table-cards >>> .headerContainer{
+    display: flex ;
+    flex-direction: row ;
+    justify-content: space-between ;
 }
 
 </style>

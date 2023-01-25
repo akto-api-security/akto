@@ -27,12 +27,6 @@
             <div class="testing-results-header" v-if="currentTest">
                 <span>Test results: </span>    
                 <span>{{selectedDateStr()}}</span>
-                <span class="button-toggle">
-                    <v-btn @click="showPopUp = !showPopUp">
-                        <span v-if="showPopUp">Show details below Table</span>
-                        <span v-else>Show details as Pop Up</span>
-                    </v-btn>
-                </span>
             </div>                  
             <simple-table
                 :headers="testingRunResultsHeaders" 
@@ -52,7 +46,7 @@
             
             </simple-table>
 
-            <v-dialog v-model="openDetailsDialog" v-if="showPopUp">
+            <v-dialog v-model="openDetailsDialog" v-if="!showBelow">
                 <div class="details-dialogBox">
                     <a-card
                         title="Test Details"
@@ -83,7 +77,7 @@
                 </div>
             </v-dialog>
 
-            <div v-if="openDetailsDialog && !showPopUp">
+            <div v-if="openDetailsDialog && showBelow">
                 <div class="details-dialog">
                     <a-card
                         title="Test Details"
@@ -143,7 +137,8 @@ export default {
     props: {
         testingRunHexId: obj.strR,
         defaultStartTimestamp: obj.numN,
-        defaultEndTimestamp: obj.numN
+        defaultEndTimestamp: obj.numN,
+        showBelow:obj.boolN
     },
     components: {
         DateRange,
@@ -192,7 +187,7 @@ export default {
             ],
             testingRunResult: null,
             openDetailsDialog: false,
-            showPopUp:false,
+            showBelow:false,
             isWorkflow: false,
             originalStateFromDb: null,
             dialogBoxIssue: {},
