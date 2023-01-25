@@ -17,6 +17,7 @@ public class TestSourceConfig {
 
     private String creator;
     public static final String CREATOR = "creator";
+    public static final String DEFAULT = "default";
 
     private int addedEpoch;
     private int stars;

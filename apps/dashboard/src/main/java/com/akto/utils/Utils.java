@@ -135,11 +135,19 @@ public class Utils {
                 url += urlObj.get("protocol").asText();
                 url += "://";
             }
-            url += host;
+            if(host.endsWith("/")){
+                url += host.substring(0, host.length()-1);
+            }
+            else{
+                url += host;
+            }
             if(urlObj.has("port") &&  urlObj.get("port").asText().length() > 0){
                 url += ":" + urlObj.get("port").asText();
             }
-            url += "/" + path;
+            if(!(path.startsWith("/") || path.startsWith("."))){
+                url += "/";
+            }
+            url += path;
         }
         return url;
     }

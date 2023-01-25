@@ -17,7 +17,8 @@ const team = {
         mergeAsyncOutside: null,
         dashboardVersion: null,
         apiRuntimeVersion: null,
-        setupType: null
+        setupType: null,
+        lastLoginTs: null
     },
     getters: {
         getId: (state) => state.id,
@@ -27,7 +28,8 @@ const team = {
         getRedactPayload: (state) => state.redactPayload,
         getDashboardVersion: (state) => state.dashboardVersion,
         getApiRuntimeVersion: (state) => state.apiRuntimeVersion,
-        getSetupType: (state) => state.setupType
+        getSetupType: (state) => state.setupType,
+        getLastLoginTs: (state) => state.lastLoginTs
     },
     mutations: {
         SET_TEAM_DETAILS(state, details) {
@@ -60,6 +62,9 @@ const team = {
                 state.mergeAsyncOutside = resp.accountSettings.mergeAsyncOutside || false
             }
         },
+        SET_USER_INFO(state, resp) {
+            state.lastLoginTs = resp.lastLoginTs
+        }
     },
     actions: {
         getTeamData({commit, dispatch}, id) {
@@ -70,6 +75,11 @@ const team = {
         fetchAdminSettings({commit, dispatch}) {
             api.fetchAdminSettings().then((resp => {
                 commit('SET_ADMIN_SETTINGS', resp)
+            }))
+        },
+        fetchUserLastLoginTs({commit, dispatch}) {
+            api.fetchUserLastLoginTs().then((resp => {
+                commit('SET_USER_INFO', resp)
             }))
         },
         toggleRedactFeature({commit, dispatch, state}, v) {

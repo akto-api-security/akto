@@ -43,7 +43,6 @@ public class HardcodedAuthParam extends AuthParam {
         String k = this.key.toLowerCase().trim();
 
         if (where.toString().equals(AuthParam.Location.BODY.toString())) {
-            String body = request.getBody();
             BasicDBObject basicDBObject =  BasicDBObject.parse(request.getBody());
             BasicDBObject data = JSONUtils.flattenWithDots(basicDBObject);
             return data.keySet().contains(this.key);

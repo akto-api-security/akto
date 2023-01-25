@@ -306,7 +306,7 @@ public class TestFuzzingTest {
                 "    path:\n" +
                 "      - \"{{BaseURL}}/{{locations}}\"\n" +
                 "    payloads:\n" +
-                "       locations: https://raw.githubusercontent.com/akto-api-security/testing_sources/master/OWASP_API_Top10_ImproperAssetsManagement/swagger_file_detection/wordlists/swagger_pathlist.txt\n" +
+                "       locations: https://github.com/akto-api-security/testing_sources/blob/master/Misconfiguration/swagger-detection/wordlists/swagger_pathlist.txt\n" +
                 "\n" +
                 "    matchers-condition: and\n" +
                 "    matchers:\n" +

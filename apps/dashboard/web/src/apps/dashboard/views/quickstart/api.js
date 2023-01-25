@@ -85,4 +85,23 @@ export default{
             return resp
         })
     },
+    fetchBurpPluginInfo() {
+        return request({
+            url: '/api/fetchBurpPluginInfo',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    downloadBurpPluginJar() {
+        return request({
+            url: '/api/downloadBurpPluginJar',
+            method: 'post',
+            data: {},
+            responseType: 'blob'
+        }).then((resp) => {
+            return resp
+        })
+    }
 }

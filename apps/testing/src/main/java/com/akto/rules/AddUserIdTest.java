@@ -48,11 +48,9 @@ public class AddUserIdTest extends AuthRequiredTestPlugin{
             testRequest.setQueryParams(combinedQueryParams);
         }
 
-        OriginalHttpResponse originalHttpResponse = rawApi.getResponse().copy();
-
         ApiExecutionDetails apiExecutionDetails;
         try {
-            apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, originalHttpResponse);
+            apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApi);
         } catch (Exception e) {
             return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest, null);
         }
@@ -60,7 +58,7 @@ public class AddUserIdTest extends AuthRequiredTestPlugin{
         boolean vulnerable = isStatusGood(apiExecutionDetails.statusCode) && apiExecutionDetails.percentageMatch < 50;
 
         TestResult testResult = buildTestResult(
-                testRequest, apiExecutionDetails.testResponse, rawApi.getOriginalMessage(), apiExecutionDetails.percentageMatch, vulnerable, null
+                testRequest, apiExecutionDetails.testResponse, apiExecutionDetails.originalReqResp, apiExecutionDetails.percentageMatch, vulnerable, null
         );
 
         testResults.add(testResult);
