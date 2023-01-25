@@ -140,7 +140,7 @@ export default {
             }
         },
         getCategoryName(name) {
-            return this.$store.state.issues.subCatogoryMap[name].superCategory.displayName;
+            return this.$store.state.issues.subCatogoryMap[name].testName;
         },
         getCategoryDescription(name) {
             return this.$store.state.issues.subCatogoryMap[name].issueDescription

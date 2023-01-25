@@ -96,8 +96,10 @@ public class TestExecutor {
         );
     }
 
-    public void  apiWiseInit(TestingRun testingRun, ObjectId summaryId) {
+    public void apiWiseInit(TestingRun testingRun, ObjectId summaryId) {
         int accountId = Context.accountId.get();
+        int now = Context.now();
+        int maxConcurrentRequests = testingRun.getMaxConcurrentRequests() > 0 ? testingRun.getMaxConcurrentRequests() : 100;
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
         Map<String, SingleTypeInfo> singleTypeInfoMap = SampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
@@ -125,20 +127,18 @@ public class TestExecutor {
 
         TestingRunResultSummariesDao.instance.updateOne(
             Filters.eq("_id", summaryId),
-            Updates.set(TestingRunResultSummary.TOTAL_APIS, apiInfoKeyList.size())
-        );
+            Updates.set(TestingRunResultSummary.TOTAL_APIS, apiInfoKeyList.size()));
 
         CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
-        ExecutorService threadPool = Executors.newFixedThreadPool(100);
-
+        ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentRequests);
         List<Future<List<TestingRunResult>>> futureTestingRunResults = new ArrayList<>();
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
             try {
                  Future<List<TestingRunResult>> future = threadPool.submit(
-                         () -> startWithLatch(
-                                 apiInfoKey, testingRun.getTestIdConfig(), testingRun.getId(),testingRun.getTestingRunConfig(), testingUtil, summaryId, accountId, latch
-                         )
-                 );
+                         () -> startWithLatch(apiInfoKey,
+                                 testingRun.getTestIdConfig(),
+                                 testingRun.getId(),testingRun.getTestingRunConfig(), testingUtil, summaryId,
+                                 accountId, latch, now, testingRun.getTestRunTime()));
                  futureTestingRunResults.add(future);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error in API " + apiInfoKey + " : " + e.getMessage());
@@ -159,7 +159,9 @@ public class TestExecutor {
         for (Future<List<TestingRunResult>> future: futureTestingRunResults) {
             if (!future.isDone()) continue;
             try {
-                testingRunResults.addAll(future.get());
+                if (!future.get().isEmpty()) {
+                    testingRunResults.addAll(future.get());
+                }
             } catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();
             }
@@ -346,16 +348,18 @@ public class TestExecutor {
 
     public List<TestingRunResult> startWithLatch(
             ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId, TestingRunConfig testingRunConfig,
-            TestingUtil testingUtil, ObjectId testRunResultSummaryId, int accountId, CountDownLatch latch) {
+            TestingUtil testingUtil, ObjectId testRunResultSummaryId, int accountId, CountDownLatch latch, int startTime, int timeToKill) {
 
         Context.accountId.set(accountId);
         List<TestingRunResult> testingRunResults = new ArrayList<>();
-
-        try {
-            testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId);
-            TestingRunResultDao.instance.insertMany(testingRunResults);
-        } catch (Exception e) {
-            e.printStackTrace();
+        int now = Context.now();
+        if ( timeToKill <= 0 || now - startTime <= timeToKill) {
+            try {
+                testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId);
+                TestingRunResultDao.instance.insertMany(testingRunResults);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
 
         latch.countDown();

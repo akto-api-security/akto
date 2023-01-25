@@ -4,27 +4,16 @@ import com.akto.dto.AccountSettings;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.type.URLMethods;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mongodb.BasicDBObject;
 import kotlin.Pair;
 import okhttp3.*;
 
 import java.io.IOException;
-import java.net.URI;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 public class ApiExecutor {
-
-    private static final ObjectMapper mapper = new ObjectMapper();
-
     public static OriginalHttpResponse common(Request request, boolean followRedirects) throws Exception {
 
-        OkHttpClient client = new OkHttpClient().newBuilder()
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
-                .followRedirects(followRedirects)
-                .build();
+        OkHttpClient client = HTTPClientHandler.instance.getHTTPClient(followRedirects);
 
         Call call = client.newCall(request);
         Response response = null;
@@ -49,7 +38,6 @@ public class ApiExecutor {
                 response.close();
             }
         }
-
 
         int statusCode = response.code();
         Headers headers = response.headers();
@@ -135,7 +123,6 @@ public class ApiExecutor {
             headers = new HashMap<>();
             request.setHeaders(headers);
         }
-
         String contentType = request.findContentType();
         String payload = request.getBody();
         if (contentType == null ) {
@@ -151,5 +138,4 @@ public class ApiExecutor {
         Request okHttpRequest = builder.build();
         return common(okHttpRequest, followRedirects);
     }
-
 }
