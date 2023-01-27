@@ -33,7 +33,7 @@
                         <simple-menu :items="maxConcurrentRequestsOptions">
                             <template v-slot:activator2>
                                 <div>
-                                    <span class="column-title">Max requests: </span>
+                                    <span class="column-title">Max concurrent requests: </span>
                                     <span class="column-title clickable-line">{{ maxConcurrentRequestsLabel }}</span>
                                     <v-icon size="14" color="#47466A">$fas_angle-down</v-icon>
                                 </div>
