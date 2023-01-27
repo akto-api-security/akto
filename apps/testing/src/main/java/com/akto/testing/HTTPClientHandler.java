@@ -19,7 +19,7 @@ public class HTTPClientHandler {
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .connectionPool(new ConnectionPool(256, 5L, TimeUnit.MINUTES))
-            .followRedirects(false)
+            .followRedirects(true)
             .build();
 
     public static final HTTPClientHandler instance = new HTTPClientHandler();
