@@ -1,7 +1,9 @@
 package com.akto.dto.test_run_findings;
 
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.util.enums.GlobalEnums.TestSubCategory;
+import org.bson.codecs.pojo.annotations.BsonIgnore;
 
 import java.util.Objects;
 
@@ -13,11 +15,22 @@ public class TestingIssuesId {
     private TestErrorSource testErrorSource;
     public static final String TEST_SUB_CATEGORY = "testSubCategory";
     private TestSubCategory testSubCategory;
+    public static final String TEST_CATEGORY_FROM_SOURCE_CONFIG = "testCategoryFromSourceConfig";
+    private String testCategoryFromSourceConfig;
+    @BsonIgnore
+    private TestSourceConfig testSourceConfig;
 
     public TestingIssuesId(ApiInfoKey apiInfoKey, TestErrorSource source, TestSubCategory category) {
         this.apiInfoKey = apiInfoKey;
         this.testErrorSource = source;
         this.testSubCategory = category;
+    }
+
+    public TestingIssuesId(ApiInfoKey apiInfoKey, TestErrorSource source, TestSubCategory category, String testCategoryFromSourceConfig) {
+        this.apiInfoKey = apiInfoKey;
+        this.testErrorSource = source;
+        this.testSubCategory = category;
+        this.testCategoryFromSourceConfig = testCategoryFromSourceConfig;
     }
 
     public TestingIssuesId() {
@@ -31,7 +44,8 @@ public class TestingIssuesId {
             TestingIssuesId id = (TestingIssuesId) o;
             return id.apiInfoKey.equals(this.apiInfoKey)
                     && id.testSubCategory == this.testSubCategory
-                    && id.testErrorSource == this.testErrorSource;
+                    && id.testErrorSource == this.testErrorSource
+                    && Objects.equals(id.testCategoryFromSourceConfig, this.testCategoryFromSourceConfig);
         }
         return false;
     }
@@ -72,4 +86,19 @@ public class TestingIssuesId {
     }
 
 
+    public String getTestCategoryFromSourceConfig() {
+        return testCategoryFromSourceConfig;
+    }
+
+    public void setTestCategoryFromSourceConfig(String testCategoryFromSourceConfig) {
+        this.testCategoryFromSourceConfig = testCategoryFromSourceConfig;
+    }
+
+    public TestSourceConfig getTestSourceConfig() {
+        return testSourceConfig;
+    }
+
+    public void setTestSourceConfig(TestSourceConfig testSourceConfig) {
+        this.testSourceConfig = testSourceConfig;
+    }
 }

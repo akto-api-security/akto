@@ -7,6 +7,7 @@ import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.WorkflowTestsDao;
+import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.testing.*;
 import com.akto.dto.ApiInfo;
@@ -15,9 +16,11 @@ import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
+import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
+import com.akto.util.enums.GlobalEnums.TestSubCategory;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
@@ -185,8 +188,13 @@ public class StartTestAction extends UserAction {
         TestingRunResult result = TestingRunResultDao.instance.findOne(Constants.ID, testingRunResultId);
         try {
             if (result.isVulnerable()) {
-                GlobalEnums.TestSubCategory category = GlobalEnums.TestSubCategory.getTestCategory(result.getTestSubType());
-                TestingIssuesId issuesId = new TestingIssuesId(result.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING, category);
+                TestSubCategory category = TestSubCategory.getTestCategory(result.getTestSubType());
+                TestSourceConfig config = null;
+                if (category == null) {
+                    config = TestSourceConfigsDao.instance.getTestSourceConfig(result.getTestSubType());
+                }
+                TestingIssuesId issuesId = new TestingIssuesId(result.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING,
+                        category, config != null ? config.getId() : null);
                 runIssues = TestingRunIssuesDao.instance.findOne(Filters.eq(Constants.ID, issuesId));
             }
         }catch (Exception ignore) {}

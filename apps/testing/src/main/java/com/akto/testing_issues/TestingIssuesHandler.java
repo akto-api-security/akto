@@ -1,10 +1,12 @@
 package com.akto.testing_issues;
 
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.testing_utils.TestingUtils;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.*;
@@ -53,8 +55,16 @@ public class TestingIssuesHandler {
             } else {
                 updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED);
             }
-            updateSeverityField = Updates.set(TestingRunIssues.KEY_SEVERITY,
-                    TestSubCategory.valueOf(runResult.getTestSubType()).getSuperCategory().getSeverity());
+
+            TestSubCategory subCategory = TestSubCategory.getTestCategory(runResult.getTestSubType());
+            if (subCategory == null) {//TestSourceConfig case
+                TestSourceConfig config = TestSourceConfigsDao.instance.getTestSourceConfig(runResult.getTestSubType());
+                updateSeverityField = Updates.set(TestingRunIssues.KEY_SEVERITY, config.getSeverity());
+            } else {//TestSubCategory case
+                updateSeverityField = Updates.set(TestingRunIssues.KEY_SEVERITY,
+                        subCategory.getSuperCategory().getSeverity());
+            }
+
             Bson updateFields = Updates.combine(
                     updateStatusFields,
                     updateSeverityField,
@@ -92,9 +102,17 @@ public class TestingIssuesHandler {
                 }
             }
             if (!doesExists && runResult.isVulnerable()) {
-                writeModelList.add(new InsertOneModel<>(new TestingRunIssues(testingIssuesId,
-                        TestSubCategory.getTestCategory(runResult.getTestSubType()).getSuperCategory().getSeverity(),
-                        TestRunIssueStatus.OPEN, lastSeen, lastSeen, runResult.getTestRunResultSummaryId())));
+                TestSubCategory subCategory = TestSubCategory.getTestCategory(runResult.getTestSubType());
+                if (subCategory == null) {
+                    TestSourceConfig config = TestSourceConfigsDao.instance.getTestSourceConfig(runResult.getTestSubType());
+                    writeModelList.add(new InsertOneModel<>(new TestingRunIssues(testingIssuesId,
+                            config.getSeverity(),
+                            TestRunIssueStatus.OPEN, lastSeen, lastSeen, runResult.getTestRunResultSummaryId())));
+                }else {
+                    writeModelList.add(new InsertOneModel<>(new TestingRunIssues(testingIssuesId,
+                            subCategory.getSuperCategory().getSeverity(),
+                            TestRunIssueStatus.OPEN, lastSeen, lastSeen, runResult.getTestRunResultSummaryId())));
+                }
                 logger.info("Inserting the id {} , with summary Id as {}", testingIssuesId, runResult.getTestRunResultSummaryId());
             }
         });
