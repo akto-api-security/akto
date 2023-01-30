@@ -53,7 +53,7 @@
                                 <div>Category</div>
                                 <v-select
                                     class="form-field-select"
-                                    :items="businessCategoryNames"
+                                    :items="businessCategoryShortNames"
                                     v-model="newTest.category"
                                     attach
                                 />
@@ -142,13 +142,11 @@ export default {
         SimpleTextField
     },
     data() {
-        let allSubcategories = ["path_traversal", "swagger_file_detection"]
         let allSeverities = ["HIGH", "MEDIUM", "LOW"]
         
         return {
             drawer: null,
             showCreateTestDialog: false,
-            allSubcategories,
             allSeverities,
             addNewSubcategory: false,
             showSubcategoriesMenu: false,
@@ -156,7 +154,7 @@ export default {
             newTest: {
                 url: "",
                 category: "BOLA",
-                subcategory: allSubcategories[0],
+                subcategory: "path_traversal",
                 severity: allSeverities[0],
                 description: ""
             }
@@ -211,12 +209,17 @@ export default {
         let aktoTestTypes = await issuesApi.fetchAllSubCategories()
         this.businessCategories = aktoTestTypes.subCategories
         this.$router.push(this.leftNavItems[0].items[0].link)
-        
     },
     computed: {
         ...mapState('marketplace', ['defaultSubcategories', 'userSubcategories', 'loading']),
+        allSubcategories() {
+            return [... new Set([...this.defaultSubcategories, ...this.userSubcategories])]
+        },
         businessCategoryNames() {
             return [...new Set(this.businessCategories.map(category => category.superCategory.name))].map(x => {return { text: (x + "/business-logic"), value: x}})
+        },
+        businessCategoryShortNames() {
+            return [...new Set(this.businessCategories.map(category => {return { text: category.superCategory.shortName, value: category.superCategory.name}}))]
         },
         leftNavItems() {
             return [
