@@ -1,7 +1,10 @@
 <template>
     <simple-layout title="Tests library">
         <template>
-            <div class="pa-8">
+            <div class="px-8">
+                <div class="py-4">
+                    <search placeholder="Search categories" @changed="onSearch" />
+                </div>
                 <div>                
                     <layout-with-left-pane>
                         <div class="category-tests">
@@ -126,6 +129,7 @@ import LayoutWithLeftPane from '@/apps/dashboard/layouts/LayoutWithLeftPane'
 import ApiCollectionGroup from '@/apps/dashboard/shared/components/menus/ApiCollectionGroup'
 import ACard from '@/apps/dashboard/shared/components/ACard'
 import SimpleTextField from '@/apps/dashboard/shared/components/SimpleTextField'
+import Search from  '@/apps/dashboard/shared/components/inputs/Search'
 
 import api from './api'
 import issuesApi from '../issues/api'
@@ -139,7 +143,8 @@ export default {
         LayoutWithLeftPane,
         ApiCollectionGroup,
         ACard,
-        SimpleTextField
+        SimpleTextField,
+        Search
     },
     data() {
         let allSeverities = ["HIGH", "MEDIUM", "LOW"]
@@ -157,7 +162,8 @@ export default {
                 subcategory: "path_traversal",
                 severity: allSeverities[0],
                 description: ""
-            }
+            },
+            searchText: ""
         }
     },
     methods: {
@@ -184,6 +190,9 @@ export default {
                 }
             })
         },
+        onSearch(searchText) {
+            this.searchText = searchText
+        },
         createCategoryObj(arrCategoryKv, creatorTitle, creatorType, colorType) {
             return {
                 icon: "$fas_plus",
@@ -192,7 +201,7 @@ export default {
                 color: func.actionItemColors()[colorType],
                 active: true,
                 items: [
-                    ...arrCategoryKv.map(category => {
+                    ...this.filterOnSearchText(arrCategoryKv).map(category => {
                         return {
                             title: category.text,
                             link: "/dashboard/library/"+creatorType+"/"+category.value,
@@ -201,6 +210,13 @@ export default {
                         }
                     })
                 ]
+            }
+        },
+        filterOnSearchText(list) {
+            if (this.searchText && this.searchText != null) {
+                return list.filter(x => JSON.stringify(x).toLowerCase().indexOf(this.searchText.toLowerCase()) > -1)
+            } else {
+                return list
             }
         }
     },
