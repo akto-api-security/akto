@@ -15,8 +15,8 @@
             <issue-box v-for="(issue, index) in issues" :key="index" :creationTime="issue.creationTime"
                 :method="issue.id.apiInfoKey.method" :endpoint="issue.id.apiInfoKey.url" :severity="issue.severity"
                 :collectionName="getCollectionName(issue.id.apiInfoKey.apiCollectionId)"
-                :categoryName="getCategoryName(issue.id.testSubCategory)"
-                :categoryDescription="getCategoryDescription(issue.id.testSubCategory)"
+                :categoryName="getCategoryName(issue.id)"
+                :categoryDescription="getCategoryDescription(issue.id)"
                 :testType="getTestType(issue.id.testErrorSource)" :issueId="issue.id"
                 :issueStatus="issue.testRunIssueStatus" :ignoreReason="issue.ignoreReason"
                 :issueChecked="(selectedIssueIds.indexOf(issue.id) > -1)" :filterStatus="filterStatus"
@@ -139,11 +139,17 @@ export default {
                     return ''
             }
         },
-        getCategoryName(name) {
-            return this.$store.state.issues.subCatogoryMap[name].testName;
+        getCategoryName(id) {
+            if (this.$store.state.issues.subCatogoryMap[id.testSubCategory] === undefined) {//Config case
+                return this.$store.state.issues.subCategoryFromSourceConfigMap[id.testCategoryFromSourceConfig].subcategory;
+            }
+            return this.$store.state.issues.subCatogoryMap[id.testSubCategory].testName;
         },
-        getCategoryDescription(name) {
-            return this.$store.state.issues.subCatogoryMap[name].issueDescription
+        getCategoryDescription(id) {
+            if (this.$store.state.issues.subCatogoryMap[id.testSubCategory] === undefined) {//Config case
+                return this.$store.state.issues.subCategoryFromSourceConfigMap[id.testCategoryFromSourceConfig].description;
+            }
+            return this.$store.state.issues.subCatogoryMap[id.testSubCategory].issueDescription
         },
         getCollectionName(collectionId) {
             return this.mapCollectionIdToName[collectionId];
