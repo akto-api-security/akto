@@ -58,7 +58,7 @@
       </div>
 
       <v-list dense nav class="left-nav" style="margin-top: auto">
-        <v-list-item class='row-nav-drawer' id="beamer-btn" @click="addCss">
+        <v-list-item class='row-nav-drawer' id="beamer-btn">
           <v-list-item-icon class="icon-nav-drawer">
             <v-icon>$fas_gift</v-icon>
           </v-list-item-icon>
@@ -103,7 +103,7 @@
           </v-btn>
           <v-btn primary dark depressed class="github-btn" @click='openGithubTestingSourcesPage'>    
             <v-icon size="16">$githubIcon</v-icon>  
-            Contribute
+            Star
           </v-btn>        
           
         </div>
@@ -202,6 +202,9 @@ export default {
         }
       ]
     }
+  },
+  mounted() {
+    window.Beamer.init();
   },
   methods: {
     ...mapGetters('auth', ['getUsername', 'getAvatar', 'getActiveAccount', 'getAccounts']),
