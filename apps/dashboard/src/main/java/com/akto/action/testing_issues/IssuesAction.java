@@ -2,16 +2,19 @@ package com.akto.action.testing_issues;
 
 import com.akto.action.UserAction;
 import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TestSubCategory;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
+import org.bouncycastle.util.test.Test;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
@@ -62,17 +65,30 @@ public class IssuesAction extends UserAction {
     public String fetchAffectedEndpoints() {
         Bson sort = Sorts.orderBy(Sorts.descending(TestingRunIssues.TEST_RUN_ISSUES_STATUS),
                 Sorts.descending(TestingRunIssues.CREATION_TIME));
-        TestCategory superCategory = issueId.getTestSubCategory().getSuperCategory();
+        TestSubCategory subCategory = issueId.getTestSubCategory();
+        TestCategory superCategory;
+        if (subCategory == null) {
+            superCategory = TestSourceConfigsDao.instance.getTestSourceConfig(issueId.getTestCategoryFromSourceConfig()).getCategory();
+        } else {
+            superCategory = issueId.getTestSubCategory().getSuperCategory();
+        }
 
         List<TestSubCategory> subCategoryList = new ArrayList<>();
-        for (TestSubCategory subCategory : TestSubCategory.getValuesArray()) {
-            if (subCategory.getSuperCategory() == superCategory) {
-                subCategoryList.add(subCategory);
+        for (TestSubCategory sctg : TestSubCategory.getValuesArray()) {
+            if (sctg.getSuperCategory() == superCategory) {
+                subCategoryList.add(sctg);
             }
         }
+        List<TestSourceConfig> sourceConfigs = TestSourceConfigsDao.instance.findAll(Filters.empty());
+        List<String> sourceConfigIds = new ArrayList<>();
+        for (TestSourceConfig sourceConfig : sourceConfigs) {
+            sourceConfigIds.add(sourceConfig.getId());
+        }
         Bson filters = Filters.and(
-                Filters.in(ID + "." + TestingIssuesId.TEST_SUB_CATEGORY, subCategoryList),
-                Filters.ne(ID, issueId));
+                Filters.or(
+                        Filters.in(ID + "." + TestingIssuesId.TEST_SUB_CATEGORY, subCategoryList),
+                        Filters.in(ID + "." + TestingIssuesId.TEST_CATEGORY_FROM_SOURCE_CONFIG, sourceConfigIds)
+                ), Filters.ne(ID, issueId));
         similarlyAffectedIssues = TestingRunIssuesDao.instance.findAll(filters, 0,3, sort);
         return SUCCESS.toUpperCase();
     }
@@ -83,6 +99,13 @@ public class IssuesAction extends UserAction {
         Bson filters = createFilters();
         totalIssuesCount = TestingRunIssuesDao.instance.getMCollection().countDocuments(filters);
         issues = TestingRunIssuesDao.instance.findAll(filters, skip,limit, sort);
+
+        for (TestingRunIssues runIssue : issues) {
+            if (runIssue.getId().getTestSubCategory() == null) {//TestSourceConfig case
+                TestSourceConfig config = TestSourceConfigsDao.instance.getTestSourceConfig(runIssue.getId().getTestCategoryFromSourceConfig());
+                runIssue.getId().setTestSourceConfig(config);
+            }
+        }
         return SUCCESS.toUpperCase();
     }
     public String fetchTestingRunResult() {
@@ -90,9 +113,15 @@ public class IssuesAction extends UserAction {
             throw new IllegalStateException();
         }
         TestingRunIssues issue = TestingRunIssuesDao.instance.findOne(Filters.eq(ID, issueId));
+        String testSubType = null;
+        if (issue.getId().getTestSubCategory() == null) {
+            testSubType = issue.getId().getTestCategoryFromSourceConfig();
+        } else {
+            testSubType = issue.getId().getTestSubCategory().getName();
+        }
         Bson filterForRunResult = Filters.and(
                 Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, issue.getLatestTestingRunSummaryId()),
-                Filters.eq(TestingRunResult.TEST_SUB_TYPE, issue.getId().getTestSubCategory().getName()),
+                Filters.eq(TestingRunResult.TEST_SUB_TYPE, testSubType),
                 Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey())
         );
         testingRunResult = TestingRunResultDao.instance.findOne(filterForRunResult);
@@ -101,9 +130,11 @@ public class IssuesAction extends UserAction {
 
     private TestSubCategory[] subCategories;
     private TestCategory[] categories;
+    private List<TestSourceConfig> testSourceConfigs;
     public String fetchAllSubCategories() {
         this.subCategories = GlobalEnums.TestSubCategory.getValuesArray();
         this.categories = GlobalEnums.TestCategory.values();
+        this.testSourceConfigs = TestSourceConfigsDao.instance.findAll(Filters.empty());
         return SUCCESS.toUpperCase();
     }
 
@@ -142,19 +173,6 @@ public class IssuesAction extends UserAction {
         TestingRunIssuesDao.instance.updateMany(Filters.in(ID, issueIdArray), update);
         return SUCCESS.toUpperCase();
     }
-    private boolean existsInFinalList(List<TestingRunIssues> finalList, TestingRunIssues issue) {
-        for (TestingRunIssues finalListIssue : finalList) {
-            if (finalListIssue.getId().getApiInfoKey().equals(issue.getId().getApiInfoKey())
-                    && finalListIssue.getId().getTestErrorSource().equals(issue.getId().getTestErrorSource())
-                    && finalListIssue.getId().getTestSubCategory().getSuperCategory().equals(issue.getId().getTestSubCategory().getSuperCategory())
-            ) {
-
-                return true;
-            }
-        }
-        return false;
-    }
-
     public List<TestingRunIssues> getIssues() {
         return issues;
     }
@@ -285,5 +303,13 @@ public class IssuesAction extends UserAction {
 
     public void setCategories(TestCategory[] categories) {
         this.categories = categories;
+    }
+
+    public List<TestSourceConfig> getTestSourceConfigs() {
+        return testSourceConfigs;
+    }
+
+    public void setTestSourceConfigs(List<TestSourceConfig> testSourceConfigs) {
+        this.testSourceConfigs = testSourceConfigs;
     }
 }

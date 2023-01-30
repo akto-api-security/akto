@@ -82,6 +82,17 @@
 
 
                 </script>
+                <script>
+                    var beamer_config = {
+                        product_id : 'TEEsyHNL42222', //DO NOT CHANGE: This is your product code on Beamer
+                        selector: '#beamer-btn',
+                        top: 0,
+                        left: 0,
+                        lazy: true
+                    };
+                </script>
+                <script type="text/javascript" src="https://app.getbeamer.com/js/beamer-embed.js" defer="defer"></script>                
+
                 <script src="/dist/main.js"></script>
             </body>
 

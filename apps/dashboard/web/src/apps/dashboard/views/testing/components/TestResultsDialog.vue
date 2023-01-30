@@ -1,12 +1,6 @@
 <template>
     <div v-if="messagesBasic && messagesBasic.length > 0">
         <div>
-            <div class="d-flex jc-end mr-3">
-                <!-- <div v-if="jsonBasic.title" style="margin: auto 8px; color: #47466A">{{ jsonBasic.title }}</div> -->
-                <v-btn v-if="messagesBasic.length > 1" icon @click="nextClicked">
-                    <v-icon>$fas_angle-double-right</v-icon>
-                </v-btn>
-            </div>
             <div>
                 <layout-with-tabs :tabsContent="getTabsContent()" title=""
                     :tabs="['Description', 'Original', 'Attempt']" ref="layoutWithTabs">
@@ -38,15 +32,14 @@
                                                 </span>
                                             </v-col>
                                         </v-row>
-                                        <v-row class="mx-0 pa-0"
+                                        <v-row v-if="issuesDetails.id.testSubCategory" class="mx-0 pa-0"
                                             :style="{ 'margin-top': '10px', 'margin-bottom': '10px' }">
                                             <v-col cols="2" class="ma-0 pa-0">
                                                 <span class="description-content">Tags</span>
                                             </v-col>
                                             <v-col class="my-0 mr-0 ml-7 pa-0">
                                                 <v-chip :style="{ 'height': '24px !important' }" color="#47466AB2"
-                                                    class="issue-summary mr-2" text-color="#FFFFFF"
-                                                    :key="index"
+                                                    class="issue-summary mr-2" text-color="#FFFFFF" :key="index"
                                                     v-for="(chipItem, index) in subCatogoryMap[issuesDetails.id.testSubCategory].issueTags">
                                                     {{ chipItem.name }}
                                                 </v-chip>
@@ -57,14 +50,14 @@
                             </div>
                             <div class="d-flex flex-column mt-4">
                                 <span class="description-title">Issue Details</span>
-                                <div class="mt-3">
+                                <div class="mt-3" v-if="issuesDetails.id.testSubCategory">
                                     <span class="description-content"
                                         v-html="replaceTags(subCatogoryMap[issuesDetails.id.testSubCategory].issueDetails)"></span>
                                 </div>
                             </div>
                             <div class="d-flex flex-column mt-4">
                                 <span class="description-title">Impact</span>
-                                <div class="mt-3">
+                                <div class="mt-3" v-if="issuesDetails.id.testSubCategory">
                                     <span class="description-content"
                                         v-html="subCatogoryMap[issuesDetails.id.testSubCategory].issueImpact"></span>
                                 </div>
@@ -74,15 +67,16 @@
                                 <table :style="{ 'width': '100%' }" class="mt-3 mb-3">
                                     <tr class="table-row" v-for="(item, index) in similarlyAffectedIssues" :key="index">
                                         <td class="table-column clickable">
-                                            <span
-                                                class="description-content mr-1 ml-3">{{ item.id.apiInfoKey.method }}</span>
+                                            <span class="description-content mr-1 ml-3">{{
+                                                item.id.apiInfoKey.method
+                                            }}</span>
                                             <span class="description-content">{{ item.id.apiInfoKey.url }}</span>
                                         </td>
                                     </tr>
                                 </table>
                                 <!-- <span v-if="!isTestingPage" class="issue-summary clickable-line ml-4" @click="$emit('showAllIssueByCategory', subCatogoryMap[issuesDetails.id.testSubCategory])">Show all endpoints</span> -->
                             </div>
-                            <div class="d-flex flex-column mt-4">
+                            <div class="d-flex flex-column mt-4" v-if="issuesDetails.id.testSubCategory">
                                 <span class="description-title">References</span>
                                 <ul class="mt-3">
                                     <li class="description-content mt-2 "
@@ -102,12 +96,17 @@
                         </div>
                     </template>
                     <template slot="Attempt" v-if="jsonAdvance && jsonAdvance['message']">
-                        <div :style="{ 'height': '500px' }">
+                        <div >
                             <div v-if="jsonBasic['errors']" class="test-errors-class">
                                 {{ this.jsonBasic["errors"] }}
                             </div>
                             <div style="margin: 24px">
-                                <span>Test response matches {{ percentageMatch }}% with original API response</span>
+                                <div class="d-flex jc-sb mr-3">
+                                    <span>Test response matches {{ percentageMatch }}% with original API response</span>
+                                    <v-btn v-if="messagesBasic.length > 1" icon @click="nextClicked">
+                                        <v-icon>$fas_angle-double-right</v-icon>
+                                    </v-btn>
+                                </div>
                                 <sample-data v-if="jsonBasic && jsonBasic['message']" :json="jsonBasic"
                                     requestTitle="Test Request" responseTitle="Test Response" />
                             </div>
@@ -146,8 +145,7 @@ export default {
     },
     data() {
         return {
-            currentIndex: 0,
-            issueSummaryTable: []
+            currentIndex: 0
         }
     },
     methods: {
@@ -185,10 +183,13 @@ export default {
         },
         mapCollectionIdToName(newValue) {
             this.issueSummaryTable[4].description = newValue[this.issuesDetails.id.apiInfoKey.apiCollectionId]
-        },
-        issuesDetails(issuesDetails) {
-            if (issuesDetails) {
-                this.issueSummaryTable = [
+        }
+    },
+    computed: {
+        issueSummaryTable() {
+            if (this.issuesDetails) {
+                let issuesDetails = this.issuesDetails
+                return [
                     {
                         title: 'Issue category',
                         description: this.subCatogoryMap[issuesDetails.id.testSubCategory].superCategory.displayName
@@ -214,9 +215,8 @@ export default {
                     }
                 ]
             }
-        }
-    },
-    computed: {
+            return []
+        },
         messagesBasic() {
             let testSubType = this.testingRunResult["testSubType"]
             return this.testingRunResult["testResults"].map(x => { return { message: x.message, title: testSubType, highlightPaths: [], errors: x.errors } })

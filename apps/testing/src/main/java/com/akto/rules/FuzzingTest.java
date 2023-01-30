@@ -13,16 +13,11 @@ import com.akto.testing.StatusCodeAnalyser;
 import com.akto.util.Pair;
 import com.google.common.io.Files;
 
-import com.google.gson.JsonObject;
-import com.mongodb.BasicDBObject;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.json.JSONObject;
 import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.Constructor;
 
 import java.io.*;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
 
@@ -33,12 +28,14 @@ public class FuzzingTest extends TestPlugin {
     private final String origTemplatePath;
     private String tempTemplatePath;
     private final String subcategory;
+    private String testSourceConfigCategory;
 
-    public FuzzingTest(String testRunId, String testRunResultSummaryId, String origTemplatePath, String subcategory) {
+    public FuzzingTest(String testRunId, String testRunResultSummaryId, String origTemplatePath, String subcategory, String testSourceConfigCategory) {
         this.testRunId = testRunId;
         this.testRunResultSummaryId = testRunResultSummaryId;
         this.origTemplatePath = origTemplatePath;
         this.subcategory = subcategory;
+        this.testSourceConfigCategory = testSourceConfigCategory;
         this.tempTemplatePath = null;
     }
 
@@ -157,6 +154,9 @@ public class FuzzingTest extends TestPlugin {
         }
     }
 
+    public String getSubcategory() {
+        return subcategory;
+    }
 
     @Override
     public String superTestName() {
@@ -166,5 +166,13 @@ public class FuzzingTest extends TestPlugin {
     @Override
     public String subTestName() {
         return "CUSTOM_IAM";
+    }
+
+    public String getTestSourceConfigCategory() {
+        return testSourceConfigCategory;
+    }
+
+    public void setTestSourceConfigCategory(String testSourceConfigCategory) {
+        this.testSourceConfigCategory = testSourceConfigCategory;
     }
 }
