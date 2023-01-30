@@ -58,6 +58,15 @@
       </div>
 
       <v-list dense nav class="left-nav" style="margin-top: auto">
+        <v-list-item class='row-nav-drawer' id="beamer-btn" @click="addCss">
+          <v-list-item-icon class="icon-nav-drawer">
+            <v-icon>$fas_gift</v-icon>
+          </v-list-item-icon>
+          <v-list-item-content class="content-nav-drawer">
+            <v-list-item-title class="title-nav-drawer">Updates</v-list-item-title>
+          </v-list-item-content>
+        </v-list-item>
+
         <v-list-item class='row-nav-drawer' @click="openDocs">
           <v-list-item-icon class="icon-nav-drawer">
             <v-icon>$fas_user-secret</v-icon>
