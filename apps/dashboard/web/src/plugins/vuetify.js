@@ -6,6 +6,8 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome' // Integration
 import CurlyBraces from "../apps/dashboard/shared/icons/CurlyBraces"
 import Burpsuite from "../apps/dashboard/shared/icons/Burpsuite"
 import Slack from "../apps/dashboard/shared/icons/Slack"
+import GithubName from "../apps/dashboard/shared/icons/GithubName"
+import GithubIcon from "../apps/dashboard/shared/icons/GithubIcon"
 import Postman from "../apps/dashboard/shared/icons/Postman"
 import AWS from "../apps/dashboard/shared/icons/AWS"
 import GCP from "../apps/dashboard/shared/icons/GCP"
@@ -209,6 +211,14 @@ faIconsOpts.slack = {
 
 faIconsOpts.restapi = {
   component: Restapi
+}
+
+faIconsOpts.githubName = {
+  component: GithubName
+}
+
+faIconsOpts.githubIcon = {
+  component: GithubIcon
 }
 
 faIconsOpts.customwebhooks = {
