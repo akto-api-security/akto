@@ -15,6 +15,11 @@
             <div class="entry-value">{{this.apiRuntimeVersion}}</div>
         </div>
 
+        <div class="account-id" v-if="this.lastLoginTs">
+            <div class="entry-text">Last Login time</div>
+            <div class="entry-value">{{epochToDateTime(this.lastLoginTs)}}</div>
+        </div>
+
         <div class="toggle-redact-feature" v-if="localSetupType !== null">
             <div class="entry-text">Setup Type</div>
             <div class="entry-value">
@@ -67,6 +72,7 @@
 </template>
 
 <script>
+import func from "@/util/func";
 import {mapState} from 'vuex'
     export default {
         name: "Account",
@@ -81,12 +87,16 @@ import {mapState} from 'vuex'
             getActiveAccount() {
                 return this.$store.state.auth.activeAccount
             },
+            epochToDateTime(timestamp) {
+                return func.epochToDateTime(timestamp)
+            }
         },
         mounted() {
             this.$store.dispatch('team/fetchAdminSettings')
+            this.$store.dispatch('team/fetchUserLastLoginTs')
         },
         computed: {
-            ...mapState('team', ['redactPayload', 'setupType', 'dashboardVersion', 'apiRuntimeVersion', 'mergeAsyncOutside']),
+            ...mapState('team', ['redactPayload', 'setupType', 'dashboardVersion', 'apiRuntimeVersion', 'mergeAsyncOutside', 'lastLoginTs']),
             localRedactPayload: {
                 get() {
                     return this.redactPayload

@@ -2,7 +2,7 @@
     <spinner v-if="endpointsLoading" />
     <div class="pr-4 api-endpoints" v-else>
         <div>
-            <div class="d-flex jc-end pb-3">
+            <div class="d-flex jc-end pb-3 pt-3">
                     <v-tooltip bottom>
                         <template v-slot:activator='{on, attrs}'>
                             <v-btn 
@@ -444,16 +444,16 @@ export default {
                 }
             })
         },
-        async startTest({recurringDaily, startTimestamp, selectedTests, testName}) {
+        async startTest({recurringDaily, startTimestamp, selectedTests, testName, testRunTime, maxConcurrentRequests}) {
             let apiInfoKeyList = this.toApiInfoKeyList(this.filteredItemsForScheduleTest)
             let filtersSelected = this.filteredItemsForScheduleTest.length === this.allEndpoints.length
             let store = this.$store
             let apiCollectionId = this.apiCollectionId
             
             if (filtersSelected) {
-                await store.dispatch('testing/scheduleTestForCollection', {apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName})
+                await store.dispatch('testing/scheduleTestForCollection', {apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests})
             } else {
-                await store.dispatch('testing/scheduleTestForCustomEndpoints', {apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName})
+                await store.dispatch('testing/scheduleTestForCustomEndpoints', {apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests})
             }
             
             this.showTestSelectorDialog = false            

@@ -16,7 +16,7 @@ import com.akto.util.modifier.NestedObjectModifier;
 import java.util.*;
 
 public class BOLATest extends AuthRequiredRunAllTestPlugin {
-
+    
     public BOLATest() { }
 
     @Override
@@ -33,7 +33,6 @@ public class BOLATest extends AuthRequiredRunAllTestPlugin {
     @Override
     public List<ExecutorResult> execute(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) {
         OriginalHttpRequest testRequest = rawApi.getRequest().copy();
-        OriginalHttpResponse originalHttpResponse = rawApi.getResponse().copy();
 
         testingUtil.getAuthMechanism().addAuthToRequest(testRequest);
 
@@ -43,7 +42,7 @@ public class BOLATest extends AuthRequiredRunAllTestPlugin {
         //      b) We couldn't find uniqueCount or publicCount for some request params
         // When it comes to case b we still say private resource but with low confidence, hence the below line
 
-        ExecutorResult executorResultSimple = util(testRequest, originalHttpResponse, rawApi, containsPrivateResourceResult);
+        ExecutorResult executorResultSimple = util(testRequest, rawApi, containsPrivateResourceResult);
 
         List<ExecutorResult> executorResults = new ArrayList<>();
         executorResults.add(executorResultSimple);
@@ -54,7 +53,7 @@ public class BOLATest extends AuthRequiredRunAllTestPlugin {
             String modifiedPayload = JSONUtils.modify(testRequestArray.getJsonRequestBody(), privateStiParams, new ConvertToArrayPayloadModifier());
             if (modifiedPayload != null) {
                 testRequestArray.setBody(modifiedPayload);
-                ExecutorResult executorResultArray = util(testRequestArray, originalHttpResponse, rawApi, containsPrivateResourceResult);
+                ExecutorResult executorResultArray = util(testRequestArray, rawApi, containsPrivateResourceResult);
                 executorResults.add(executorResultArray);
             }
 
@@ -62,7 +61,7 @@ public class BOLATest extends AuthRequiredRunAllTestPlugin {
             modifiedPayload = JSONUtils.modify(testRequestJson.getJsonRequestBody(), privateStiParams, new NestedObjectModifier());
             if (modifiedPayload != null) {
                 testRequestJson.setBody(modifiedPayload);
-                ExecutorResult executorResultJson = util(testRequestJson, originalHttpResponse, rawApi, containsPrivateResourceResult);
+                ExecutorResult executorResultJson = util(testRequestJson, rawApi, containsPrivateResourceResult);
                 executorResults.add(executorResultJson);
             }
         }
@@ -71,11 +70,12 @@ public class BOLATest extends AuthRequiredRunAllTestPlugin {
         return executorResults;
     }
 
-    public ExecutorResult util(OriginalHttpRequest testRequest, OriginalHttpResponse originalHttpResponse, RawApi rawApi,
-                               ContainsPrivateResourceResult containsPrivateResourceResult) {
+    public ExecutorResult util(OriginalHttpRequest testRequest, RawApi rawApi, ContainsPrivateResourceResult containsPrivateResourceResult) {
+        
         ApiExecutionDetails apiExecutionDetails;
+        RawApi rawApiDuplicate = rawApi.copy();
         try {
-            apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, originalHttpResponse);
+            apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApiDuplicate);
         } catch (Exception e) {
             return new ExecutorResult(false, null, new ArrayList<>(), 0, rawApi,
                     TestResult.TestError.API_REQUEST_FAILED, testRequest, null, null);
@@ -89,7 +89,7 @@ public class BOLATest extends AuthRequiredRunAllTestPlugin {
         if (!vulnerable) confidence = Confidence.HIGH;
 
         return new ExecutorResult(vulnerable,confidence, containsPrivateResourceResult.singleTypeInfos, apiExecutionDetails.percentageMatch,
-                rawApi, null, testRequest, apiExecutionDetails.testResponse, null);
+            rawApiDuplicate, null, testRequest, apiExecutionDetails.testResponse, null);
 
     }
 

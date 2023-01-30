@@ -79,7 +79,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
 
                 if (passHash.equals(passInfo.getPasshash())) {
                     loginUser(signupUserInfo.getUser(), servletResponse, false, servletRequest);
-                    loginResult.put("redirect", "/dashboard/setup");
+                    loginResult.put("redirect", "/dashboard/quick-start");
                     return "SUCCESS";
                 }
             }
@@ -147,7 +147,10 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             if (signedUp) {
                 UsersDao.instance.getMCollection().findOneAndUpdate(
                         Filters.eq("_id", user.getId()),
-                        Updates.set("refreshTokens", refreshTokens)
+                        Updates.combine(
+                                Updates.set("refreshTokens", refreshTokens),
+                                Updates.set(User.LAST_LOGIN_TS, Context.now())
+                        )
                 );
             }
             return Action.SUCCESS.toUpperCase();

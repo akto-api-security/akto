@@ -15,7 +15,7 @@
 
             <body>
                 <noscript>To run this application, JavaScript is required to be enabled.</noscript>
-                <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js">
+                <script src="//ajax.googleapis.com/ajax/libs/jquery/3.6.3/jquery.min.js">
                 </script>
                 <script src="https://apis.google.com/js/client:platform.js?onload=start" async defer>
                 </script>
@@ -52,6 +52,7 @@
                     window.DASHBOARDS = JSON.parse(atob('${requestScope.dashboards}') || '[]');
                     window.ACCOUNTS = JSON.parse('${requestScope.accounts}' || '{}');
                     window.ACTIVE_ACCOUNT = +'${requestScope.activeAccount}';
+                    window.DASHBOARD_MODE = '${requestScope.dashboardMode}';
                     window.ACCESS_TOKEN = '${accessToken}';
                     window.SIGNUP_INVITATION_CODE = '${signupInvitationCode}'
                     window.SIGNUP_EMAIL_ID = '${signupEmailId}'
@@ -75,6 +76,7 @@
                             api_base: "https://api-iam.intercom.io",
                             app_id: "xjvl0z2h",
                             email: window.USER_NAME,
+                            user_hash: '${userHash}',
                             created_at: new Date().getTime()
                         };
                     }
@@ -82,6 +84,17 @@
 
 
                 </script>
+                <script>
+                    var beamer_config = {
+                        product_id : 'TEEsyHNL42222', //DO NOT CHANGE: This is your product code on Beamer
+                        selector: '#beamer-btn',
+                        top: 0,
+                        left: 0,
+                        lazy: true
+                    };
+                </script>
+                <script type="text/javascript" src="https://app.getbeamer.com/js/beamer-embed.js" defer="defer"></script>                
+
                 <script src="/dist/main.js"></script>
             </body>
 

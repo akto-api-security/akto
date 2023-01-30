@@ -8,6 +8,7 @@ import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.listener.KafkaListener;
+import com.akto.listener.RuntimeListener;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.policies.AktoPolicy;
@@ -135,11 +136,19 @@ public class Utils {
                 url += urlObj.get("protocol").asText();
                 url += "://";
             }
-            url += host;
+            if(host.endsWith("/")){
+                url += host.substring(0, host.length()-1);
+            }
+            else{
+                url += host;
+            }
             if(urlObj.has("port") &&  urlObj.get("port").asText().length() > 0){
                 url += ":" + urlObj.get("port").asText();
             }
-            url += "/" + path;
+            if(!(path.startsWith("/") || path.startsWith("."))){
+                url += "/";
+            }
+            url += path;
         }
         return url;
     }
@@ -207,17 +216,14 @@ public class Utils {
         }
 
         if(skipKafka) {
-            HttpCallParser parser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
-            SingleTypeInfo.fetchCustomDataTypes();
-            APICatalogSync apiCatalogSync = parser.syncFunction(responses, true, false);
-            AktoPolicy aktoPolicy = new AktoPolicy(parser.apiCatalogSync, false);
-            aktoPolicy.main(responses, apiCatalogSync, false);
-            ResourceAnalyser resourceAnalyser = new ResourceAnalyser(300_000, 0.01, 100_000, 0.01);
+            SingleTypeInfo.fetchCustomDataTypes(); //todo:
+            APICatalogSync apiCatalogSync = RuntimeListener.httpCallParser.syncFunction(responses, true, false);
+            RuntimeListener.aktoPolicy.main(responses, apiCatalogSync, false);
             for (HttpResponseParams responseParams: responses)  {
                 responseParams.requestParams.getHeaders().put("x-forwarded-for", Collections.singletonList("127.0.0.1"));
-                resourceAnalyser.analyse(responseParams);
+                RuntimeListener.resourceAnalyser.analyse(responseParams);
             }
-            resourceAnalyser.syncWithDb();
+            RuntimeListener.resourceAnalyser.syncWithDb();
         }
     }
 

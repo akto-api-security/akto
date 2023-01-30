@@ -51,7 +51,7 @@ public class ParameterPollutionTest extends TestPlugin {
 
         ApiExecutionDetails apiExecutionDetails;
         try {
-            apiExecutionDetails = executeApiAndReturnDetails(testRequest1, true, message1.getResponse());
+            apiExecutionDetails = executeApiAndReturnDetails(testRequest1, true, message1);
         } catch (Exception e) {
             return addWithRequestError( message1.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest1, null);
         }
@@ -59,7 +59,7 @@ public class ParameterPollutionTest extends TestPlugin {
         boolean vulnerable = isStatusGood(apiExecutionDetails.statusCode) && apiExecutionDetails.percentageMatch < 80;
 
         TestResult testResult = buildTestResult(
-                testRequest1, apiExecutionDetails.testResponse, message1.getOriginalMessage(), apiExecutionDetails.percentageMatch, vulnerable, null
+                testRequest1, apiExecutionDetails.testResponse, apiExecutionDetails.originalReqResp, apiExecutionDetails.percentageMatch, vulnerable, null
         );
         return addTestSuccessResult(
                 vulnerable, Collections.singletonList(testResult), new ArrayList<>(), TestResult.Confidence.HIGH

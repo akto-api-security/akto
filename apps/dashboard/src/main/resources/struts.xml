@@ -206,17 +206,7 @@
                 <param name="root">code</param>
             </result>
         </action>
-
-        <action name="dashboard/setup/add-signup-info" class="com.akto.action.SignupAction" method="addSignupInfo">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS"   type="json">
-                <param name="root">shouldLogin</param>
-            </result>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
-            </result>
-        </action>
+        
 
         <action name="api/loadContent" class="com.akto.action.AuditAction" method="loadContent">
             <interceptor-ref name="json"/>
@@ -1509,6 +1499,28 @@
             </result>
         </action>
 
+        <action name="api/downloadBurpPluginJar" class="com.akto.action.BurpJarAction" >
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
+            </result>
+        </action>
+
+        <action name="api/sendHealthCheck" class="com.akto.action.BurpJarAction" method="sendHealthCheck">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchRecordedFlowOutput" class="com.akto.action.testing.LoginRecorderAction" method="fetchRecordedFlowOutput">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -1545,6 +1557,16 @@
             </result>
         </action>
 
+        <action name="api/fetchBurpPluginInfo" class="com.akto.action.BurpJarAction" method="fetchBurpPluginInfo">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json" />
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
+            </result>
+        </action>
         <action name="api/fetchTestingSources" class="com.akto.action.testing.MarketplaceAction" method="fetchTestingSources">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -1557,6 +1579,18 @@
         </action>
 
         <action name="api/addCustomTest" class="com.akto.action.testing.MarketplaceAction" method="addCustomTest">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchUserLastLoginTs" class="com.akto.action.user.UserInfoAction" method="fetchUserLastLoginTs">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json">

@@ -10,6 +10,7 @@ import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
+import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -37,6 +38,8 @@ public class TestExecutor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class);
     private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
+
+
 
     public void init(TestingRun testingRun, ObjectId summaryId) {
         if (testingRun.getTestIdConfig() != 1) {
@@ -96,8 +99,10 @@ public class TestExecutor {
         );
     }
 
-    public void  apiWiseInit(TestingRun testingRun, ObjectId summaryId) {
+    public void apiWiseInit(TestingRun testingRun, ObjectId summaryId) {
         int accountId = Context.accountId.get();
+        int now = Context.now();
+        int maxConcurrentRequests = testingRun.getMaxConcurrentRequests() > 0 ? testingRun.getMaxConcurrentRequests() : 100;
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
         Map<String, SingleTypeInfo> singleTypeInfoMap = SampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
@@ -125,20 +130,18 @@ public class TestExecutor {
 
         TestingRunResultSummariesDao.instance.updateOne(
             Filters.eq("_id", summaryId),
-            Updates.set(TestingRunResultSummary.TOTAL_APIS, apiInfoKeyList.size())
-        );
+            Updates.set(TestingRunResultSummary.TOTAL_APIS, apiInfoKeyList.size()));
 
         CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
-        ExecutorService threadPool = Executors.newFixedThreadPool(100);
-
+        ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentRequests);
         List<Future<List<TestingRunResult>>> futureTestingRunResults = new ArrayList<>();
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
             try {
                  Future<List<TestingRunResult>> future = threadPool.submit(
-                         () -> startWithLatch(
-                                 apiInfoKey, testingRun.getTestIdConfig(), testingRun.getId(),testingRun.getTestingRunConfig(), testingUtil, summaryId, accountId, latch
-                         )
-                 );
+                         () -> startWithLatch(apiInfoKey,
+                                 testingRun.getTestIdConfig(),
+                                 testingRun.getId(),testingRun.getTestingRunConfig(), testingUtil, summaryId,
+                                 accountId, latch, now, testingRun.getTestRunTime()));
                  futureTestingRunResults.add(future);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error in API " + apiInfoKey + " : " + e.getMessage());
@@ -159,7 +162,9 @@ public class TestExecutor {
         for (Future<List<TestingRunResult>> future: futureTestingRunResults) {
             if (!future.isDone()) continue;
             try {
-                testingRunResults.addAll(future.get());
+                if (!future.get().isEmpty()) {
+                    testingRunResults.addAll(future.get());
+                }
             } catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();
             }
@@ -346,16 +351,18 @@ public class TestExecutor {
 
     public List<TestingRunResult> startWithLatch(
             ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId, TestingRunConfig testingRunConfig,
-            TestingUtil testingUtil, ObjectId testRunResultSummaryId, int accountId, CountDownLatch latch) {
+            TestingUtil testingUtil, ObjectId testRunResultSummaryId, int accountId, CountDownLatch latch, int startTime, int timeToKill) {
 
         Context.accountId.set(accountId);
         List<TestingRunResult> testingRunResults = new ArrayList<>();
-
-        try {
-            testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId);
-            TestingRunResultDao.instance.insertMany(testingRunResults);
-        } catch (Exception e) {
-            e.printStackTrace();
+        int now = Context.now();
+        if ( timeToKill <= 0 || now - startTime <= timeToKill) {
+            try {
+                testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId);
+                TestingRunResultDao.instance.insertMany(testingRunResults);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
 
         latch.countDown();
@@ -455,7 +462,7 @@ public class TestExecutor {
                         origTemplateURL = origTemplateURL.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/");
 
                         String subcategory = origTemplateURL.substring(origTemplateURL.lastIndexOf("/")+1).split("\\.")[0];
-                        FuzzingTest fuzzingTest = new FuzzingTest(testRunId.toHexString(), testRunResultSummaryId.toHexString(), origTemplateURL, subcategory);
+                        FuzzingTest fuzzingTest = new FuzzingTest(testRunId.toHexString(), testRunResultSummaryId.toHexString(), origTemplateURL, subcategory, testSubCategory);
                         TestingRunResult fuzzResult = runTest(fuzzingTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
                         if (fuzzResult != null) testingRunResults.add(fuzzResult);        
                     } catch (Exception e) {
@@ -476,8 +483,15 @@ public class TestExecutor {
         if (result == null) return null;
         int endTime = Context.now();
 
+        String subTestName = testPlugin.subTestName();
+
+        if (testPlugin instanceof FuzzingTest) {
+            FuzzingTest test = (FuzzingTest) testPlugin;
+            subTestName = test.getTestSourceConfigCategory();
+        }
+
         return new TestingRunResult(
-                testRunId, apiInfoKey, testPlugin.superTestName(), testPlugin.subTestName(), result.testResults,
+                testRunId, apiInfoKey, testPlugin.superTestName(), subTestName, result.testResults,
                 result.isVulnerable,result.singleTypeInfos, result.confidencePercentage,
                 startTime, endTime, testRunResultSummaryId
         );

@@ -160,6 +160,13 @@ public class UsersDao extends CommonContextDao<User> {
         return result;
     }
 
+    public Integer fetchUserLasLoginTs(int userId) {
+        User user = instance.getMCollection().find(eq("_id", userId)).projection(new BasicDBObject(User.LAST_LOGIN_TS,1)).first();
+        if (user == null) return null;
+
+        return user.getLastLoginTs();
+    }
+
     @Override
     public String getCollName() {
         return "users";

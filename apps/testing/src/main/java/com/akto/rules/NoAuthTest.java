@@ -20,13 +20,12 @@ public class NoAuthTest extends AuthRequiredTestPlugin {
         RawApi rawApi = filteredMessages.get(0).copy();
 
         OriginalHttpRequest testRequest = rawApi.getRequest();
-        OriginalHttpResponse originalHttpResponse = rawApi.getResponse();
 
         testingUtil.getAuthMechanism().removeAuthFromRequest(testRequest);
 
         ApiExecutionDetails apiExecutionDetails;
         try {
-             apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, originalHttpResponse);
+             apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApi);
         } catch (Exception e) {
             return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest, null);
         }
@@ -34,7 +33,7 @@ public class NoAuthTest extends AuthRequiredTestPlugin {
         boolean vulnerable = isStatusGood(apiExecutionDetails.statusCode);
 
         TestResult testResult = buildTestResult(
-                testRequest, apiExecutionDetails.testResponse, rawApi.getOriginalMessage(), apiExecutionDetails.percentageMatch, vulnerable, null
+                testRequest, apiExecutionDetails.testResponse, apiExecutionDetails.originalReqResp, apiExecutionDetails.percentageMatch, vulnerable, null
         );
         return addTestSuccessResult(
                 vulnerable, Collections.singletonList(testResult), new ArrayList<>(), TestResult.Confidence.HIGH

@@ -12,7 +12,6 @@ const TestingRunResults  = () => import( "@/apps/dashboard/views/testing/compone
 const CreateTestingRun  = () => import( "@/apps/dashboard/views/testing/components/CreateTestingRun")
 import store from '@/apps/main/store/module'
 const PageSignup = () => import("@/apps/signup/PageSignup")
-const PageOnboard = () => import("@/apps/signup/PageOnboard")
 const PageSettings = () => import("@/apps/dashboard/views/settings/PageSettings")
 const Observe = () => import( "@/apps/dashboard/views/observe/inventory/Observe")
 const Inventory = () => import("@/apps/dashboard/views/observe/inventory/Inventory")
@@ -49,11 +48,6 @@ const router =  new Router({
             path: '/signup',
             name: 'signup',
             component: PageSignup
-        },
-        {
-            path: '/dashboard/setup',
-            name: 'setup',
-            component: PageOnboard
         },
         {
             path: '/dashboard',

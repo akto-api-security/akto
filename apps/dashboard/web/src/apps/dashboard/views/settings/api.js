@@ -228,5 +228,14 @@ export default {
             data: {id}
         })
     },
+    fetchUserLastLoginTs() {
+        return request({
+            url: '/api/fetchUserLastLoginTs',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
+    },
 
 }

@@ -88,7 +88,8 @@ export default {
     data () {
         return {
             testSourceConfigs: [],
-            businessLogicCategories: [],
+            businessLogicSubcategories: [],
+            categories: [],
             loading: false,
             mapCategoryToSubcategory: {},
             recurringDaily: false,
@@ -103,7 +104,8 @@ export default {
         marketplaceApi.fetchAllMarketplaceSubcategories().then(resp => {
             _this.testSourceConfigs = resp.testSourceConfigs
             issuesApi.fetchAllSubCategories().then(resp => {
-                _this.businessLogicCategories = resp.subCategories
+                _this.businessLogicSubcategories = resp.subCategories
+                _this.categories = resp.categories
                 _this.loading = false
                 _this.mapCategoryToSubcategory = _this.populateMapCategoryToSubcategory()
             })
@@ -113,7 +115,7 @@ export default {
     },
     methods: {
         getCategoryName(category) {
-            return this.businessLogicCategories.find(x => x.superCategory.name === category).superCategory.displayName
+            return this.categories.find(x => x.name === category).displayName
         },
         setTestName(testName) {
             this.testName = testName
@@ -123,7 +125,7 @@ export default {
             let currObj = this.mapCategoryToSubcategory[this.selectedCategory]
             currObj.selected = this.globalCheckbox ? [...currObj.all] : []
         },
-        emitTestSelection({recurringDaily, startTimestamp}) {
+        emitTestSelection({recurringDaily, startTimestamp, testRunTime, maxConcurrentRequests}) {
             if (!this.testName) {
                 window._AKTO.$emit('SHOW_SNACKBAR', {
                     show: true,
@@ -139,6 +141,8 @@ export default {
                 recurringDaily: this.recurringDaily, 
                 startTimestamp: this.startTimestamp, 
                 selectedTests, 
+                testRunTime,
+                maxConcurrentRequests,
                 testName: this.testName
             }
             return this.$emit('testsSelected', ret)
@@ -158,7 +162,7 @@ export default {
                 ret[x.category].all.push(obj);
             })
 
-            this.businessLogicCategories.forEach(x => {
+            this.businessLogicSubcategories.forEach(x => {
                 if (!ret[x.superCategory.name]) {
                     ret[x.superCategory.name] = {selected: [], all: []}
                 }

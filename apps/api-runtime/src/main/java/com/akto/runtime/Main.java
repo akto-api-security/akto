@@ -134,11 +134,7 @@ public class Main {
         // mongoURI = "mongodb://write_ops:write_ops@cluster0-shard-00-00.yg43a.mongodb.net:27017,cluster0-shard-00-01.yg43a.mongodb.net:27017,cluster0-shard-00-02.yg43a.mongodb.net:27017/myFirstDatabase?ssl=true&replicaSet=atlas-qd3mle-shard-0&authSource=admin&retryWrites=true&w=majority";
         DaoInit.init(new ConnectionString(mongoURI));
         Context.accountId.set(1_000_000);
-        SingleTypeInfoDao.instance.getMCollection().updateMany(Filters.exists("apiCollectionId", false), Updates.set("apiCollectionId", 0));
-        SingleTypeInfo.init();
-
-        createIndices();
-        insertRuntimeFilters();
+        initializeRuntime();
 
         String centralKafkaTopicName = AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME;
 
@@ -152,21 +148,6 @@ public class Main {
             }
         }, 5, 5, TimeUnit.MINUTES);
 
-
-        try {
-            AccountSettingsDao.instance.updateVersion(AccountSettings.API_RUNTIME_VERSION);
-        } catch (Exception e) {
-            logger.error("error while updating dashboard version: " + e.getMessage());
-        }
-
-        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("_id", 0);
-        if (apiCollection == null) {
-            Set<String> urls = new HashSet<>();
-            for(SingleTypeInfo singleTypeInfo: SingleTypeInfoDao.instance.fetchAll()) {
-                urls.add(singleTypeInfo.getUrl());
-            }
-            ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), urls, null, 0));
-        }
 
         APIConfig apiConfig;
         apiConfig = APIConfigsDao.instance.findOne(Filters.eq("name", configName));
@@ -311,6 +292,28 @@ public class Main {
             e.printStackTrace();
         } finally {
             main.consumer.close();
+        }
+    }
+
+    public static void initializeRuntime(){
+        SingleTypeInfoDao.instance.getMCollection().updateMany(Filters.exists("apiCollectionId", false), Updates.set("apiCollectionId", 0));
+        SingleTypeInfo.init();
+
+        createIndices();
+        insertRuntimeFilters();
+        try {
+            AccountSettingsDao.instance.updateVersion(AccountSettings.API_RUNTIME_VERSION);
+        } catch (Exception e) {
+            logger.error("error while updating dashboard version: " + e.getMessage());
+        }
+
+        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("_id", 0);
+        if (apiCollection == null) {
+            Set<String> urls = new HashSet<>();
+            for(SingleTypeInfo singleTypeInfo: SingleTypeInfoDao.instance.fetchAll()) {
+                urls.add(singleTypeInfo.getUrl());
+            }
+            ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), urls, null, 0));
         }
     }
 

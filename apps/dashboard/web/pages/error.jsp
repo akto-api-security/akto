@@ -9,7 +9,7 @@
     <title>Error Page</title>
 </head>
 <body>
-<h4>User Name or Password is wrong</h4>
+<h4>OOPS! Something went wrong</h4>
 <s:include value="login.jsp"></s:include>
 </body>
 </html>

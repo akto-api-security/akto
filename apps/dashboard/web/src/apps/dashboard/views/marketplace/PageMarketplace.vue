@@ -53,7 +53,7 @@
                                 <div>Category</div>
                                 <v-select
                                     class="form-field-select"
-                                    :items="allCategories"
+                                    :items="businessCategoryNames"
                                     v-model="newTest.category"
                                     attach
                                 />
@@ -128,6 +128,7 @@ import ACard from '@/apps/dashboard/shared/components/ACard'
 import SimpleTextField from '@/apps/dashboard/shared/components/SimpleTextField'
 
 import api from './api'
+import issuesApi from '../issues/api'
 import func from '@/util/func'
 import { mapState } from 'vuex'
 
@@ -141,21 +142,20 @@ export default {
         SimpleTextField
     },
     data() {
-        let allCategories = ["BOLA", "BUA", "IAM", "BFLA"]
         let allSubcategories = ["path_traversal", "swagger_file_detection"]
         let allSeverities = ["HIGH", "MEDIUM", "LOW"]
         
         return {
             drawer: null,
             showCreateTestDialog: false,
-            allCategories,
             allSubcategories,
             allSeverities,
             addNewSubcategory: false,
             showSubcategoriesMenu: false,
+            businessCategories: [],
             newTest: {
                 url: "",
-                category: allCategories[0],
+                category: "BOLA",
                 subcategory: allSubcategories[0],
                 severity: allSeverities[0],
                 description: ""
@@ -208,14 +208,19 @@ export default {
     },
     async mounted() {
         await this.$store.dispatch('marketplace/fetchAllMarketplaceSubcategories')
+        let aktoTestTypes = await issuesApi.fetchAllSubCategories()
+        this.businessCategories = aktoTestTypes.subCategories
         this.$router.push(this.leftNavItems[0].items[0].link)
         
     },
     computed: {
         ...mapState('marketplace', ['defaultSubcategories', 'userSubcategories', 'loading']),
+        businessCategoryNames() {
+            return [...new Set(this.businessCategories.map(category => category.superCategory.name))].map(x => {return { text: (x + "/business-logic"), value: x}})
+        },
         leftNavItems() {
             return [
-                this.createCategoryObj(this.nameToKvObj(this.defaultSubcategories), "Categories", "default", "This week"),
+                this.createCategoryObj(this.businessCategoryNames.concat(this.nameToKvObj(this.defaultSubcategories)), "Categories", "default", "This week"),
                 this.createCategoryObj(this.nameToKvObj(this.userSubcategories), "Your tests", "custom", "Total")
             ]
         }

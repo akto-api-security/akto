@@ -14,6 +14,7 @@ import com.akto.testing.ApiExecutor;
 import com.akto.testing.StatusCodeAnalyser;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -38,20 +39,17 @@ public abstract class ChangeMethodPlugin extends TestPlugin {
         List<TestResult> testResults = new ArrayList<>();
         for (URLMethods.Method method: undocumentedMethods) {
             OriginalHttpRequest testRequest = rawApi.getRequest().copy();
-            OriginalHttpResponse originalHttpResponse = rawApi.getResponse().copy();
 
             modifyRequest(testRequest, method);
 
             ApiExecutionDetails apiExecutionDetails;
             TestResult testResult;
             try {
-                apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, originalHttpResponse);
-                int statusCode = StatusCodeAnalyser.getStatusCode(apiExecutionDetails.testResponse.getBody(), apiExecutionDetails.testResponse.getStatusCode());
-                double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), apiExecutionDetails.testResponse.getBody());
-                boolean vulnerable = isVulnerable(percentageMatch, statusCode);
+                apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApi);
+                boolean vulnerable = isVulnerable(apiExecutionDetails.percentageMatch, apiExecutionDetails.statusCode);
                 overallVulnerable = overallVulnerable || vulnerable;
 
-                testResult = buildTestResult(testRequest, apiExecutionDetails.testResponse, rawApi.getOriginalMessage(), percentageMatch, vulnerable, null);
+                testResult = buildTestResult(testRequest, apiExecutionDetails.testResponse, apiExecutionDetails.originalReqResp, apiExecutionDetails.percentageMatch, vulnerable, null);
             } catch (Exception e) {
                 testResult = buildFailedTestResultWithOriginalMessage( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest, null);
             }

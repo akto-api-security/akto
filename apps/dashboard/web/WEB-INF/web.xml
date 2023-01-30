@@ -12,6 +12,10 @@
         </cookie-config>
     </session-config>
 
+    <error-page>
+        <location>/pages/error.jsp</location>
+    </error-page>
+
     <filter>
         <filter-name>GzipFilter</filter-name>
         <filter-class>org.eclipse.jetty.servlets.GzipFilter</filter-class>
@@ -97,6 +101,9 @@
 
     <listener>
         <listener-class>com.akto.listener.InitializerListener</listener-class>
+    </listener>
+    <listener>
+        <listener-class>com.akto.listener.RuntimeListener</listener-class>
     </listener>
     <listener>
         <listener-class>com.akto.listener.KafkaListener</listener-class>

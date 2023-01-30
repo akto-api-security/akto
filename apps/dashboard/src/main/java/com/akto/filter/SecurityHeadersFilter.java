@@ -20,7 +20,6 @@ public class SecurityHeadersFilter implements Filter {
         httpServletResponse.addHeader("X-XSS-Protection", "1");
         httpServletResponse.addHeader("X-Content-Type-Options", "nosniff");
         httpServletResponse.addHeader("cache-control", "no-cache, no-store, must-revalidate, pre-check=0, post-check=0");
-        httpServletResponse.addHeader("server","AKTO server");
 
         if (Objects.equals(https, "true")) {
             httpServletResponse.addHeader("strict-transport-security","max-age=31536000; includeSubDomains; preload");

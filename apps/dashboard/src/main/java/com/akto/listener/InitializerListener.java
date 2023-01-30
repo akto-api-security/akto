@@ -42,6 +42,7 @@ import com.sendgrid.helpers.mail.Mail;
 import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
@@ -50,13 +51,17 @@ import org.slf4j.LoggerFactory;
 import javax.servlet.ServletContextListener;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 
+import static com.akto.util.Constants.ID;
 import static com.mongodb.client.model.Filters.eq;
 
 public class InitializerListener implements ServletContextListener {
@@ -64,8 +69,9 @@ public class InitializerListener implements ServletContextListener {
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     private static String domain = null;
+
     public static String getDomain() {
-        if(domain == null) {
+        if (domain == null) {
             if (true) {
                 domain = "https://staging.akto.io:8443";
             } else {
@@ -102,12 +108,12 @@ public class InitializerListener implements ServletContextListener {
                     String sendTo = UsersDao.instance.findOne(new BasicDBObject()).getLogin();
                     logger.info("Sending weekly email");
                     Mail mail = WeeklyEmail.buildWeeklyEmail(
-                        changesInfo.recentSentiiveParams, 
-                        changesInfo.newEndpointsLast7Days.size(), 
-                        changesInfo.newEndpointsLast31Days.size(), 
-                        sendTo, 
-                        changesInfo.newEndpointsLast7Days, 
-                        changesInfo.newSensitiveParams.keySet()
+                            changesInfo.recentSentiiveParams,
+                            changesInfo.newEndpointsLast7Days.size(),
+                            changesInfo.newEndpointsLast31Days.size(),
+                            sendTo,
+                            changesInfo.newEndpointsLast7Days,
+                            changesInfo.newSensitiveParams.keySet()
                     );
 
                     WeeklyEmail.send(mail);
@@ -119,7 +125,8 @@ public class InitializerListener implements ServletContextListener {
         }, delayInDays, 7, TimeUnit.DAYS);
 
     }
-    public void setUpPiiAndTestSourcesScheduler(){
+
+    public void setUpPiiAndTestSourcesScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 String mongoURI = System.getenv("AKTO_MONGO_CONN");
@@ -140,21 +147,26 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 4, TimeUnit.HOURS);
     }
 
-    static TestCategory findTestCategory(String path) {
-        if (path.contains("BrokenObjectLevelAuthorization")) return TestCategory.BOLA;
-        if (path.contains("ImproperAssetsManagement")) return TestCategory.IAM;
-        if (path.contains("BrokenUserAuthentication")) return TestCategory.NO_AUTH;
-        if (path.contains("BrokenFunctionLevelAuthorization")) return TestCategory.BFLA;
-        return null;
+    static TestCategory findTestCategory(String path, Map<String, TestCategory> shortNameToTestCategory) {
+        path = path.replaceAll("-", "").replaceAll("_", "").toLowerCase();
+        return shortNameToTestCategory.getOrDefault(path, TestCategory.UC);
     }
 
     static String findTestSubcategory(String path) {
         String parentPath = path.substring(0, path.lastIndexOf("/"));
-        return parentPath.substring(parentPath.lastIndexOf("/")+1);
+        return parentPath.substring(parentPath.lastIndexOf("/") + 1);
     }
 
     static void executeTestSourcesFetch() {
         try {
+            TestCategory[] testCategories = TestCategory.values();
+            Map<String, TestCategory> shortNameToTestCategory = new HashMap<>();
+            for (TestCategory tc : testCategories) {
+                String sn = tc.getShortName().replaceAll("-", "").replaceAll("_", "")
+                        .replaceAll(" ", "").toLowerCase();
+                shortNameToTestCategory.put(sn, tc);
+            }
+
             String testingSourcesRepoTree = "https://api.github.com/repos/akto-api-security/testing_sources/git/trees/master?recursive=1";
             String tempFilename = "temp_testingSourcesRepoTree.json";
             FileUtils.copyURLToFile(new URL(testingSourcesRepoTree), new File(tempFilename));
@@ -162,20 +174,40 @@ public class InitializerListener implements ServletContextListener {
             BasicDBObject fileList = BasicDBObject.parse(fileContent);
             BasicDBList files = (BasicDBList) (fileList.get("tree"));
 
-            if (files == null) return;
-            for (Object fileObj: files) {
-                BasicDBObject fileDetails = (BasicDBObject) fileObj;
-                String filePath = fileDetails.getString("path");
-                if (filePath.endsWith(".yaml")) {
-                    filePath = "https://github.com/akto-api-security/testing_sources/blob/master/" + filePath;
-                    if (TestSourceConfigsDao.instance.findOne("_id", filePath) == null) {
-                        TestCategory testCategory = findTestCategory(filePath);
-                        String subcategory = findTestSubcategory(filePath);
-                        TestSourceConfig testSourceConfig = new TestSourceConfig(filePath, testCategory, subcategory, Severity.HIGH, "", "default", Context.now());
-                        TestSourceConfigsDao.instance.insertOne(testSourceConfig);
-                    }
+            BasicDBObject systemTestsQuery = new BasicDBObject(TestSourceConfig.CREATOR, TestSourceConfig.DEFAULT);
+            List<TestSourceConfig> currConfigs = TestSourceConfigsDao.instance.findAll(systemTestsQuery);
+            Map<String, TestSourceConfig> currConfigsMap = new HashMap<>();
+            for (TestSourceConfig tsc : currConfigs) {
+
+                if (tsc.getCategory() == null || tsc.getCategory().equals(TestCategory.UC)) {
+                    Bson deleteQ = Filters.eq("_id", tsc.getId());
+                    TestSourceConfigsDao.instance.getMCollection().deleteOne(deleteQ);
+                } else {
+                    currConfigsMap.put(tsc.getId(), tsc);
                 }
             }
+
+            if (files == null) return;
+            for (Object fileObj : files) {
+                BasicDBObject fileDetails = (BasicDBObject) fileObj;
+                String filePath = fileDetails.getString("path");
+                if (filePath.endsWith(".yaml") || filePath.endsWith(".yml")) {
+                    String categoryFolder = filePath.split("/")[0];
+                    filePath = "https://github.com/akto-api-security/testing_sources/blob/master/" + filePath;
+//                    if (!currConfigsMap.containsKey(filePath)) {
+                    TestCategory testCategory = findTestCategory(categoryFolder, shortNameToTestCategory);
+                    String subcategory = findTestSubcategory(filePath);
+                    TestSourceConfig testSourceConfig = new TestSourceConfig(filePath, testCategory, subcategory, testCategory.getSeverity(), "", TestSourceConfig.DEFAULT, Context.now());
+                    TestSourceConfigsDao.instance.replaceOne(Filters.eq(ID, filePath), testSourceConfig);
+//                    }
+                    currConfigsMap.remove(filePath);
+                }
+            }
+
+            for (String toBeDeleted : currConfigsMap.keySet()) {
+                TestSourceConfigsDao.instance.getMCollection().deleteOne(new BasicDBObject("_id", toBeDeleted));
+            }
+
 
         } catch (IOException e1) {
             e1.printStackTrace();
@@ -186,7 +218,7 @@ public class InitializerListener implements ServletContextListener {
 
     static void executePIISourceFetch() {
         List<PIISource> piiSources = PIISourceDao.instance.findAll("active", true);
-        for (PIISource piiSource: piiSources) {
+        for (PIISource piiSource : piiSources) {
             String fileUrl = piiSource.getFileUrl();
             String id = piiSource.getId();
             Map<String, PIIType> currTypes = piiSource.getMapNameToPIIType();
@@ -196,7 +228,7 @@ public class InitializerListener implements ServletContextListener {
 
             try {
                 if (fileUrl.startsWith("http")) {
-                    String tempFileUrl = "temp_"+id;
+                    String tempFileUrl = "temp_" + id;
                     FileUtils.copyURLToFile(new URL(fileUrl), new File(tempFileUrl));
                     fileUrl = tempFileUrl;
                 }
@@ -205,18 +237,18 @@ public class InitializerListener implements ServletContextListener {
                 BasicDBList dataTypes = (BasicDBList) (fileObj.get("types"));
                 Bson findQ = Filters.eq("_id", id);
 
-                for (Object dtObj: dataTypes) {
+                for (Object dtObj : dataTypes) {
                     BasicDBObject dt = (BasicDBObject) dtObj;
                     String piiKey = dt.getString("name").toUpperCase();
                     PIIType piiType = new PIIType(
-                        piiKey,
-                        dt.getBoolean("sensitive"),
-                        dt.getString("regexPattern"),
-                        dt.getBoolean("onKey")
+                            piiKey,
+                            dt.getBoolean("sensitive"),
+                            dt.getString("regexPattern"),
+                            dt.getBoolean("onKey")
                     );
 
                     if (!dt.getBoolean("active", true)) {
-                        PIISourceDao.instance.updateOne(findQ, Updates.unset("mapNameToPIIType."+piiKey));
+                        PIISourceDao.instance.updateOne(findQ, Updates.unset("mapNameToPIIType." + piiKey));
                         CustomDataTypeDao.instance.updateOne("name", piiKey, Updates.set("active", false));
                     }
 
@@ -225,15 +257,15 @@ public class InitializerListener implements ServletContextListener {
                     } else {
                         CustomDataTypeDao.instance.deleteAll(Filters.eq("name", piiKey));
                         if (!dt.getBoolean("active", true)) {
-                            PIISourceDao.instance.updateOne(findQ, Updates.unset("mapNameToPIIType."+piiKey));
-                            CustomDataTypeDao.instance.insertOne(getCustomDataTypeFromPiiType(piiSource, piiType,false));
+                            PIISourceDao.instance.updateOne(findQ, Updates.unset("mapNameToPIIType." + piiKey));
+                            CustomDataTypeDao.instance.insertOne(getCustomDataTypeFromPiiType(piiSource, piiType, false));
 
                         } else {
-                            Bson updateQ = Updates.set("mapNameToPIIType."+piiKey, piiType);
+                            Bson updateQ = Updates.set("mapNameToPIIType." + piiKey, piiType);
                             PIISourceDao.instance.updateOne(findQ, updateQ);
-                            CustomDataTypeDao.instance.insertOne(getCustomDataTypeFromPiiType(piiSource, piiType,true));
-                        } 
-                        
+                            CustomDataTypeDao.instance.insertOne(getCustomDataTypeFromPiiType(piiSource, piiType, true));
+                        }
+
                     }
                 }
 
@@ -245,23 +277,23 @@ public class InitializerListener implements ServletContextListener {
         SingleTypeInfo.fetchCustomDataTypes();
     }
 
-    private static CustomDataType getCustomDataTypeFromPiiType(PIISource piiSource, PIIType piiType,Boolean active) {
+    private static CustomDataType getCustomDataTypeFromPiiType(PIISource piiSource, PIIType piiType, Boolean active) {
         String piiKey = piiType.getName();
 
-        List<Predicate> predicates = new ArrayList<>(); 
+        List<Predicate> predicates = new ArrayList<>();
         Conditions conditions = new Conditions(predicates, Operator.OR);
         predicates.add(new RegexPredicate(piiType.getRegexPattern()));
         IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
         CustomDataType ret = new CustomDataType(
-            piiKey, 
-            piiType.getIsSensitive(), 
-            Collections.emptyList(), 
-            piiSource.getAddedByUser(), 
-            active, 
-            conditions, 
-            (piiType.getOnKey() ? null : conditions), 
-            Operator.OR,
-            ignoreData
+                piiKey,
+                piiType.getIsSensitive(),
+                Collections.emptyList(),
+                piiSource.getAddedByUser(),
+                active,
+                conditions,
+                (piiType.getOnKey() ? null : conditions),
+                Operator.OR,
+                ignoreData
         );
 
         return ret;
@@ -278,18 +310,18 @@ public class InitializerListener implements ServletContextListener {
                     }
 
                     Slack slack = Slack.getInstance();
-        
-                    for(SlackWebhook slackWebhook: listWebhooks) {
-                        int now =Context.now();
+
+                    for (SlackWebhook slackWebhook : listWebhooks) {
+                        int now = Context.now();
                         // System.out.println("debugSlack: " + slackWebhook.getLastSentTimestamp() + " " + slackWebhook.getFrequencyInSeconds() + " " +now );
 
-                        if(slackWebhook.getFrequencyInSeconds()==0) {
-                            slackWebhook.setFrequencyInSeconds(24*60*60);
+                        if (slackWebhook.getFrequencyInSeconds() == 0) {
+                            slackWebhook.setFrequencyInSeconds(24 * 60 * 60);
                         }
 
-                        boolean shouldSend = ( slackWebhook.getLastSentTimestamp() + slackWebhook.getFrequencyInSeconds() ) <= now ;
-                        
-                        if(!shouldSend){
+                        boolean shouldSend = (slackWebhook.getLastSentTimestamp() + slackWebhook.getFrequencyInSeconds()) <= now;
+
+                        if (!shouldSend) {
                             continue;
                         }
 
@@ -299,16 +331,16 @@ public class InitializerListener implements ServletContextListener {
                         if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0) {
                             return;
                         }
-    
+
                         DailyUpdate dailyUpdate = new DailyUpdate(
-                            0, 0, 
-                            ci.newSensitiveParams.size(), ci.newEndpointsLast7Days.size(),
-                            ci.recentSentiiveParams, ci.newParamsInExistingEndpoints,
-                            slackWebhook.getLastSentTimestamp(), now ,
-                            ci.newSensitiveParams, slackWebhook.getDashboardUrl());
-                        
+                                0, 0,
+                                ci.newSensitiveParams.size(), ci.newEndpointsLast7Days.size(),
+                                ci.recentSentiiveParams, ci.newParamsInExistingEndpoints,
+                                slackWebhook.getLastSentTimestamp(), now,
+                                ci.newSensitiveParams, slackWebhook.getDashboardUrl());
+
                         slackWebhook.setLastSentTimestamp(now);
-                        SlackWebhooksDao.instance.updateOne(eq("webhook",slackWebhook.getWebhook()), Updates.set("lastSentTimestamp", now));
+                        SlackWebhooksDao.instance.updateOne(eq("webhook", slackWebhook.getWebhook()), Updates.set("lastSentTimestamp", now));
 
                         System.out.println("******************DAILY INVENTORY SLACK******************");
                         String webhookUrl = slackWebhook.getWebhook();
@@ -337,12 +369,12 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
-    public static void webhookSenderUtil(CustomWebhook webhook){
+    public static void webhookSenderUtil(CustomWebhook webhook) {
         int now = Context.now();
 
-        boolean shouldSend = ( webhook.getLastSentTimestamp() + webhook.getFrequencyInSeconds() ) <= now ;
+        boolean shouldSend = (webhook.getLastSentTimestamp() + webhook.getFrequencyInSeconds()) <= now;
 
-        if(webhook.getActiveStatus()!=ActiveStatus.ACTIVE || !shouldSend){
+        if (webhook.getActiveStatus() != ActiveStatus.ACTIVE || !shouldSend) {
             return;
         }
 
@@ -353,48 +385,48 @@ public class InitializerListener implements ServletContextListener {
 
         List<String> errors = new ArrayList<>();
 
-        Map<String,Object> valueMap = new HashMap<>();
+        Map<String, Object> valueMap = new HashMap<>();
 
         valueMap.put("AKTO.changes_info.newSensitiveEndpoints", ci.newSensitiveParamsObject);
-        valueMap.put("AKTO.changes_info.newSensitiveEndpointsCount",ci.newSensitiveParams.size());
+        valueMap.put("AKTO.changes_info.newSensitiveEndpointsCount", ci.newSensitiveParams.size());
 
-        valueMap.put("AKTO.changes_info.newEndpoints",ci.newEndpointsLast7DaysObject);
-        valueMap.put("AKTO.changes_info.newEndpointsCount",ci.newEndpointsLast7Days.size());
+        valueMap.put("AKTO.changes_info.newEndpoints", ci.newEndpointsLast7DaysObject);
+        valueMap.put("AKTO.changes_info.newEndpointsCount", ci.newEndpointsLast7Days.size());
 
-        valueMap.put("AKTO.changes_info.newSensitiveParametersCount",ci.recentSentiiveParams);
-        valueMap.put("AKTO.changes_info.newParametersCount",ci.newParamsInExistingEndpoints);
+        valueMap.put("AKTO.changes_info.newSensitiveParametersCount", ci.recentSentiiveParams);
+        valueMap.put("AKTO.changes_info.newParametersCount", ci.newParamsInExistingEndpoints);
 
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         String payload = null;
 
-        try{
-            payload = apiWorkflowExecutor.replaceVariables(webhook.getBody(),valueMap, false);
-        } catch(Exception e){
+        try {
+            payload = apiWorkflowExecutor.replaceVariables(webhook.getBody(), valueMap, false);
+        } catch (Exception e) {
             errors.add("Failed to replace variables");
         }
 
         webhook.setLastSentTimestamp(now);
-        CustomWebhooksDao.instance.updateOne(Filters.eq("_id",webhook.getId()), Updates.set("lastSentTimestamp", now));
+        CustomWebhooksDao.instance.updateOne(Filters.eq("_id", webhook.getId()), Updates.set("lastSentTimestamp", now));
 
-        Map<String,List<String>> headers = OriginalHttpRequest.buildHeadersMap(webhook.getHeaderString());
-        OriginalHttpRequest request = new OriginalHttpRequest(webhook.getUrl(),webhook.getQueryParams(),webhook.getMethod().toString(),payload,headers,"");
+        Map<String, List<String>> headers = OriginalHttpRequest.buildHeadersMap(webhook.getHeaderString());
+        OriginalHttpRequest request = new OriginalHttpRequest(webhook.getUrl(), webhook.getQueryParams(), webhook.getMethod().toString(), payload, headers, "");
         OriginalHttpResponse response = null; // null response means api request failed. Do not use new OriginalHttpResponse() in such cases else the string parsing fails.
 
         try {
-            response = ApiExecutor.sendRequest(request,true);
+            response = ApiExecutor.sendRequest(request, true);
             System.out.println("webhook request sent");
-        } catch(Exception e){
+        } catch (Exception e) {
             errors.add("API execution failed");
         }
 
         String message = null;
-        try{
+        try {
             message = RedactSampleData.convertOriginalReqRespToString(request, response);
-        } catch(Exception e){
+        } catch (Exception e) {
             errors.add("Failed converting sample data");
         }
 
-        CustomWebhookResult webhookResult = new CustomWebhookResult(webhook.getId(),webhook.getUserEmail(),now,message,errors);
+        CustomWebhookResult webhookResult = new CustomWebhookResult(webhook.getId(), webhook.getUserEmail(), now, message, errors);
         CustomWebhooksResultDao.instance.insertOne(webhookResult);
     }
 
@@ -404,8 +436,8 @@ public class InitializerListener implements ServletContextListener {
             if (listWebhooks == null || listWebhooks.isEmpty()) {
                 return;
             }
-            
-            for(CustomWebhook webhook:listWebhooks) {
+
+            for (CustomWebhook webhook : listWebhooks) {
                 webhookSenderUtil(webhook);
             }
 
@@ -414,7 +446,7 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    public void setUpWebhookScheduler(){
+    public void setUpWebhookScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 String mongoURI = System.getenv("AKTO_MONGO_CONN");
@@ -449,7 +481,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
 
-    public static UrlResult extractUrlFromBasicDbObject(BasicDBObject singleTypeInfo, Map<Integer, ApiCollection> apiCollectionMap)  {
+    public static UrlResult extractUrlFromBasicDbObject(BasicDBObject singleTypeInfo, Map<Integer, ApiCollection> apiCollectionMap) {
         String method = singleTypeInfo.getString("method");
         String path = singleTypeInfo.getString("url");
 
@@ -489,7 +521,7 @@ public class InitializerListener implements ServletContextListener {
 
     protected static ChangesInfo getChangesInfo(int newEndpointsFrequency, int newSensitiveParamsFrequency) {
         try {
-            
+
             ChangesInfo ret = new ChangesInfo();
             int now = Context.now();
             List<BasicDBObject> newEndpointsSmallerDuration = new InventoryAction().fetchRecentEndpoints(now - newSensitiveParamsFrequency, now);
@@ -497,29 +529,29 @@ public class InitializerListener implements ServletContextListener {
 
             Map<Integer, ApiCollection> apiCollectionMap = ApiCollectionsDao.instance.generateApiCollectionMap();
 
-            int newParamInNewEndpoint=0;
+            int newParamInNewEndpoint = 0;
 
-            for (BasicDBObject singleTypeInfo: newEndpointsSmallerDuration) {
+            for (BasicDBObject singleTypeInfo : newEndpointsSmallerDuration) {
                 newParamInNewEndpoint += (int) singleTypeInfo.getOrDefault("countTs", 0);
                 singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
                 UrlResult urlResult = extractUrlFromBasicDbObject(singleTypeInfo, apiCollectionMap);
                 ret.newEndpointsLast7Days.add(urlResult.urlString);
                 ret.newEndpointsLast7DaysObject.add(urlResult.urlObject);
             }
-    
-            for (BasicDBObject singleTypeInfo: newEndpointsBiggerDuration) {
+
+            for (BasicDBObject singleTypeInfo : newEndpointsBiggerDuration) {
                 singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
                 UrlResult urlResult = extractUrlFromBasicDbObject(singleTypeInfo, apiCollectionMap);
                 ret.newEndpointsLast31Days.add(urlResult.urlString);
                 ret.newEndpointsLast31DaysObject.add(urlResult.urlObject);
             }
-    
+
             List<SingleTypeInfo> sensitiveParamsList = new InventoryAction().fetchSensitiveParams();
             ret.totalSensitiveParams = sensitiveParamsList.size();
             ret.recentSentiiveParams = 0;
             int delta = newSensitiveParamsFrequency;
             Map<Pair<String, String>, Set<String>> endpointToSubTypes = new HashMap<>();
-            for(SingleTypeInfo sti: sensitiveParamsList) {
+            for (SingleTypeInfo sti : sensitiveParamsList) {
                 ApiCollection apiCollection = apiCollectionMap.get(sti.getApiCollectionId());
                 String url = sti.getUrl();
                 if (apiCollection != null && apiCollection.getHostName() != null) {
@@ -528,11 +560,11 @@ public class InitializerListener implements ServletContextListener {
                 }
 
                 String encoded = Base64.getEncoder().encodeToString((sti.getUrl() + " " + sti.getMethod()).getBytes());
-                String link = "/dashboard/observe/inventory/"+sti.getApiCollectionId()+"/"+encoded;
+                String link = "/dashboard/observe/inventory/" + sti.getApiCollectionId() + "/" + encoded;
                 Pair<String, String> key = new Pair<>(sti.getMethod() + " " + url, link);
                 String value = sti.getSubType().getName();
                 if (sti.getTimestamp() >= now - delta) {
-                    ret.recentSentiiveParams ++;
+                    ret.recentSentiiveParams++;
                     Set<String> subTypes = endpointToSubTypes.get(key);
                     if (subTypes == null) {
                         subTypes = new HashSet<>();
@@ -542,7 +574,7 @@ public class InitializerListener implements ServletContextListener {
                 }
             }
 
-            for(Pair<String, String> key: endpointToSubTypes.keySet()) {
+            for (Pair<String, String> key : endpointToSubTypes.keySet()) {
                 String subTypes = StringUtils.join(endpointToSubTypes.get(key), ",");
                 String methodPlusUrl = key.getFirst();
                 ret.newSensitiveParams.put(methodPlusUrl + ": " + subTypes, key.getSecond());
@@ -552,19 +584,19 @@ public class InitializerListener implements ServletContextListener {
                 if (methodPlusUrlList.length != 2) continue;
                 basicDBObject.put("url", methodPlusUrlList[1]);
                 basicDBObject.put("method", methodPlusUrlList[0]);
-                basicDBObject.put("subTypes",  subTypes);
+                basicDBObject.put("subTypes", subTypes);
                 ret.newSensitiveParamsObject.add(basicDBObject);
             }
 
             List<SingleTypeInfo> allNewParameters = new InventoryAction().fetchAllNewParams(now - newEndpointsFrequency, now);
-            int totalNewParameters=allNewParameters.size();
+            int totalNewParameters = allNewParameters.size();
             ret.newParamsInExistingEndpoints = Math.max(0, totalNewParameters - newParamInNewEndpoint);
-            
+
             return ret;
         } catch (Exception e) {
             logger.error("get new endpoints", e);
         }
-        
+
         return null;
     }
 
@@ -617,6 +649,17 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
+    public void deleteAccessListFromApiToken(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getDeleteAccessListFromApiToken() == 0) {
+            ApiTokensDao.instance.updateMany(new BasicDBObject(), Updates.unset("accessList"));
+        }
+
+        BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.DELETE_ACCESS_LIST_FROM_API_TOKEN, Context.now())
+        );
+    }
+
     public void readyForNewTestingFramework(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getReadyForNewTestingFramework() == 0) {
             TestingRunDao.instance.getMCollection().drop();
@@ -631,25 +674,25 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    public void addAktoDataTypes(BackwardCompatibility backwardCompatibility){
-        if(backwardCompatibility.getAddAktoDataTypes()==0){
+    public void addAktoDataTypes(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getAddAktoDataTypes() == 0) {
             List<AktoDataType> aktoDataTypes = new ArrayList<>();
             int now = Context.now();
             IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
-            aktoDataTypes.add(new AktoDataType("JWT", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER),now,ignoreData));
-            aktoDataTypes.add(new AktoDataType("EMAIL", true, Collections.emptyList(),now,ignoreData));
-            aktoDataTypes.add(new AktoDataType("CREDIT_CARD", true, Collections.emptyList(),now,ignoreData));
-            aktoDataTypes.add(new AktoDataType("SSN", true, Collections.emptyList(),now,ignoreData));
-            aktoDataTypes.add(new AktoDataType("ADDRESS", true, Collections.emptyList(),now,ignoreData));
-            aktoDataTypes.add(new AktoDataType("IP_ADDRESS", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER),now,ignoreData));
-            aktoDataTypes.add(new AktoDataType("PHONE_NUMBER", true, Collections.emptyList(),now,ignoreData));
-            aktoDataTypes.add(new AktoDataType("UUID", false, Collections.emptyList(),now,ignoreData));
+            aktoDataTypes.add(new AktoDataType("JWT", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER), now, ignoreData));
+            aktoDataTypes.add(new AktoDataType("EMAIL", true, Collections.emptyList(), now, ignoreData));
+            aktoDataTypes.add(new AktoDataType("CREDIT_CARD", true, Collections.emptyList(), now, ignoreData));
+            aktoDataTypes.add(new AktoDataType("SSN", true, Collections.emptyList(), now, ignoreData));
+            aktoDataTypes.add(new AktoDataType("ADDRESS", true, Collections.emptyList(), now, ignoreData));
+            aktoDataTypes.add(new AktoDataType("IP_ADDRESS", false, Arrays.asList(SingleTypeInfo.Position.RESPONSE_PAYLOAD, SingleTypeInfo.Position.RESPONSE_HEADER), now, ignoreData));
+            aktoDataTypes.add(new AktoDataType("PHONE_NUMBER", true, Collections.emptyList(), now, ignoreData));
+            aktoDataTypes.add(new AktoDataType("UUID", false, Collections.emptyList(), now, ignoreData));
             AktoDataTypeDao.instance.getMCollection().drop();
-            AktoDataTypeDao.instance.insertMany(aktoDataTypes);    
-            
+            AktoDataTypeDao.instance.insertMany(aktoDataTypes);
+
             BackwardCompatibilityDao.instance.updateOne(
-                Filters.eq("_id", backwardCompatibility.getId()),
-                Updates.set(BackwardCompatibility.ADD_AKTO_DATA_TYPES, Context.now())
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.ADD_AKTO_DATA_TYPES, Context.now())
             );
         }
     }
@@ -689,16 +732,17 @@ public class InitializerListener implements ServletContextListener {
             addAktoDataTypes(backwardCompatibility);
             updateDeploymentStatus(backwardCompatibility);
             dropAuthMechanismData(backwardCompatibility);
+            deleteAccessListFromApiToken(backwardCompatibility);
 
             SingleTypeInfo.init();
 
             Context.accountId.set(1000000);
-            
+
             if (PIISourceDao.instance.findOne("_id", "A") == null) {
                 String fileUrl = "https://raw.githubusercontent.com/akto-api-security/pii-types/master/general.json";
                 PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
                 piiSource.setId("A");
-        
+
                 PIISourceDao.instance.insertOne(piiSource);
             }
 
@@ -718,25 +762,55 @@ public class InitializerListener implements ServletContextListener {
         } catch (Exception e) {
             logger.error("error while updating dashboard version: " + e.getMessage());
         }
+
+        try {
+            readAndSaveBurpPluginVersion();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    public static int burpPluginVersion = -1;
+
+    public void readAndSaveBurpPluginVersion() {
+        URL url = this.getClass().getResource("/Akto.jar");
+        if (url == null) return;
+
+        try (JarFile jarFile = new JarFile(url.getPath())) {
+            Enumeration<JarEntry> jarEntries = jarFile.entries();
+
+            while (jarEntries.hasMoreElements()) {
+                JarEntry entry = jarEntries.nextElement();
+                if (entry.getName().contains("AktoVersion.txt")) {
+                    InputStream inputStream = jarFile.getInputStream(entry);
+                    String result = IOUtils.toString(inputStream, StandardCharsets.UTF_8);
+                    burpPluginVersion = Integer.parseInt(result.trim());
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
     }
 
     public void updateDeploymentStatus(BackwardCompatibility backwardCompatibility) {
         String ownerEmail = System.getenv("OWNER_EMAIL");
-        if(ownerEmail == null) {
+        if (ownerEmail == null) {
             logger.info("Owner email missing, might be an existing customer, skipping sending an slack and mixpanel alert");
             return;
         }
-        if(backwardCompatibility.isDeploymentStatusUpdated()){
+        if (backwardCompatibility.isDeploymentStatusUpdated()) {
             logger.info("Deployment status has already been updated, skipping this");
             return;
         }
-        String body = "{\n    \"ownerEmail\": \""+ ownerEmail +"\",\n    \"stackStatus\": \"COMPLETED\",\n    \"cloudType\": \"AWS\"\n}";
+        String body = "{\n    \"ownerEmail\": \"" + ownerEmail + "\",\n    \"stackStatus\": \"COMPLETED\",\n    \"cloudType\": \"AWS\"\n}";
         String headers = "{\"Content-Type\": \"application/json\"}";
-        OriginalHttpRequest request = new OriginalHttpRequest(getUpdateDeploymentStatusUrl(),"","POST", body, OriginalHttpRequest.buildHeadersMap(headers),"");
+        OriginalHttpRequest request = new OriginalHttpRequest(getUpdateDeploymentStatusUrl(), "", "POST", body, OriginalHttpRequest.buildHeadersMap(headers), "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request,false);
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, false);
             logger.info("Update deployment status reponse: {}", response.getBody());
-        } catch(Exception e){
+        } catch (Exception e) {
             logger.error("Failed to update deployment status, will try again on next boot up", e);
             return;
         }
@@ -748,6 +822,6 @@ public class InitializerListener implements ServletContextListener {
 
     private String getUpdateDeploymentStatusUrl() {
         String url = System.getenv("UPDATE_DEPLOYMENT_STATUS_URL");
-        return url != null ? url: "https://stairway.akto.io/deployment/status";
+        return url != null ? url : "https://stairway.akto.io/deployment/status";
     }
 }

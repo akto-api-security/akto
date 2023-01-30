@@ -73,6 +73,7 @@ public class APICatalogSync {
             try {
                 processResponse(requestTemplate, iter.next(), deletedInfo);
             } catch (Exception e) {
+                e.printStackTrace();
                 logger.error("processResponse: " + e.getMessage());
             }
         }
