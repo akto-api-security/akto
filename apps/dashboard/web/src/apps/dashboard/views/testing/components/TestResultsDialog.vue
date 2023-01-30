@@ -32,7 +32,7 @@
                                                 </span>
                                             </v-col>
                                         </v-row>
-                                        <v-row class="mx-0 pa-0"
+                                        <v-row v-if="issuesDetails.id.testSubCategory" class="mx-0 pa-0"
                                             :style="{ 'margin-top': '10px', 'margin-bottom': '10px' }">
                                             <v-col cols="2" class="ma-0 pa-0">
                                                 <span class="description-content">Tags</span>
@@ -50,14 +50,14 @@
                             </div>
                             <div class="d-flex flex-column mt-4">
                                 <span class="description-title">Issue Details</span>
-                                <div class="mt-3">
+                                <div class="mt-3" v-if="issuesDetails.id.testSubCategory">
                                     <span class="description-content"
                                         v-html="replaceTags(subCatogoryMap[issuesDetails.id.testSubCategory].issueDetails)"></span>
                                 </div>
                             </div>
                             <div class="d-flex flex-column mt-4">
                                 <span class="description-title">Impact</span>
-                                <div class="mt-3">
+                                <div class="mt-3" v-if="issuesDetails.id.testSubCategory">
                                     <span class="description-content"
                                         v-html="subCatogoryMap[issuesDetails.id.testSubCategory].issueImpact"></span>
                                 </div>
@@ -76,7 +76,7 @@
                                 </table>
                                 <!-- <span v-if="!isTestingPage" class="issue-summary clickable-line ml-4" @click="$emit('showAllIssueByCategory', subCatogoryMap[issuesDetails.id.testSubCategory])">Show all endpoints</span> -->
                             </div>
-                            <div class="d-flex flex-column mt-4">
+                            <div class="d-flex flex-column mt-4" v-if="issuesDetails.id.testSubCategory">
                                 <span class="description-title">References</span>
                                 <ul class="mt-3">
                                     <li class="description-content mt-2 "

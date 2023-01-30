@@ -229,13 +229,28 @@ export default {
                 this.selectedDate = Math.max(...this.testingRunResultSummaries.map(o => o.startTimestamp))
             })
         },
+        getRunResultSubCategory (runResult) {
+            debugger
+            if (this.subCatogoryMap[runResult.testSubType] === undefined) {
+                return this.subCategoryFromSourceConfigMap[runResult.testSubType].subcategory
+            } else {
+                return this.subCatogoryMap[runResult.testSubType].testName
+            }
+        },
+        getRunResultCategory (runResult) {
+            if (this.subCatogoryMap[runResult.testSubType] === undefined) {
+                return this.subCategoryFromSourceConfigMap[runResult.testSubType].category.shortName
+            } else {
+                return this.subCatogoryMap[runResult.testSubType].superCategory.shortName
+            }
+        },
         prepareForTable(runResult) {
             return {
                 ...runResult,
                 endpoint: runResult.apiInfoKey.method + " " + runResult.apiInfoKey.url,
                 severity: runResult["vulnerable"] ? "HIGH" : null,
-                testSubType: this.subCatogoryMap[runResult.testSubType].testName,
-                testSuperType: this.subCatogoryMap[runResult.testSubType].superCategory.shortName
+                testSubType: this.getRunResultSubCategory (runResult),
+                testSuperType: this.getRunResultCategory(runResult)
             }
         },
         async openDetails(row) {
@@ -264,6 +279,11 @@ export default {
         subCatogoryMap: {
             get() {
                 return this.$store.state.issues.subCatogoryMap
+            }
+        },
+        subCategoryFromSourceConfigMap: {
+            get() {
+                return this.$store.state.issues.subCategoryFromSourceConfigMap
             }
         },
         mapCollectionIdToName() {

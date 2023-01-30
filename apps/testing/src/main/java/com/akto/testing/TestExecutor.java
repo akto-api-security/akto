@@ -10,6 +10,7 @@ import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
+import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -37,6 +38,8 @@ public class TestExecutor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class);
     private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
+
+
 
     public void init(TestingRun testingRun, ObjectId summaryId) {
         if (testingRun.getTestIdConfig() != 1) {
@@ -459,7 +462,7 @@ public class TestExecutor {
                         origTemplateURL = origTemplateURL.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/");
 
                         String subcategory = origTemplateURL.substring(origTemplateURL.lastIndexOf("/")+1).split("\\.")[0];
-                        FuzzingTest fuzzingTest = new FuzzingTest(testRunId.toHexString(), testRunResultSummaryId.toHexString(), origTemplateURL, subcategory);
+                        FuzzingTest fuzzingTest = new FuzzingTest(testRunId.toHexString(), testRunResultSummaryId.toHexString(), origTemplateURL, subcategory, testSubCategory);
                         TestingRunResult fuzzResult = runTest(fuzzingTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
                         if (fuzzResult != null) testingRunResults.add(fuzzResult);        
                     } catch (Exception e) {
@@ -480,8 +483,15 @@ public class TestExecutor {
         if (result == null) return null;
         int endTime = Context.now();
 
+        String subTestName = testPlugin.subTestName();
+
+        if (testPlugin instanceof FuzzingTest) {
+            FuzzingTest test = (FuzzingTest) testPlugin;
+            subTestName = test.getTestSourceConfigCategory();
+        }
+
         return new TestingRunResult(
-                testRunId, apiInfoKey, testPlugin.superTestName(), testPlugin.subTestName(), result.testResults,
+                testRunId, apiInfoKey, testPlugin.superTestName(), subTestName, result.testResults,
                 result.isVulnerable,result.singleTypeInfos, result.confidencePercentage,
                 startTime, endTime, testRunResultSummaryId
         );

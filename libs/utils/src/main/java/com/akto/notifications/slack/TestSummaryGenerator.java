@@ -62,7 +62,7 @@ public class TestSummaryGenerator {
         List<LinkWithDescription> linkWithDescriptionList = new ArrayList<>();
         for (TestingRunIssues issue: generateResult.testingRunIssues) {
             TestingIssuesId id = issue.getId();
-            String issueName = id.getTestSubCategory().getIssueDescription();
+            String issueName = id.getTestSubCategory() == null ? id.getTestCategoryFromSourceConfig() : id.getTestSubCategory().getIssueDescription();
             ApiInfo.ApiInfoKey apiInfoKey =  id.getApiInfoKey();
             String url = apiInfoKey.getUrl();
             String method = apiInfoKey.getMethod().name();

@@ -18,7 +18,9 @@ const state = {
     startEpoch : 0,
     selectedIssueIds : [],
     testingRunResult: {},
-    subCatogoryMap: {}
+    subCatogoryMap: {},
+    subCategoryFromSourceConfigMap: {},
+    testCategoryMap: {}
 }
 
 const issues = {
@@ -107,11 +109,20 @@ const issues = {
         },
         fetchAllSubCategories() {
             return api.fetchAllSubCategories().then((resp) => {
+                debugger
                 state.subCatogoryMap = {}
                 resp.subCategories.forEach((x) => {
                     state.subCatogoryMap[x.name] = x
                 })
-            }).catch((err) => {
+                state.subCategoryFromSourceConfigMap = {}
+                resp.testSourceConfigs.forEach((x) => {
+                    state.subCategoryFromSourceConfigMap[x.id] = x
+                })
+                state.testCategoryMap = {}
+                resp.categories.forEach((x) => {
+                    state.testCategoryMap[x.name] = x
+                })
+            }).catch((err) => { 
                 console.log(err);
             })
         },
