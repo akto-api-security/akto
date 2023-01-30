@@ -103,7 +103,7 @@
           </v-btn>
           <v-btn primary dark depressed class="github-btn" @click='openGithubTestingSourcesPage'>    
             <v-icon size="16">$githubIcon</v-icon>  
-            Contribute
+            Star
           </v-btn>        
           
         </div>
