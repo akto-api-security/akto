@@ -6,6 +6,8 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome' // Integration
 import CurlyBraces from "../apps/dashboard/shared/icons/CurlyBraces"
 import Burpsuite from "../apps/dashboard/shared/icons/Burpsuite"
 import Slack from "../apps/dashboard/shared/icons/Slack"
+import GithubName from "../apps/dashboard/shared/icons/GithubName"
+import GithubIcon from "../apps/dashboard/shared/icons/GithubIcon"
 import Postman from "../apps/dashboard/shared/icons/Postman"
 import AWS from "../apps/dashboard/shared/icons/AWS"
 import GCP from "../apps/dashboard/shared/icons/GCP"
@@ -104,6 +106,7 @@ import {
   faLaptopHouse,
   faAnchor,
   faArrowRight,
+  faGift
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -135,7 +138,7 @@ const faIcons = [
   faCreditCard,faAddressCard,faChalkboard,faFilter,faKey,faAngleDoubleDown,faAngleDoubleUp,faUpload,faRedo,faGlobe,faAngleDown,
   faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faCaretSquareUp,
   faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faThumbsUp,faCaretUp,faShareAlt,faUserPlus,faCaretDown,
-  faLaptopHouse,faAnchor,fabGithub,faArrowRight,
+  faLaptopHouse,faAnchor,fabGithub,faArrowRight,faGift,
   
   farComments,farCalendar, farHandPointRight, farBuilding, farStar,farSquare, farCheckSquare,farFolder,farFolderOpen,farClock,
   farQuestionCircle,
@@ -209,6 +212,14 @@ faIconsOpts.slack = {
 
 faIconsOpts.restapi = {
   component: Restapi
+}
+
+faIconsOpts.githubName = {
+  component: GithubName
+}
+
+faIconsOpts.githubIcon = {
+  component: GithubIcon
 }
 
 faIconsOpts.customwebhooks = {

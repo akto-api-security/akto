@@ -58,6 +58,15 @@
       </div>
 
       <v-list dense nav class="left-nav" style="margin-top: auto">
+        <v-list-item class='row-nav-drawer' id="beamer-btn" @click="addCss">
+          <v-list-item-icon class="icon-nav-drawer">
+            <v-icon>$fas_gift</v-icon>
+          </v-list-item-icon>
+          <v-list-item-content class="content-nav-drawer">
+            <v-list-item-title class="title-nav-drawer">Updates</v-list-item-title>
+          </v-list-item-content>
+        </v-list-item>
+
         <v-list-item class='row-nav-drawer' @click="openDocs">
           <v-list-item-icon class="icon-nav-drawer">
             <v-icon>$fas_user-secret</v-icon>
@@ -88,6 +97,16 @@
           <template slot="universal-ctas">
           </template>
         </router-view>
+        <div class="akto-external-links">
+          <v-btn primary dark depressed color="#4A154B" @click='openSlackCommunity'>
+            Ask us on <v-icon size="16">$slack</v-icon>
+          </v-btn>
+          <v-btn primary dark depressed class="github-btn" @click='openGithubTestingSourcesPage'>    
+            <v-icon size="16">$githubIcon</v-icon>  
+            Contribute
+          </v-btn>        
+          
+        </div>
       </div>
     </v-main>
   </v-app>
@@ -186,6 +205,12 @@ export default {
   },
   methods: {
     ...mapGetters('auth', ['getUsername', 'getAvatar', 'getActiveAccount', 'getAccounts']),
+    openSlackCommunity() {
+      return window.open("https://join.slack.com/t/aktocommunity/shared_invite/zt-1nqfw3knb-XO~r7UZyzD9f8_Ddm4R1lg")
+    },
+    openGithubTestingSourcesPage() {
+      return window.open("https://github.com/akto-api-security/testing_sources/")
+    },
     openDocs() {
       window.open('https://docs.akto.io/deploy/self-hosted-deployment/aws-deploy', '_blank')
     },
@@ -221,6 +246,7 @@ export default {
   background-color: #ffffff
   border-radius: 8px 0 0 8px
   height: 100%
+  position: relative
 
 .group-nav-drawer
   padding: 0px
@@ -357,4 +383,16 @@ export default {
 .v-navigation-drawer__content
   display: flex
   flex-direction: column
+
+.github-btn
+  background: linear-gradient(180deg, #f6f8fa, #ebf0f4 90%)  
+  color: #24292f !important
+  border: 1px solid rgba(27,31,36,.15)
+  margin-left: 8px
+
+.akto-external-links
+  position: absolute
+  right: 0px
+  top: 0px  
+  padding: 18px 24px
 </style>

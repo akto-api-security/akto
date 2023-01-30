@@ -2,7 +2,7 @@
     <spinner v-if="endpointsLoading" />
     <div class="pr-4 api-endpoints" v-else>
         <div>
-            <div class="d-flex jc-end pb-3">
+            <div class="d-flex jc-end pb-3 pt-3">
                     <v-tooltip bottom>
                         <template v-slot:activator='{on, attrs}'>
                             <v-btn 
