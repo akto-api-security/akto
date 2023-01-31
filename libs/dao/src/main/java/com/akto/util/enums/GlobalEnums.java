@@ -380,7 +380,7 @@ public class GlobalEnums {
                     return testSubCategory;
                 }
             }
-            throw new IllegalStateException("Unknown TestCategory passed :- " + category);
+            return null;
         }
 
         public String getName() {
