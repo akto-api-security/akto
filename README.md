@@ -1,20 +1,38 @@
 # Akto.io API Security
 
-This is an open-source API security product that helps to protect your API from various attacks such as SQL injection, cross-site scripting (XSS), and cross-site request forgery (CSRF).
+# What is Akto?
 
-## Features
+[How it works](https://docs.akto.io/#how-it-works) • [Getting-Started](https://docs.akto.io/#how-to-get-started) • [API Inventory](https://docs.akto.io/api-inventory/api-collections) • [API testing](https://docs.akto.io/testing/run-test) • [Add Test](https://docs.akto.io/testing/test-library) • [Join Slack community](https://join.slack.com/t/aktocommunity/shared\_invite/zt-1nqfw3knb-XO\~r7UZyzD9f8\_Ddm4R1lg) •
 
-- Get your API Inventory
-- Run automated tests for BOLA, BUA, JWT tests
-- Import data from Burpsuite and Postman
+Akto is a plug-n-play API security platform that takes only 60 secs to get started. Akto is used by security teams to maintain a continuous inventory of APIs, test APIs for vulnerabilities and find runtime issues. Akto offers tests for all OWASP top 10 and HackerOne Top 10 categories including BOLA, authentication, SSRF, XSS, security configurations, etc. Akto's powerful testing engine runs variety of business logic tests by reading traffic data to understand API traffic pattern leading to reduced false positives. Akto can integrate with multiple traffic sources - burpsuite, AWS, postman, GCP, gateways, etc.
 
-## Getting Started
+Akto enables security and engineering teams to secure their APIs by doing three things:
 
-### Quick local deploy
-Execute the following command: 
-`/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/cf-deploy-akto)"`
+1. [API inventory](https://docs.akto.io/api-inventory/api-collections)
+2. [Run business logic tests in CI/CD](https://docs.akto.io/testing/run-test)
+3. [Find vulnerabilities in run-time](https://docs.akto.io/api-inventory/sensitive-data)
 
-### Deploy (Suggest better title here)
+## How it works?
+
+Step 1: Create inventory
+
+<figure><img src="https://2145800921-files.gitbook.io/~/files/v0/b/gitbook-x-prod.appspot.com/o/spaces%2FRc4KTKGprZI2sPWKoaLe%2Fuploads%2FRXIYBFFP0cIi5gyJ02ZD%2FScreenshot%202023-01-26%20at%205.07.03%20PM.png?alt=media&token=d2976b86-d0cf-40f6-b17a-2611adceea05" alt=""><figcaption></figcaption></figure>
+
+Step 2: Run tests
+
+<figure><img src="https://2145800921-files.gitbook.io/~/files/v0/b/gitbook-x-prod.appspot.com/o/spaces%2FRc4KTKGprZI2sPWKoaLe%2Fuploads%2FPBJv5INL2k1UZOUXPbOG%2FScreenshot%202023-01-26%20at%205.08.19%20PM.png?alt=media&token=511b637c-1558-434a-b606-7983d24006a9" alt=""><figcaption></figcaption></figure>
+
+## How to get Started?
+
+There are two ways:
+
+1. [Self Hosted](https://docs.akto.io/getting-started/quick-start-with-akto-self-hosted)
+   1. [Local Deploy](https://docs.akto.io/getting-started/quick-start-with-akto-self-hosted/local-deploy) (Open Source)
+   2. [AWS Deploy](https://docs.akto.io/getting-started/quick-start-with-akto-self-hosted/aws-deploy)
+   3. [GCP Deploy](https://docs.akto.io/getting-started/quick-start-with-akto-self-hosted/gcp-deploy)
+2. [Cloud ( Akto hosted)](https://docs.akto.io/getting-started/quick-start-with-akto-cloud)
+
+### Develop and contribute
 
 #### Prerequisites
 OpenJDK 8, node, npm, maven (v3.6.3), Mongo
@@ -23,7 +41,7 @@ OpenJDK 8, node, npm, maven (v3.6.3), Mongo
 #### Clone repo
 1. `mkdir ~/akto_code`
 2. `cd akto_code`
-3. `git clone https://github.com/akto-api-security/mono` Link to be updated as per the open source repo
+3. `git clone https://github.com/akto-api-security/community-edition` Link to be updated as per the open source repo
 
 #### Setup database
 
@@ -33,13 +51,13 @@ OpenJDK 8, node, npm, maven (v3.6.3), Mongo
 
 #### Setup Frontend
 
-1. `cd ~/akto_code/mono`
+1. `cd ~/akto_code/community-edition`
 2. `cd apps/dashboard`
 3. `npm install`
 4. `npm run hot`
 
 #### Setup Backend
-1. `cd ~/akto_code/mono`
+1. `cd ~/akto_code/community-edition`
 2. `export AKTO_MONGO_CONN="mongodb://localhost:27017"`
 3. `mvn clean install`
 4. `mvn --projects :dashboard --also-make jetty:run`
@@ -47,10 +65,6 @@ OpenJDK 8, node, npm, maven (v3.6.3), Mongo
 #### Play around
 1. Open `localhost:8080` in your favourite browser
 2. You will need to signup when logging in for the first time, next time onwards you can login
-
-## Usage
-
-You can use this product as a middleware in your express.js or any other node.js based web application.
 
 ## Contributing
 
