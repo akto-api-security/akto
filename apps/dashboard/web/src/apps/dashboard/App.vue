@@ -101,7 +101,7 @@
           <v-btn primary dark depressed color="#4A154B" @click='openSlackCommunity'>
             Ask us on <v-icon size="16">$slack</v-icon>
           </v-btn>
-          <v-btn primary dark depressed class="github-btn" @click='openGithubTestingSourcesPage'>    
+          <v-btn primary dark depressed class="github-btn" @click='openGithubRepoPage'>    
             <v-icon size="16">$githubIcon</v-icon>  
             Star
           </v-btn>        
@@ -211,8 +211,8 @@ export default {
     openSlackCommunity() {
       return window.open("https://join.slack.com/t/aktocommunity/shared_invite/zt-1nqfw3knb-XO~r7UZyzD9f8_Ddm4R1lg")
     },
-    openGithubTestingSourcesPage() {
-      return window.open("https://github.com/akto-api-security/testing_sources/")
+    openGithubRepoPage() {
+      return window.open("https://github.com/akto-api-security/community-edition/")
     },
     openDocs() {
       window.open('https://docs.akto.io/deploy/self-hosted-deployment/aws-deploy', '_blank')

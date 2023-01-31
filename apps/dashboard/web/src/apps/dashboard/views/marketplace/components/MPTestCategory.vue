@@ -45,7 +45,7 @@ export default {
     },
     data() {
         return {
-            githubLink: this.categoryType === "default" ? "https://github.com/akto-api-security/testing_sources" : null,
+            githubLink: this.categoryType === "default" ? "https://github.com/akto-api-security/tests-library" : null,
             testSourceConfigs: [],
             categoryTitle: this.categoryId.replaceAll("_", " "),
             loading: false,

@@ -123,7 +123,7 @@ public class InitializerListener implements ServletContextListener {
                 shortNameToTestCategory.put(sn, tc);
             }
 
-            String testingSourcesRepoTree = "https://api.github.com/repos/akto-api-security/testing_sources/git/trees/master?recursive=1";
+            String testingSourcesRepoTree = "https://api.github.com/repos/akto-api-security/tests-library/git/trees/master?recursive=1";
             String tempFilename = "temp_testingSourcesRepoTree.json";
             FileUtils.copyURLToFile(new URL(testingSourcesRepoTree), new File(tempFilename));
             String fileContent = FileUtils.readFileToString(new File(tempFilename), StandardCharsets.UTF_8);
@@ -149,13 +149,13 @@ public class InitializerListener implements ServletContextListener {
                 String filePath = fileDetails.getString("path");
                 if (filePath.endsWith(".yaml") || filePath.endsWith(".yml")) {
                     String categoryFolder = filePath.split("/")[0];
-                    filePath = "https://github.com/akto-api-security/testing_sources/blob/master/" + filePath;
-//                    if (!currConfigsMap.containsKey(filePath)) {
-                    TestCategory testCategory = findTestCategory(categoryFolder, shortNameToTestCategory);
-                    String subcategory = findTestSubcategory(filePath);
-                    TestSourceConfig testSourceConfig = new TestSourceConfig(filePath, testCategory, subcategory, testCategory.getSeverity(), "", TestSourceConfig.DEFAULT, Context.now());
-                    TestSourceConfigsDao.instance.replaceOne(Filters.eq(ID, filePath), testSourceConfig);
-//                    }
+                    filePath = "https://github.com/akto-api-security/tests-library/blob/master/" + filePath;
+                    if (!currConfigsMap.containsKey(filePath)) {
+                        TestCategory testCategory = findTestCategory(categoryFolder, shortNameToTestCategory);
+                        String subcategory = findTestSubcategory(filePath);
+                        TestSourceConfig testSourceConfig = new TestSourceConfig(filePath, testCategory, subcategory, Severity.HIGH, "", TestSourceConfig.DEFAULT, Context.now());
+                        TestSourceConfigsDao.instance.insertOne(testSourceConfig);
+                    }
                     currConfigsMap.remove(filePath);
                 }
             }
