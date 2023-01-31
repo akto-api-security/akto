@@ -1,0 +1,14 @@
+node_modules/
+package-lock.json
+target/
+web/dist/
+yarn.lock
+.DS_Store
+*.iml
+*.pem
+
+*.env
+.settings
+.project
+.classpath
+.idea/

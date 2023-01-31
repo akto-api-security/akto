@@ -1,0 +1,155 @@
+{
+    "openapi" : "3.0.1",
+    "info" : {
+      "title" : "",
+      "description" : "Akto generated openAPI file",
+      "version" : "1.0.0"
+    },
+    "paths" : {
+      "/api/cars" : {
+        "description" : "description",
+        "post" : {
+          "summary" : "POST request for endpoint http://localhost:8000/api/cars",
+          "operationId" : "http://localhost:8000/api/cars-POST",
+          "requestBody" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "properties" : {
+                    "p" : {
+                      "type" : "integer",
+                      "format" : "int32"
+                    },
+                    "q" : {
+                      "type" : "integer",
+                      "format" : "int32"
+                    }
+                  },
+                  "description" : "Sample description"
+                }
+              }
+            }
+          },
+          "responses" : {
+            "201" : {
+              "description" : "description",
+              "content" : {
+                "application/json" : {
+                  "schema" : {
+                    "type" : "object",
+                    "properties" : {
+                        "author" : {
+                          "type" : "object",
+                          "properties" : {
+                            "firstname" : {
+                              "type" : "string"
+                            },
+                            "lastname" : {
+                              "type" : "string"
+                            }
+                          }
+                        },
+                        "isbn" : {
+                          "type" : "integer",
+                          "format" : "int32"
+                        },
+                        "id" : {
+                          "type" : "integer",
+                          "format" : "int32"
+                        },
+                        "title" : {
+                          "type" : "string"
+                        },
+                        "timestamp" : {
+                          "type" : "integer",
+                          "format" : "int32"
+                        }
+                      },
+                      "description" : "Sample description"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "servers" : [ {
+            "url" : "http://localhost:8000"
+          } ],
+          "parameters" : [ ]
+        },
+        "/api/books" : {
+            "description" : "description",
+            "get" : {
+              "summary" : "GET request for endpoint http://localhost:8000/api/books",
+              "operationId" : "http://localhost:8000/api/books-GET",
+              "requestBody" : {
+                "content" : {
+                  "application/json" : {
+                    "schema" : {
+                      "type" : "object",
+                      "properties" : {
+                        "p" : {
+                          "type" : "integer",
+                          "format" : "int32"
+                        },
+                        "q" : {
+                          "type" : "integer",
+                          "format" : "int32"
+                        }
+                      },
+                      "description" : "Sample description"
+                    }
+                  }
+                }
+              },
+              "responses" : {
+                "201" : {
+                  "description" : "description",
+                  "content" : {
+                    "application/json" : {
+                      "schema" : {
+                        "type" : "object",
+                        "properties" : {
+                          "author" : {
+                            "type" : "object",
+                            "properties" : {
+                              "firstname" : {
+                                "type" : "string"
+                              },
+                              "lastname" : {
+                                "type" : "string"
+                              }
+                            }
+                        },
+                        "isbn" : {
+                          "type" : "integer",
+                          "format" : "int32"
+                        },
+                        "id" : {
+                          "type" : "integer",
+                          "format" : "int32"
+                        },
+                        "title" : {
+                          "type" : "string"
+                        },
+                        "timestamp" : {
+                          "type" : "integer",
+                          "format" : "int32"
+                        }
+                      },
+                      "description" : "Sample description"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "servers" : [ {
+            "url" : "http://localhost:8000"
+          } ],
+          "parameters" : [ ]
+        }
+      }
+    }
+          

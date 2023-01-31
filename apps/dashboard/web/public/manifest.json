@@ -1,0 +1,28 @@
+{
+  "short_name": "Akto",
+  "name": "Akto",
+  "icons": [
+    {
+      "src": "/public/favicon2.svg",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/public/favicon4.svg",
+      "sizes": "144x144",
+      "purpose": "any"
+    },
+    {
+      "src": "/public/favicon3.svg",
+      "sizes": "512x512",
+      "purpose": "any"
+    }
+  ],
+  "start_url": "/login",
+  "background_color": "#FFFFFF",
+  "display": "standalone",
+  "scope": "/",
+  "theme_color": "#6200EA",
+  "offline_enabled": true,
+  "gcm_sender_id": "896372355210"
+}
