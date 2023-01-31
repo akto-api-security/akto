@@ -29,13 +29,13 @@ const marketplace = {
             return api.fetchAllMarketplaceSubcategories().then((resp) => {
                 for(let index in resp.testSourceConfigs) {
                     let tsc = resp.testSourceConfigs[index]
-
-                    if (state.defaultSubcategories.indexOf(tsc.subcategory) == -1) {
-                        state.defaultSubcategories.push(tsc.subcategory)
+                    let entry = tsc.category+"/"+tsc.subcategory
+                    if (state.defaultSubcategories.indexOf(entry) == -1) {
+                        state.defaultSubcategories.push(entry)
                     }
 
-                    if( tsc.creator !== "default"  && state.userSubcategories.indexOf(tsc.subcategory) == -1) {
-                        state.userSubcategories.push(tsc.subcategory)
+                    if( tsc.creator !== "default"  && state.userSubcategories.indexOf(entry) == -1) {
+                        state.userSubcategories.push(entry)
                     }
                 }
             })
