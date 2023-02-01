@@ -24,8 +24,12 @@ Step 2: Run tests
 
 ## How to get Started?
 
+Local deploy:
+
 Run this script to create Akto at ~/akto and run the docker containers. You'll need to have Docker installed in order to run the container. 
+
 `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/cf-deploy-akto)"`
+
 
 ## Develop and contribute
 
