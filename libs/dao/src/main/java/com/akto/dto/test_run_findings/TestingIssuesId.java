@@ -10,6 +10,14 @@ import java.util.Objects;
 import static com.akto.util.enums.GlobalEnums.TestErrorSource;
 
 public class TestingIssuesId {
+    
+    /*
+    * TestIssueId contains apiInfoKey, testSubCategory and TestCategoryFromSourceConfig
+    * whenever we encounter testing issue,
+    * if that issue is via existing business logic, we use testSubCategory
+    * if issue is via fuzzing test we use TestCategoryFromSourceConfig which is stored in db.
+    * */
+    
     public static final String API_KEY_INFO = "apiInfoKey";
     private ApiInfoKey apiInfoKey;
     private TestErrorSource testErrorSource;
