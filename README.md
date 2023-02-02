@@ -12,7 +12,7 @@ Akto enables security and engineering teams to secure their APIs by doing three 
 2. [Run business logic tests in CI/CD](https://docs.akto.io/testing/run-test)
 3. [Find vulnerabilities in run-time](https://docs.akto.io/api-inventory/sensitive-data)
 
-https://raw.githubusercontent.com/akto-api-security/Documentation/documentation/.gitbook/assets/Akto%20demo.mp4
+https://akto-setup.s3.amazonaws.com/templates/Akto+demo.mp4
 
 ## How it works?
 
