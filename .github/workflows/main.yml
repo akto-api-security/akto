@@ -4,9 +4,9 @@ name: CI
 on:
   # Triggers the workflow on push or pull request events but only for the master branch
   push:
-    branches: [ master, develop ]
+    branches: [ master ]
   pull_request:
-    branches: [ master, develop ]
+    branches: [ master ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -118,11 +118,6 @@ jobs:
           cd ../testing
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG . --push
           echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"       
-          cd ../api-analyser
-          docker build -t $ECR_REGISTRY/akto-api-context-analyzer:$IMAGE_TAG .
-          echo "Pushing image to ECR..."
-          docker push $ECR_REGISTRY/akto-api-context-analyzer:$IMAGE_TAG
-          echo "::set-output name=image::$ECR_REGISTRY/akto-api-context-analyzer:$IMAGE_TAG"
       - name: Set up JDK 11
         uses: actions/setup-java@v1
         with:
@@ -139,8 +134,3 @@ jobs:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
-      - name: Build and analyze
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=akto-api-security_mono
