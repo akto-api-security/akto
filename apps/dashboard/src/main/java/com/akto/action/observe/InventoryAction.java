@@ -40,10 +40,11 @@ public class InventoryAction extends UserAction {
 
     public final static int DELTA_PERIOD_VALUE = 60 * 24 * 60 * 60;
 
+    private String subType;
     public List<SingleTypeInfo> fetchSensitiveParams() {
-        Bson filterStandardSensitiveParams = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId, url, method);
+        Bson filterStandardSensitiveParams = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId, url, method, subType);
 
-        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(filterStandardSensitiveParams);
+        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(filterStandardSensitiveParams, 0, 10_000, Sorts.descending(SingleTypeInfo._TIMESTAMP));
 
         return list;        
     }
@@ -60,6 +61,7 @@ public class InventoryAction extends UserAction {
         pipeline.add(Aggregates.group(groupedId, Accumulators.min("startTs", "$timestamp"),Accumulators.sum("countTs",1)));
         pipeline.add(Aggregates.match(Filters.gte("startTs", startTimestamp)));
         pipeline.add(Aggregates.match(Filters.lte("startTs", endTimestamp)));
+        pipeline.add(Aggregates.limit(500_000));
         pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
         MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
 
@@ -384,30 +386,27 @@ public class InventoryAction extends UserAction {
         List list = fetchSensitiveParams();
         List<Bson> filterCustomSensitiveParams = new ArrayList<>();
 
-        filterCustomSensitiveParams.add(Filters.eq("sensitive", true));
-        
-        if (apiCollectionId >= 0) {
-            Bson apiCollectionIdFilter = Filters.eq("apiCollectionId", apiCollectionId);
+        if (subType == null) {
+            filterCustomSensitiveParams.add(Filters.eq("sensitive", true));
+            
+            if (apiCollectionId >= 0) {
+                Bson apiCollectionIdFilter = Filters.eq("apiCollectionId", apiCollectionId);
+                filterCustomSensitiveParams.add(apiCollectionIdFilter);
+            }
 
-            filterCustomSensitiveParams.add(apiCollectionIdFilter);
+            if (url != null) {
+                Bson urlFilter = Filters.eq("url", url);
+                filterCustomSensitiveParams.add(urlFilter);
+            }
+
+            if (method != null) {
+                Bson methodFilter = Filters.eq("method", method);
+                filterCustomSensitiveParams.add(methodFilter);
+            }
+
+            List<SensitiveParamInfo> customSensitiveList = SensitiveParamInfoDao.instance.findAll(Filters.and(filterCustomSensitiveParams));
+            list.addAll(customSensitiveList);
         }
-
-        if (url != null) {
-            Bson urlFilter = Filters.eq("url", url);
-
-            filterCustomSensitiveParams.add(urlFilter);
-        }
-
-        if (method != null) {
-            Bson methodFilter = Filters.eq("method", method);
-
-            filterCustomSensitiveParams.add(methodFilter);
-
-        }
-
-        List<SensitiveParamInfo> customSensitiveList = SensitiveParamInfoDao.instance.findAll(Filters.and(filterCustomSensitiveParams));
-
-        list.addAll(customSensitiveList);
 
         response = new BasicDBObject();
         response.put("data", new BasicDBObject("endpoints", list));
@@ -417,6 +416,7 @@ public class InventoryAction extends UserAction {
 
     public String fetchNewParametersTrend() {
         List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.limit(100_000));
         pipeline.add(Aggregates.match(Filters.gte("timestamp", startTimestamp)));
         pipeline.add(Aggregates.match(Filters.lte("timestamp", endTimestamp)));
         pipeline.add(Aggregates.project(Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$timestamp", 86400}))));
@@ -664,5 +664,9 @@ public class InventoryAction extends UserAction {
 
     public void setListOfEndpointsInCollection(Set<ApiInfoKey> listOfEndpointsInCollection) {
         this.listOfEndpointsInCollection = listOfEndpointsInCollection;
+    }
+
+    public void setSubType(String subType) {
+        this.subType = subType;
     }
 }
