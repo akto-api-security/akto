@@ -43,7 +43,7 @@ OpenJDK 8, node, npm, maven (v3.6.3), Mongo
 #### Clone repo
 1. `mkdir ~/akto_code`
 2. `cd akto_code`
-3. `git clone https://github.com/akto-api-security/community-edition` Link to be updated as per the open source repo
+3. `git clone https://github.com/akto-api-security/community-edition`
 
 #### Setup database
 
