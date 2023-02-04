@@ -8,6 +8,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.har.HAR;
 import com.akto.listener.KafkaListener;
+import com.akto.listener.RuntimeListener;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.policies.AktoPolicy;
@@ -105,7 +106,7 @@ public class HarAction extends UserAction {
             HAR har = new HAR();
             List<String> messages = har.getMessages(harString, apiCollectionId);
             harErrors = har.getErrors();
-            Utils.pushDataToKafka(apiCollectionId, topic, messages, harErrors, skipKafka);
+            Utils.pushDataToKafka(apiCollectionId, topic, messages, harErrors, skipKafka, RuntimeListener.httpCallParser, RuntimeListener.aktoPolicy, KafkaListener.kafka, KafkaListener.BATCH_SIZE_CONFIG);
         } catch (Exception e) {
             ;
             return SUCCESS.toUpperCase();

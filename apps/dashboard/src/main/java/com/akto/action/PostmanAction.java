@@ -9,6 +9,8 @@ import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.listener.KafkaListener;
+import com.akto.listener.RuntimeListener;
 import com.akto.postman.Main;
 import com.akto.utils.DashboardMode;
 import com.akto.utils.SampleDataToSTI;
@@ -280,7 +282,7 @@ public class PostmanAction extends UserAction {
             //For each entry, push a message to Kafka
             int aktoCollectionId = entry.getKey();
             List<String> msgs = entry.getValue();
-            Utils.pushDataToKafka(aktoCollectionId, topic, msgs, new ArrayList<>(), skipKafka);
+            Utils.pushDataToKafka(aktoCollectionId, topic, msgs, new ArrayList<>(), skipKafka, RuntimeListener.httpCallParser, RuntimeListener.aktoPolicy, KafkaListener.kafka, KafkaListener.BATCH_SIZE_CONFIG);
             logger.info("Pushed data in apicollection id {}", aktoCollectionId);
         }
         return SUCCESS.toUpperCase();

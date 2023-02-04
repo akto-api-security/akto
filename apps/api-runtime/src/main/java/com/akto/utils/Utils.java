@@ -6,8 +6,7 @@ import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.listener.KafkaListener;
-import com.akto.listener.RuntimeListener;
+import com.akto.kafka.Kafka;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.policies.AktoPolicy;
@@ -198,12 +197,12 @@ public class Utils {
 
     }
 
-    public static void pushDataToKafka(int apiCollectionId, String topic, List<String> messages, List<String> errors, boolean skipKafka) throws Exception {
+    public static void pushDataToKafka(int apiCollectionId, String topic, List<String> messages, List<String> errors, boolean skipKafka, HttpCallParser httpCallParser, AktoPolicy aktoPolicy, Kafka kafka, int batchSize) throws Exception {
         List<HttpResponseParams> responses = new ArrayList<>();
         for (String message: messages){
-            if (message.length() < 0.8 * KafkaListener.BATCH_SIZE_CONFIG) {
+            if (message.length() < 0.8 * batchSize) {
                 if (!skipKafka) {
-                    KafkaListener.kafka.send(message,"har_" + topic);
+                    kafka.send(message,"har_" + topic);
                 } else {
                     HttpResponseParams responseParams =  HttpCallParser.parseKafkaMessage(message);
                     responseParams.getRequestParams().setApiCollectionId(apiCollectionId);
@@ -216,8 +215,8 @@ public class Utils {
 
         if(skipKafka) {
             SingleTypeInfo.fetchCustomDataTypes(); //todo:
-            APICatalogSync apiCatalogSync = RuntimeListener.httpCallParser.syncFunction(responses, true, false);
-            RuntimeListener.aktoPolicy.main(responses, apiCatalogSync, false);
+            APICatalogSync apiCatalogSync = httpCallParser.syncFunction(responses, true, false);
+            aktoPolicy.main(responses, apiCatalogSync, false);
         }
     }
 
