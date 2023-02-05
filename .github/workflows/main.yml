@@ -93,7 +93,7 @@ jobs:
           DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
           DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
         run: |
-          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD 
+          echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 
       - name: Build, tag, and push the image to DockerHub
         if: ${{ github.event.inputs.Environment == 'prod' }}
