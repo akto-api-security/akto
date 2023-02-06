@@ -8,6 +8,7 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.util.Constants;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
@@ -43,7 +44,7 @@ public class InventoryAction extends UserAction {
     public List<SingleTypeInfo> fetchSensitiveParams() {
         Bson filterStandardSensitiveParams = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId, url, method);
 
-        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(filterStandardSensitiveParams);
+        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(filterStandardSensitiveParams, 0, 1_000, null, Projections.exclude("values"));
 
         return list;        
     }
@@ -52,20 +53,39 @@ public class InventoryAction extends UserAction {
     private int endTimestamp = 0;
 
     public List<BasicDBObject> fetchRecentEndpoints(int startTimestamp, int endTimestamp) {
-        List<Bson> pipeline = new ArrayList<>();
-        BasicDBObject groupedId = 
-            new BasicDBObject("apiCollectionId", "$apiCollectionId")
-            .append("url", "$url")
-            .append("method", "$method");
-        pipeline.add(Aggregates.group(groupedId, Accumulators.min("startTs", "$timestamp"),Accumulators.sum("countTs",1)));
-        pipeline.add(Aggregates.match(Filters.gte("startTs", startTimestamp)));
-        pipeline.add(Aggregates.match(Filters.lte("startTs", endTimestamp)));
-        pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
-        MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
-
         List<BasicDBObject> endpoints = new ArrayList<>();
-        while(endpointsCursor.hasNext()) {
-            endpoints.add(endpointsCursor.next());
+
+        Bson hostFilterQ = SingleTypeInfoDao.filterForHostHeader(0, false);
+        Bson filterQWithTs = Filters.and(Filters.gte("startTs", startTimestamp), Filters.lte("startTs", endTimestamp), hostFilterQ);
+        List<SingleTypeInfo> latestHosts = SingleTypeInfoDao.instance.findAll(filterQWithTs, 0, 1_000, Sorts.descending("timestamp"), Projections.exclude("values"));
+        for(SingleTypeInfo sti: latestHosts) {
+            BasicDBObject id = 
+                new BasicDBObject("apiCollectionId", sti.getApiCollectionId())
+                .append("url", sti.getUrl())
+                .append("method", sti.getMethod());
+            BasicDBObject endpoint = 
+                new BasicDBObject("_id", id).append("startTs", sti.getTimestamp()).append("count", 1);
+            endpoints.add(endpoint);
+        }
+        
+        List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
+
+        if (nonHostApiCollectionIds != null && nonHostApiCollectionIds.size() > 0){
+            List<Bson> pipeline = new ArrayList<>();
+
+            pipeline.add(Aggregates.match(Filters.in("apiCollectionId", nonHostApiCollectionIds)));
+            BasicDBObject groupedId = 
+                new BasicDBObject("apiCollectionId", "$apiCollectionId")
+                .append("url", "$url")
+                .append("method", "$method");
+            pipeline.add(Aggregates.group(groupedId, Accumulators.min("startTs", "$timestamp"),Accumulators.sum("countTs",1)));
+            pipeline.add(Aggregates.match(Filters.gte("startTs", startTimestamp)));
+            pipeline.add(Aggregates.match(Filters.lte("startTs", endTimestamp)));
+            pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
+            MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+            while(endpointsCursor.hasNext()) {
+                endpoints.add(endpointsCursor.next());
+            }
         }
 
         return endpoints;
@@ -372,6 +392,26 @@ public class InventoryAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    private List<String> urls;
+    public String fetchSensitiveParamsForEndpoints() {
+
+        int batchSize = 500;
+        List<SingleTypeInfo> list = new ArrayList<>();
+        for (int i = 0; i < urls.size(); i += batchSize) {
+            List<String> slice = urls.subList(i, Math.min(i+batchSize, urls.size()));
+            Bson sensitiveFilters = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(null, null, null);
+            Bson sensitiveFiltersWithUrls = 
+                Filters.and(Filters.in("url", slice), sensitiveFilters);
+            List<SingleTypeInfo> sensitiveSTIs = SingleTypeInfoDao.instance.findAll(sensitiveFiltersWithUrls, 0, 2000, null, Projections.exclude("values"));
+            list.addAll(sensitiveSTIs);
+        }
+
+        response = new BasicDBObject();
+        response.put("data", new BasicDBObject("endpoints", list));
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String loadRecentEndpoints() {
         List<BasicDBObject> list = fetchRecentEndpoints(startTimestamp, endTimestamp);
         attachTagsInAPIList(list);
@@ -664,5 +704,13 @@ public class InventoryAction extends UserAction {
 
     public void setListOfEndpointsInCollection(Set<ApiInfoKey> listOfEndpointsInCollection) {
         this.listOfEndpointsInCollection = listOfEndpointsInCollection;
+    }
+
+    public List<String> getUrls() {
+        return this.urls;
+    }
+
+    public void setUrls(List<String> urls) {
+        this.urls = urls;
     }
 }

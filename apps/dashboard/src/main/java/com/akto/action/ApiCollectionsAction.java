@@ -33,6 +33,7 @@ public class ApiCollectionsAction extends UserAction {
             } else {
                 apiCollection.setUrlsCount(apiCollection.getUrls().size());
             }
+            apiCollection.setUrls(new HashSet<>());
         }
 
         return Action.SUCCESS.toUpperCase();

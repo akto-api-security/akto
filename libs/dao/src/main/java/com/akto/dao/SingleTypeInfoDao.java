@@ -75,6 +75,11 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(new String[]{SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID}));
             counter++;
         }
+
+        if (counter == 5) {
+            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(new String[]{SingleTypeInfo.SUB_TYPE, SingleTypeInfo._RESPONSE_CODE}));
+            counter++;
+        }
     }
 
 
