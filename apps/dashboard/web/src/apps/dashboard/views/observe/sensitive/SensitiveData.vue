@@ -111,7 +111,7 @@ import constants from '@/util/constants'
 import SimpleLayout from '@/apps/dashboard/layouts/SimpleLayout'
 import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
 import obj from '@/util/obj'
-import api from '/Users/avneesh/Desktop/akto-api-security/mono/apps/dashboard/web/src/apps/dashboard/views/observe/changes/api.js'
+import api from '@/apps/dashboard/views/observe/changes/api.js'
 import ServerTable from '@/apps/dashboard/shared/components/ServerTable'
 
 export default {
