@@ -69,6 +69,7 @@ import func from '@/util/func'
 import constants from '@/util/constants'
 import SimpleLayout from '@/apps/dashboard/layouts/SimpleLayout'
 import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
+import obj from '@/util/obj'
 
 export default {
     name: "SensitiveData",
@@ -79,6 +80,9 @@ export default {
         SensitiveParamsCard,
         SimpleLayout,
         SensitiveChipGroup 
+    },
+    props: {
+        subType: obj.strR
     },
     data () {
  
@@ -218,7 +222,7 @@ export default {
             this.$router.push(routeObj)
         },
         refreshPage(shouldLoad) {
-            this.$store.dispatch('sensitive/loadSensitiveParameters', {shouldLoad:shouldLoad})
+            this.$store.dispatch('sensitive/loadSensitiveParameters', {shouldLoad:shouldLoad, subType: this.subType})
         }
     },
     computed: {

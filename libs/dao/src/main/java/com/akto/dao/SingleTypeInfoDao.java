@@ -182,14 +182,21 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return sensitiveInResponse;
     }
 
-    public Bson filterForSensitiveParamsExcludingUserMarkedSensitive(Integer apiCollectionId, String url, String method) {
+    public Bson filterForSensitiveParamsExcludingUserMarkedSensitive(Integer apiCollectionId, String url, String method, String subType) {
         // apiCollectionId null then no filter for apiCollectionId
         List<String> sensitiveSubTypes = sensitiveSubTypeNames();
 
         Bson alwaysSensitiveFilter = Filters.in("subType", sensitiveSubTypes);
 
-        List<String> sensitiveInResponse = sensitiveSubTypeInResponseNames();
-        List<String> sensitiveInRequest = sensitiveSubTypeInRequestNames();
+        List<String> sensitiveInResponse;
+        List<String> sensitiveInRequest;
+        if (subType != null) {
+            sensitiveInRequest = Collections.singletonList(subType);
+            sensitiveInResponse = Collections.singletonList(subType);
+        } else {
+            sensitiveInResponse = sensitiveSubTypeInResponseNames();
+            sensitiveInRequest = sensitiveSubTypeInRequestNames();
+        }
 
         Bson sensitiveInResponseFilter = Filters.and(
                 Filters.in("subType",sensitiveInResponse ),
@@ -201,7 +208,13 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         );
 
         List<Bson> filters = new ArrayList<>();
-        filters.add(Filters.or(alwaysSensitiveFilter, sensitiveInResponseFilter, sensitiveInRequestFilter));
+
+        List<Bson> subTypeFilters =  new ArrayList<>();
+        subTypeFilters.add(sensitiveInRequestFilter);
+        subTypeFilters.add(sensitiveInResponseFilter);
+        if (subType == null) subTypeFilters.add(alwaysSensitiveFilter);
+
+        filters.add(Filters.or(subTypeFilters));
 
         if (apiCollectionId != null && apiCollectionId >= 0) {
             filters.add(Filters.eq("apiCollectionId", apiCollectionId) );
@@ -242,7 +255,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             urls.add(sensitiveParamInfo.getUrl());
         }
 
-        Bson filter = filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId, url, method);
+        Bson filter = filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId, url, method, null);
 
         urls.addAll(instance.findDistinctFields("url", String.class, filter));
 
