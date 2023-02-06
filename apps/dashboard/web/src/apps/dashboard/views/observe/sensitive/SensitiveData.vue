@@ -128,9 +128,6 @@ export default {
     props: {
         subType: obj.strN
     },
-    props: {
-        subType: obj.strR
-    },
     data () {
  
            return {

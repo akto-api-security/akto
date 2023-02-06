@@ -56,7 +56,7 @@ public class InventoryAction extends UserAction {
         List<BasicDBObject> endpoints = new ArrayList<>();
 
         Bson hostFilterQ = SingleTypeInfoDao.filterForHostHeader(0, false);
-        Bson filterQWithTs = Filters.and(Filters.gte("startTs", startTimestamp), Filters.lte("startTs", endTimestamp), hostFilterQ);
+        Bson filterQWithTs = Filters.and(Filters.gte("timestamp", startTimestamp), Filters.lte("timestamp", endTimestamp), hostFilterQ);
         List<SingleTypeInfo> latestHosts = SingleTypeInfoDao.instance.findAll(filterQWithTs, 0, 1_000, Sorts.descending("timestamp"), Projections.exclude("values"));
         for(SingleTypeInfo sti: latestHosts) {
             BasicDBObject id = 
