@@ -41,11 +41,11 @@ public class InventoryAction extends UserAction {
 
     public final static int DELTA_PERIOD_VALUE = 60 * 24 * 60 * 60;
 
+    private String subType;
     public List<SingleTypeInfo> fetchSensitiveParams() {
-        Bson filterStandardSensitiveParams = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId, url, method);
+        Bson filterStandardSensitiveParams = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId, url, method, subType);
 
         List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(filterStandardSensitiveParams, 0, 1_000, null, Projections.exclude("values"));
-
         return list;        
     }
 
@@ -399,7 +399,7 @@ public class InventoryAction extends UserAction {
         List<SingleTypeInfo> list = new ArrayList<>();
         for (int i = 0; i < urls.size(); i += batchSize) {
             List<String> slice = urls.subList(i, Math.min(i+batchSize, urls.size()));
-            Bson sensitiveFilters = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(null, null, null);
+            Bson sensitiveFilters = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(null, null, null, null);
             Bson sensitiveFiltersWithUrls = 
                 Filters.and(Filters.in("url", slice), sensitiveFilters);
             List<SingleTypeInfo> sensitiveSTIs = SingleTypeInfoDao.instance.findAll(sensitiveFiltersWithUrls, 0, 2000, null, Projections.exclude("values"));
@@ -424,30 +424,27 @@ public class InventoryAction extends UserAction {
         List list = fetchSensitiveParams();
         List<Bson> filterCustomSensitiveParams = new ArrayList<>();
 
-        filterCustomSensitiveParams.add(Filters.eq("sensitive", true));
-        
-        if (apiCollectionId != -1) {
-            Bson apiCollectionIdFilter = Filters.eq("apiCollectionId", apiCollectionId);
+        if (subType == null) {
+            filterCustomSensitiveParams.add(Filters.eq("sensitive", true));
+            
+            if (apiCollectionId != -1) {
+                Bson apiCollectionIdFilter = Filters.eq("apiCollectionId", apiCollectionId);
+                filterCustomSensitiveParams.add(apiCollectionIdFilter);
+            }
 
-            filterCustomSensitiveParams.add(apiCollectionIdFilter);
+            if (url != null) {
+                Bson urlFilter = Filters.eq("url", url);
+                filterCustomSensitiveParams.add(urlFilter);
+            }
+
+            if (method != null) {
+                Bson methodFilter = Filters.eq("method", method);
+                filterCustomSensitiveParams.add(methodFilter);
+            }
+
+            List<SensitiveParamInfo> customSensitiveList = SensitiveParamInfoDao.instance.findAll(Filters.and(filterCustomSensitiveParams));
+            list.addAll(customSensitiveList);
         }
-
-        if (url != null) {
-            Bson urlFilter = Filters.eq("url", url);
-
-            filterCustomSensitiveParams.add(urlFilter);
-        }
-
-        if (method != null) {
-            Bson methodFilter = Filters.eq("method", method);
-
-            filterCustomSensitiveParams.add(methodFilter);
-
-        }
-
-        List<SensitiveParamInfo> customSensitiveList = SensitiveParamInfoDao.instance.findAll(Filters.and(filterCustomSensitiveParams));
-
-        list.addAll(customSensitiveList);
 
         response = new BasicDBObject();
         response.put("data", new BasicDBObject("endpoints", list));
@@ -457,6 +454,7 @@ public class InventoryAction extends UserAction {
 
     public String fetchNewParametersTrend() {
         List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.limit(100_000));
         pipeline.add(Aggregates.match(Filters.gte("timestamp", startTimestamp)));
         pipeline.add(Aggregates.match(Filters.lte("timestamp", endTimestamp)));
         pipeline.add(Aggregates.project(Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$timestamp", 86400}))));
@@ -755,4 +753,7 @@ public class InventoryAction extends UserAction {
     }
 
     
+    public void setSubType(String subType) {
+        this.subType = subType;
+    }
 }

@@ -172,7 +172,10 @@ const router =  new Router({
                         {
                             path: 'sensitive',
                             name: 'sensitive',
-                            component: SensitiveData
+                            component: SensitiveData,
+                            props: route => ({
+                                subType: route.query.type
+                            })
                         },
                         {
                             path: 'param_state',

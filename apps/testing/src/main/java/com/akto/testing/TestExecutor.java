@@ -10,7 +10,6 @@ import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
-import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -20,8 +19,8 @@ import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.util.JSONUtils;
-import com.akto.util.enums.LoginFlowEnums;
 import com.akto.util.enums.GlobalEnums.TestSubCategory;
+import com.akto.util.enums.LoginFlowEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -31,7 +30,10 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 
 public class TestExecutor {
@@ -176,10 +178,6 @@ public class TestExecutor {
             Filters.eq("_id", summaryId),
             Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, testingRunResults.size())
         );
-
-        //Creating issues from testingRunResults
-        TestingIssuesHandler handler = new TestingIssuesHandler();
-        handler.handleIssuesCreationFromTestingRunResults(testingRunResults);
 
         loggerMaker.infoAndAddToDb("Finished adding issues");
 
@@ -360,6 +358,9 @@ public class TestExecutor {
             try {
                 testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId);
                 TestingRunResultDao.instance.insertMany(testingRunResults);
+                //Creating issues from testingRunResults
+                TestingIssuesHandler handler = new TestingIssuesHandler();
+                handler.handleIssuesCreationFromTestingRunResults(testingRunResults);
             } catch (Exception e) {
                 e.printStackTrace();
             }
