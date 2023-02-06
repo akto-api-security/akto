@@ -107,6 +107,15 @@ export default {
             return resp
         })
     },
+    fetchSensitiveParamsForEndpoints (urls) {
+        return request({
+            url: '/api/fetchSensitiveParamsForEndpoints',
+            method: 'post',
+            data: {urls}
+        }).then((resp) => {
+            return resp
+        })
+    },
     loadSensitiveParameters (apiCollectionId, url, method, subType) {
         return request({
             url: '/api/loadSensitiveParameters',
