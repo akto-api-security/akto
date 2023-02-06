@@ -8,9 +8,10 @@ import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.RawApi;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
-import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -31,6 +32,8 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -54,7 +57,7 @@ public class TestExecutor {
         Context.accountId.set(1_000_000);
 
         TestExecutor testExecutor = new TestExecutor();
-        TestingRun testingRun = TestingRunDao.instance.findOne(new BasicDBObject());
+        TestingRun testingRun = TestingRunDao.instance.findLatestOne(new BasicDBObject());
         testExecutor.init(testingRun, new ObjectId());
     }
 
@@ -135,7 +138,15 @@ public class TestExecutor {
         CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
         ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentRequests);
         List<Future<List<TestingRunResult>>> futureTestingRunResults = new ArrayList<>();
+        Set<String> hosts = new HashSet<>();
+
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
+            try {
+                String host = findHost(apiInfoKey, testingUtil);
+                if (host != null) hosts.add(host);
+            } catch (URISyntaxException e) {
+                e.printStackTrace();
+            }
             try {
                  Future<List<TestingRunResult>> future = threadPool.submit(
                          () -> startWithLatch(apiInfoKey,
@@ -148,6 +159,7 @@ public class TestExecutor {
             }
         }
 
+        System.out.println(hosts);
         loggerMaker.infoAndAddToDb("Waiting...");
 
         try {
@@ -168,6 +180,12 @@ public class TestExecutor {
             } catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();
             }
+        }
+
+        for (String host: hosts) {
+            List<TestingRunResult> nucleiResults = runNucleiTests(new ApiInfo.ApiInfoKey(-1, host, URLMethods.Method.GET), testingRun, testingUtil, summaryId);
+            if (nucleiResults != null && !nucleiResults.isEmpty()) TestingRunResultDao.instance.insertMany(nucleiResults);
+            testingRunResults.addAll(nucleiResults);
         }
 
         loggerMaker.infoAndAddToDb("Finished adding " + testingRunResults.size() + " testingRunResults");
@@ -208,6 +226,25 @@ public class TestExecutor {
 
     }
 
+    public String findHost(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) throws URISyntaxException {
+        Map<ApiInfo.ApiInfoKey, List<String>> sampleMessagesMap =  testingUtil.getSampleMessages();
+        List<String> sampleMessages = sampleMessagesMap.get(apiInfoKey);
+        if (sampleMessages == null || sampleMessagesMap.isEmpty()) return null;
+
+        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
+        if (messages.isEmpty()) return null;
+
+        OriginalHttpRequest originalHttpRequest = messages.get(0).getRequest();
+
+        String baseUrl = originalHttpRequest.getUrl();
+        if (baseUrl.startsWith("http")) {
+            URI uri = new URI(baseUrl);
+            return uri.getScheme() + "://" + uri.getHost();
+        } else {
+            return "https://" + originalHttpRequest.findHostFromHeader();
+        }
+    }
+
     private LoginFlowResponse triggerLoginFlow(AuthMechanism authMechanism, int retries) {
         LoginFlowResponse loginFlowResponse = null;
         for (int i=0; i<retries; i++) {
@@ -223,6 +260,33 @@ public class TestExecutor {
             }
         }
         return loginFlowResponse;
+    }
+
+
+    public List<TestingRunResult> runNucleiTests(ApiInfo.ApiInfoKey apiInfoKey, TestingRun testingRun, TestingUtil testingUtil, ObjectId summaryId) {
+        List<TestingRunResult> testingRunResults = new ArrayList<>();
+        List<String> testSubCategories = testingRun.getTestingRunConfig().getTestSubCategoryList();
+        if (testSubCategories != null) {
+            for (String testSubCategory: testSubCategories) {
+                if (testSubCategory.startsWith("http://") || testSubCategory.startsWith("https://")) {
+                    System.out.println("running " + testSubCategory);
+                    try {
+                        String origTemplateURL = testSubCategory;
+                        origTemplateURL = origTemplateURL.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/");
+                        String subcategory = origTemplateURL.substring(origTemplateURL.lastIndexOf("/")+1).split("\\.")[0];
+
+                        FuzzingTest fuzzingTest = new FuzzingTest(testingRun.getId().toHexString(), summaryId.toHexString(), origTemplateURL, subcategory, testSubCategory);
+                        TestingRunResult fuzzResult = runTest(fuzzingTest, apiInfoKey, testingUtil, testingRun.getId(), summaryId);
+                        if (fuzzResult != null) testingRunResults.add(fuzzResult);        
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("unable to execute fuzzing for " + testSubCategory);
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+
+        return testingRunResults;
     }
 
     public LoginFlowResponse executeLoginFlow(AuthMechanism authMechanism, LoginFlowParams loginFlowParams) throws Exception {
@@ -359,7 +423,7 @@ public class TestExecutor {
         if ( timeToKill <= 0 || now - startTime <= timeToKill) {
             try {
                 testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId);
-                TestingRunResultDao.instance.insertMany(testingRunResults);
+                if (testingRunResults != null && !testingRunResults.isEmpty()) TestingRunResultDao.instance.insertMany(testingRunResults);
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -451,26 +515,6 @@ public class TestExecutor {
         if (testSubCategories == null || testSubCategories.contains(TestSubCategory.CHANGE_METHOD.name())) {
             TestingRunResult changeHttpMethodTestResult = runTest(changeHttpMethodTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
             if (changeHttpMethodTestResult != null) testingRunResults.add(changeHttpMethodTestResult);
-        }
-
-        if (testSubCategories != null) {
-            for (String testSubCategory: testSubCategories) {
-                if (testSubCategory.startsWith("http://") || testSubCategory.startsWith("https://")) {
-                    try {
-                        String origTemplateURL = testSubCategory;
-
-                        origTemplateURL = origTemplateURL.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/");
-
-                        String subcategory = origTemplateURL.substring(origTemplateURL.lastIndexOf("/")+1).split("\\.")[0];
-                        FuzzingTest fuzzingTest = new FuzzingTest(testRunId.toHexString(), testRunResultSummaryId.toHexString(), origTemplateURL, subcategory, testSubCategory);
-                        TestingRunResult fuzzResult = runTest(fuzzingTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-                        if (fuzzResult != null) testingRunResults.add(fuzzResult);        
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb("unable to execute fuzzing for " + testSubCategory);
-                        e.printStackTrace();
-                    }
-                }
-            }
         }
 
         return testingRunResults;

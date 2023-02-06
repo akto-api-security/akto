@@ -8,9 +8,11 @@ import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.info.NucleiTestInfo;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
+import com.akto.testing.ApiExecutor;
 import com.akto.testing.NucleiExecutor;
 import com.akto.testing.StatusCodeAnalyser;
 import com.akto.util.Pair;
+import com.akto.utils.RedactSampleData;
 import com.google.common.io.Files;
 
 import org.apache.commons.io.FileUtils;
@@ -52,9 +54,25 @@ public class FuzzingTest extends TestPlugin {
     @Override
     public Result start(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) {
         List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
-        if (messages.isEmpty()) return null;
+        RawApi rawApi;
+        if (messages.isEmpty()) {
+            OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest(
+                    apiInfoKey.getUrl(), null, apiInfoKey.method.name(), null, new HashMap<>(), ""
+            );
 
-        RawApi rawApi = messages.get(0);
+            OriginalHttpResponse originalHttpResponse = null;
+            try {
+                originalHttpResponse = ApiExecutor.sendRequest(originalHttpRequest,true);
+            } catch (Exception e) {
+                e.printStackTrace();
+                return null;
+            }
+            String originalMessage = RedactSampleData.convertOriginalReqRespToString(originalHttpRequest, originalHttpResponse);
+            rawApi = new RawApi(originalHttpRequest, originalHttpResponse, originalMessage);
+        } else {
+            rawApi = messages.get(0);
+        }
+
         List<TestResult> testResults = new ArrayList<>();
         OriginalHttpRequest testRequest = rawApi.getRequest().copy();
 
