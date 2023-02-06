@@ -208,7 +208,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         List<Bson> filters = new ArrayList<>();
         filters.add(Filters.or(alwaysSensitiveFilter, sensitiveInResponseFilter, sensitiveInRequestFilter));
 
-        if (apiCollectionId != null && apiCollectionId >= 0) {
+        if (apiCollectionId != null && apiCollectionId != -1) {
             filters.add(Filters.eq("apiCollectionId", apiCollectionId) );
         }
 

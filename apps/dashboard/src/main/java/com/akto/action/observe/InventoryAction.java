@@ -426,7 +426,7 @@ public class InventoryAction extends UserAction {
 
         filterCustomSensitiveParams.add(Filters.eq("sensitive", true));
         
-        if (apiCollectionId >= 0) {
+        if (apiCollectionId != -1) {
             Bson apiCollectionIdFilter = Filters.eq("apiCollectionId", apiCollectionId);
 
             filterCustomSensitiveParams.add(apiCollectionIdFilter);
