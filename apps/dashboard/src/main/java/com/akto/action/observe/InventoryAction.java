@@ -510,11 +510,35 @@ public class InventoryAction extends UserAction {
     private int skip;
     private Map<String, List> filters;
     private Map<String, String> filterOperators;
+    private boolean sensitive;
+    private boolean request;
 
     private Bson prepareFilters() {
         ArrayList<Bson> filterList = new ArrayList<>();
         filterList.add(Filters.gt("timestamp", startTimestamp));
         filterList.add(Filters.lt("timestamp", endTimestamp));
+
+        if (sensitive) {
+            Bson sensitveSubTypeFilter;
+            if (request) {
+                List<String> sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
+                sensitiveInRequest.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
+                sensitveSubTypeFilter = Filters.and(
+                        Filters.in("subType",sensitiveInRequest),
+                        Filters.eq("responseCode", -1)
+                );
+            } else {
+                List<String> sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
+                sensitiveInResponse.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
+                sensitveSubTypeFilter = Filters.and(
+                    Filters.in("subType",sensitiveInResponse),
+                    Filters.gt("responseCode", -1)
+                );
+            }
+
+            filterList.add(sensitveSubTypeFilter);
+        }
+
         for(Map.Entry<String, List> entry: filters.entrySet()) {
             String key = entry.getKey();
             List value = entry.getValue();
@@ -596,6 +620,14 @@ public class InventoryAction extends UserAction {
     public String fetchChanges() {
         response = new BasicDBObject();
         response.put("data", new BasicDBObject("endpoints", getMongoResults()).append("total", getTotalParams()));
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchSubTypeCountMap() {
+        Map<String,Map<String, Integer>> subTypeCountMap = SingleTypeInfoDao.instance.buildSubTypeCountMap(startTimestamp, endTimestamp);
+        response = new BasicDBObject();
+        response.put("subTypeCountMap", subTypeCountMap);
 
         return Action.SUCCESS.toUpperCase();
     }
@@ -713,4 +745,14 @@ public class InventoryAction extends UserAction {
     public void setUrls(List<String> urls) {
         this.urls = urls;
     }
+
+    public void setSensitive(boolean sensitive) {
+        this.sensitive = sensitive;
+    }
+
+    public void setRequest(boolean request) {
+        this.request = request;
+    }
+
+    
 }
