@@ -68,6 +68,23 @@ OpenJDK 8, node, npm, maven (v3.6.3), Mongo
 1. Open `localhost:8080` in your favourite browser
 2. You will need to signup when logging in for the first time, next time onwards you can login
 
+#### Debug
+1. To debug front end, install Vue.js Chrome extension from [here](https://devtools.vuejs.org/guide/installation.html).
+2. To debug backend, run the following before running web server - 
+    a. Set MAVEN_OPTS variable to enable debugging on your Java process
+        
+        ```bash
+        export MAVEN_OPTS="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8081, -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
+        ```
+        
+    b. In Visual Studio code, click on any line number to set a breakpoint.
+    
+    c.  Attach the Java debugger from Run and Debug mode. If you are doing this for the first time, click on “Create launch.json file” and then “Add configuration”. Choose “Java: Attach process by ID” and save the file. 
+    
+     <img width="426" alt="img1" src="https://user-images.githubusercontent.com/91221068/217048839-dbb00c48-00df-419b-8f32-cdb2d47a2218.png">
+
+    d. A list of running Java processes with show up. Select the web server process to attach the debugger
+
 ## Contributing
 
 We welcome contributions to this project. Please read our [CONTRIBUTING.md](CONTRIBUTING.md) for more information on how to get involved.
