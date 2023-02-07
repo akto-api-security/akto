@@ -187,7 +187,6 @@ export default {
             ],
             testingRunResult: null,
             openDetailsDialog: false,
-            showBelow:false,
             isWorkflow: false,
             originalStateFromDb: null,
             dialogBoxIssue: {},
