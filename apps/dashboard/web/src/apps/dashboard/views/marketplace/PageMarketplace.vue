@@ -1,7 +1,10 @@
 <template>
     <simple-layout title="Tests library">
         <template>
-            <div class="pa-8">
+            <div class="px-8">
+                <div class="py-4">
+                    <search placeholder="Search categories" @changed="onSearch" />
+                </div>
                 <div>                
                     <layout-with-left-pane>
                         <div class="category-tests">
@@ -20,7 +23,7 @@
                                     </div>
                                 </v-btn>
                                 <div class="nav-section">
-                                    <api-collection-group
+                                    <tests-library
                                         :items=leftNavItems
                                     >
                                         <!-- <template #prependItem>
@@ -31,7 +34,7 @@
                                                 </div>
                                             </v-btn>
                                         </template> -->
-                                    </api-collection-group>
+                                    </tests-library>
                                 </div>
                             </v-navigation-drawer>
                         </template>
@@ -53,7 +56,7 @@
                                 <div>Category</div>
                                 <v-select
                                     class="form-field-select"
-                                    :items="businessCategoryNames"
+                                    :items="businessCategoryShortNames"
                                     v-model="newTest.category"
                                     attach
                                 />
@@ -123,9 +126,10 @@
 <script>
 import SimpleLayout from '@/apps/dashboard/layouts/SimpleLayout'
 import LayoutWithLeftPane from '@/apps/dashboard/layouts/LayoutWithLeftPane'
-import ApiCollectionGroup from '@/apps/dashboard/shared/components/menus/ApiCollectionGroup'
+import TestsLibrary from '@/apps/dashboard/shared/components/menus/TestsLibrary'
 import ACard from '@/apps/dashboard/shared/components/ACard'
 import SimpleTextField from '@/apps/dashboard/shared/components/SimpleTextField'
+import Search from  '@/apps/dashboard/shared/components/inputs/Search'
 
 import api from './api'
 import issuesApi from '../issues/api'
@@ -137,18 +141,17 @@ export default {
     components: { 
         SimpleLayout,
         LayoutWithLeftPane,
-        ApiCollectionGroup,
+        TestsLibrary,
         ACard,
-        SimpleTextField
+        SimpleTextField,
+        Search
     },
     data() {
-        let allSubcategories = ["path_traversal", "swagger_file_detection"]
         let allSeverities = ["HIGH", "MEDIUM", "LOW"]
         
         return {
             drawer: null,
             showCreateTestDialog: false,
-            allSubcategories,
             allSeverities,
             addNewSubcategory: false,
             showSubcategoriesMenu: false,
@@ -156,10 +159,12 @@ export default {
             newTest: {
                 url: "",
                 category: "BOLA",
-                subcategory: allSubcategories[0],
+                subcategory: "path_traversal",
                 severity: allSeverities[0],
                 description: ""
-            }
+            },
+            searchText: "",
+            businessSubCategories: []
         }
     },
     methods: {
@@ -180,11 +185,18 @@ export default {
         },
         nameToKvObj(names) {
             return names.map(x => {
+                let category = x.split("/")[0]
+                let subCategory = x.split("/")[1]
+
+                let categoryShortName = this.businessCategoryShortNamesMap[category]
                 return {
-                    text: x,
-                    value: x.toLowerCase().replaceAll(" ", "_")
+                    text: categoryShortName+"/"+subCategory,
+                    value: subCategory.toLowerCase().replaceAll(" ", "_")
                 }
             })
+        },
+        onSearch(searchText) {
+            this.searchText = searchText
         },
         createCategoryObj(arrCategoryKv, creatorTitle, creatorType, colorType) {
             return {
@@ -194,7 +206,7 @@ export default {
                 color: func.actionItemColors()[colorType],
                 active: true,
                 items: [
-                    ...arrCategoryKv.map(category => {
+                    ...this.filterOnSearchText(arrCategoryKv).map(category => {
                         return {
                             title: category.text,
                             link: "/dashboard/library/"+creatorType+"/"+category.value,
@@ -204,19 +216,53 @@ export default {
                     })
                 ]
             }
+        },
+        filterOnSearchText(list) {
+            if (this.searchText && this.searchText != null) {
+                return list.filter(x => JSON.stringify(x).toLowerCase().indexOf(this.searchText.toLowerCase()) > -1)
+            } else {
+                return list
+            }
         }
     },
     async mounted() {
         await this.$store.dispatch('marketplace/fetchAllMarketplaceSubcategories')
         let aktoTestTypes = await issuesApi.fetchAllSubCategories()
-        this.businessCategories = aktoTestTypes.subCategories
+        this.businessCategories = aktoTestTypes.categories
+        this.businessSubCategories = aktoTestTypes.subCategories
         this.$router.push(this.leftNavItems[0].items[0].link)
-        
     },
     computed: {
         ...mapState('marketplace', ['defaultSubcategories', 'userSubcategories', 'loading']),
+        allSubcategories() {
+            return [... new Set([...this.defaultSubcategories, ...this.userSubcategories])].map(x => x.split("/")[1])
+        },
         businessCategoryNames() {
-            return [...new Set(this.businessCategories.map(category => category.superCategory.name))].map(x => {return { text: (x + "/business-logic"), value: x}})
+
+            let businessLogicCategoriesSet = new Set()
+            let ret = []
+
+            for(let index in this.businessSubCategories) {
+                let category = this.businessSubCategories[index]
+                let shortName = category.superCategory.shortName
+
+                if (!businessLogicCategoriesSet.has(shortName)) {
+                    businessLogicCategoriesSet.add(shortName)
+                    ret.push({text: shortName+"/business-logic", value: category.superCategory.name})
+                }
+            }
+
+            return ret
+        },
+        businessCategoryShortNames() {
+            return [...new Set(this.businessCategories.map(category => {return { text: category.shortName, value: category.name}}))]
+        },
+        businessCategoryShortNamesMap() {
+            let ret = {}
+            for (let index in this.businessCategoryShortNames) {
+                ret[this.businessCategoryShortNames[index].value] = this.businessCategoryShortNames[index].text
+            }
+            return ret
         },
         leftNavItems() {
             return [

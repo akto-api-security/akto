@@ -6,7 +6,9 @@ import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.types.CappedSet;
+
 import org.junit.Test;
 
 import java.util.*;
@@ -15,9 +17,12 @@ import static org.junit.Assert.*;
 
 public class TestInitializerListener extends MongoBasedTest {
 
-    private SingleTypeInfo generateSti(String url, int apiCollectionId) {
+    private static SingleTypeInfo generateSti(String url, int apiCollectionId, boolean isHost) {
+        String param = isHost ? "host" : "param#key";
+        SubType subType = isHost ? SingleTypeInfo.GENERIC : SingleTypeInfo.EMAIL;
+        int responseCode = isHost ? -1 : 200;
         SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(
-                url, "GET",200, false, "param#key", SingleTypeInfo.EMAIL, apiCollectionId, false
+                url, "GET", responseCode,isHost, param, subType, apiCollectionId, false
         );
         return new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 0,1000,0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
     }
@@ -29,13 +34,16 @@ public class TestInitializerListener extends MongoBasedTest {
         ApiCollection apiCollection3 = new ApiCollection(2, "coll3", Context.now(), new HashSet<>(), null, 3);
         ApiCollectionsDao.instance.insertMany(Arrays.asList(apiCollection1, apiCollection2, apiCollection3));
 
-        SingleTypeInfo sti1 = generateSti("/api/books", 0);
-        SingleTypeInfo sti2 = generateSti("api/books/INTEGER", 0);
-        SingleTypeInfo sti3 = generateSti("/api/cars", 1);
-        SingleTypeInfo sti4 = generateSti("/api/toys", 2);
-        SingleTypeInfo sti5 = generateSti("/api/bus", 9999);
+        SingleTypeInfo sti1 = generateSti("/api/books", 0, false);
+        SingleTypeInfo sti1h = generateSti("/api/books", 0,true);
+        SingleTypeInfo sti2 = generateSti("api/books/INTEGER", 0, false);
+        SingleTypeInfo sti2h = generateSti("api/books/INTEGER", 0, true);
+        SingleTypeInfo sti3 = generateSti("/api/cars", 1, false);
+        SingleTypeInfo sti3h = generateSti("/api/cars", 1, true);
+        SingleTypeInfo sti4 = generateSti("/api/toys", 2, false);
+        SingleTypeInfo sti5 = generateSti("/api/bus",2, false);
 
-        SingleTypeInfoDao.instance.insertMany(Arrays.asList(sti1, sti2, sti3, sti4, sti5));
+        SingleTypeInfoDao.instance.insertMany(Arrays.asList(sti1, sti2, sti3, sti4, sti5, sti1h, sti2h, sti3h));
 
         InitializerListener.ChangesInfo changesInfo = InitializerListener.getChangesInfo(Context.now(), Context.now());
         assertNotNull(changesInfo);
