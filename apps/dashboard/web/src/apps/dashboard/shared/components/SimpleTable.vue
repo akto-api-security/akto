@@ -4,6 +4,7 @@
             :headers="headers"
             :items="filteredItems"
             class="board-table-cards keep-scrolling"
+            :class="{horizontalView:showGridView && !leftView}"
             :search="search"
             :sort-by="sortKey"
             :sort-desc="sortDesc"
@@ -17,42 +18,48 @@
         >
             <template v-slot:top="{ pagination, options, updateOptions }" v-if="items && items.length > 0">
                 <div class="headerContainer">
-                    <div class="headerDiv">
-                        <div v-if="showName" class="table-name">
+                    <div v-if="showGridView && !leftView" class="gridName">
+                        <h1>{{ name }}</h1>
+                    </div>
+                    <div class="headerDiv" v-if="!leftView">
+                        <div v-if="showName && !showGridView" class="table-name">
                             {{name}}
                         </div>                 
                         <div>
                             <slot name="massActions"/>
                         </div>
 
-                        <v-menu offset-y :close-on-content-click="false" v-if="headers.length > 4">
-                            <template v-slot:activator="{ on, attrs }">
-                                <v-btn class = "showEnd" v-bind= "attrs" v-on = "on" plain>
-                                    <span class="filterHeaderSpan">
-                                        More Filters
-                                    </span>
-                                </v-btn>     
-                            </template>
+                        <span class="headerButtonContainer showEnd">
+                            <v-menu offset-y :close-on-content-click="false" v-if="headers.length > 4">
+                                <template v-slot:activator="{ on, attrs }">
+                                    <v-btn class = "showButtons noBorderButton" v-bind= "attrs" v-on = "on" plain>
+                                        <span class="filterHeaderSpan">
+                                            More Filters
+                                            <v-icon :size="16">$fas_filter</v-icon>
+                                        </span>
+                                    </v-btn>     
+                                </template>
 
-                            <filter-list
-                                :title="headers[1].text"
-                                hideOperators
-                                hideListTitle
-                                :items="convertHeadersList()"
-                                @clickedItem = "pushIntoNew($event)"
-                                @selectedAll = "selectAllHeaders($event)"
-                            />
-                        
-                        </v-menu>
+                                <filter-list
+                                    :title="headers[1].text"
+                                    hideOperators
+                                    hideListTitle
+                                    :items="convertHeadersList()"
+                                    @clickedItem = "pushIntoNew($event)"
+                                    @selectedAll = "selectAllHeaders($event)"
+                                />
+                            
+                            </v-menu>
+                        </span>
 
                         <template v-for = "(header,index) in selectedHeaders">
-                            <span>
+                            <span class="headerButtonContainer" :key="index">
                                 <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.value]"> 
                                     <template v-slot:activator="{ on, attrs }">
                                         <v-btn class = "showButtons" v-bind = "attrs" v-on = "on">
                                             <span class="filterHeaderSpan" :style="filters[header.value].size > 0 ? {'color': '#6200EA'} : {'color':'#47466A'}" >
                                                 {{header.text}}
-                                                <v-icon :size="14">$fas_angle-down</v-icon>
+                                                <v-icon :size="16">$fas_angle-down</v-icon>
                                             </span>
                                         </v-btn>     
                                     </template>
@@ -64,13 +71,22 @@
                                         @selectedAll="selectedAll(header.value, $event)"
                                     />
                                 </v-menu>
-                            </span> 
-                        
+                            </span>
                         </template>
                     </div>
 
-                    <div class="headerDiv">
+                    <div v-if="filteredItems.length < items.length">
+                        <span class="headerButtonContainer">
+                            <v-btn class = "showButtons noBorderButton" plain @click="clearFilters()">
+                                <span class="filterHeaderSpan">
+                                    Clear All Filters
+                                    <v-icon :size="16">$fas_times</v-icon>
+                                </span>
+                            </v-btn>
+                        </span>
+                    </div>
 
+                    <div class="headerDiv" v-if="!showGridView">
                         <v-btn-toggle
                             v-model="toggle_exclusive"
                             mandatory
@@ -85,97 +101,98 @@
                                             icon
                                             plain
                                         >
-                                            <v-icon>{{item.icon}}</v-icon>
+                                            <v-icon :size="16">{{item.icon}}</v-icon>
                                         </v-btn>
                                     </template>
                                     {{item.toolTipText}}
                                 </v-tooltip>
                             </template>
                         </v-btn-toggle>
-
-                        <span>
-                            <v-menu offset-y>
-                                <template v-slot:activator="{ on, attrs }">
-                                    <v-btn
-                                    dark
-                                    text
-                                    color="primary"
-                                    v-bind="attrs"
-                                    v-on="on"
-                                    >
-                                    <span v-if ="itemsPerPage > 0">
-                                        {{ itemsPerPage }}
-                                    </span>
-
-                                    <span v-else>
-                                        Choose Rows Per Page
-                                    </span>
-                                        <v-icon :size="14">$fas_angle-down</v-icon>
-                                    </v-btn>
-                                </template>
-                                <v-list>
-                                    <v-list-item
-                                    v-for="(val, index) in itemsPerPageArray"
-                                    :key="index"
-                                    @click="updateItemsPerPage(val)"
-                                    >
-                                        <v-list-item-title v-if="val > 0">{{ val }}</v-list-item-title>
-                                        <v-list-item-title v-else>Show All</v-list-item-title>
-                                    </v-list-item>
-                                </v-list>
-                            </v-menu>
-                        </span>
-
                         <v-data-footer 
-                            v-if="enablePagination && itemsPerPage > 0"
+                            v-if="itemsPerPage > 0"
                             :pagination="pagination" 
                             :options="options"
                             @update:options="updateOptions"
                             prevIcon= '$fas_angle-left'
                             nextIcon= '$fas_angle-right'
                         />
+                        <span>
+                            <v-menu offset-y>
+                                <template v-slot:activator="{ on, attrs }">
+                                    <v-btn
+                                    dark
+                                    text
+                                    v-bind="attrs"
+                                    v-on="on"
+                                    >
+                                        <span>
+                                        <v-icon :size="16" color="#000000">$fas_ellipsis-v</v-icon>
+                                    </span>
+                                    </v-btn>
+                                </template>
+                                <v-list>
+                                    <v-list-item-title>Show Up to</v-list-item-title>
+                                    <v-list-item
+                                        v-for="(val, index) in itemsPerPageArray"
+                                        :key="index"
+                                        @click="updateItemsPerPage(val)"
+                                    >
+                                        <v-list-item-title v-if="val > 0">{{ val }}</v-list-item-title>
+                                        <v-list-item-title v-else>Show All</v-list-item-title>
+                                        <v-list-item-subtitle v-if="val === itemsPerPage">
+                                            <v-icon :size="16">$fas_check</v-icon>
+                                        </v-list-item-subtitle>
+                                    </v-list-item>
+                                </v-list>
+                            </v-menu>
+                        </span>
+                    </div>
 
-                        <div class="d-flex board-table-cards jc-end">
-                            <div class="clickable download-csv">
-                                <v-tooltip bottom>
-                                    <template v-slot:activator="{on, attrs}">
-                                        <v-btn 
-                                            v-on="on"
-                                            v-bind="attrs" 
-                                            class="showButtons"
-                                            @click="downloadData" v-if="!hideDownloadCSVIcon">
+                    <div class="headerDiv" v-if="!showGridView">
+                        <div class="clickable download-csv">
+                            <v-tooltip bottom>
+                                <template v-slot:activator="{on, attrs}">
+                                    <v-btn 
+                                        v-on="on"
+                                        v-bind="attrs" 
+                                        class="showButtons"
+                                        @click="downloadData" v-if="!hideDownloadCSVIcon"
+                                    >
+                                        <span class="filterHeaderSpan adjust-width">
                                             Export
-                                        </v-btn>
-                                    </template>
-                                    Download as CSV
-                                </v-tooltip>
-                            </div>
-                            <div>
-                                <slot name="add-new-row-btn" :filteredItems=filteredItems />
-                            </div>
+                                            <v-icon :size="16">$fas_upload</v-icon>
+                                        </span>
+                                    </v-btn>
+                                </template>
+                                Download as CSV
+                            </v-tooltip>
+                        </div>
+                        <div>
+                            <slot name="add-new-row-btn" :filteredItems=filteredItems />
                         </div>
                     </div>
                 </div>
             </template>
-
             <template v-slot:footer.prepend="{}">
                 <v-spacer/>
             </template>
 
-            <template v-slot:header="{}">
+            <template v-slot:header="{}" v-if="!showGridView">
                 <template v-for="(header, index) in headers">
                     <th
                             class='table-header'
-                            :style="index == 0 ? {'padding': '2px !important'} : {}" 
+                            :style="index == 0 ? {'padding': '0px !important'} : {}" 
                             :key="index"
                     >
+                        <!-- <div v-if="index == 1 && actions">
+                            <span class="table-sub-header" />
+                        </div> -->
                         <div v-if="index > 0">
                                 <span class="table-sub-header">
                                     <span class="clickable"  @click="setSortOrInvertOrder(header)">
                                         {{header.text}} 
                                     </span>                                    
                                 </span>
-                            
                         </div>
                     </th>
                 </template>
@@ -184,42 +201,65 @@
                             <slot name="add-new-row" />
                         </tr>                
                 </template>
-
             </template>
-            <template v-slot:item="{item}">
-                <tr class="table-row" 
-                    @click="rowSelected(item)"
-                    :class="currentRow === item ? 'grey' : ''"
-                >
-                    <td
-                        class="table-column high-dense"
-                        :style="{'background-color':item.color, 'padding' : '0px !important'}"
-                    />
-                    <td
-                        v-for="(header, index) in headers.slice(1)"
-                        :key="index"
-                        class="table-column clickable"
-                        @click="$emit('rowClicked', item)"
-                        :style="adjustHeight"
-                    >
-                        <slot :name="[`item.${header.value}`]" :item="item">
-                            <div class="table-entry">{{item[header.value]}}</div>
-                        </slot>
-                    </td>
 
-                    <td v-if="actions && actions.length > 0" class="table-column" :style="adjustHeight">
-                        <simple-menu :items="actionsFunction(item)">
-                            <template v-slot:activator2>
-                                <v-icon
-                                    size=16
-                                    color="#424242"
+            <template v-slot:header="{}" v-else-if="!leftView && showGridView">
+                <div class="showAllButton">
+                    <span class="buttonText" v-if="!activeButton" @click="showAll()">    
+                        Show All
+                        <v-icon>$fas_angle-down</v-icon>
+                    </span>
+                    <span class="buttonText" v-else @click="showAll()">    
+                        Hide All
+                        <v-icon>$fas_angle-up</v-icon>
+                    </span>              
+                </div>
+            </template>
+            
+            <template v-slot:item="{item}">
+                <slot name="gridView" :rowData="item" :length="filteredItems.length">
+                    <tr class="table-row" 
+                    @click="rowSelected(item)"
+                    :style="currentRow === item ? {'background':'rgba(71, 70, 106, 0.7)'} : {}" 
+                    >
+                        <td
+                            class="table-column high-dense"
+                            :style="{'background-color':item.color, 'padding' : '0px !important'}"
+                        />
+                        <!-- <td v-if="actions && actions.length > 0" class="table-column high-dense">
+                            <input type="checkbox" id="checkbox" v-model="batchSelection" :value="item" />
+                        </td> -->
+                        <td
+                            v-for="(header, index) in headers.slice(1)"
+                            :key="index"
+                            class="table-column clickable"
+                            @click="$emit('rowClicked', item)"
+                            :style="adjustHeight"
+                        >
+                            <slot :name="[`item.${header.value}`]" :item="item">
+                                <div 
+                                    class="table-entry" 
+                                    :style="currentRow === item ? {'color':'#FFFFFF'}: {}"
                                 >
-                                    $fas_ellipsis-v
-                                </v-icon>
-                            </template>
-                        </simple-menu>
-                    </td>
-                </tr>
+                                    {{item[header.value]}}
+                                </div>
+                            </slot>
+                        </td>
+
+                        <td v-if="actions && actions.length > 0" class="table-column" :style="adjustHeight">
+                            <simple-menu :items="actionsFunction(item)">
+                                <template v-slot:activator2>
+                                    <v-icon
+                                        :size="16"                                        
+                                        :style="currentRow === item ? {'color':'#FFFFFF'}: {}"
+                                    >
+                                        $fas_ellipsis-v
+                                    </v-icon>
+                                </template>
+                            </simple-menu>
+                        </td>
+                    </tr>
+                </slot>
             </template>
         </v-data-table>
     </div>
@@ -251,15 +291,18 @@ export default {
         allowNewRow: obj.boolN,
         hideDownloadCSVIcon: obj.boolN,
         showName: obj.boolN,
+        showGridView:obj.boolN,
+        leftView:obj.boolN
     },
     data () {
         return {
+            batchSelection:[],
             pageNum:1,
             activeButton:false,
             initialDisplayedItems:[],
             selectedHeaders: [],
             currentRow: {},
-            itemsPerPage: 15,
+            itemsPerPage: 10,
             itemsPerPageArray:[5,10,15,20,25,30,-1],
             search: null,
             sortKey: this.sortKeyDefault || null,
@@ -288,6 +331,20 @@ export default {
         }
     },
     methods: {
+        showAll(){
+            this.activeButton = !this.activeButton
+            if(this.activeButton){
+                this.itemsPerPage = -1
+            }else{
+                this.itemsPerPage = 5
+            }
+
+        },
+        clearFilters(){
+            this.filters= this.headers.reduce((map, e) => {map[e.value] = new Set(); return map}, {})
+            this.showFilterMenu= this.headers.reduce((map, e) => {map[e.value] = false; return map}, {})
+            this.filterOperators= this.headers.reduce((map, e) => {map[e.value] = 'OR'; return map}, {})
+        },
         selectTable(){
             this.$store.state.globalUid = this._uid
         },
@@ -597,6 +654,13 @@ export default {
             return this.filteredItems && this.filteredItems.length > this.itemsPerPage
         } ,
         fillInitial(){
+            if(this.leftView){
+                this.itemsPerPage = -1
+            }
+
+            else if(this.showGridView){
+                this.itemsPerPage = 5
+            }
             if(this.selectedHeaders.length < 1){
                 var index = 0
                 var lim = 4
@@ -651,12 +715,46 @@ export default {
             display: none;
         }
     }
+
+    .showAllButton{
+        cursor: pointer;
+        display: flex;
+        justify-content: end;
+
+        .buttonText{
+            font-family: 'Poppins';
+            font-style: normal;
+            font-weight: 500;
+            font-size: 16px;
+            line-height: 130%;
+            color: #C9C9C9;
+        }
+    }
+
+    .horizontalView{
+        tbody{
+            display: flex;
+            gap: 18px;
+            flex-direction: row;
+            margin: 12px 5px 0px 5px;
+            flex-wrap: wrap;
+        }
+    }
+
+    .table-row{
+        &:hover{
+            .table-entry{
+                color: #47466A !important;
+            }
+        }
+    }
 </style>
 
 <style lang="sass" scoped>
 .board-table-cards
     padding-right: 24px
     cursor: pointer
+    align-items: center !important
     .table-header
         vertical-align: bottom
         text-align: left
@@ -686,7 +784,6 @@ export default {
 
         &:hover
             background-color: #edecf0 !important
-            
     .form-field-text
         padding-top: 8px !important
         margin-top: 0px !important
@@ -697,6 +794,8 @@ export default {
         font-size: 12px
         color: var(--v-themeColor-base)
         display: flex
+        align-items: center
+        margin-top: 4px
 
     .table-name
         justify-content: end
@@ -708,34 +807,22 @@ export default {
         display: flex
 
 .showButtons
-    box-sizing: border-box
-    width: fit-content
-    background: #FFFFFF !important
-    border: 1px solid #D0D5DD
+    box-sizing: border-box !important
+    width: fit-content !important
+    background: #fff !important
+    border: 1px solid #d0d5dd
     font-weight: 500
-    margin:0px 5px 5px 5px
-    box-shadow: 0px 1px 2px rgba(16, 24, 40, 0.05)
+    height: 30px !important
+    display: flex !important
+    flex-direction: row !important
+    padding: 4px 8px !important
+    gap: 4px !important
+    align-items: center !important
+    box-shadow: 0px 1px 2px rgb(16 24 40 / 5%)
 
 
 .table-sub-header
     position: relative
-
-.filter-icon
-    color: #6200EA !important
-    opacity:0.8
-    min-width: 0px !important
-    position: absolute
-    right: -35px
-    top: -5px
-
-.list-header
-    border: 1px solid #47466A    
-    font-weight: 500
-    padding: 4px 6px
-    color: #47466A
-    background: white
-    opacity: 1
-    font-size: 14px
 </style>
 
 <style scoped>
@@ -746,8 +833,41 @@ export default {
   font-weight: 400;
 }
 
+.headerButtonContainer{
+    display: flex;
+    margin: 5px 8px 0px 0px ;
+}
+.selectRowsPerPage{
+    color:black;
+    margin-right: 5px;
+}
+
+.gridName {
+    align-items: center;
+    padding: 5px 0px 10px 20px;
+}
 .tableContainer{
-    margin-top: 20px;
+    margin-bottom: 15px !important;
+    margin-top: 15px !important;
+}
+
+.v-data-table >>> .v-data-table__wrapper {
+    margin-top:10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    background: #FFFFFF;
+    border-width: 1px 1px 0px 1px;
+    border-style: solid;
+    border-color: #D9D9D9;
+}
+
+.noBorderButton{
+    box-shadow: none;
+    border: none !important;
+}
+
+.adjust-width{
+    width: 70px !important;
 }
 
 
@@ -757,37 +877,44 @@ export default {
 }
 
 .headerDiv:first-child{
-    /* flex-direction: row-reverse; */
-    max-width: 630px;
+    width: 630px;
 }
 
 .headerDiv:last-child{
     justify-content: flex-end;
-}
-
-.v-btn-toggle:not(.v-btn-toggle--dense) .v-btn.v-btn.v-size--default {
-    height: 36px; 
-}
-
-.v-btn:not(.v-btn--round).v-size--default {
-    margin: 0 5px 5px 5px;
+    gap: 10px;
 }
 .v-btn-toggle .v-btn.v-btn.v-size--default {
     min-width: 0px;
     min-height: 0;
 }
 
+.v-btn:not(.v-btn--round).v-size--default {
+    height: 30px;
+    min-width: 40px;
+    padding: 0 8px;
+}
 .theme--light.v-btn-toggle:not(.v-btn-toggle--group) .v-btn.v-btn .v-icon {
     color: #47466A;
 }
 .filterHeaderSpan{
-    min-width: 67px;
     height: 16px;
     font-family: 'Poppins';
     font-style: normal;
     font-weight: 500;
     font-size: 12px;
+    justify-content: flex-start;
+    align-items: center;
+    display: flex;
 }
+
+.v-list-item__title {
+    align-self: center;
+    font-size: 1rem;
+    min-width: 100px;
+    padding-left: 8px;
+}
+
 
 .showEnd{
     order: 99;
@@ -810,27 +937,45 @@ export default {
 }
 
 .board-table-cards >>> .v-data-footer__pagination {
-    height: 24px;
+    height: 30px;
     margin: 0 5px 0 5px;
-    line-height: 2;
+    line-height: 2.5;
     font-size: 0.8rem;
     order: 1;
 }
-
 .board-table-cards >>> .v-data-footer{
-    border: thin solid rgba(0,0,0,.12);
-    height: 36px;
+    border: none;  
+    height: 30px;
+    padding:0px !important;
+    background: #F4F4F4;
+    border-radius: 4px;
+    margin-right: 15px;
 }
-
+.board-table-cards >>> .v-data-footer__icons-before {
+    width: 40px;
+    display: flex;
+    justify-content: center;
+    height: 30px !important;
+    align-items: center;
+}
 .board-table-cards >>> .v-data-footer__icons-after {
     order: 2;
+    width: 40px;
+    display: flex;
+    justify-content: center;
+    height: 30px !important;
+    align-items: center;
+}
+
+.v-btn-toggle .v-btn.v-btn.v-size--default[data-v-1f3b7669] {
+    height: 30px;
 }
 
 
 .board-table-cards >>> .headerContainer{
     display: flex ;
     flex-direction: row ;
-    justify-content: space-between ;
+    justify-content: space-between;
 }
 
 </style>
