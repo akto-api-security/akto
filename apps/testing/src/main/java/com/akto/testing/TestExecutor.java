@@ -21,8 +21,8 @@ import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.util.JSONUtils;
-import com.akto.util.enums.LoginFlowEnums;
 import com.akto.util.enums.GlobalEnums.TestSubCategory;
+import com.akto.util.enums.LoginFlowEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -35,6 +35,10 @@ import org.slf4j.LoggerFactory;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 
 public class TestExecutor {
@@ -194,10 +198,6 @@ public class TestExecutor {
             Filters.eq("_id", summaryId),
             Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, testingRunResults.size())
         );
-
-        //Creating issues from testingRunResults
-        TestingIssuesHandler handler = new TestingIssuesHandler();
-        handler.handleIssuesCreationFromTestingRunResults(testingRunResults);
 
         loggerMaker.infoAndAddToDb("Finished adding issues");
 
@@ -423,7 +423,12 @@ public class TestExecutor {
         if ( timeToKill <= 0 || now - startTime <= timeToKill) {
             try {
                 testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId);
-                if (testingRunResults != null && !testingRunResults.isEmpty()) TestingRunResultDao.instance.insertMany(testingRunResults);
+                if (testingRunResults != null && !testingRunResults.isEmpty()) {
+                    TestingRunResultDao.instance.insertMany(testingRunResults);
+                    //Creating issues from testingRunResults
+                    TestingIssuesHandler handler = new TestingIssuesHandler();
+                    handler.handleIssuesCreationFromTestingRunResults(testingRunResults);
+                }
             } catch (Exception e) {
                 e.printStackTrace();
             }

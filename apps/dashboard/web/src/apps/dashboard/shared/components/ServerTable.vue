@@ -57,7 +57,7 @@
                                         <span class="clickable"  @click="setSortOrInvertOrder(header)">
                                             {{header.text}} 
                                         </span>
-                                        <span>
+                                        <span v-if="header.showFilterMenu">
                                             <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.sortKey || header.value]"> 
                                                 <template v-slot:activator="{ on, attrs }">                         
                                                     <v-btn 
