@@ -40,18 +40,16 @@
                     name="All" 
                     sortKeyDefault="sensitiveTags" 
                     :sortDescDefault="true"
+                    :slotActions="true"
                 >
                     <template #add-new-row-btn="{filteredItems}">
-                        <div style="align-items: center; display: flex;">
-                            <v-tooltip>
-                                <template v-slot:activator='{ on, attrs }'>
-                                    <v-btn icon primary dark color="#47466A" @click="showScheduleDialog(filteredItems)">
-                                        <v-icon>$fas_play</v-icon>
-                                    </v-btn>
-                                </template>
-                                "Run test"
-                            </v-tooltip>
-                            
+                        <div style="display: flex; gap:8px;">
+                            <v-btn class="showButtons" @click="showScheduleDialog(filteredItems)">
+                                <span class="filterHeaderSpan">
+                                    Run Test
+                                    <v-icon :size="14">$fas_play</v-icon>
+                                </span>
+                            </v-btn>    
                         </div>
                         
                     </template>
@@ -540,4 +538,35 @@ export default {
     display: flex
     justify-content: right
 
+.v-btn--icon.v-size--default
+    height: 30px
+    width: 36px
+
+.showButtons
+    box-sizing: border-box !important   
+    width: fit-content !important
+    background: #fff !important
+    font-weight: 500 !important
+    height: 30px !important
+    display: flex !important
+    flex-direction: row !important
+    padding: 4px 8px !important
+    gap: 4px !important
+    align-items: center !important
+    border:1px solid #D0D5DD !important
+    border-radius: 4px !important
+    box-shadow: none !important
+
+
+.filterHeaderSpan
+    height: 16px
+    font-family: 'Poppins'
+    font-style: normal
+    font-weight: 500
+    font-size: 12px
+    justify-content: center
+    align-items: center
+    display: flex
+    gap:3px
+    color:#47466A
 </style>

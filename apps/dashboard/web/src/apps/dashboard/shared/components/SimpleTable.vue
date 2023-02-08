@@ -32,10 +32,9 @@
                         <span class="headerButtonContainer showEnd">
                             <v-menu offset-y :close-on-content-click="false" v-if="headers.length > 4">
                                 <template v-slot:activator="{ on, attrs }">
-                                    <v-btn class = "showButtons noBorderButton" v-bind= "attrs" v-on = "on" plain>
-                                        <span class="filterHeaderSpan">
+                                    <v-btn class = "showButtons noBorderButton" v-bind= "attrs" v-on = "on">
+                                        <span class="filterHeaderSpan" :style="{'color':'#676767'}">
                                             More Filters
-                                            <v-icon :size="16">$fas_filter</v-icon>
                                         </span>
                                     </v-btn>     
                                 </template>
@@ -57,7 +56,7 @@
                                 <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.value]"> 
                                     <template v-slot:activator="{ on, attrs }">
                                         <v-btn class = "showButtons" v-bind = "attrs" v-on = "on">
-                                            <span class="filterHeaderSpan" :style="filters[header.value].size > 0 ? {'color': '#6200EA'} : {'color':'#47466A'}" >
+                                            <span class="filterHeaderSpan" :style="filters[header.value].size > 0 ? {'color': '#6200EA'} : {}">
                                                 {{header.text}}
                                                 <v-icon :size="16">$fas_angle-down</v-icon>
                                             </span>
@@ -75,7 +74,7 @@
                         </template>
                     </div>
 
-                    <div v-if="filteredItems.length < items.length">
+                    <!-- <div v-if="filteredItems.length < items.length">
                         <span class="headerButtonContainer">
                             <v-btn class = "showButtons noBorderButton" plain @click="clearFilters()">
                                 <span class="filterHeaderSpan">
@@ -84,10 +83,10 @@
                                 </span>
                             </v-btn>
                         </span>
-                    </div>
+                    </div> -->
 
                     <div class="headerDiv" v-if="!showGridView">
-                        <v-btn-toggle
+                        <!-- <v-btn-toggle
                             v-model="toggle_exclusive"
                             mandatory
                         >
@@ -107,7 +106,7 @@
                                     {{item.toolTipText}}
                                 </v-tooltip>
                             </template>
-                        </v-btn-toggle>
+                        </v-btn-toggle> -->
                         <v-data-footer 
                             v-if="itemsPerPage > 0"
                             :pagination="pagination" 
@@ -116,7 +115,28 @@
                             prevIcon= '$fas_angle-left'
                             nextIcon= '$fas_angle-right'
                         />
-                        <span>
+                        <div class="clickable download-csv">
+                            <v-tooltip bottom>
+                                <template v-slot:activator="{on, attrs}">
+                                    <v-btn 
+                                        v-on="on"
+                                        v-bind="attrs" 
+                                        class="showButtons"
+                                        @click="downloadData" v-if="!hideDownloadCSVIcon && !slotActions"
+                                    >
+                                        <span class="filterHeaderSpan adjust-width">
+                                            Export
+                                            <v-icon :size="16">$fas_upload</v-icon>
+                                        </span>
+                                    </v-btn>
+                                </template>
+                                Download as CSV
+                            </v-tooltip>
+                            <div>
+                                <slot name="add-new-row-btn" :filteredItems=filteredItems />
+                            </div>
+                        </div>
+                        <span class="dropdownActions" v-if="!hideMoreActions">
                             <v-menu offset-y>
                                 <template v-slot:activator="{ on, attrs }">
                                     <v-btn
@@ -125,12 +145,29 @@
                                     v-bind="attrs"
                                     v-on="on"
                                     >
-                                        <span>
-                                        <v-icon :size="16" color="#000000">$fas_ellipsis-v</v-icon>
-                                    </span>
+                                        <v-tooltip top>
+                                            <template v-slot:activator="{ on, attrs }">
+                                                <v-icon color="#47466A" v-on="on" v-bind="attrs">$dropdown</v-icon>
+                                            </template>
+                                            More Actions
+                                        </v-tooltip>
                                     </v-btn>
                                 </template>
                                 <v-list>
+                                    <v-tooltip bottom>
+                                        <template v-slot:activator="{on, attrs}">
+                                            <div class="exportList" 
+                                                v-if="slotActions" 
+                                                @click="downloadData"
+                                                v-on="on"
+                                                v-bind="attrs"
+                                            >
+                                                Export
+                                            </div>
+                                        </template>
+                                        Download as CSV
+                                    </v-tooltip>
+                                    
                                     <v-list-item-title>Show Up to</v-list-item-title>
                                     <v-list-item
                                         v-for="(val, index) in itemsPerPageArray"
@@ -146,30 +183,6 @@
                                 </v-list>
                             </v-menu>
                         </span>
-                    </div>
-
-                    <div class="headerDiv" v-if="!showGridView">
-                        <div class="clickable download-csv">
-                            <v-tooltip bottom>
-                                <template v-slot:activator="{on, attrs}">
-                                    <v-btn 
-                                        v-on="on"
-                                        v-bind="attrs" 
-                                        class="showButtons"
-                                        @click="downloadData" v-if="!hideDownloadCSVIcon"
-                                    >
-                                        <span class="filterHeaderSpan adjust-width">
-                                            Export
-                                            <v-icon :size="16">$fas_upload</v-icon>
-                                        </span>
-                                    </v-btn>
-                                </template>
-                                Download as CSV
-                            </v-tooltip>
-                        </div>
-                        <div>
-                            <slot name="add-new-row-btn" :filteredItems=filteredItems />
-                        </div>
                     </div>
                 </div>
             </template>
@@ -236,7 +249,7 @@
                             @click="$emit('rowClicked', item)"
                             :style="adjustHeight"
                         >
-                            <slot :name="[`item.${header.value}`]" :item="item">
+                            <slot :name="[`item.${header.value}`]" :item="item" >
                                 <div 
                                     class="table-entry" 
                                     :style="currentRow === item ? {'color':'#FFFFFF'}: {}"
@@ -249,11 +262,10 @@
                         <td v-if="actions && actions.length > 0" class="table-column" :style="adjustHeight">
                             <simple-menu :items="actionsFunction(item)">
                                 <template v-slot:activator2>
-                                    <v-icon
-                                        :size="16"                                        
+                                    <v-icon                                       
                                         :style="currentRow === item ? {'color':'#FFFFFF'}: {}"
                                     >
-                                        $fas_ellipsis-v
+                                        $dropdown
                                     </v-icon>
                                 </template>
                             </simple-menu>
@@ -292,7 +304,9 @@ export default {
         hideDownloadCSVIcon: obj.boolN,
         showName: obj.boolN,
         showGridView:obj.boolN,
-        leftView:obj.boolN
+        leftView:obj.boolN,
+        hideMoreActions:obj.boolN,
+        slotActions:obj.boolN,
     },
     data () {
         return {
@@ -730,7 +744,7 @@ export default {
             color: #C9C9C9;
         }
     }
-
+    
     .horizontalView{
         tbody{
             display: flex;
@@ -794,8 +808,8 @@ export default {
         font-size: 12px
         color: var(--v-themeColor-base)
         display: flex
-        align-items: center
-        margin-top: 4px
+        margin-top: 5px
+        gap: 8px
 
     .table-name
         justify-content: end
@@ -819,14 +833,16 @@ export default {
     gap: 4px !important
     align-items: center !important
     box-shadow: 0px 1px 2px rgb(16 24 40 / 5%)
-
-
 .table-sub-header
     position: relative
 </style>
 
 <style scoped>
 
+
+.v-tooltip__content:after{
+    border:#7e7e97 !important;
+}
 .form-field-text >>> .v-label {
   font-size: 12px;
   color: #6200EA;
@@ -876,13 +892,20 @@ export default {
     flex-wrap: wrap;
 }
 
+.exportList{
+    margin: 8px 0px 30px 0px;
+    padding: 4px 8px;
+    border-bottom: 1px solid;
+    cursor: pointer;
+}
+
 .headerDiv:first-child{
     width: 630px;
 }
 
 .headerDiv:last-child{
     justify-content: flex-end;
-    gap: 10px;
+    gap: 8px;
 }
 .v-btn-toggle .v-btn.v-btn.v-size--default {
     min-width: 0px;
@@ -906,6 +929,8 @@ export default {
     justify-content: flex-start;
     align-items: center;
     display: flex;
+    gap:3px;
+    color:#47466A !important;
 }
 
 .v-list-item__title {
@@ -913,6 +938,13 @@ export default {
     font-size: 1rem;
     min-width: 100px;
     padding-left: 8px;
+}
+
+.dropdownActions{
+    margin-top: 5px;
+    width:20px;
+    display: flex;
+    justify-content: center;
 }
 
 
@@ -942,27 +974,29 @@ export default {
     line-height: 2.5;
     font-size: 0.8rem;
     order: 1;
+    color:#47466A;
 }
 .board-table-cards >>> .v-data-footer{
     border: none;  
     height: 30px;
     padding:0px !important;
-    background: #F4F4F4;
+    background: #FFFFFF;
     border-radius: 4px;
-    margin-right: 15px;
+    margin-top:5px;
+    border: 1px solid #D0D5DD;
 }
 .board-table-cards >>> .v-data-footer__icons-before {
-    width: 40px;
+    width: 30px;
     display: flex;
-    justify-content: center;
+    justify-content: flex-start;
     height: 30px !important;
     align-items: center;
 }
 .board-table-cards >>> .v-data-footer__icons-after {
     order: 2;
-    width: 40px;
+    width: 30px;
     display: flex;
-    justify-content: center;
+    justify-content: flex-end;
     height: 30px !important;
     align-items: center;
 }
