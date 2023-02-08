@@ -12,11 +12,16 @@
                 @rowClicked=rowClicked
                 hide-default-footer ="true"
                 :hideDownloadCSVIcon="true"
+                :hideMoreActions="true"
             >
                 <template v-slot:add-new-row-btn="{}">
-                    <div class="clickable download-csv ma-1">
-                        <v-btn icon :disabled=showNewRow :color="$vuetify.theme.themes.dark.themeColor"  @click="showNewRow = true">
-                            <v-icon>$fas_plus</v-icon>
+                    <div class="clickable download-csv slottedActions">
+                        <v-btn class="showButtons" :disabled=showNewRow @click="showNewRow = true">
+                            <span class="filterHeaderSpan">
+                                Add Collections
+                                <v-icon :size="16">$plusIcon</v-icon>
+                            </span>
+                            
                         </v-btn>
 
                         <v-dialog
@@ -34,7 +39,9 @@
                             >
                             <v-tooltip bottom>
                                 <template v-slot:activator='{ on, attrs }'>
-                                    <v-icon color="#6200EA" size="16" v-bind="attrs" v-on="on" >$fas_trash</v-icon>
+                                    <span class="filterHeaderSpan">
+                                        <v-icon :size="20" v-bind="attrs" v-on="on" >$deleteIcon</v-icon>
+                                    </span>
                                 </template>
                                 Delete multiple collections
                             </v-tooltip>
@@ -277,4 +284,51 @@ export default {
 
 .v-time-picker-clock__item--active
     color: #FFFFFF    
+</style>
+
+<style lang="scss" scoped>
+    
+    .slottedActions{
+        display: flex;
+        margin: 0px !important;
+        gap:8px;
+    }
+
+    .showButtons{
+        box-sizing: border-box !important;
+        width: fit-content !important;
+        background: #fff !important;
+        font-weight: 500 !important;
+        height: 30px !important;
+        display: flex !important;
+        flex-direction: row !important;
+        padding: 4px 8px !important;
+        gap: 4px !important;
+        align-items: center !important;
+        border:1px solid #D0D5DD !important;
+        border-radius: 4px !important;
+        box-shadow: none !important;
+    }
+
+    .filterHeaderSpan{
+        height: 16px;
+        font-family: 'Poppins';
+        font-style: normal;
+        font-weight: 500;
+        font-size: 12px;
+        justify-content: flex-start;
+        align-items: center;
+        display: flex;
+        gap:3px;
+        color:#47466A;
+    }
+
+    .v-btn:not(.v-btn--round).v-size--default {
+        height: 30px;
+        padding: 0 8px;
+        min-width: 40px;
+    }
+    .v-btn--icon.v-size--default {
+        height: 29px !important;
+    }
 </style>

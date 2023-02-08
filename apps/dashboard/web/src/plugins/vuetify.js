@@ -18,6 +18,9 @@ import TrashSingleTick from "../apps/dashboard/shared/icons/TrashSingleTick"
 import TrashDoubleTick from "../apps/dashboard/shared/icons/TrashDoubleTick"
 import AktoWhite from "../apps/dashboard/shared/icons/AktoWhite"
 import BookBookmark from "../apps/dashboard/shared/icons/BookBookmark"
+import DeleteIcon from "../apps/dashboard/shared/icons/DeleteIcon"
+import DropDown from "../apps/dashboard/shared/icons/DropDown"
+import PlusIcon from "../apps/dashboard/shared/icons/PlusIcon"
 
 Vue.component('font-awesome-icon', FontAwesomeIcon)
 
@@ -175,6 +178,18 @@ const ctTheme = {
 }
 
 const faIconsOpts = {}
+
+faIconsOpts.deleteIcon = {
+  component: DeleteIcon
+}
+
+faIconsOpts.dropdown = {
+  component: DropDown
+}
+
+faIconsOpts.plusIcon = {
+  component: PlusIcon
+}
 
 faIconsOpts.bookBookmark = {
   component: BookBookmark
