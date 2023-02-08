@@ -233,6 +233,13 @@ public class OriginalHttpRequest {
         return findHeaderValue("x-forwarded-proto");
     }
 
+    public String getFullUrlIncludingDomain() throws Exception {
+        if (!url.startsWith("http")) {
+            return OriginalHttpRequest.makeUrlAbsolute(url, findHostFromHeader(), findProtocolFromHeader());
+        }
+        return url;
+    }
+
     public String getFullUrlWithParams() {
         if (this.queryParams == null || this.queryParams.isEmpty()) return this.url;
         if (url.contains("?")) return this.url + "&" + this.queryParams;
