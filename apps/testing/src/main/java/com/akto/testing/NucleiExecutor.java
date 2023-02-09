@@ -65,7 +65,7 @@ public class NucleiExecutor {
         }
 
         List<String> baseCmdTokens = new ArrayList<>();
-        baseCmdTokens.add("/Users/avneesh/go_test/go_test");
+        baseCmdTokens.add("/app/nuclei_"+nucleiFileSuffix);
 
         baseCmdTokens.add("-u");
         baseCmdTokens.add(fullUrl);
