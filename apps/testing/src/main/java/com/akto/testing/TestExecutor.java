@@ -3,10 +3,7 @@ package com.akto.testing;
 import com.akto.DaoInit;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.TestingRunDao;
-import com.akto.dao.testing.TestingRunResultDao;
-import com.akto.dao.testing.TestingRunResultSummariesDao;
-import com.akto.dao.testing.WorkflowTestsDao;
+import com.akto.dao.testing.*;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
@@ -20,6 +17,7 @@ import com.akto.rules.*;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.testing_issues.TestingIssuesHandler;
+import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.enums.GlobalEnums.TestSubCategory;
 import com.akto.util.enums.LoginFlowEnums;
@@ -62,6 +60,13 @@ public class TestExecutor {
 
         TestExecutor testExecutor = new TestExecutor();
         TestingRun testingRun = TestingRunDao.instance.findLatestOne(new BasicDBObject());
+        if (testingRun.getTestIdConfig() > 1) {
+            TestingRunConfig testingRunConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
+            if (testingRunConfig != null) {
+                loggerMaker.infoAndAddToDb("Found testing run config with id :" + testingRunConfig.getId());
+                testingRun.setTestingRunConfig(testingRunConfig);
+            }
+        }
         testExecutor.init(testingRun, new ObjectId());
     }
 
@@ -142,12 +147,14 @@ public class TestExecutor {
         CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
         ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentRequests);
         List<Future<List<TestingRunResult>>> futureTestingRunResults = new ArrayList<>();
-        Set<String> hosts = new HashSet<>();
+        Map<String, Integer> hostsToApiCollectionMap = new HashMap<>();
 
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
             try {
                 String host = findHost(apiInfoKey, testingUtil);
-                if (host != null) hosts.add(host);
+                if (hostsToApiCollectionMap.get(host) == null) {
+                    hostsToApiCollectionMap.put(host, apiInfoKey.getApiCollectionId());
+                }
             } catch (URISyntaxException e) {
                 e.printStackTrace();
             }
@@ -163,7 +170,7 @@ public class TestExecutor {
             }
         }
 
-        System.out.println(hosts);
+        System.out.println(hostsToApiCollectionMap.keySet());
         loggerMaker.infoAndAddToDb("Waiting...");
 
         try {
@@ -186,9 +193,14 @@ public class TestExecutor {
             }
         }
 
-        for (String host: hosts) {
-            List<TestingRunResult> nucleiResults = runNucleiTests(new ApiInfo.ApiInfoKey(-1, host, URLMethods.Method.GET), testingRun, testingUtil, summaryId);
-            if (nucleiResults != null && !nucleiResults.isEmpty()) TestingRunResultDao.instance.insertMany(nucleiResults);
+        for (String host: hostsToApiCollectionMap.keySet()) {
+            Integer apiCollectionId = hostsToApiCollectionMap.get(host);
+            List<TestingRunResult> nucleiResults = runNucleiTests(new ApiInfo.ApiInfoKey(apiCollectionId, "http://localhost:8092/avneesh", URLMethods.Method.GET), testingRun, testingUtil, summaryId);
+            if (nucleiResults != null && !nucleiResults.isEmpty()) {
+                TestingRunResultDao.instance.insertMany(nucleiResults);
+                TestingIssuesHandler handler = new TestingIssuesHandler();
+                handler.handleIssuesCreationFromTestingRunResults(nucleiResults);
+            }
             testingRunResults.addAll(nucleiResults);
         }
 

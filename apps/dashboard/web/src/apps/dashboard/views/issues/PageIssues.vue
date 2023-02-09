@@ -156,6 +156,8 @@ export default {
             return this.$store.state.issues.subCatogoryMap[id.testSubCategory].issueDescription
         },
         getCollectionName(collectionId) {
+            console.log(this.mapCollectionIdToName);
+            console.log(collectionId)
             return this.mapCollectionIdToName[collectionId];
         }
     }

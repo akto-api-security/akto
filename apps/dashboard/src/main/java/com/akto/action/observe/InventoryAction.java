@@ -756,4 +756,10 @@ public class InventoryAction extends UserAction {
     public void setSubType(String subType) {
         this.subType = subType;
     }
+
+    public String avneesh() {
+        response = new BasicDBObject();
+        response.put("sql", "MemSQL does not support this type of query");
+        return SUCCESS.toUpperCase();
+    }
 }

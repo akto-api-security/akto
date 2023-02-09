@@ -1,7 +1,36 @@
-<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+[error-based-sql-injection] Dumped HTTP request for http://localhost:8092/avneesh/'
+
+
+GET /avneesh/' HTTP/1.1
+Host: localhost:8092
+User-Agent: Mozilla/5.0 (Windows NT 5.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.3319.102 Safari/537.36
+Connection: close
+Accept: */*
+Accept-Language: en
+X-Akto-Ignore: 0
+Accept-Encoding: gzip
+
+
+[error-based-sql-injection] Dumped HTTP response http://localhost:8092/avneesh/'
+
+HTTP/1.1 200 OK
+Connection: close
+Cache-Control: no-cache, no-store, must-revalidate, pre-check=0, post-check=0
+Content-Language: en
+Content-Type: text/html;charset=utf-8
+Date: Thu, 09 Feb 2023 18:24:43 GMT
+Expires: Thu, 01 Jan 1970 00:00:00 GMT
+Server: Jetty(9.4.36.v20210114)
+Set-Cookie: JSESSIONID=node034w63xss2j781t8fo3xambpru2.node0; Path=/; HttpOnly
+Vary: Accept-Encoding, User-Agent
+X-Content-Type-Options: nosniff
+X-Frame-Options: deny
+X-Xss-Protection: 1
+
+
     <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
-    <%-- Using Struts2 Tags in JSP --%>
-        <%@ taglib uri="/struts-tags" prefix="s" %>
+    
+        
             <html>
 
             <head>
@@ -45,17 +74,17 @@
                     */
 
                     window.asdf = 'MemSQL does not support this type of query';
-                    window.SIGNUP_INFO = JSON.parse('${requestScope.signupInfo}' || '{}');
-                    window.AVATAR = '${requestScope.avatar}';
-                    window.USER_NAME = '${requestScope.username}';
-                    window.USERS = JSON.parse('${requestScope.users}' || '{}');
-                    window.DASHBOARDS = JSON.parse(atob('${requestScope.dashboards}') || '[]');
-                    window.ACCOUNTS = JSON.parse('${requestScope.accounts}' || '{}');
-                    window.ACTIVE_ACCOUNT = +'${requestScope.activeAccount}';
-                    window.DASHBOARD_MODE = '${requestScope.dashboardMode}';
-                    window.ACCESS_TOKEN = '${accessToken}';
-                    window.SIGNUP_INVITATION_CODE = '${signupInvitationCode}'
-                    window.SIGNUP_EMAIL_ID = '${signupEmailId}'
+                    window.SIGNUP_INFO = JSON.parse('' || '{}');
+                    window.AVATAR = '';
+                    window.USER_NAME = '';
+                    window.USERS = JSON.parse('' || '{}');
+                    window.DASHBOARDS = JSON.parse(atob('') || '[]');
+                    window.ACCOUNTS = JSON.parse('' || '{}');
+                    window.ACTIVE_ACCOUNT = +'';
+                    window.DASHBOARD_MODE = '';
+                    window.ACCESS_TOKEN = '';
+                    window.SIGNUP_INVITATION_CODE = ''
+                    window.SIGNUP_EMAIL_ID = ''
                     // Enabling the debug mode flag is useful during implementation,
                     // but it's recommended you remove it for production
 
@@ -76,7 +105,7 @@
                             api_base: "https://api-iam.intercom.io",
                             app_id: "xjvl0z2h",
                             email: window.USER_NAME,
-                            user_hash: '${userHash}',
+                            user_hash: '',
                             created_at: new Date().getTime()
                         };
                     }
