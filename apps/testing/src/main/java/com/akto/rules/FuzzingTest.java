@@ -137,7 +137,7 @@ public class FuzzingTest extends TestPlugin {
                 int statusCode = StatusCodeAnalyser.getStatusCode(testResponse.getBody(), testResponse.getStatusCode());
                 double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), testResponse.getBody(), new HashMap<>());
 
-                vulnerable = nucleiResult.metaData.get(idx).getBoolean("matcher-status");
+                vulnerable = vulnerable || nucleiResult.metaData.get(idx).getBoolean("matcher-status");
 
                 apiExecutionDetails = new ApiExecutionDetails(statusCode, percentageMatch, testResponse, originalHttpResponse, rawApi.getOriginalMessage());
 
