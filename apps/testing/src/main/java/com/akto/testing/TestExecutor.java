@@ -195,7 +195,7 @@ public class TestExecutor {
 
         for (String host: hostsToApiCollectionMap.keySet()) {
             Integer apiCollectionId = hostsToApiCollectionMap.get(host);
-            List<TestingRunResult> nucleiResults = runNucleiTests(new ApiInfo.ApiInfoKey(apiCollectionId, "http://localhost:8092/avneesh", URLMethods.Method.GET), testingRun, testingUtil, summaryId);
+            List<TestingRunResult> nucleiResults = runNucleiTests(new ApiInfo.ApiInfoKey(apiCollectionId, host, URLMethods.Method.GET), testingRun, testingUtil, summaryId);
             if (nucleiResults != null && !nucleiResults.isEmpty()) {
                 TestingRunResultDao.instance.insertMany(nucleiResults);
                 TestingIssuesHandler handler = new TestingIssuesHandler();

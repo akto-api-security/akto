@@ -1,1 +1,0 @@
-{"template":"/Users/avneesh/Desktop/akto-api-security/mono/apps/testing/63e53a3db5d54841ef02d5ed/63e53a5f5199a81311515aa0/1773748333/error-based-sql-injection.yaml","input":"http://localhost:8092/avneesh/'","error":"none","type":"http"}
