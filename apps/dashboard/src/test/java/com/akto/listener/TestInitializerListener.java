@@ -4,11 +4,20 @@ import com.akto.MongoBasedTest;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.BackwardCompatibility;
+import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.SingleTypeInfo.SubType;
+import com.akto.dto.type.URLMethods;
 import com.akto.types.CappedSet;
 
+import com.akto.util.enums.GlobalEnums;
+import com.mongodb.client.model.Filters;
+import org.bson.types.ObjectId;
 import org.junit.Test;
 
 import java.util.*;
@@ -71,6 +80,33 @@ public class TestInitializerListener extends MongoBasedTest {
         InitializerListener initializerListener = new InitializerListener();
         initializerListener.readAndSaveBurpPluginVersion();
         assertTrue(InitializerListener.burpPluginVersion > 0);
+    }
+
+    @Test
+    public void deleteNullSubCategoryIssues() {
+        TestingRunIssuesDao.instance.getMCollection().drop();
+
+        ApiInfo.ApiInfoKey apiInfoKey1 = new ApiInfo.ApiInfoKey(0, "url1", URLMethods.Method.GET);
+        TestingRunIssues testingRunIssues1 = new TestingRunIssues(new TestingIssuesId(apiInfoKey1, GlobalEnums.TestErrorSource.AUTOMATED_TESTING,null, "something"), GlobalEnums.Severity.HIGH, GlobalEnums.TestRunIssueStatus.OPEN, 0, 0, new ObjectId());
+
+        ApiInfo.ApiInfoKey apiInfoKey2 = new ApiInfo.ApiInfoKey(0, "url2", URLMethods.Method.GET);
+        TestingRunIssues testingRunIssues2 = new TestingRunIssues(new TestingIssuesId(apiInfoKey2, GlobalEnums.TestErrorSource.AUTOMATED_TESTING,GlobalEnums.TestSubCategory.BFLA, null), GlobalEnums.Severity.HIGH, GlobalEnums.TestRunIssueStatus.OPEN, 0, 0, new ObjectId());
+
+        TestingRunIssuesDao.instance.insertMany(Arrays.asList(testingRunIssues1, testingRunIssues2));
+
+        TestingRunIssues testingRunIssues = TestingRunIssuesDao.instance.findOne(Filters.eq("_id.apiInfoKey.url", apiInfoKey1.url));
+        assertNotNull(testingRunIssues);
+
+        InitializerListener initializerListener = new InitializerListener();
+        BackwardCompatibility backwardCompatibility = new BackwardCompatibility();
+        initializerListener.deleteNullSubCategoryIssues(backwardCompatibility);
+
+        testingRunIssues = TestingRunIssuesDao.instance.findOne(Filters.eq("_id.apiInfoKey.url", apiInfoKey1.url));
+        assertNull(testingRunIssues);
+
+        testingRunIssues = TestingRunIssuesDao.instance.findOne(Filters.eq("_id.apiInfoKey.url", apiInfoKey2.url));
+        assertNotNull(testingRunIssues);
+
     }
 
 }

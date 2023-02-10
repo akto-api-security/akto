@@ -663,7 +663,12 @@ public class InitializerListener implements ServletContextListener {
 
     public void deleteNullSubCategoryIssues(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getDeleteNullSubCategoryIssues() == 0) {
-            TestingRunIssuesDao.instance.deleteAll(Filters.eq("_id.testSubCategory"));
+            TestingRunIssuesDao.instance.deleteAll(
+                    Filters.or(
+                            Filters.exists("_id.testSubCategory", false),
+                            Filters.eq("_id.testSubCategory", null)
+                    )
+            );
         }
 
         BackwardCompatibilityDao.instance.updateOne(
