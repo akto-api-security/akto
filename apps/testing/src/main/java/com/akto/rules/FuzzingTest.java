@@ -107,10 +107,18 @@ public class FuzzingTest extends TestPlugin {
             return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.FAILED_DOWNLOADING_PAYLOAD_FILES, testRequest, nucleiTestInfo);
         }
 
+        String fullUrlWithHost;
+        try {
+             fullUrlWithHost = testRequest.getFullUrlIncludingDomain();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.FAILED_BUILDING_URL_WITH_DOMAIN, testRequest, nucleiTestInfo);
+        }
+
         try {
             NucleiExecutor.NucleiResult nucleiResult = NucleiExecutor.execute(
                 testRequest.getMethod(), 
-                testRequest.getFullUrlWithParams(), 
+                fullUrlWithHost,
                 this.tempTemplatePath,
                 outputDir, 
                 testRequest.getBody(), 
@@ -129,7 +137,7 @@ public class FuzzingTest extends TestPlugin {
                 int statusCode = StatusCodeAnalyser.getStatusCode(testResponse.getBody(), testResponse.getStatusCode());
                 double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), testResponse.getBody(), new HashMap<>());
 
-                vulnerable = nucleiResult.metaData.get(idx).getBoolean("matcher-status");
+                vulnerable = vulnerable || nucleiResult.metaData.get(idx).getBoolean("matcher-status");
 
                 apiExecutionDetails = new ApiExecutionDetails(statusCode, percentageMatch, testResponse, originalHttpResponse, rawApi.getOriginalMessage());
 

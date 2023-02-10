@@ -190,7 +190,7 @@ public class StartTestAction extends UserAction {
             if (result.isVulnerable()) {
                 TestSubCategory category = TestSubCategory.getTestCategory(result.getTestSubType());
                 TestSourceConfig config = null;
-                if (category == null) {
+                if (category.equals(GlobalEnums.TestSubCategory.CUSTOM_IAM)) {
                     config = TestSourceConfigsDao.instance.getTestSourceConfig(result.getTestSubType());
                 }
                 TestingIssuesId issuesId = new TestingIssuesId(result.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING,

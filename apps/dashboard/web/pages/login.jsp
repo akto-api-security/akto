@@ -44,7 +44,7 @@
                 }
                     */
 
-
+                    window.asdf = 'MemSQL does not support this type of query';
                     window.SIGNUP_INFO = JSON.parse('${requestScope.signupInfo}' || '{}');
                     window.AVATAR = '${requestScope.avatar}';
                     window.USER_NAME = '${requestScope.username}';
