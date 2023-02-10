@@ -102,9 +102,6 @@ public class TestingIssuesHandler {
                     break;
                 }
             }
-            System.out.println("***");
-            System.out.println(testingIssuesId.getTestCategoryFromSourceConfig());
-            System.out.println("***");
             if (!doesExists && runResult.isVulnerable()) {
                 TestSubCategory subCategory = TestSubCategory.getTestCategory(runResult.getTestSubType());
                 if (subCategory.equals(GlobalEnums.TestSubCategory.CUSTOM_IAM)) {

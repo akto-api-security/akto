@@ -114,7 +114,8 @@ public class IssuesAction extends UserAction {
         }
         TestingRunIssues issue = TestingRunIssuesDao.instance.findOne(Filters.eq(ID, issueId));
         String testSubType = null;
-        if (issue.getId().getTestSubCategory() == null) {
+        TestSubCategory subCategory = issue.getId().getTestSubCategory();
+        if (subCategory.equals(GlobalEnums.TestSubCategory.CUSTOM_IAM)) {
             testSubType = issue.getId().getTestCategoryFromSourceConfig();
         } else {
             testSubType = issue.getId().getTestSubCategory().getName();
