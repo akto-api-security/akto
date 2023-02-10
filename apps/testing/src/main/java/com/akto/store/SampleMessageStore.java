@@ -102,7 +102,9 @@ public class SampleMessageStore {
         for (String message: samples) {
             try {
                 messages.add(RawApi.buildFromMessage(message));
-            } catch(Exception ignored) { }
+            } catch(Exception e) {
+                e.printStackTrace();
+            }
 
         }
 
