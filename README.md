@@ -59,8 +59,14 @@ OpenJDK 8, node, npm, maven (v3.6.3), Mongo
 #### Setup Backend
 1. `cd ~/akto_code/community-edition`
 2. `export AKTO_MONGO_CONN="mongodb://localhost:27017"`
-3. `mvn clean install`
-4. `mvn --projects :dashboard --also-make jetty:run`
+3. `export DASHBOARD_MODE="local_deploy"`
+4. `mvn clean install`
+
+### Run Dashboard
+`mvn --projects :dashboard --also-make jetty:run`
+
+### Run Testing
+`mvn compile; mvn exec:java -Dexec.mainClass="com.akto.testing.Main"`
 
 #### Play around
 1. Open `localhost:8080` in your favourite browser
