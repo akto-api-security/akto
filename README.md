@@ -62,10 +62,10 @@ OpenJDK 8, node, npm, maven (v3.6.3), Mongo
 3. `export DASHBOARD_MODE="local_deploy"`
 4. `mvn clean install`
 
-### Run Dashboard
+##### Run Dashboard
 `mvn --projects :dashboard --also-make jetty:run`
 
-### Run Testing
+##### Run Testing
 `mvn compile; mvn exec:java -Dexec.mainClass="com.akto.testing.Main"`
 
 #### Play around
