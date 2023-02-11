@@ -137,7 +137,7 @@ public class TestExecutor {
 
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
-        System.out.println("APIs: " + apiInfoKeyList.size());
+        logger.info("APIs: " + apiInfoKeyList.size());
         loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size());
 
         TestingRunResultSummariesDao.instance.updateOne(
@@ -170,7 +170,7 @@ public class TestExecutor {
             }
         }
 
-        System.out.println(hostsToApiCollectionMap.keySet());
+        logger.info("hostsToApiCollectionMap : " + hostsToApiCollectionMap.keySet());
         loggerMaker.infoAndAddToDb("Waiting...");
 
         try {
@@ -200,8 +200,8 @@ public class TestExecutor {
                 TestingRunResultDao.instance.insertMany(nucleiResults);
                 TestingIssuesHandler handler = new TestingIssuesHandler();
                 handler.handleIssuesCreationFromTestingRunResults(nucleiResults);
+                testingRunResults.addAll(nucleiResults);
             }
-            testingRunResults.addAll(nucleiResults);
         }
 
         loggerMaker.infoAndAddToDb("Finished adding " + testingRunResults.size() + " testingRunResults");
@@ -281,7 +281,6 @@ public class TestExecutor {
         if (testSubCategories != null) {
             for (String testSubCategory: testSubCategories) {
                 if (testSubCategory.startsWith("http://") || testSubCategory.startsWith("https://")) {
-                    System.out.println("running " + testSubCategory);
                     try {
                         String origTemplateURL = testSubCategory;
                         origTemplateURL = origTemplateURL.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/");
