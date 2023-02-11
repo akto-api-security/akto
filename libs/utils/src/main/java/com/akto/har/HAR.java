@@ -1,16 +1,17 @@
 package com.akto.har;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.sstoehr.harreader.HarReader;
 import de.sstoehr.harreader.HarReaderException;
 import de.sstoehr.harreader.HarReaderMode;
 import de.sstoehr.harreader.model.*;
+import graphql.language.*;
+import graphql.parser.Parser;
+import graphql.parser.StringValueParsing;
+import org.mortbay.util.ajax.JSON;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.net.URLDecoder;
 import java.util.*;
 
 public class HAR {
@@ -29,24 +30,70 @@ public class HAR {
         List<String> entriesList =  new ArrayList<>();
         int idx=0;
         for (HarEntry entry: entries) {
+            List<OperationDefinition> operationDefinitions = parseGraphQLRequest(entry.getRequest().getPostData().getText());
             idx += 1;
-            try {
-                Map<String,String> result = getResultMap(entry);
-                if (result != null) {
+            if (operationDefinitions.isEmpty()) {
+                try {
+                    Map<String,String> result = getResultMap(entry, null, null);
+                    logger.info("results map : {}", mapper.writeValueAsString(result));
                     result.put("akto_vxlan_id", collection_id+"");
                     entriesList.add(mapper.writeValueAsString(result));
+                } catch (Exception e) {
+                    logger.error("Error while parsing har file on entry: " + idx + " ERROR: " + e);
+                    errors.add("Error in entry " + idx);
                 }
-                
-            } catch (Exception e) {
-                logger.error("Error while parsing har file on entry: " + idx + " ERROR: " + e);
-                errors.add("Error in entry " + idx);
+            } else {
+                for (OperationDefinition definition : operationDefinitions) {
+                    OperationDefinition.Operation operation = definition.getOperation();
+                    SelectionSet selectionSets = definition.getSelectionSet();
+                    List<Selection> selectionList = selectionSets.getSelections();
+                    for (Selection selection : selectionList) {
+                        if (selection instanceof Field) {
+                            Field field = (Field) selection;
+                            try {
+                                Map<String,String> result = getResultMap(entry, operation, field.getName());
+                                logger.info("results map : {}", mapper.writeValueAsString(result));
+                                result.put("akto_vxlan_id", collection_id+"");
+                                entriesList.add(mapper.writeValueAsString(result));
+                            } catch (Exception e) {
+                                logger.error("Error while parsing har file on entry: " + idx + " ERROR: " + e);
+                                errors.add("Error in entry " + idx);
+                            }
+                        }
+                    }
+
+                }
             }
         }
-
         return entriesList;
     }
 
-    public static Map<String,String> getResultMap(HarEntry entry) throws Exception {
+    private List<OperationDefinition> parseGraphQLRequest(String requestPayload) {
+        List<OperationDefinition> result = new ArrayList<>();
+        Object obj  = JSON.parse(requestPayload);
+        if (obj instanceof HashMap) {
+            HashMap map = (HashMap) obj;
+            String query = (String) map.get("query");
+            try {
+                Document document = Parser.parse(query);
+                List<Definition> definitionList = document.getDefinitions();
+                for (Definition definition : definitionList) {
+                    if (definition instanceof OperationDefinition) {
+                        result.add((OperationDefinition) definition);
+                    }
+                }
+            } catch (Exception e) {
+                //eat exception
+                return result;
+            }
+        }
+        return result;
+
+    }
+
+    public static Map<String,String> getResultMap(HarEntry entry,
+                                                  OperationDefinition.Operation operation,
+                                                  String fieldName) throws Exception {
         HarRequest request = entry.getRequest();
         HarResponse response = entry.getResponse();
         Date dateTime = entry.getStartedDateTime();
@@ -57,13 +104,14 @@ public class HAR {
         Map<String,String> requestHeaderMap = convertHarHeadersToMap(requestHarHeaders);
         Map<String,String> responseHeaderMap = convertHarHeadersToMap(responseHarHeaders);
 
-        String requestContentType = getContentType(requestHarHeaders);
-
         String requestPayload = request.getPostData().getText();
         if (requestPayload == null) requestPayload = "";
 
         String akto_account_id = 1_000_000 + ""; // TODO:
         String path = getPath(request);
+        if (operation != null) {
+            path += "/" + operation.name().toLowerCase() + "/" + fieldName;
+        }
         String requestHeaders = mapper.writeValueAsString(requestHeaderMap);
         String responseHeaders = mapper.writeValueAsString(responseHeaderMap);
         String method = request.getMethod().toString();
@@ -127,6 +175,28 @@ public class HAR {
         // TODO: which will take preference querystring or post value
         for (HarQueryParam param: params) {
             paramsMap.put(param.getName(), param.getValue());
+        }
+    }
+
+    public static void main2 (String[] args) {
+        Parser parser = new Parser();
+//        Document document = parser.parseDocument("{ allBooks { id author { firstName } }  allAuthors { firstName lastName } authorById(id: \"author-1\") { id firstName lastName bookList{ name } }}");
+        String request = "{\"query\":\"{\\n  allBooks {\\n  \\tid\\n    author {\\n      firstName\\n    }\\n  }\\n  \\n  allAuthors {\\n    firstName\\n    lastName\\n  }\\n  authorById(id: \\\"author-1\\\") {\\n    id\\n    firstName\\n    lastName\\n    bookList{\\n      name\\n    }\\n  }\\n}\"}";
+        String response = "{\"data\":{\"allBooks\":[{\"id\":\"book-1\",\"author\":{\"firstName\":\"Joanne\"}},{\"id\":\"book-2\",\"author\":{\"firstName\":\"Herman\"}},{\"id\":\"book-4\",\"author\":{\"firstName\":\"Harper\"}},{\"id\":\"book-3\",\"author\":{\"firstName\":\"Anne\"}}],\"allAuthors\":[{\"firstName\":\"Joanne\",\"lastName\":\"Rowling\"},{\"firstName\":\"Herman\",\"lastName\":\"Melville\"},{\"firstName\":\"Harper\",\"lastName\":\"Lee\"},{\"firstName\":\"Anne\",\"lastName\":\"Rice\"},{\"firstName\":\"Shivam\",\"lastName\":\"Rawat\"}],\"authorById\":{\"id\":\"author-1\",\"firstName\":\"Joanne\",\"lastName\":\"Rowling\",\"bookList\":[{\"name\":\"Harry Potter and the Philosopher's Stone\"}]}}}";
+        String result1 = StringValueParsing.parseTripleQuotedString(request);
+        String result2 = StringValueParsing.removeIndentation(request);
+        Object obj  = JSON.parse(request);
+        System.out.println(request);
+        System.out.println(result1);
+        System.out.println(result2);
+        HashMap map = (HashMap) obj;
+        String query = (String) map.get("query");
+        Document document = parser.parseDocument(query);
+        List<Definition> definitionList = document.getDefinitions();
+        System.out.println(obj);
+        System.out.println(document);
+        for (Definition definition : definitionList) {
+            System.out.println(((OperationDefinition) definition).getOperation());
         }
     }
 
