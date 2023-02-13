@@ -35,7 +35,7 @@ There are two ways:
 ### Develop and contribute
 
 #### Prerequisites
-OpenJDK 8, node, npm, maven (v3.6.3), Mongo
+OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), npm(v8.15.0+), maven (v3.6.3 [link](https://dlcdn.apache.org/maven/maven-3/3.6.3/binaries/)), Mongo (v5.0.3+)
 
 
 #### Clone repo
@@ -45,24 +45,38 @@ OpenJDK 8, node, npm, maven (v3.6.3), Mongo
 
 #### Setup database
 
-1. `cd ~`
-2. `mkdir ~/akto_mongo_data`
-3. `<path_to_mongo_folder>/bin/mongod --dbpath ~/akto_mongo_data`
+1. `Open a new terminal tab`
+2. `cd ~`
+3. `mkdir ~/akto_mongo_data`
+4. `<path_to_mongo_folder>/bin/mongod --dbpath ~/akto_mongo_data`
 
 #### Setup Frontend
 
-1. `cd ~/akto_code/community-edition`
-2. `cd apps/dashboard`
-3. `npm install`
-4. `npm run hot`
+1. `Open a new terminal tab`
+2. `cd ~/akto_code/community-edition`
+3. `cd apps/dashboard`
+4. `npm install`
+5. `npm run hot`
 
-#### Setup Backend
-1. `cd ~/akto_code/community-edition`
-2. `export AKTO_MONGO_CONN="mongodb://localhost:27017"`
-3. `mvn clean install`
-4. `mvn --projects :dashboard --also-make jetty:run`
+#### Setup Dashboard
+
+1. `Open a new terminal tab`
+2. `cd ~/akto_code/community-edition`
+3. `export AKTO_MONGO_CONN="mongodb://localhost:27017"`
+4. `export DASHBOARD_MODE="local_deploy"`
+5. `mvn clean install`
+6. `mvn --projects :dashboard --also-make jetty:run`
+
+##### Setup Testing
+
+1. `Open a new terminal tab`
+2. `cd ~/akto_code/community-edition`
+3. `cd apps/testing`
+4. `export AKTO_MONGO_CONN="mongodb://localhost:27017"`
+5. `mvn compile; mvn exec:java -Dexec.mainClass="com.akto.testing.Main"`
 
 #### Play around
+
 1. Open `localhost:8080` in your favourite browser
 2. You will need to signup when logging in for the first time, next time onwards you can login
 
