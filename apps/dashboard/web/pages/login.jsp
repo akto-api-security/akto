@@ -44,7 +44,6 @@
                 }
                     */
 
-
                     window.SIGNUP_INFO = JSON.parse('${requestScope.signupInfo}' || '{}');
                     window.AVATAR = '${requestScope.avatar}';
                     window.USER_NAME = '${requestScope.username}';

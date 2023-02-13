@@ -11,6 +11,7 @@ import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dao.pii.PIISourceDao;
 import com.akto.dao.testing.*;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.*;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
@@ -663,6 +664,22 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
+    public void deleteNullSubCategoryIssues(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getDeleteNullSubCategoryIssues() == 0) {
+            TestingRunIssuesDao.instance.deleteAll(
+                    Filters.or(
+                            Filters.exists("_id.testSubCategory", false),
+                            Filters.eq("_id.testSubCategory", null)
+                    )
+            );
+        }
+
+        BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.DELETE_NULL_SUB_CATEGORY_ISSUES, Context.now())
+        );
+    }
+
     public void readyForNewTestingFramework(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getReadyForNewTestingFramework() == 0) {
             TestingRunDao.instance.getMCollection().drop();
@@ -762,6 +779,7 @@ public class InitializerListener implements ServletContextListener {
             updateDeploymentStatus(backwardCompatibility);
             dropAuthMechanismData(backwardCompatibility);
             deleteAccessListFromApiToken(backwardCompatibility);
+            deleteNullSubCategoryIssues(backwardCompatibility);
 
             SingleTypeInfo.init();
 
