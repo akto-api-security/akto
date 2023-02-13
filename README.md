@@ -35,7 +35,7 @@ There are two ways:
 ### Develop and contribute
 
 #### Prerequisites
-OpenJDK 8, node, npm, maven (v3.6.3), Mongo
+OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), npm(v8.15.0+), maven (v3.6.3 [link](https://dlcdn.apache.org/maven/maven-3/3.6.3/binaries/)), Mongo (v5.0.3+)
 
 
 #### Clone repo
