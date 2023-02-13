@@ -67,6 +67,9 @@ import static com.mongodb.client.model.Filters.eq;
 public class InitializerListener implements ServletContextListener {
     private static final Logger logger = LoggerFactory.getLogger(InitializerListener.class);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
+    public static boolean connectedToMongo = false;
 
     private static String domain = null;
 
@@ -710,9 +713,35 @@ public class InitializerListener implements ServletContextListener {
         System.out.println("MONGO URI " + mongoURI);
 
 
-        DaoInit.init(new ConnectionString(mongoURI));
+        executorService.schedule( new Runnable() {
+            public void run() {
+                boolean calledOnce = false;
+                do {
+                    try {
+                        if (!calledOnce) {
+                            DaoInit.init(new ConnectionString(mongoURI));
+                            Context.accountId.set(1_000_000);
+                            calledOnce = true;
+                        }
+                        AccountSettingsDao.instance.getStats();
+                        connectedToMongo = true;
+                        runInitializerFunctions();
+                    } catch (Exception e) {
+//                        e.printStackTrace();
+                    } finally {
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                } while (!connectedToMongo);
+            }
+        }, 0 , TimeUnit.SECONDS);
 
-        Context.accountId.set(1_000_000);
+    }
+
+    public void runInitializerFunctions() {
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
         TestRolesDao.instance.createIndicesIfAbsent();
 

@@ -20,6 +20,10 @@
         <action name="metrics" class="com.akto.action.InfraMetricsAction">
         </action>
 
+        <action name="mongo-error" class="com.akto.action.HomeAction" method="error">
+            <result name="SUCCESS">/pages/mongo-error.jsp</result>
+        </action>
+
         <action name="api/inventory/*/openapi" class="com.akto.action.OpenApiAction" method="burpSwagger">
             <param name="apiCollectionId">{1}</param>
         </action>
