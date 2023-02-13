@@ -33,6 +33,22 @@ public class Main {
         DaoInit.init(new ConnectionString(mongoURI));
         Context.accountId.set(1_000_000);
 
+        boolean connectedToMongo = false;
+        do {
+            try {
+                AccountSettingsDao.instance.getStats();
+                connectedToMongo = true;
+            } catch (Exception e) {
+//                        e.printStackTrace();
+            } finally {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        } while (!connectedToMongo);
+
         int delta = Context.now() - 20*60;
 
         loggerMaker.infoAndAddToDb("Starting.......");
