@@ -243,14 +243,14 @@ public class TestTestPlugin extends MongoBasedTest {
         headers.put("random", Collections.singletonList("avneesh_is_studddd"));
 
         // no change to headers since it doesn't find any JWT token
-        Map<String, List<String>> result = JSONUtils.modifyHeaderValues(headers, new NoneAlgoJWTModifier());
+        Map<String, List<String>> result = JSONUtils.modifyHeaderValues(headers, new NoneAlgoJWTModifier("none"));
         assertNull(result);
         assertEquals(2, headers.size());
         assertEquals("https://www.akto.io", headers.get("origin").get(0));
         assertEquals("avneesh_is_studddd", headers.get("random").get(0));
 
         headers.put("access-token", Collections.singletonList("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"));
-        result = JSONUtils.modifyHeaderValues(headers, new NoneAlgoJWTModifier());
+        result = JSONUtils.modifyHeaderValues(headers, new NoneAlgoJWTModifier("none"));
         assertNotNull(result);
         assertEquals("eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.", result.get("access-token").get(0));
     }

@@ -11,6 +11,7 @@ import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dao.pii.PIISourceDao;
 import com.akto.dao.testing.*;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.*;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
@@ -67,6 +68,9 @@ import static com.mongodb.client.model.Filters.eq;
 public class InitializerListener implements ServletContextListener {
     private static final Logger logger = LoggerFactory.getLogger(InitializerListener.class);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
+    public static boolean connectedToMongo = false;
 
     private static String domain = null;
 
@@ -660,6 +664,22 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
+    public void deleteNullSubCategoryIssues(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getDeleteNullSubCategoryIssues() == 0) {
+            TestingRunIssuesDao.instance.deleteAll(
+                    Filters.or(
+                            Filters.exists("_id.testSubCategory", false),
+                            Filters.eq("_id.testSubCategory", null)
+                    )
+            );
+        }
+
+        BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.DELETE_NULL_SUB_CATEGORY_ISSUES, Context.now())
+        );
+    }
+
     public void readyForNewTestingFramework(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getReadyForNewTestingFramework() == 0) {
             TestingRunDao.instance.getMCollection().drop();
@@ -710,9 +730,35 @@ public class InitializerListener implements ServletContextListener {
         System.out.println("MONGO URI " + mongoURI);
 
 
-        DaoInit.init(new ConnectionString(mongoURI));
+        executorService.schedule( new Runnable() {
+            public void run() {
+                boolean calledOnce = false;
+                do {
+                    try {
+                        if (!calledOnce) {
+                            DaoInit.init(new ConnectionString(mongoURI));
+                            Context.accountId.set(1_000_000);
+                            calledOnce = true;
+                        }
+                        AccountSettingsDao.instance.getStats();
+                        connectedToMongo = true;
+                        runInitializerFunctions();
+                    } catch (Exception e) {
+//                        e.printStackTrace();
+                    } finally {
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                } while (!connectedToMongo);
+            }
+        }, 0 , TimeUnit.SECONDS);
 
-        Context.accountId.set(1_000_000);
+    }
+
+    public void runInitializerFunctions() {
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
         TestRolesDao.instance.createIndicesIfAbsent();
 
@@ -733,6 +779,7 @@ public class InitializerListener implements ServletContextListener {
             updateDeploymentStatus(backwardCompatibility);
             dropAuthMechanismData(backwardCompatibility);
             deleteAccessListFromApiToken(backwardCompatibility);
+            deleteNullSubCategoryIssues(backwardCompatibility);
 
             SingleTypeInfo.init();
 

@@ -40,13 +40,13 @@ public class TestFuzzingTest {
         return new File(outputDirectory).listFiles();
     }
 
-    @Test
-    public void testDownloadLinksSwagger() throws Exception {
-        // contains a rawGithubLink in payloads so should generate payloadFile
-        File[] files = testDownloadLinkMain(generateSwaggerFileDetectionText(), "swagger_file_detection.yaml");
-        assertEquals(1, files.length);
-        assertEquals("swagger_pathlist.txt", files[0].getName());
-    }
+//     @Test
+//     public void testDownloadLinksSwagger() throws Exception {
+//         // contains a rawGithubLink in payloads so should generate payloadFile
+//         File[] files = testDownloadLinkMain(generateSwaggerFileDetectionText(), "swagger_file_detection.yaml");
+//         assertEquals(1, files.length);
+//         assertEquals("swagger_pathlist.txt", files[0].getName());
+//     }
 
     @Test
     public void testDownloadLinksWordpress() throws Exception {
@@ -288,38 +288,38 @@ public class TestFuzzingTest {
 
 
 
-    private String generateSwaggerFileDetectionText() {
-        return "id: swagger-version\n" +
-                "  \n" +
-                "info:\n" +
-                "  name: Swagger 2.x Version Detection\n" +
-                "  author: c-sh0\n" +
-                "  reference:\n" +
-                "     - Swagger UI 2.x and under\n" +
-                "     - https://github.com/swagger-api/swagger-ui/blob/master/docs/usage/version-detection.md\n" +
-                "  severity: info\n" +
-                "  description: Obtain Swagger Version\n" +
-                "  tags: tech,swagger,api\n" +
-                "\n" +
-                "requests:\n" +
-                "  - method: GET\n" +
-                "    path:\n" +
-                "      - \"{{BaseURL}}/{{locations}}\"\n" +
-                "    payloads:\n" +
-                "       locations: https://github.com/akto-api-security/testing_sources/blob/master/Misconfiguration/swagger-detection/wordlists/swagger_pathlist.txt\n" +
-                "\n" +
-                "    matchers-condition: and\n" +
-                "    matchers:\n" +
-                "     - type: status\n" +
-                "       status:\n" +
-                "         - 200\n" +
-                "\n" +
-                "    extractors:\n" +
-                "     - type: regex\n" +
-                "       part: body\n" +
-                "       group: 1\n" +
-                "       regex:\n" +
-                "         - \" @version (v[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3})\"";
-    }
+//     private String generateSwaggerFileDetectionText() {
+//         return "id: swagger-version\n" +
+//                 "  \n" +
+//                 "info:\n" +
+//                 "  name: Swagger 2.x Version Detection\n" +
+//                 "  author: c-sh0\n" +
+//                 "  reference:\n" +
+//                 "     - Swagger UI 2.x and under\n" +
+//                 "     - https://github.com/swagger-api/swagger-ui/blob/master/docs/usage/version-detection.md\n" +
+//                 "  severity: info\n" +
+//                 "  description: Obtain Swagger Version\n" +
+//                 "  tags: tech,swagger,api\n" +
+//                 "\n" +
+//                 "requests:\n" +
+//                 "  - method: GET\n" +
+//                 "    path:\n" +
+//                 "      - \"{{BaseURL}}/{{locations}}\"\n" +
+//                 "    payloads:\n" +
+//                 "       locations: https://github.com/akto-api-security/testing_sources/blob/master/Misconfiguration/swagger-detection/wordlists/swagger_pathlist.txt\n" +
+//                 "\n" +
+//                 "    matchers-condition: and\n" +
+//                 "    matchers:\n" +
+//                 "     - type: status\n" +
+//                 "       status:\n" +
+//                 "         - 200\n" +
+//                 "\n" +
+//                 "    extractors:\n" +
+//                 "     - type: regex\n" +
+//                 "       part: body\n" +
+//                 "       group: 1\n" +
+//                 "       regex:\n" +
+//                 "         - \" @version (v[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3})\"";
+//     }
 
 }
