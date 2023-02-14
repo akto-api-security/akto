@@ -45,6 +45,12 @@
             <artifactId>aws-java-sdk-cloudformation</artifactId>
             <version>1.11.678</version>
         </dependency>
+        <!-- v1.11.678 does not support startInstanceRefresh, using latest version. -->
+        <dependency>
+            <groupId>com.amazonaws</groupId>
+            <artifactId>aws-java-sdk-autoscaling</artifactId>
+            <version>1.12.405</version>
+        </dependency>
         <dependency>
             <groupId>org.apache.struts</groupId>
             <artifactId>struts2-core</artifactId>
