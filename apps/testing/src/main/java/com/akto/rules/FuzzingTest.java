@@ -88,7 +88,7 @@ public class FuzzingTest extends TestPlugin {
         File file = createDirPath(filepath);
 
         if (file == null) return null;
-        boolean vulnerable = false;
+        boolean overallVulnerable = false;
         String outputDir = file.getParent();
         this.tempTemplatePath = outputDir+"/"+subcategory+".yaml";
         NucleiTestInfo nucleiTestInfo = new NucleiTestInfo(this.subcategory, this.origTemplatePath);
@@ -136,8 +136,9 @@ public class FuzzingTest extends TestPlugin {
 
                 int statusCode = StatusCodeAnalyser.getStatusCode(testResponse.getBody(), testResponse.getStatusCode());
                 double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), testResponse.getBody(), new HashMap<>());
+                boolean vulnerable = nucleiResult.metaData.get(idx).getBoolean("matcher-status");
 
-                vulnerable = vulnerable || nucleiResult.metaData.get(idx).getBoolean("matcher-status");
+                overallVulnerable = overallVulnerable || vulnerable;
 
                 apiExecutionDetails = new ApiExecutionDetails(statusCode, percentageMatch, testResponse, originalHttpResponse, rawApi.getOriginalMessage());
 
@@ -153,7 +154,7 @@ public class FuzzingTest extends TestPlugin {
             return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest, nucleiTestInfo);
         }
 
-        return addTestSuccessResult(vulnerable, testResults, new ArrayList<>(), TestResult.Confidence.HIGH);
+        return addTestSuccessResult(overallVulnerable, testResults, new ArrayList<>(), TestResult.Confidence.HIGH);
     }
 
     public static void downloadLinks(String templatePath, String outputDir) throws IOException {
