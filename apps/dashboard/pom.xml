@@ -17,7 +17,7 @@
             <dependency>
                 <groupId>com.amazonaws</groupId>
                 <artifactId>aws-java-sdk-bom</artifactId>
-                <version>1.11.678</version>
+                <version>1.12.405</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -28,22 +28,22 @@
        <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-lambda</artifactId>
-            <version>1.11.678</version>
+            <version>1.12.405</version>
         </dependency>
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-logs</artifactId>
-            <version>1.11.678</version>
+            <version>1.12.405</version>
         </dependency>
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-elasticloadbalancingv2</artifactId>
-            <version>1.11.678</version>
+            <version>1.12.405</version>
         </dependency>
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-cloudformation</artifactId>
-            <version>1.11.678</version>
+            <version>1.12.405</version>
         </dependency>
         <!-- v1.11.678 does not support startInstanceRefresh, using latest version. -->
         <dependency>

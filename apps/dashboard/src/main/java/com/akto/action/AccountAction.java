@@ -107,13 +107,21 @@ public class AccountAction extends UserAction {
             StartInstanceRefreshRequest refreshRequest = new StartInstanceRefreshRequest();
             refreshRequest.setPreferences(refreshPreferences);
             StartInstanceRefreshResult result = new StartInstanceRefreshResult();
+            String lambda;
             try {
                 autoScalingGroup = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.AKTO_CONTEXT_ANALYSER_AUTO_SCALING_GROUP);
                 refreshRequest.setAutoScalingGroupName(autoScalingGroup);
                 result = asc.startInstanceRefresh(refreshRequest);
                 logger.info("Instance refresh on context analyser called with result {}", result);
             } catch (Exception e){
-                logger.error("Failed to update Akto Context Analyzer", e);
+                logger.info("could not invoke instance refresh directly, using lambda ",e.getMessage());
+                try {
+                    lambda = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.AKTO_CONTEXT_ANALYZER_UPDATE_LAMBDA);
+                    Lambda.getInstance().invokeFunction(lambda);
+                    logger.info("Successfully invoked lambda {}", lambda);
+                } catch (Exception f){
+                    logger.error("Failed to update Akto Context Analyzer", f);
+                }
             }
             try {
                 autoScalingGroup = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.AKTO_TRAFFIC_MIRRORING_AUTO_SCALING_GROUP);
@@ -121,7 +129,14 @@ public class AccountAction extends UserAction {
                 asc.startInstanceRefresh(refreshRequest);
                 logger.info("Instance refresh on traffic mirroring instance called with result {}", result);
             } catch (Exception e){
-                logger.error("Failed to update Akto Traffic Mirroring Instance", e);
+                logger.info("could not invoke instance refresh directly, using lambda ",e.getMessage());
+                try {
+                    lambda = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.AKTO_RUNTIME_UPDATE_LAMBDA);
+                    Lambda.getInstance().invokeFunction(lambda);
+                    logger.info("Successfully invoked lambda {}", lambda);
+                } catch (Exception f){
+                    logger.error("Failed to update Akto Traffic Mirroring Instance", f);
+                }
             }
             try {
                 autoScalingGroup = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(DashboardStackDetails.getStackName(), DashboardStackDetails.AKTO_DASHBOARD_AUTO_SCALING_GROUP);
@@ -129,7 +144,14 @@ public class AccountAction extends UserAction {
                 asc.startInstanceRefresh(refreshRequest);
                 logger.info("Instance refresh on dashboard called with result {}", result);
             } catch (Exception e){
-                logger.error("Failed to update Akto Dashboard", e);
+                logger.info("could not invoke instance refresh directly, using lambda ",e.getMessage());
+                try {
+                    lambda = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(),MirroringStackDetails.AKTO_DASHBOARD_UPDATE_LAMBDA);
+                    Lambda.getInstance().invokeFunction(lambda);
+                    logger.info("Successfully invoked lambda {}", lambda);
+                } catch (Exception f){
+                    logger.error("Failed to update Akto Dashboard", f);   
+                }
             }
         } else {
             logger.info("This is an old installation, updating via old way");
