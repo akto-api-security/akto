@@ -288,6 +288,17 @@
             </result>
         </action>
 
+        <action name="api/fetchSensitiveParamsForEndpoints" class="com.akto.action.observe.InventoryAction" method="fetchSensitiveParamsForEndpoints">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
 
         <action name="api/fetchAllUrlsAndMethods" class="com.akto.action.observe.InventoryAction" method="fetchAllUrlsAndMethods">
             <interceptor-ref name="json"/>
@@ -1513,6 +1524,18 @@
         </action>
 
         <action name="api/fetchUserLastLoginTs" class="com.akto.action.user.UserInfoAction" method="fetchUserLastLoginTs">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchSubTypeCountMap" class="com.akto.action.observe.InventoryAction" method="fetchSubTypeCountMap">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json">
