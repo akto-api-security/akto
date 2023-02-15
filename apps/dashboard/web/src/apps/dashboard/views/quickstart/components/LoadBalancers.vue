@@ -143,7 +143,7 @@ export default {
                 `                "autoscaling:PutScalingPolicy",`,
                 `                "autoscaling:UpdateAutoScalingGroup",`,
                 `                "autoscaling:CreateAutoScalingGroup",`,
-                `                "autoscaling:StartInstanceRefresh"`
+                `                "autoscaling:StartInstanceRefresh"`,
                 `            ],`,
                 `            "Resource": [`,
                 `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/DASHBOARD_STACK_NAME*",`,
