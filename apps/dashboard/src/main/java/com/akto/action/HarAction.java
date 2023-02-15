@@ -33,6 +33,7 @@ public class HarAction extends UserAction {
     private List<String> harErrors;
     private BasicDBObject content;
     private int apiCollectionId;
+
     private String apiCollectionName;
 
     private boolean skipKafka = DashboardMode.isLocalDeployment();
