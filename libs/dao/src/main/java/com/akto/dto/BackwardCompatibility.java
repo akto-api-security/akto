@@ -32,9 +32,13 @@ public class BackwardCompatibility {
     public static final String DELETE_ACCESS_LIST_FROM_API_TOKEN = "deleteAccessListFromApiToken";
     private int deleteAccessListFromApiToken;
 
+    public static final String DELETE_NULL_SUB_CATEGORY_ISSUES = "deleteNullSubCategoryIssues";
+    private int deleteNullSubCategoryIssues;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
-                                 int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken) {
+                                 int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
+                                 int deleteNullSubCategoryIssues) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -45,6 +49,7 @@ public class BackwardCompatibility {
         this.mirroringLambdaTriggered = mirroringLambdaTriggered;
         this.authMechanismData = authMechanismData;
         this.deleteAccessListFromApiToken = deleteAccessListFromApiToken;
+        this.deleteNullSubCategoryIssues = deleteNullSubCategoryIssues;
     }
 
     public BackwardCompatibility() {
@@ -136,5 +141,13 @@ public class BackwardCompatibility {
 
     public void setDeleteAccessListFromApiToken(int deleteAccessListFromApiToken) {
         this.deleteAccessListFromApiToken = deleteAccessListFromApiToken;
+    }
+
+    public int getDeleteNullSubCategoryIssues() {
+        return deleteNullSubCategoryIssues;
+    }
+
+    public void setDeleteNullSubCategoryIssues(int deleteNullSubCategoryIssues) {
+        this.deleteNullSubCategoryIssues = deleteNullSubCategoryIssues;
     }
 }

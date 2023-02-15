@@ -9,7 +9,6 @@ import com.akto.dto.SignupInfo;
 import com.akto.dto.SignupUserInfo;
 import com.akto.dto.User;
 import com.akto.utils.Token;
-import com.akto.utils.HttpUtils;
 import com.akto.utils.JWT;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -33,7 +32,7 @@ import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
 
 // Validates user from the supplied username and password
 // Generates refresh token jwt using the username if valid user
-// Saves the refresh token to db
+// Saves the refresh token to db (TODO)
 // Generates access token jwt using the refresh token
 // Adds the refresh token to http-only cookie
 // Adds the access token to header
@@ -52,7 +51,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
     BasicDBObject loginResult = new BasicDBObject();
     @Override
     public String execute() throws IOException {
-        logger.info("LoginAction Hit");
+        System.out.println("LoginAction Hit");
 
         if (username == null) {
             return Action.ERROR.toUpperCase();
@@ -85,7 +84,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                 }
             }
 
-            logger.info("Auth Failed");
+            System.out.println("Auth Failed");
             return "ERROR";
         }
         String result = loginUser(user, servletResponse, true, servletRequest);
@@ -94,6 +93,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
     }
 
     private void decideFirstPage(BasicDBObject loginResult){
+        //TODO get this reviewed
         Context.accountId.set(1_000_000);
         long count = SingleTypeInfoDao.instance.getEstimatedCount();
         if(count == 0){
@@ -134,8 +134,10 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             cookie.setHttpOnly(true);
             cookie.setPath("/dashboard");
 
-            cookie.setSecure(HttpUtils.isHttpsEnabled());
-            
+            String https = System.getenv("AKTO_HTTPS_FLAG");
+            if (Objects.equals(https, "true")) {
+                cookie.setSecure(true);
+            }
 
             servletResponse.addCookie(cookie);
             HttpSession session = servletRequest.getSession(true);
@@ -153,7 +155,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             }
             return Action.SUCCESS.toUpperCase();
         } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
-            ;
+            e.printStackTrace();
         }
 
         return Action.ERROR.toUpperCase();

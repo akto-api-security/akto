@@ -44,7 +44,7 @@ public class NucleiExecutor {
         try {
             FileUtils.writeStringToFile(file, "{}", Charsets.UTF_8);
         } catch (IOException e) {
-            ;
+            e.printStackTrace();
             return null;
         }
 
@@ -64,16 +64,8 @@ public class NucleiExecutor {
             nucleiFileSuffix = "m1";
         }
 
-<<<<<<< HEAD
         List<String> baseCmdTokens = new ArrayList<>();
         baseCmdTokens.add("/app/nuclei_"+nucleiFileSuffix);
-=======
-        String nucleiExecutablePath = System.getenv("NUCLEI_EXECUTABLE_PATH");
-        String nuclei = nucleiExecutablePath == null ? "/app/nuclei_"+nucleiFileSuffix : nucleiExecutablePath;
-
-        List<String> baseCmdTokens = new ArrayList<>();
-        baseCmdTokens.add(nuclei);
->>>>>>> pub-repo/master
 
         baseCmdTokens.add("-u");
         baseCmdTokens.add(fullUrl);
@@ -107,6 +99,7 @@ public class NucleiExecutor {
             baseCmdTokens.add(headerName + ":\"" + headerValue + "\"");
         }
 
+        System.out.println("Command: " + String.join(" ",baseCmdTokens));
         Process process;
 
         try {
@@ -131,14 +124,15 @@ public class NucleiExecutor {
 
             boolean processResult = process.waitFor(5, TimeUnit.MINUTES);
         } catch (IOException | InterruptedException e) {
-            ;
+            e.printStackTrace();
         }
 
         List<BasicDBObject> metaData;
         try {
              metaData = readMetaData(outputDirFiles);
         } catch (Exception e) {
-            ;
+            System.out.println("ERROR reading meta data: ");
+            e.printStackTrace();
             return null;
         }
 
@@ -245,7 +239,7 @@ public class NucleiExecutor {
                         }
             
                     } catch (IOException e) {
-                        ;
+                        e.printStackTrace();
                     } finally {
 
                         try {

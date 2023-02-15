@@ -8,9 +8,11 @@ import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.info.NucleiTestInfo;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
+import com.akto.testing.ApiExecutor;
 import com.akto.testing.NucleiExecutor;
 import com.akto.testing.StatusCodeAnalyser;
 import com.akto.util.Pair;
+import com.akto.utils.RedactSampleData;
 import com.google.common.io.Files;
 
 import org.apache.commons.io.FileUtils;
@@ -52,9 +54,25 @@ public class FuzzingTest extends TestPlugin {
     @Override
     public Result start(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) {
         List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
-        if (messages.isEmpty()) return null;
+        RawApi rawApi;
+        if (messages.isEmpty()) {
+            OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest(
+                    apiInfoKey.getUrl(), null, apiInfoKey.method.name(), null, new HashMap<>(), ""
+            );
 
-        RawApi rawApi = messages.get(0);
+            OriginalHttpResponse originalHttpResponse = null;
+            try {
+                originalHttpResponse = ApiExecutor.sendRequest(originalHttpRequest,true);
+            } catch (Exception e) {
+                e.printStackTrace();
+                return null;
+            }
+            String originalMessage = RedactSampleData.convertOriginalReqRespToString(originalHttpRequest, originalHttpResponse);
+            rawApi = new RawApi(originalHttpRequest, originalHttpResponse, originalMessage);
+        } else {
+            rawApi = messages.get(0);
+        }
+
         List<TestResult> testResults = new ArrayList<>();
         OriginalHttpRequest testRequest = rawApi.getRequest().copy();
 
@@ -70,7 +88,7 @@ public class FuzzingTest extends TestPlugin {
         File file = createDirPath(filepath);
 
         if (file == null) return null;
-        boolean vulnerable = false;
+        boolean overallVulnerable = false;
         String outputDir = file.getParent();
         this.tempTemplatePath = outputDir+"/"+subcategory+".yaml";
         NucleiTestInfo nucleiTestInfo = new NucleiTestInfo(this.subcategory, this.origTemplatePath);
@@ -78,20 +96,29 @@ public class FuzzingTest extends TestPlugin {
         try {
             FileUtils.copyURLToFile(new URL(this.origTemplatePath), new File(this.tempTemplatePath));
         } catch (IOException e1) {
+            e1.printStackTrace();
             return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.FAILED_DOWNLOADING_NUCLEI_TEMPLATE, testRequest, nucleiTestInfo);
         }
 
         try {
             downloadLinks(this.tempTemplatePath, outputDir);
         } catch (Exception e) {
-            ;
+            e.printStackTrace();
             return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.FAILED_DOWNLOADING_PAYLOAD_FILES, testRequest, nucleiTestInfo);
+        }
+
+        String fullUrlWithHost;
+        try {
+             fullUrlWithHost = testRequest.getFullUrlIncludingDomain();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.FAILED_BUILDING_URL_WITH_DOMAIN, testRequest, nucleiTestInfo);
         }
 
         try {
             NucleiExecutor.NucleiResult nucleiResult = NucleiExecutor.execute(
                 testRequest.getMethod(), 
-                testRequest.getFullUrlWithParams(), 
+                fullUrlWithHost,
                 this.tempTemplatePath,
                 outputDir, 
                 testRequest.getBody(), 
@@ -109,8 +136,9 @@ public class FuzzingTest extends TestPlugin {
 
                 int statusCode = StatusCodeAnalyser.getStatusCode(testResponse.getBody(), testResponse.getStatusCode());
                 double percentageMatch = compareWithOriginalResponse(originalHttpResponse.getBody(), testResponse.getBody(), new HashMap<>());
+                boolean vulnerable = nucleiResult.metaData.get(idx).getBoolean("matcher-status");
 
-                vulnerable = nucleiResult.metaData.get(idx).getBoolean("matcher-status");
+                overallVulnerable = overallVulnerable || vulnerable;
 
                 apiExecutionDetails = new ApiExecutionDetails(statusCode, percentageMatch, testResponse, originalHttpResponse, rawApi.getOriginalMessage());
 
@@ -122,11 +150,11 @@ public class FuzzingTest extends TestPlugin {
 
             }
         } catch (Exception e) {
-            ;
+            e.printStackTrace();
             return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest, nucleiTestInfo);
         }
 
-        return addTestSuccessResult(vulnerable, testResults, new ArrayList<>(), TestResult.Confidence.HIGH);
+        return addTestSuccessResult(overallVulnerable, testResults, new ArrayList<>(), TestResult.Confidence.HIGH);
     }
 
     public static void downloadLinks(String templatePath, String outputDir) throws IOException {

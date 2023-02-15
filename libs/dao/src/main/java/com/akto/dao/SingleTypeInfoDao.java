@@ -75,6 +75,16 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(new String[]{SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID}));
             counter++;
         }
+
+        if (counter == 5) {
+            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(new String[]{SingleTypeInfo.SUB_TYPE, SingleTypeInfo._RESPONSE_CODE}));
+            counter++;
+        }
+
+        if (counter == 6) {
+            String[] fieldNames = {"responseCode", "subType", "timestamp",};
+            SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
+        }
     }
 
 
@@ -182,14 +192,21 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return sensitiveInResponse;
     }
 
-    public Bson filterForSensitiveParamsExcludingUserMarkedSensitive(Integer apiCollectionId, String url, String method) {
+    public Bson filterForSensitiveParamsExcludingUserMarkedSensitive(Integer apiCollectionId, String url, String method, String subType) {
         // apiCollectionId null then no filter for apiCollectionId
         List<String> sensitiveSubTypes = sensitiveSubTypeNames();
 
         Bson alwaysSensitiveFilter = Filters.in("subType", sensitiveSubTypes);
 
-        List<String> sensitiveInResponse = sensitiveSubTypeInResponseNames();
-        List<String> sensitiveInRequest = sensitiveSubTypeInRequestNames();
+        List<String> sensitiveInResponse;
+        List<String> sensitiveInRequest;
+        if (subType != null) {
+            sensitiveInRequest = Collections.singletonList(subType);
+            sensitiveInResponse = Collections.singletonList(subType);
+        } else {
+            sensitiveInResponse = sensitiveSubTypeInResponseNames();
+            sensitiveInRequest = sensitiveSubTypeInRequestNames();
+        }
 
         Bson sensitiveInResponseFilter = Filters.and(
                 Filters.in("subType",sensitiveInResponse ),
@@ -201,9 +218,15 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         );
 
         List<Bson> filters = new ArrayList<>();
-        filters.add(Filters.or(alwaysSensitiveFilter, sensitiveInResponseFilter, sensitiveInRequestFilter));
 
-        if (apiCollectionId != null && apiCollectionId >= 0) {
+        List<Bson> subTypeFilters =  new ArrayList<>();
+        subTypeFilters.add(sensitiveInRequestFilter);
+        subTypeFilters.add(sensitiveInResponseFilter);
+        if (subType == null) subTypeFilters.add(alwaysSensitiveFilter);
+
+        filters.add(Filters.or(subTypeFilters));
+
+        if (apiCollectionId != null && apiCollectionId != -1) {
             filters.add(Filters.eq("apiCollectionId", apiCollectionId) );
         }
 
@@ -242,7 +265,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             urls.add(sensitiveParamInfo.getUrl());
         }
 
-        Bson filter = filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId, url, method);
+        Bson filter = filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId, url, method, null);
 
         urls.addAll(instance.findDistinctFields("url", String.class, filter));
 
@@ -291,7 +314,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
                 );
                 endpoints.add(apiInfoKey);
             } catch (Exception e) {
-                ;
+                e.printStackTrace();
 
             }
         }
@@ -313,5 +336,61 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
     public long getEstimatedCount(){
         return instance.getMCollection().estimatedDocumentCount();
+    }
+
+    public Map<String,Map<String, Integer>> buildSubTypeCountMap(int startTimestamp, int endTimestamp) {
+
+        ArrayList<Bson> filterList = new ArrayList<>();
+        filterList.add(Filters.gt("timestamp", startTimestamp));
+        filterList.add(Filters.lt("timestamp", endTimestamp));
+
+        List<String> sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
+        sensitiveInRequest.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
+        Bson sensitveSubTypeFilterRequest = Filters.in("subType",sensitiveInRequest);
+        List<Bson> requestFilterList = new ArrayList<>();
+        requestFilterList.add(sensitveSubTypeFilterRequest);
+        requestFilterList.addAll(filterList);
+        requestFilterList.add(Filters.eq("responseCode", -1));
+
+        List<String> sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
+        sensitiveInResponse.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
+        Bson sensitveSubTypeFilterResponse = Filters.in("subType",sensitiveInResponse);
+        List<Bson> responseFilterList = new ArrayList<>();
+        responseFilterList.add(sensitveSubTypeFilterResponse);
+        responseFilterList.addAll(filterList);
+        responseFilterList.add(Filters.gt("responseCode", -1));
+
+        Map<String, Integer> requestResult = execute(requestFilterList);
+        Map<String, Integer> responseResult = execute(responseFilterList);
+
+        Map<String, Map<String, Integer>> resultMap = new HashMap<>();
+        resultMap.put("REQUEST", requestResult);
+        resultMap.put("RESPONSE", responseResult);
+        
+        return resultMap;
+    }
+
+    public Map<String, Integer> execute(List<Bson> filterList) {
+        Map<String, Integer> countMap = new HashMap<>();
+        List<Bson> pipeline = new ArrayList<>();
+
+        pipeline.add(Aggregates.match(Filters.and(filterList)));
+
+        BasicDBObject groupedId = new BasicDBObject("subType", "$subType");
+        pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count",1)));
+
+        MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while(endpointsCursor.hasNext()) {
+            try {
+                BasicDBObject basicDBObject = endpointsCursor.next();
+                String subType = ((BasicDBObject) basicDBObject.get("_id")).getString("subType");
+                int count = basicDBObject.getInt("count");
+                countMap.put(subType, count);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        return countMap;
     }
 }

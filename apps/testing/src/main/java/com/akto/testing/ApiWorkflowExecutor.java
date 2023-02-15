@@ -46,6 +46,16 @@ public class ApiWorkflowExecutor {
     private static final Logger logger = LoggerFactory.getLogger(ApiWorkflowExecutor.class);
     private static final Gson gson = new Gson();
 
+    public static void main(String[] args) {
+        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
+        Context.accountId.set(1_000_000);
+
+        TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq("_id", new ObjectId("631cac6b09119467be6a1640")));
+        WorkflowTestingEndpoints workflowTestingEndpoints = (WorkflowTestingEndpoints) testingRun.getTestingEndpoints();
+        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
+        apiWorkflowExecutor.init(workflowTestingEndpoints.getWorkflowTest(), testingRun.getId(), null);
+    }
+
     public void init(WorkflowTest workflowTest, ObjectId testingRunId, ObjectId testingRunSummaryId) {
         Graph graph = new Graph();
         graph.buildGraph(workflowTest);
@@ -61,7 +71,7 @@ public class ApiWorkflowExecutor {
             try {
                 nodeResult = processNode(node, valuesMap, true);
             } catch (Exception e) {
-                ;
+                e.printStackTrace();
                 List<String> testErrors = new ArrayList<>();
                 testErrors.add("Something went wrong");
                 nodeResult = new WorkflowTestResult.NodeResult("{}", false, testErrors);
@@ -94,7 +104,7 @@ public class ApiWorkflowExecutor {
             try {
                 nodeResult = processNode(node, valuesMap, false);
             } catch (Exception e) {
-                ;
+                e.printStackTrace();
                 List<String> testErrors = new ArrayList<>();
                 testErrors.add("Error Processing Node In Login Flow " + e.getMessage());
                 nodeResult = new WorkflowTestResult.NodeResult("{}", false, testErrors);
@@ -172,6 +182,7 @@ public class ApiWorkflowExecutor {
         return valuesMap;
     }
 
+    //todo: make this generic
     public WorkflowTestResult.NodeResult processOtpNode(Node node, Map<String, Object> valuesMap) {
 
         List<String> testErrors = new ArrayList<>();
@@ -220,9 +231,9 @@ public class ApiWorkflowExecutor {
             try {
                 int waitInSeconds = Math.min(node.getWorkflowNodeDetails().getWaitInSeconds(), 60);
                 if (waitInSeconds > 0) {
-                    logger.info("WAITING: " + waitInSeconds + " seconds");
+                    System.out.println("WAITING: " + waitInSeconds + " seconds");
                     Thread.sleep(waitInSeconds*1000);
-                    logger.info("DONE WAITING!!!!");
+                    System.out.println("DONE WAITING!!!!");
                 }
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
@@ -242,7 +253,7 @@ public class ApiWorkflowExecutor {
     }
 
     private String extractOtpCode(String text, String regex) {
-        logger.info(regex);
+        System.out.println(regex);
 
         Pattern pattern = Pattern.compile(regex);
         Matcher matcher = pattern.matcher(text);
@@ -329,8 +340,8 @@ public class ApiWorkflowExecutor {
 
 
     public WorkflowTestResult.NodeResult processApiNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes) {
-        logger.info("\n");
-        logger.info("NODE: " + node.getId());
+        System.out.println("\n");
+        System.out.println("NODE: " + node.getId());
         List<String> testErrors = new ArrayList<>();
         String nodeId = node.getId();
         WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
@@ -343,7 +354,7 @@ public class ApiWorkflowExecutor {
             request = buildHttpRequest(updatedSampleData, valuesMap);
             if (request == null) throw new Exception();
         } catch (Exception e) {
-            ;
+            e.printStackTrace();
             return new WorkflowTestResult.NodeResult(null, false, Collections.singletonList("Failed building request body"));
         }
 
@@ -359,9 +370,9 @@ public class ApiWorkflowExecutor {
         try {
             int waitInSeconds = Math.min(workflowNodeDetails.getWaitInSeconds(),60);
             if (waitInSeconds > 0) {
-                logger.info("WAITING: " + waitInSeconds + " seconds");
+                System.out.println("WAITING: " + waitInSeconds + " seconds");
                 Thread.sleep(waitInSeconds*1000);
-                logger.info("DONE WAITING!!!!");
+                System.out.println("DONE WAITING!!!!");
             }
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
@@ -390,7 +401,7 @@ public class ApiWorkflowExecutor {
                 Thread.currentThread().interrupt();
             } catch (Exception e) {
                 testErrors.add("API request failed");
-                ;
+                e.printStackTrace();
             }
         }
 
@@ -398,7 +409,8 @@ public class ApiWorkflowExecutor {
         try {
             message = RedactSampleData.convertOriginalReqRespToString(request, response);
         } catch (Exception e) {
-            ;
+            // todo: what to do if message = null
+            e.printStackTrace();
         }
 
         boolean vulnerable = validateTest(workflowNodeDetails.getTestValidatorCode(), valuesMap);
@@ -416,15 +428,15 @@ public class ApiWorkflowExecutor {
         ScriptEngine engine = factory.getEngineByName("nashorn");
         try {
             String code = replaceVariables(testValidatorCode, valuesMap, true);
-            logger.info("*******************************************************************");
-            logger.info("TEST VALIDATOR CODE:");
-            logger.info(code);
+            System.out.println("*******************************************************************");
+            System.out.println("TEST VALIDATOR CODE:");
+            System.out.println(code);
             Object o = engine.eval(code);
-            logger.info("TEST VALIDATOR RESULT: " + o.toString());
-            logger.info("*******************************************************************");
+            System.out.println("TEST VALIDATOR RESULT: " + o.toString());
+            System.out.println("*******************************************************************");
             vulnerable = ! (boolean) o;
         } catch (Exception e) {
-            ;
+            e.printStackTrace();
         }
 
         return vulnerable;
@@ -464,7 +476,7 @@ public class ApiWorkflowExecutor {
                 String mockUrl = "url?"+ queryParams; // because getQueryJSON function needs complete url
                 queryParamsObject = RequestTemplate.getQueryJSON(mockUrl);
             } catch (Exception e) {
-                ;
+                e.printStackTrace();
             }
         }
 
@@ -528,21 +540,21 @@ public class ApiWorkflowExecutor {
 
         boolean userSuppliedQueryParamsNullOrEmpty = queryParams == null || queryParams.trim().length() == 0;
         if (requestUrl != null) {
-            logger.info("requestUrl: " + requestUrl);
+            System.out.println("requestUrl: " + requestUrl);
             String rawUrl = executeCode(requestUrl, valuesMap);
-            logger.info("rawUrl: " + requestUrl);
+            System.out.println("rawUrl: " + requestUrl);
             // this url might contain urlQueryParams. We need to move it queryParams
             String[] rawUrlArr = rawUrl.split("\\?");
             request.setUrl(rawUrlArr[0]);
             if (rawUrlArr.length > 1) {
                 queryFromReplacedUrl = rawUrlArr[1];
             }
-            logger.info("final url: " + request.getUrl());
-            logger.info("queryFromReplacedUrl: " + queryFromReplacedUrl);
+            System.out.println("final url: " + request.getUrl());
+            System.out.println("queryFromReplacedUrl: " + queryFromReplacedUrl);
         }
 
         if (userSuppliedQueryParamsNullOrEmpty) {
-            logger.info("setting null");
+            System.out.println("setting null");
             request.setQueryParams(null);
         }
 
@@ -560,15 +572,15 @@ public class ApiWorkflowExecutor {
         boolean queryFromReplacedUrlNullOrEmpty = queryFromReplacedUrl == null || queryFromReplacedUrl.trim().isEmpty();
 
         if (!userSuppliedQueryParamsNullOrEmpty) {
-            logger.info("user has supplied query params");
+            System.out.println("user has supplied query params");
             String finalQueryParams = executeCode(queryParams, valuesMap);
-            logger.info("finalQueryParams: " + finalQueryParams);
+            System.out.println("finalQueryParams: " + finalQueryParams);
             if (queryFromReplacedUrlNullOrEmpty) {
                 request.setQueryParams(finalQueryParams);
             } else {
                 // combine original query params and user defined query params and latter overriding former
                 String combinedQueryParams = OriginalHttpRequest.combineQueryParams(queryFromReplacedUrl, finalQueryParams);
-                logger.info("combinedQueryParams: " + combinedQueryParams);
+                System.out.println("combinedQueryParams: " + combinedQueryParams);
                 request.setQueryParams(combinedQueryParams);
             }
         } else if (!queryFromReplacedUrlNullOrEmpty) {
@@ -600,17 +612,24 @@ public class ApiWorkflowExecutor {
                 Object val = engine.eval(code);
                 matcher.appendReplacement(sb, val.toString());
             } catch (final ScriptException se) {
+                se.printStackTrace();
             }
 
         }
 
-        matcher.appendTail(sb); 
+        matcher.appendTail(sb); // todo: check if it needs to be called only after appendReplacement
+
+
+
+        // evaluate JavaScript statement
+
         return sb.toString();
     }
 
 
+    // todo: test invalid cases
     public String replaceVariables(String payload, Map<String, Object> valuesMap, boolean escapeString) throws Exception {
-        String regex = "\\$\\{(x\\d+\\.[\\w\\-\\[\\].]+|AKTO\\.changes_info\\..*?)\\}"; 
+        String regex = "\\$\\{(x\\d+\\.[\\w\\-\\[\\].]+|AKTO\\.changes_info\\..*?)\\}"; // todo: integer inside brackets
         Pattern p = Pattern.compile(regex);
 
         // replace with values
@@ -621,6 +640,7 @@ public class ApiWorkflowExecutor {
             if (key == null) continue;
             Object obj = valuesMap.get(key);
             if (obj == null) {
+                // todo: check for nested objects
                 logger.error("couldn't find: " + key);
                 throw new Exception("Couldn't find " + key);
             }
@@ -639,7 +659,7 @@ public class ApiWorkflowExecutor {
             sb.append(val);
         }
 
-        matcher.appendTail(sb);
+        matcher.appendTail(sb); // todo: check if it needs to be called only after appendReplacement
 
         return sb.toString();
     }

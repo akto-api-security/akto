@@ -21,7 +21,7 @@ public class TestAddPathItems {
             Main.addPathItems(200,paths, "/api/1", "PUT", new ArrayList<>(), true);
             Main.addPathItems(200,paths, "/api/2", "GET", new ArrayList<>(), true);
         } catch (Exception e) {
-            ;
+            e.printStackTrace();
         }
         assertEquals(paths.size(), 2);
         PathItem pathItem1 = paths.get("/api/1");

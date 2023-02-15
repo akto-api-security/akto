@@ -43,7 +43,7 @@ public class Main {
     private static void printL(Object o) {
         if (debugPrintCounter > 0) {
             debugPrintCounter--;
-            logger.info(o.toString());
+            System.out.println(o);
         }
     }   
 
@@ -95,6 +95,7 @@ public class Main {
 
     public static Kafka kafkaProducer = null;
     private static void buildKafka(int accountId) {
+        System.out.println("Building kafka...................");
         Context.accountId.set(accountId);
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter(accountId));
         if (accountSettings != null && accountSettings.getCentralKafkaIp()!= null) {
@@ -105,10 +106,27 @@ public class Main {
                 kafkaProducer = new Kafka(centralKafkaBrokerUrl, centralKafkaLingerMS, centralKafkaBatchSize);
                 logger.info("Connected to central kafka @ " + Context.now());
             }
+        } else {
+            System.out.println(accountSettings);
         }
     }
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+
+    public static class AccountInfo {
+        long estimatedCount;
+        int lastEstimatedCountTime;
+
+        public AccountInfo() {
+            this.estimatedCount = 0;
+            this.lastEstimatedCountTime = 0;
+        }
+
+        public AccountInfo(long estimatedCount, int lastEstimatedCountTime) {
+            this.estimatedCount = estimatedCount;
+            this.lastEstimatedCountTime = lastEstimatedCountTime;
+        }
+    }
 
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
@@ -120,7 +138,10 @@ public class Main {
         String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
         boolean syncImmediately = false;
         boolean fetchAllSTI = true;
-        if (instanceType != null && instanceType.equals("DASHBOARD")) {
+        Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
+
+        boolean isDashboardInstance = instanceType != null && instanceType.equals("DASHBOARD");
+        if (isDashboardInstance) {
             syncImmediately = true;
             fetchAllSTI = false;
         }
@@ -164,7 +185,7 @@ public class Main {
                 try {
                     mainThread.join();
                 } catch (InterruptedException e) {
-                    ;
+                    e.printStackTrace();
                 }
             }
         });
@@ -186,6 +207,7 @@ public class Main {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 main.consumer.commitSync();
 
+                // TODO: what happens if exception
                 Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
                 for (ConsumerRecord<String,String> r: records) {
                     HttpResponseParams httpResponseParams;
@@ -195,7 +217,7 @@ public class Main {
                         lastSyncOffset++;
 
                         if (lastSyncOffset % 100 == 0) {
-                            logger.info("Committing offset at position: " + lastSyncOffset);
+                            System.out.println("Committing offset at position: " + lastSyncOffset);
                         }
 
                         if (tryForCollectionName(r.value())) {
@@ -220,11 +242,27 @@ public class Main {
                     try {
                         accountIdInt = Integer.parseInt(accountId);
                     } catch (Exception ignored) {
+                        // TODO:
                         logger.info("Account id not string");
                         continue;
                     }
 
                     Context.accountId.set(accountIdInt);
+
+                    AccountInfo accountInfo = accountInfoMap.get(accountIdInt);
+                    if (accountInfo == null) {
+                        accountInfo = new AccountInfo();
+                        accountInfoMap.put(accountIdInt, accountInfo);
+                    }
+
+                    if ((Context.now() - accountInfo.lastEstimatedCountTime) > 60*60) {
+                        accountInfo.lastEstimatedCountTime = Context.now();
+                        accountInfo.estimatedCount = SingleTypeInfoDao.instance.getMCollection().estimatedDocumentCount();
+                    }
+
+                    if (!isDashboardInstance && accountInfo.estimatedCount> 20_000_000) {
+                        continue;
+                    }
 
                     if (!httpCallParserMap.containsKey(accountId)) {
                         HttpCallParser parser = new HttpCallParser(
@@ -284,7 +322,7 @@ public class Main {
           // nothing to catch. This exception is called from the shutdown hook.
         } catch (Exception e) {
             printL(e);
-            ;
+            e.printStackTrace();
         } finally {
             main.consumer.close();
         }

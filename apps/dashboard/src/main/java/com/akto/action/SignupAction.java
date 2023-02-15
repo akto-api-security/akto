@@ -3,6 +3,7 @@ package com.akto.action;
 import com.akto.dao.*;
 import com.akto.dto.*;
 import com.akto.listener.InitializerListener;
+import com.akto.notifications.email.WelcomeEmail;
 import com.akto.utils.JWT;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeTokenRequest;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
@@ -64,11 +65,17 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     public String registerViaSlack() {
         String codeFromSlack = code;
         code = "err";
+        System.out.println(code+ " " +state);
 
         Config.SlackConfig aktoSlackConfig = (Config.SlackConfig) ConfigsDao.instance.findOne("_id", "SLACK-ankush");
 
         if(aktoSlackConfig == null) {
-            return Action.ERROR.toUpperCase();
+            Config.SlackConfig newConfig = new Config.SlackConfig();
+            newConfig.setClientId("1966181353905.1950504597541");
+            newConfig.setClientSecret("2b586ffd4fe4bdccd35a8675b43c1e91");
+            newConfig.setRedirect_url("");
+            ConfigsDao.instance.insertOne(newConfig);
+            aktoSlackConfig = (Config.SlackConfig) ConfigsDao.instance.findOne("_id", "SLACK-ankush");
         }
 
         OAuthV2AccessRequest request = OAuthV2AccessRequest.builder()
@@ -144,7 +151,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         } catch (SlackApiException e) {
             code = e.getResponse().message();
         } catch (Exception e) {
-            ;
+            e.printStackTrace();
             code = e.getMessage();
         } finally {
             if (code.length() > 0) {
@@ -158,12 +165,23 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
     public String registerViaGoogle() {
 
+        System.out.println(code + " " + state);
+
         String codeFromGoogle = code;
         code = "err";
 
         Config.GoogleConfig aktoGoogleConfig = (Config.GoogleConfig) ConfigsDao.instance.findOne("_id", "GOOGLE-ankush");
         if (aktoGoogleConfig == null) {
-
+            Config.GoogleConfig newConfig = new Config.GoogleConfig();
+            newConfig.setClientId("323545309385-7nr1afdhf4kautv9bridgadh19krfkn5.apps.googleusercontent.com");
+            newConfig.setProjectId("my-project-1523474847276");
+            newConfig.setAuthURI("https://accounts.google.com/o/oauth2/auth");
+            newConfig.setCertURL("https://www.googleapis.com/oauth2/v1/certs");
+            newConfig.setJsOrigins(InitializerListener.getDomain());
+            newConfig.setClientSecret("gRUVh9tRfWg2vDbYK1fBbsE8");
+            newConfig.setTokenURI("https://oauth2.googleapis.com/token");
+            ConfigsDao.instance.insertOne(newConfig);
+            aktoGoogleConfig = (Config.GoogleConfig) ConfigsDao.instance.findOne("_id", "GOOGLE-ankush");
         }
 
 
@@ -261,7 +279,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         try {
             createUserAndRedirect(email, email, signupInfo);
         } catch (IOException e) {
-            ;
+            e.printStackTrace();
             return ERROR.toUpperCase();
         }
         return SUCCESS.toUpperCase();

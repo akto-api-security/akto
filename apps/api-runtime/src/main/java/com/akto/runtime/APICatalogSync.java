@@ -179,20 +179,25 @@ public class APICatalogSync {
         } 
 
         URLAggregator aggregator = new URLAggregator(origAggregator.urls);
+        System.out.println("aggregator: " + (System.currentTimeMillis() - start));
         origAggregator.urls = new ConcurrentHashMap<>();
 
         start = System.currentTimeMillis();
         processKnownStaticURLs(aggregator, deltaCatalog, dbCatalog);
+        System.out.println("processKnownStaticURLs: " + (System.currentTimeMillis() - start));
 
         start = System.currentTimeMillis();
         Map<URLStatic, RequestTemplate> pendingRequests = createRequestTemplates(aggregator);
+        System.out.println("pendingRequests: " + (System.currentTimeMillis() - start));
 
         start = System.currentTimeMillis();
         tryWithKnownURLTemplates(pendingRequests, deltaCatalog, dbCatalog, apiCollectionId );
+        System.out.println("tryWithKnownURLTemplates: " + (System.currentTimeMillis() - start));
 
         if (!mergeAsyncOutside) {
             start = System.currentTimeMillis();
             tryMergingWithKnownStrictURLs(pendingRequests, dbCatalog, deltaCatalog);
+            System.out.println("tryMergingWithKnownStrictURLs: " + (System.currentTimeMillis() - start));
         } else {
             for (URLStatic pending: pendingRequests.keySet()) {
                 RequestTemplate pendingTemplate = pendingRequests.get(pending);
@@ -204,6 +209,9 @@ public class APICatalogSync {
                 }
             }
         }
+
+        System.out.println("processTime: " + RequestTemplate.insertTime + " " + RequestTemplate.processTime + " " + RequestTemplate.deleteTime);
+
     }
 
 
@@ -227,7 +235,7 @@ public class APICatalogSync {
         ApiMergerResult finalResult = new ApiMergerResult(new HashMap<>());
         do {
             singleTypeInfos = SingleTypeInfoDao.instance.findAll(filterQ, offset, limit, null, Projections.exclude("values"));
-
+            System.out.println(singleTypeInfos.size());
 
             Map<String, Set<String>> staticUrlToSti = new HashMap<>();
             List<String> templateUrls = new ArrayList<>();
@@ -903,7 +911,7 @@ public class APICatalogSync {
                         finalSamples.add(s);
                     }
                 } catch (Exception e) {
-                    ;
+                    e.printStackTrace();
                 }
             }
             Bson bson = Updates.pushEach("samples", finalSamples, new PushOptions().slice(-10));
@@ -1130,7 +1138,8 @@ public class APICatalogSync {
                             mergeUrlsAndSave(apiCollection.getId());
                         }
                     } catch (Exception e) {
-                        ;
+                        System.out.println("mergeUrlsAndSave: " + e.getMessage());
+                        e.printStackTrace();
                     }
                 }
             }

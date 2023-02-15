@@ -32,7 +32,7 @@ public abstract class JwtModifier extends PayloadModifier {
                     finalValue.add(modifiedString);
                     flag = true;
                 } catch (Exception e) {
-                    ;
+                    e.printStackTrace();
                     return null;
                 }
             } else {

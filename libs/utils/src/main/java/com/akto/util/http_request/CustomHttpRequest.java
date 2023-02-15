@@ -35,7 +35,7 @@ public class CustomHttpRequest {
         try {
             httpPost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
         } catch (UnsupportedEncodingException e) {
-            ;
+            e.printStackTrace();
         }
 
         return s(httpPost);
@@ -48,9 +48,11 @@ public class CustomHttpRequest {
         try {
             response = httpclient.execute(request);
         } catch (IOException ioException) {
+            ioException.printStackTrace();
         }
 
         if (response == null) {
+            System.out.println("RESPONSE NULL");
             return null;
         }
 
@@ -67,11 +69,13 @@ public class CustomHttpRequest {
                 inputStream = entity.getContent();
                 jsonMap = mapper.readValue(inputStream, Map.class);
             } catch (IOException ioException) {
+                ioException.printStackTrace();
             } finally {
                 if (inputStream != null) {
                     try {
                         inputStream.close();
                     } catch (IOException ioException) {
+                        ioException.printStackTrace();
                     }
                 }
             }

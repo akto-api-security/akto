@@ -16,6 +16,7 @@ import com.akto.dto.AktoDataType;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.User;
+import com.akto.dto.messaging.Message.Mode;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.RequestTemplate;
@@ -61,10 +62,12 @@ public class TestDBSync extends MongoBasedTest {
     public void testMongo() {
         testInitializer();
         long u = UsersDao.instance.getMCollection().countDocuments();
-        UsersDao.instance.insertOne(new User("Abc", "abc@def.gmail", new HashMap<>(), new HashMap<>()));
+        UsersDao.instance.insertOne(new User("Abc", "abc@def.gmail", new HashMap<>(), new HashMap<>(), Mode.EMAIL));
 
         // then
         long v = UsersDao.instance.getMCollection().countDocuments();
+
+        System.out.println("some new print" + u + " " +v);
 
         assertEquals(u+1, v);
 

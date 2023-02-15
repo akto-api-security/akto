@@ -75,6 +75,7 @@ public class SingleTypeInfo {
             }
             aktoDataTypeMap = newAktoMap;
         } catch (Exception ex) {
+            ex.printStackTrace(); // or logger would be better
         }
     }
 
@@ -335,6 +336,7 @@ public class SingleTypeInfo {
                 if (customDataType != null) {
                     this.subType = customDataType.toSubType();
                 } else {
+                    // TODO:
                     this.subType = GENERIC;
                 }
             }
@@ -672,6 +674,7 @@ public String composeKeyWithCustomSubType(SubType s) {
             if (customDataType != null) {
                 this.subType = customDataType.toSubType();
             } else {
+                // TODO:
                 this.subType = GENERIC;
             }
         }

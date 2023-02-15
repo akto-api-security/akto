@@ -32,8 +32,8 @@ public class OriginalHttpResponse {
     public void buildFromSampleMessage(String message) {
         Map<String, Object> json = gson.fromJson(message, Map.class);
 
-        String requestPayload = (String) json.get("responsePayload");
-        this.body = requestPayload.trim();
+        String responsePayload = (String) json.get("responsePayload");
+        this.body = responsePayload != null ? responsePayload.trim() : null;
         this.headers = OriginalHttpRequest.buildHeadersMap(json, "responseHeaders");
         this.statusCode = Integer.parseInt(json.get("statusCode").toString());
     }

@@ -1,0 +1,31 @@
+package com.akto.oas;
+public class PathComponent {
+    public static final String OPEN_API = "openapi";
+    public static final String SECURITY = "security";
+    public static final String PATHS = "paths";
+    public static final String PARAMETERS = "parameters";
+    public static final String REF = "$ref";
+    public static final String TAGS = "tags";
+    public static final String SERVERS = "servers";
+    public static final String URL = "url";
+    public static final String COMPONENTS = "components";
+    public static final String SCHEMAS = "schemas";
+    public static final String EXAMPLE_SET_FLAG = "exampleSetFlag";
+    public static final String SCHEMA = "schema";
+    public static final String SECURITY_SCHEMES= "securitySchemes";
+    public static final String ALL_OF = "allOf";
+    public static final String ANY_OF = "anyOf";
+    public static final String ONE_OF = "oneOf";
+    public static final String ITEMS = "items";
+    public static final String FORMAT = "format";
+    public static final String MAXIMUM = "maximum";
+    public static final String MINIMUM = "minimum";
+    public static final String MAX_LENGTH = "maxLength";
+    public static final String PATTERN = "pattern";
+    public static final String MAX_ITEMS = "maxItems";
+    public static final String PROPERTIES = "properties";
+    public static final String AUTHORIZATION_CODE = "authorizationCode";
+    public static final String PASSWORD = "password";
+    public static final String IMPLICIT = "implicit";
+    public static final String CLIENT_CREDENTIALS = "clientCredentials";
+}

@@ -88,7 +88,9 @@ public class CustomAuthTypeAction extends UserAction{
         int accountId = Context.accountId.get();
         executorService.schedule( new Runnable() {
             public void run() {
+                System.out.println("RUNNING");
                 Context.accountId.set(accountId);
+                System.out.println(accountId);
                 CustomAuthUtil.customAuthTypeUtil(SingleTypeInfo.activeCustomAuthTypes);
             }
         }, 5 , TimeUnit.SECONDS);

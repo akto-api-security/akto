@@ -107,6 +107,7 @@ public class UsersDao extends CommonContextDao<User> {
     }
 
 
+    // TODO: account id
     public BasicDBObject getUserInfo(int user_id) {
         User user = instance.getMCollection().find(eq("_id",user_id)).projection(
                 new BasicDBObject("_id",1)

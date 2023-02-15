@@ -6,6 +6,7 @@ import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.utils.DashboardMode;
+import com.akto.utils.Intercom;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import org.bson.internal.Base64;
@@ -54,6 +55,7 @@ public class ProfileAction extends UserAction {
         if (sessionAccId == 0) {
             throw new IllegalStateException("user has no accounts associated");
         } else {
+            System.out.println("setting session: " + sessionAccId);
             request.getSession().setAttribute("accountId", sessionAccId);
             Context.accountId.set(sessionAccId);
         }
@@ -65,6 +67,7 @@ public class ProfileAction extends UserAction {
                 .append("avatar", "dummy")
                 .append("activeAccount", sessionAccId)
                 .append("dashboardMode", DashboardMode.getDashboardMode())
+                .append("userHash", Intercom.getUserHash(user.getLogin()))
                 .append("users", UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get()));
 
         for (String k: userDetails.keySet()) {

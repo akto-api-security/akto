@@ -33,6 +33,7 @@ public class ApiCollectionsAction extends UserAction {
             } else {
                 apiCollection.setUrlsCount(apiCollection.getUrls().size());
             }
+            apiCollection.setUrls(new HashSet<>());
         }
 
         return Action.SUCCESS.toUpperCase();
@@ -97,7 +98,11 @@ public class ApiCollectionsAction extends UserAction {
         ApiCollectionsDao.instance.deleteAll(Filters.in("_id", apiCollectionIds));
         SingleTypeInfoDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
         APISpecDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
-        SensitiveParamInfoDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));                    
+        SensitiveParamInfoDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));      
+        // TODO : Markov and Relationship
+        // MarkovDao.instance.deleteAll()
+        // RelationshipDao.instance.deleteAll();
+              
 
         return SUCCESS.toUpperCase();
     }

@@ -2,8 +2,6 @@ package com.akto.listener;
 
 
 import com.akto.kafka.Kafka;
-import com.akto.utils.DashboardMode;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,7 +14,7 @@ public class KafkaListener implements ServletContextListener {
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
         String brokerIP = "kafka1:19092"; //System.getenv("AKTO_KAFKA_BROKER_URL");
-        if (brokerIP != null && !DashboardMode.isLocalDeployment()) {
+        if (brokerIP != null) {
             try {
                 kafka = new Kafka(brokerIP,  1000, BATCH_SIZE_CONFIG);
             } catch (Exception e) {

@@ -3,14 +3,12 @@ package com.akto.testing;
 import com.akto.DaoInit;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.TestingRunDao;
-import com.akto.dao.testing.TestingRunResultDao;
-import com.akto.dao.testing.TestingRunResultSummariesDao;
-import com.akto.dao.testing.WorkflowTestsDao;
+import com.akto.dao.testing.*;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.RawApi;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
-import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -19,9 +17,10 @@ import com.akto.rules.*;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.testing_issues.TestingIssuesHandler;
+import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
-import com.akto.util.enums.LoginFlowEnums;
 import com.akto.util.enums.GlobalEnums.TestSubCategory;
+import com.akto.util.enums.LoginFlowEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -31,7 +30,13 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 
 public class TestExecutor {
@@ -54,7 +59,14 @@ public class TestExecutor {
         Context.accountId.set(1_000_000);
 
         TestExecutor testExecutor = new TestExecutor();
-        TestingRun testingRun = TestingRunDao.instance.findOne(new BasicDBObject());
+        TestingRun testingRun = TestingRunDao.instance.findLatestOne(new BasicDBObject());
+        if (testingRun.getTestIdConfig() > 1) {
+            TestingRunConfig testingRunConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
+            if (testingRunConfig != null) {
+                loggerMaker.infoAndAddToDb("Found testing run config with id :" + testingRunConfig.getId());
+                testingRun.setTestingRunConfig(testingRunConfig);
+            }
+        }
         testExecutor.init(testingRun, new ObjectId());
     }
 
@@ -81,7 +93,7 @@ public class TestExecutor {
         try {
             apiWorkflowExecutor.init(workflowTest, testingRun.getId(), summaryId);
         } catch (Exception e) {
-            ;
+            e.printStackTrace();
         }
 
         Map<String, Integer> totalCountIssues = new HashMap<>();
@@ -125,7 +137,7 @@ public class TestExecutor {
 
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
-
+        logger.info("APIs: " + apiInfoKeyList.size());
         loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size());
 
         TestingRunResultSummariesDao.instance.updateOne(
@@ -135,7 +147,17 @@ public class TestExecutor {
         CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
         ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentRequests);
         List<Future<List<TestingRunResult>>> futureTestingRunResults = new ArrayList<>();
+        Map<String, Integer> hostsToApiCollectionMap = new HashMap<>();
+
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
+            try {
+                String host = findHost(apiInfoKey, testingUtil);
+                if (hostsToApiCollectionMap.get(host) == null) {
+                    hostsToApiCollectionMap.put(host, apiInfoKey.getApiCollectionId());
+                }
+            } catch (URISyntaxException e) {
+                e.printStackTrace();
+            }
             try {
                  Future<List<TestingRunResult>> future = threadPool.submit(
                          () -> startWithLatch(apiInfoKey,
@@ -148,6 +170,7 @@ public class TestExecutor {
             }
         }
 
+        logger.info("hostsToApiCollectionMap : " + hostsToApiCollectionMap.keySet());
         loggerMaker.infoAndAddToDb("Waiting...");
 
         try {
@@ -166,7 +189,18 @@ public class TestExecutor {
                     testingRunResults.addAll(future.get());
                 }
             } catch (InterruptedException | ExecutionException e) {
-                ;
+                e.printStackTrace();
+            }
+        }
+
+        for (String host: hostsToApiCollectionMap.keySet()) {
+            Integer apiCollectionId = hostsToApiCollectionMap.get(host);
+            List<TestingRunResult> nucleiResults = runNucleiTests(new ApiInfo.ApiInfoKey(apiCollectionId, host, URLMethods.Method.GET), testingRun, testingUtil, summaryId);
+            if (nucleiResults != null && !nucleiResults.isEmpty()) {
+                TestingRunResultDao.instance.insertMany(nucleiResults);
+                TestingIssuesHandler handler = new TestingIssuesHandler();
+                handler.handleIssuesCreationFromTestingRunResults(nucleiResults);
+                testingRunResults.addAll(nucleiResults);
             }
         }
 
@@ -176,10 +210,6 @@ public class TestExecutor {
             Filters.eq("_id", summaryId),
             Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, testingRunResults.size())
         );
-
-        //Creating issues from testingRunResults
-        TestingIssuesHandler handler = new TestingIssuesHandler();
-        handler.handleIssuesCreationFromTestingRunResults(testingRunResults);
 
         loggerMaker.infoAndAddToDb("Finished adding issues");
 
@@ -208,6 +238,25 @@ public class TestExecutor {
 
     }
 
+    public String findHost(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) throws URISyntaxException {
+        Map<ApiInfo.ApiInfoKey, List<String>> sampleMessagesMap =  testingUtil.getSampleMessages();
+        List<String> sampleMessages = sampleMessagesMap.get(apiInfoKey);
+        if (sampleMessages == null || sampleMessagesMap.isEmpty()) return null;
+
+        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
+        if (messages.isEmpty()) return null;
+
+        OriginalHttpRequest originalHttpRequest = messages.get(0).getRequest();
+
+        String baseUrl = originalHttpRequest.getUrl();
+        if (baseUrl.startsWith("http")) {
+            URI uri = new URI(baseUrl);
+            return uri.getScheme() + "://" + uri.getHost();
+        } else {
+            return "https://" + originalHttpRequest.findHostFromHeader();
+        }
+    }
+
     private LoginFlowResponse triggerLoginFlow(AuthMechanism authMechanism, int retries) {
         LoginFlowResponse loginFlowResponse = null;
         for (int i=0; i<retries; i++) {
@@ -223,6 +272,32 @@ public class TestExecutor {
             }
         }
         return loginFlowResponse;
+    }
+
+
+    public List<TestingRunResult> runNucleiTests(ApiInfo.ApiInfoKey apiInfoKey, TestingRun testingRun, TestingUtil testingUtil, ObjectId summaryId) {
+        List<TestingRunResult> testingRunResults = new ArrayList<>();
+        List<String> testSubCategories = testingRun.getTestingRunConfig().getTestSubCategoryList();
+        if (testSubCategories != null) {
+            for (String testSubCategory: testSubCategories) {
+                if (testSubCategory.startsWith("http://") || testSubCategory.startsWith("https://")) {
+                    try {
+                        String origTemplateURL = testSubCategory;
+                        origTemplateURL = origTemplateURL.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/");
+                        String subcategory = origTemplateURL.substring(origTemplateURL.lastIndexOf("/")+1).split("\\.")[0];
+
+                        FuzzingTest fuzzingTest = new FuzzingTest(testingRun.getId().toHexString(), summaryId.toHexString(), origTemplateURL, subcategory, testSubCategory);
+                        TestingRunResult fuzzResult = runTest(fuzzingTest, apiInfoKey, testingUtil, testingRun.getId(), summaryId);
+                        if (fuzzResult != null) testingRunResults.add(fuzzResult);        
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("unable to execute fuzzing for " + testSubCategory);
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+
+        return testingRunResults;
     }
 
     public LoginFlowResponse executeLoginFlow(AuthMechanism authMechanism, LoginFlowParams loginFlowParams) throws Exception {
@@ -334,11 +409,15 @@ public class TestExecutor {
 
 
         for (String param: flattened.keySet()) {
+            System.out.println(param);
+            System.out.println(flattened.get(param));
             respMap.put(param, flattened.get(param));
         }
 
         for (String headerName: headers.keySet()) {
             for (String val: headers.get(headerName)) {
+                System.out.println(headerName);
+                System.out.println(val);
                 respMap.put(headerName, val);
             }
         }
@@ -355,7 +434,12 @@ public class TestExecutor {
         if ( timeToKill <= 0 || now - startTime <= timeToKill) {
             try {
                 testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId);
-                TestingRunResultDao.instance.insertMany(testingRunResults);
+                if (testingRunResults != null && !testingRunResults.isEmpty()) {
+                    TestingRunResultDao.instance.insertMany(testingRunResults);
+                    //Creating issues from testingRunResults
+                    TestingIssuesHandler handler = new TestingIssuesHandler();
+                    handler.handleIssuesCreationFromTestingRunResults(testingRunResults);
+                }
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -447,26 +531,6 @@ public class TestExecutor {
         if (testSubCategories == null || testSubCategories.contains(TestSubCategory.CHANGE_METHOD.name())) {
             TestingRunResult changeHttpMethodTestResult = runTest(changeHttpMethodTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
             if (changeHttpMethodTestResult != null) testingRunResults.add(changeHttpMethodTestResult);
-        }
-
-        if (testSubCategories != null) {
-            for (String testSubCategory: testSubCategories) {
-                if (testSubCategory.startsWith("http://") || testSubCategory.startsWith("https://")) {
-                    try {
-                        String origTemplateURL = testSubCategory;
-
-                        origTemplateURL = origTemplateURL.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/");
-
-                        String subcategory = origTemplateURL.substring(origTemplateURL.lastIndexOf("/")+1).split("\\.")[0];
-                        FuzzingTest fuzzingTest = new FuzzingTest(testRunId.toHexString(), testRunResultSummaryId.toHexString(), origTemplateURL, subcategory, testSubCategory);
-                        TestingRunResult fuzzResult = runTest(fuzzingTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-                        if (fuzzResult != null) testingRunResults.add(fuzzResult);        
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb("unable to execute fuzzing for " + testSubCategory);
-                        ;
-                    }
-                }
-            }
         }
 
         return testingRunResults;

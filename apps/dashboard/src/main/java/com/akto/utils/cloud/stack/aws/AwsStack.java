@@ -61,10 +61,10 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
             }
             Future<CreateStackResult> future = CLOUD_FORMATION_ASYNC.createStackAsync(createRequest);
             CreateStackResult createStackResult = future.get();
-            logger.info("Stack Id: " + createStackResult.getStackId());
+            System.out.println("Stack Id: " + createStackResult.getStackId());
             return createStackResult.getStackId();
         } catch (Exception e) {
-            ;
+            e.printStackTrace();
             throw e;
         }
     }
@@ -91,7 +91,7 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
             String stackStatus = stack.getStackStatus();
 
             if (!ACCEPTABLE_STACK_STATUSES.contains(stackStatus)) {
-                logger.info("Actual stack status: " + stackStatus);
+                System.out.println("Actual stack status: " + stackStatus);
                 return new StackState(StackStatus.CREATION_FAILED.toString(), 0);
             }
             return new StackState(stackStatus, stack.getCreationTime().getTime());
@@ -99,8 +99,11 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
             if (e.getMessage().contains("does not exist")) {
                 return new StackState(StackStatus.DOES_NOT_EXISTS.toString(), 0);
             }
-            ;
-            return new StackState(StackStatus.FAILED_TO_FETCH_STACK_STATUS.toString(), 0); 
+            e.printStackTrace();
+            return new StackState(StackStatus.FAILED_TO_FETCH_STACK_STATUS.toString(), 0); // TODO: what should we
+                                                                                           // return when we fail to
+            // fetch
+            // stack's status.
         }
     }
 
@@ -114,7 +117,7 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
         try {
             DescribeStackResourcesResult res = CLOUD_FORMATION_SYNC.describeStackResources(req);
             List<StackResource> resources = res.getStackResources();
-
+            System.out.println(resources);
             return resources.get(0).getPhysicalResourceId();
         } catch (Exception e) {
             logger.error("Failed to fetch physical id of resource with logical id {}", logicalId, e);

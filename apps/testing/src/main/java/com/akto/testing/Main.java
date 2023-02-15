@@ -33,6 +33,22 @@ public class Main {
         DaoInit.init(new ConnectionString(mongoURI));
         Context.accountId.set(1_000_000);
 
+        boolean connectedToMongo = false;
+        do {
+            try {
+                AccountSettingsDao.instance.getStats();
+                connectedToMongo = true;
+            } catch (Exception e) {
+//                        e.printStackTrace();
+            } finally {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        } while (!connectedToMongo);
+
         int delta = Context.now() - 20*60;
 
         loggerMaker.infoAndAddToDb("Starting.......");
@@ -44,6 +60,12 @@ public class Main {
         if (runStatusCodeAnalyser) {
             StatusCodeAnalyser.run();
         }
+
+        System.out.println("*********************RESULT******************************************");
+        System.out.println(System.getProperty("sun.arch.data.model"));
+        System.out.println(System.getProperty("os.arch"));
+        System.out.println(System.getProperty("os.version"));
+        System.out.println("***************************************************************");
 
         TestExecutor testExecutor = new TestExecutor();
 
@@ -68,6 +90,7 @@ public class Main {
                     Filters.or(filter1,filter2), update);
 
 
+            // TODO: find a better solution than wait
             if (testingRun == null) {
                 try {
                     Thread.sleep(10 * 1000L);
@@ -94,7 +117,7 @@ public class Main {
             try {
                 testExecutor.init(testingRun, summaryId);
             } catch (Exception e) {
-                ;
+                e.printStackTrace();
             }
 
             Bson completedUpdate = Updates.combine(

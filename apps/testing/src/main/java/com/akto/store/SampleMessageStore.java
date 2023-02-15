@@ -62,7 +62,7 @@ public class SampleMessageStore {
                 singleTypeInfoMap.put(singleTypeInfo.composeKeyWithCustomSubType(SingleTypeInfo.GENERIC), singleTypeInfo);
             }
         } catch (Exception e) {
-            ;
+            e.printStackTrace();
         }
 
         return singleTypeInfoMap;
@@ -75,6 +75,7 @@ public class SampleMessageStore {
 
     public static Map<ApiInfo.ApiInfoKey, List<String>> fetchSampleMessages() {
         List<SampleData> sampleDataList = SampleDataDao.instance.findAll(new BasicDBObject(), 0, 10_000, null);
+        System.out.println("SampleDataSize " + sampleDataList.size());
         Map<ApiInfo.ApiInfoKey, List<String>> tempSampleDataMap = new HashMap<>();
         for (SampleData sampleData: sampleDataList) {
             if (sampleData.getSamples() == null) continue;
@@ -101,7 +102,9 @@ public class SampleMessageStore {
         for (String message: samples) {
             try {
                 messages.add(RawApi.buildFromMessage(message));
-            } catch(Exception ignored) { }
+            } catch(Exception e) {
+                e.printStackTrace();
+            }
 
         }
 

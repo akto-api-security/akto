@@ -57,12 +57,14 @@ public class UserDetailsFilter implements Filter {
         }
 
         if (!httpServletRequest.getRequestURI().contains(LOGIN_URI) && !httpServletRequest.getRequestURI().contains("/auth/login") && !httpServletRequest.getRequestURI().contains("api/googleConfig")) {
+            System.out.println("redirecting from " + httpServletRequest.getRequestURI() + " to login");
             httpServletResponse.sendRedirect(LOGIN_URI+"?redirect_uri="+httpServletRequest.getRequestURI());
             return;
         }
         filterChain.doFilter(httpServletRequest, httpServletResponse);
     }
 
+    //TODO: logout if user in access-token is not the same as the user in cookie
     @Override
     public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
         HttpServletRequest httpServletRequest= (HttpServletRequest) servletRequest;
@@ -104,7 +106,7 @@ public class UserDetailsFilter implements Filter {
             try {
                 accessToken = Token.generateAccessToken(apiToken.getUsername(),"true");
             } catch (Exception e) {
-                ;
+                e.printStackTrace();
                 httpServletResponse.sendError(403);
                 return;
             }
@@ -152,6 +154,7 @@ public class UserDetailsFilter implements Filter {
         HttpSession session = httpServletRequest.getSession(apiKeyFlag);
         // session will be non-null for external API Key requests and when session data has not been deleted
         if (session == null ) {
+            System.out.println("Session expired");
             Token tempToken = AccessTokenAction.generateAccessTokenFromServletRequest(httpServletRequest);
             // If we are able to extract token from Refresh Token then this means RT is valid and new session can be created
             if (tempToken== null) {
@@ -162,6 +165,7 @@ public class UserDetailsFilter implements Filter {
             session.setAttribute("username", username);
             session.setAttribute("login", Context.now());
             session.setAttribute("signedUp", signedUp);
+            System.out.println("New session created");
         }
 
         // only for access-token based auth we check if session is valid or not
@@ -199,6 +203,7 @@ public class UserDetailsFilter implements Filter {
         if ((httpServletRequest.getRequestURI().startsWith("/dashboard") || httpServletRequest.getRequestURI().startsWith("/api")) && isSignedUp) {
 
             // if no user details in the session, ask from DB
+            // TODO: if session info is too old, then also fetch from DB
             if (user == null || !username.equals(user.getLogin())) {
                 user = UsersDao.instance.findOne("login", username);
                 session.setAttribute("user", user);
@@ -216,7 +221,9 @@ public class UserDetailsFilter implements Filter {
                 if (accountId > 0) {
                     if(user.getAccounts().containsKey(accountIdStr)) {
                         Context.accountId.set(accountId);
+                        System.out.println("choosing account: " + accountIdStr);
                     } else {
+                        System.out.println("you don't have access to this account: " + accountIdStr + " " + user.getLogin());
                     }
                 }
             }

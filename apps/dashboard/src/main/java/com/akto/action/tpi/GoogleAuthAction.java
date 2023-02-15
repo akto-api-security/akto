@@ -85,7 +85,8 @@ public class GoogleAuthAction extends UserAction {
             this.code = userId;
 
         } catch (IOException e) {
-            ;
+            System.out.println(e.getMessage());
+            e.printStackTrace();
             return Action.ERROR.toUpperCase();
         }
 

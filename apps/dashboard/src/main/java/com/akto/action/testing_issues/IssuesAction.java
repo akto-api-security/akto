@@ -67,7 +67,7 @@ public class IssuesAction extends UserAction {
                 Sorts.descending(TestingRunIssues.CREATION_TIME));
         TestSubCategory subCategory = issueId.getTestSubCategory();
         TestCategory superCategory;
-        if (subCategory == null) {
+        if (subCategory.equals(GlobalEnums.TestSubCategory.CUSTOM_IAM)) {
             superCategory = TestSourceConfigsDao.instance.getTestSourceConfig(issueId.getTestCategoryFromSourceConfig()).getCategory();
         } else {
             superCategory = issueId.getTestSubCategory().getSuperCategory();
@@ -101,7 +101,7 @@ public class IssuesAction extends UserAction {
         issues = TestingRunIssuesDao.instance.findAll(filters, skip,limit, sort);
 
         for (TestingRunIssues runIssue : issues) {
-            if (runIssue.getId().getTestSubCategory() == null) {//TestSourceConfig case
+            if (runIssue.getId().getTestSubCategory().equals(GlobalEnums.TestSubCategory.CUSTOM_IAM)) {//TestSourceConfig case
                 TestSourceConfig config = TestSourceConfigsDao.instance.getTestSourceConfig(runIssue.getId().getTestCategoryFromSourceConfig());
                 runIssue.getId().setTestSourceConfig(config);
             }
@@ -114,7 +114,8 @@ public class IssuesAction extends UserAction {
         }
         TestingRunIssues issue = TestingRunIssuesDao.instance.findOne(Filters.eq(ID, issueId));
         String testSubType = null;
-        if (issue.getId().getTestSubCategory() == null) {
+        TestSubCategory subCategory = issue.getId().getTestSubCategory();
+        if (subCategory.equals(GlobalEnums.TestSubCategory.CUSTOM_IAM)) {
             testSubType = issue.getId().getTestCategoryFromSourceConfig();
         } else {
             testSubType = issue.getId().getTestSubCategory().getName();
@@ -144,6 +145,9 @@ public class IssuesAction extends UserAction {
             throw new IllegalStateException();
         }
 
+        System.out.println("Issue id from db to be updated " + issueId);
+        System.out.println("status id from db to be updated " + statusToBeUpdated);
+        System.out.println("status reason from db to be updated " + ignoreReason);
         Bson update = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated);
 
         if (statusToBeUpdated == TestRunIssueStatus.IGNORED) { //Changing status to ignored
@@ -163,6 +167,9 @@ public class IssuesAction extends UserAction {
             throw new IllegalStateException();
         }
 
+        System.out.println("Issue id from db to be updated " + issueIdArray);
+        System.out.println("status id from db to be updated " + statusToBeUpdated);
+        System.out.println("status reason from db to be updated " + ignoreReason);
         Bson update = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated);
 
         if (statusToBeUpdated == TestRunIssueStatus.IGNORED) { //Changing status to ignored

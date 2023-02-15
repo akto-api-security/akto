@@ -20,6 +20,10 @@
         <action name="metrics" class="com.akto.action.InfraMetricsAction">
         </action>
 
+        <action name="mongo-error" class="com.akto.action.HomeAction" method="error">
+            <result name="SUCCESS">/pages/mongo-error.jsp</result>
+        </action>
+
         <action name="api/inventory/*/openapi" class="com.akto.action.OpenApiAction" method="burpSwagger">
             <param name="apiCollectionId">{1}</param>
         </action>
@@ -208,6 +212,72 @@
         </action>
         
 
+        <action name="api/loadContent" class="com.akto.action.AuditAction" method="loadContent">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">auditResult</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/saveContent" class="com.akto.action.AuditAction" method="saveContent">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">auditResult</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/saveContentAndFetchAuditResults" class="com.akto.action.AuditAction" method="saveContentAndFetchAuditResults">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">auditResult</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/fetchAuditResults" class="com.akto.action.AuditAction" method="fetchAuditResults">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">auditResult</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/saveTestConfig" class="com.akto.action.AuditAction" method="saveTestConfig">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">testConfigId</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/fetchTestResults" class="com.akto.action.AuditAction" method="fetchTestResults">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">testConfigId</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
         <action name="api/getAPICatalog" class="com.akto.action.APICatalogAction" method="getAPICatalog">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -288,6 +358,17 @@
             </result>
         </action>
 
+        <action name="api/fetchSensitiveParamsForEndpoints" class="com.akto.action.observe.InventoryAction" method="fetchSensitiveParamsForEndpoints">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
 
         <action name="api/fetchAllUrlsAndMethods" class="com.akto.action.observe.InventoryAction" method="fetchAllUrlsAndMethods">
             <interceptor-ref name="json"/>
@@ -354,6 +435,18 @@
             </result>
             <result name="ERROR" type="httpheader">
                 <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/inviteUsers" class="com.akto.action.InviteUserAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
 
@@ -1513,6 +1606,18 @@
         </action>
 
         <action name="api/fetchUserLastLoginTs" class="com.akto.action.user.UserInfoAction" method="fetchUserLastLoginTs">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchSubTypeCountMap" class="com.akto.action.observe.InventoryAction" method="fetchSubTypeCountMap">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json">

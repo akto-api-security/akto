@@ -17,6 +17,7 @@
     <modules>
         <module>dao</module>
         <module>utils</module>
+        <module>oas-security</module>
         <module>integrations</module>
     </modules>
 </project>

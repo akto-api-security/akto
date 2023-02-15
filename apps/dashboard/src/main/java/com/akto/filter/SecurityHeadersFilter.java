@@ -1,15 +1,13 @@
 package com.akto.filter;
 
 import javax.servlet.*;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-import com.akto.utils.HttpUtils;
-
 import java.io.IOException;
-
+import java.util.Objects;
 
 public class SecurityHeadersFilter implements Filter {
-
+    private static final String https = System.getenv("AKTO_HTTPS_FLAG");
     @Override
     public void init(FilterConfig filterConfig) throws ServletException {
     }
@@ -23,7 +21,7 @@ public class SecurityHeadersFilter implements Filter {
         httpServletResponse.addHeader("X-Content-Type-Options", "nosniff");
         httpServletResponse.addHeader("cache-control", "no-cache, no-store, must-revalidate, pre-check=0, post-check=0");
 
-        if (HttpUtils.isHttpsEnabled()) {
+        if (Objects.equals(https, "true")) {
             httpServletResponse.addHeader("strict-transport-security","max-age=31536000; includeSubDomains; preload");
         }
 

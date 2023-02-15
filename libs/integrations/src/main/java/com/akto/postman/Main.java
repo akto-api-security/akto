@@ -17,6 +17,17 @@ public class Main {
         this.apiKey = apiKey;
     }
 
+    public static void main(String[] args) {
+        Main main = new Main("PMAK-61dda7b35e30ce28fc2a131e-ccf78be950e3026bec27313d4472b7259b");
+//        main.fetchWorkspaces();
+        String workspaceId = "d0510f32-2e14-4f87-8024-b85bd85de3f1";
+        String collectionId = "223645de-9ede-4f12-93c4-1dcf80487ee6";
+
+//        main.createApiWithSchema(workspaceId,"Test", );
+//        String apiId = main.createApi(workspaceId,"sixth API");
+//        System.out.println(apiId);
+    }
+
     public void getPostmanCollection(String collectionId) {
         String url = "https://api.getpostman.com/collections/" + "";
         JsonNode jsonNode = ApiRequest.getRequest(generateHeadersWithAuth(), url);
@@ -72,7 +83,7 @@ public class Main {
     }
 
     public String createVersion(String versionName, String apiId) {
-        String url = BASE_URL +  "apis/" + apiId + "/versions";
+        String url = BASE_URL +  "apis/" + apiId + "/versions"; // TODO: created by me
 
         JSONObject child = new JSONObject();
         child.put("name", versionName);
@@ -111,9 +122,9 @@ public class Main {
 
     public void createApiWithSchema(String workspaceId, String apiName, Map<String, String> openApiSchemaMap) {
         // Get akto_<collectionName> API
-        String url = BASE_URL +  "apis?name=" + apiName + "&" + "workspace=" + workspaceId;
+        String url = BASE_URL +  "apis?name=" + apiName + "&" + "workspace=" + workspaceId; // TODO: created by me
         JsonNode jsonNode = ApiRequest.getRequest(generateHeadersWithAuth(), url);
-        JsonNode apisNode = jsonNode.get("apis");
+        JsonNode apisNode = jsonNode.get("apis"); // TODO:
         String apiId;
 
         if (apisNode.elements().hasNext()) {

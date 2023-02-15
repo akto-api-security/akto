@@ -66,7 +66,7 @@ public class Lambda implements ServerlessFunction {
 
             if (keysUpdatedCount == 0) {
                 // no env vars to update, returning
-                logger.info("No env vars to update for funciton: " + functionName + ", returning");
+                System.out.println("No env vars to update for funciton: " + functionName + ", returning");
                 return;
             }
 
@@ -77,9 +77,9 @@ public class Lambda implements ServerlessFunction {
             req.setEnvironment(updatedEnvironment);
 
             awsLambda.updateFunctionConfiguration(req);
-            logger.info("Succeefully updated function configuration for function: " + functionName);
+            System.out.println("Succeefully updated function configuration for function: " + functionName);
         } catch (Exception e) {
-            ;
+            e.printStackTrace();
         }
     }
 
@@ -99,7 +99,7 @@ public class Lambda implements ServerlessFunction {
         InvokeResult invokeResult = null;
         try {
 
-            logger.info("Invoke lambda "+functionName);
+            System.out.println("Invoke lambda "+functionName);
             invokeResult = awsLambda.invoke(invokeRequest);
 
             String resp = new String(invokeResult.getPayload().array(), StandardCharsets.UTF_8);

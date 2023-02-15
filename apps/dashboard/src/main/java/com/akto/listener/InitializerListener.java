@@ -11,6 +11,7 @@ import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dao.pii.PIISourceDao;
 import com.akto.dao.testing.*;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.*;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
@@ -24,6 +25,7 @@ import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.notifications.email.WeeklyEmail;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
 import com.akto.testing.ApiExecutor;
@@ -31,7 +33,6 @@ import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
-import com.akto.utils.HttpUtils;
 import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -67,6 +68,9 @@ import static com.mongodb.client.model.Filters.eq;
 public class InitializerListener implements ServletContextListener {
     private static final Logger logger = LoggerFactory.getLogger(InitializerListener.class);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
+    public static boolean connectedToMongo = false;
 
     private static String domain = null;
 
@@ -82,7 +86,51 @@ public class InitializerListener implements ServletContextListener {
         return domain;
     }
 
-    public void setUpPiiAndTestSourcesScheduler(){
+    private void setUpWeeklyScheduler() {
+
+        Map<Integer, Integer> dayToDelay = new HashMap<Integer, Integer>();
+        dayToDelay.put(Calendar.FRIDAY, 5);
+        dayToDelay.put(Calendar.SATURDAY, 4);
+        dayToDelay.put(Calendar.SUNDAY, 3);
+        dayToDelay.put(Calendar.MONDAY, 2);
+        dayToDelay.put(Calendar.TUESDAY, 1);
+        dayToDelay.put(Calendar.WEDNESDAY, 0);
+        dayToDelay.put(Calendar.THURSDAY, 6);
+        Calendar with = Calendar.getInstance();
+        Date aDate = new Date();
+        with.setTime(aDate);
+        int dayOfWeek = with.get(Calendar.DAY_OF_WEEK);
+        int delayInDays = dayToDelay.get(dayOfWeek);
+
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                try {
+                    ChangesInfo changesInfo = getChangesInfo(31, 7);
+                    if (changesInfo == null || (changesInfo.newEndpointsLast7Days.size() + changesInfo.newSensitiveParams.size()) == 0) {
+                        return;
+                    }
+                    String sendTo = UsersDao.instance.findOne(new BasicDBObject()).getLogin();
+                    logger.info("Sending weekly email");
+                    Mail mail = WeeklyEmail.buildWeeklyEmail(
+                            changesInfo.recentSentiiveParams,
+                            changesInfo.newEndpointsLast7Days.size(),
+                            changesInfo.newEndpointsLast31Days.size(),
+                            sendTo,
+                            changesInfo.newEndpointsLast7Days,
+                            changesInfo.newSensitiveParams.keySet()
+                    );
+
+                    WeeklyEmail.send(mail);
+
+                } catch (Exception ex) {
+                    ex.printStackTrace(); // or loggger would be better
+                }
+            }
+        }, delayInDays, 7, TimeUnit.DAYS);
+
+    }
+
+    public void setUpPiiAndTestSourcesScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 String mongoURI = System.getenv("AKTO_MONGO_CONN");
@@ -166,6 +214,7 @@ public class InitializerListener implements ServletContextListener {
 
 
         } catch (IOException e1) {
+            e1.printStackTrace();
         }
 
 
@@ -265,9 +314,10 @@ public class InitializerListener implements ServletContextListener {
                     }
 
                     Slack slack = Slack.getInstance();
-        
-                    for(SlackWebhook slackWebhook: listWebhooks) {
-                        int now =Context.now();
+
+                    for (SlackWebhook slackWebhook : listWebhooks) {
+                        int now = Context.now();
+                        // System.out.println("debugSlack: " + slackWebhook.getLastSentTimestamp() + " " + slackWebhook.getFrequencyInSeconds() + " " +now );
 
                         if (slackWebhook.getFrequencyInSeconds() == 0) {
                             slackWebhook.setFrequencyInSeconds(24 * 60 * 60);
@@ -279,7 +329,7 @@ public class InitializerListener implements ServletContextListener {
                             continue;
                         }
 
-                        logger.info(slackWebhook.toString());
+                        System.out.println(slackWebhook);
 
                         ChangesInfo ci = getChangesInfo(now - slackWebhook.getLastSentTimestamp(), now - slackWebhook.getLastSentTimestamp());
                         if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0) {
@@ -296,24 +346,27 @@ public class InitializerListener implements ServletContextListener {
                         slackWebhook.setLastSentTimestamp(now);
                         SlackWebhooksDao.instance.updateOne(eq("webhook", slackWebhook.getWebhook()), Updates.set("lastSentTimestamp", now));
 
-                        logger.info("******************DAILY INVENTORY SLACK******************");
+                        System.out.println("******************DAILY INVENTORY SLACK******************");
                         String webhookUrl = slackWebhook.getWebhook();
                         String payload = dailyUpdate.toJSON();
-                        logger.info(payload);
+                        System.out.println(payload);
                         WebhookResponse response = slack.send(webhookUrl, payload);
-                        logger.info("*********************************************************");
+                        System.out.println(response);
+                        System.out.println("*********************************************************");
 
                         // slack testing notification
-                        logger.info("******************TESTING SUMMARY SLACK******************");
+                        System.out.println("******************TESTING SUMMARY SLACK******************");
                         TestSummaryGenerator testSummaryGenerator = new TestSummaryGenerator(1_000_000);
                         payload = testSummaryGenerator.toJson(slackWebhook.getDashboardUrl());
-                        logger.info(payload);
+                        System.out.println(payload);
                         response = slack.send(webhookUrl, payload);
-                        logger.info("*********************************************************");
+                        System.out.println(response);
+                        System.out.println("*********************************************************");
 
                     }
 
                 } catch (Exception ex) {
+                    ex.printStackTrace(); // or loggger would be better
                 }
             }
         }, 0, 5, TimeUnit.MINUTES);
@@ -364,9 +417,9 @@ public class InitializerListener implements ServletContextListener {
         OriginalHttpResponse response = null; // null response means api request failed. Do not use new OriginalHttpResponse() in such cases else the string parsing fails.
 
         try {
-            response = ApiExecutor.sendRequest(request,true);
-            logger.info("webhook request sent");
-        } catch(Exception e){
+            response = ApiExecutor.sendRequest(request, true);
+            System.out.println("webhook request sent");
+        } catch (Exception e) {
             errors.add("API execution failed");
         }
 
@@ -393,6 +446,7 @@ public class InitializerListener implements ServletContextListener {
             }
 
         } catch (Exception ex) {
+            ex.printStackTrace();
         }
     }
 
@@ -610,6 +664,22 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
+    public void deleteNullSubCategoryIssues(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getDeleteNullSubCategoryIssues() == 0) {
+            TestingRunIssuesDao.instance.deleteAll(
+                    Filters.or(
+                            Filters.exists("_id.testSubCategory", false),
+                            Filters.eq("_id.testSubCategory", null)
+                    )
+            );
+        }
+
+        BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.DELETE_NULL_SUB_CATEGORY_ISSUES, Context.now())
+        );
+    }
+
     public void readyForNewTestingFramework(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getReadyForNewTestingFramework() == 0) {
             TestingRunDao.instance.getMCollection().drop();
@@ -649,18 +719,46 @@ public class InitializerListener implements ServletContextListener {
 
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
-        sce.getServletContext().getSessionCookieConfig().setSecure(HttpUtils.isHttpsEnabled());
+        String https = System.getenv("AKTO_HTTPS_FLAG");
+        boolean httpsFlag = Objects.equals(https, "true");
+        sce.getServletContext().getSessionCookieConfig().setSecure(httpsFlag);
 
-        logger.info("context initialized");
+        System.out.println("context initialized");
 
         // String mongoURI = "mongodb://write_ops:write_ops@cluster0-shard-00-00.yg43a.mongodb.net:27017,cluster0-shard-00-01.yg43a.mongodb.net:27017,cluster0-shard-00-02.yg43a.mongodb.net:27017/myFirstDatabase?ssl=true&replicaSet=atlas-qd3mle-shard-0&authSource=admin&retryWrites=true&w=majority";
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
-        logger.info("MONGO URI " + mongoURI);
+        System.out.println("MONGO URI " + mongoURI);
 
 
-        DaoInit.init(new ConnectionString(mongoURI));
+        executorService.schedule( new Runnable() {
+            public void run() {
+                boolean calledOnce = false;
+                do {
+                    try {
+                        if (!calledOnce) {
+                            DaoInit.init(new ConnectionString(mongoURI));
+                            Context.accountId.set(1_000_000);
+                            calledOnce = true;
+                        }
+                        AccountSettingsDao.instance.getStats();
+                        connectedToMongo = true;
+                        runInitializerFunctions();
+                    } catch (Exception e) {
+//                        e.printStackTrace();
+                    } finally {
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                } while (!connectedToMongo);
+            }
+        }, 0 , TimeUnit.SECONDS);
 
-        Context.accountId.set(1_000_000);
+    }
+
+    public void runInitializerFunctions() {
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
         TestRolesDao.instance.createIndicesIfAbsent();
 
@@ -681,6 +779,7 @@ public class InitializerListener implements ServletContextListener {
             updateDeploymentStatus(backwardCompatibility);
             dropAuthMechanismData(backwardCompatibility);
             deleteAccessListFromApiToken(backwardCompatibility);
+            deleteNullSubCategoryIssues(backwardCompatibility);
 
             SingleTypeInfo.init();
 
@@ -694,6 +793,7 @@ public class InitializerListener implements ServletContextListener {
                 PIISourceDao.instance.insertOne(piiSource);
             }
 
+            setUpWeeklyScheduler();
             setUpDailyScheduler();
             setUpWebhookScheduler();
             setUpPiiAndTestSourcesScheduler();

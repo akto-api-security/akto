@@ -9,6 +9,7 @@ abstract public class PeriodicTask {
     int freqInHours;
 
     public void start(int freqInHours) {
+        System.out.println("starting task " + this.getClass().getName());
         ScheduledExecutorService ses = Executors.newSingleThreadScheduledExecutor();
         ses.scheduleAtFixedRate(new Runnable() {
             @Override

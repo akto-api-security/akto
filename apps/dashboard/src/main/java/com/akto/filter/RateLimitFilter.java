@@ -28,7 +28,7 @@ public class RateLimitFilter implements Filter {
             try {
                 cache.deleteOldData();
             } catch (Exception e) {
-                ;
+                e.printStackTrace();
                 val.clear();
             }
         }

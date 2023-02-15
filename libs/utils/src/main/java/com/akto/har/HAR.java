@@ -59,42 +59,16 @@ public class HAR {
 
         String requestContentType = getContentType(requestHarHeaders);
 
-        String requestPayload;
-        if (requestContentType == null) {
-            // get request data from querystring
-            Map<String,Object> paramMap = new HashMap<>();
-            requestPayload = mapper.writeValueAsString(paramMap);
-        } else if (requestContentType.contains(JSON_CONTENT_TYPE)) {
-            String postData = request.getPostData().getText();
-            if (postData == null) {
-                postData = "{}";
-            }
+        String requestPayload = request.getPostData().getText();
+        if (requestPayload == null) requestPayload = "";
 
-            if (postData.startsWith("[")) {
-                requestPayload = postData;
-            } else {
-                Map<String,Object> paramMap = mapper.readValue(postData, new TypeReference<HashMap<String,Object>>() {});
-                requestPayload = mapper.writeValueAsString(paramMap);
-            }
-        } else if (requestContentType.contains(FORM_URL_ENCODED_CONTENT_TYPE)) {
-            String postText = request.getPostData().getText();
-            if (postText == null) {
-                postText = "";
-            }
-
-            requestPayload = postText;
-        } else {
-            return null;
-        }
-
-
-        String akto_account_id = 1_000_000 + "";
+        String akto_account_id = 1_000_000 + ""; // TODO:
         String path = getPath(request);
         String requestHeaders = mapper.writeValueAsString(requestHeaderMap);
         String responseHeaders = mapper.writeValueAsString(responseHeaderMap);
         String method = request.getMethod().toString();
         String responsePayload = response.getContent().getText();;
-        String ip = "null"; 
+        String ip = "null"; // TODO:
         String time = (int) (dateTime.getTime() / 1000) + "";
         String statusCode = response.getStatus() + "";
         String type = request.getHttpVersion();
@@ -150,6 +124,7 @@ public class HAR {
      }
 
     public static void addQueryStringToMap(List<HarQueryParam> params, Map<String,Object> paramsMap) {
+        // TODO: which will take preference querystring or post value
         for (HarQueryParam param: params) {
             paramsMap.put(param.getName(), param.getValue());
         }

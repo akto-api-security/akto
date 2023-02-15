@@ -164,8 +164,9 @@ public class QuickStartAction extends UserAction {
                         .getResourceAsStream("/cloud_formation_templates/akto_aws_mirroring.template"));
                 List<Tag> tags = Utils.fetchTags(DashboardStackDetails.getStackName());
                 String stackId = AwsStack.getInstance().createStack(MirroringStackDetails.getStackName(), parameters, template, tags);
+                System.out.println("Started creation of stack with id: " + stackId);
             } catch (Exception e) {
-                ;
+                e.printStackTrace();
             }
 
         } else {
@@ -179,9 +180,10 @@ public class QuickStartAction extends UserAction {
                 String functionName = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.CREATE_MIRROR_SESSION_LAMBDA);
                 UpdateFunctionRequest ufr = new UpdateFunctionRequest(updatedEnvVars);
                 Lambda.getInstance().updateFunctionConfiguration(functionName, ufr);
+                System.out.println("Successfully updated env var for lambda");
                 // invoke lambda
             } catch (Exception e) {
-                ;
+                e.printStackTrace();
             }
         }
         this.stackState = AwsStack.getInstance().fetchStackStatus(MirroringStackDetails.getStackName());
