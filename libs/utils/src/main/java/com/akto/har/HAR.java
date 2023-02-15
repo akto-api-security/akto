@@ -1,16 +1,16 @@
 package com.akto.har;
 
 import com.akto.graphql.GraphQLUtils;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.gson.Gson;
 import de.sstoehr.harreader.HarReader;
 import de.sstoehr.harreader.HarReaderException;
 import de.sstoehr.harreader.HarReaderMode;
 import de.sstoehr.harreader.model.*;
-import graphql.language.*;
-import graphql.parser.Parser;
-import graphql.validation.DocumentVisitor;
-import graphql.validation.LanguageTraversal;
+import graphql.language.Field;
+import graphql.language.OperationDefinition;
+import graphql.language.Selection;
+import graphql.language.SelectionSet;
 import org.mortbay.util.ajax.JSON;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +23,6 @@ public class HAR {
     private static final Logger logger = LoggerFactory.getLogger(Har.class);
     public static final String JSON_CONTENT_TYPE = "application/json";
     public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
-
     public List<String> getMessages(String harString, int collection_id) throws HarReaderException {
         HarReader harReader = new HarReader();
         Har har = harReader.readFromString(harString, HarReaderMode.LAX);
@@ -81,7 +80,35 @@ public class HAR {
         Map<String,String> requestHeaderMap = convertHarHeadersToMap(requestHarHeaders);
         Map<String,String> responseHeaderMap = convertHarHeadersToMap(responseHarHeaders);
 
-        String requestPayload = request.getPostData().getText();
+        String requestContentType = getContentType(requestHarHeaders);
+
+        String requestPayload;
+        if (requestContentType == null) {
+            // get request data from querystring
+            Map<String,Object> paramMap = new HashMap<>();
+            requestPayload = mapper.writeValueAsString(paramMap);
+        } else if (requestContentType.contains(JSON_CONTENT_TYPE)) {
+            String postData = request.getPostData().getText();
+            if (postData == null) {
+                postData = "{}";
+            }
+
+            if (postData.startsWith("[")) {
+                requestPayload = postData;
+            } else {
+                Map<String,Object> paramMap = mapper.readValue(postData, new TypeReference<HashMap<String,Object>>() {});
+                requestPayload = mapper.writeValueAsString(paramMap);
+            }
+        } else if (requestContentType.contains(FORM_URL_ENCODED_CONTENT_TYPE)) {
+            String postText = request.getPostData().getText();
+            if (postText == null) {
+                postText = "";
+            }
+
+            requestPayload = postText;
+        } else {
+            return null;
+        }
 
         if (requestPayload == null) requestPayload = "";
 
@@ -92,15 +119,19 @@ public class HAR {
         }
 
         if (field != null) {
-            Map<String, Object> map = GraphQLUtils.getUtils().fieldTraversal(field);
-            Object obj = JSON.parse(requestPayload);
-            if (obj instanceof Map) {
-                Map tempMap = (Map) obj;
-                for (String key : map.keySet()) {
-                    tempMap.put(key.substring(1), map.get(key));
+            try {
+                Map<String, Object> map = GraphQLUtils.getUtils().fieldTraversal(field);
+                Object obj = JSON.parse(requestPayload);
+                if (obj instanceof Map) {
+                    Map tempMap = (Map) obj;
+                    for (String key : map.keySet()) {
+                        tempMap.put(key.substring(1), map.get(key));
+                    }
+                    tempMap.remove("query");
+                    requestPayload = JSON.toString(obj);
                 }
-                tempMap.remove("query");
-                requestPayload = JSON.toString(obj);
+            } catch (Exception e) {
+                //eat exception, No changes to request payload, parse Exception
             }
         }
 
