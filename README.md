@@ -75,7 +75,11 @@ OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), 
 2. `cd ~/akto_code/community-edition`
 3. `cd apps/testing`
 4. `export AKTO_MONGO_CONN="mongodb://localhost:27017"`
-5. `mvn compile; mvn exec:java -Dexec.mainClass="com.akto.testing.Main"`
+5. [OPTIONAL] To setup nuclei testing: Compile the nuclei executable from https://github.com/akto-api-security/nuclei-wrapper. Once executable is built add the path of executable to env variable "NUCLEI_EXECUTABLE_PATH".
+6. `mvn compile; mvn exec:java -Dexec.mainClass="com.akto.testing.Main"`
+
+
+
 
 #### Play around
 
