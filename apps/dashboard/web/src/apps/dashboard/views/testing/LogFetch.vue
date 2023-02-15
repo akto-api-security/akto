@@ -7,9 +7,14 @@
             <div class="log-content">
                 <div v-for="(line, index) in modifiedTestingLogs" :key="index">{{line}}</div>
             </div>
+
+            <div style="font-weight: bold; font-size: 14px;">
+                Logs Fetched Between {{logsFetchBetween}}
+            </div>
             <v-btn primary plain color="#6200EA" @click='fetchNextLogs' >
                 Next
             </v-btn>
+
         </div>  
     </div>
 </template>
@@ -76,7 +81,11 @@ export default {
 
     
     computed: {
-
+        logsFetchBetween() {
+            var d1 = func.epochToDateTime(Math.floor(this.logFetchStartTime/1000))
+            var d2 = func.epochToDateTime(Math.floor((this.logFetchStartTime + this.fiveMins)/1000))
+            return " " + d1 + " - " + d2
+        }
     }
 }
 </script>
