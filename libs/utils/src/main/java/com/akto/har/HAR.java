@@ -99,6 +99,7 @@ public class HAR {
                 for (String key : map.keySet()) {
                     tempMap.put(key.substring(1), map.get(key));
                 }
+                tempMap.remove("query");
                 requestPayload = JSON.toString(obj);
             }
         }
