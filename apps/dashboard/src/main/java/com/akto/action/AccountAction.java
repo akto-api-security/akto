@@ -99,7 +99,7 @@ public class AccountAction extends UserAction {
         String autoScalingGroup = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(stack, asg);
         refreshRequest.setAutoScalingGroupName(autoScalingGroup);
         StartInstanceRefreshResult result = asc.startInstanceRefresh(refreshRequest);
-        logger.info("instance refresh called on %s with result %s", asg, result.toString());
+        logger.info(String.format("instance refresh called on %s with result %s", asg, result.toString()));
     }
 
     public void lambdaInstanceRefresh(){
