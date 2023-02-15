@@ -313,6 +313,15 @@ public class TestDump2 {
     }
 
     @Test
+<<<<<<< HEAD
+=======
+    public void testURLInvalidMatch() {
+        String url = "htt://amazonpay.amazon.in/ap/signin?openid.return_to=https%3A%2F%2Famazonpay.amazon.in%2Fv1%2Finitiate-payment%3FredirectUrl%3D";
+        assertFalse(KeyTypes.patternToSubType.get(SingleTypeInfo.URL).matcher(url).matches());
+    }
+
+    @Test
+>>>>>>> pub-repo/master
     public void test2() {
         String[] urlTokens = APICatalogSync.tokenize("https://qapi.mpl.live:443/{param_STRING}/pending-invites");
         urlTokens[3] = null;

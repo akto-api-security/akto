@@ -64,8 +64,16 @@ public class NucleiExecutor {
             nucleiFileSuffix = "m1";
         }
 
+<<<<<<< HEAD
         List<String> baseCmdTokens = new ArrayList<>();
         baseCmdTokens.add("/app/nuclei_"+nucleiFileSuffix);
+=======
+        String nucleiExecutablePath = System.getenv("NUCLEI_EXECUTABLE_PATH");
+        String nuclei = nucleiExecutablePath == null ? "/app/nuclei_"+nucleiFileSuffix : nucleiExecutablePath;
+
+        List<String> baseCmdTokens = new ArrayList<>();
+        baseCmdTokens.add(nuclei);
+>>>>>>> pub-repo/master
 
         baseCmdTokens.add("-u");
         baseCmdTokens.add(fullUrl);
