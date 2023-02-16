@@ -12,7 +12,7 @@ import java.io.IOException;
 import java.util.*;
 
 public class ApiExecutor {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
     public static OriginalHttpResponse common(Request request, boolean followRedirects) throws Exception {
 
         OkHttpClient client = HTTPClientHandler.instance.getHTTPClient(followRedirects);
