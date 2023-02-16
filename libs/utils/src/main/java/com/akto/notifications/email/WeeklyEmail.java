@@ -64,7 +64,7 @@ public class WeeklyEmail{
 
 
   public static void send(final Mail mail) throws IOException {
-    final SendGrid sg = new SendGrid("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");
+    final SendGrid sg = new SendGrid("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");
     final Request request = new Request();
     request.setMethod(Method.POST);
     request.setEndpoint("mail/send");
