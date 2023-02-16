@@ -184,5 +184,15 @@ export default {
         }).then((resp) => {
             return resp
         })
+    },
+
+    fetchTestingLogs(logFetchStartTime, logFetchEndTime) {
+        return request({
+            url: '/api/fetchTestingLogs',
+            method: 'post',
+            data: {logFetchStartTime, logFetchEndTime}
+        }).then((resp) => {
+            return resp
+        })
     }
 }
