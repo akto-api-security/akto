@@ -1,32 +1,27 @@
 package com.akto.action;
 
-import com.akto.DaoInit;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.BurpPluginInfoDao;
-import com.akto.dao.RuntimeFilterDao;
-import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
-import com.akto.har.HAR;
-import com.akto.listener.KafkaListener;
-import com.akto.parsers.HttpCallParser;
-import com.akto.runtime.APICatalogSync;
-import com.akto.runtime.policies.AktoPolicy;
-import com.akto.dto.HttpResponseParams;
 import com.akto.dto.ApiToken.Utility;
-import com.akto.dto.type.SingleTypeInfo;
-import com.akto.utils.DashboardMode;
+import com.akto.har.HAR;
 import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
-import com.sun.jna.*;
-
+import com.sun.jna.Library;
+import com.sun.jna.Native;
+import com.sun.jna.Structure;
 import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.UUID;
 
 public class HarAction extends UserAction {
     private String harString;
@@ -37,6 +32,7 @@ public class HarAction extends UserAction {
 
     private boolean skipKafka = DashboardMode.isLocalDeployment();
     private byte[] tcpContent;
+    private static final Logger logger = LoggerFactory.getLogger(HarAction.class);
 
     @Override
     public String execute() throws IOException {
@@ -98,11 +94,13 @@ public class HarAction extends UserAction {
 
         try {
             HAR har = new HAR();
+            logger.info("Har file upload processing for collectionId : {}", apiCollectionId);
             List<String> messages = har.getMessages(harString, apiCollectionId);
             harErrors = har.getErrors();
             Utils.pushDataToKafka(apiCollectionId, topic, messages, harErrors, skipKafka);
         } catch (Exception e) {
-            ;
+            logger.error("Exception while parsing harString");
+            e.printStackTrace();
             return SUCCESS.toUpperCase();
         }
         return SUCCESS.toUpperCase();
