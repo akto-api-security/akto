@@ -5,6 +5,7 @@ import com.akto.dao.BurpPluginInfoDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.har.HAR;
+import com.akto.utils.DashboardMode;
 import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
