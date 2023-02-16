@@ -218,19 +218,19 @@ public class TestTestPlugin extends MongoBasedTest {
 
     @Test
     public void testDecrementUrlVersion() {
-        String result = TestPlugin.decrementUrlVersion("/api/v2/books/v3n0m/", 1, 1);
+        String result = new OldApiVersionTest().decrementUrlVersion("/api/v2/books/v3n0m/", 1, 1);
         assertEquals("/api/v1/books/v3n0m/", result);
 
-        result = TestPlugin.decrementUrlVersion("/api/v22/books/v3/cars", 2, 1);
+        result = new OldApiVersionTest().decrementUrlVersion("/api/v22/books/v3/cars", 2, 1);
         assertEquals("/api/v20/books/v1/cars", result);
 
-        result = TestPlugin.decrementUrlVersion("/api/v22/books/", 2, 1);
+        result = new OldApiVersionTest().decrementUrlVersion("/api/v22/books/", 2, 1);
         assertEquals("/api/v20/books/", result);
 
-        result = TestPlugin.decrementUrlVersion("/api/v22/books", -1, 1);
+        result = new OldApiVersionTest().decrementUrlVersion("/api/v22/books", -1, 1);
         assertEquals("/api/v23/books", result);
 
-        result = TestPlugin.decrementUrlVersion("/api/v1/books", 1, 1);
+        result = new OldApiVersionTest().decrementUrlVersion("/api/v1/books", 1, 1);
         assertNull(result);
 
     }

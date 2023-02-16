@@ -34,6 +34,7 @@ public abstract class ModifyAuthTokenTestPlugin extends AuthRequiredTestPlugin {
             try {
                 apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApi);
             } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error while after executing " + subTestName() +" test : " + e);
                 return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest, null);
             }
 
