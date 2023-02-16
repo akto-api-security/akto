@@ -38,8 +38,7 @@ public class Main {
             try {
                 AccountSettingsDao.instance.getStats();
                 connectedToMongo = true;
-            } catch (Exception e) {
-//                        e.printStackTrace();
+            } catch (Exception ignored) {
             } finally {
                 try {
                     Thread.sleep(1000);
@@ -58,14 +57,16 @@ public class Main {
                 accountSettings.getSetupType() != AccountSettings.SetupType.PROD;
 
         if (runStatusCodeAnalyser) {
-            StatusCodeAnalyser.run();
+            try {
+                StatusCodeAnalyser.run();
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error while running status code analyser: " + e);
+            }
         }
 
-        System.out.println("*********************RESULT******************************************");
-        System.out.println(System.getProperty("sun.arch.data.model"));
-        System.out.println(System.getProperty("os.arch"));
-        System.out.println(System.getProperty("os.version"));
-        System.out.println("***************************************************************");
+        loggerMaker.infoAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"));
+        loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"));
+        loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"));
 
         TestExecutor testExecutor = new TestExecutor();
 
@@ -117,7 +118,7 @@ public class Main {
             try {
                 testExecutor.init(testingRun, summaryId);
             } catch (Exception e) {
-                e.printStackTrace();
+                loggerMaker.errorAndAddToDb("Error in init " + e);
             }
 
             Bson completedUpdate = Updates.combine(

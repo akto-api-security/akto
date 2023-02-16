@@ -3,6 +3,7 @@ package com.akto.testing;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dto.*;
 import com.akto.dto.testing.AuthMechanism;
+import com.akto.log.LoggerMaker;
 import com.akto.store.SampleMessageStore;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
@@ -38,16 +39,16 @@ public class StatusCodeAnalyser {
         }
     }
 
-    private static final Logger logger = LoggerFactory.getLogger(StatusCodeAnalyser.class);
 
+    private static final LoggerMaker loggerMaker = new LoggerMaker(StatusCodeAnalyser.class);
     public static int MAX_COUNT = 30;
     public static void run() {
-        logger.info("Running status analyser");
+        loggerMaker.infoAndAddToDb("Running status analyser");
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = SampleMessageStore.fetchSampleMessages();
 
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
         if (authMechanism == null) {
-            logger.error("No auth mechanism");
+            loggerMaker.errorAndAddToDb("No auth mechanism");
             return;
         }
         Map<Set<String>, Map<String,Integer>> frequencyMap = new HashMap<>();
@@ -61,10 +62,10 @@ public class StatusCodeAnalyser {
                 boolean success = fillFrequencyMap(messages, authMechanism, frequencyMap);
                 if (success)  {
                     count += 1;
-                    logger.info("count: " + count);
+                    loggerMaker.infoAndAddToDb("count: " + count);
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                loggerMaker.errorAndAddToDb("Error while filling frequency map: " + e);
             }
             if (inc % 10 == 0) System.out.println(inc);
             inc += 1;
@@ -72,9 +73,7 @@ public class StatusCodeAnalyser {
 
         calculateResult(frequencyMap, 5);
 
-        System.out.println("*********************");
-        System.out.println(result);
-        System.out.println("*********************");
+        loggerMaker.infoAndAddToDb("result of status code analyser : " + result);
     }
 
     public static void calculateResult(Map<Set<String>, Map<String,Integer>> frequencyMap, int threshold) {

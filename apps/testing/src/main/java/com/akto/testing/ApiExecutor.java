@@ -4,6 +4,7 @@ import com.akto.dto.AccountSettings;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.type.URLMethods;
+import com.akto.log.LoggerMaker;
 import kotlin.Pair;
 import okhttp3.*;
 
@@ -11,6 +12,7 @@ import java.io.IOException;
 import java.util.*;
 
 public class ApiExecutor {
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
     public static OriginalHttpResponse common(Request request, boolean followRedirects) throws Exception {
 
         OkHttpClient client = HTTPClientHandler.instance.getHTTPClient(followRedirects);
@@ -27,11 +29,11 @@ public class ApiExecutor {
             try {
                 body = responseBody.string();
             } catch (IOException e) {
-                System.out.println(e.getMessage());
+                loggerMaker.errorAndAddToDb("Error while parsing response body: " + e);
                 body = "{}";
             }
         } catch (IOException e) {
-            System.out.println(e.getMessage());
+            loggerMaker.errorAndAddToDb("Error while executing request: " + e);
             throw new Exception("Api Call failed");
         } finally {
             if (response != null) {
