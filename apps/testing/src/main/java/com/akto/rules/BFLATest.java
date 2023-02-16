@@ -38,6 +38,7 @@ public class BFLATest extends AuthRequiredRunAllTestPlugin {
             try {
                 apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApiDuplicate);
             } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error while after executing " + subTestName() +"test : " + e);
                 return Collections.singletonList(new ExecutorResult(false, null, new ArrayList<>(), 0, rawApi,
                         TestResult.TestError.API_REQUEST_FAILED, testRequest, null, bflaTestInfo));
             }
