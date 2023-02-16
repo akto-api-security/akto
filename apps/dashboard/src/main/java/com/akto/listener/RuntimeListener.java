@@ -18,6 +18,7 @@ public class RuntimeListener implements ServletContextListener {
     public static HttpCallParser httpCallParser = null;
     public static AktoPolicy aktoPolicy = null;
     public static ResourceAnalyser resourceAnalyser = null;
+    private boolean ranOnce = false;
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     @Override
@@ -25,13 +26,15 @@ public class RuntimeListener implements ServletContextListener {
 
         executorService.schedule( new Runnable() {
             public void run() {
-                do {
+                while (!ranOnce) {
+                    if (!InitializerListener.connectedToMongo) continue;
                     try {
                         Context.accountId.set(1_000_000);
                         Main.initializeRuntime();
                         httpCallParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
                         aktoPolicy = new AktoPolicy(RuntimeListener.httpCallParser.apiCatalogSync, false);
                         resourceAnalyser = new ResourceAnalyser(300_000, 0.01, 100_000, 0.01);
+                        ranOnce = true;
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -40,7 +43,7 @@ public class RuntimeListener implements ServletContextListener {
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
                     }
-                } while (!InitializerListener.connectedToMongo);
+                }
             }
         }, 0 , TimeUnit.SECONDS);
 
