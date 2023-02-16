@@ -36,8 +36,10 @@ public class HAR {
             List<OperationDefinition> operationDefinitions = GraphQLUtils.getUtils().parseGraphQLRequest(entry.getRequest().getPostData().getText());
             idx += 1;
             if (operationDefinitions.isEmpty()) {
+                logger.info("Adding via REST framework for collection_ID: {}", collection_id);
                 updateEntriesList(entry, null, null, null, collection_id, entriesList, idx);
             } else {
+                logger.info("Adding via graphQL framework for collection_ID: {}, operationDefinitions: {}", collection_id, operationDefinitions);
                 for (OperationDefinition definition : operationDefinitions) {
                     OperationDefinition.Operation operation = definition.getOperation();
                     SelectionSet selectionSets = definition.getSelectionSet();

@@ -16,7 +16,9 @@ public class GraphQLUtils {//Singleton class
     public static final String __ARGS = "__args";
 
     private static final GraphQLUtils utils = new GraphQLUtils();
-    private GraphQLUtils(){}
+
+    private GraphQLUtils() {
+    }
 
     public static GraphQLUtils getUtils() {
         return utils;
@@ -27,12 +29,12 @@ public class GraphQLUtils {//Singleton class
 
         traversal.traverse(field, new DocumentVisitor() {
             String currPath = "";
+
             @Override
             public void enter(Node node, List<Node> path) {
                 if (node instanceof Field) {
                     currPath += ("." + ((Field) node).getName());
                     if (node.getChildren() == null || node.getChildren().isEmpty()) {//Last Node
-                        System.out.println(currPath);
                         map.put(currPath, true);
                     }
                     List<Argument> arguments = ((Field) node).getArguments();
@@ -48,7 +50,7 @@ public class GraphQLUtils {//Singleton class
                             } else if (value instanceof BooleanValue) {
                                 map.put(currPath + "." + __ARGS + "." + argument.getName(), ((BooleanValue) argument.getValue()).isValue());
                             } else {
-                                map.put(currPath + "." + __ARGS + "." + argument.getName(),argument.getValue().toString());
+                                map.put(currPath + "." + __ARGS + "." + argument.getName(), argument.getValue().toString());
                             }
                         }
                     }
@@ -69,11 +71,11 @@ public class GraphQLUtils {//Singleton class
 
     public List<OperationDefinition> parseGraphQLRequest(String requestPayload) {
         List<OperationDefinition> result = new ArrayList<>();
-        Object obj  = JSON.parse(requestPayload);
-        if (obj instanceof HashMap) {
-            HashMap map = (HashMap) obj;
-            String query = (String) map.get("query");
-            try {
+        try {
+            Object obj = JSON.parse(requestPayload);
+            if (obj instanceof HashMap) {
+                HashMap map = (HashMap) obj;
+                String query = (String) map.get("query");
                 Document document = parser.parseDocument(query);
                 List<Definition> definitionList = document.getDefinitions();
                 for (Definition definition : definitionList) {
@@ -81,10 +83,11 @@ public class GraphQLUtils {//Singleton class
                         result.add((OperationDefinition) definition);
                     }
                 }
-            } catch (Exception e) {
-                //eat exception
-                return result;
             }
+        } catch (Exception e) {
+            result.clear();
+            //eat exception
+            return result;
         }
         return result;
     }
