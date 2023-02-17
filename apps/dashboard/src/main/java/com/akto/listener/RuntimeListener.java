@@ -27,7 +27,15 @@ public class RuntimeListener implements ServletContextListener {
         executorService.schedule( new Runnable() {
             public void run() {
                 while (!ranOnce) {
-                    if (!InitializerListener.connectedToMongo) continue;
+                    if (!InitializerListener.connectedToMongo) {
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                        continue;
+                    }
+
                     try {
                         Context.accountId.set(1_000_000);
                         Main.initializeRuntime();
@@ -37,11 +45,6 @@ public class RuntimeListener implements ServletContextListener {
                         ranOnce = true;
                     } catch (Exception e) {
                         e.printStackTrace();
-                    }
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
                     }
                 }
             }
