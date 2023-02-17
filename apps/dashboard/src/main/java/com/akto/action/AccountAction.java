@@ -6,13 +6,18 @@ import com.akto.dao.context.Context;
 import com.akto.dto.Account;
 import com.akto.dto.UserAccountEntry;
 import com.akto.utils.cloud.serverless.aws.Lambda;
-import com.akto.utils.cloud.stack.Stack;
 import com.akto.utils.cloud.stack.aws.AwsStack;
 import com.akto.utils.cloud.stack.dto.StackState;
+import com.akto.utils.platform.DashboardStackDetails;
 import com.akto.utils.platform.MirroringStackDetails;
 import com.amazonaws.services.lambda.model.*;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
+import com.amazonaws.services.autoscaling.AmazonAutoScaling;
+import com.amazonaws.services.autoscaling.AmazonAutoScalingClientBuilder;
+import com.amazonaws.services.autoscaling.model.RefreshPreferences;
+import com.amazonaws.services.autoscaling.model.StartInstanceRefreshRequest;
+import com.amazonaws.services.autoscaling.model.StartInstanceRefreshResult;
 import com.amazonaws.services.lambda.AWSLambda;
 import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
 import org.slf4j.Logger;
@@ -29,7 +34,7 @@ public class AccountAction extends UserAction {
     private static final Logger logger = LoggerFactory.getLogger(AccountAction.class);
 
     public static final int MAX_NUM_OF_LAMBDAS_TO_FETCH = 50;
-
+    private static AmazonAutoScaling asc = AmazonAutoScalingClientBuilder.standard().build();
     @Override
     public String execute() {
 
@@ -90,10 +95,15 @@ public class AccountAction extends UserAction {
         }
     }
 
-    public String takeUpdate() {
-        if(checkIfStairwayInstallation()) {
-            logger.info("This is a stairway installation, invoking lambdas now");
-            String lambda;
+    public void asgInstanceRefresh(StartInstanceRefreshRequest refreshRequest, String stack, String asg){
+        String autoScalingGroup = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(stack, asg);
+        refreshRequest.setAutoScalingGroupName(autoScalingGroup);
+        StartInstanceRefreshResult result = asc.startInstanceRefresh(refreshRequest);
+        logger.info(String.format("instance refresh called on %s with result %s", asg, result.toString()));
+    }
+
+    public void lambdaInstanceRefresh(){
+        String lambda;
             try {
                 lambda = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.AKTO_CONTEXT_ANALYZER_UPDATE_LAMBDA);
                 Lambda.getInstance().invokeFunction(lambda);
@@ -108,13 +118,30 @@ public class AccountAction extends UserAction {
             } catch (Exception e) {
                 logger.error("Failed to update Akto Dashboard", e);
             }
-                
+
             try{
                 lambda = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.AKTO_RUNTIME_UPDATE_LAMBDA);
                 Lambda.getInstance().invokeFunction(lambda);
                 logger.info("Successfully invoked lambda {}", lambda);
             } catch (Exception e) {
                 logger.error("Failed to update Akto Traffic Mirroring Instance", e);
+            }
+    }
+
+    public String takeUpdate() {
+        if(checkIfStairwayInstallation()) {
+            RefreshPreferences refreshPreferences = new RefreshPreferences();
+            StartInstanceRefreshRequest refreshRequest = new StartInstanceRefreshRequest();
+            refreshPreferences.setMinHealthyPercentage(0);
+            refreshPreferences.setInstanceWarmup(200);
+            refreshRequest.setPreferences(refreshPreferences);
+            try {
+                asgInstanceRefresh(refreshRequest, MirroringStackDetails.getStackName(), MirroringStackDetails.AKTO_CONTEXT_ANALYSER_AUTO_SCALING_GROUP);
+                asgInstanceRefresh(refreshRequest, MirroringStackDetails.getStackName(), MirroringStackDetails.AKTO_TRAFFIC_MIRRORING_AUTO_SCALING_GROUP);
+                asgInstanceRefresh(refreshRequest, DashboardStackDetails.getStackName(), DashboardStackDetails.AKTO_DASHBOARD_AUTO_SCALING_GROUP);
+            } catch (Exception e){
+                logger.info("could not invoke instance refresh directly, using lambdas ",e.getMessage());
+                lambdaInstanceRefresh();
             }
         } else {
             logger.info("This is an old installation, updating via old way");

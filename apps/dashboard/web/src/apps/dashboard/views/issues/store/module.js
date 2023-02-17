@@ -109,7 +109,6 @@ const issues = {
         },
         fetchAllSubCategories() {
             return api.fetchAllSubCategories().then((resp) => {
-                debugger
                 state.subCatogoryMap = {}
                 resp.subCategories.forEach((x) => {
                     state.subCatogoryMap[x.name] = x

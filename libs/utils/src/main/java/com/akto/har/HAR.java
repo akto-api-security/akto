@@ -59,34 +59,8 @@ public class HAR {
 
         String requestContentType = getContentType(requestHarHeaders);
 
-        String requestPayload;
-        if (requestContentType == null) {
-            // get request data from querystring
-            Map<String,Object> paramMap = new HashMap<>();
-            requestPayload = mapper.writeValueAsString(paramMap);
-        } else if (requestContentType.contains(JSON_CONTENT_TYPE)) {
-            String postData = request.getPostData().getText();
-            if (postData == null) {
-                postData = "{}";
-            }
-
-            if (postData.startsWith("[")) {
-                requestPayload = postData;
-            } else {
-                Map<String,Object> paramMap = mapper.readValue(postData, new TypeReference<HashMap<String,Object>>() {});
-                requestPayload = mapper.writeValueAsString(paramMap);
-            }
-        } else if (requestContentType.contains(FORM_URL_ENCODED_CONTENT_TYPE)) {
-            String postText = request.getPostData().getText();
-            if (postText == null) {
-                postText = "";
-            }
-
-            requestPayload = postText;
-        } else {
-            return null;
-        }
-
+        String requestPayload = request.getPostData().getText();
+        if (requestPayload == null) requestPayload = "";
 
         String akto_account_id = 1_000_000 + "";
         String path = getPath(request);

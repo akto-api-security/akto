@@ -27,6 +27,7 @@ public class NoAuthTest extends AuthRequiredTestPlugin {
         try {
              apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApi);
         } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while executing request in noAuth test: " + e);
             return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest, null);
         }
 

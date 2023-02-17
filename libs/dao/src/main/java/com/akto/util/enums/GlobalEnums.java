@@ -375,6 +375,7 @@ public class GlobalEnums {
         }
 
         public static TestSubCategory getTestCategory(String category) {
+            if (category.startsWith("http")) return CUSTOM_IAM;
             for (TestSubCategory testSubCategory : valuesArray) {
                 if (testSubCategory.name.equalsIgnoreCase(category)) {
                     return testSubCategory;

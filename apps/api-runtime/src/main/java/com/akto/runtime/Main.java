@@ -110,6 +110,21 @@ public class Main {
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
+    public static class AccountInfo {
+        long estimatedCount;
+        int lastEstimatedCountTime;
+
+        public AccountInfo() {
+            this.estimatedCount = 0;
+            this.lastEstimatedCountTime = 0;
+        }
+
+        public AccountInfo(long estimatedCount, int lastEstimatedCountTime) {
+            this.estimatedCount = estimatedCount;
+            this.lastEstimatedCountTime = lastEstimatedCountTime;
+        }
+    }
+
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
@@ -120,7 +135,10 @@ public class Main {
         String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
         boolean syncImmediately = false;
         boolean fetchAllSTI = true;
-        if (instanceType != null && instanceType.equals("DASHBOARD")) {
+        Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
+
+        boolean isDashboardInstance = instanceType != null && instanceType.equals("DASHBOARD");
+        if (isDashboardInstance) {
             syncImmediately = true;
             fetchAllSTI = false;
         }
@@ -225,6 +243,21 @@ public class Main {
                     }
 
                     Context.accountId.set(accountIdInt);
+
+                    AccountInfo accountInfo = accountInfoMap.get(accountIdInt);
+                    if (accountInfo == null) {
+                        accountInfo = new AccountInfo();
+                        accountInfoMap.put(accountIdInt, accountInfo);
+                    }
+
+                    if ((Context.now() - accountInfo.lastEstimatedCountTime) > 60*60) {
+                        accountInfo.lastEstimatedCountTime = Context.now();
+                        accountInfo.estimatedCount = SingleTypeInfoDao.instance.getMCollection().estimatedDocumentCount();
+                    }
+
+                    if (!isDashboardInstance && accountInfo.estimatedCount> 20_000_000) {
+                        continue;
+                    }
 
                     if (!httpCallParserMap.containsKey(accountId)) {
                         HttpCallParser parser = new HttpCallParser(
