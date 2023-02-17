@@ -53,8 +53,7 @@ public class AuthPolicy {
     }
 
     public static boolean findAuthType(HttpResponseParams httpResponseParams, ApiInfo apiInfo, RuntimeFilter filter, List<CustomAuthType> customAuthTypes) {
-        Set<Set<ApiInfo.AuthType>> allAuthTypesFound = apiInfo.getAllAuthTypesFound();
-        if (allAuthTypesFound == null) allAuthTypesFound = new HashSet<>();
+        Set<Set<ApiInfo.AuthType>> allAuthTypesFound = new HashSet<>();
 
         // TODO: from custom api-token
         // NOTE: custom api-token can be in multiple headers. For example twitter api sends 2 headers access-key and access-token
