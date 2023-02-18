@@ -380,7 +380,7 @@ export default {
                     }
                 }
 
-                let authType = apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].join(" or ") : ""
+                let authType = apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].join(" , ") : ""
 
                 ret[key] = {
                     shadow: x.shadow ? x.shadow : false,
