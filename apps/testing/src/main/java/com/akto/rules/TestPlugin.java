@@ -6,6 +6,7 @@ import com.akto.dto.testing.*;
 import com.akto.dto.testing.info.TestInfo;
 import com.akto.dto.type.*;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.RelationshipSync;
 import com.akto.store.TestingUtil;
@@ -70,7 +71,7 @@ public abstract class TestPlugin {
             try {
                 version = Integer.parseInt(code);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while parsing integer " + code + " : " + e);
+                loggerMaker.errorAndAddToDb("Error while parsing integer " + code + " : " + e, LogDb.TESTING);
                 return null;
             }
             int newVersion = version - decrementValue;
@@ -149,7 +150,7 @@ public abstract class TestPlugin {
         try {
             message = RedactSampleData.convertOriginalReqRespToString(request, null);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while converting testRequest object to string : " + e);
+            loggerMaker.errorAndAddToDb("Error while converting testRequest object to string : " + e, LogDb.TESTING);
         }
 
         return new TestResult(message, originalMessage, Collections.singletonList(testError), 0, false, TestResult.Confidence.HIGH, testInfo);

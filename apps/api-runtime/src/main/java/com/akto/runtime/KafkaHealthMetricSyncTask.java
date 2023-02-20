@@ -3,6 +3,8 @@ package com.akto.runtime;
 import com.akto.dao.KafkaHealthMetricsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.KafkaHealthMetric;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.ReplaceOptions;
 
@@ -20,6 +22,7 @@ public class KafkaHealthMetricSyncTask implements Runnable{
     Consumer<String, String>  consumer;
     public Map<String,KafkaHealthMetric> kafkaHealthMetricsMap = new HashMap<>();
     private static final Logger logger = LoggerFactory.getLogger(KafkaHealthMetricSyncTask.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(APICatalogSync.class);
 
 
     public KafkaHealthMetricSyncTask(Consumer<String, String>  consumer) {
@@ -56,7 +59,7 @@ public class KafkaHealthMetricSyncTask implements Runnable{
             }
             logger.info("SYNC DONE");
         } catch (Exception e) {
-            logger.error("ERROR in kafka data sync from api runtime", e);
+            loggerMaker.errorAndAddToDb("ERROR in kafka data sync from api runtime" + e, LogDb.RUNTIME);
         }
     }
 }
