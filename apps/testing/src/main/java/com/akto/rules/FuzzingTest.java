@@ -133,6 +133,9 @@ public class FuzzingTest extends TestPlugin {
 
             int totalCount = Math.min(Math.min(nucleiResult.attempts.size(), nucleiResult.metaData.size()), 100);
 
+            List<TestResult> vulnerableTestResults = new ArrayList<>();
+            List<TestResult> nonVulnerableTestResults = new ArrayList<>();
+
             for (int idx=0; idx < totalCount; idx++) {
                 Pair<OriginalHttpRequest, OriginalHttpResponse> pair = nucleiResult.attempts.get(idx);
                 OriginalHttpResponse testResponse = pair.getSecond();
@@ -148,10 +151,17 @@ public class FuzzingTest extends TestPlugin {
                 TestResult testResult = buildTestResult(
                     pair.getFirst(), apiExecutionDetails.testResponse, rawApi.getOriginalMessage(), apiExecutionDetails.percentageMatch, vulnerable, nucleiTestInfo
                 );
-        
-                testResults.add(testResult);
 
+                if (vulnerable) {
+                    vulnerableTestResults.add(testResult);
+                } else {
+                    nonVulnerableTestResults.add(testResult);
+                }
             }
+
+            vulnerableTestResults.addAll(nonVulnerableTestResults);
+            testResults = vulnerableTestResults;
+
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while running nuclei test: " + e);
             return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest, nucleiTestInfo);
