@@ -11,7 +11,7 @@
                 <template #subtitle>
                     <span>
                         <span>(Your data remains within your VPC strictly.</span>
-                        <span class="clickable-docs"><a target="_blank" href="https://docs.akto.io/what-is-akto/faqs#i-dont-want-the-data-to-leave-my-vpn.-does-akto-support-on-premise-deployment">See how Akto handles data)</a></span>
+                        <span class="clickable-docs"><a target="_blank" href="https://docs.akto.io/getting-started/faqs-on-data-concerns">See how Akto handles data)</a></span>
                     </span>
                 </template>
                 <template #content>
