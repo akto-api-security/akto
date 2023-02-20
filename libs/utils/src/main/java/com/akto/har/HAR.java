@@ -64,7 +64,7 @@ public class HAR {
             // get request data from querystring
             Map<String,Object> paramMap = new HashMap<>();
             requestPayload = mapper.writeValueAsString(paramMap);
-        } else if (requestContentType.contains(JSON_CONTENT_TYPE)) {
+        } else if (requestContentType.contains(JSON_CONTENT_TYPE) || requestContentType.contains("text/plain")) {
             String postData = request.getPostData().getText();
             if (postData == null) {
                 postData = "{}";

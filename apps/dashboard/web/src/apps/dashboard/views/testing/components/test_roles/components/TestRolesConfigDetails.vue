@@ -39,6 +39,35 @@
                         :requireMapInputForTypeArray="requireMapInputForTypeArray" :operation_types="operation_types" />
                 </v-row>
             </div>
+
+            <div class="d-flex pt-4">
+                <div class="form-text">
+                    Auth token
+                </div>
+
+                <div class="input-value">
+                    <v-text-field v-model="newKey" style="width: 200px">
+                        <template slot="label">
+                            <div class="d-flex">
+                                Auth header key
+                            </div>
+                        </template>
+                    </v-text-field>
+
+                </div>
+                <div class="input-value">
+                    <v-text-field v-model="newVal" style="width: 500px">
+                        <template slot="label">
+                            <div class="d-flex">
+                                Auth header value
+                            </div>
+                        </template>
+
+                    </v-text-field>
+                </div>
+            </div>
+
+
             <v-row style="padding-top: 30px">
                 <div style="padding: 12px">
                     <v-btn @click="save" color="#6200EA" class="save-btn" height="40px" width="100px"
@@ -93,6 +122,8 @@ export default {
             saveLoading: false,
             reviewLoading: false,
             roleName: "",
+            newKey: "",
+            newVal: "",
             name_rules: [
                 value => {
                     if (!value) return "Required"
@@ -174,7 +205,12 @@ export default {
                     await this.$store.dispatch('test_roles/updateTestRoles', {
                         roleName,
                         andConditions,
-                        orConditions
+                        orConditions,
+                        authParamData: [{
+                            "key": this.newKey,
+                            "value": this.newVal,
+                            "where": "HEADER"
+                        }]                        
                     })
                         .then((resp) => {
                             this.saveLoading = false
@@ -245,6 +281,9 @@ export default {
 </script>
 
 <style lang="sass" scoped>
+    .input-value
+        padding-right: 8px
+        color: #47466A
 
     .condition-row
         width: 100%

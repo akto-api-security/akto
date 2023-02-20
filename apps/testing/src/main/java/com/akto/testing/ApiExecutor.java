@@ -71,7 +71,6 @@ public class ApiExecutor {
         List<String> forbiddenHeaders = Arrays.asList("content-length", "accept-encoding");
         Map<String, List<String>> headersMap = request.getHeaders();
         if (headersMap == null) headersMap = new HashMap<>();
-        headersMap.put(AccountSettings.AKTO_IGNORE_FLAG, Collections.singletonList("0"));
         for (String headerName: headersMap.keySet()) {
             if (forbiddenHeaders.contains(headerName)) continue;
             List<String> headerValueList = headersMap.get(headerName);
@@ -104,6 +103,7 @@ public class ApiExecutor {
                 throw new Exception("Invalid method name");
         }
 
+
         return response;
     }
 
@@ -133,6 +133,7 @@ public class ApiExecutor {
         if (payload == null) payload = "";
         RequestBody body = RequestBody.create(payload, MediaType.parse(contentType));
         builder = builder.method(request.getMethod(), body);
+
         Request okHttpRequest = builder.build();
         return common(okHttpRequest, followRedirects);
     }

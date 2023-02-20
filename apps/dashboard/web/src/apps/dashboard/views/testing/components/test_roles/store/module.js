@@ -67,9 +67,9 @@ const test_roles = {
                 state.loading = false
             })
         },
-        updateTestRoles ({commit}, {roleName, andConditions, orConditions}) {
+        updateTestRoles ({commit}, {roleName, andConditions, orConditions, authParamData}) {
             state.loading = true
-            api.updateTestRoles(roleName, andConditions, orConditions).then((resp) => {
+            api.updateTestRoles(roleName, andConditions, orConditions, authParamData).then((resp) => {
                 state.loading = false
 
             }).catch(() => {

@@ -19,11 +19,11 @@ export default {
             return resp
         })        
     },
-    updateTestRoles (roleName, andConditions, orConditions) {
+    updateTestRoles (roleName, andConditions, orConditions, authParamData) {
         return request({
             url: '/api/updateTestRoles',
             method: 'post',
-            data: {roleName, andConditions, orConditions}
+            data: {roleName, andConditions, orConditions, authParamData}
         }).then((resp) => {
             return resp
         })        
