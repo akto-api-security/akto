@@ -49,7 +49,7 @@ public class TestApiInfo {
 
         apiInfo.calculateActualAuth();
 
-        assertEquals(apiInfo.getActualAuthType(), Collections.singletonList(ApiInfo.AuthType.BEARER));
+        assertEquals(apiInfo.getActualAuthType(), Arrays.asList(ApiInfo.AuthType.JWT , ApiInfo.AuthType.BEARER));
     }
 
     @Test
