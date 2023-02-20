@@ -1,6 +1,27 @@
 package com.akto.dto;
 
+import org.bson.codecs.pojo.annotations.BsonIgnore;
+import org.bson.types.ObjectId;
+
 public class Log {
+
+    private ObjectId id;
+    public ObjectId getId() {
+        return id;
+    }
+
+    public void setId(ObjectId id) {
+        this.id = id;
+    }
+    @BsonIgnore
+    private String hexId;
+    public String getHexId() {
+        return this.id.toHexString();
+    }
+
+    public void setHexId(String hexId) {
+        this.hexId = hexId;
+    }
     private String log;
     private String key;
 

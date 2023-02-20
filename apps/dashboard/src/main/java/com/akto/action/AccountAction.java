@@ -5,6 +5,8 @@ import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
 import com.akto.dto.UserAccountEntry;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.cloud.serverless.aws.Lambda;
 import com.akto.utils.cloud.stack.aws.AwsStack;
 import com.akto.utils.cloud.stack.dto.StackState;
@@ -31,7 +33,7 @@ public class AccountAction extends UserAction {
 
     private String newAccountName;
     private int newAccountId;
-    private static final Logger logger = LoggerFactory.getLogger(AccountAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.class);
 
     public static final int MAX_NUM_OF_LAMBDAS_TO_FETCH = 50;
     private static AmazonAutoScaling asc = AmazonAutoScalingClientBuilder.standard().build();
@@ -49,13 +51,13 @@ public class AccountAction extends UserAction {
         InvokeResult invokeResult = null;
         try {
 
-            logger.info("Invoke lambda "+functionName);
+            loggerMaker.infoAndAddToDb("Invoke lambda "+functionName, LogDb.DASHBOARD);
             invokeResult = awsLambda.invoke(invokeRequest);
 
             String resp = new String(invokeResult.getPayload().array(), StandardCharsets.UTF_8);
-            logger.info("Function: {}, response: {}", functionName, resp);
+            loggerMaker.infoAndAddToDb("Function: " + functionName + ", response:" + resp, LogDb.DASHBOARD);
         } catch (AWSLambdaException e) {
-            logger.error(String.format("Error while invoking Lambda: %s", functionName), e);
+            loggerMaker.errorAndAddToDb(String.format("Error while invoking Lambda, %s: %s", functionName, e), LogDb.DASHBOARD);
         }
     }
 
@@ -70,13 +72,13 @@ public class AccountAction extends UserAction {
                 ListFunctionsResult functionResult = awsLambda
                         .listFunctions(request);
                 List<FunctionConfiguration> list = functionResult.getFunctions();
-                logger.info("Found {} functions", list.size());
+                loggerMaker.infoAndAddToDb(String.format("Found %s functions", list.size()), LogDb.DASHBOARD);
 
                 for (FunctionConfiguration config: list) {
-                    logger.info("Found function: {}",config.getFunctionName());
+                    loggerMaker.infoAndAddToDb(String.format("Found function: %s",config.getFunctionName()), LogDb.DASHBOARD);
 
                     if(config.getFunctionName().contains(functionName)) {
-                        logger.info("Invoking function: {}", config.getFunctionName());
+                        loggerMaker.infoAndAddToDb(String.format("Invoking function: %s", config.getFunctionName()), LogDb.DASHBOARD);
                         invokeExactLambda(config.getFunctionName(), awsLambda);
                     }
                 }
@@ -91,7 +93,7 @@ public class AccountAction extends UserAction {
 
 
         } catch (AWSLambdaException e) {
-            logger.error("Error while updating Akto",e);
+            loggerMaker.errorAndAddToDb(String.format("Error while updating Akto: %s",e), LogDb.DASHBOARD);
         }
     }
 
@@ -99,7 +101,7 @@ public class AccountAction extends UserAction {
         String autoScalingGroup = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(stack, asg);
         refreshRequest.setAutoScalingGroupName(autoScalingGroup);
         StartInstanceRefreshResult result = asc.startInstanceRefresh(refreshRequest);
-        logger.info(String.format("instance refresh called on %s with result %s", asg, result.toString()));
+        loggerMaker.infoAndAddToDb(String.format("instance refresh called on %s with result %s", asg, result.toString()), LogDb.DASHBOARD);
     }
 
     public void lambdaInstanceRefresh(){
@@ -107,24 +109,24 @@ public class AccountAction extends UserAction {
             try {
                 lambda = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.AKTO_CONTEXT_ANALYZER_UPDATE_LAMBDA);
                 Lambda.getInstance().invokeFunction(lambda);
-                logger.info("Successfully invoked lambda {}", lambda);
+                loggerMaker.infoAndAddToDb("Successfully invoked lambda " + lambda, LogDb.DASHBOARD);
             } catch (Exception e) {
-                logger.error("Failed to update Akto Context Analyzer", e);
+                loggerMaker.errorAndAddToDb("Failed to update Akto Context Analyzer" + e, LogDb.DASHBOARD);
             }
             try{
                 lambda = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(),MirroringStackDetails.AKTO_DASHBOARD_UPDATE_LAMBDA);
                 Lambda.getInstance().invokeFunction(lambda);
-                logger.info("Successfully invoked lambda {}", lambda);
+                loggerMaker.infoAndAddToDb("Successfully invoked lambda " +lambda, LogDb.DASHBOARD);
             } catch (Exception e) {
-                logger.error("Failed to update Akto Dashboard", e);
+                loggerMaker.errorAndAddToDb("Failed to update Akto Dashboard" + e, LogDb.DASHBOARD);
             }
 
             try{
                 lambda = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.AKTO_RUNTIME_UPDATE_LAMBDA);
                 Lambda.getInstance().invokeFunction(lambda);
-                logger.info("Successfully invoked lambda {}", lambda);
+                loggerMaker.infoAndAddToDb("Successfully invoked lambda " + lambda, LogDb.DASHBOARD);
             } catch (Exception e) {
-                logger.error("Failed to update Akto Traffic Mirroring Instance", e);
+                loggerMaker.errorAndAddToDb("Failed to update Akto Traffic Mirroring Instance" + e, LogDb.DASHBOARD);
             }
     }
 
@@ -140,11 +142,11 @@ public class AccountAction extends UserAction {
                 asgInstanceRefresh(refreshRequest, MirroringStackDetails.getStackName(), MirroringStackDetails.AKTO_TRAFFIC_MIRRORING_AUTO_SCALING_GROUP);
                 asgInstanceRefresh(refreshRequest, DashboardStackDetails.getStackName(), DashboardStackDetails.AKTO_DASHBOARD_AUTO_SCALING_GROUP);
             } catch (Exception e){
-                logger.info("could not invoke instance refresh directly, using lambdas ",e.getMessage());
+                loggerMaker.infoAndAddToDb("could not invoke instance refresh directly, using lambdas " + e.getMessage(), LogDb.DASHBOARD);
                 lambdaInstanceRefresh();
             }
         } else {
-            logger.info("This is an old installation, updating via old way");
+            loggerMaker.infoAndAddToDb("This is an old installation, updating via old way", LogDb.DASHBOARD);
             listMatchingLambda("InstanceRefresh");
         }
         

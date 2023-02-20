@@ -7,6 +7,8 @@ import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing_utils.TestingUtils;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.bulk.BulkWriteResult;
@@ -24,7 +26,8 @@ import static com.akto.util.enums.GlobalEnums.*;
 
 public class TestingIssuesHandler {
 
-    private static final Logger logger = LoggerFactory.getLogger(TestingIssuesHandler.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(TestingIssuesHandler.class);
+
     //Update one Write models
     /*
      * Checks the status of issue from db,
@@ -72,8 +75,8 @@ public class TestingIssuesHandler {
                     Updates.set(TestingRunIssues.LAST_SEEN, lastSeen),
                     Updates.set(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, runResult.getTestRunResultSummaryId())
             );
-            logger.info("Updating the issue with id {}, with update parameters and result_summary_Id :{} ", issuesId
-                    ,runResult.getTestRunResultSummaryId());
+            loggerMaker.infoAndAddToDb(String.format("Updating the issue with id %s, with update parameters and result_summary_Id :%s ", issuesId
+                    ,runResult.getTestRunResultSummaryId()), LogDb.TESTING);
 
             writeModelList.add(new UpdateOneModel<>(query, updateFields));
         });
@@ -114,7 +117,7 @@ public class TestingIssuesHandler {
                             subCategory.getSuperCategory().getSeverity(),
                             TestRunIssueStatus.OPEN, lastSeen, lastSeen, runResult.getTestRunResultSummaryId())));
                 }
-                logger.info("Inserting the id {} , with summary Id as {}", testingIssuesId, runResult.getTestRunResultSummaryId());
+                loggerMaker.infoAndAddToDb(String.format("Inserting the id %s , with summary Id as %s", testingIssuesId, runResult.getTestRunResultSummaryId()), LogDb.TESTING);
             }
         });
     }
@@ -124,27 +127,27 @@ public class TestingIssuesHandler {
         Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap = TestingUtils.
                 listOfIssuesIdsFromTestingRunResults(testingRunResultList, true);
 
-        logger.info("Total issue id created from TestingRunResult map : {}", testingIssuesIdsMap.size());
+        loggerMaker.infoAndAddToDb(String.format("Total issue id created from TestingRunResult map : %s", testingIssuesIdsMap.size()), LogDb.TESTING);
         Bson inQuery = Filters.in(ID, testingIssuesIdsMap.keySet().toArray());
         List<TestingRunIssues> testingRunIssuesList = TestingRunIssuesDao.instance.findAll(inQuery);
 
-        logger.info("Total list of issues from db : {}", testingRunIssuesList.size());
+        loggerMaker.infoAndAddToDb(String.format("Total list of issues from db : %s", testingRunIssuesList.size()), LogDb.TESTING);
         List<WriteModel<TestingRunIssues>> writeModelList = new ArrayList<>();
         writeUpdateQueryIntoWriteModel(writeModelList, testingIssuesIdsMap, testingRunIssuesList);
-        logger.info("Total write queries after the update iterations: {}", writeModelList.size());
+        loggerMaker.infoAndAddToDb(String.format("Total write queries after the update iterations: %s", writeModelList.size()), LogDb.TESTING);
         insertVulnerableTestsIntoIssuesCollection(writeModelList, testingIssuesIdsMap, testingRunIssuesList);
-        logger.info("Total write queries after the insertion iterations: {}", writeModelList.size());
+        loggerMaker.infoAndAddToDb(String.format("Total write queries after the insertion iterations: %s", writeModelList.size()), LogDb.TESTING);
         try {
             if (writeModelList.size() > 0) {
                 BulkWriteResult result = TestingRunIssuesDao.instance.bulkWrite(writeModelList, new BulkWriteOptions().ordered(false));
-                logger.info("Matched records : {}", result.getMatchedCount());
-                logger.info("inserted counts : {}", result.getInsertedCount());
-                logger.info("Modified counts : {}", result.getModifiedCount());
+                loggerMaker.infoAndAddToDb(String.format("Matched records : %s", result.getMatchedCount()), LogDb.TESTING);
+                loggerMaker.infoAndAddToDb(String.format("inserted counts : %s", result.getInsertedCount()), LogDb.TESTING);
+                loggerMaker.infoAndAddToDb(String.format("Modified counts : %s", result.getModifiedCount()), LogDb.TESTING);
             } else {
-                logger.info("writeModelList is empty");
+                loggerMaker.infoAndAddToDb("writeModelList is empty", LogDb.TESTING);
             }
         } catch (Exception e) {
-            logger.error("Error while inserting issues into db: {}", e.getMessage());
+            loggerMaker.errorAndAddToDb(String.format("Error while inserting issues into db: %s", e.toString()), LogDb.TESTING);
         }
     }
 }

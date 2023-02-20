@@ -7,9 +7,13 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.akto.dto.type.KeyTypes;
 
 public class Trie {
+    private static final Logger logger = LoggerFactory.getLogger(Trie.class);
 
     public static class Node<K, V> {
         public static<K, V> Node<K, V> createTerminal(K pathElem, V value) {
@@ -92,7 +96,7 @@ public class Trie {
 
         void printHelper(int tab, Consumer<Node<K, V>> consumer) {
             for(int i = 0; i < tab; i++) {
-                System.out.print("\t");
+                logger.info("\t");
             }
 
             if (consumer != null) consumer.accept(this);

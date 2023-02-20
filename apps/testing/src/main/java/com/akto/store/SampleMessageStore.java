@@ -14,6 +14,7 @@ import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.NucleiExecutor;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -64,7 +65,7 @@ public class SampleMessageStore {
                 singleTypeInfoMap.put(singleTypeInfo.composeKeyWithCustomSubType(SingleTypeInfo.GENERIC), singleTypeInfo);
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while building STI map: " + e);
+            loggerMaker.errorAndAddToDb("Error while building STI map: " + e, LogDb.TESTING);
         }
 
         return singleTypeInfoMap;
@@ -104,7 +105,7 @@ public class SampleMessageStore {
             try {
                 messages.add(RawApi.buildFromMessage(message));
             } catch(Exception e) {
-                loggerMaker.errorAndAddToDb("Error while building RawAPI for "+ apiInfoKey +" : " + e);
+                loggerMaker.errorAndAddToDb("Error while building RawAPI for "+ apiInfoKey +" : " + e, LogDb.TESTING);
             }
 
         }

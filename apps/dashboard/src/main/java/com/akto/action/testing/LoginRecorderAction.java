@@ -9,14 +9,14 @@ import java.util.concurrent.TimeUnit;
 import java.io.File;
 
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.akto.action.UserAction;
 import com.akto.dao.RecordedLoginInputDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.LoginFlowStepsDao;
 import com.akto.dto.RecordedLoginFlowInput;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.RecordedLoginFlowUtil;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -32,7 +32,7 @@ public class LoginRecorderAction extends UserAction {
 
     private String nodeId;
 
-    private static final Logger logger = LoggerFactory.getLogger(LoginRecorderAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(LoginRecorderAction.class);
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -50,7 +50,7 @@ public class LoginRecorderAction extends UserAction {
                     File tmpErrorFile = File.createTempFile("recordedFlowOutput", ".txt");
                     RecordedLoginFlowUtil.triggerFlow(tokenFetchCommand, payload, tmpOutputFile.getPath(), tmpErrorFile.getPath(), getSUser().getId());
                 } catch (Exception e) {
-                    logger.error("error running recorded flow " + e.getMessage());
+                    loggerMaker.errorAndAddToDb("error running recorded flow " + e.toString(), LogDb.DASHBOARD);
                 }
             }
         }, 1, TimeUnit.SECONDS);

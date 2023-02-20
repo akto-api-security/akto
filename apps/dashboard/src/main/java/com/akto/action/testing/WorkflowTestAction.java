@@ -11,6 +11,7 @@ import com.akto.dto.Log;
 import com.akto.dto.testing.WorkflowNodeDetails;
 import com.akto.dto.testing.WorkflowTest;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
@@ -195,7 +196,7 @@ public class WorkflowTestAction extends UserAction {
 
     public String fetchTestingLogs() {
 
-        testingLogs = loggerMaker.fetchLogRecords(logFetchStartTime, logFetchEndTime);
+        testingLogs = loggerMaker.fetchLogRecords(logFetchStartTime, logFetchEndTime, LogDb.TESTING);
         return SUCCESS.toUpperCase();
     }
 
