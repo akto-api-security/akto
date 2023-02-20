@@ -64,7 +64,7 @@ public class Main {
                 try {
                     addPathItems(responseCode, paths, url, method, singleTypeInfoList, includeHeaders);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("ERROR in buildPathsFromSingleTypeInfosPerUrl  " + e, LogDb.RUNTIME);
+                    loggerMaker.errorAndAddToDb("ERROR in buildPathsFromSingleTypeInfosPerUrl  " + e, LogDb.DASHBOARD);
                 }
             }
         }
@@ -75,7 +75,7 @@ public class Main {
         try {
             schema = buildSchema(singleTypeInfoList);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("ERROR in building schema in addPathItems " + e, LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("ERROR in building schema in addPathItems " + e, LogDb.DASHBOARD);
         }
         if (schema == null) {
             schema = new ObjectSchema();
@@ -85,7 +85,7 @@ public class Main {
         try{
             headerParameters = buildHeaders(singleTypeInfoList);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("ERROR in building headers in addPathItems " + e, LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("ERROR in building headers in addPathItems " + e, LogDb.DASHBOARD);
         }
         
         PathBuilder.addPathItem(paths, url, method, responseCode, schema, headerParameters, includeHeaders);

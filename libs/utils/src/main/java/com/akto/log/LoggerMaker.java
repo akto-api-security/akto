@@ -19,6 +19,10 @@ public class LoggerMaker  {
     public final Logger logger;
     private final Class<?> aClass;
 
+    private static int logCount = 0;
+    private static int logCountResetTimestamp = Context.now();
+    private static final int oneMinute = 60; 
+
     public enum LogDb {
         TESTING,RUNTIME,DASHBOARD
     }
@@ -30,26 +34,50 @@ public class LoggerMaker  {
 
     public void errorAndAddToDb(String err, LogDb db) {
         logger.error(err);
-        insert(err, "error", db);
+        try{
+            insert(err, "error", db);
+        } catch (Exception e){
+            e.printStackTrace();
+        }
     }
 
     public void infoAndAddToDb(String info, LogDb db) {
         logger.info(info);
-        insert(info, "info",db);
+        try{
+            insert(info, "info",db);
+        } catch (Exception e){
+            e.printStackTrace();
+        }
     }
 
+    private Boolean checkUpdate(){
+        if(logCount>=1000){
+            if((logCountResetTimestamp + oneMinute) >= Context.now()){
+                return false;
+            } else {
+                logCount = 0;
+                logCountResetTimestamp = Context.now();
+            }
+        }
+        return true;
+    }
+    
     private void insert(String info, String key, LogDb db) {
         String text = aClass + " : " + info;
         Log log = new Log(text, key, Context.now());
-        switch(db){
-            case TESTING: 
-                LogsDao.instance.insertOne(log);
-                break;
-            case RUNTIME: 
-                RuntimeLogsDao.instance.insertOne(log);
-                break;
-            case DASHBOARD: 
-                DashboardLogsDao.instance.insertOne(log);
+        
+        if(checkUpdate()){
+            switch(db){
+                case TESTING: 
+                    LogsDao.instance.insertOne(log);
+                    break;
+                case RUNTIME: 
+                    RuntimeLogsDao.instance.insertOne(log);
+                    break;
+                case DASHBOARD: 
+                    DashboardLogsDao.instance.insertOne(log);
+            }
+            logCount++;
         }
     }
 

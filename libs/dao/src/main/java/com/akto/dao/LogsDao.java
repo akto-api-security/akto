@@ -15,7 +15,7 @@ import org.bson.Document;
 public class LogsDao extends AccountsContextDao<Log> {
 
     public static final LogsDao instance = new LogsDao();
-    public void initIndices() {
+    public void createIndicesIfAbsent() {
         boolean exists = false;
         String dbName = Context.accountId.get()+"";
         MongoDatabase db = clients[0].getDatabase(dbName);
@@ -37,13 +37,9 @@ public class LogsDao extends AccountsContextDao<Log> {
             indices.add(cursor.next());
         }
 
-        if (indices.size() == 0) {
+        if (indices.size() == 1) {
             instance.getMCollection().createIndex(Indexes.descending(Log.TIMESTAMP));
         }
-    }
-
-    private LogsDao() {
-        initIndices();
     }
 
     @Override

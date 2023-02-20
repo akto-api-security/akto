@@ -40,7 +40,7 @@ public class HAR {
                 }
                 
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while parsing har file on entry: " + idx + " ERROR: " + e.toString(), LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("Error while parsing har file on entry: " + idx + " ERROR: " + e.toString(), LogDb.DASHBOARD);
                 errors.add("Error in entry " + idx);
             }
         }
