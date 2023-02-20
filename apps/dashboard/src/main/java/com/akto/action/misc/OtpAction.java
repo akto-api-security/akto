@@ -4,13 +4,13 @@ import com.akto.action.UserAction;
 import com.akto.dao.OtpMessagesDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.OTPMessage;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
 
 public class OtpAction extends UserAction {
 
-    private static final Logger logger = LoggerFactory.getLogger(OtpAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(OtpAction.class);
 
     private String from;
     private String text;
@@ -34,13 +34,13 @@ public class OtpAction extends UserAction {
     public String execute() {
         Context.accountId.set(1_000_000);
 
-        logger.info(text);
+        loggerMaker.infoAndAddToDb(text, LogDb.DASHBOARD);
         if (text == null || !text.contains("OTP")) {
-            logger.info("But doesn't contain the word 'OTP' ");
+            loggerMaker.infoAndAddToDb("But doesn't contain the word 'OTP' ", LogDb.DASHBOARD);
             return SUCCESS.toUpperCase();
         }
 
-        logger.info("And contains OTP");
+        loggerMaker.infoAndAddToDb("And contains OTP", LogDb.DASHBOARD);
         OTPMessage otpMessage = new OTPMessage(Context.now(), from, text, Context.now());
         OtpMessagesDao.instance.insertOne(otpMessage);
         return SUCCESS.toUpperCase();
@@ -58,7 +58,7 @@ public class OtpAction extends UserAction {
         if (val == null || val.isEmpty()) return ERROR.toUpperCase();
 
         otp = val;
-        logger.info("found otp: " + otp);
+        loggerMaker.infoAndAddToDb("found otp: " + otp, LogDb.DASHBOARD);
 
         return SUCCESS.toUpperCase();
     }
@@ -79,9 +79,9 @@ public class OtpAction extends UserAction {
 
     private Integer latestMessageId = null;
     public String fetchLatestMessageId() {
-        logger.info(apiKey);
-        logger.info(authToken);
-        logger.info(address);
+        loggerMaker.infoAndAddToDb(apiKey, LogDb.DASHBOARD);
+        loggerMaker.infoAndAddToDb(authToken, LogDb.DASHBOARD);
+        loggerMaker.infoAndAddToDb(address, LogDb.DASHBOARD);
         BasicDBObject result;
         try {
             result = makeRequestToMySms();
@@ -112,7 +112,7 @@ public class OtpAction extends UserAction {
             if (val == null || val.isEmpty()) return ERROR.toUpperCase();
 
             otp = val;
-            logger.info("found otp: " + otp);
+            loggerMaker.infoAndAddToDb("found otp: " + otp, LogDb.DASHBOARD);
 
         } catch (Exception e) {
             return ERROR.toUpperCase();
