@@ -182,20 +182,14 @@ public class ApiInfo {
 
     public void calculateActualAuth() {
         List<AuthType> result = new ArrayList<>();
-        Set<AuthType> uniqueAuths = new HashSet<>();
         for (Set<AuthType> authTypes: this.allAuthTypesFound) {
             if (authTypes.contains(AuthType.UNAUTHENTICATED)) {
                 this.actualAuthType = Collections.singletonList(AuthType.UNAUTHENTICATED);
-                uniqueAuths.add(AuthType.UNAUTHENTICATED);
                 return;
             }
-            if (authTypes.size() > 0) {
-                uniqueAuths.addAll(authTypes);
+            if (authTypes.size() == 1) {
+                result.addAll(authTypes);
             }
-        }
-
-        for (AuthType authType: uniqueAuths) {
-            result.add(authType);
         }
 
         this.actualAuthType = result;
