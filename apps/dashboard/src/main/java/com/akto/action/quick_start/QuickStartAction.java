@@ -61,7 +61,7 @@ public class QuickStartAction extends UserAction {
     private String aktoDashboardStackName;
 
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(QuickStartAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(QuickStartAction.class, LogDb.DASHBOARD);
 
     public String fetchQuickStartPageState() {
 
@@ -122,7 +122,7 @@ public class QuickStartAction extends UserAction {
                 }
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(String.format("Error occurred while fetching LBs %s", e), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(String.format("Error occurred while fetching LBs %s", e));
             this.dashboardHasNecessaryRole = false;
         }
         this.awsRegion = System.getenv(Constants.AWS_REGION);
@@ -207,16 +207,16 @@ public class QuickStartAction extends UserAction {
         invokeLambdaIfNecessary(stackState);
         if(Stack.StackStatus.CREATION_FAILED.toString().equalsIgnoreCase(this.stackState.getStatus())){
             AwsResourcesDao.instance.getMCollection().deleteOne(Filters.eq("_id", Context.accountId.get()));
-            loggerMaker.infoAndAddToDb("Current stack status is failed, so we are removing entry from db", LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("Current stack status is failed, so we are removing entry from db");
         }
         if(Stack.StackStatus.DOES_NOT_EXISTS.toString().equalsIgnoreCase(this.stackState.getStatus())){
             AwsResources resources = AwsResourcesDao.instance.findOne(AwsResourcesDao.generateFilter());
             if(resources != null && resources.getLoadBalancers().size() > 0){
                 AwsResourcesDao.instance.getMCollection().deleteOne(AwsResourcesDao.generateFilter());
-                loggerMaker.infoAndAddToDb("Stack does not exists but entry present in DB, removing it", LogDb.DASHBOARD);
+                loggerMaker.infoAndAddToDb("Stack does not exists but entry present in DB, removing it");
                 fetchLoadBalancers();
             } else {
-                loggerMaker.infoAndAddToDb("Nothing set in DB, moving on", LogDb.DASHBOARD);
+                loggerMaker.infoAndAddToDb("Nothing set in DB, moving on");
             }
         }
         return Action.SUCCESS.toUpperCase();
@@ -235,12 +235,12 @@ public class QuickStartAction extends UserAction {
                                 Filters.eq("_id", backwardCompatibility.getId()),
                                 Updates.set(BackwardCompatibility.MIRRORING_LAMBDA_TRIGGERED, true)
                         );
-                        loggerMaker.infoAndAddToDb("Successfully triggered CreateMirrorSession", LogDb.DASHBOARD);
+                        loggerMaker.infoAndAddToDb("Successfully triggered CreateMirrorSession");
                     } catch(Exception e){
-                        loggerMaker.errorAndAddToDb(String.format("Failed to invoke lambda for the first time : %s", e), LogDb.DASHBOARD);
+                        loggerMaker.errorAndAddToDb(String.format("Failed to invoke lambda for the first time : %s", e));
                     }
                 } else {
-                    loggerMaker.infoAndAddToDb("Already invoked", LogDb.DASHBOARD);
+                    loggerMaker.infoAndAddToDb("Already invoked");
                 }
             }
         };

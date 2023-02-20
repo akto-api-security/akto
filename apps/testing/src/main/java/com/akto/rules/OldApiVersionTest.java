@@ -49,7 +49,7 @@ public class OldApiVersionTest extends AuthRequiredTestPlugin{
             try {
                 originalHttpResponse = ApiExecutor.sendRequest(testRequest, true);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while after executing " + subTestName() +" test : " + e, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("Error while after executing " + subTestName() +" test : " + e);
                 oldVersionUrl = decrementUrlVersion(oldVersionUrl, 1, 1);
                 continue;
             }

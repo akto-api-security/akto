@@ -43,7 +43,7 @@ import java.util.regex.Pattern;
 
 public class ApiWorkflowExecutor {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiWorkflowExecutor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiWorkflowExecutor.class, LogDb.TESTING);
     private static final Gson gson = new Gson();
 
     public void init(WorkflowTest workflowTest, ObjectId testingRunId, ObjectId testingRunSummaryId) {
@@ -220,9 +220,9 @@ public class ApiWorkflowExecutor {
             try {
                 int waitInSeconds = Math.min(node.getWorkflowNodeDetails().getWaitInSeconds(), 60);
                 if (waitInSeconds > 0) {
-                    loggerMaker.infoAndAddToDb("WAITING: " + waitInSeconds + " seconds", LogDb.TESTING);
+                    loggerMaker.infoAndAddToDb("WAITING: " + waitInSeconds + " seconds");
                     Thread.sleep(waitInSeconds*1000);
-                    loggerMaker.infoAndAddToDb("DONE WAITING!!!!", LogDb.TESTING);
+                    loggerMaker.infoAndAddToDb("DONE WAITING!!!!");
                 }
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
@@ -242,7 +242,7 @@ public class ApiWorkflowExecutor {
     }
 
     private String extractOtpCode(String text, String regex) {
-        loggerMaker.infoAndAddToDb(regex, LogDb.TESTING);
+        loggerMaker.infoAndAddToDb(regex);
 
         Pattern pattern = Pattern.compile(regex);
         Matcher matcher = pattern.matcher(text);
@@ -297,14 +297,14 @@ public class ApiWorkflowExecutor {
                 RecordedLoginFlowUtil.triggerFlow(recordedLoginFlowInput.getTokenFetchCommand(), payload, 
                 tmpOutputFile.getPath(), tmpErrorFile.getPath(), 0);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("error running recorded flow, retrying " + e.toString(), LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("error running recorded flow, retrying " + e.toString());
                 continue;
             }
 
             try {
                 token = RecordedLoginFlowUtil.fetchToken(tmpOutputFile.getPath(), tmpErrorFile.getPath());
             } catch(Exception e) {
-                loggerMaker.errorAndAddToDb("error fetching token, retrying " + e.toString(), LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("error fetching token, retrying " + e.toString());
                 continue;
             }
             if (token != null) {
@@ -329,8 +329,8 @@ public class ApiWorkflowExecutor {
 
 
     public WorkflowTestResult.NodeResult processApiNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes) {
-        loggerMaker.infoAndAddToDb("\n", LogDb.TESTING);
-        loggerMaker.infoAndAddToDb("NODE: " + node.getId(), LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("\n");
+        loggerMaker.infoAndAddToDb("NODE: " + node.getId());
         List<String> testErrors = new ArrayList<>();
         String nodeId = node.getId();
         WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
@@ -359,9 +359,9 @@ public class ApiWorkflowExecutor {
         try {
             int waitInSeconds = Math.min(workflowNodeDetails.getWaitInSeconds(),60);
             if (waitInSeconds > 0) {
-                loggerMaker.infoAndAddToDb("WAITING: " + waitInSeconds + " seconds", LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("WAITING: " + waitInSeconds + " seconds");
                 Thread.sleep(waitInSeconds*1000);
-                loggerMaker.infoAndAddToDb("DONE WAITING!!!!", LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("DONE WAITING!!!!");
             }
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
@@ -371,7 +371,7 @@ public class ApiWorkflowExecutor {
             try {
                 if (i > 0) {
                     int sleep = node.getWorkflowNodeDetails().getPollRetryDuration();
-                    loggerMaker.infoAndAddToDb("Waiting "+ (sleep/1000) +" before sending another request......", LogDb.TESTING);
+                    loggerMaker.infoAndAddToDb("Waiting "+ (sleep/1000) +" before sending another request......");
                     Thread.sleep(sleep);
                 }
 
@@ -416,12 +416,12 @@ public class ApiWorkflowExecutor {
         ScriptEngine engine = factory.getEngineByName("nashorn");
         try {
             String code = replaceVariables(testValidatorCode, valuesMap, true);
-            loggerMaker.infoAndAddToDb("*******************************************************************", LogDb.TESTING);
-            loggerMaker.infoAndAddToDb("TEST VALIDATOR CODE:", LogDb.TESTING);
-            loggerMaker.infoAndAddToDb(code, LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("*******************************************************************");
+            loggerMaker.infoAndAddToDb("TEST VALIDATOR CODE:");
+            loggerMaker.infoAndAddToDb(code);
             Object o = engine.eval(code);
-            loggerMaker.infoAndAddToDb("TEST VALIDATOR RESULT: " + o.toString(), LogDb.TESTING);
-            loggerMaker.infoAndAddToDb("*******************************************************************", LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("TEST VALIDATOR RESULT: " + o.toString());
+            loggerMaker.infoAndAddToDb("*******************************************************************");
             vulnerable = ! (boolean) o;
         } catch (Exception e) {
             ;
@@ -528,21 +528,21 @@ public class ApiWorkflowExecutor {
 
         boolean userSuppliedQueryParamsNullOrEmpty = queryParams == null || queryParams.trim().length() == 0;
         if (requestUrl != null) {
-            loggerMaker.infoAndAddToDb("requestUrl: " + requestUrl, LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("requestUrl: " + requestUrl);
             String rawUrl = executeCode(requestUrl, valuesMap);
-            loggerMaker.infoAndAddToDb("rawUrl: " + requestUrl, LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("rawUrl: " + requestUrl);
             // this url might contain urlQueryParams. We need to move it queryParams
             String[] rawUrlArr = rawUrl.split("\\?");
             request.setUrl(rawUrlArr[0]);
             if (rawUrlArr.length > 1) {
                 queryFromReplacedUrl = rawUrlArr[1];
             }
-            loggerMaker.infoAndAddToDb("final url: " + request.getUrl(), LogDb.TESTING);
-            loggerMaker.infoAndAddToDb("queryFromReplacedUrl: " + queryFromReplacedUrl, LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("final url: " + request.getUrl());
+            loggerMaker.infoAndAddToDb("queryFromReplacedUrl: " + queryFromReplacedUrl);
         }
 
         if (userSuppliedQueryParamsNullOrEmpty) {
-            loggerMaker.infoAndAddToDb("setting null", LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("setting null");
             request.setQueryParams(null);
         }
 
@@ -560,15 +560,15 @@ public class ApiWorkflowExecutor {
         boolean queryFromReplacedUrlNullOrEmpty = queryFromReplacedUrl == null || queryFromReplacedUrl.trim().isEmpty();
 
         if (!userSuppliedQueryParamsNullOrEmpty) {
-            loggerMaker.infoAndAddToDb("user has supplied query params", LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("user has supplied query params");
             String finalQueryParams = executeCode(queryParams, valuesMap);
-            loggerMaker.infoAndAddToDb("finalQueryParams: " + finalQueryParams, LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("finalQueryParams: " + finalQueryParams);
             if (queryFromReplacedUrlNullOrEmpty) {
                 request.setQueryParams(finalQueryParams);
             } else {
                 // combine original query params and user defined query params and latter overriding former
                 String combinedQueryParams = OriginalHttpRequest.combineQueryParams(queryFromReplacedUrl, finalQueryParams);
-                loggerMaker.infoAndAddToDb("combinedQueryParams: " + combinedQueryParams, LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("combinedQueryParams: " + combinedQueryParams);
                 request.setQueryParams(combinedQueryParams);
             }
         } else if (!queryFromReplacedUrlNullOrEmpty) {
@@ -621,7 +621,7 @@ public class ApiWorkflowExecutor {
             if (key == null) continue;
             Object obj = valuesMap.get(key);
             if (obj == null) {
-                loggerMaker.errorAndAddToDb("couldn't find: " + key, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("couldn't find: " + key);
                 throw new Exception("Couldn't find " + key);
             }
             String val = obj.toString();

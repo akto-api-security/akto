@@ -37,7 +37,7 @@ public class Main {
     public static final String VXLAN_ID = "vxlanId";
     public static final String VPC_CIDR = "vpc_cidr";
     private static final Logger logger = LoggerFactory.getLogger(HttpCallParser.class);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class, LogDb.RUNTIME);
 
     // this sync threshold time is used for deleting sample data
     public static final int sync_threshold_time = 120;
@@ -79,7 +79,7 @@ public class Main {
                 }
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in try collection" + e, LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error in try collection" + e);
         }
 
         return ret;
@@ -226,7 +226,7 @@ public class Main {
                         httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
                          
                     } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb("Error while parsing kafka message " + e, LogDb.RUNTIME);
+                        loggerMaker.errorAndAddToDb("Error while parsing kafka message " + e);
                         continue;
                     }
                     String accountId = httpResponseParams.getAccountId();
@@ -241,7 +241,7 @@ public class Main {
                     try {
                         accountIdInt = Integer.parseInt(accountId);
                     } catch (Exception ignored) {
-                        loggerMaker.errorAndAddToDb("Account id not string", LogDb.RUNTIME);
+                        loggerMaker.errorAndAddToDb("Account id not string");
                         continue;
                     }
 
@@ -303,7 +303,7 @@ public class Main {
                                 } catch (Exception e) {
                                     // force close it
                                     kafkaProducer.close();
-                                    loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.RUNTIME);
+                                    loggerMaker.errorAndAddToDb(e.getMessage());
                                 }
                             }
                         }
@@ -311,7 +311,7 @@ public class Main {
                         // flow.init(accWiseResponse);
                         aktoPolicy.main(accWiseResponse, apiCatalogSync, fetchAllSTI);
                     } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
+                        loggerMaker.errorAndAddToDb(e.toString());
                     }
                 }
             }
@@ -335,7 +335,7 @@ public class Main {
         try {
             AccountSettingsDao.instance.updateVersion(AccountSettings.API_RUNTIME_VERSION);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error while updating dashboard version: " + e.getMessage(), LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error while updating dashboard version: " + e.getMessage());
         }
 
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("_id", 0);

@@ -34,7 +34,7 @@ import java.util.jar.JarOutputStream;
 
 public class BurpJarAction extends UserAction implements ServletResponseAware, ServletRequestAware {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(BurpJarAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(BurpJarAction.class, LogDb.DASHBOARD);
     @Override
     public String execute() {
         String host = servletRequest.getHeader("Origin");
@@ -126,7 +126,7 @@ public class BurpJarAction extends UserAction implements ServletResponseAware, S
                 }
 
             } catch (Exception ex) {
-                loggerMaker.errorAndAddToDb(ex.toString(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(ex.toString());
             }
 
         } finally {
@@ -141,7 +141,7 @@ public class BurpJarAction extends UserAction implements ServletResponseAware, S
 
         servletResponse.setContentType("application/octet-stream");
         servletResponse.setHeader("Content-Disposition", "filename=\"Akto.jar\"");
-        loggerMaker.infoAndAddToDb("set header done", LogDb.DASHBOARD);
+        loggerMaker.infoAndAddToDb("set header done");
         File srcFile = new File(tmpJarFile.getPath());
         try {
             FileUtils.copyFile(srcFile, servletResponse.getOutputStream());
@@ -150,7 +150,7 @@ public class BurpJarAction extends UserAction implements ServletResponseAware, S
             return ERROR.toUpperCase();
         }
 
-        loggerMaker.infoAndAddToDb("done", LogDb.DASHBOARD);
+        loggerMaker.infoAndAddToDb("done");
 
         credFile.delete();
         tmpJarFile.delete();

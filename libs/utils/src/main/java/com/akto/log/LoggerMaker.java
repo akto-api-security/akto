@@ -27,24 +27,26 @@ public class LoggerMaker  {
         TESTING,RUNTIME,DASHBOARD
     }
 
-    public LoggerMaker(Class<?> c) {
+    public LogDb db;
+
+    public LoggerMaker(Class<?> c, LogDb db) {
         aClass = c;
         logger = LoggerFactory.getLogger(c);
     }
 
-    public void errorAndAddToDb(String err, LogDb db) {
+    public void errorAndAddToDb(String err) {
         logger.error(err);
         try{
-            insert(err, "error", db);
+            insert(err, "error");
         } catch (Exception e){
             e.printStackTrace();
         }
     }
 
-    public void infoAndAddToDb(String info, LogDb db) {
+    public void infoAndAddToDb(String info) {
         logger.info(info);
         try{
-            insert(info, "info",db);
+            insert(info, "info");
         } catch (Exception e){
             e.printStackTrace();
         }
@@ -62,7 +64,7 @@ public class LoggerMaker  {
         return true;
     }
     
-    private void insert(String info, String key, LogDb db) {
+    private void insert(String info, String key) {
         String text = aClass + " : " + info;
         Log log = new Log(text, key, Context.now());
         

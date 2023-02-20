@@ -34,7 +34,7 @@ public class WorkflowTestAction extends UserAction {
     int logFetchStartTime;
     int logFetchEndTime;
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(WorkflowTestAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(WorkflowTestAction.class, LogDb.DASHBOARD);
 
     public String fetchWorkflowTests() {
         workflowTests = WorkflowTestsDao.instance.findAll(new BasicDBObject());

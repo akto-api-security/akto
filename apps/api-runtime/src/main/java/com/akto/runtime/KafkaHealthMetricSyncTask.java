@@ -22,7 +22,7 @@ public class KafkaHealthMetricSyncTask implements Runnable{
     Consumer<String, String>  consumer;
     public Map<String,KafkaHealthMetric> kafkaHealthMetricsMap = new HashMap<>();
     private static final Logger logger = LoggerFactory.getLogger(KafkaHealthMetricSyncTask.class);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(APICatalogSync.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(APICatalogSync.class, LogDb.RUNTIME);
 
 
     public KafkaHealthMetricSyncTask(Consumer<String, String>  consumer) {
@@ -59,7 +59,7 @@ public class KafkaHealthMetricSyncTask implements Runnable{
             }
             logger.info("SYNC DONE");
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("ERROR in kafka data sync from api runtime" + e, LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("ERROR in kafka data sync from api runtime" + e);
         }
     }
 }

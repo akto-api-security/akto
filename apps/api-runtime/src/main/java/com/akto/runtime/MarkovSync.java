@@ -26,7 +26,7 @@ public class MarkovSync {
     private final int last_sync_thresh;
     private final int user_thresh;
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(MarkovSync.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(MarkovSync.class, LogDb.RUNTIME);
 
     public MarkovSync(int user_thresh,int counter_thresh, int last_sync_thresh) {
         this.last_sync = Context.now();
@@ -91,12 +91,12 @@ public class MarkovSync {
 
     private void syncWithDb() {
         List<WriteModel<Markov>> bulkUpdates = getBulkUpdates();
-        loggerMaker.infoAndAddToDb("adding " + bulkUpdates.size() + " updates", LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("adding " + bulkUpdates.size() + " updates");
         if (bulkUpdates.size() > 0) {
             try {
                 MarkovDao.instance.getMCollection().bulkWrite(bulkUpdates);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e.getMessage());
             }
         }
 
@@ -113,7 +113,7 @@ public class MarkovSync {
             try {
                 userIdentifier = getUserIdentifier(userIdentifierName, httpRequestParams);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e.getMessage());
                 continue;
             }
             this.counter += 1;

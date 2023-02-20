@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
 import static com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL;
 
 public class Main {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.DASHBOARD);
     private static final ObjectMapper mapper = new ObjectMapper();
 
 
@@ -64,7 +64,7 @@ public class Main {
                 try {
                     addPathItems(responseCode, paths, url, method, singleTypeInfoList, includeHeaders);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("ERROR in buildPathsFromSingleTypeInfosPerUrl  " + e, LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb("ERROR in buildPathsFromSingleTypeInfosPerUrl  " + e);
                 }
             }
         }
@@ -75,7 +75,7 @@ public class Main {
         try {
             schema = buildSchema(singleTypeInfoList);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("ERROR in building schema in addPathItems " + e, LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb("ERROR in building schema in addPathItems " + e);
         }
         if (schema == null) {
             schema = new ObjectSchema();
@@ -85,7 +85,7 @@ public class Main {
         try{
             headerParameters = buildHeaders(singleTypeInfoList);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("ERROR in building headers in addPathItems " + e, LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb("ERROR in building headers in addPathItems " + e);
         }
         
         PathBuilder.addPathItem(paths, url, method, responseCode, schema, headerParameters, includeHeaders);

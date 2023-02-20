@@ -33,7 +33,7 @@ public class HttpCallParser {
     private final int sync_threshold_time;
     private int sync_count = 0;
     private int last_synced;
-    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class, LogDb.RUNTIME);
     public APICatalogSync apiCatalogSync;
     private Map<String, Integer> hostNameToIdMap = new HashMap<>();
 
@@ -140,7 +140,7 @@ public class HttpCallParser {
                 flag = true;
                 break;
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while inserting apiCollection, trying again " + i + " " + e.getMessage(), LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("Error while inserting apiCollection, trying again " + i + " " + e.getMessage());
             }
         }
         if (flag) { // flag tells if we were successfully able to insert collection
@@ -219,7 +219,7 @@ public class HttpCallParser {
 
                         hostNameToIdMap.put(key, apiCollectionId);
                     } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb("Failed to create collection for host : " + hostName, LogDb.RUNTIME);
+                        loggerMaker.errorAndAddToDb("Failed to create collection for host : " + hostName);
                         createCollectionSimple(vxlanId);
                         hostNameToIdMap.put("null " + vxlanId, vxlanId);
                         apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
@@ -275,7 +275,7 @@ public class HttpCallParser {
             }
         }
         
-        loggerMaker.infoAndAddToDb("added " + count + " urls", LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("added " + count + " urls");
         return ret;
     }
 

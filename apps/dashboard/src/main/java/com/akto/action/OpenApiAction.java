@@ -23,7 +23,7 @@ import java.util.Map;
 
 public class OpenApiAction extends UserAction implements ServletResponseAware {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(OpenApiAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(OpenApiAction.class, LogDb.DASHBOARD);
     private int apiCollectionId;
     private String openAPIString = null;
     private boolean includeHeaders = true;
@@ -45,7 +45,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
             OpenAPI openAPI = Main.init(apiCollection.getDisplayName(),stiList, includeHeaders, host);
             openAPIString = Main.convertOpenApiToJSON(openAPI);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("ERROR while downloading openApi file " + e, LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb("ERROR while downloading openApi file " + e);
             return ERROR.toUpperCase();
         }
 

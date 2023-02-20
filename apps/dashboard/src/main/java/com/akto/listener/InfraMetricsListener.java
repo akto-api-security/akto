@@ -16,7 +16,7 @@ import java.io.File;
 
 public class InfraMetricsListener implements ServletContextListener {
     public static PrometheusMeterRegistry registry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(InfraMetricsListener.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(InfraMetricsListener.class, LogDb.DASHBOARD);
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
 
@@ -28,7 +28,7 @@ public class InfraMetricsListener implements ServletContextListener {
             new ProcessorMetrics().bindTo(registry); // metrics related to the CPU stats
             new UptimeMetrics().bindTo(registry);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("ERROR while setting up InfraMetricsListener", LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb("ERROR while setting up InfraMetricsListener");
         }
     }
 }

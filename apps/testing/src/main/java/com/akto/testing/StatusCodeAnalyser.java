@@ -41,15 +41,15 @@ public class StatusCodeAnalyser {
     }
 
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(StatusCodeAnalyser.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(StatusCodeAnalyser.class, LogDb.TESTING);
     public static int MAX_COUNT = 30;
     public static void run() {
-        loggerMaker.infoAndAddToDb("Running status analyser", LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("Running status analyser");
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = SampleMessageStore.fetchSampleMessages();
 
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
         if (authMechanism == null) {
-            loggerMaker.errorAndAddToDb("No auth mechanism", LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("No auth mechanism");
             return;
         }
         Map<Set<String>, Map<String,Integer>> frequencyMap = new HashMap<>();
@@ -63,17 +63,17 @@ public class StatusCodeAnalyser {
                 boolean success = fillFrequencyMap(messages, authMechanism, frequencyMap);
                 if (success)  {
                     count += 1;
-                    loggerMaker.infoAndAddToDb("count: " + count, LogDb.TESTING);
+                    loggerMaker.infoAndAddToDb("count: " + count);
                 }
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while filling frequency map: " + e, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("Error while filling frequency map: " + e);
             }
             inc += 1;
         }
 
         calculateResult(frequencyMap, 5);
 
-        loggerMaker.infoAndAddToDb("result of status code analyser : " + result, LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("result of status code analyser : " + result);
     }
 
     public static void calculateResult(Map<Set<String>, Map<String,Integer>> frequencyMap, int threshold) {

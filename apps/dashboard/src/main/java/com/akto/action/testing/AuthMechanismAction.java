@@ -7,6 +7,7 @@ import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dto.testing.*;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.TestExecutor;
 import com.akto.util.enums.LoginFlowEnums;
 import com.google.gson.Gson;
@@ -40,7 +41,7 @@ public class AuthMechanismAction extends UserAction {
 
     private String nodeId;
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(AuthMechanismAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(AuthMechanismAction.class, LogDb.DASHBOARD);
 
     public String addAuthMechanism() {
         List<AuthParam> authParams = new ArrayList<>();

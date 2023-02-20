@@ -26,7 +26,7 @@ import java.util.*;
 public class SampleMessageStore {
 
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(SampleMessageStore.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(SampleMessageStore.class, LogDb.TESTING);
     public static Map<String, SingleTypeInfo> buildSingleTypeInfoMap(TestingEndpoints testingEndpoints) {
         Map<String, SingleTypeInfo> singleTypeInfoMap = new HashMap<>();
         if (testingEndpoints == null) return singleTypeInfoMap;
@@ -65,7 +65,7 @@ public class SampleMessageStore {
                 singleTypeInfoMap.put(singleTypeInfo.composeKeyWithCustomSubType(SingleTypeInfo.GENERIC), singleTypeInfo);
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while building STI map: " + e, LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Error while building STI map: " + e);
         }
 
         return singleTypeInfoMap;
@@ -105,7 +105,7 @@ public class SampleMessageStore {
             try {
                 messages.add(RawApi.buildFromMessage(message));
             } catch(Exception e) {
-                loggerMaker.errorAndAddToDb("Error while building RawAPI for "+ apiInfoKey +" : " + e, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("Error while building RawAPI for "+ apiInfoKey +" : " + e);
             }
 
         }

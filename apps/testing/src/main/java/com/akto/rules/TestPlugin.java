@@ -37,7 +37,7 @@ import static com.akto.runtime.APICatalogSync.trimAndSplit;
 public abstract class TestPlugin {
     static ObjectMapper mapper = new ObjectMapper();
     static JsonFactory factory = mapper.getFactory();
-    final LoggerMaker loggerMaker = new LoggerMaker(this.getClass());
+    final LoggerMaker loggerMaker = new LoggerMaker(this.getClass(), LogDb.TESTING);
 
     private static final Logger logger = LoggerFactory.getLogger(TestPlugin.class);
     private static final Gson gson = new Gson();
@@ -71,7 +71,7 @@ public abstract class TestPlugin {
             try {
                 version = Integer.parseInt(code);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while parsing integer " + code + " : " + e, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("Error while parsing integer " + code + " : " + e);
                 return null;
             }
             int newVersion = version - decrementValue;
@@ -150,7 +150,7 @@ public abstract class TestPlugin {
         try {
             message = RedactSampleData.convertOriginalReqRespToString(request, null);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while converting testRequest object to string : " + e, LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Error while converting testRequest object to string : " + e);
         }
 
         return new TestResult(message, originalMessage, Collections.singletonList(testError), 0, false, TestResult.Confidence.HIGH, testInfo);

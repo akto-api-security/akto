@@ -35,7 +35,7 @@ public class Lambda implements ServerlessFunction {
 
     }
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ServerlessFunction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ServerlessFunction.class, LogDb.DASHBOARD);
 
     private static final AWSLambda awsLambda = AWSLambdaClientBuilder.standard().build();
 
@@ -66,7 +66,7 @@ public class Lambda implements ServerlessFunction {
 
             if (keysUpdatedCount == 0) {
                 // no env vars to update, returning
-                loggerMaker.infoAndAddToDb("No env vars to update for funciton: " + functionName + ", returning", LogDb.DASHBOARD);
+                loggerMaker.infoAndAddToDb("No env vars to update for funciton: " + functionName + ", returning");
                 return;
             }
 
@@ -77,9 +77,9 @@ public class Lambda implements ServerlessFunction {
             req.setEnvironment(updatedEnvironment);
 
             awsLambda.updateFunctionConfiguration(req);
-            loggerMaker.infoAndAddToDb("Succeefully updated function configuration for function: " + functionName, LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("Succeefully updated function configuration for function: " + functionName);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e.toString());
         }
     }
 
@@ -99,13 +99,13 @@ public class Lambda implements ServerlessFunction {
         InvokeResult invokeResult = null;
         try {
 
-            loggerMaker.infoAndAddToDb("Invoke lambda "+functionName, LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("Invoke lambda "+functionName);
             invokeResult = awsLambda.invoke(invokeRequest);
 
             String resp = new String(invokeResult.getPayload().array(), StandardCharsets.UTF_8);
-            loggerMaker.infoAndAddToDb(String.format("Function: %s, response: %s", functionName, resp), LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb(String.format("Function: %s, response: %s", functionName, resp));
         } catch (AWSLambdaException e) {
-            loggerMaker.errorAndAddToDb(String.format("Error while invoking Lambda, %s : %s", functionName, e.toString()), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(String.format("Error while invoking Lambda, %s : %s", functionName, e.toString()));
         }
 
 

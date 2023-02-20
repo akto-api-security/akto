@@ -16,7 +16,7 @@ import java.util.Arrays;
 
 public class InfraMetricsFilter implements Filter {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(InfraMetricsFilter.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(InfraMetricsFilter.class, LogDb.DASHBOARD);
 
     @Override
     public void init(FilterConfig filterConfig) { }
@@ -54,7 +54,7 @@ public class InfraMetricsFilter implements Filter {
                     .register(InfraMetricsListener.registry)
                     .increment();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(String.format("Inframetrics filter Error: %s", e.toString()), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(String.format("Inframetrics filter Error: %s", e.toString()));
         }
 
     }

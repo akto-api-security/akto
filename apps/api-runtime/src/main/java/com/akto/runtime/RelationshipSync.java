@@ -29,7 +29,7 @@ public class RelationshipSync {
     public Map<String,Map<String, Map<String, Set<Relationship.ApiRelationInfo>>>> userWiseParameterMap = new HashMap<>();
     ObjectMapper mapper = new ObjectMapper();
     JsonFactory factory = mapper.getFactory();
-    private static final LoggerMaker loggerMaker = new LoggerMaker(RelationshipSync.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(RelationshipSync.class, LogDb.RUNTIME);
 
     public RelationshipSync(int user_thresh, int counter_thresh, int last_sync_thresh) {
         this.user_thresh = user_thresh;
@@ -109,12 +109,12 @@ public class RelationshipSync {
 
     private void syncWithDb() {
         List<WriteModel<Relationship>> bulkUpdates = getBulkUpdates();
-        loggerMaker.infoAndAddToDb("adding " + bulkUpdates.size() + " updates", LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("adding " + bulkUpdates.size() + " updates");
         if (bulkUpdates.size() > 0) {
             try {
                 RelationshipDao.instance.getMCollection().bulkWrite(bulkUpdates);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e.getMessage());
             }
         }
 
@@ -138,7 +138,7 @@ public class RelationshipSync {
             try {
                 buildParameterMap(httpResponseParam, userIdentifierName);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e.getMessage());
                 continue;
             }
             counter += 1;

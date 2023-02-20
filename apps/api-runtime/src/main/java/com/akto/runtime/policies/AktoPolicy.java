@@ -41,7 +41,7 @@ public class AktoPolicy {
     private int currentBatchSize = 0;
 
     private static final Logger logger = LoggerFactory.getLogger(AktoPolicy.class);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(AktoPolicy.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(AktoPolicy.class, LogDb.RUNTIME);
 
     public void fetchFilters() {
         this.filters = RuntimeFilterDao.instance.findAll(new BasicDBObject());
@@ -108,7 +108,7 @@ public class AktoPolicy {
             try {
                 fillApiInfoInCatalog(apiInfo, true);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e.getMessage() + " " + e.getCause(), LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e.getMessage() + " " + e.getCause());
             }
         }
 
@@ -116,7 +116,7 @@ public class AktoPolicy {
             try {
                 fillApiInfoInCatalog(apiInfo, false);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e.getMessage() + " " + e.getCause(), LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e.getMessage() + " " + e.getCause());
             }
         }
 
@@ -125,7 +125,7 @@ public class AktoPolicy {
             try{
                 fillFilterSampleDataInCatalog(filterSampleData);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e.getMessage() + " " + e.getCause(), LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e.getMessage() + " " + e.getCause());
             }
         }
 
@@ -133,7 +133,7 @@ public class AktoPolicy {
             try {
                 fillFilterSampleDataInCatalog(filterSampleData);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e.getMessage() + " " + e.getCause(), LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e.getMessage() + " " + e.getCause());
             }
         }
 
@@ -142,17 +142,17 @@ public class AktoPolicy {
     }
 
     public void syncWithDb(boolean initialising, Map<Integer, APICatalog> delta, boolean fetchAllSTI) {
-        loggerMaker.infoAndAddToDb("Syncing with db", LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("Syncing with db");
         if (!initialising) {
             UpdateReturn updateReturn = AktoPolicy.getUpdates(apiInfoCatalogMap);
             List<WriteModel<ApiInfo>> writesForApiInfo = updateReturn.updatesForApiInfo;
             List<WriteModel<FilterSampleData>> writesForSampleData = updateReturn.updatesForSampleData;
-            loggerMaker.infoAndAddToDb("Writing to db: " + "writesForApiInfoSize="+writesForApiInfo.size() + " writesForSampleData="+ writesForSampleData.size(), LogDb.RUNTIME);
+            loggerMaker.infoAndAddToDb("Writing to db: " + "writesForApiInfoSize="+writesForApiInfo.size() + " writesForSampleData="+ writesForSampleData.size());
             try {
                 if (writesForApiInfo.size() > 0) ApiInfoDao.instance.getMCollection().bulkWrite(writesForApiInfo);
                 if (!redact && writesForSampleData.size() > 0) FilterSampleDataDao.instance.getMCollection().bulkWrite(writesForSampleData);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e.toString());
             }
         }
 
@@ -293,7 +293,7 @@ public class AktoPolicy {
             try {
                 process(httpResponseParams);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e.toString());
                 ;
             }
             currentBatchSize += 1;

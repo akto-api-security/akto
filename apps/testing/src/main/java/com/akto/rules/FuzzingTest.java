@@ -6,7 +6,6 @@ import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.info.NucleiTestInfo;
-import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.testing.ApiExecutor;
@@ -69,7 +68,7 @@ public class FuzzingTest extends TestPlugin {
             try {
                 originalHttpResponse = ApiExecutor.sendRequest(originalHttpRequest,true);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while after executing " + subTestName() +"test : " + e, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("Error while after executing " + subTestName() +"test : " + e);
                 return null;
             }
             String originalMessage = RedactSampleData.convertOriginalReqRespToString(originalHttpRequest, originalHttpResponse);
@@ -107,7 +106,7 @@ public class FuzzingTest extends TestPlugin {
         try {
             downloadLinks(this.tempTemplatePath, outputDir);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while downloading links: " + e, LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Error while downloading links: " + e);
             return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.FAILED_DOWNLOADING_PAYLOAD_FILES, testRequest, nucleiTestInfo);
         }
 
@@ -115,7 +114,7 @@ public class FuzzingTest extends TestPlugin {
         try {
              fullUrlWithHost = testRequest.getFullUrlIncludingDomain();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while getting full url including domain: " + e, LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Error while getting full url including domain: " + e);
             return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.FAILED_BUILDING_URL_WITH_DOMAIN, testRequest, nucleiTestInfo);
         }
 
@@ -164,7 +163,7 @@ public class FuzzingTest extends TestPlugin {
             testResults = vulnerableTestResults;
 
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while running nuclei test: " + e, LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Error while running nuclei test: " + e);
             return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest, nucleiTestInfo);
         }
 
