@@ -22,6 +22,8 @@ import org.yaml.snakeyaml.Yaml;
 
 import java.io.*;
 import java.net.URL;
+import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 public class FuzzingTest extends TestPlugin {
@@ -32,6 +34,8 @@ public class FuzzingTest extends TestPlugin {
     private String tempTemplatePath;
     private final String subcategory;
     private String testSourceConfigCategory;
+
+    public static final int payloadLineLimit = 100;
 
     public FuzzingTest(String testRunId, String testRunResultSummaryId, String origTemplatePath, String subcategory, String testSourceConfigCategory) {
         this.testRunId = testRunId;
@@ -130,6 +134,9 @@ public class FuzzingTest extends TestPlugin {
 
             int totalCount = Math.min(Math.min(nucleiResult.attempts.size(), nucleiResult.metaData.size()), 100);
 
+            List<TestResult> vulnerableTestResults = new ArrayList<>();
+            List<TestResult> nonVulnerableTestResults = new ArrayList<>();
+
             for (int idx=0; idx < totalCount; idx++) {
                 Pair<OriginalHttpRequest, OriginalHttpResponse> pair = nucleiResult.attempts.get(idx);
                 OriginalHttpResponse testResponse = pair.getSecond();
@@ -145,10 +152,17 @@ public class FuzzingTest extends TestPlugin {
                 TestResult testResult = buildTestResult(
                     pair.getFirst(), apiExecutionDetails.testResponse, rawApi.getOriginalMessage(), apiExecutionDetails.percentageMatch, vulnerable, nucleiTestInfo
                 );
-        
-                testResults.add(testResult);
 
+                if (vulnerable) {
+                    vulnerableTestResults.add(testResult);
+                } else {
+                    nonVulnerableTestResults.add(testResult);
+                }
             }
+
+            vulnerableTestResults.addAll(nonVulnerableTestResults);
+            testResults = vulnerableTestResults;
+
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while running nuclei test: " + e, LogDb.TESTING);
             return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest, nucleiTestInfo);
@@ -178,7 +192,22 @@ public class FuzzingTest extends TestPlugin {
 
         for (String url: urlsToDownload) {
             String[] fileNameList = url.split("/");
-            FileUtils.copyURLToFile(new URL(url), new File(outputDir + "/" + fileNameList[fileNameList.length-1]));
+
+            List<String> lines = new ArrayList<>();
+            URLConnection urlConnection = new URL(url).openConnection();
+            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(urlConnection.getInputStream()));
+            String line;
+            while ((line = bufferedReader.readLine()) != null) {
+                lines.add(line);
+            }
+            bufferedReader.close();
+
+            if (lines.size() > payloadLineLimit) {
+                Collections.shuffle(lines);
+                lines = lines.subList(0, payloadLineLimit);
+            }
+
+            FileUtils.writeLines(new File(outputDir + "/" + fileNameList[fileNameList.length-1]), StandardCharsets.UTF_8.name(), lines);
         }
     }
 

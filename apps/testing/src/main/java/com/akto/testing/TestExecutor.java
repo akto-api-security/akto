@@ -28,8 +28,6 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -43,6 +41,7 @@ import java.util.concurrent.*;
 public class TestExecutor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class);
+    public static long acceptableSizeInBytes = 5_000_000;
 
 
 
@@ -151,7 +150,7 @@ public class TestExecutor {
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
             try {
                 String host = findHost(apiInfoKey, testingUtil);
-                if (hostsToApiCollectionMap.get(host) == null) {
+                if (host != null && hostsToApiCollectionMap.get(host) == null) {
                     hostsToApiCollectionMap.put(host, apiInfoKey.getApiCollectionId());
                 }
             } catch (URISyntaxException e) {
@@ -196,9 +195,6 @@ public class TestExecutor {
             Integer apiCollectionId = hostsToApiCollectionMap.get(host);
             List<TestingRunResult> nucleiResults = runNucleiTests(new ApiInfo.ApiInfoKey(apiCollectionId, host, URLMethods.Method.GET), testingRun, testingUtil, summaryId);
             if (nucleiResults != null && !nucleiResults.isEmpty()) {
-                TestingRunResultDao.instance.insertMany(nucleiResults);
-                TestingIssuesHandler handler = new TestingIssuesHandler();
-                handler.handleIssuesCreationFromTestingRunResults(nucleiResults);
                 testingRunResults.addAll(nucleiResults);
             }
         }
@@ -286,7 +282,13 @@ public class TestExecutor {
 
                         FuzzingTest fuzzingTest = new FuzzingTest(testingRun.getId().toHexString(), summaryId.toHexString(), origTemplateURL, subcategory, testSubCategory);
                         TestingRunResult fuzzResult = runTest(fuzzingTest, apiInfoKey, testingUtil, testingRun.getId(), summaryId);
-                        if (fuzzResult != null) testingRunResults.add(fuzzResult);        
+                        if (fuzzResult != null) {
+                            trim(fuzzResult);
+                            TestingRunResultDao.instance.insertOne(fuzzResult);
+                            TestingIssuesHandler handler = new TestingIssuesHandler();
+                            handler.handleIssuesCreationFromTestingRunResults(Collections.singletonList(fuzzResult));
+                            testingRunResults.add(fuzzResult);
+                        }
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb("unable to execute fuzzing for " + testSubCategory, LogDb.TESTING);
                     }
@@ -432,6 +434,7 @@ public class TestExecutor {
                 String size = testingRunResults == null ? "null" : testingRunResults.size()+"";
                 loggerMaker.infoAndAddToDb("testingRunResults size: " + size, LogDb.TESTING);
                 if (testingRunResults != null && !testingRunResults.isEmpty()) {
+                    trim(testingRunResults);
                     TestingRunResultDao.instance.insertMany(testingRunResults);
                     loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);
                     //Creating issues from testingRunResults
@@ -445,6 +448,38 @@ public class TestExecutor {
 
         latch.countDown();
         return testingRunResults;
+    }
+
+    public static void trim(TestingRunResult testingRunResult) {
+        List<TestResult> testResults = testingRunResult.getTestResults();
+        int endIdx = testResults.size();
+        long currentSize = 0;
+
+        for (int idx=0;idx< testResults.size();idx++) {
+            TestResult testResult = testResults.get(idx);
+
+            String originalMessage = testResult.getOriginalMessage();
+            long originalMessageSize = originalMessage == null ? 0 : originalMessage.getBytes().length;
+
+            String message = testResult.getMessage();
+            long messageSize = message == null ? 0 : message.getBytes().length;
+
+            currentSize += originalMessageSize + messageSize;
+
+            if (currentSize > acceptableSizeInBytes) {
+                endIdx = idx;
+                break;
+            }
+        }
+
+        testResults = testResults.subList(0,endIdx);
+        testingRunResult.setTestResults(testResults);
+    }
+
+    public void trim(List<TestingRunResult> testingRunResults) {
+        for (TestingRunResult testingRunResult: testingRunResults) {
+            trim(testingRunResult);
+        }
     }
 
     public List<TestingRunResult> start(ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId,
