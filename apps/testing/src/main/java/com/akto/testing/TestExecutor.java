@@ -150,7 +150,7 @@ public class TestExecutor {
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
             try {
                 String host = findHost(apiInfoKey, testingUtil);
-                if (hostsToApiCollectionMap.get(host) == null) {
+                if (host != null && hostsToApiCollectionMap.get(host) == null) {
                     hostsToApiCollectionMap.put(host, apiInfoKey.getApiCollectionId());
                 }
             } catch (URISyntaxException e) {
