@@ -122,7 +122,7 @@ export default {
             startTime = Math.floor(startTime / 1000);
             endTime = Math.floor(endTime / 1000)
             await api.fetchLogsFromDb(startTime, endTime, this.logGroupName).then((resp) => {
-                this.logs = resp.logs;
+                this.logs.push(...resp.logs);
                 for (var i = 0; i < resp.logs.length; i++) {
                     var timeStamp = resp.logs[i].timestamp;
                     var d1 = func.epochToDateTime(timeStamp)
