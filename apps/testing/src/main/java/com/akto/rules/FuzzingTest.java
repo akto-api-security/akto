@@ -64,7 +64,7 @@ public class FuzzingTest extends TestPlugin {
             try {
                 originalHttpResponse = ApiExecutor.sendRequest(originalHttpRequest,true);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while after executing " + subTestName() +"test : " + e);
+                loggerMaker.errorAndAddToDb("Error while after executing " + subcategory +" test : " + e);
                 return null;
             }
             String originalMessage = RedactSampleData.convertOriginalReqRespToString(originalHttpRequest, originalHttpResponse);
