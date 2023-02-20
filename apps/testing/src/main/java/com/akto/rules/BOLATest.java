@@ -77,6 +77,7 @@ public class BOLATest extends AuthRequiredRunAllTestPlugin {
         try {
             apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApiDuplicate);
         } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while after executing BOLA test: " + e);
             return new ExecutorResult(false, null, new ArrayList<>(), 0, rawApi,
                     TestResult.TestError.API_REQUEST_FAILED, testRequest, null, null);
         }

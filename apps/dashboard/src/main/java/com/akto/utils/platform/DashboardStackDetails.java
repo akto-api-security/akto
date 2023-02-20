@@ -12,6 +12,7 @@ public class DashboardStackDetails {
 
     public static final String AKTO_DASHBOARD_ROLE = "AktoDashboardRole";
 
+    public static final String AKTO_DASHBOARD_AUTO_SCALING_GROUP = "AktoDashboardAutoScalingGroup";
 
     public static final String AKTO_LB_DASHBOARD = "AktoLBDashboard";
 

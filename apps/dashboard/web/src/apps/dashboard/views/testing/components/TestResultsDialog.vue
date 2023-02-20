@@ -97,12 +97,16 @@
                     </template>
                     <template slot="Attempt" v-if="jsonAdvance && jsonAdvance['message']">
                         <div >
+                            <div v-if="getNucleiFileName(testingRunResult.testSubType)" style="margin-left: 24px" class="description-title mt-4" >
+                                <span> Nuclei template:</span> 
+                                <a target="_blank" :href="testingRunResult.testSubType"> <span style="color: rgb(98, 0, 234)" >{{getNucleiFileName(testingRunResult.testSubType)}}</span> </a>
+                            </div>
                             <div v-if="jsonBasic['errors']" class="test-errors-class">
                                 {{ this.jsonBasic["errors"] }}
                             </div>
-                            <div style="margin: 24px">
+                            <div style="margin-left: 24px">
                                 <div class="d-flex jc-sb mr-3">
-                                    <span>Test response matches {{ percentageMatch }}% with original API response</span>
+                                    <span class="description-title mt-4">Test response matches {{ percentageMatch }}% with original API response</span>
                                     <v-btn v-if="messagesBasic.length > 1" icon @click="nextClicked">
                                         <v-icon>$fas_angle-double-right</v-icon>
                                     </v-btn>
@@ -149,6 +153,9 @@ export default {
         }
     },
     methods: {
+        getNucleiFileName(path) {
+            return path.startsWith("http") ? path.substring(path.lastIndexOf('/')+1) : null
+        },
         getTabsContent() {
             if (this.messagesBasic.length > 1) {
                 return { 'Attempt': this.messagesBasic.length }

@@ -69,8 +69,9 @@ const changes = {
             state.loading = true
             state.lastFetched = new Date() / 1000
             return api.loadRecentEndpoints(startTimestamp, endTimestamp).then((resp) => {
+                resp.data.endpoints.sort((x, y)  => x.startTs > y.startTs ? 1 : -1)
                 commit('SAVE_API_COLLECTION', {data: resp.data}, options)
-                api.loadSensitiveParameters().then(allSensitiveFields => {
+                api.fetchSensitiveParamsForEndpoints(resp.data.endpoints.map(x => x._id.url)).then(allSensitiveFields => {
                     commit('SAVE_SENSITIVE', allSensitiveFields.data.endpoints)
                 })
                 state.loading = false
