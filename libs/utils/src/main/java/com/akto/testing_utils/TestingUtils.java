@@ -36,7 +36,7 @@ public class TestingUtils {
             String subType = runResult.getTestSubType();
             TestSourceConfig config = null;
             GlobalEnums.TestSubCategory subCategory = GlobalEnums.TestSubCategory.getTestCategory(subType);
-            if (subCategory == null) {//Issue came from custom template
+            if (subCategory.equals(GlobalEnums.TestSubCategory.CUSTOM_IAM)) {//Issue came from custom template
                 config = TestSourceConfigsDao.instance.getTestSourceConfig(subType);
             }
             TestingIssuesId issueId = new TestingIssuesId(runResult.getApiInfoKey(),

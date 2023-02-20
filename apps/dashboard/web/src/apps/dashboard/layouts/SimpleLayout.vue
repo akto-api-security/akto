@@ -1,6 +1,6 @@
 <template>
     <div>
-        <div class="layout-border pl-8">
+        <div class="layout-border pl-8" style="padding-bottom: 12px">
             <div v-if="title" class="pt-6">
                 <div>
                     <span class="board-name">{{ title || 'Loading...' }}</span>
