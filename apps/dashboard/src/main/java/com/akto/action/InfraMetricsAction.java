@@ -5,6 +5,8 @@ import com.akto.dao.KafkaHealthMetricsDao;
 import com.akto.dao.UsersDao;
 import com.akto.dto.KafkaHealthMetric;
 import com.akto.listener.InfraMetricsListener;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 import javax.servlet.http.HttpServletRequest;
@@ -20,7 +22,7 @@ import org.slf4j.LoggerFactory;
 
 public class InfraMetricsAction implements Action,ServletResponseAware, ServletRequestAware  {
 
-    private static final Logger logger = LoggerFactory.getLogger(InfraMetricsAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(InfraMetricsAction.class);
     @Override
     public String execute() throws Exception {
         InfraMetricsListener.registry.scrape(servletResponse.getWriter());
@@ -34,7 +36,7 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
             akto_health.put("mongo", mongoHealth);
         } catch (Exception e) {
             akto_health.put("mongo", "Error getting health metrics from mongo. Check logs.");
-            logger.error("ERROR health metrics from mongo " + e);
+            loggerMaker.errorAndAddToDb("ERROR health metrics from mongo " + e, LogDb.DASHBOARD);
         }
 
         try {
@@ -42,7 +44,7 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
             akto_health.put("runtime", kafkaHealthMetrics);
         } catch (Exception e) {
             akto_health.put("runtime", "Error getting health metrics from runtime. Check logs.");
-            logger.error("ERROR health metrics from runtime " + e);
+            loggerMaker.errorAndAddToDb("ERROR health metrics from runtime " + e, LogDb.DASHBOARD);
         }
         return SUCCESS.toUpperCase();
     }

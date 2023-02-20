@@ -5,6 +5,8 @@ import com.akto.dao.SampleDataDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.open_api.Main;
 import com.akto.utils.SampleDataToSTI;
 import com.mongodb.client.model.Filters;
@@ -21,7 +23,7 @@ import java.util.Map;
 
 public class OpenApiAction extends UserAction implements ServletResponseAware {
 
-    private static final Logger logger = LoggerFactory.getLogger(OpenApiAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(OpenApiAction.class);
     private int apiCollectionId;
     private String openAPIString = null;
     private boolean includeHeaders = true;
@@ -43,7 +45,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
             OpenAPI openAPI = Main.init(apiCollection.getDisplayName(),stiList, includeHeaders, host);
             openAPIString = Main.convertOpenApiToJSON(openAPI);
         } catch (Exception e) {
-            logger.error("ERROR while downloading openApi file " + e);
+            loggerMaker.errorAndAddToDb("ERROR while downloading openApi file " + e, LogDb.DASHBOARD);
             return ERROR.toUpperCase();
         }
 
