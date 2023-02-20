@@ -12,16 +12,18 @@
                 :testingRunResult="testingRunResult" :subCatogoryMap="subCatogoryMap" :issue="dialogBoxIssue"
                 @closeDialogBox="(dialogBox = false)">
             </issues-dialog>
-            <issue-box v-for="(issue, index) in issues" :key="index" :creationTime="issue.creationTime"
-                :method="issue.id.apiInfoKey.method" :endpoint="issue.id.apiInfoKey.url" :severity="issue.severity"
-                :collectionName="getCollectionName(issue.id.apiInfoKey.apiCollectionId)"
-                :categoryName="getCategoryName(issue.id)"
-                :categoryDescription="getCategoryDescription(issue.id)"
-                :testType="getTestType(issue.id.testErrorSource)" :issueId="issue.id"
-                :issueStatus="issue.testRunIssueStatus" :ignoreReason="issue.ignoreReason"
-                :issueChecked="(selectedIssueIds.indexOf(issue.id) > -1)" :filterStatus="filterStatus"
-                @clickedIssueCheckbox="updateSelectedIssueIds" @openDialogBox="openDialogBox">
-            </issue-box>
+            <template v-for="(issue, index) in issues" >
+                <issue-box v-if="getCategoryName(issue.id)"  :key="index" :creationTime="issue.creationTime"
+                    :method="issue.id.apiInfoKey.method" :endpoint="issue.id.apiInfoKey.url" :severity="issue.severity"
+                    :collectionName="getCollectionName(issue.id.apiInfoKey.apiCollectionId)"
+                    :categoryName="getCategoryName(issue.id)"
+                    :categoryDescription="getCategoryDescription(issue.id)"
+                    :testType="getTestType(issue.id.testErrorSource)" :issueId="issue.id"
+                    :issueStatus="issue.testRunIssueStatus" :ignoreReason="issue.ignoreReason"
+                    :issueChecked="(selectedIssueIds.indexOf(issue.id) > -1)" :filterStatus="filterStatus"
+                    @clickedIssueCheckbox="updateSelectedIssueIds" @openDialogBox="openDialogBox">
+                </issue-box>
+            </template>
             <v-pagination color="var(--v-themeColor-base)" v-model="currentPageIndex" v-if="totalPages > 1"
                 :length="totalPages" prev-icon="$fas_angle-left" next-icon="$fas_angle-right">
             </v-pagination>
@@ -141,13 +143,15 @@ export default {
         },
         getCategoryName(id) {
             if (this.$store.state.issues.subCatogoryMap[id.testSubCategory] === undefined) {//Config case
-                return this.$store.state.issues.subCategoryFromSourceConfigMap[id.testCategoryFromSourceConfig].subcategory;
+                let a = this.$store.state.issues.subCategoryFromSourceConfigMap[id.testCategoryFromSourceConfig]
+                return a ?  a.subcategory : null;
             }
             return this.$store.state.issues.subCatogoryMap[id.testSubCategory].testName;
         },
         getCategoryDescription(id) {
             if (this.$store.state.issues.subCatogoryMap[id.testSubCategory] === undefined) {//Config case
-                return this.$store.state.issues.subCategoryFromSourceConfigMap[id.testCategoryFromSourceConfig].description;
+                let a = this.$store.state.issues.subCategoryFromSourceConfigMap[id.testCategoryFromSourceConfig]
+                return a ? a.description : null;
             }
             return this.$store.state.issues.subCatogoryMap[id.testSubCategory].issueDescription
         },

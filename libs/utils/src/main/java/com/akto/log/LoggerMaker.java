@@ -3,6 +3,14 @@ package com.akto.log;
 import com.akto.dao.LogsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Log;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,6 +40,15 @@ public class LoggerMaker  {
         LogsDao.instance.insertOne(log);
     }
 
+    public List<Log> fetchLogRecords(int logFetchStartTime, int logFetchEndTime) {
 
+        List<Log> logs = new ArrayList<>();
 
+        Bson filters = Filters.and(
+            Filters.gte(Log.TIMESTAMP, logFetchStartTime),
+            Filters.lte(Log.TIMESTAMP, logFetchEndTime)
+        );
+        logs = LogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+        return logs;
+    }
 }

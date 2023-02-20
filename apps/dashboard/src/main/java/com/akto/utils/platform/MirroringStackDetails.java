@@ -33,6 +33,9 @@ public class MirroringStackDetails {
     public static final String AKTO_DASHBOARD_UPDATE_LAMBDA = "DashboardInstanceRefreshHandler";
     public static final String AKTO_RUNTIME_UPDATE_LAMBDA = "TrafficMirroringInstanceRefreshHandler";
 
+    public static final String AKTO_CONTEXT_ANALYSER_AUTO_SCALING_GROUP = "AktoContextAnalyzerAutoScalingGroup";
+    public static final String AKTO_TRAFFIC_MIRRORING_AUTO_SCALING_GROUP = "AktoAutoScalingGroup";
+
     public static final String GET_AKTO_SETUP_DETAILS_LAMBDA = "GetAktoSetupDetails";
 
     public static final String LAMBDA_VPC_ACCESS_ROLE = "LambdaVPCAccessRole";

@@ -7,8 +7,10 @@ import java.util.Map;
 import com.akto.action.UserAction;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.WorkflowTestsDao;
+import com.akto.dto.Log;
 import com.akto.dto.testing.WorkflowNodeDetails;
 import com.akto.dto.testing.WorkflowTest;
+import com.akto.log.LoggerMaker;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
@@ -27,6 +29,11 @@ public class WorkflowTestAction extends UserAction {
     int id;
     String str;
     private List<WorkflowTest> workflowTests;
+    private List<Log> testingLogs;
+    int logFetchStartTime;
+    int logFetchEndTime;
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(WorkflowTestAction.class);
 
     public String fetchWorkflowTests() {
         workflowTests = WorkflowTestsDao.instance.findAll(new BasicDBObject());
@@ -186,6 +193,12 @@ public class WorkflowTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String fetchTestingLogs() {
+
+        testingLogs = loggerMaker.fetchLogRecords(logFetchStartTime, logFetchEndTime);
+        return SUCCESS.toUpperCase();
+    }
+
     public int getApiCollectionId() {
         return this.apiCollectionId;
     }
@@ -256,5 +269,29 @@ public class WorkflowTestAction extends UserAction {
 
     public void setWorkflowTestJson(String workflowTestJson) {
         this.workflowTestJson = workflowTestJson;
+    }
+
+    public int getLogFetchStartTime() {
+        return logFetchStartTime;
+    }
+
+    public void setLogFetchStartTime(int logFetchStartTime) {
+        this.logFetchStartTime = logFetchStartTime;
+    }
+
+    public int getLogFetchEndTime() {
+        return logFetchEndTime;
+    }
+
+    public void setLogFetchEndTime(int logFetchEndTime) {
+        this.logFetchEndTime = logFetchEndTime;
+    }
+
+    public List<Log> getTestingLogs() {
+        return testingLogs;
+    }
+
+    public void setTestingLogs(List<Log> testingLogs) {
+        this.testingLogs = testingLogs;
     }
 }

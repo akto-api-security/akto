@@ -8,6 +8,7 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.testing_utils.TestingUtils;
+import com.akto.util.enums.GlobalEnums;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
@@ -57,7 +58,7 @@ public class TestingIssuesHandler {
             }
 
             TestSubCategory subCategory = TestSubCategory.getTestCategory(runResult.getTestSubType());
-            if (subCategory == null) {//TestSourceConfig case
+            if (subCategory.equals(GlobalEnums.TestSubCategory.CUSTOM_IAM)) {//TestSourceConfig case
                 TestSourceConfig config = TestSourceConfigsDao.instance.getTestSourceConfig(runResult.getTestSubType());
                 updateSeverityField = Updates.set(TestingRunIssues.KEY_SEVERITY, config.getSeverity());
             } else {//TestSubCategory case
@@ -103,7 +104,7 @@ public class TestingIssuesHandler {
             }
             if (!doesExists && runResult.isVulnerable()) {
                 TestSubCategory subCategory = TestSubCategory.getTestCategory(runResult.getTestSubType());
-                if (subCategory == null) {
+                if (subCategory.equals(GlobalEnums.TestSubCategory.CUSTOM_IAM)) {
                     TestSourceConfig config = TestSourceConfigsDao.instance.getTestSourceConfig(runResult.getTestSubType());
                     writeModelList.add(new InsertOneModel<>(new TestingRunIssues(testingIssuesId,
                             config.getSeverity(),

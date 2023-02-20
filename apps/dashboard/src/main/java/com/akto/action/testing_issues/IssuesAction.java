@@ -67,7 +67,7 @@ public class IssuesAction extends UserAction {
                 Sorts.descending(TestingRunIssues.CREATION_TIME));
         TestSubCategory subCategory = issueId.getTestSubCategory();
         TestCategory superCategory;
-        if (subCategory == null) {
+        if (subCategory.equals(GlobalEnums.TestSubCategory.CUSTOM_IAM)) {
             superCategory = TestSourceConfigsDao.instance.getTestSourceConfig(issueId.getTestCategoryFromSourceConfig()).getCategory();
         } else {
             superCategory = issueId.getTestSubCategory().getSuperCategory();
@@ -101,7 +101,7 @@ public class IssuesAction extends UserAction {
         issues = TestingRunIssuesDao.instance.findAll(filters, skip,limit, sort);
 
         for (TestingRunIssues runIssue : issues) {
-            if (runIssue.getId().getTestSubCategory() == null) {//TestSourceConfig case
+            if (runIssue.getId().getTestSubCategory().equals(GlobalEnums.TestSubCategory.CUSTOM_IAM)) {//TestSourceConfig case
                 TestSourceConfig config = TestSourceConfigsDao.instance.getTestSourceConfig(runIssue.getId().getTestCategoryFromSourceConfig());
                 runIssue.getId().setTestSourceConfig(config);
             }
@@ -114,7 +114,8 @@ public class IssuesAction extends UserAction {
         }
         TestingRunIssues issue = TestingRunIssuesDao.instance.findOne(Filters.eq(ID, issueId));
         String testSubType = null;
-        if (issue.getId().getTestSubCategory() == null) {
+        TestSubCategory subCategory = issue.getId().getTestSubCategory();
+        if (subCategory.equals(GlobalEnums.TestSubCategory.CUSTOM_IAM)) {
             testSubType = issue.getId().getTestCategoryFromSourceConfig();
         } else {
             testSubType = issue.getId().getTestSubCategory().getName();

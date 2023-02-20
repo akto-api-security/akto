@@ -5,11 +5,13 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.info.TestInfo;
 import com.akto.dto.type.*;
+import com.akto.log.LoggerMaker;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.RelationshipSync;
 import com.akto.store.TestingUtil;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.StatusCodeAnalyser;
+import com.akto.testing.TestExecutor;
 import com.akto.types.CappedSet;
 import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
@@ -34,6 +36,7 @@ import static com.akto.runtime.APICatalogSync.trimAndSplit;
 public abstract class TestPlugin {
     static ObjectMapper mapper = new ObjectMapper();
     static JsonFactory factory = mapper.getFactory();
+    final LoggerMaker loggerMaker = new LoggerMaker(this.getClass());
 
     private static final Logger logger = LoggerFactory.getLogger(TestPlugin.class);
     private static final Gson gson = new Gson();
@@ -53,7 +56,7 @@ public abstract class TestPlugin {
         RelationshipSync.extractAllValuesFromPayload(node,new ArrayList<>(),payloadMap);
     }
 
-    public static String decrementUrlVersion(String url, int decrementValue, int limit) {
+    public String decrementUrlVersion(String url, int decrementValue, int limit) {
         String regex = "\\/v(\\d+)\\/";
         Pattern p = Pattern.compile(regex);
         Matcher matcher = p.matcher(url);
@@ -67,7 +70,7 @@ public abstract class TestPlugin {
             try {
                 version = Integer.parseInt(code);
             } catch (Exception e) {
-                ;
+                loggerMaker.errorAndAddToDb("Error while parsing integer " + code + " : " + e);
                 return null;
             }
             int newVersion = version - decrementValue;
@@ -146,7 +149,7 @@ public abstract class TestPlugin {
         try {
             message = RedactSampleData.convertOriginalReqRespToString(request, null);
         } catch (Exception e) {
-            ;
+            loggerMaker.errorAndAddToDb("Error while converting testRequest object to string : " + e);
         }
 
         return new TestResult(message, originalMessage, Collections.singletonList(testError), 0, false, TestResult.Confidence.HIGH, testInfo);
