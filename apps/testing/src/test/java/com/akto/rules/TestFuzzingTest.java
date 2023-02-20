@@ -63,6 +63,16 @@ public class TestFuzzingTest {
     }
 
     @Test
+    public void testDownloadLinksPathTraversalFull() throws Exception {
+        // contains a local file link in payloads so should NOT generate payloadFile
+        File[] files = testDownloadLinkMain(generatePathTraversalFullText(), "path_traversal_full.yaml");
+         assertEquals("dotdotpwn.txt", files[0].getName());
+
+         List<String> lines = FileUtils.readLines(files[0], Charsets.UTF_8);
+         assertEquals(FuzzingTest.payloadLineLimit, lines.size());
+    }
+
+    @Test
     public void testReadMetaData() throws IOException {
         File file = nucleiOutputFolder.newFile("main.txt");
         FileUtils.writeStringToFile(file, "", Charsets.UTF_8);
@@ -284,6 +294,38 @@ public class TestFuzzingTest {
                 "        regex:\n" +
                 "          - \"===\\\\s(.*)\\\\s===\" # extract the plugin name\n" +
                 "          - \"(?m)Stable tag: ([0-9.]+)\" # extract the plugin version";
+    }
+
+    private String generatePathTraversalFullText() {
+        return "id: path-traversal\n" +
+                "  \n" +
+                "info:\n" +
+                "  name: Path traversal full\n" +
+                "  author: akto\n" +
+                "  reference:\n" +
+                "    - From OWASP site - https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/05-Authorization_Testing/01-Testing_Directory_Traversal_File_Include\n" +
+                "    - https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/Directory%20Traversal\n" +
+                "  severity: info\n" +
+                "\n" +
+                "requests:\n" +
+                "  - method: GET\n" +
+                "    path:\n" +
+                "      - \"{{BaseURL}}/{{locations}}\"\n" +
+                "\n" +
+                "    payloads:\n" +
+                "      locations: https://raw.githubusercontent.com/swisskyrepo/PayloadsAllTheThings/master/Directory%20Traversal/Intruder/dotdotpwn.txt\n" +
+                "    matchers-condition: and\n" +
+                "    matchers:\n" +
+                "     - type: status\n" +
+                "       status:\n" +
+                "         - 200\n" +
+                "\n" +
+                "    extractors:\n" +
+                "     - type: regex\n" +
+                "       part: body\n" +
+                "       group: 1\n" +
+                "       regex:\n" +
+                "         - \" @version (v[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3})\"";
     }
 
 
