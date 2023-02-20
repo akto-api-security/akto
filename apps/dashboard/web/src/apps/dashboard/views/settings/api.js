@@ -182,6 +182,17 @@ export default {
             }
         })
     },
+    fetchLogsFromDb(startTime, endTime, logDb) {
+        return request({
+            url: '/api/fetchLogsFromDb',
+            method: 'post',
+            data: {
+                startTime,
+                endTime,
+                logDb
+            }
+        })
+    },
     addCustomWebhook(webhookName, url, queryParams, method, headerString, body, frequencyInSeconds) {
         return request({
             url: '/api/addCustomWebhook',

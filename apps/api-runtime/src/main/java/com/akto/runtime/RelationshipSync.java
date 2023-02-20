@@ -3,6 +3,8 @@ package com.akto.runtime;
 import com.akto.dao.RelationshipDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Relationship;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -27,7 +29,7 @@ public class RelationshipSync {
     public Map<String,Map<String, Map<String, Set<Relationship.ApiRelationInfo>>>> userWiseParameterMap = new HashMap<>();
     ObjectMapper mapper = new ObjectMapper();
     JsonFactory factory = mapper.getFactory();
-    private static final Logger logger = LoggerFactory.getLogger(RelationshipSync.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(RelationshipSync.class);
 
     public RelationshipSync(int user_thresh, int counter_thresh, int last_sync_thresh) {
         this.user_thresh = user_thresh;
@@ -107,12 +109,12 @@ public class RelationshipSync {
 
     private void syncWithDb() {
         List<WriteModel<Relationship>> bulkUpdates = getBulkUpdates();
-        logger.info("adding " + bulkUpdates.size() + " updates");
+        loggerMaker.infoAndAddToDb("adding " + bulkUpdates.size() + " updates", LogDb.RUNTIME);
         if (bulkUpdates.size() > 0) {
             try {
                 RelationshipDao.instance.getMCollection().bulkWrite(bulkUpdates);
             } catch (Exception e) {
-                logger.error(e.getMessage());
+                loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.RUNTIME);
             }
         }
 
@@ -136,7 +138,7 @@ public class RelationshipSync {
             try {
                 buildParameterMap(httpResponseParam, userIdentifierName);
             } catch (Exception e) {
-                logger.error(e.getMessage());
+                loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.RUNTIME);
                 continue;
             }
             counter += 1;
