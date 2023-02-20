@@ -5,6 +5,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.TestResult;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.TestingUtil;
 
 import java.util.ArrayList;
@@ -34,7 +35,7 @@ public abstract class ModifyAuthTokenTestPlugin extends AuthRequiredTestPlugin {
             try {
                 apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApi);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while after executing " + subTestName() +" test : " + e);
+                loggerMaker.errorAndAddToDb("Error while after executing " + subTestName() +" test : " + e, LogDb.TESTING);
                 return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest, null);
             }
 
