@@ -230,16 +230,17 @@ export default {
             })
         },
         getRunResultSubCategory (runResult) {
-            debugger
             if (this.subCatogoryMap[runResult.testSubType] === undefined) {
-                return this.subCategoryFromSourceConfigMap[runResult.testSubType].subcategory
+                let a = this.subCategoryFromSourceConfigMap[runResult.testSubType]
+                return a ? a.subcategory : null
             } else {
                 return this.subCatogoryMap[runResult.testSubType].testName
             }
         },
         getRunResultCategory (runResult) {
             if (this.subCatogoryMap[runResult.testSubType] === undefined) {
-                return this.subCategoryFromSourceConfigMap[runResult.testSubType].category.shortName
+                let a = this.subCategoryFromSourceConfigMap[runResult.testSubType]
+                return a ? a.category.shortName : null
             } else {
                 return this.subCatogoryMap[runResult.testSubType].superCategory.shortName
             }
@@ -329,7 +330,8 @@ export default {
             return currentSummary
         },
         testingRunResultsItems() {
-            return (this.testingRunResults || []).map(x => this.prepareForTable(x))
+            let result = (this.testingRunResults || []).map(x => this.prepareForTable(x))
+            return result.filter(x => x.testSubType && x.testSuperType)
         }
     }
 }
