@@ -6,6 +6,7 @@ import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.HttpResponseParams;
+import com.akto.log.LoggerMaker;
 import com.akto.parsers.HttpCallParser;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Updates;
@@ -23,7 +24,7 @@ import java.util.regex.Pattern;
 
 public class Main {
     private Consumer<String, String> consumer;
-    private static final Logger logger = LoggerFactory.getLogger(Main.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
 
     public static void main(String[] args) {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
@@ -70,7 +71,7 @@ public class Main {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 main.consumer.commitSync();
                 for (ConsumerRecord<String,String> r: records) {
-                    if ( (i<1000 && i%100 == 0) || (i>10_000 && i%10_000==0)) logger.info(i+"");
+                    if ( (i<1000 && i%100 == 0) || (i>10_000 && i%10_000==0)) loggerMaker.infoAndAddToDb("Count: " + i, LoggerMaker.LogDb.ANALYSER);
                     i ++;
 
                     try {
@@ -84,7 +85,7 @@ public class Main {
                         resourceAnalyser.analyse(httpResponseParams);
                     } catch (Exception e) {
                         // todo: check cause
-                        logger.error("Error parsing http response params : " + e.getMessage() + " " + e.getCause());
+                        loggerMaker.errorAndAddToDb("Error parsing http response params : " + e.getMessage() + " " + e.getCause(), LoggerMaker.LogDb.ANALYSER);
                     }
                 }
             }

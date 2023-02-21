@@ -4,6 +4,7 @@ import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.type.*;
+import com.akto.log.LoggerMaker;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
@@ -13,6 +14,7 @@ import com.google.common.base.Charsets;
 import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnels;
 import com.mongodb.BasicDBObject;
+import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 
@@ -24,6 +26,8 @@ public class ResourceAnalyser {
     Map<String, SingleTypeInfo> countMap = new HashMap<>();
 
     int last_sync = 0;
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ResourceAnalyser.class);
 
     public ResourceAnalyser(int duplicateCheckerBfSize, double duplicateCheckerBfFpp, int valuesBfSize, double valuesBfFpp) {
         duplicateCheckerBF = BloomFilter.create(
@@ -81,6 +85,8 @@ public class ResourceAnalyser {
         return null;
     }
 
+    private final Set<String> hostsSeen = new HashSet<>();
+
 
     public void analyse(HttpResponseParams responseParams) {
         if (responseParams.statusCode < 200 || responseParams.statusCode >= 300) return;
@@ -94,9 +100,15 @@ public class ResourceAnalyser {
 
         // user id
         Map<String,List<String>> headers = requestParams.getHeaders();
-        if (headers == null) return;
+        if (headers == null) {
+            loggerMaker.infoAndAddToDb("No headers", LoggerMaker.LogDb.ANALYSER);
+            return;
+        }
         List<String> ipList = headers.get(X_FORWARDED_FOR);
-        if (ipList == null || ipList.isEmpty()) return;
+        if (ipList == null || ipList.isEmpty()) {
+            loggerMaker.infoAndAddToDb("IP not found: " + headers.keySet(), LoggerMaker.LogDb.ANALYSER);
+            return;
+        }
         String userId = ipList.get(0);
 
         // get actual api collection id
@@ -104,7 +116,12 @@ public class ResourceAnalyser {
         String hostName = HttpCallParser.getHeaderValue(requestParams.getHeaders(), "host");
         apiCollectionId = findTrueApiCollectionId(apiCollectionId, hostName, responseParams.getSource());
 
-        if (apiCollectionId == null) return;
+        if (hostName != null) hostsSeen.add(hostName);
+
+        if (apiCollectionId == null) {
+            loggerMaker.infoAndAddToDb("API collection not found: " + apiCollectionId + " " + hostName + " " + responseParams.getSource(), LoggerMaker.LogDb.ANALYSER);
+            return;
+        }
 
         String method = requestParams.getMethod();
 
@@ -217,6 +234,8 @@ public class ResourceAnalyser {
 
     public void buildCatalog() {
         List<ApiInfo.ApiInfoKey> apis = SingleTypeInfoDao.instance.fetchEndpointsInCollection(-1);
+        loggerMaker.infoAndAddToDb("APIs fetched from db: " + apis.size(), LoggerMaker.LogDb.ANALYSER);
+
         for (ApiInfo.ApiInfoKey apiInfoKey: apis) {
 
             int apiCollectionId = apiInfoKey.getApiCollectionId();
@@ -245,20 +264,29 @@ public class ResourceAnalyser {
 
 
     public void syncWithDb() {
+        loggerMaker.infoAndAddToDb("Hosts seen till now: " + hostsSeen, LoggerMaker.LogDb.ANALYSER);
+
         buildCatalog();
         populateHostNameToIdMap();
 
         List<WriteModel<SingleTypeInfo>> dbUpdates = getDbUpdatesForSingleTypeInfo();
-        System.out.println("total count: " + dbUpdates.size());
+        loggerMaker.infoAndAddToDb("total db updates count: " + dbUpdates.size(), LoggerMaker.LogDb.ANALYSER);
         countMap = new HashMap<>();
         last_sync = Context.now();
         if (dbUpdates.size() > 0) {
-            SingleTypeInfoDao.instance.getMCollection().bulkWrite(dbUpdates);
+            BulkWriteResult bulkWriteResult = SingleTypeInfoDao.instance.getMCollection().bulkWrite(dbUpdates);
+            loggerMaker.infoAndAddToDb("Modified count: " + bulkWriteResult.getModifiedCount(), LoggerMaker.LogDb.ANALYSER);
+            loggerMaker.infoAndAddToDb("Inserted count: " + bulkWriteResult.getInsertedCount(), LoggerMaker.LogDb.ANALYSER);
+            loggerMaker.infoAndAddToDb("Matched count: " + bulkWriteResult.getMatchedCount(), LoggerMaker.LogDb.ANALYSER);
+            loggerMaker.infoAndAddToDb("Deleted count: " + bulkWriteResult.getDeletedCount(), LoggerMaker.LogDb.ANALYSER);
+            loggerMaker.infoAndAddToDb("Db updates done", LoggerMaker.LogDb.ANALYSER);
         }
     }
 
     public List<WriteModel<SingleTypeInfo>> getDbUpdatesForSingleTypeInfo() {
         List<WriteModel<SingleTypeInfo>> bulkUpdates = new ArrayList<>();
+        loggerMaker.infoAndAddToDb("countMap keySet size: " + countMap.size(), LoggerMaker.LogDb.ANALYSER);
+
         for (SingleTypeInfo singleTypeInfo: countMap.values()) {
             if (singleTypeInfo.getUniqueCount() == 0 && singleTypeInfo.getPublicCount() == 0) continue;
             Bson filter = SingleTypeInfoDao.createFiltersWithoutSubType(singleTypeInfo);
@@ -268,6 +296,11 @@ public class ResourceAnalyser {
             );
             bulkUpdates.add(new UpdateManyModel<>(filter, update, new UpdateOptions().upsert(false)));
         }
+
+        int i = bulkUpdates.size();
+        int total = countMap.values().size();
+
+        loggerMaker.infoAndAddToDb("bulkUpdates: " + i + " total countMap size: " + total, LoggerMaker.LogDb.ANALYSER);
 
         return bulkUpdates;
     }
@@ -328,6 +361,7 @@ public class ResourceAnalyser {
             String key = apiCollection.getHostName() + "$" + apiCollection.getVxlanId();
             hostNameToIdMap.put(key, apiCollection.getId());
         }
+        loggerMaker.infoAndAddToDb("hostNameToIdMap: " + hostNameToIdMap, LoggerMaker.LogDb.ANALYSER);
     }
 
 
