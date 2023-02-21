@@ -91,11 +91,7 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
             String stackStatus = stack.getStackStatus();
 
             if (!ACCEPTABLE_STACK_STATUSES.contains(stackStatus)) {
-<<<<<<< HEAD
-                System.out.println("Actual stack status: " + stackStatus);
-=======
                 loggerMaker.infoAndAddToDb("Actual stack status: " + stackStatus, LogDb.DASHBOARD);
->>>>>>> pub-repo/master
                 return new StackState(StackStatus.CREATION_FAILED.toString(), 0);
             }
             return new StackState(stackStatus, stack.getCreationTime().getTime());
