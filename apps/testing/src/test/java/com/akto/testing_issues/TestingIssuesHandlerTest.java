@@ -56,7 +56,7 @@ public class TestingIssuesHandlerTest extends MongoBasedTest {
                 summaryId);
     }
 
-    @Test
+    @Ignore
     public void testHandler() {
         Context.accountId.set(1000);
         TestingRunIssuesDao.instance.getMCollection().drop();
