@@ -343,7 +343,12 @@ public class ResourceAnalyser {
     private Map<String, Integer> hostNameToIdMap = new HashMap<>();
 
     public Integer findTrueApiCollectionId(int originalApiCollectionId, String hostName, HttpResponseParams.Source source) {
+
+        loggerMaker.infoAndAddToDb("findTrueApiCollectionId: " + originalApiCollectionId + " " + hostName + " " + source, LoggerMaker.LogDb.ANALYSER);
+
         if (!HttpCallParser.useHostCondition(hostName, source)) {
+            loggerMaker.infoAndAddToDb("findTrueApiCollectionId return" , LoggerMaker.LogDb.ANALYSER);
+
             return originalApiCollectionId;
         }
 
@@ -352,6 +357,12 @@ public class ResourceAnalyser {
 
         if (hostNameToIdMap.containsKey(key)) {
             trueApiCollectionId = hostNameToIdMap.get(key);
+            loggerMaker.infoAndAddToDb("findTrueApiCollectionId return: " +trueApiCollectionId , LoggerMaker.LogDb.ANALYSER);
+
+        } else if (hostNameToIdMap.containsKey(hostName + "$0")) {
+            trueApiCollectionId = hostNameToIdMap.get(hostName + "$0");
+            loggerMaker.infoAndAddToDb("findTrueApiCollectionId return2 : " +trueApiCollectionId , LoggerMaker.LogDb.ANALYSER);
+
         }
 
         // todo: what if we don't find because of cycles
