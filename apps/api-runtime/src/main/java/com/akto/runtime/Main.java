@@ -301,13 +301,14 @@ public class Main {
 
                         // send to central kafka
                         if (kafkaProducer != null) {
+                            loggerMaker.infoAndAddToDb("Sending " + accWiseResponse.size() +" records to context analyzer", LogDb.RUNTIME);
                             for (HttpResponseParams httpResponseParams: accWiseResponse) {
                                 try {
                                     kafkaProducer.send(httpResponseParams.getOrig(), centralKafkaTopicName);
                                 } catch (Exception e) {
                                     // force close it
                                     kafkaProducer.close();
-                                    loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.RUNTIME);
+                                    loggerMaker.errorAndAddToDb("Closing kafka: " + e.getMessage(), LogDb.RUNTIME);
                                 }
                             }
                         }
