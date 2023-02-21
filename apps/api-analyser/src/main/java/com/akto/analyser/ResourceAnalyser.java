@@ -104,6 +104,11 @@ public class ResourceAnalyser {
             loggerMaker.infoAndAddToDb("No headers", LoggerMaker.LogDb.ANALYSER);
             return;
         }
+
+        for(String key: headers.keySet()) {
+            loggerMaker.infoAndAddToDb("printing header map keys : " + key + " " + headers.get(key), LoggerMaker.LogDb.ANALYSER);
+        }
+
         List<String> ipList = headers.get(X_FORWARDED_FOR);
         if (ipList == null || ipList.isEmpty()) {
             loggerMaker.infoAndAddToDb("IP not found: " + headers.keySet(), LoggerMaker.LogDb.ANALYSER);
