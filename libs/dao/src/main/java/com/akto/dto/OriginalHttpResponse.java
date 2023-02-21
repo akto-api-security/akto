@@ -67,6 +67,13 @@ public class OriginalHttpResponse {
         this.body += line;
     }
 
+    public String findHeaderValue(String headerName) {
+        if (this.headers == null ) return null;
+        List<String> values = this.headers.get(headerName.trim().toLowerCase());
+        if (values == null || values.size() == 0) return null;
+        return values.get(0);
+    }
+
     public String getBody() {
         return body;
     }

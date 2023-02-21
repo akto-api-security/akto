@@ -21,6 +21,7 @@ public class GlobalEnums {
     /* Category of tests perfomred */
     public enum TestCategory {
         BOLA("BOLA", Severity.HIGH, "Broken Object Level Authorization (BOLA)", "BOLA"),
+        MISCONFIGURATION("MISCONFIGURATION", Severity.HIGH, "Misconfiguration", "Misconfiguration"),
         NO_AUTH("NO_AUTH", Severity.HIGH, "Broken User Authentication (BUA)", "Broken Authentication"),
         BFLA("BFLA", Severity.HIGH, "Broken Function Level Authorization (BFLA)", "Broken Function Level Authorization"),
         IAM("IAM", Severity.HIGH, "Improper Assets Management (IAM)", "Improper Assets Management"),
@@ -327,6 +328,26 @@ public class GlobalEnums {
                 new String[]{
                         "https://redhuntlabs.com/a-practical-guide-to-attack-jwt-json-web-token",
                         "https://portswigger.net/web-security/jwt/lab-jwt-authentication-bypass-via-jku-header-injection"
+                }, new IssueTags[]{
+                IssueTags.BL,
+                IssueTags.OWASPTOP10,
+                IssueTags.HACKERONETOP10,
+        }),
+        OPEN_REDIRECT(
+                "OPEN_REDIRECT",
+                TestCategory.MISCONFIGURATION,
+                "Open redirect",
+                "Attacker can access resources of any user by introducing multiple parameters with same name.",
+                "The endpoint appears to be vulnerable to broken object level authorization attack. The original request was replayed by adding private resources in query params (for eg: <b>user_id=1234&account_id=436783).</b>. " +
+                        " The server responded with 2XX success codes and less than <b>{{percentageMatch}}%</b> of the response body matched with original response body. <br><br>" +
+                        "<b>Background:</b> Object level authorization is an access control mechanism that is usually implemented at the code level to validate that one user can only access objects that they should have access to.",
+                "Unauthorized access can result in data disclosure to unauthorized parties, data loss, or data manipulation. Unauthorized access to objects can also lead to full account takeover.",
+                new String[]{
+                        "https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/04-Testing_for_HTTP_Parameter_Pollution",
+                        "https://www.madlab.it/slides/BHEU2011/whitepaper-bhEU2011.pdf",
+                        "https://www.akto.io/blog/what-is-broken-object-level-authorization-bola",
+                        "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa1-broken-object-level-authorization.md",
+                        "https://cwe.mitre.org/data/definitions/284.html"
                 }, new IssueTags[]{
                 IssueTags.BL,
                 IssueTags.OWASPTOP10,
