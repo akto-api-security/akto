@@ -1,20 +1,19 @@
 package com.akto.dao;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import com.akto.dao.context.Context;
 import com.akto.dto.Log;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Indexes;
-
 import org.bson.Document;
 
-public class LogsDao extends AccountsContextDao<Log> {
+import java.util.ArrayList;
+import java.util.List;
 
-    public static final LogsDao instance = new LogsDao();
+public class AnalyserLogsDao extends AccountsContextDao<Log> {
+
+    public static final AnalyserLogsDao instance = new AnalyserLogsDao();
     public void createIndicesIfAbsent() {
         boolean exists = false;
         String dbName = Context.accountId.get()+"";
@@ -29,7 +28,7 @@ public class LogsDao extends AccountsContextDao<Log> {
         if (!exists) {
             db.createCollection(getCollName(), new CreateCollectionOptions().capped(true).maxDocuments(100_000).sizeInBytes(100_000_000));
         }
-        
+
         MongoCursor<Document> cursor = db.getCollection(getCollName()).listIndexes().cursor();
         List<Document> indices = new ArrayList<>();
 
@@ -44,12 +43,12 @@ public class LogsDao extends AccountsContextDao<Log> {
 
     @Override
     public String getCollName() {
-        return "logs";
+        return "logs_analyser";
     }
 
     @Override
     public Class<Log> getClassT() {
         return Log.class;
     }
-    
+
 }

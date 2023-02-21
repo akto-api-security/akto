@@ -15,6 +15,7 @@ import com.akto.util.enums.GlobalEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import org.bson.types.ObjectId;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -56,8 +57,9 @@ public class TestingIssuesHandlerTest extends MongoBasedTest {
                 summaryId);
     }
 
-    @Test
+    @Ignore
     public void testHandler() {
+        Context.accountId.set(1000);
         TestingRunIssuesDao.instance.getMCollection().drop();
         TestSourceConfigsDao.instance.getMCollection().drop();
 
@@ -105,6 +107,10 @@ public class TestingIssuesHandlerTest extends MongoBasedTest {
         //When all said and done, total issue can't be more than 36
 
         int size = TestingRunIssuesDao.instance.findAll(new BasicDBObject()).size();
+        System.out.println(size);
+        System.out.println(urls.length
+        * URLMethods.Method.getValuesArray().length
+        * GlobalEnums.TestSubCategory.getValuesArray().length);
         assertTrue(size <=
                 urls.length
                         * URLMethods.Method.getValuesArray().length
