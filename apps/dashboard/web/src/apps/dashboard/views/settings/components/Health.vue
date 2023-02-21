@@ -17,6 +17,7 @@
                         ]"
                         v-model="logGroupName"
                         label="Select log group"
+                        @input="refreshClick()"
                     />
                 </div>
 
