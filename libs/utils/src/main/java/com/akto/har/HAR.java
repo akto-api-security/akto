@@ -38,10 +38,10 @@ public class HAR {
             List<OperationDefinition> operationDefinitions = GraphQLUtils.getUtils().parseGraphQLRequest(entry.getRequest().getPostData().getText());
             idx += 1;
             if (operationDefinitions.isEmpty()) {
-                loggerMaker.infoAndAddToDb("Adding via REST framework for collection_ID: " + collection_id);
+                loggerMaker.infoAndAddToDb("Adding via REST framework for collection_ID: " + collection_id, LogDb.DASHBOARD);
                 updateEntriesList(entry, null, null, null, collection_id, entriesList, idx);
             } else {
-                loggerMaker.infoAndAddToDb("Adding via graphQL framework for collection_ID: "+ collection_id);
+                loggerMaker.infoAndAddToDb("Adding via graphQL framework for collection_ID: "+ collection_id, LogDb.DASHBOARD);
                 for (OperationDefinition definition : operationDefinitions) {
                     OperationDefinition.Operation operation = definition.getOperation();
                     SelectionSet selectionSets = definition.getSelectionSet();
@@ -62,7 +62,7 @@ public class HAR {
     private void updateEntriesList(HarEntry entry, OperationDefinition.Operation operation, String fieldName, Field field1, int collection_id, List<String> entriesList, int idx) {
         try {
             Map<String,String> result = getResultMap(entry, operation, fieldName, field1);
-            loggerMaker.infoAndAddToDb("results map : " + mapper.writeValueAsString(result));
+            loggerMaker.infoAndAddToDb("results map : " + mapper.writeValueAsString(result), LogDb.DASHBOARD);
             result.put("akto_vxlan_id", collection_id +"");
             entriesList.add(mapper.writeValueAsString(result));
         } catch (Exception e) {
