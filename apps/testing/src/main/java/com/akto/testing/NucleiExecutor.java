@@ -62,7 +62,7 @@ public class NucleiExecutor {
         String arch = System.getProperty("os.arch");
         String nucleiFileSuffix = "linux";
 
-        if (arch != null && arch.equals("aarch64")) {
+       if (arch != null && arch.equals("aarch64")) {
             nucleiFileSuffix = "m1";
         }
 

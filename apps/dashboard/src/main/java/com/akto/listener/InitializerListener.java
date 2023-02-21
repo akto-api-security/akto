@@ -756,6 +756,35 @@ public class InitializerListener implements ServletContextListener {
             }
         }, 0 , TimeUnit.SECONDS);
 
+<<<<<<< HEAD
+=======
+        executorService.schedule( new Runnable() {
+            public void run() {
+                boolean calledOnce = false;
+                do {
+                    try {
+                        if (!calledOnce) {
+                            DaoInit.init(new ConnectionString(mongoURI));
+                            Context.accountId.set(1_000_000);
+                            calledOnce = true;
+                        }
+                        AccountSettingsDao.instance.getStats();
+                        connectedToMongo = true;
+                        runInitializerFunctions();
+                    } catch (Exception e) {
+//                        e.printStackTrace();
+                    } finally {
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                } while (!connectedToMongo);
+            }
+        }, 0 , TimeUnit.SECONDS);
+
+>>>>>>> pub-repo/feature/feb_20_2
     }
 
     public void runInitializerFunctions() {

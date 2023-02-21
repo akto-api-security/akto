@@ -17,7 +17,10 @@ public class RuntimeListener implements ServletContextListener {
 
     public static HttpCallParser httpCallParser = null;
     public static AktoPolicy aktoPolicy = null;
+<<<<<<< HEAD
     public static ResourceAnalyser resourceAnalyser = null;
+=======
+>>>>>>> pub-repo/feature/feb_20_2
     private boolean ranOnce = false;
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
@@ -41,7 +44,10 @@ public class RuntimeListener implements ServletContextListener {
                         Main.initializeRuntime();
                         httpCallParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
                         aktoPolicy = new AktoPolicy(RuntimeListener.httpCallParser.apiCatalogSync, false);
+<<<<<<< HEAD
                         resourceAnalyser = new ResourceAnalyser(300_000, 0.01, 100_000, 0.01);
+=======
+>>>>>>> pub-repo/feature/feb_20_2
                         ranOnce = true;
                     } catch (Exception e) {
                         e.printStackTrace();
