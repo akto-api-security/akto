@@ -191,12 +191,16 @@ public class TestExecutor {
             }
         }
 
-        for (String host: hostsToApiCollectionMap.keySet()) {
-            Integer apiCollectionId = hostsToApiCollectionMap.get(host);
-            List<TestingRunResult> nucleiResults = runNucleiTests(new ApiInfo.ApiInfoKey(apiCollectionId, host, URLMethods.Method.GET), testingRun, testingUtil, summaryId);
-            if (nucleiResults != null && !nucleiResults.isEmpty()) {
-                testingRunResults.addAll(nucleiResults);
+        try {
+            for (String host: hostsToApiCollectionMap.keySet()) {
+                Integer apiCollectionId = hostsToApiCollectionMap.get(host);
+                List<TestingRunResult> nucleiResults = runNucleiTests(new ApiInfo.ApiInfoKey(apiCollectionId, host, URLMethods.Method.GET), testingRun, testingUtil, summaryId);
+                if (nucleiResults != null && !nucleiResults.isEmpty()) {
+                    testingRunResults.addAll(nucleiResults);
+                }
             }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Failed Running Nuclei Tests " + e.getMessage(), LogDb.TESTING);
         }
 
         loggerMaker.infoAndAddToDb("Finished adding " + testingRunResults.size() + " testingRunResults", LogDb.TESTING);
