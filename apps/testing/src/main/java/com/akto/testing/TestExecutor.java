@@ -2,9 +2,11 @@ package com.akto.testing;
 
 import com.akto.DaoInit;
 import com.akto.dao.AuthMechanismsDao;
+import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.*;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.*;
@@ -120,6 +122,35 @@ public class TestExecutor {
         Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = SampleMessageStore.fetchSampleMessages();
         List<TestRoles> testRoles = SampleMessageStore.fetchTestRoles();
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
+
+        List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
+
+        List<AuthParam> authParams = authMechanism.getAuthParams();
+
+        Set<String> authParamKeys = new HashSet<>();
+
+        for (AuthParam authParam : authParams) {
+            authParamKeys.add(authParam.getKey());
+        }
+
+        for (CustomAuthType customAuthType : customAuthTypes) {
+            List<String> customAuthTypeHeaderKeys = customAuthType.getHeaderKeys();
+            for (String headerAuthKey: customAuthTypeHeaderKeys) {
+                if (authParamKeys.contains(headerAuthKey)) {
+                    continue;
+                }
+                authParams.add(new HardcodedAuthParam(AuthParam.Location.HEADER, headerAuthKey, null, true));
+            }
+            List<String> customAuthTypePayloadKeys = customAuthType.getPayloadKeys();
+            for (String payloadAuthKey: customAuthTypePayloadKeys) {
+                if (authParamKeys.contains(payloadAuthKey)) {
+                    continue;
+                }
+                authParams.add(new HardcodedAuthParam(AuthParam.Location.BODY, payloadAuthKey, null, true));
+            }
+        }
+
+        authMechanism.setAuthParams(authParams);
 
         TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessages, singleTypeInfoMap, testRoles);
 
