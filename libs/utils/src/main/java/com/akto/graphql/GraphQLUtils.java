@@ -14,6 +14,7 @@ public class GraphQLUtils {//Singleton class
     Parser parser = new Parser();
     LanguageTraversal traversal = new LanguageTraversal();
     public static final String __ARGS = "__args";
+    public static final String QUERY = "query";
 
     private static final GraphQLUtils utils = new GraphQLUtils();
 
@@ -75,7 +76,7 @@ public class GraphQLUtils {//Singleton class
             Object obj = JSON.parse(requestPayload);
             if (obj instanceof HashMap) {
                 HashMap map = (HashMap) obj;
-                String query = (String) map.get("query");
+                String query = (String) map.get(QUERY);
                 Document document = parser.parseDocument(query);
                 List<Definition> definitionList = document.getDefinitions();
                 for (Definition definition : definitionList) {
