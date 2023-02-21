@@ -127,9 +127,9 @@ public class HAR {
                 if (obj instanceof Map) {
                     Map tempMap = (Map) obj;
                     for (String key : map.keySet()) {
-                        tempMap.put(key.substring(1), map.get(key));
+                        tempMap.put(GraphQLUtils.QUERY + key, map.get(key));
                     }
-                    tempMap.remove("query");
+                    tempMap.remove(GraphQLUtils.QUERY);
                     requestPayload = JSON.toString(obj);
                 }
             } catch (Exception e) {
