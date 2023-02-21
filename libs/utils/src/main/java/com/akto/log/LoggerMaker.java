@@ -1,5 +1,6 @@
 package com.akto.log;
 
+import com.akto.dao.AnalyserLogsDao;
 import com.akto.dao.DashboardLogsDao;
 import com.akto.dao.LogsDao;
 import com.akto.dao.RuntimeLogsDao;
@@ -24,7 +25,7 @@ public class LoggerMaker  {
     private static final int oneMinute = 60; 
 
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD
+        TESTING,RUNTIME,DASHBOARD, ANALYSER
     }
 
     public LoggerMaker(Class<?> c) {
@@ -76,6 +77,8 @@ public class LoggerMaker  {
                     break;
                 case DASHBOARD: 
                     DashboardLogsDao.instance.insertOne(log);
+                case ANALYSER:
+                    AnalyserLogsDao.instance.insertOne(log);
             }
             logCount++;
         }
@@ -91,7 +94,7 @@ public class LoggerMaker  {
         
         Bson filters = Filters.and(
             Filters.gte(Log.TIMESTAMP, logFetchStartTime),
-            Filters.lte(Log.TIMESTAMP, logFetchEndTime)
+            Filters.lt(Log.TIMESTAMP, logFetchEndTime)
         );
         switch(db){
             case TESTING: 
@@ -102,6 +105,9 @@ public class LoggerMaker  {
                 break;
             case DASHBOARD: 
                 logs = DashboardLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                break;
+            case ANALYSER:
+                logs = AnalyserLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
         }
         return logs;
     }

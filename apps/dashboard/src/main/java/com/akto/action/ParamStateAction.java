@@ -2,8 +2,10 @@ package com.akto.action;
 
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.log.LoggerMaker;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.EstimatedDocumentCountOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
@@ -15,6 +17,7 @@ import org.bson.conversions.Bson;
 
 public class ParamStateAction extends UserAction {
 
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ParamStateAction.class);
     @Override
     public String execute() {
         return SUCCESS.toUpperCase();
@@ -54,6 +57,17 @@ public class ParamStateAction extends UserAction {
         while(cursor.hasNext()) {
             SingleTypeInfo singleTypeInfo = cursor.next();
             privateSingleTypeInfo.add(singleTypeInfo);
+        }
+
+        loggerMaker.infoAndAddToDb("Found " + privateSingleTypeInfo.size() + " private STIs", LoggerMaker.LogDb.DASHBOARD);
+
+        if (privateSingleTypeInfo.isEmpty()) {
+            Bson filter = Filters.or(
+                    Filters.exists(SingleTypeInfo._UNIQUE_COUNT),
+                    Filters.gt(SingleTypeInfo._UNIQUE_COUNT, 0)
+            );
+            SingleTypeInfo singleTypeInfo = SingleTypeInfoDao.instance.findOne(filter);
+            loggerMaker.infoAndAddToDb("Did find STI with unique count url=" + singleTypeInfo.getUrl() + "count="+ singleTypeInfo.uniqueCount, LoggerMaker.LogDb.DASHBOARD);
         }
 
         return SUCCESS.toUpperCase();
