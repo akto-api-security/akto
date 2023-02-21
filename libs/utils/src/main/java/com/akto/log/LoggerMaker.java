@@ -94,7 +94,7 @@ public class LoggerMaker  {
         
         Bson filters = Filters.and(
             Filters.gte(Log.TIMESTAMP, logFetchStartTime),
-            Filters.lte(Log.TIMESTAMP, logFetchEndTime)
+            Filters.lt(Log.TIMESTAMP, logFetchEndTime)
         );
         switch(db){
             case TESTING: 
