@@ -105,10 +105,6 @@ public class ResourceAnalyser {
             return;
         }
 
-        for(String key: headers.keySet()) {
-            loggerMaker.infoAndAddToDb("printing header map keys : " + key + " " + headers.get(key), LoggerMaker.LogDb.ANALYSER);
-        }
-
         List<String> ipList = headers.get(X_FORWARDED_FOR);
         if (ipList == null || ipList.isEmpty()) {
             loggerMaker.infoAndAddToDb("IP not found: " + headers.keySet(), LoggerMaker.LogDb.ANALYSER);
@@ -280,11 +276,7 @@ public class ResourceAnalyser {
         last_sync = Context.now();
         if (dbUpdates.size() > 0) {
             BulkWriteResult bulkWriteResult = SingleTypeInfoDao.instance.getMCollection().bulkWrite(dbUpdates);
-            loggerMaker.infoAndAddToDb("Modified count: " + bulkWriteResult.getModifiedCount(), LoggerMaker.LogDb.ANALYSER);
-            loggerMaker.infoAndAddToDb("Inserted count: " + bulkWriteResult.getInsertedCount(), LoggerMaker.LogDb.ANALYSER);
-            loggerMaker.infoAndAddToDb("Matched count: " + bulkWriteResult.getMatchedCount(), LoggerMaker.LogDb.ANALYSER);
-            loggerMaker.infoAndAddToDb("Deleted count: " + bulkWriteResult.getDeletedCount(), LoggerMaker.LogDb.ANALYSER);
-            loggerMaker.infoAndAddToDb("Db updates done", LoggerMaker.LogDb.ANALYSER);
+            loggerMaker.infoAndAddToDb("bulkWriteResult: " + bulkWriteResult, LoggerMaker.LogDb.ANALYSER);
         }
     }
 
@@ -344,11 +336,7 @@ public class ResourceAnalyser {
 
     public Integer findTrueApiCollectionId(int originalApiCollectionId, String hostName, HttpResponseParams.Source source) {
 
-        loggerMaker.infoAndAddToDb("findTrueApiCollectionId: " + originalApiCollectionId + " " + hostName + " " + source, LoggerMaker.LogDb.ANALYSER);
-
         if (!HttpCallParser.useHostCondition(hostName, source)) {
-            loggerMaker.infoAndAddToDb("findTrueApiCollectionId return" , LoggerMaker.LogDb.ANALYSER);
-
             return originalApiCollectionId;
         }
 
@@ -357,11 +345,9 @@ public class ResourceAnalyser {
 
         if (hostNameToIdMap.containsKey(key)) {
             trueApiCollectionId = hostNameToIdMap.get(key);
-            loggerMaker.infoAndAddToDb("findTrueApiCollectionId return: " +trueApiCollectionId , LoggerMaker.LogDb.ANALYSER);
 
         } else if (hostNameToIdMap.containsKey(hostName + "$0")) {
             trueApiCollectionId = hostNameToIdMap.get(hostName + "$0");
-            loggerMaker.infoAndAddToDb("findTrueApiCollectionId return2 : " +trueApiCollectionId , LoggerMaker.LogDb.ANALYSER);
 
         }
 
