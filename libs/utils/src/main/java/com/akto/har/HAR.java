@@ -3,7 +3,6 @@ package com.akto.har;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.sstoehr.harreader.HarReader;
 import de.sstoehr.harreader.HarReaderException;
@@ -14,8 +13,6 @@ import graphql.language.OperationDefinition;
 import graphql.language.Selection;
 import graphql.language.SelectionSet;
 import org.mortbay.util.ajax.JSON;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
