@@ -1,5 +1,5 @@
 <template>
-    <layout-with-tabs title="API Testing" class="page-testing" :tabs='["Test results", "User config", "Roles", "Logs"]'>
+    <layout-with-tabs title="API Testing" class="page-testing" :tabs='["Test results", "User config", "Roles"]'>
         <template slot="Test results">
             <div class="py-8">
                 <div>

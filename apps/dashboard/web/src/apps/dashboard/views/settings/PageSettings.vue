@@ -62,7 +62,7 @@
             <team-overview />
         </template>
         <template slot="Health">
-            <health />
+            <health :defaultStartTimestamp="defaultStartTimestamp" :defaultEndTimestamp="defaultEndTimestamp"/>
         </template>
     </layout-with-tabs>
 </template>
@@ -80,6 +80,7 @@ import TagConfigDetails from './components/tag_configs/TagConfigDetails.vue'
 import ACard from '@/apps/dashboard/shared/components/ACard'
 import IntegrationCenter from './components/integrations/IntegrationCenter'
 import AuthTypeDetails from './components/auth_types/AuthTypeDetails.vue'
+import obj from "@/util/obj"
 
 import { mapState } from 'vuex'
 export default {
@@ -96,6 +97,11 @@ export default {
         DataTypeDetails,
         AuthTypeDetails,
         ACard
+    },
+    props:{
+        defaultStartTimestamp: obj.strN,
+        defaultEndTimestamp: obj.strN,
+        tab: obj.strN
     },
     mounted() {
         this.$store.dispatch("data_types/fetchDataTypes")
@@ -146,6 +152,8 @@ export default {
         getTabs() {
           if(window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'){
             return ['Data types','Auth types', 'Tags', 'Users', 'Integrations'];
+          } else if(this.tab && this.tab=="health"){
+            return ['Health', 'Data types','Auth types', 'Tags', 'Account', 'Users', 'Integrations'];
           }
           return ['Data types','Auth types', 'Tags', 'Account', 'Users', 'Health', 'Integrations'];
         }
