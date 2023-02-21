@@ -5,6 +5,7 @@ import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.testing.ApiExecutor;
@@ -77,6 +78,7 @@ public class BOLATest extends AuthRequiredRunAllTestPlugin {
         try {
             apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApiDuplicate);
         } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while after executing BOLA test: " + e, LogDb.TESTING);
             return new ExecutorResult(false, null, new ArrayList<>(), 0, rawApi,
                     TestResult.TestError.API_REQUEST_FAILED, testRequest, null, null);
         }

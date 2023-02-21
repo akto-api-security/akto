@@ -8,6 +8,7 @@ import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.HardcodedAuthParam;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.testing.ApiExecutor;
@@ -48,7 +49,7 @@ public class OldApiVersionTest extends AuthRequiredTestPlugin{
             try {
                 originalHttpResponse = ApiExecutor.sendRequest(testRequest, true);
             } catch (Exception e) {
-                ;
+                loggerMaker.errorAndAddToDb("Error while after executing " + subTestName() +" test : " + e, LogDb.TESTING);
                 oldVersionUrl = decrementUrlVersion(oldVersionUrl, 1, 1);
                 continue;
             }

@@ -9,7 +9,7 @@ public class TestNoneAlgoJWTModifier {
 
     @Test
     public void testJWTModify() throws Exception {
-        NoneAlgoJWTModifier noneAlgoJWTModifier = new NoneAlgoJWTModifier();
+        NoneAlgoJWTModifier noneAlgoJWTModifier = new NoneAlgoJWTModifier("none");
         String jwt = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MiwiaWF0IjoxNTczMzU4Mzk2fQ.RwNNHvOKZk8p6fICIeezuajDalK8ZSOkEGMhZsRPFSk";
         String modifiedJWT = noneAlgoJWTModifier.jwtModify("token", jwt);
         assertEquals("eyJ0eXAiOiJKV1QiLCJhbGciOiJub25lIn0.eyJpZCI6MiwiaWF0IjoxNTczMzU4Mzk2fQ.", modifiedJWT);

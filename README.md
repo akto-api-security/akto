@@ -2,15 +2,19 @@
 
 # What is Akto?
 
-[How it works](https://docs.akto.io/#how-it-works) • [Getting-Started](https://docs.akto.io/#how-to-get-started) • [API Inventory](https://docs.akto.io/api-inventory/api-collections) • [API testing](https://docs.akto.io/testing/run-test) • [Add Test](https://docs.akto.io/testing/test-library) • [Join Slack community](https://join.slack.com/t/aktocommunity/shared\_invite/zt-1nqfw3knb-XO\~r7UZyzD9f8\_Ddm4R1lg) •
+[How it works](https://docs.akto.io/#how-it-works) • [Getting-Started](https://docs.akto.io/#how-to-get-started) • [API Inventory](https://docs.akto.io/api-inventory/api-collections) • [API testing](https://docs.akto.io/testing/run-test) • [Add Test](https://docs.akto.io/testing/test-library) • [Join Discord community](https://discord.com/invite/Wpc6xVME4s) •
 
-Akto is a plug-n-play API security platform that takes only 60 secs to get started. Akto is used by security teams to maintain a continuous inventory of APIs, test APIs for vulnerabilities and find runtime issues. Akto offers tests for all OWASP top 10 and HackerOne Top 10 categories including BOLA, authentication, SSRF, XSS, security configurations, etc. Akto's powerful testing engine runs variety of business logic tests by reading traffic data to understand API traffic pattern leading to reduced false positives. Akto can integrate with multiple traffic sources - burpsuite, AWS, postman, GCP, gateways, etc.
+Akto is a plug-n-play API security platform that takes only 60 secs to get started. Akto is used by security teams to maintain a continuous inventory of APIs, test APIs for vulnerabilities and find runtime issues. Akto offers coverage for all OWASP top 10 and HackerOne Top 10 categories including BOLA, authentication, SSRF, XSS, security configurations, etc. Akto's powerful testing engine runs variety of business logic tests by reading traffic data to understand API traffic pattern leading to reduced false positives. Akto can integrate with multiple traffic sources - burpsuite, AWS, postman, GCP, gateways, etc. Here is our [public roadmap](https://github.com/orgs/akto-api-security/projects/8) for this quarter.
+
 
 Akto enables security and engineering teams to secure their APIs by doing three things:
 
 1. [API inventory](https://docs.akto.io/api-inventory/api-collections)
 2. [Run business logic tests in CI/CD](https://docs.akto.io/testing/run-test)
 3. [Find vulnerabilities in run-time](https://docs.akto.io/api-inventory/sensitive-data)
+
+
+https://user-images.githubusercontent.com/91306853/216407351-d18c396b-5cd0-4cbc-a350-10a76b1d67b3.mp4
 
 ## How it works?
 
@@ -24,15 +28,14 @@ Step 2: Run tests
 
 ## How to get Started?
 
-There are two ways:
+Local deploy:
 
-1. [Self Hosted](https://docs.akto.io/getting-started/quick-start-with-akto-self-hosted)
-   1. [Local Deploy](https://docs.akto.io/getting-started/quick-start-with-akto-self-hosted/local-deploy) (Open Source)
-   2. [AWS Deploy](https://docs.akto.io/getting-started/quick-start-with-akto-self-hosted/aws-deploy)
-   3. [GCP Deploy](https://docs.akto.io/getting-started/quick-start-with-akto-self-hosted/gcp-deploy)
-2. [Cloud ( Akto hosted)](https://docs.akto.io/getting-started/quick-start-with-akto-cloud)
+Run this script to create Akto at ~/akto and run the docker containers. You'll need to have Docker installed in order to run the container. 
 
-### Develop and contribute
+`/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/cf-deploy-akto)"`
+
+
+## Develop and contribute
 
 #### Prerequisites
 OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), npm(v8.15.0+), maven (v3.6.3 [link](https://dlcdn.apache.org/maven/maven-3/3.6.3/binaries/)), Mongo (v5.0.3+)
@@ -73,12 +76,33 @@ OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), 
 2. `cd ~/akto_code/community-edition`
 3. `cd apps/testing`
 4. `export AKTO_MONGO_CONN="mongodb://localhost:27017"`
-5. `mvn compile; mvn exec:java -Dexec.mainClass="com.akto.testing.Main"`
+5. [OPTIONAL] To setup nuclei testing: Compile the nuclei executable from https://github.com/akto-api-security/nuclei-wrapper. Once executable is built add the path of executable to env variable "NUCLEI_EXECUTABLE_PATH".
+6. `mvn compile; mvn exec:java -Dexec.mainClass="com.akto.testing.Main"`
+
+
+
 
 #### Play around
 
 1. Open `localhost:8080` in your favourite browser
 2. You will need to signup when logging in for the first time, next time onwards you can login
+
+#### Debug
+1. To debug front end, install Vue.js Chrome extension from [here](https://devtools.vuejs.org/guide/installation.html).
+2. To debug backend, run the following before running web server - 
+    a. Set MAVEN_OPTS variable to enable debugging on your Java process
+        
+        ```bash
+        export MAVEN_OPTS="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8081, -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
+        ```
+        
+    b. In Visual Studio code, click on any line number to set a breakpoint.
+    
+    c.  Attach the Java debugger from Run and Debug mode. If you are doing this for the first time, click on “Create launch.json file” and then “Add configuration”. Choose “Java: Attach process by ID” and save the file. 
+    
+     <img width="426" alt="img1" src="https://user-images.githubusercontent.com/91221068/217048839-dbb00c48-00df-419b-8f32-cdb2d47a2218.png">
+
+    d. A list of running Java processes with show up. Select the web server process to attach the debugger
 
 ## Contributing
 
@@ -86,4 +110,4 @@ We welcome contributions to this project. Please read our [CONTRIBUTING.md](CONT
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [MIT License](LICENSE.md).

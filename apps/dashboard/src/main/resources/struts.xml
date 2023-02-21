@@ -20,6 +20,10 @@
         <action name="metrics" class="com.akto.action.InfraMetricsAction">
         </action>
 
+        <action name="mongo-error" class="com.akto.action.HomeAction" method="error">
+            <result name="SUCCESS">/pages/mongo-error.jsp</result>
+        </action>
+
         <action name="api/inventory/*/openapi" class="com.akto.action.OpenApiAction" method="burpSwagger">
             <param name="apiCollectionId">{1}</param>
         </action>
@@ -278,6 +282,17 @@
 
         <!--  DO NOT CHANGE THE PATH NAME BEING USED BY EXTERNAL API -->
         <action name="api/loadSensitiveParameters" class="com.akto.action.observe.InventoryAction" method="loadSensitiveParameters">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/fetchSensitiveParamsForEndpoints" class="com.akto.action.observe.InventoryAction" method="fetchSensitiveParamsForEndpoints">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"   type="json">
@@ -944,6 +959,17 @@
             </result>
         </action>
 
+        <action name="api/fetchLogsFromDb" class="com.akto.action.DbLogsAction" method="fetchLogsFromDb">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchAllIssues" class="com.akto.action.testing_issues.IssuesAction" method="fetchAllIssues">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -1516,6 +1542,31 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchSubTypeCountMap" class="com.akto.action.observe.InventoryAction" method="fetchSubTypeCountMap">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchTestingLogs" class="com.akto.action.testing.WorkflowTestAction" method="fetchTestingLogs">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^testingLogs.*</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>

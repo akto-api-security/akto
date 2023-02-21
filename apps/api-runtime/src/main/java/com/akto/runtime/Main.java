@@ -14,6 +14,8 @@ import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.kafka.Kafka;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.dto.HttpResponseParams;
 import com.akto.runtime.policies.AktoPolicies;
@@ -35,6 +37,7 @@ public class Main {
     public static final String VXLAN_ID = "vxlanId";
     public static final String VPC_CIDR = "vpc_cidr";
     private static final Logger logger = LoggerFactory.getLogger(HttpCallParser.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class);
 
     // this sync threshold time is used for deleting sample data
     public static final int sync_threshold_time = 120;
@@ -76,7 +79,7 @@ public class Main {
                 }
             }
         } catch (Exception e) {
-            logger.error("error in try collection", e);
+            loggerMaker.errorAndAddToDb("error in try collection" + e, LogDb.RUNTIME);
         }
 
         return ret;
@@ -110,6 +113,21 @@ public class Main {
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
+    public static class AccountInfo {
+        long estimatedCount;
+        int lastEstimatedCountTime;
+
+        public AccountInfo() {
+            this.estimatedCount = 0;
+            this.lastEstimatedCountTime = 0;
+        }
+
+        public AccountInfo(long estimatedCount, int lastEstimatedCountTime) {
+            this.estimatedCount = estimatedCount;
+            this.lastEstimatedCountTime = lastEstimatedCountTime;
+        }
+    }
+
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
@@ -120,7 +138,10 @@ public class Main {
         String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
         boolean syncImmediately = false;
         boolean fetchAllSTI = true;
-        if (instanceType != null && instanceType.equals("DASHBOARD")) {
+        Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
+
+        boolean isDashboardInstance = instanceType != null && instanceType.equals("DASHBOARD");
+        if (isDashboardInstance) {
             syncImmediately = true;
             fetchAllSTI = false;
         }
@@ -205,7 +226,7 @@ public class Main {
                         httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
                          
                     } catch (Exception e) {
-                        logger.error("Error while parsing kafka message " + e);
+                        loggerMaker.errorAndAddToDb("Error while parsing kafka message " + e, LogDb.RUNTIME);
                         continue;
                     }
                     String accountId = httpResponseParams.getAccountId();
@@ -220,11 +241,26 @@ public class Main {
                     try {
                         accountIdInt = Integer.parseInt(accountId);
                     } catch (Exception ignored) {
-                        logger.info("Account id not string");
+                        loggerMaker.errorAndAddToDb("Account id not string", LogDb.RUNTIME);
                         continue;
                     }
 
                     Context.accountId.set(accountIdInt);
+
+                    AccountInfo accountInfo = accountInfoMap.get(accountIdInt);
+                    if (accountInfo == null) {
+                        accountInfo = new AccountInfo();
+                        accountInfoMap.put(accountIdInt, accountInfo);
+                    }
+
+                    if ((Context.now() - accountInfo.lastEstimatedCountTime) > 60*60) {
+                        accountInfo.lastEstimatedCountTime = Context.now();
+                        accountInfo.estimatedCount = SingleTypeInfoDao.instance.getMCollection().estimatedDocumentCount();
+                    }
+
+                    if (!isDashboardInstance && accountInfo.estimatedCount> 20_000_000) {
+                        continue;
+                    }
 
                     if (!httpCallParserMap.containsKey(accountId)) {
                         HttpCallParser parser = new HttpCallParser(
@@ -267,7 +303,7 @@ public class Main {
                                 } catch (Exception e) {
                                     // force close it
                                     kafkaProducer.close();
-                                    logger.error(e.getMessage());
+                                    loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.RUNTIME);
                                 }
                             }
                         }
@@ -275,7 +311,7 @@ public class Main {
                         // flow.init(accWiseResponse);
                         aktoPolicy.main(accWiseResponse, apiCatalogSync, fetchAllSTI);
                     } catch (Exception e) {
-                        logger.error(e.toString());
+                        loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
                     }
                 }
             }
@@ -299,7 +335,7 @@ public class Main {
         try {
             AccountSettingsDao.instance.updateVersion(AccountSettings.API_RUNTIME_VERSION);
         } catch (Exception e) {
-            logger.error("error while updating dashboard version: " + e.getMessage());
+            loggerMaker.errorAndAddToDb("error while updating dashboard version: " + e.getMessage(), LogDb.RUNTIME);
         }
 
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("_id", 0);

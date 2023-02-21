@@ -269,46 +269,55 @@ export default {
             parameterHeaders: [
                 {
                     text: '',
-                    value: 'color'
+                    value: 'color',
+                    showFilterMenu: true
                 },
                 {
                     text: 'Name',
                     value: 'name',
-                    sortKey: 'param'
+                    sortKey: 'param',
+                    showFilterMenu: true
                 },
                 {
                     text: 'Type',
                     value: 'type',
-                    sortKey: 'subType'
+                    sortKey: 'subType',
+                    showFilterMenu: true
                 },
                 {
                     text: 'Endpoint',
                     value: 'endpoint',
-                    sortKey: 'url'
+                    sortKey: 'url',
+                    showFilterMenu: true
                 },
                 {
                     text: 'Collection',
                     value: 'apiCollectionName',
-                    sortKey: 'apiCollectionId'
+                    sortKey: 'apiCollectionId',
+                    showFilterMenu: true
                 },
                 {
                     text: 'Method',
                     value: 'method',
-                    sortKey: 'method'
+                    sortKey: 'method',
+                    showFilterMenu: true
                 },
                 {
                     text: 'Location',
                     value: 'location',
-                    sortKey: 'isHeader'
+                    sortKey: 'isHeader',
+                    showFilterMenu: true
                 },
                 {
                     text: constants.DISCOVERED,
                     value: 'added',
-                    sortKey: 'timestamp'
+                    sortKey: 'timestamp',
+                    showFilterMenu: true
                 },
                 {
                   text: 'Values',
                   value: 'domain',
+                  showFilterMenu: true
                 }
             ]
         }
@@ -437,7 +446,7 @@ export default {
             }
         },
         async fetchRecentParams(sortKey, sortOrder, skip, limit, filters, filterOperators) {
-            return await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, this.startTimestamp, this.endTimestamp)
+            return await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, this.startTimestamp, this.endTimestamp, false, false)
         },
         async fetchSensitiveParams() {
             return await inventorApi.listAllSensitiveFields().then(resp => {

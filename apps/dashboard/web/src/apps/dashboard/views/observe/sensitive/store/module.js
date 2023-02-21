@@ -53,12 +53,12 @@ const sensitive = {
         emptyState({commit}, payload, options) {
             commit('EMPTY_STATE', payload, options)
         },
-        loadSensitiveParameters({commit},{shouldLoad}, options) {
+        loadSensitiveParameters({commit},{shouldLoad, subType}, options) {
             commit('EMPTY_STATE')
             if (shouldLoad) {
                 state.loading = true
             }
-            return api.loadSensitiveParameters(-1).then((resp) => {
+            return api.loadSensitiveParameters(-1,null,null, subType).then((resp) => {
                 commit('SAVE_API_COLLECTION', {data: resp.data}, options)
                 listAllSensitiveFields().then(allSensitiveFields => {
                     commit('SAVE_SENSITIVE', allSensitiveFields.data)

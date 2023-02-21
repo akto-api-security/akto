@@ -7,6 +7,7 @@ import com.akto.dto.RawApi;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.types.CappedSet;
@@ -52,6 +53,7 @@ public class AddUserIdTest extends AuthRequiredTestPlugin{
         try {
             apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApi);
         } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while after executing " + subTestName() +" test : " + e,LogDb.TESTING);
             return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest, null);
         }
 
