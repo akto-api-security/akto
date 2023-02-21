@@ -20,7 +20,7 @@ public class NoAuthTest extends AuthRequiredTestPlugin {
     public Result exec(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil, List<RawApi> filteredMessages) {
         RawApi rawApi = filteredMessages.get(0).copy();
 
-        OriginalHttpRequest testRequest = rawApi.getRequest();
+        OriginalHttpRequest testRequest = rawApi.getRequest().copy();
 
         testingUtil.getAuthMechanism().removeAuthFromRequest(testRequest);
 
