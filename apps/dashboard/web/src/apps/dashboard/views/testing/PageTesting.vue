@@ -124,6 +124,11 @@
                 </template>
             </test-roles>
         </template>
+        <template slot="Logs" >
+            <div>
+                <log-fetch />
+            </div>
+        </template>
     </layout-with-tabs>
 </template>
 
@@ -136,6 +141,7 @@ import SampleData from '@/apps/dashboard/shared/components/SampleData'
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import TestRoles from './components/test_roles/TestRoles'
 import TestRolesConfigDetails from './components/test_roles/components/TestRolesConfigDetails'
+import LogFetch from './LogFetch'
 
 
 import func from '@/util/func'
@@ -162,7 +168,8 @@ export default {
         TestRoles,
         TestRolesConfigDetails,
         TokenAutomation,
-        HelpTooltip
+        HelpTooltip,
+        LogFetch
     },
     props: {
 

@@ -1,6 +1,9 @@
 package com.akto.filter;
 
 import com.akto.listener.InfraMetricsListener;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Tag;
 
@@ -10,12 +13,10 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class InfraMetricsFilter implements Filter {
 
-    private static final Logger logger = LoggerFactory.getLogger(InfraMetricsFilter.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(InfraMetricsFilter.class);
 
     @Override
     public void init(FilterConfig filterConfig) { }
@@ -53,7 +54,7 @@ public class InfraMetricsFilter implements Filter {
                     .register(InfraMetricsListener.registry)
                     .increment();
         } catch (Exception e) {
-            logger.error("Inframetrics filter Error: ", e);;
+            loggerMaker.errorAndAddToDb(String.format("Inframetrics filter Error: %s", e.toString()), LogDb.DASHBOARD);
         }
 
     }

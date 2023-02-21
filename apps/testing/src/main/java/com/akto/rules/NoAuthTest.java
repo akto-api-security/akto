@@ -4,6 +4,7 @@ package com.akto.rules;
 import com.akto.dto.*;
 import com.akto.dto.testing.*;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 
@@ -27,6 +28,7 @@ public class NoAuthTest extends AuthRequiredTestPlugin {
         try {
              apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApi);
         } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while executing request in noAuth test: " + e, LogDb.TESTING);
             return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.API_REQUEST_FAILED, testRequest, null);
         }
 

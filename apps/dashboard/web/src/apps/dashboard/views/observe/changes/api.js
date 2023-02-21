@@ -11,7 +11,7 @@ export default {
             }
         })
     },
-    fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, startTimestamp, endTimestamp) {
+    fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, startTimestamp, endTimestamp, sensitive, isRequest) {
         return request({
             url: '/api/fetchChanges',
             method: 'post',
@@ -26,7 +26,9 @@ export default {
                 }, {}), 
                 filterOperators,
                 startTimestamp, 
-                endTimestamp
+                endTimestamp,
+                sensitive: sensitive,
+                request: isRequest
             }
         }).then(resp => {
             return resp.response.data
@@ -40,5 +42,15 @@ export default {
         }).then(resp => {
             return resp.data.endpoints
         })
-    }
+    },
+    fetchSubTypeCountMap(startTimestamp, endTimestamp) {
+        return request({
+            url: '/api/fetchSubTypeCountMap',
+            method: 'post',
+            data: {
+                startTimestamp, 
+                endTimestamp
+            }
+        })
+    },
 }

@@ -12,9 +12,9 @@ import com.mongodb.client.model.Indexes;
 
 import org.bson.Document;
 
-public class LogsDao extends AccountsContextDao<Log> {
-
-    public static final LogsDao instance = new LogsDao();
+public class DashboardLogsDao extends AccountsContextDao<Log> {
+    
+    public static final DashboardLogsDao instance = new DashboardLogsDao();
     public void createIndicesIfAbsent() {
         boolean exists = false;
         String dbName = Context.accountId.get()+"";
@@ -44,7 +44,7 @@ public class LogsDao extends AccountsContextDao<Log> {
 
     @Override
     public String getCollName() {
-        return "logs";
+        return "logs_dashboard";
     }
 
     @Override

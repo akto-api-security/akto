@@ -7,6 +7,7 @@ import com.akto.dto.RawApi;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.info.BFLATestInfo;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.TestingUtil;
 
 import java.util.ArrayList;
@@ -38,6 +39,7 @@ public class BFLATest extends AuthRequiredRunAllTestPlugin {
             try {
                 apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApiDuplicate);
             } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error while after executing " + subTestName() +"test : " + e,LogDb.TESTING);
                 return Collections.singletonList(new ExecutorResult(false, null, new ArrayList<>(), 0, rawApi,
                         TestResult.TestError.API_REQUEST_FAILED, testRequest, null, bflaTestInfo));
             }

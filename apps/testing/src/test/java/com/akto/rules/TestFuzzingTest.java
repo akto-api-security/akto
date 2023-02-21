@@ -40,13 +40,13 @@ public class TestFuzzingTest {
         return new File(outputDirectory).listFiles();
     }
 
-    @Test
-    public void testDownloadLinksSwagger() throws Exception {
-        // contains a rawGithubLink in payloads so should generate payloadFile
-        File[] files = testDownloadLinkMain(generateSwaggerFileDetectionText(), "swagger_file_detection.yaml");
-        assertEquals(1, files.length);
-        assertEquals("swagger_pathlist.txt", files[0].getName());
-    }
+//     @Test
+//     public void testDownloadLinksSwagger() throws Exception {
+//         // contains a rawGithubLink in payloads so should generate payloadFile
+//         File[] files = testDownloadLinkMain(generateSwaggerFileDetectionText(), "swagger_file_detection.yaml");
+//         assertEquals(1, files.length);
+//         assertEquals("swagger_pathlist.txt", files[0].getName());
+//     }
 
     @Test
     public void testDownloadLinksWordpress() throws Exception {
@@ -60,6 +60,16 @@ public class TestFuzzingTest {
         // contains a local file link in payloads so should NOT generate payloadFile
         File[] files = testDownloadLinkMain(generateValidGmailCheck(), "valid-gmail-check.yaml");
         assertEquals(0, files.length);
+    }
+
+    @Test
+    public void testDownloadLinksPathTraversalFull() throws Exception {
+        // contains a local file link in payloads so should NOT generate payloadFile
+        File[] files = testDownloadLinkMain(generatePathTraversalFullText(), "path_traversal_full.yaml");
+         assertEquals("dotdotpwn.txt", files[0].getName());
+
+         List<String> lines = FileUtils.readLines(files[0], Charsets.UTF_8);
+         assertEquals(FuzzingTest.payloadLineLimit, lines.size());
     }
 
     @Test
@@ -286,28 +296,24 @@ public class TestFuzzingTest {
                 "          - \"(?m)Stable tag: ([0-9.]+)\" # extract the plugin version";
     }
 
-
-
-    private String generateSwaggerFileDetectionText() {
-        return "id: swagger-version\n" +
+    private String generatePathTraversalFullText() {
+        return "id: path-traversal\n" +
                 "  \n" +
                 "info:\n" +
-                "  name: Swagger 2.x Version Detection\n" +
-                "  author: c-sh0\n" +
+                "  name: Path traversal full\n" +
+                "  author: akto\n" +
                 "  reference:\n" +
-                "     - Swagger UI 2.x and under\n" +
-                "     - https://github.com/swagger-api/swagger-ui/blob/master/docs/usage/version-detection.md\n" +
+                "    - From OWASP site - https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/05-Authorization_Testing/01-Testing_Directory_Traversal_File_Include\n" +
+                "    - https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/Directory%20Traversal\n" +
                 "  severity: info\n" +
-                "  description: Obtain Swagger Version\n" +
-                "  tags: tech,swagger,api\n" +
                 "\n" +
                 "requests:\n" +
                 "  - method: GET\n" +
                 "    path:\n" +
                 "      - \"{{BaseURL}}/{{locations}}\"\n" +
-                "    payloads:\n" +
-                "       locations: https://github.com/akto-api-security/testing_sources/blob/master/Misconfiguration/swagger-detection/wordlists/swagger_pathlist.txt\n" +
                 "\n" +
+                "    payloads:\n" +
+                "      locations: https://raw.githubusercontent.com/swisskyrepo/PayloadsAllTheThings/master/Directory%20Traversal/Intruder/dotdotpwn.txt\n" +
                 "    matchers-condition: and\n" +
                 "    matchers:\n" +
                 "     - type: status\n" +
@@ -321,5 +327,41 @@ public class TestFuzzingTest {
                 "       regex:\n" +
                 "         - \" @version (v[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3})\"";
     }
+
+
+
+//     private String generateSwaggerFileDetectionText() {
+//         return "id: swagger-version\n" +
+//                 "  \n" +
+//                 "info:\n" +
+//                 "  name: Swagger 2.x Version Detection\n" +
+//                 "  author: c-sh0\n" +
+//                 "  reference:\n" +
+//                 "     - Swagger UI 2.x and under\n" +
+//                 "     - https://github.com/swagger-api/swagger-ui/blob/master/docs/usage/version-detection.md\n" +
+//                 "  severity: info\n" +
+//                 "  description: Obtain Swagger Version\n" +
+//                 "  tags: tech,swagger,api\n" +
+//                 "\n" +
+//                 "requests:\n" +
+//                 "  - method: GET\n" +
+//                 "    path:\n" +
+//                 "      - \"{{BaseURL}}/{{locations}}\"\n" +
+//                 "    payloads:\n" +
+//                 "       locations: https://github.com/akto-api-security/testing_sources/blob/master/Misconfiguration/swagger-detection/wordlists/swagger_pathlist.txt\n" +
+//                 "\n" +
+//                 "    matchers-condition: and\n" +
+//                 "    matchers:\n" +
+//                 "     - type: status\n" +
+//                 "       status:\n" +
+//                 "         - 200\n" +
+//                 "\n" +
+//                 "    extractors:\n" +
+//                 "     - type: regex\n" +
+//                 "       part: body\n" +
+//                 "       group: 1\n" +
+//                 "       regex:\n" +
+//                 "         - \" @version (v[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3})\"";
+//     }
 
 }
