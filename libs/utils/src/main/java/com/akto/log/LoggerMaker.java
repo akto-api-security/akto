@@ -77,6 +77,7 @@ public class LoggerMaker  {
                     break;
                 case DASHBOARD: 
                     DashboardLogsDao.instance.insertOne(log);
+                    break;
                 case ANALYSER:
                     AnalyserLogsDao.instance.insertOne(log);
             }
