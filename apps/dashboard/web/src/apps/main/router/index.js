@@ -121,9 +121,12 @@ const router =  new Router({
                 {
                     path: 'settings',
                     name: 'settings',
-                    components: {
-                        default: PageSettings
-                    }
+                    component: PageSettings,
+                    props: route => ({
+                        defaultStartTimestamp: route.query.start,
+                        defaultEndTimestamp: route.query.end,
+                        tab: route.query.tab
+                    })
                 },
                 {
                     path: 'observe',

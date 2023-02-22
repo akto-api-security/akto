@@ -5,6 +5,8 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+
 import kotlin.Pair;
 import okhttp3.*;
 
@@ -29,11 +31,11 @@ public class ApiExecutor {
             try {
                 body = responseBody.string();
             } catch (IOException e) {
-                loggerMaker.errorAndAddToDb("Error while parsing response body: " + e);
+                loggerMaker.errorAndAddToDb("Error while parsing response body: " + e, LogDb.TESTING);
                 body = "{}";
             }
         } catch (IOException e) {
-            loggerMaker.errorAndAddToDb("Error while executing request: " + e);
+            loggerMaker.errorAndAddToDb("Error while executing request: " + e, LogDb.TESTING);
             throw new Exception("Api Call failed");
         } finally {
             if (response != null) {

@@ -25,6 +25,8 @@ import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.notifications.email.WeeklyEmail;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
@@ -67,6 +69,7 @@ import static com.mongodb.client.model.Filters.eq;
 
 public class InitializerListener implements ServletContextListener {
     private static final Logger logger = LoggerFactory.getLogger(InitializerListener.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(InitializerListener.class);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -274,7 +277,7 @@ public class InitializerListener implements ServletContextListener {
                 }
 
             } catch (IOException e) {
-                logger.error("failed to read file", e);
+                loggerMaker.errorAndAddToDb(String.format("failed to read file %s", e.toString()), LogDb.DASHBOARD);
                 continue;
             }
         }
@@ -329,7 +332,7 @@ public class InitializerListener implements ServletContextListener {
                             continue;
                         }
 
-                        System.out.println(slackWebhook);
+                        loggerMaker.infoAndAddToDb(slackWebhook.toString(), LogDb.DASHBOARD);
 
                         ChangesInfo ci = getChangesInfo(now - slackWebhook.getLastSentTimestamp(), now - slackWebhook.getLastSentTimestamp());
                         if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0) {
@@ -346,22 +349,20 @@ public class InitializerListener implements ServletContextListener {
                         slackWebhook.setLastSentTimestamp(now);
                         SlackWebhooksDao.instance.updateOne(eq("webhook", slackWebhook.getWebhook()), Updates.set("lastSentTimestamp", now));
 
-                        System.out.println("******************DAILY INVENTORY SLACK******************");
+                        loggerMaker.infoAndAddToDb("******************DAILY INVENTORY SLACK******************", LogDb.DASHBOARD);
                         String webhookUrl = slackWebhook.getWebhook();
                         String payload = dailyUpdate.toJSON();
-                        System.out.println(payload);
+                        loggerMaker.infoAndAddToDb(payload, LogDb.DASHBOARD);
                         WebhookResponse response = slack.send(webhookUrl, payload);
-                        System.out.println(response);
-                        System.out.println("*********************************************************");
+                        loggerMaker.infoAndAddToDb("*********************************************************", LogDb.DASHBOARD);
 
                         // slack testing notification
-                        System.out.println("******************TESTING SUMMARY SLACK******************");
+                        loggerMaker.infoAndAddToDb("******************TESTING SUMMARY SLACK******************", LogDb.DASHBOARD);
                         TestSummaryGenerator testSummaryGenerator = new TestSummaryGenerator(1_000_000);
                         payload = testSummaryGenerator.toJson(slackWebhook.getDashboardUrl());
-                        System.out.println(payload);
+                        loggerMaker.infoAndAddToDb(payload, LogDb.DASHBOARD);
                         response = slack.send(webhookUrl, payload);
-                        System.out.println(response);
-                        System.out.println("*********************************************************");
+                        loggerMaker.infoAndAddToDb("*********************************************************", LogDb.DASHBOARD);
 
                     }
 
@@ -417,9 +418,9 @@ public class InitializerListener implements ServletContextListener {
         OriginalHttpResponse response = null; // null response means api request failed. Do not use new OriginalHttpResponse() in such cases else the string parsing fails.
 
         try {
-            response = ApiExecutor.sendRequest(request, true);
-            System.out.println("webhook request sent");
-        } catch (Exception e) {
+            response = ApiExecutor.sendRequest(request,true);
+            loggerMaker.infoAndAddToDb("webhook request sent", LogDb.DASHBOARD);
+        } catch(Exception e){
             errors.add("API execution failed");
         }
 
@@ -598,7 +599,7 @@ public class InitializerListener implements ServletContextListener {
 
             return ret;
         } catch (Exception e) {
-            logger.error("get new endpoints", e);
+            loggerMaker.errorAndAddToDb(String.format("get new endpoints %s", e.toString()), LogDb.DASHBOARD);
         }
 
         return null;
@@ -763,6 +764,10 @@ public class InitializerListener implements ServletContextListener {
         TestRolesDao.instance.createIndicesIfAbsent();
 
         ApiInfoDao.instance.createIndicesIfAbsent();
+        RuntimeLogsDao.instance.createIndicesIfAbsent();
+        LogsDao.instance.createIndicesIfAbsent();
+        DashboardLogsDao.instance.createIndicesIfAbsent();
+        AnalyserLogsDao.instance.createIndicesIfAbsent();
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
         if (backwardCompatibility == null) {
             backwardCompatibility = new BackwardCompatibility();
@@ -801,13 +806,13 @@ public class InitializerListener implements ServletContextListener {
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             dropSampleDataIfEarlierNotDroped(accountSettings);
         } catch (Exception e) {
-            logger.error("error while setting up dashboard: " + e.getMessage());
+            loggerMaker.errorAndAddToDb("error while setting up dashboard: " + e.toString(), LogDb.DASHBOARD);
         }
 
         try {
             AccountSettingsDao.instance.updateVersion(AccountSettings.DASHBOARD_VERSION);
         } catch (Exception e) {
-            logger.error("error while updating dashboard version: " + e.getMessage());
+            loggerMaker.errorAndAddToDb("error while updating dashboard version: " + e.toString(), LogDb.DASHBOARD);
         }
 
         try {
@@ -848,7 +853,7 @@ public class InitializerListener implements ServletContextListener {
             return;
         }
         if (backwardCompatibility.isDeploymentStatusUpdated()) {
-            logger.info("Deployment status has already been updated, skipping this");
+            loggerMaker.infoAndAddToDb("Deployment status has already been updated, skipping this", LogDb.DASHBOARD);
             return;
         }
         String body = "{\n    \"ownerEmail\": \"" + ownerEmail + "\",\n    \"stackStatus\": \"COMPLETED\",\n    \"cloudType\": \"AWS\"\n}";
@@ -856,9 +861,9 @@ public class InitializerListener implements ServletContextListener {
         OriginalHttpRequest request = new OriginalHttpRequest(getUpdateDeploymentStatusUrl(), "", "POST", body, OriginalHttpRequest.buildHeadersMap(headers), "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, false);
-            logger.info("Update deployment status reponse: {}", response.getBody());
+            loggerMaker.infoAndAddToDb(String.format("Update deployment status reponse: %s", response.getBody()), LogDb.DASHBOARD);
         } catch (Exception e) {
-            logger.error("Failed to update deployment status, will try again on next boot up", e);
+            loggerMaker.errorAndAddToDb(String.format("Failed to update deployment status, will try again on next boot up : %s", e.toString()), LogDb.DASHBOARD);
             return;
         }
         BackwardCompatibilityDao.instance.updateOne(

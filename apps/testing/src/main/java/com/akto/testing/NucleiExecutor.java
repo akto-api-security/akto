@@ -9,6 +9,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.FuzzingTest;
 import com.akto.util.Pair;
 
@@ -46,7 +47,7 @@ public class NucleiExecutor {
         try {
             FileUtils.writeStringToFile(file, "{}", Charsets.UTF_8);
         } catch (IOException e) {
-            loggerMaker.errorAndAddToDb("Error while writing to file .templates-config.json " + e);
+            loggerMaker.errorAndAddToDb("Error while writing to file .templates-config.json " + e, LogDb.TESTING);
             return null;
         }
 
@@ -62,7 +63,7 @@ public class NucleiExecutor {
         String arch = System.getProperty("os.arch");
         String nucleiFileSuffix = "linux";
 
-        if (arch != null && arch.equals("aarch64")) {
+       if (arch != null && arch.equals("aarch64")) {
             nucleiFileSuffix = "m1";
         }
 
@@ -101,7 +102,7 @@ public class NucleiExecutor {
             baseCmdTokens.add(headerName + ":\"" + headerValue + "\"");
         }
 
-        loggerMaker.infoAndAddToDb("Nuclei Command: " + String.join(" ",baseCmdTokens));
+        loggerMaker.infoAndAddToDb("Nuclei Command: " + String.join(" ",baseCmdTokens), LogDb.TESTING);
         Process process;
 
         try {
@@ -126,14 +127,14 @@ public class NucleiExecutor {
 
             boolean processResult = process.waitFor(5, TimeUnit.MINUTES);
         } catch (IOException | InterruptedException e) {
-            loggerMaker.errorAndAddToDb("Error while nuclei CLI " + e);
+            loggerMaker.errorAndAddToDb("Error while nuclei CLI " + e, LogDb.TESTING);
         }
 
         List<BasicDBObject> metaData;
         try {
              metaData = readMetaData(outputDirFiles);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while reading meta data : " + e);
+            loggerMaker.errorAndAddToDb("Error while reading meta data : " + e, LogDb.TESTING);
             return null;
         }
 
@@ -240,14 +241,14 @@ public class NucleiExecutor {
                         }
             
                     } catch (IOException e) {
-                        loggerMaker.errorAndAddToDb("Error while reading nuclei response : " + e);
+                        loggerMaker.errorAndAddToDb("Error while reading nuclei response : " + e, LogDb.TESTING);
                     } finally {
 
                         try {
                             if (fileReader != null) fileReader.close();
                             if (reader != null) reader.close();
                         } catch (IOException e) {
-                            loggerMaker.errorAndAddToDb("Error while closing nuclei log file: " + e);
+                            loggerMaker.errorAndAddToDb("Error while closing nuclei log file: " + e, LogDb.TESTING);
                         }
                     }
             
