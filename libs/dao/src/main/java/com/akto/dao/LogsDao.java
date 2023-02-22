@@ -24,7 +24,7 @@ public class LogsDao extends AccountsContextDao<Log> {
                 exists = true;
                 break;
             }
-        };
+        }
 
         if (!exists) {
             db.createCollection(getCollName(), new CreateCollectionOptions().capped(true).maxDocuments(100_000).sizeInBytes(100_000_000));
@@ -38,13 +38,17 @@ public class LogsDao extends AccountsContextDao<Log> {
         }
 
         if (indices.size() == 1) {
-            instance.getMCollection().createIndex(Indexes.descending(Log.TIMESTAMP));
+            getInstance().getMCollection().createIndex(Indexes.descending(Log.TIMESTAMP));
         }
     }
 
     @Override
     public String getCollName() {
         return "logs";
+    }
+
+    public LogsDao getInstance(){
+        return instance;
     }
 
     @Override

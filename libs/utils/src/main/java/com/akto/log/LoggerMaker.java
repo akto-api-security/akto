@@ -21,17 +21,18 @@ public class LoggerMaker  {
 
     private static int logCount = 0;
     private static int logCountResetTimestamp = Context.now();
-    private static final int oneMinute = 60; 
+    private static final int ONEMINUTE = 60; 
 
     public enum LogDb {
         TESTING,RUNTIME,DASHBOARD
     }
 
-    public LogDb db;
+    private LogDb db;
 
     public LoggerMaker(Class<?> c, LogDb db) {
         aClass = c;
         logger = LoggerFactory.getLogger(c);
+        this.db = db;
     }
 
     public void errorAndAddToDb(String err) {
@@ -52,9 +53,9 @@ public class LoggerMaker  {
         }
     }
 
-    private Boolean checkUpdate(){
+    private static Boolean checkUpdate(){
         if(logCount>=1000){
-            if((logCountResetTimestamp + oneMinute) >= Context.now()){
+            if((logCountResetTimestamp + ONEMINUTE) >= Context.now()){
                 return false;
             } else {
                 logCount = 0;
@@ -63,12 +64,16 @@ public class LoggerMaker  {
         }
         return true;
     }
+
+    private static void updateLogCount(){
+        logCount++;
+    }
     
     private void insert(String info, String key) {
         String text = aClass + " : " + info;
         Log log = new Log(text, key, Context.now());
         
-        if(checkUpdate()){
+        if(Boolean.TRUE.equals(checkUpdate())){
             switch(db){
                 case TESTING: 
                     LogsDao.instance.insertOne(log);
@@ -79,7 +84,7 @@ public class LoggerMaker  {
                 case DASHBOARD: 
                     DashboardLogsDao.instance.insertOne(log);
             }
-            logCount++;
+            updateLogCount();
         }
     }
 

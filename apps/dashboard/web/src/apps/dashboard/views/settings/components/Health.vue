@@ -1,10 +1,5 @@
 <template>
     <div>
-        <!-- <json-viewer
-            v-if="content"
-            :contentJSON="content"
-            :errors="{}"
-        />                     -->
         <div>
             <div class="d-flex mt-5">
                 <div class="log-title mr-2">Latest logs</div>
@@ -123,13 +118,16 @@ export default {
             startTime = Math.floor(startTime / 1000);
             endTime = Math.floor(endTime / 1000)
             await api.fetchLogsFromDb(startTime, endTime, this.logGroupName).then((resp) => {
-                this.logs.push(...resp.logs);
-                for (var i = 0; i < resp.logs.length; i++) {
-                    var timeStamp = resp.logs[i].timestamp;
+                let reverseLogs = resp.logs.reverse();
+                this.logs.unshift(...reverseLogs);
+                let logContent = [];
+                for (var i = 0; i < reverseLogs.length; i++) {
+                    var timeStamp = reverseLogs[i].timestamp;
                     var d1 = func.epochToDateTime(timeStamp)
-                    var log = resp.logs[i].log;
-                    this.logContent.push("[" + d1 + "]" + " " + log);
+                    var log = reverseLogs[i].log;
+                    logContent.push("[" + d1 + "]" + " " + log);
                 }
+                this.logContent.unshift(...logContent);
             })
         },
         downloadData() {
