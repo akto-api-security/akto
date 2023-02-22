@@ -45,9 +45,9 @@ public class AuthMechanism {
     }
 
     public boolean authTokenPresent(OriginalHttpRequest request) {
-        boolean result = true;
+        boolean result = false;
         for (AuthParam authParamPair : authParams) {
-            result = result && authParamPair.authTokenPresent(request);
+            result = result || authParamPair.authTokenPresent(request);
         }
         return result;
     }
