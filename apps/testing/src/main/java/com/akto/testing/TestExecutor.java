@@ -469,8 +469,8 @@ public class TestExecutor {
                     TestingRunResultDao.instance.insertMany(testingRunResults);
                     loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);
                     //Creating issues from testingRunResults
-//                    TestingIssuesHandler handler = new TestingIssuesHandler();
-//                    handler.handleIssuesCreationFromTestingRunResults(testingRunResults);
+                   TestingIssuesHandler handler = new TestingIssuesHandler();
+                   handler.handleIssuesCreationFromTestingRunResults(testingRunResults);
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("error while running tests: " + e, LogDb.TESTING);

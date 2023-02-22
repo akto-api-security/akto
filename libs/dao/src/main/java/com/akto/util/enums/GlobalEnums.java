@@ -21,7 +21,6 @@ public class GlobalEnums {
     /* Category of tests perfomred */
     public enum TestCategory {
         BOLA("BOLA", Severity.HIGH, "Broken Object Level Authorization (BOLA)", "BOLA"),
-        MISCONFIGURATION("MISCONFIGURATION", Severity.HIGH, "Misconfiguration", "Misconfiguration"),
         NO_AUTH("NO_AUTH", Severity.HIGH, "Broken User Authentication (BUA)", "Broken Authentication"),
         BFLA("BFLA", Severity.HIGH, "Broken Function Level Authorization (BFLA)", "Broken Function Level Authorization"),
         IAM("IAM", Severity.HIGH, "Improper Assets Management (IAM)", "Improper Assets Management"),
@@ -335,7 +334,7 @@ public class GlobalEnums {
         }),
         OPEN_REDIRECT(
                 "OPEN_REDIRECT",
-                TestCategory.MISCONFIGURATION,
+                TestCategory.SM,
                 "Open redirect",
                 "Attacker can access resources of any user by introducing multiple parameters with same name.",
                 "The endpoint appears to be vulnerable to broken object level authorization attack. The original request was replayed by adding private resources in query params (for eg: <b>user_id=1234&account_id=436783).</b>. " +
