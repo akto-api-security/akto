@@ -57,7 +57,7 @@
                 <v-row
                     style="padding: 12px 12px 12px 12px"
                 >
-                    <operator-component :operator="auth_type_copy.operator" :onlyEqual="true"/>
+                    <operator-component :operators="operators" :operator="auth_type_copy.operator" :onlyEqual="true"/>
                 </v-row>
             <v-row style="padding: 12px"  >
                     <conditions-table
@@ -102,6 +102,9 @@ export default {
         OperatorComponent,
     },
     data() {
+        var operators = [
+                "OR"
+            ]
         return {
             auth_type_copy: null,
             saveLoading: false,
@@ -113,6 +116,7 @@ export default {
                         return true
                     },
                 ],
+            operators
         }
     },
     methods: {
