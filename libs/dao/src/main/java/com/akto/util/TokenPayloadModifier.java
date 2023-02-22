@@ -21,8 +21,11 @@ public class TokenPayloadModifier {
         else {
             Map<String, List<String>> headers = request.getHeaders();
             String k = key.toLowerCase().trim();
-            if (!headers.containsKey(k)) return false;
-            headers.put(k, Collections.singletonList(value));
+            if (value == null || value == "null") {
+                headers.remove(k);
+            } else {
+                headers.put(k, Collections.singletonList(value));
+            }
         }
         return true;
     }
