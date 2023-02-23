@@ -155,10 +155,10 @@ public class QuickStartAction extends UserAction {
             this.isFirstSetup = true;
             try {
                 Map<String, String> parameters = new HashMap<>();
-                    parameters.put("MongoIp", System.getenv("AKTO_MONGO_CONN"));
-                    parameters.put("KeyPair", System.getenv("EC2_KEY_PAIR"));
-                    parameters.put("SourceLBs", extractLBs());
-                    parameters.put("SubnetId", System.getenv("EC2_SUBNET_ID"));
+                parameters.put("MongoIp", System.getenv("AKTO_MONGO_CONN"));
+                parameters.put("KeyPair", System.getenv("EC2_KEY_PAIR"));
+                parameters.put("SourceLBs", extractLBs());
+                parameters.put("SubnetId", System.getenv("EC2_SUBNET_ID"));
                 String template = convertStreamToString(AwsStack.class
                         .getResourceAsStream("/cloud_formation_templates/akto_aws_mirroring.template"));
                 List<Tag> tags = Utils.fetchTags(DashboardStackDetails.getStackName());
