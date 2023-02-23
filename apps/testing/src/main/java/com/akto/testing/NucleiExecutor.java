@@ -21,7 +21,7 @@ import org.apache.commons.lang3.StringUtils;
 
 public class NucleiExecutor {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(NucleiExecutor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(NucleiExecutor.class, LogDb.TESTING);
     public static class NucleiResult {
         public ArrayList<Pair<OriginalHttpRequest, OriginalHttpResponse>> attempts;
         public List<BasicDBObject> metaData;
@@ -47,7 +47,7 @@ public class NucleiExecutor {
         try {
             FileUtils.writeStringToFile(file, "{}", Charsets.UTF_8);
         } catch (IOException e) {
-            loggerMaker.errorAndAddToDb("Error while writing to file .templates-config.json " + e, LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Error while writing to file .templates-config.json " + e);
             return null;
         }
 
@@ -105,7 +105,7 @@ public class NucleiExecutor {
             baseCmdTokens.add(headerName + ":\"" + headerValue + "\"");
         }
 
-        loggerMaker.infoAndAddToDb("Nuclei Command: " + String.join(" ",baseCmdTokens), LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("Nuclei Command: " + String.join(" ",baseCmdTokens));
         Process process;
 
         try {
@@ -130,14 +130,14 @@ public class NucleiExecutor {
 
             boolean processResult = process.waitFor(5, TimeUnit.MINUTES);
         } catch (IOException | InterruptedException e) {
-            loggerMaker.errorAndAddToDb("Error while nuclei CLI " + e, LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Error while nuclei CLI " + e);
         }
 
         List<BasicDBObject> metaData;
         try {
              metaData = readMetaData(outputDirFiles);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while reading meta data : " + e, LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Error while reading meta data : " + e);
             return null;
         }
 
@@ -244,14 +244,14 @@ public class NucleiExecutor {
                         }
             
                     } catch (IOException e) {
-                        loggerMaker.errorAndAddToDb("Error while reading nuclei response : " + e, LogDb.TESTING);
+                        loggerMaker.errorAndAddToDb("Error while reading nuclei response : " + e);
                     } finally {
 
                         try {
                             if (fileReader != null) fileReader.close();
                             if (reader != null) reader.close();
                         } catch (IOException e) {
-                            loggerMaker.errorAndAddToDb("Error while closing nuclei log file: " + e, LogDb.TESTING);
+                            loggerMaker.errorAndAddToDb("Error while closing nuclei log file: " + e);
                         }
                     }
             

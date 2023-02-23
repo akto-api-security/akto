@@ -69,7 +69,7 @@ import static com.mongodb.client.model.Filters.eq;
 
 public class InitializerListener implements ServletContextListener {
     private static final Logger logger = LoggerFactory.getLogger(InitializerListener.class);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(InitializerListener.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(InitializerListener.class, LogDb.DASHBOARD);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -232,7 +232,7 @@ public class InitializerListener implements ServletContextListener {
                 }
 
             } catch (IOException e) {
-                loggerMaker.errorAndAddToDb(String.format("failed to read file %s", e.toString()), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(String.format("failed to read file %s", e.toString()));
                 continue;
             }
         }
@@ -286,7 +286,7 @@ public class InitializerListener implements ServletContextListener {
                             continue;
                         }
 
-                        loggerMaker.infoAndAddToDb(slackWebhook.toString(), LogDb.DASHBOARD);
+                        loggerMaker.infoAndAddToDb(slackWebhook.toString());
 
                         ChangesInfo ci = getChangesInfo(now - slackWebhook.getLastSentTimestamp(), now - slackWebhook.getLastSentTimestamp());
                         if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0) {
@@ -303,20 +303,20 @@ public class InitializerListener implements ServletContextListener {
                         slackWebhook.setLastSentTimestamp(now);
                         SlackWebhooksDao.instance.updateOne(eq("webhook", slackWebhook.getWebhook()), Updates.set("lastSentTimestamp", now));
 
-                        loggerMaker.infoAndAddToDb("******************DAILY INVENTORY SLACK******************", LogDb.DASHBOARD);
+                        loggerMaker.infoAndAddToDb("******************DAILY INVENTORY SLACK******************");
                         String webhookUrl = slackWebhook.getWebhook();
                         String payload = dailyUpdate.toJSON();
-                        loggerMaker.infoAndAddToDb(payload, LogDb.DASHBOARD);
+                        loggerMaker.infoAndAddToDb(payload);
                         WebhookResponse response = slack.send(webhookUrl, payload);
-                        loggerMaker.infoAndAddToDb("*********************************************************", LogDb.DASHBOARD);
+                        loggerMaker.infoAndAddToDb("*********************************************************");
 
                         // slack testing notification
-                        loggerMaker.infoAndAddToDb("******************TESTING SUMMARY SLACK******************", LogDb.DASHBOARD);
+                        loggerMaker.infoAndAddToDb("******************TESTING SUMMARY SLACK******************");
                         TestSummaryGenerator testSummaryGenerator = new TestSummaryGenerator(1_000_000);
                         payload = testSummaryGenerator.toJson(slackWebhook.getDashboardUrl());
-                        loggerMaker.infoAndAddToDb(payload, LogDb.DASHBOARD);
+                        loggerMaker.infoAndAddToDb(payload);
                         response = slack.send(webhookUrl, payload);
-                        loggerMaker.infoAndAddToDb("*********************************************************", LogDb.DASHBOARD);
+                        loggerMaker.infoAndAddToDb("*********************************************************");
 
                     }
 
@@ -372,7 +372,7 @@ public class InitializerListener implements ServletContextListener {
 
         try {
             response = ApiExecutor.sendRequest(request,true);
-            loggerMaker.infoAndAddToDb("webhook request sent", LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("webhook request sent");
         } catch(Exception e){
             errors.add("API execution failed");
         }
@@ -551,7 +551,7 @@ public class InitializerListener implements ServletContextListener {
 
             return ret;
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(String.format("get new endpoints %s", e.toString()), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(String.format("get new endpoints %s", e.toString()));
         }
 
         return null;
@@ -754,13 +754,13 @@ public class InitializerListener implements ServletContextListener {
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             dropSampleDataIfEarlierNotDroped(accountSettings);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error while setting up dashboard: " + e.toString(), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb("error while setting up dashboard: " + e.toString());
         }
 
         try {
             AccountSettingsDao.instance.updateVersion(AccountSettings.DASHBOARD_VERSION);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error while updating dashboard version: " + e.toString(), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb("error while updating dashboard version: " + e.toString());
         }
 
         try {
@@ -801,7 +801,7 @@ public class InitializerListener implements ServletContextListener {
             return;
         }
         if (backwardCompatibility.isDeploymentStatusUpdated()) {
-            loggerMaker.infoAndAddToDb("Deployment status has already been updated, skipping this", LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("Deployment status has already been updated, skipping this");
             return;
         }
         String body = "{\n    \"ownerEmail\": \"" + ownerEmail + "\",\n    \"stackStatus\": \"COMPLETED\",\n    \"cloudType\": \"AWS\"\n}";
@@ -809,9 +809,9 @@ public class InitializerListener implements ServletContextListener {
         OriginalHttpRequest request = new OriginalHttpRequest(getUpdateDeploymentStatusUrl(), "", "POST", body, OriginalHttpRequest.buildHeadersMap(headers), "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, false);
-            loggerMaker.infoAndAddToDb(String.format("Update deployment status reponse: %s", response.getBody()), LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb(String.format("Update deployment status reponse: %s", response.getBody()));
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(String.format("Failed to update deployment status, will try again on next boot up : %s", e.toString()), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(String.format("Failed to update deployment status, will try again on next boot up : %s", e.toString()));
             return;
         }
         BackwardCompatibilityDao.instance.updateOne(

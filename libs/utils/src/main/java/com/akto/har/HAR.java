@@ -18,7 +18,7 @@ import java.util.*;
 public class HAR {
     private final static ObjectMapper mapper = new ObjectMapper();
     private final List<String> errors = new ArrayList<>();
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Har.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Har.class, LogDb.DASHBOARD);
     public static final String JSON_CONTENT_TYPE = "application/json";
     public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
     public List<String> getMessages(String harString, int collection_id) throws HarReaderException {
@@ -40,7 +40,7 @@ public class HAR {
                 }
                 
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while parsing har file on entry: " + idx + " ERROR: " + e.toString(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb("Error while parsing har file on entry: " + idx + " ERROR: " + e.toString());
                 errors.add("Error in entry " + idx);
             }
         }

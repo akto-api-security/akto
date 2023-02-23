@@ -45,7 +45,7 @@ public class APICatalogSync {
     public int thresh;
     public String userIdentifier;
     private static final Logger logger = LoggerFactory.getLogger(APICatalogSync.class);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(APICatalogSync.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(APICatalogSync.class, LogDb.RUNTIME);
     public Map<Integer, APICatalog> dbState;
     public Map<Integer, APICatalog> delta;
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
@@ -77,7 +77,7 @@ public class APICatalogSync {
                 processResponse(requestTemplate, iter.next(), deletedInfo);
             } catch (Exception e) {
                 e.printStackTrace();
-                loggerMaker.errorAndAddToDb("processResponse: " + e.getMessage(), LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("processResponse: " + e.getMessage());
             }
         }
     }
@@ -144,7 +144,7 @@ public class APICatalogSync {
             }
 
         } catch (JsonParseException e) {
-            loggerMaker.errorAndAddToDb("Failed to parse json payload " + e.getMessage(), LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("Failed to parse json payload " + e.getMessage());
         }
     }
 
@@ -775,7 +775,7 @@ public class APICatalogSync {
                 iterator.remove();
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb(e.toString());
         }
 
         return ret;
@@ -806,7 +806,7 @@ public class APICatalogSync {
 
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e.toString(),LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb(e.toString());
         }
     }
 
@@ -1251,7 +1251,7 @@ public class APICatalogSync {
                     }
                     keyTypes.getOccurrences().put(param.getSubType(), param);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("ERROR while parsing url param position: " + p, LogDb.RUNTIME);
+                    loggerMaker.errorAndAddToDb("ERROR while parsing url param position: " + p);
                 }
                 continue;
             }
@@ -1321,7 +1321,7 @@ public class APICatalogSync {
             writesForSampleData.addAll(getDBUpdatesForSampleData(apiCollectionId, deltaCatalog,dbCatalog, redact, forceUpdate));
         }
 
-        loggerMaker.infoAndAddToDb("adding " + writesForParams.size() + " updates for params", LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("adding " + writesForParams.size() + " updates for params");
 
         long start = System.currentTimeMillis();
 
@@ -1332,23 +1332,23 @@ public class APICatalogSync {
                     writesForParams
                 );
 
-                loggerMaker.infoAndAddToDb((System.currentTimeMillis() - start) + ": " + res.getInserts().size() + " " +res.getUpserts().size(), LogDb.RUNTIME);
+                loggerMaker.infoAndAddToDb((System.currentTimeMillis() - start) + ": " + res.getInserts().size() + " " +res.getUpserts().size());
         }
 
-        loggerMaker.infoAndAddToDb("adding " + writesForTraffic.size() + " updates for traffic", LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("adding " + writesForTraffic.size() + " updates for traffic");
         if(writesForTraffic.size() > 0) {
             BulkWriteResult res = TrafficInfoDao.instance.getMCollection().bulkWrite(writesForTraffic);
 
-            loggerMaker.infoAndAddToDb(res.getInserts().size() + " " +res.getUpserts().size(), LogDb.RUNTIME);
+            loggerMaker.infoAndAddToDb(res.getInserts().size() + " " +res.getUpserts().size());
 
         }
         
 
-        loggerMaker.infoAndAddToDb("adding " + writesForSampleData.size() + " updates for samples", LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("adding " + writesForSampleData.size() + " updates for samples");
         if(writesForSampleData.size() > 0) {
             BulkWriteResult res = SampleDataDao.instance.getMCollection().bulkWrite(writesForSampleData);
 
-            loggerMaker.infoAndAddToDb(res.getInserts().size() + " " +res.getUpserts().size(), LogDb.RUNTIME);
+            loggerMaker.infoAndAddToDb(res.getInserts().size() + " " +res.getUpserts().size());
 
         }
 

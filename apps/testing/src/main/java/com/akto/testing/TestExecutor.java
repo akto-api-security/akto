@@ -42,7 +42,7 @@ import java.util.concurrent.*;
 
 public class TestExecutor {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class, LogDb.TESTING);
     public static long acceptableSizeInBytes = 5_000_000;
 
 
@@ -64,7 +64,7 @@ public class TestExecutor {
         if (testingRun.getTestIdConfig() > 1) {
             TestingRunConfig testingRunConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
             if (testingRunConfig != null) {
-                loggerMaker.infoAndAddToDb("Found testing run config with id :" + testingRunConfig.getId(), LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("Found testing run config with id :" + testingRunConfig.getId());
                 testingRun.setTestingRunConfig(testingRunConfig);
             }
         }
@@ -74,7 +74,7 @@ public class TestExecutor {
     public void workflowInit (TestingRun testingRun, ObjectId summaryId) {
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
         if (!testingEndpoints.getType().equals(TestingEndpoints.Type.WORKFLOW)) {
-            loggerMaker.errorAndAddToDb("Invalid workflow type", LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Invalid workflow type");
             return;
         }
 
@@ -86,7 +86,7 @@ public class TestExecutor {
         );
 
         if (workflowTest == null) {
-            loggerMaker.errorAndAddToDb("Workflow test has been deleted", LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Workflow test has been deleted");
             return ;
         }
 
@@ -94,7 +94,7 @@ public class TestExecutor {
         try {
             apiWorkflowExecutor.init(workflowTest, testingRun.getId(), summaryId);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while executing workflow test " + e, LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Error while executing workflow test " + e);
         }
 
         Map<String, Integer> totalCountIssues = new HashMap<>();
@@ -157,17 +157,17 @@ public class TestExecutor {
         try {
             LoginFlowResponse loginFlowResponse = triggerLoginFlow(authMechanism, 3);
             if (!loginFlowResponse.getSuccess()) {
-                loggerMaker.errorAndAddToDb("login flow failed", LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("login flow failed");
                 throw new Exception("login flow failed");
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.TESTING);
+            loggerMaker.errorAndAddToDb(e.getMessage());
             return;
         }
 
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
-        loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size());
 
         TestingRunResultSummariesDao.instance.updateOne(
             Filters.eq("_id", summaryId),
@@ -185,7 +185,7 @@ public class TestExecutor {
                     hostsToApiCollectionMap.put(host, apiInfoKey.getApiCollectionId());
                 }
             } catch (URISyntaxException e) {
-                loggerMaker.errorAndAddToDb("Error while finding host: " + e, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("Error while finding host: " + e);
             }
             try {
                  Future<List<TestingRunResult>> future = threadPool.submit(
@@ -195,12 +195,12 @@ public class TestExecutor {
                                  accountId, latch, now, testingRun.getTestRunTime()));
                  futureTestingRunResults.add(future);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error in API " + apiInfoKey + " : " + e.getMessage(), LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("Error in API " + apiInfoKey + " : " + e.getMessage());
             }
         }
 
-        loggerMaker.infoAndAddToDb("hostsToApiCollectionMap : " + hostsToApiCollectionMap.keySet(), LogDb.TESTING);
-        loggerMaker.infoAndAddToDb("Waiting...", LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("hostsToApiCollectionMap : " + hostsToApiCollectionMap.keySet());
+        loggerMaker.infoAndAddToDb("Waiting...");
 
         try {
             latch.await();
@@ -208,7 +208,7 @@ public class TestExecutor {
             throw new RuntimeException(e);
         }
 
-        loggerMaker.infoAndAddToDb("Finished testing", LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("Finished testing");
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
         for (Future<List<TestingRunResult>> future: futureTestingRunResults) {
@@ -218,7 +218,7 @@ public class TestExecutor {
                     testingRunResults.addAll(future.get());
                 }
             } catch (InterruptedException | ExecutionException e) {
-                loggerMaker.errorAndAddToDb("Error while after running test : " + e, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("Error while after running test : " + e);
             }
         }
 
@@ -230,14 +230,14 @@ public class TestExecutor {
             }
         }
 
-        loggerMaker.infoAndAddToDb("Finished adding " + testingRunResults.size() + " testingRunResults", LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("Finished adding " + testingRunResults.size() + " testingRunResults");
 
         TestingRunResultSummariesDao.instance.updateOne(
             Filters.eq("_id", summaryId),
             Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, testingRunResults.size())
         );
 
-        loggerMaker.infoAndAddToDb("Finished adding issues", LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("Finished adding issues");
 
         Map<String, Integer> totalCountIssues = new HashMap<>();
         totalCountIssues.put("HIGH", 0);
@@ -260,7 +260,7 @@ public class TestExecutor {
             )
         );
 
-        loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao", LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao");
 
     }
 
@@ -289,11 +289,11 @@ public class TestExecutor {
             try {
                 loginFlowResponse = executeLoginFlow(authMechanism, null);
                 if (loginFlowResponse.getSuccess()) {
-                    loggerMaker.infoAndAddToDb("login flow success", LogDb.TESTING);
+                    loggerMaker.infoAndAddToDb("login flow success");
                     break;
                 }
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.TESTING);
+                loggerMaker.errorAndAddToDb(e.getMessage());
             }
         }
         return loginFlowResponse;
@@ -321,7 +321,7 @@ public class TestExecutor {
                             testingRunResults.add(fuzzResult);
                         }
                     } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb("unable to execute fuzzing for " + testSubCategory, LogDb.TESTING);
+                        loggerMaker.errorAndAddToDb("unable to execute fuzzing for " + testSubCategory);
                     }
                 }
             }
@@ -333,16 +333,16 @@ public class TestExecutor {
     public LoginFlowResponse executeLoginFlow(AuthMechanism authMechanism, LoginFlowParams loginFlowParams) throws Exception {
 
         if (authMechanism.getType() == null) {
-            loggerMaker.infoAndAddToDb("auth type value is null", LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("auth type value is null");
             return new LoginFlowResponse(null, null, true);
         }
 
         if (!authMechanism.getType().equals(LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString())) {
-            loggerMaker.infoAndAddToDb("invalid auth type for login flow execution", LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("invalid auth type for login flow execution");
             return new LoginFlowResponse(null, null, true);
         }
 
-        loggerMaker.infoAndAddToDb("login flow execution started", LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("login flow execution started");
 
         WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData(), loginFlowParams);
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
@@ -454,7 +454,7 @@ public class TestExecutor {
             ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId, TestingRunConfig testingRunConfig,
             TestingUtil testingUtil, ObjectId testRunResultSummaryId, int accountId, CountDownLatch latch, int startTime, int timeToKill) {
 
-        loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey);
 
         Context.accountId.set(accountId);
         List<TestingRunResult> testingRunResults = new ArrayList<>();
@@ -463,17 +463,17 @@ public class TestExecutor {
             try {
                 testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId);
                 String size = testingRunResults == null ? "null" : testingRunResults.size()+"";
-                loggerMaker.infoAndAddToDb("testingRunResults size: " + size, LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("testingRunResults size: " + size);
                 if (testingRunResults != null && !testingRunResults.isEmpty()) {
                     trim(testingRunResults);
                     TestingRunResultDao.instance.insertMany(testingRunResults);
-                    loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);
+                    loggerMaker.infoAndAddToDb("Inserted testing results");
                     //Creating issues from testingRunResults
                    TestingIssuesHandler handler = new TestingIssuesHandler();
                    handler.handleIssuesCreationFromTestingRunResults(testingRunResults);
                 }
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("error while running tests: " + e, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("error while running tests: " + e);
             }
         }
 
@@ -517,7 +517,7 @@ public class TestExecutor {
                                         TestingRunConfig testingRunConfig, TestingUtil testingUtil, ObjectId testRunResultSummaryId) {
 
         if (testIdConfig == 1) {
-            loggerMaker.errorAndAddToDb("Test id config is 1", LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Test id config is 1");
             return new ArrayList<>();
         }
 
@@ -543,12 +543,12 @@ public class TestExecutor {
         if (noAuthTestResult != null) {
             testingRunResults.add(noAuthTestResult);
         } else {
-            loggerMaker.infoAndAddToDb("No auth result is null for " + apiInfoKey, LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("No auth result is null for " + apiInfoKey);
         }
         if (noAuthTestResult != null && !noAuthTestResult.isVulnerable()) {
 
             TestPlugin.TestRoleMatcher testRoleMatcher = new TestPlugin.TestRoleMatcher(testingUtil.getTestRoles(), apiInfoKey);
-            loggerMaker.infoAndAddToDb("Starting auth required tests for " + apiInfoKey, LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("Starting auth required tests for " + apiInfoKey);
             if ((testSubCategories == null || testSubCategories.contains(TestSubCategory.BFLA.name())) && testRoleMatcher.shouldDoBFLA())  {
                 TestingRunResult bflaTestResult = runTest(bflaTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
                 if (bflaTestResult != null) testingRunResults.add(bflaTestResult);

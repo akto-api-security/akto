@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
 
 public class PayloadAnalyzer {
     private static final Logger logger = LoggerFactory.getLogger(PayloadAnalyzer.class);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(PayloadAnalyzer.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(PayloadAnalyzer.class, LogDb.RUNTIME);
     private static EndpointInfo endpointInfo = null;
 
     public static EndpointInfo getEndpointInfo() {
@@ -79,7 +79,7 @@ public class PayloadAnalyzer {
                     try {    
                         SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkUpdates);
                     } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
+                        loggerMaker.errorAndAddToDb(e.toString());
                     }
                 }
                 logger.info("updates completed");

@@ -29,7 +29,7 @@ import java.util.*;
 
 public class PostmanAction extends UserAction {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(PostmanAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(PostmanAction.class, LogDb.DASHBOARD);
     private static final ObjectMapper mapper = new ObjectMapper();
     @Override
     public String execute() {
@@ -227,7 +227,7 @@ public class PostmanAction extends UserAction {
         }
         Main main = new Main(postmanCredential.getApiKey());
         String workspaceId = this.workspace_id;
-        loggerMaker.infoAndAddToDb("Fetching details for workspace_id:" + workspace_id, LogDb.DASHBOARD);
+        loggerMaker.infoAndAddToDb("Fetching details for workspace_id:" + workspace_id);
         JsonNode workspaceDetails = main.fetchWorkspace(workspaceId);
         JsonNode workspaceObj = workspaceDetails.get("workspace");
         ArrayNode collectionsObj = (ArrayNode) workspaceObj.get("collections");
@@ -244,22 +244,22 @@ public class PostmanAction extends UserAction {
             Utils.fetchApisRecursively((ArrayNode) collectionDetailsObj.get("item"), jsonNodes);
             String collectionName = collectionDetailsObj.get("info").get("name").asText();
             if(jsonNodes.size() == 0) {
-                loggerMaker.infoAndAddToDb("Collection "+ collectionName + " has no requests, skipping it", LogDb.DASHBOARD);
+                loggerMaker.infoAndAddToDb("Collection "+ collectionName + " has no requests, skipping it");
                 continue;
             }
-            loggerMaker.infoAndAddToDb(String.format("Found %s apis in collection %s", jsonNodes.size(), collectionName), LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb(String.format("Found %s apis in collection %s", jsonNodes.size(), collectionName));
             for(JsonNode item: jsonNodes){
                 String apiName = item.get("name").asText();
-                loggerMaker.infoAndAddToDb(String.format("Processing api %s if collection %s", apiName, collectionName), LogDb.DASHBOARD);
+                loggerMaker.infoAndAddToDb(String.format("Processing api %s if collection %s", apiName, collectionName));
                 Map<String, String> apiInAktoFormat = Utils.convertApiInAktoFormat(item, variablesMap, String.valueOf(1_000_000));
                 if(apiInAktoFormat != null){
                     try{
                         apiInAktoFormat.put("akto_vxlan_id", String.valueOf(aktoCollectionId));
                         String s = mapper.writeValueAsString(apiInAktoFormat);
-                        loggerMaker.infoAndAddToDb(String.format("Api name: %s, CollectionName: %s, AktoFormat: %s", apiName, collectionName, s), LogDb.DASHBOARD);
+                        loggerMaker.infoAndAddToDb(String.format("Api name: %s, CollectionName: %s, AktoFormat: %s", apiName, collectionName, s));
                         msgs.add(s);
                     } catch (JsonProcessingException e){
-                        loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+                        loggerMaker.errorAndAddToDb(e.toString());
                     }
                 }
             }
@@ -268,19 +268,19 @@ public class PostmanAction extends UserAction {
                 if(ApiCollectionsDao.instance.findOne(Filters.eq("_id", aktoCollectionId)) == null){
                     ApiCollectionsDao.instance.insertOne(ApiCollection.createManualCollection(aktoCollectionId, "Postman " + collectionName));
                 }
-                loggerMaker.infoAndAddToDb(String.format("Pushed %s apis from collection %s", msgs.size(), collectionName), LogDb.DASHBOARD);
+                loggerMaker.infoAndAddToDb(String.format("Pushed %s apis from collection %s", msgs.size(), collectionName));
             }
 
         }
         //Push to Akto
-        loggerMaker.infoAndAddToDb(String.format("Starting to push data to Akto, pushin data in %s collections", aktoFormat.size()), LogDb.DASHBOARD);
+        loggerMaker.infoAndAddToDb(String.format("Starting to push data to Akto, pushin data in %s collections", aktoFormat.size()));
         String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
         for(Map.Entry<Integer, List<String>> entry: aktoFormat.entrySet()){
             //For each entry, push a message to Kafka
             int aktoCollectionId = entry.getKey();
             List<String> msgs = entry.getValue();
             Utils.pushDataToKafka(aktoCollectionId, topic, msgs, new ArrayList<>(), skipKafka);
-            loggerMaker.infoAndAddToDb(String.format("Pushed data in apicollection id %s", aktoCollectionId), LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb(String.format("Pushed data in apicollection id %s", aktoCollectionId));
         }
         return SUCCESS.toUpperCase();
     }

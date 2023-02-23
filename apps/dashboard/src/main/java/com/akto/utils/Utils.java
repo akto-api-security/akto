@@ -27,7 +27,7 @@ import com.mongodb.client.model.Filters;
 
 public class Utils {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LogDb.DASHBOARD);
     private final static ObjectMapper mapper = new ObjectMapper();
     public static Map<String, String> getVariableMap(ArrayNode variables){
         Map<String,String> result = new HashMap<>();
@@ -46,7 +46,7 @@ public class Utils {
             JsonNode response = apiInfo.has("response") ?  apiInfo.get("response").get(0): null;
             String apiName = apiInfo.get("name").asText();
             if(response == null){
-                loggerMaker.infoAndAddToDb(String.format("There are no responses for this api %s, skipping this", apiName), LogDb.DASHBOARD);
+                loggerMaker.infoAndAddToDb(String.format("There are no responses for this api %s, skipping this", apiName));
                 return null;
             }
             Timestamp timestamp = new Timestamp(System.currentTimeMillis());
@@ -60,7 +60,7 @@ public class Utils {
                 result.put("requestHeaders", mapper.writeValueAsString(requestHeadersMap));
                 result.put("responseHeaders", mapper.writeValueAsString(responseHeadersMap));
             } catch (JsonProcessingException e) {
-                loggerMaker.errorAndAddToDb(String.format("Error while processing request/response headers : %s", e.toString()), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(String.format("Error while processing request/response headers : %s", e.toString()));
             }
 
             String contentType = getContentType(request, response, requestHeadersMap);
@@ -83,7 +83,7 @@ public class Utils {
                 }
                 requestPayload = postText;
             } else {
-                loggerMaker.infoAndAddToDb(String.format("Unsupported content type %s for api %s",contentType, apiName), LogDb.DASHBOARD);
+                loggerMaker.infoAndAddToDb(String.format("Unsupported content type %s for api %s",contentType, apiName));
                 return null;
             }
 
@@ -100,7 +100,7 @@ public class Utils {
 
             return result;
         } catch (Exception e){
-            loggerMaker.errorAndAddToDb(String.format("Failed to convert postman obj to Akto format : %s", e.toString()), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(String.format("Failed to convert postman obj to Akto format : %s", e.toString()));
             return null;
         }
     }

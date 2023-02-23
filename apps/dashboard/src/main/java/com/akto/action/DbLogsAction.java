@@ -33,7 +33,7 @@ public class DbLogsAction extends UserAction {
         this.logDb = logDb;
     }
     private List<Log> logs;
-    private static final LoggerMaker loggerMaker = new LoggerMaker(DbLogsAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(DbLogsAction.class, LogDb.DASHBOARD);
 
     public String fetchLogsFromDb() {
         if(logDb==null){

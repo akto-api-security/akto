@@ -21,38 +21,41 @@ public class LoggerMaker  {
 
     private static int logCount = 0;
     private static int logCountResetTimestamp = Context.now();
-    private static final int oneMinute = 60; 
+    private static final int ONEMINUTE = 60; 
 
     public enum LogDb {
         TESTING,RUNTIME,DASHBOARD
     }
 
-    public LoggerMaker(Class<?> c) {
+    private LogDb db;
+
+    public LoggerMaker(Class<?> c, LogDb db) {
         aClass = c;
         logger = LoggerFactory.getLogger(c);
+        this.db = db;
     }
 
-    public void errorAndAddToDb(String err, LogDb db) {
+    public void errorAndAddToDb(String err) {
         logger.error(err);
         try{
-            insert(err, "error", db);
+            insert(err, "error");
         } catch (Exception e){
             e.printStackTrace();
         }
     }
 
-    public void infoAndAddToDb(String info, LogDb db) {
+    public void infoAndAddToDb(String info) {
         logger.info(info);
         try{
-            insert(info, "info",db);
+            insert(info, "info");
         } catch (Exception e){
             e.printStackTrace();
         }
     }
 
-    private Boolean checkUpdate(){
+    private static Boolean checkUpdate(){
         if(logCount>=1000){
-            if((logCountResetTimestamp + oneMinute) >= Context.now()){
+            if((logCountResetTimestamp + ONEMINUTE) >= Context.now()){
                 return false;
             } else {
                 logCount = 0;
@@ -61,12 +64,16 @@ public class LoggerMaker  {
         }
         return true;
     }
+
+    private static void updateLogCount(){
+        logCount++;
+    }
     
-    private void insert(String info, String key, LogDb db) {
+    private void insert(String info, String key) {
         String text = aClass + " : " + info;
         Log log = new Log(text, key, Context.now());
         
-        if(checkUpdate()){
+        if(Boolean.TRUE.equals(checkUpdate())){
             switch(db){
                 case TESTING: 
                     LogsDao.instance.insertOne(log);
@@ -77,7 +84,7 @@ public class LoggerMaker  {
                 case DASHBOARD: 
                     DashboardLogsDao.instance.insertOne(log);
             }
-            logCount++;
+            updateLogCount();
         }
     }
 
@@ -91,7 +98,7 @@ public class LoggerMaker  {
         
         Bson filters = Filters.and(
             Filters.gte(Log.TIMESTAMP, logFetchStartTime),
-            Filters.lte(Log.TIMESTAMP, logFetchEndTime)
+            Filters.lt(Log.TIMESTAMP, logFetchEndTime)
         );
         switch(db){
             case TESTING: 

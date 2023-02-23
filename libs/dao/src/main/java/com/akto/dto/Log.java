@@ -6,25 +6,10 @@ import org.bson.types.ObjectId;
 public class Log {
 
     private ObjectId id;
-    public ObjectId getId() {
-        return id;
-    }
-
-    public void setId(ObjectId id) {
-        this.id = id;
-    }
     @BsonIgnore
     private String hexId;
-    public String getHexId() {
-        return this.id.toHexString();
-    }
-
-    public void setHexId(String hexId) {
-        this.hexId = hexId;
-    }
     private String log;
     private String key;
-
     public static final String TIMESTAMP = "timestamp";
     private int timestamp;
 
@@ -35,6 +20,22 @@ public class Log {
         this.log = log;
         this.key = key;
         this.timestamp = timestamp;
+    }
+
+    public ObjectId getId() {
+        return id;
+    }
+
+    public void setId(ObjectId id) {
+        this.id = id;
+    }
+
+    public String getHexId() {
+        return this.id.toHexString();
+    }
+
+    public void setHexId(String hexId) {
+        this.hexId = hexId;
     }
 
     public String getLog() {

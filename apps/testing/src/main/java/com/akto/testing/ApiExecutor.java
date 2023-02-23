@@ -14,7 +14,7 @@ import java.io.IOException;
 import java.util.*;
 
 public class ApiExecutor {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.TESTING);
     public static OriginalHttpResponse common(Request request, boolean followRedirects) throws Exception {
 
         OkHttpClient client = HTTPClientHandler.instance.getHTTPClient(followRedirects);
@@ -31,11 +31,11 @@ public class ApiExecutor {
             try {
                 body = responseBody.string();
             } catch (IOException e) {
-                loggerMaker.errorAndAddToDb("Error while parsing response body: " + e, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("Error while parsing response body: " + e);
                 body = "{}";
             }
         } catch (IOException e) {
-            loggerMaker.errorAndAddToDb("Error while executing request: " + e, LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Error while executing request: " + e);
             throw new Exception("Api Call failed");
         } finally {
             if (response != null) {

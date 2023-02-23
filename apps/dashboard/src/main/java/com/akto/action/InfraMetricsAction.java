@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
 
 public class InfraMetricsAction implements Action,ServletResponseAware, ServletRequestAware  {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(InfraMetricsAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(InfraMetricsAction.class, LogDb.DASHBOARD);
     @Override
     public String execute() throws Exception {
         InfraMetricsListener.registry.scrape(servletResponse.getWriter());
@@ -36,7 +36,7 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
             akto_health.put("mongo", mongoHealth);
         } catch (Exception e) {
             akto_health.put("mongo", "Error getting health metrics from mongo. Check logs.");
-            loggerMaker.errorAndAddToDb("ERROR health metrics from mongo " + e, LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb("ERROR health metrics from mongo " + e);
         }
 
         try {
@@ -44,7 +44,7 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
             akto_health.put("runtime", kafkaHealthMetrics);
         } catch (Exception e) {
             akto_health.put("runtime", "Error getting health metrics from runtime. Check logs.");
-            loggerMaker.errorAndAddToDb("ERROR health metrics from runtime " + e, LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb("ERROR health metrics from runtime " + e);
         }
         return SUCCESS.toUpperCase();
     }

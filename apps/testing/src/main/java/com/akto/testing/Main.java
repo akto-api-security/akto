@@ -25,7 +25,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 public class Main {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.TESTING);
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
@@ -51,7 +51,7 @@ public class Main {
 
         int delta = Context.now() - 20*60;
 
-        loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("Starting.......");
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(new BasicDBObject());
         boolean runStatusCodeAnalyser = accountSettings == null ||
@@ -61,13 +61,13 @@ public class Main {
             try {
                 StatusCodeAnalyser.run();
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while running status code analyser: " + e, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("Error while running status code analyser: " + e);
             }
         }
 
-        loggerMaker.infoAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"), LogDb.TESTING);
-        loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
-        loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"), LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"));
+        loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"));
+        loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"));
 
         TestExecutor testExecutor = new TestExecutor();
 
@@ -101,11 +101,11 @@ public class Main {
                 }
             }
 
-            loggerMaker.infoAndAddToDb("Found one + " + testingRun.getId().toHexString(), LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("Found one + " + testingRun.getId().toHexString());
             if (testingRun.getTestIdConfig() > 1) {
                 TestingRunConfig testingRunConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
                 if (testingRunConfig != null) {
-                    loggerMaker.infoAndAddToDb("Found testing run config with id :" + testingRunConfig.getId(), LogDb.TESTING);
+                    loggerMaker.infoAndAddToDb("Found testing run config with id :" + testingRunConfig.getId());
                     testingRun.setTestingRunConfig(testingRunConfig);
                 }
             }
@@ -118,7 +118,7 @@ public class Main {
             try {
                 testExecutor.init(testingRun, summaryId);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error in init " + e, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("Error in init " + e);
             }
 
             Bson completedUpdate = Updates.combine(
@@ -139,7 +139,7 @@ public class Main {
             );
 
 
-            loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds", LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds");
         }
     }
 }

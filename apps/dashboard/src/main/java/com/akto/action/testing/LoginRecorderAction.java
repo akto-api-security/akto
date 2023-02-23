@@ -32,7 +32,7 @@ public class LoginRecorderAction extends UserAction {
 
     private String nodeId;
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(LoginRecorderAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(LoginRecorderAction.class, LogDb.DASHBOARD);
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -50,7 +50,7 @@ public class LoginRecorderAction extends UserAction {
                     File tmpErrorFile = File.createTempFile("recordedFlowOutput", ".txt");
                     RecordedLoginFlowUtil.triggerFlow(tokenFetchCommand, payload, tmpOutputFile.getPath(), tmpErrorFile.getPath(), getSUser().getId());
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("error running recorded flow " + e.toString(), LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb("error running recorded flow " + e.toString());
                 }
             }
         }, 1, TimeUnit.SECONDS);

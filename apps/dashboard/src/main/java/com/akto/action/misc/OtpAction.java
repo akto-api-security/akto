@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
 
 public class OtpAction extends UserAction {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(OtpAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(OtpAction.class, LogDb.DASHBOARD);
 
     private String from;
     private String text;
@@ -34,13 +34,13 @@ public class OtpAction extends UserAction {
     public String execute() {
         Context.accountId.set(1_000_000);
 
-        loggerMaker.infoAndAddToDb(text, LogDb.DASHBOARD);
+        loggerMaker.infoAndAddToDb(text);
         if (text == null || !text.contains("OTP")) {
-            loggerMaker.infoAndAddToDb("But doesn't contain the word 'OTP' ", LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("But doesn't contain the word 'OTP' ");
             return SUCCESS.toUpperCase();
         }
 
-        loggerMaker.infoAndAddToDb("And contains OTP", LogDb.DASHBOARD);
+        loggerMaker.infoAndAddToDb("And contains OTP");
         OTPMessage otpMessage = new OTPMessage(Context.now(), from, text, Context.now());
         OtpMessagesDao.instance.insertOne(otpMessage);
         return SUCCESS.toUpperCase();
@@ -58,7 +58,7 @@ public class OtpAction extends UserAction {
         if (val == null || val.isEmpty()) return ERROR.toUpperCase();
 
         otp = val;
-        loggerMaker.infoAndAddToDb("found otp: " + otp, LogDb.DASHBOARD);
+        loggerMaker.infoAndAddToDb("found otp: " + otp);
 
         return SUCCESS.toUpperCase();
     }
@@ -79,9 +79,9 @@ public class OtpAction extends UserAction {
 
     private Integer latestMessageId = null;
     public String fetchLatestMessageId() {
-        loggerMaker.infoAndAddToDb(apiKey, LogDb.DASHBOARD);
-        loggerMaker.infoAndAddToDb(authToken, LogDb.DASHBOARD);
-        loggerMaker.infoAndAddToDb(address, LogDb.DASHBOARD);
+        loggerMaker.infoAndAddToDb(apiKey);
+        loggerMaker.infoAndAddToDb(authToken);
+        loggerMaker.infoAndAddToDb(address);
         BasicDBObject result;
         try {
             result = makeRequestToMySms();
@@ -112,7 +112,7 @@ public class OtpAction extends UserAction {
             if (val == null || val.isEmpty()) return ERROR.toUpperCase();
 
             otp = val;
-            loggerMaker.infoAndAddToDb("found otp: " + otp, LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("found otp: " + otp);
 
         } catch (Exception e) {
             return ERROR.toUpperCase();
