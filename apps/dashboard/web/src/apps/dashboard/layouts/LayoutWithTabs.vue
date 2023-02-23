@@ -57,11 +57,12 @@
             tabs: obj.arrR,
             description: obj.strN,
             defaultTabName: obj.strN,
-            tabsContent: obj.objN
+            tabsContent: obj.objN,
+            tab: obj.strN
         },
         data () {
             return {
-                tabName: null
+                tabName: parseInt(this.tab) || null
             }
         },
         methods: {
