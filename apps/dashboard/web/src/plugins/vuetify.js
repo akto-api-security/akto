@@ -109,7 +109,7 @@ import {
   faLaptopHouse,
   faAnchor,
   faArrowRight,
-  faGift
+  faGift,
   faGripLines,
   faAlignJustify,
 } from '@fortawesome/free-solid-svg-icons'
