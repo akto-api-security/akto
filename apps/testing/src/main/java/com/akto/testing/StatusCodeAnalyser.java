@@ -1,6 +1,9 @@
 package com.akto.testing;
 
+import com.akto.DaoInit;
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.AuthMechanismsDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.log.LoggerMaker;
@@ -11,8 +14,7 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.mongodb.ConnectionString;
 
 import java.util.*;
 
@@ -40,6 +42,12 @@ public class StatusCodeAnalyser {
         }
     }
 
+    public static void main(String[] args) {
+        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
+        Context.accountId.set(1_000_000);
+        run();
+    }
+
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(StatusCodeAnalyser.class);
     public static int MAX_COUNT = 30;
@@ -53,14 +61,33 @@ public class StatusCodeAnalyser {
             return;
         }
         Map<Set<String>, Map<String,Integer>> frequencyMap = new HashMap<>();
+        Map<Integer, ApiCollection> apiCollectionMap = ApiCollectionsDao.instance.generateApiCollectionMap();
 
         int count = 0;
         int inc = 0;
         for (ApiInfo.ApiInfoKey apiInfoKey: sampleDataMap.keySet()) {
+            ApiCollection apiCollection = apiCollectionMap.get(apiInfoKey.getApiCollectionId());
+            if (!apiInfoKey.url.startsWith("http")) { // mirroring
+                if (apiCollection == null || apiCollection.getHostName() == null || apiCollection.getHostName().isEmpty()) {
+                    continue;
+                }
+            }
+
+            if (inc >= 5) {
+                loggerMaker.infoAndAddToDb("5 error API calls. Exiting status code analyser", LogDb.TESTING);
+                break;
+            }
+
             if (count > MAX_COUNT) break;
             try {
                 List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleDataMap);
-                boolean success = fillFrequencyMap(messages, authMechanism, frequencyMap);
+                boolean success;
+                try {
+                    success = fillFrequencyMap(messages, authMechanism, frequencyMap);
+                } catch (Exception e) {
+                    inc += 1;
+                    continue;
+                }
                 if (success)  {
                     count += 1;
                     loggerMaker.infoAndAddToDb("count: " + count, LogDb.TESTING);
@@ -68,7 +95,6 @@ public class StatusCodeAnalyser {
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error while filling frequency map: " + e, LogDb.TESTING);
             }
-            inc += 1;
         }
 
         calculateResult(frequencyMap, 5);
@@ -77,6 +103,7 @@ public class StatusCodeAnalyser {
     }
 
     public static void calculateResult(Map<Set<String>, Map<String,Integer>> frequencyMap, int threshold) {
+        System.out.println(frequencyMap);
         if (frequencyMap == null) return;
         for (Set<String> params: frequencyMap.keySet()) {
             Map<String, Integer> countObj = frequencyMap.getOrDefault(params, new HashMap<>());
@@ -89,7 +116,7 @@ public class StatusCodeAnalyser {
         }
     }
 
-    public static boolean fillFrequencyMap(List<RawApi> messages, AuthMechanism authMechanism, Map<Set<String>, Map<String,Integer>> frequencyMap) {
+    public static boolean fillFrequencyMap(List<RawApi> messages, AuthMechanism authMechanism, Map<Set<String>, Map<String,Integer>> frequencyMap) throws Exception {
 
         // fetch sample message
         List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, authMechanism);
@@ -111,12 +138,7 @@ public class StatusCodeAnalyser {
         if (!result) return false;
 
         // execute API
-        OriginalHttpResponse finalResponse;
-        try {
-            finalResponse = ApiExecutor.sendRequest(request, true);
-        } catch (Exception e) {
-            return false;
-        }
+        OriginalHttpResponse finalResponse = ApiExecutor.sendRequest(request, true);
 
         // if non 2xx then skip this api
         if (finalResponse.getStatusCode() < 200 || finalResponse.getStatusCode() >= 300) return false;
