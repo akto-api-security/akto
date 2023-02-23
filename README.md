@@ -30,10 +30,18 @@ Step 2: Run tests
 
 Local deploy:
 
+### Linux/Unix based machines
 Run this script to create Akto at ~/akto and run the docker containers. You'll need to have Docker installed in order to run the container. 
 
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/cf-deploy-akto)"
 
+### Directly using docker-compose (best option for Windows)
+Run the following commands to install Akto. You'll need to have curl and Docker installed in order to run the container..
+
+1. `mkdir akto/infra`
+2. `cd akto/infra`
+3. `curl -o docker-compose.yml https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/docker-compose.yml`
+4. `docker-compose up`
 
 ## Develop and contribute
 
