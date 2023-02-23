@@ -539,9 +539,6 @@ public class TestExecutor {
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
 
-        TestingRunResult openRedirectResult = runTest(openRedirectTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-        if (openRedirectResult != null) testingRunResults.add(openRedirectResult);
-
         TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
         if (noAuthTestResult != null) {
             testingRunResults.add(noAuthTestResult);
@@ -604,6 +601,11 @@ public class TestExecutor {
         if (testSubCategories == null || testSubCategories.contains(TestSubCategory.CHANGE_METHOD.name())) {
             TestingRunResult changeHttpMethodTestResult = runTest(changeHttpMethodTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
             if (changeHttpMethodTestResult != null) testingRunResults.add(changeHttpMethodTestResult);
+        }
+
+        if (testSubCategories == null || testSubCategories.contains(TestSubCategory.OPEN_REDIRECT.name())) {
+            TestingRunResult openRedirectResult = runTest(openRedirectTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            if (openRedirectResult != null) testingRunResults.add(openRedirectResult);
         }
 
         return testingRunResults;
