@@ -57,8 +57,20 @@ public class CustomAuthUtil {
                     headerAndCookieKeys.addAll(cookieMap.keySet());
                 }
 
+                Boolean foundKey = false;
+
                 // checking headerAuthKeys in header and cookie in any unathenticated API
                 if (!headerAndCookieKeys.isEmpty() && !customAuthType.getHeaderKeys().isEmpty() && headerAndCookieKeys.containsAll(customAuthType.getHeaderKeys())) {
+                    foundKey = true;
+                }
+
+                // checking if all payload keys occur in any unauthenticated API
+                List<SingleTypeInfo> payloadSTIs = SingleTypeInfoDao.instance.findAll(getFilters(apiInfo, false, customAuthType.getPayloadKeys()));
+                if (payloadSTIs!=null && payloadSTIs.size()==customAuthType.getPayloadKeys().size()) {
+                    foundKey = true;
+                }
+
+                if(Boolean.TRUE.equals(foundKey)){
                     UpdateOneModel<ApiInfo> update = new UpdateOneModel<>(
                             ApiInfoDao.getFilter(apiInfo.getId()),
                             Updates.set(ApiInfo.ALL_AUTH_TYPES_FOUND, authTypes),
@@ -67,21 +79,9 @@ public class CustomAuthUtil {
                     apiInfosUpdates.add(update);
                     break;
                 }
-
-                // checking if all payload keys occur in any unauthenticated API
-                List<SingleTypeInfo> payloadSTIs = SingleTypeInfoDao.instance.findAll(getFilters(apiInfo, false, customAuthType.getPayloadKeys()));
-                if (payloadSTIs!=null && payloadSTIs.size()==customAuthType.getPayloadKeys().size()) {
-
-                    UpdateOneModel<ApiInfo> update = new UpdateOneModel<>(
-                            ApiInfoDao.getFilter(apiInfo.getId()),
-                            Updates.set(ApiInfo.ALL_AUTH_TYPES_FOUND, authTypes),
-                            new UpdateOptions().upsert(false)
-                    );
-                    apiInfosUpdates.add(update);
-                }
             }
 
-            if (apiInfosUpdates.size() > 0) {
+            if (!apiInfosUpdates.isEmpty()) {
                 ApiInfoDao.instance.getMCollection().bulkWrite(apiInfosUpdates);
             }
         }
