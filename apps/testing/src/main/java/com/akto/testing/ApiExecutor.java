@@ -35,7 +35,7 @@ public class ApiExecutor {
                 body = "{}";
             }
         } catch (IOException e) {
-            loggerMaker.errorAndAddToDb("Error while executing request: " + e, LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e, LogDb.TESTING);
             throw new Exception("Api Call failed");
         } finally {
             if (response != null) {
