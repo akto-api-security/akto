@@ -154,14 +154,11 @@ public class QuickStartAction extends UserAction {
         if (!AwsStack.getInstance().checkIfStackExists(MirroringStackDetails.getStackName())) {
             this.isFirstSetup = true;
             try {
-                Map<String, String> parameters = new HashMap<String, String>() {
-                    {
-                        put("MongoIp", System.getenv("AKTO_MONGO_CONN"));
-                        put("KeyPair", System.getenv("EC2_KEY_PAIR"));
-                        put("SourceLBs", extractLBs());
-                        put("SubnetId", System.getenv("EC2_SUBNET_ID"));
-                    }
-                };
+                Map<String, String> parameters = new HashMap<>();
+                    parameters.put("MongoIp", System.getenv("AKTO_MONGO_CONN"));
+                    parameters.put("KeyPair", System.getenv("EC2_KEY_PAIR"));
+                    parameters.put("SourceLBs", extractLBs());
+                    parameters.put("SubnetId", System.getenv("EC2_SUBNET_ID"));
                 String template = convertStreamToString(AwsStack.class
                         .getResourceAsStream("/cloud_formation_templates/akto_aws_mirroring.template"));
                 List<Tag> tags = Utils.fetchTags(DashboardStackDetails.getStackName());
@@ -173,11 +170,8 @@ public class QuickStartAction extends UserAction {
         } else {
             this.isFirstSetup = false;
             try {
-                Map<String, String> updatedEnvVars = new HashMap<String, String>() {
-                    {
-                        put("ELB_NAMES", extractLBs());
-                    }
-                };
+                Map<String, String> updatedEnvVars = new HashMap<>();
+                updatedEnvVars.put("ELB_NAMES", extractLBs());
                 String functionName = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.CREATE_MIRROR_SESSION_LAMBDA);
                 UpdateFunctionRequest ufr = new UpdateFunctionRequest(updatedEnvVars);
                 Lambda.getInstance().updateFunctionConfiguration(functionName, ufr);
