@@ -41,7 +41,8 @@ Run the following commands to install Akto. You'll need to have curl and Docker 
 1. `mkdir akto/infra`
 2. `cd akto/infra`
 3. `curl -o docker-compose.yml https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/docker-compose.yml`
-4. `docker-compose up`
+4. `curl -o docker.env https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/docker.env`
+5. `docker-compose up -d`
 
 ## Develop and contribute
 
