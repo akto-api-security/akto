@@ -2,6 +2,7 @@ package com.akto.dto.testing;
 
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.OriginalHttpRequest;
+import com.akto.util.CookieTransformer;
 import com.akto.util.JSONUtils;
 import com.akto.util.JsonStringPayloadModifier;
 import com.akto.util.TokenPayloadModifier;
@@ -48,7 +49,8 @@ public class HardcodedAuthParam extends AuthParam {
             return data.keySet().contains(this.key);
         } else {
             Map<String, List<String>> headers = request.getHeaders();
-            return headers.containsKey(k);
+            List<String> cookieList = headers.getOrDefault("cookie", new ArrayList<>());
+            return headers.containsKey(k) || CookieTransformer.isKeyPresentInCookie(cookieList, k);
         }
     }
 
