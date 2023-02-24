@@ -30,7 +30,7 @@
                     <span>{{selectedDateStr()}}</span>
                 </div>
                 <div style="display: flex; text-transform: capitalize;">
-                    <div>Test status: {{this.currentTest.state.toLowerCase()}}</div>
+                    <div v-if="this.currentTest.state">Test status: {{this.currentTest.state.toLowerCase()}}</div>
                     <div v-if="this.currentTest.state === 'SCHEDULED' || this.currentTest.state === 'RUNNING' " style="padding-left: 6px; padding-top: 4px;">
                         <v-progress-circular indeterminate color="primary" :size="12" :width="1.5"></v-progress-circular>
                     </div>
@@ -183,6 +183,7 @@ export default {
             
         },
         selectedDateStr() {
+            debugger
             return func.toTimeStr(new Date(this.currentTest.startTimestamp * 1000), true)
         },
         getScheduleStr() {
@@ -232,7 +233,6 @@ export default {
             this.selectedDate = point / 1000
         },
         refreshSummaries() {
-            console.log("AAA");
             api.fetchTestingRunResultSummaries(this.startTimestamp, this.endTimestamp, this.testingRunHexId).then(resp => {
                 if (resp.testingRun.testIdConfig == 1) {
                     this.isWorkflow = true
