@@ -2,9 +2,11 @@ package com.akto.testing;
 
 import com.akto.DaoInit;
 import com.akto.dao.AuthMechanismsDao;
+import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.*;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.*;
@@ -120,6 +122,35 @@ public class TestExecutor {
         Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = SampleMessageStore.fetchSampleMessages();
         List<TestRoles> testRoles = SampleMessageStore.fetchTestRoles();
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
+
+        List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
+
+        List<AuthParam> authParams = authMechanism.getAuthParams();
+
+        Set<String> authParamKeys = new HashSet<>();
+
+        for (AuthParam authParam : authParams) {
+            authParamKeys.add(authParam.getKey());
+        }
+
+        for (CustomAuthType customAuthType : customAuthTypes) {
+            List<String> customAuthTypeHeaderKeys = customAuthType.getHeaderKeys();
+            for (String headerAuthKey: customAuthTypeHeaderKeys) {
+                if (authParamKeys.contains(headerAuthKey)) {
+                    continue;
+                }
+                authParams.add(new HardcodedAuthParam(AuthParam.Location.HEADER, headerAuthKey, null, true));
+            }
+            List<String> customAuthTypePayloadKeys = customAuthType.getPayloadKeys();
+            for (String payloadAuthKey: customAuthTypePayloadKeys) {
+                if (authParamKeys.contains(payloadAuthKey)) {
+                    continue;
+                }
+                authParams.add(new HardcodedAuthParam(AuthParam.Location.BODY, payloadAuthKey, null, true));
+            }
+        }
+
+        authMechanism.setAuthParams(authParams);
 
         TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessages, singleTypeInfoMap, testRoles);
 
@@ -280,7 +311,7 @@ public class TestExecutor {
                         origTemplateURL = origTemplateURL.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/");
                         String subcategory = origTemplateURL.substring(origTemplateURL.lastIndexOf("/")+1).split("\\.")[0];
 
-                        FuzzingTest fuzzingTest = new FuzzingTest(testingRun.getId().toHexString(), summaryId.toHexString(), origTemplateURL, subcategory, testSubCategory);
+                        FuzzingTest fuzzingTest = new FuzzingTest(testingRun.getId().toHexString(), summaryId.toHexString(), origTemplateURL, subcategory, testSubCategory, null);
                         TestingRunResult fuzzResult = runTest(fuzzingTest, apiInfoKey, testingUtil, testingRun.getId(), summaryId);
                         if (fuzzResult != null) {
                             trim(fuzzResult);
@@ -438,8 +469,8 @@ public class TestExecutor {
                     TestingRunResultDao.instance.insertMany(testingRunResults);
                     loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);
                     //Creating issues from testingRunResults
-                    TestingIssuesHandler handler = new TestingIssuesHandler();
-                    handler.handleIssuesCreationFromTestingRunResults(testingRunResults);
+                   TestingIssuesHandler handler = new TestingIssuesHandler();
+                   handler.handleIssuesCreationFromTestingRunResults(testingRunResults);
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("error while running tests: " + e, LogDb.TESTING);
@@ -504,6 +535,7 @@ public class TestExecutor {
         JWTInvalidSignatureTest jwtInvalidSignatureTest = new JWTInvalidSignatureTest();//JWT_INVALID_SIGNATURE
         AddJkuToJwtTest addJkuToJwtTest = new AddJkuToJwtTest();//ADD_JKU_TO_JWT
         BFLATest bflaTest = new BFLATest();//BFLA
+        OpenRedirectTest openRedirectTest = new OpenRedirectTest(testRunId.toHexString(), testRunResultSummaryId.toHexString());
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
 
@@ -569,6 +601,11 @@ public class TestExecutor {
         if (testSubCategories == null || testSubCategories.contains(TestSubCategory.CHANGE_METHOD.name())) {
             TestingRunResult changeHttpMethodTestResult = runTest(changeHttpMethodTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
             if (changeHttpMethodTestResult != null) testingRunResults.add(changeHttpMethodTestResult);
+        }
+
+        if (testSubCategories == null || testSubCategories.contains(TestSubCategory.OPEN_REDIRECT.name())) {
+            TestingRunResult openRedirectResult = runTest(openRedirectTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            if (openRedirectResult != null) testingRunResults.add(openRedirectResult);
         }
 
         return testingRunResults;

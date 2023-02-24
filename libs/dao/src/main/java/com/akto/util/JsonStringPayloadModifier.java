@@ -24,7 +24,11 @@ public class JsonStringPayloadModifier {
                 throw new Exception("key not found in request payload");
             }
             
-            ((ObjectNode) parentNode).put(keys[keys.length-1], newVal);
+            if (newVal == null || newVal == "null") {
+                ((ObjectNode) parentNode).remove(keys[keys.length-1]);
+            } else {
+                ((ObjectNode) parentNode).put(keys[keys.length-1], newVal);
+            }
             return origRequestNode.toString();
 
         } catch (Exception e) {
