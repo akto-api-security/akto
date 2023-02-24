@@ -169,8 +169,7 @@ export default {
             isWorkflow: false,
             originalStateFromDb: null,
             dialogBoxIssue: {},
-            similarlyAffectedIssues: [],
-            scheduled: true
+            similarlyAffectedIssues: []
         }
     },
     methods: {
@@ -183,7 +182,6 @@ export default {
             
         },
         selectedDateStr() {
-            debugger
             return func.toTimeStr(new Date(this.currentTest.startTimestamp * 1000), true)
         },
         getScheduleStr() {
@@ -239,7 +237,6 @@ export default {
                     this.originalStateFromDb = resp.workflowTest
                 }
                 this.testingRunResultSummaries = resp.testingRunResultSummaries
-                this.scheduled = this.testingRunResultSummaries.length == 0
                 this.selectedDate = Math.max(...this.testingRunResultSummaries.map(o => o.startTimestamp))
             })
         },
