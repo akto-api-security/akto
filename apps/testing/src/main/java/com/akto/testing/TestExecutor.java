@@ -535,6 +535,7 @@ public class TestExecutor {
         JWTInvalidSignatureTest jwtInvalidSignatureTest = new JWTInvalidSignatureTest();//JWT_INVALID_SIGNATURE
         AddJkuToJwtTest addJkuToJwtTest = new AddJkuToJwtTest();//ADD_JKU_TO_JWT
         BFLATest bflaTest = new BFLATest();//BFLA
+        PageSizeDosTest pageSizeDosTest = new PageSizeDosTest(testRunId.toHexString(), testRunResultSummaryId.toHexString());//PAGE_SIZE_DOS
         OpenRedirectTest openRedirectTest = new OpenRedirectTest(testRunId.toHexString(), testRunResultSummaryId.toHexString());
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
@@ -586,6 +587,11 @@ public class TestExecutor {
                 TestingRunResult addJkuToJwtTestResult = runTest(addJkuToJwtTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
                 if (addJkuToJwtTestResult != null) testingRunResults.add(addJkuToJwtTestResult);
             }
+        }
+
+       if(testSubCategories == null || testSubCategories.contains(TestSubCategory.PAGINATION_MISCONFIGURATION.name())) {
+            TestingRunResult paginationMisconfigurationTestResult = runTest(pageSizeDosTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            if (paginationMisconfigurationTestResult != null) testingRunResults.add(paginationMisconfigurationTestResult);
         }
 
         if (testSubCategories == null || testSubCategories.contains(TestSubCategory.ADD_METHOD_IN_PARAMETER.name())) {
