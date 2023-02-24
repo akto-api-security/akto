@@ -112,7 +112,7 @@ public class FuzzingTest extends TestPlugin {
             FileUtils.copyURLToFile(new URL(this.origTemplatePath), new File(this.tempTemplatePath));
         } catch (IOException e1) {
             e1.printStackTrace();
-            return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.FAILED_DOWNLOADING_NUCLEI_TEMPLATE, testRequest, nucleiTestInfo);
+            return addWithRequestError( originalMessage, TestResult.TestError.FAILED_DOWNLOADING_NUCLEI_TEMPLATE, testRequest, nucleiTestInfo);
         }
 
         try {
