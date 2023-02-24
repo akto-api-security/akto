@@ -25,8 +25,19 @@
                 @dateClicked=dateClicked
             />     
             <div class="testing-results-header" v-if="currentTest">
-                <span>Test results: </span>    
-                <span>{{selectedDateStr()}}</span>
+                <div>
+                    <span>Test results: </span>    
+                    <span>{{selectedDateStr()}}</span>
+                </div>
+                <div style="display: flex; text-transform: capitalize;">
+                    <div v-if="this.currentTest.state">Test status: {{this.currentTest.state.toLowerCase()}}</div>
+                    <div v-if="this.currentTest.state === 'SCHEDULED' || this.currentTest.state === 'RUNNING' " style="padding-left: 6px; padding-top: 4px;">
+                        <v-progress-circular indeterminate color="primary" :size="12" :width="1.5"></v-progress-circular>
+                    </div>
+                    <span v-if="this.currentTest.state === 'COMPLETED'" style="padding-top: 4px;">
+                        <v-icon color="green" :size="14">$fas_check-circle</v-icon>
+                    </span>
+                </div>
             </div>                  
             <simple-table
                 :headers="testingRunResultsHeaders" 
@@ -354,4 +365,7 @@ export default {
     font-size: 14px        
     font-weight: 500
     color: #47466A80
+    display: flex
+    justify-content: space-between
+    padding-right: 24px
 </style>

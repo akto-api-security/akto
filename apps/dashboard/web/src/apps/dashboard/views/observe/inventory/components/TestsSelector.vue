@@ -2,7 +2,11 @@
     <spinner v-if="loading"/>
     <a-card  v-else title="Configure test" icon="$fas_cog" class="tests-selector-container">
         <div class="mx-8 my-4">
-            <div class="d-flex">
+            <div v-if="!authPresent">
+                Please set an authentication mechanism <a target="_blank" class="clickable-link" href="/dashboard/testing/active?tab=1">here</a> before you test any APIs.
+            </div>
+            <div :class="disableLinkClass">
+            <div class="d-flex" >
                 <div class="name-div">Name: </div>
                 <name-input :defaultName="collectionName" :defaultSuffixes="nameSuffixes" @changed="setTestName" />
             </div>
@@ -58,7 +62,7 @@
             </div>
 
             <schedule-box @schedule="emitTestSelection" class="mt-2"/>
-
+            </div>
         </div>
     </a-card>
 </template>
@@ -67,6 +71,7 @@
 
 import marketplaceApi from '../../../marketplace/api'
 import issuesApi from '../../../issues/api'
+import testingApi from '../../../testing/api'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
 import ScheduleBox from '@/apps/dashboard/shared/components/ScheduleBox'
 import func from '@/util/func'
@@ -96,7 +101,9 @@ export default {
             startTimestamp: func.timeNow(),
             selectedCategory: null,
             globalCheckbox: false,
-            testName: ""
+            testName: "",
+            authPresent: false,
+            disableLinkClass: 'disable-div'
         }
     },
     mounted() {
@@ -111,7 +118,12 @@ export default {
                 _this.mapCategoryToSubcategory = _this.populateMapCategoryToSubcategory()
             })
         })
-        
+        testingApi.fetchAuthMechanismData().then(resp => {
+            if(resp.authMechanism){
+                this.authPresent = true;
+                this.disableLinkClass = ''
+            }
+        })
         
     },
     methods: {
@@ -246,4 +258,11 @@ export default {
     margin: auto 8px auto 0
     font-size: 14px
     font-weight: 500
+
+.clickable-link
+    color: #6200ea !important
+
+.disable-div
+    pointer-events: none
+    opacity: 0.4
 </style>
