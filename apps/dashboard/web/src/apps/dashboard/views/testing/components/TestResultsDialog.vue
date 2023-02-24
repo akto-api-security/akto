@@ -106,7 +106,15 @@
                             </div>
                             <div style="margin-left: 24px">
                                 <div class="d-flex jc-sb mr-3">
-                                    <span class="description-title mt-4">Test response matches {{ percentageMatch }}% with original API response</span>
+                                    <span class="description-title mt-4">
+                                        Test response matches {{ percentageMatch }}% with original API response
+
+                                        <v-chip v-if="isVulnerableAttempt" :style="{ 'height': '18px !important' }" class="ml-2 mr-2" color="rgba(255, 0, 0, 0.5)" text-color="#FFFFFF">
+                                            Vulnerable Attempt
+                                        </v-chip>
+                                    </span>
+                                    <span>
+                                    </span>
                                     <v-btn v-if="messagesBasic.length > 1" icon @click="nextClicked">
                                         <v-icon>$fas_angle-double-right</v-icon>
                                     </v-btn>
@@ -232,7 +240,7 @@ export default {
             let testSubType = this.testingRunResult["testSubType"]
             let singleTypeInfos = this.testingRunResult["singleTypeInfos"]
             let highlightPaths = this.buildHighlightPaths(singleTypeInfos);
-            return this.testingRunResult["testResults"].map(x => { return { message: x.originalMessage, title: testSubType, highlightPaths: highlightPaths, errors: x.errors, percentageMatch: x.percentageMatch } })
+            return this.testingRunResult["testResults"].map(x => { return { message: x.originalMessage, title: testSubType, highlightPaths: highlightPaths, errors: x.errors, percentageMatch: x.percentageMatch, vulnerable: x.vulnerable } })
         },
         jsonBasic: function () {
             if (this.testingRunResult == null) return null
@@ -253,6 +261,11 @@ export default {
                 console.log(e);
                 return null
             }
+        },
+        isVulnerableAttempt: function () {
+            if (this.testingRunResult == null) return null
+            let currentMessage = this.messagesAdvance[this.currentIndex]
+            return currentMessage ? currentMessage["vulnerable"] : null
         },
         jsonAdvance: function () {
             if (this.testingRunResult == null) return null
