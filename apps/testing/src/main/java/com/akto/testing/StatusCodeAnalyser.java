@@ -42,13 +42,6 @@ public class StatusCodeAnalyser {
         }
     }
 
-    public static void main(String[] args) {
-        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
-        Context.accountId.set(1_000_000);
-        run();
-    }
-
-
     private static final LoggerMaker loggerMaker = new LoggerMaker(StatusCodeAnalyser.class);
     public static int MAX_COUNT = 30;
     public static void run() {
@@ -103,7 +96,6 @@ public class StatusCodeAnalyser {
     }
 
     public static void calculateResult(Map<Set<String>, Map<String,Integer>> frequencyMap, int threshold) {
-        System.out.println(frequencyMap);
         if (frequencyMap == null) return;
         for (Set<String> params: frequencyMap.keySet()) {
             Map<String, Integer> countObj = frequencyMap.getOrDefault(params, new HashMap<>());
