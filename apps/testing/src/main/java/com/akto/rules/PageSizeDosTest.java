@@ -13,13 +13,18 @@
  import com.akto.util.modifier.NestedObjectModifier;
  import com.akto.util.modifier.SetValueModifier;
  import com.mongodb.BasicDBObject;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
 
  import java.util.*;
 
  public class PageSizeDosTest extends TestPlugin {
 
+     public static final String MODIFIED_COUNT = "AKTOREDIRECT";
      private final String testRunId;
      private final String testRunResultSummaryId;
+
+     private static final Logger logger = LoggerFactory.getLogger(PageSizeDosTest.class);
 
      private final static String REDIRECT_KEYWORD = "{{redirect}}";
      private final static String REDIRECT_KEYWORD_TEMP = "AKTOREDIRECT";
@@ -33,140 +38,91 @@
      @Override
      public Result start(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) {
          List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
-         RawApi rawApi = null;
-         String location = null;
-
-         // todo: check if location doesn't come from request
-         boolean flag = false;
-
+        if (messages.size() == 0) {
+            logger.error("No messages found for apiInfoKey: " + apiInfoKey);
+            return null;
+        }
          for (RawApi message: messages) {
-             rawApi = message.copy();
+             RawApi rawApi = message.copy();
              OriginalHttpRequest req = rawApi.getRequest();
 
              String qp = req.getQueryParams();
-             if (qp == null || qp.length() == 0) continue;
+             if (qp == null || qp.length() == 0) {
+                 loggerMaker.infoAndAddToDb("No query params found for url: " + req.getUrl(), LoggerMaker.LogDb.TESTING);
+                 continue;
+             }
 
-             BasicDBObject queryParams = RequestTemplate.getQueryJSON("url?"+qp);
+             String queryJson = OriginalHttpRequest.convertFormUrlEncodedToJson(req.getQueryParams());
+             BasicDBObject queryParams = BasicDBObject.parse(queryJson);
 
              String paginatedKeyPresent = null;
-             for(String paginatedKey: PAGINATED_KEYWORDS) {
+             for (String paginatedKey : PAGINATED_KEYWORDS) {
                  if (queryParams.containsKey(paginatedKey)) {
                      paginatedKeyPresent = paginatedKey;
+                     queryParams.put(paginatedKey, MODIFIED_COUNT);
                      break;
                  }
              }
 
              if (paginatedKeyPresent == null) {
+                 loggerMaker.infoAndAddToDb("No paginated keyword found for endpoint: " + req.getUrl() + " skipping this endpoint", LoggerMaker.LogDb.TESTING);
                  continue;
              }
 
              OriginalHttpResponse resp = rawApi.getResponse();
+             int originalResponseLength = resp.getBody().length();
 
-             if (resp.)
-
-             // find original redirect location
-             location = resp.findHeaderValue("location");
-             if (location == null) {
-                 rawApi = null;
-                 continue;
-             }
-
-             // find if location is being passed in header
-             Map<String, List<String>> reqHeaders = req.getHeaders();
-             for (String key: reqHeaders.keySet()) {
-                 List<String> values = reqHeaders.get(key);
-                 if (values == null) values = new ArrayList<>();
-                 for (int idx=0; idx<values.size(); idx++) {
-                     String v = values.get(idx);
-                     if (v.equalsIgnoreCase(location)) {
-                         flag = true;
-                         values.set(idx, REDIRECT_KEYWORD);
-                     }
-                 }
-             }
-
-             // find if location is being passed in queryParams
-             String queryJson = OriginalHttpRequest.convertFormUrlEncodedToJson(req.getQueryParams());
-             BasicDBObject queryObj = BasicDBObject.parse(queryJson);
-             for (String key: queryObj.keySet()) {
-                 Object valueObj = queryObj.get(key);
-                 if (valueObj == null) continue;
-                 String value = valueObj.toString();
-                 if (value.equalsIgnoreCase(location)) {
-                     flag = true;
-                     queryObj.put(key, REDIRECT_KEYWORD_TEMP);
-                 }
-             }
-             String modifiedQueryParamString = OriginalHttpRequest.getRawQueryFromJson(queryObj.toJson());
+             //modify query param
+             String modifiedQueryParamString = OriginalHttpRequest.getRawQueryFromJson(queryParams.toJson());
              if (modifiedQueryParamString != null) {
-                 modifiedQueryParamString = modifiedQueryParamString.replaceAll(REDIRECT_KEYWORD_TEMP, REDIRECT_KEYWORD);
+                 modifiedQueryParamString = modifiedQueryParamString.replaceAll(MODIFIED_COUNT, String.valueOf(1_000_000));
                  req.setQueryParams(modifiedQueryParamString);
              }
+             logger.info("Modified query params: " + modifiedQueryParamString);
 
-             // find if location is being passed in request body
-             String jsonBody = req.getJsonRequestBody();
-             BasicDBObject payload = RequestTemplate.parseRequestPayload(jsonBody, null);
-             Map<String, Set<Object>> flattenedPayload = JSONUtils.flatten(payload);
-             Set<String> payloadKeysToFuzz = new HashSet<>();
-             for (String key: flattenedPayload.keySet()) {
-                 Set<Object> values = flattenedPayload.get(key);
-                 for (Object v: values) {
-                     if (v !=null && v.equals(location))  {
-                         flag = true;
-                         payloadKeysToFuzz.add(key);
-                     }
+             String origTemplatePath = "https://raw.githubusercontent.com/Ankush12389/tests-library/master/Lack%20of%20Resources%20and%20Rate%20Limiting/resource-limiting/pagesize_dos.yaml";
+             String testSourceConfigCategory = "";
+
+             Map<String, Object> valuesMap = new HashMap<>();
+             valuesMap.put("Method", apiInfoKey.method);
+             String baseUrl;
+             try {
+                 baseUrl = rawApi.getRequest().getFullUrlIncludingDomain();
+                 baseUrl = OriginalHttpRequest.getFullUrlWithParams(baseUrl,rawApi.getRequest().getQueryParams());
+             } catch (Exception e) {
+                 loggerMaker.errorAndAddToDb("Error while getting full url including domain: " + e, LoggerMaker.LogDb.TESTING);
+                 return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.FAILED_BUILDING_URL_WITH_DOMAIN,rawApi.getRequest(), null);
+             }
+             valuesMap.put("BaseURL", baseUrl);
+             valuesMap.put("Body", rawApi.getRequest().getBody());
+             FuzzingTest fuzzingTest = new FuzzingTest(
+                     testRunId, testRunResultSummaryId, origTemplatePath,subTestName(), testSourceConfigCategory, valuesMap
+             );
+             try {
+                 Result result = fuzzingTest.runNucleiTest(rawApi);
+                 //analyze result
+                 TestResult testResult = result.testResults.get(0);
+                 int testResponseLength = testResult.getMessage().length();
+                 if(testResponseLength >= 3 * originalResponseLength){
+                     result.confidencePercentage = 100;
+                     result.isVulnerable = true;
+                     return result;
                  }
+             } catch (Exception e ) {
+                 return null;
              }
 
-             Map<String, Object> store = new HashMap<>();
-             for (String k: payloadKeysToFuzz) store.put(k, REDIRECT_KEYWORD);
-
-             String modifiedPayload = JSONUtils.modify(jsonBody, payloadKeysToFuzz, new SetValueModifier(store));
-             req.setBody(modifiedPayload);
-
-             if (flag) break;
          }
-
-         if (rawApi == null) return null;
-
-         System.out.println("******************");
-         System.out.println(rawApi.getRequest().toString());
-         System.out.println("******************");
-
-
-         String origTemplatePath = "https://raw.githubusercontent.com/Ankush12389/tests-library/master/Lack%20of%20Resources%20and%20Rate%20Limiting/resource-limiting/pagesize_dos.yaml";
-         String testSourceConfigCategory = "";
-
-         Map<String, Object> valuesMap = new HashMap<>();
-         valuesMap.put("Method", apiInfoKey.method);
-         String baseUrl;
-         try {
-             baseUrl = rawApi.getRequest().getFullUrlIncludingDomain();
-             baseUrl = OriginalHttpRequest.getFullUrlWithParams(baseUrl,rawApi.getRequest().getQueryParams());
-         } catch (Exception e) {
-             loggerMaker.errorAndAddToDb("Error while getting full url including domain: " + e, LoggerMaker.LogDb.TESTING);
-             return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.FAILED_BUILDING_URL_WITH_DOMAIN,rawApi.getRequest(), null);
-         }
-         valuesMap.put("BaseURL", baseUrl);
-         valuesMap.put("Body", rawApi.getRequest().getBody());
-         valuesMap.put("OriginalLocationUrl", location);
-         FuzzingTest fuzzingTest = new FuzzingTest(
-                 testRunId, testRunResultSummaryId, origTemplatePath,subTestName(), testSourceConfigCategory, valuesMap
-         );
-         try {
-             return fuzzingTest.runNucleiTest(rawApi);
-         } catch (Exception e ) {
-             return null;
-         }
+         return null;
      }
 
      @Override
      public String superTestName() {
-         return "MISCONFIGURATION";
+         return "RATE_LIMITING";
      }
 
      @Override
      public String subTestName() {
-         return "OPEN_REDIRECT";
+         return "PAGE_SIZE_DOS";
      }
  }
