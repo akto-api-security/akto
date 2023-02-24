@@ -361,6 +361,21 @@ public class GlobalEnums {
                 IssueTags.BL,
                 IssueTags.OWASPTOP10,
                 IssueTags.HACKERONETOP10,
+        }),
+
+        PAGINATION_MISCONFIGURATION(
+                "PAGINATION_MISCONFIGURATION",
+                TestCategory.RL,
+                "Possible DOS due to pagination misconfiguration",
+                "Possible DOS due to pagination misconfiguration",
+                "Possible DOS due to pagination misconfiguration",
+                "Possible DOS due to pagination misconfiguration",
+                new String[]{
+                        "some link"
+                }, new IssueTags[]{
+                IssueTags.BL,
+                IssueTags.OWASPTOP10,
+                IssueTags.HACKERONETOP10,
         });
 
 
