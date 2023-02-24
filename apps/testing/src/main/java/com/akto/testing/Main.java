@@ -101,12 +101,16 @@ public class Main {
                 }
             }
 
-            loggerMaker.infoAndAddToDb("Found one + " + testingRun.getId().toHexString(), LogDb.TESTING);
+            long timestamp = testingRun.getId().getTimestamp();
+            long seconds = Context.now() - timestamp;
+            loggerMaker.infoAndAddToDb("Found one + " + testingRun.getId().toHexString() + " created: " + seconds + " seconds ago", LogDb.TESTING);
             if (testingRun.getTestIdConfig() > 1) {
                 TestingRunConfig testingRunConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
                 if (testingRunConfig != null) {
                     loggerMaker.infoAndAddToDb("Found testing run config with id :" + testingRunConfig.getId(), LogDb.TESTING);
                     testingRun.setTestingRunConfig(testingRunConfig);
+                } else {
+                    loggerMaker.errorAndAddToDb("Couldn't find testing run config id for " + testingRun.getTestIdConfig(), LogDb.TESTING);
                 }
             }
 
@@ -114,6 +118,7 @@ public class Main {
                     0, testingRun.getId(), testingRun.getId().toHexString(), 0);
 
             ObjectId summaryId = TestingRunResultSummariesDao.instance.insertOne(summary).getInsertedId().asObjectId().getValue();
+            loggerMaker.infoAndAddToDb("Inserted testing run summary: " + summaryId, LogDb.TESTING);
 
             try {
                 testExecutor.init(testingRun, summaryId);

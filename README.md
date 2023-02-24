@@ -30,21 +30,30 @@ Step 2: Run tests
 
 Local deploy:
 
+### Linux/Unix based machines
 Run this script to create Akto at ~/akto and run the docker containers. You'll need to have Docker installed in order to run the container. 
 
-`/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/cf-deploy-akto)"`
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/cf-deploy-akto)"
 
+### Directly using docker-compose (best option for Windows)
+Run the following commands to install Akto. You'll need to have curl and Docker installed in order to run the container..
+
+1. `mkdir akto/infra`
+2. `cd akto/infra`
+3. `curl -o docker-compose.yml https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/docker-compose.yml`
+4. `curl -o docker.env https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/docker.env`
+5. `docker-compose up -d`
 
 ## Develop and contribute
 
 #### Prerequisites
-OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), npm(v8.15.0+), maven (v3.6.3 [link](https://dlcdn.apache.org/maven/maven-3/3.6.3/binaries/)), Mongo (v5.0.3+)
+OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), npm(v8.15.0+), maven (v3.6.3 [link](https://dlcdn.apache.org/maven/maven-3/3.6.3/binaries/)), MongoDB (v5.0.3+ [link](https://www.mongodb.com/docs/manual/administration/install-community/))
 
 
 #### Clone repo
 1. `mkdir ~/akto_code`
 2. `cd akto_code`
-3. `git clone https://github.com/akto-api-security/community-edition`
+3. `git clone https://github.com/akto-api-security/akto`
 
 #### Setup database
 
@@ -56,7 +65,7 @@ OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), 
 #### Setup Frontend
 
 1. `Open a new terminal tab`
-2. `cd ~/akto_code/community-edition`
+2. `cd ~/akto_code/akto`
 3. `cd apps/dashboard`
 4. `npm install`
 5. `npm run hot`
@@ -64,7 +73,7 @@ OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), 
 #### Setup Dashboard
 
 1. `Open a new terminal tab`
-2. `cd ~/akto_code/community-edition`
+2. `cd ~/akto_code/akto`
 3. `export AKTO_MONGO_CONN="mongodb://localhost:27017"`
 4. `export DASHBOARD_MODE="local_deploy"`
 5. `mvn clean install`
@@ -73,7 +82,7 @@ OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), 
 ##### Setup Testing
 
 1. `Open a new terminal tab`
-2. `cd ~/akto_code/community-edition`
+2. `cd ~/akto_code/akto`
 3. `cd apps/testing`
 4. `export AKTO_MONGO_CONN="mongodb://localhost:27017"`
 5. [OPTIONAL] To setup nuclei testing: Compile the nuclei executable from https://github.com/akto-api-security/nuclei-wrapper. Once executable is built add the path of executable to env variable "NUCLEI_EXECUTABLE_PATH".
@@ -92,9 +101,7 @@ OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), 
 2. To debug backend, run the following before running web server - 
     a. Set MAVEN_OPTS variable to enable debugging on your Java process
         
-        ```bash
         export MAVEN_OPTS="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8081, -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
-        ```
         
     b. In Visual Studio code, click on any line number to set a breakpoint.
     

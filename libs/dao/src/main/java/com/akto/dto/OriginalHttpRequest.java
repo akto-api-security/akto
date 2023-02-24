@@ -241,9 +241,13 @@ public class OriginalHttpRequest {
     }
 
     public String getFullUrlWithParams() {
-        if (this.queryParams == null || this.queryParams.isEmpty()) return this.url;
-        if (url.contains("?")) return this.url + "&" + this.queryParams;
-        return this.url + "?" + this.queryParams;
+        return getFullUrlWithParams(this.url, this.queryParams);
+    }
+
+    public static String getFullUrlWithParams(String url, String queryParams) {
+        if (queryParams == null || queryParams.isEmpty()) return url;
+        if (url.contains("?")) return url + "&" + queryParams;
+        return url + "?" + queryParams;
     }
 
     public static Map<String,List<String>> buildHeadersMap(Map json, String key) {
@@ -360,5 +364,17 @@ public class OriginalHttpRequest {
         this.type = tokens[2];
 
         return true;
+    }
+
+    @Override
+    public String toString() {
+        return "OriginalHttpRequest{" +
+                "url='" + url + '\'' +
+                ", type='" + type + '\'' +
+                ", queryParams='" + queryParams + '\'' +
+                ", method='" + method + '\'' +
+                ", body='" + body + '\'' +
+                ", headers=" + headers +
+                '}';
     }
 }
