@@ -16,6 +16,7 @@ import com.akto.util.Pair;
 import com.akto.utils.RedactSampleData;
 import com.google.common.io.Files;
 
+import kotlin.text.Charsets;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.yaml.snakeyaml.Yaml;
@@ -23,8 +24,11 @@ import org.yaml.snakeyaml.Yaml;
 import java.io.*;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class FuzzingTest extends TestPlugin {
 
@@ -34,16 +38,19 @@ public class FuzzingTest extends TestPlugin {
     private String tempTemplatePath;
     private final String subcategory;
     private String testSourceConfigCategory;
+    private final Map<String, Object> valuesMap;
 
     public static final int payloadLineLimit = 100;
 
-    public FuzzingTest(String testRunId, String testRunResultSummaryId, String origTemplatePath, String subcategory, String testSourceConfigCategory) {
+    public FuzzingTest(String testRunId, String testRunResultSummaryId, String origTemplatePath, String subcategory,
+                       String testSourceConfigCategory, Map<String, Object> valuesMap) {
         this.testRunId = testRunId;
         this.testRunResultSummaryId = testRunResultSummaryId;
         this.origTemplatePath = origTemplatePath;
         this.subcategory = subcategory;
         this.testSourceConfigCategory = testSourceConfigCategory;
         this.tempTemplatePath = null;
+        this.valuesMap = valuesMap;
     }
 
     public static File createDirPath(String filePath) {
@@ -78,11 +85,14 @@ public class FuzzingTest extends TestPlugin {
             rawApi = messages.get(0);
         }
 
-        List<TestResult> testResults = new ArrayList<>();
+        return runNucleiTest(rawApi);
+    }
+
+    public Result runNucleiTest(RawApi rawApi) {
         OriginalHttpRequest testRequest = rawApi.getRequest().copy();
-
         OriginalHttpResponse originalHttpResponse = rawApi.getResponse().copy();
-
+        String originalMessage = rawApi.getOriginalMessage();
+        List<TestResult> testResults = new ArrayList<>();
         ApiExecutionDetails apiExecutionDetails;
 
         String subDir = ""+testRequest.hashCode();
@@ -114,24 +124,31 @@ public class FuzzingTest extends TestPlugin {
 
         String fullUrlWithHost;
         try {
-             fullUrlWithHost = testRequest.getFullUrlIncludingDomain();
+            fullUrlWithHost = testRequest.getFullUrlIncludingDomain();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while getting full url including domain: " + e, LogDb.TESTING);
             return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.FAILED_BUILDING_URL_WITH_DOMAIN, testRequest, nucleiTestInfo);
         }
 
         try {
+            replaceVariables(this.tempTemplatePath, valuesMap);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while replacing variables in nuclei file: " + e, LogDb.TESTING);
+            return addWithRequestError( originalMessage, TestResult.TestError.FAILED_BUILDING_URL_WITH_DOMAIN, testRequest, nucleiTestInfo);
+        }
+
+        try {
             NucleiExecutor.NucleiResult nucleiResult = NucleiExecutor.execute(
-                testRequest.getMethod(), 
-                fullUrlWithHost,
-                this.tempTemplatePath,
-                outputDir, 
-                testRequest.getBody(), 
-                testRequest.getHeaders(),
-                pwd
+                    testRequest.getMethod(),
+                    fullUrlWithHost,
+                    this.tempTemplatePath,
+                    outputDir,
+                    testRequest.getBody(),
+                    testRequest.getHeaders(),
+                    pwd
             );
 
-            if (nucleiResult == null) return addWithoutRequestError(rawApi.getOriginalMessage(), TestResult.TestError.FAILED_BUILDING_NUCLEI_TEMPLATE);
+            if (nucleiResult == null) return addWithoutRequestError(originalMessage, TestResult.TestError.FAILED_BUILDING_NUCLEI_TEMPLATE);
 
             int totalCount = Math.min(Math.min(nucleiResult.attempts.size(), nucleiResult.metaData.size()), 100);
 
@@ -148,10 +165,10 @@ public class FuzzingTest extends TestPlugin {
 
                 overallVulnerable = overallVulnerable || vulnerable;
 
-                apiExecutionDetails = new ApiExecutionDetails(statusCode, percentageMatch, testResponse, originalHttpResponse, rawApi.getOriginalMessage());
+                apiExecutionDetails = new ApiExecutionDetails(statusCode, percentageMatch, testResponse, originalHttpResponse, originalMessage);
 
                 TestResult testResult = buildTestResult(
-                    pair.getFirst(), apiExecutionDetails.testResponse, rawApi.getOriginalMessage(), apiExecutionDetails.percentageMatch, vulnerable, nucleiTestInfo
+                        pair.getFirst(), apiExecutionDetails.testResponse, originalMessage, apiExecutionDetails.percentageMatch, vulnerable, nucleiTestInfo
                 );
 
                 if (vulnerable) {
@@ -170,6 +187,61 @@ public class FuzzingTest extends TestPlugin {
         }
 
         return addTestSuccessResult(overallVulnerable, testResults, new ArrayList<>(), TestResult.Confidence.HIGH);
+    }
+
+    public static void replaceVariables(String templatePath, Map<String, Object> valuesMap) throws Exception {
+        if (valuesMap == null || valuesMap.isEmpty()) return;
+
+        InputStream inputStream = java.nio.file.Files.newInputStream(new File(templatePath).toPath());
+        StringBuilder textBuilder = new StringBuilder();
+        try (Reader reader = new BufferedReader(new InputStreamReader
+                (inputStream, Charset.forName(StandardCharsets.UTF_8.name())))) {
+            int c = 0;
+            while ((c = reader.read()) != -1) {
+                textBuilder.append((char) c);
+            }
+        }
+
+        String templateString = textBuilder.toString();
+
+        String regex = "\\{\\{(.*?)\\}\\}"; // todo: integer inside brackets
+        Pattern p = Pattern.compile(regex);
+
+        // replace with values
+        Matcher matcher = p.matcher(templateString);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            String key = matcher.group(1);
+            if (key == null) continue;
+            if (!valuesMap.containsKey(key)) {
+                System.out.println("Missed: " + key);
+                continue;
+            }
+            Object obj = valuesMap.get(key);
+            if (obj == null) obj = "null";
+
+            String val = obj.toString();
+            if (true) { // todo remove
+                val = val.replace("\\", "\\\\")
+                        .replace("\t", "\\t")
+                        .replace("\b", "\\b")
+                        .replace("\n", "\\n")
+                        .replace("\r", "\\r")
+                        .replace("\f", "\\f")
+                        .replace("\'", "\\'")
+                        .replace("\"", "\\\"");
+            }
+            matcher.appendReplacement(sb, "");
+            sb.append(val);
+        }
+
+        matcher.appendTail(sb);
+
+        String finalTemplateString = sb.toString();
+
+
+        File file = new File(templatePath);
+        FileUtils.writeStringToFile(file, finalTemplateString, Charsets.UTF_8);
     }
 
     public static void downloadLinks(String templatePath, String outputDir) throws IOException {
