@@ -311,7 +311,7 @@ public class TestExecutor {
                         origTemplateURL = origTemplateURL.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/");
                         String subcategory = origTemplateURL.substring(origTemplateURL.lastIndexOf("/")+1).split("\\.")[0];
 
-                        FuzzingTest fuzzingTest = new FuzzingTest(testingRun.getId().toHexString(), summaryId.toHexString(), origTemplateURL, subcategory, testSubCategory);
+                        FuzzingTest fuzzingTest = new FuzzingTest(testingRun.getId().toHexString(), summaryId.toHexString(), origTemplateURL, subcategory, testSubCategory, null);
                         TestingRunResult fuzzResult = runTest(fuzzingTest, apiInfoKey, testingUtil, testingRun.getId(), summaryId);
                         if (fuzzResult != null) {
                             trim(fuzzResult);
@@ -473,8 +473,8 @@ public class TestExecutor {
                     TestingRunResultDao.instance.insertMany(testingRunResults);
                     loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);
                     //Creating issues from testingRunResults
-                    TestingIssuesHandler handler = new TestingIssuesHandler();
-                    handler.handleIssuesCreationFromTestingRunResults(testingRunResults);
+                   TestingIssuesHandler handler = new TestingIssuesHandler();
+                   handler.handleIssuesCreationFromTestingRunResults(testingRunResults);
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("error while running tests: " + e, LogDb.TESTING);
@@ -539,6 +539,7 @@ public class TestExecutor {
         JWTInvalidSignatureTest jwtInvalidSignatureTest = new JWTInvalidSignatureTest();//JWT_INVALID_SIGNATURE
         AddJkuToJwtTest addJkuToJwtTest = new AddJkuToJwtTest();//ADD_JKU_TO_JWT
         BFLATest bflaTest = new BFLATest();//BFLA
+        OpenRedirectTest openRedirectTest = new OpenRedirectTest(testRunId.toHexString(), testRunResultSummaryId.toHexString());
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
 
@@ -604,6 +605,11 @@ public class TestExecutor {
         if (testSubCategories == null || testSubCategories.contains(TestSubCategory.CHANGE_METHOD.name())) {
             TestingRunResult changeHttpMethodTestResult = runTest(changeHttpMethodTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
             if (changeHttpMethodTestResult != null) testingRunResults.add(changeHttpMethodTestResult);
+        }
+
+        if (testSubCategories == null || testSubCategories.contains(TestSubCategory.OPEN_REDIRECT.name())) {
+            TestingRunResult openRedirectResult = runTest(openRedirectTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            if (openRedirectResult != null) testingRunResults.add(openRedirectResult);
         }
 
         return testingRunResults;
