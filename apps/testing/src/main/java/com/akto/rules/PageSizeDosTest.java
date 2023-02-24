@@ -56,9 +56,11 @@
              BasicDBObject queryParams = BasicDBObject.parse(queryJson);
 
              String paginatedKeyPresent = null;
+             String paginationValue = "";
              for (String paginatedKey : PAGINATED_KEYWORDS) {
                  if (queryParams.containsKey(paginatedKey)) {
                      paginatedKeyPresent = paginatedKey;
+                     paginationValue = queryParams.getString(paginatedKey);
                      queryParams.put(paginatedKey, MODIFIED_COUNT);
                      break;
                  }
@@ -75,7 +77,7 @@
              //modify query param
              String modifiedQueryParamString = OriginalHttpRequest.getRawQueryFromJson(queryParams.toJson());
              if (modifiedQueryParamString != null) {
-                 modifiedQueryParamString = modifiedQueryParamString.replaceAll(MODIFIED_COUNT, String.valueOf(1_000_000));
+                 modifiedQueryParamString = modifiedQueryParamString.replaceAll(MODIFIED_COUNT, paginationValue+"0");
                  req.setQueryParams(modifiedQueryParamString);
              }
              logger.info("Modified query params: " + modifiedQueryParamString);
@@ -87,14 +89,22 @@
              valuesMap.put("Method", apiInfoKey.method);
              String baseUrl;
              try {
-                 baseUrl = rawApi.getRequest().getFullUrlIncludingDomain();
-                 baseUrl = OriginalHttpRequest.getFullUrlWithParams(baseUrl,rawApi.getRequest().getQueryParams());
+                 baseUrl = req.getFullUrlWithParams();
              } catch (Exception e) {
                  loggerMaker.errorAndAddToDb("Error while getting full url including domain: " + e, LoggerMaker.LogDb.TESTING);
                  return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.FAILED_BUILDING_URL_WITH_DOMAIN,rawApi.getRequest(), null);
-             }
-             valuesMap.put("BaseURL", baseUrl);
+             }             
+
+             int endIndexDomain = baseUrl.indexOf("/", 7);
+             String domain = baseUrl.substring(0, endIndexDomain);
+             String path = baseUrl.substring(endIndexDomain, baseUrl.length());
+
+             valuesMap.put("MyPath", path.split("\\?")[0]);
+             valuesMap.put("QueryParams", baseUrl.split("\\?")[1]);
              valuesMap.put("Body", rawApi.getRequest().getBody());
+             
+             req.setUrl(domain);
+             rawApi.setRequest(req);
              FuzzingTest fuzzingTest = new FuzzingTest(
                      testRunId, testRunResultSummaryId, origTemplatePath,subTestName(), testSourceConfigCategory, valuesMap
              );
@@ -123,6 +133,6 @@
 
      @Override
      public String subTestName() {
-         return "PAGE_SIZE_DOS";
+         return "PAGINATION_MISCONFIGURATION";
      }
  }
