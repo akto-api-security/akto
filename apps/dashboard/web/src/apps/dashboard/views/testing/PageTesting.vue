@@ -1,5 +1,5 @@
 <template>
-    <layout-with-tabs title="API Testing" class="page-testing" :tabs='["Test results", "User config", "Roles"]'>
+    <layout-with-tabs title="API Testing" class="page-testing" :tabs='["Test results", "User config", "Roles"]' :tab="tab">
         <template slot="Test results">
             <div class="py-8">
                 <div>
@@ -40,7 +40,7 @@
                             <p> 1 </p>
                         </div>
                         <div>
-                            <h3> Inject hard-coded auth token </h3>
+                            <h3> Inject hard-coded attacker auth token </h3>
                         </div>
                     </div>
                     <!-- <div>
@@ -83,7 +83,7 @@
                         </div>
                         
                         <div>
-                            <h3> Automate auth token generation </h3>
+                            <h3> Automate attacker auth token generation </h3>
                         </div>
                     </div>
                     
@@ -153,6 +153,7 @@ import ApiCollectionGroup from '@/apps/dashboard/shared/components/menus/ApiColl
 import LoginStepBuilder from './components/token/LoginStepBuilder'
 import TokenAutomation from './components/token/TokenAutomation'
 import HelpTooltip from '@/apps/dashboard/shared/components/help/HelpTooltip'
+import obj from "@/util/obj";
 
 export default {
     name: "PageTesting",
@@ -172,7 +173,7 @@ export default {
         LogFetch
     },
     props: {
-
+        tab: obj.strN
     },
     data() {
         return {
