@@ -18,6 +18,7 @@ import TrashSingleTick from "../apps/dashboard/shared/icons/TrashSingleTick"
 import TrashDoubleTick from "../apps/dashboard/shared/icons/TrashDoubleTick"
 import AktoWhite from "../apps/dashboard/shared/icons/AktoWhite"
 import BookBookmark from "../apps/dashboard/shared/icons/BookBookmark"
+import Discord from "../apps/dashboard/shared/icons/Discord"
 
 Vue.component('font-awesome-icon', FontAwesomeIcon)
 
@@ -208,6 +209,10 @@ faIconsOpts.gcp = {
 
 faIconsOpts.slack = {
   component: Slack
+}
+
+faIconsOpts.discord = {
+  component: Discord
 }
 
 faIconsOpts.restapi = {
