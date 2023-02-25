@@ -191,6 +191,9 @@ public class HttpCallParser {
         return whiteListSource.contains(source) &&  hostNameCondition && ApiCollection.useHost;
     }
 
+    public static boolean containsItemFromArray(String inputString, String[] items) {
+        return Arrays.stream(items).anyMatch(inputString::contains);
+    }
 
     public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
@@ -245,7 +248,7 @@ public class HttpCallParser {
             if (hostName != null) {
                 DefaultResponse defaultResponse = DefaultResponseDao.instance.findOne(Filters.eq("host", hostName));
                 if (defaultResponse != null
-                        && defaultResponse.getDefaultPayloads().contains(httpResponseParam.getPayload())) {
+                        && containsItemFromArray(httpResponseParam.getPayload(),defaultResponse.getDefaultPayloads().stream().toArray(String[]::new))) {
                     ApiInfoKey apiInfoKey = new ApiInfoKey(
                         apiCollectionId,
                         httpResponseParam.requestParams.getURL(),
