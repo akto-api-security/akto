@@ -336,17 +336,12 @@ public class GlobalEnums {
                 "OPEN_REDIRECT",
                 TestCategory.SM,
                 "Open redirect",
-                "Attacker can access resources of any user by introducing multiple parameters with same name.",
-                "The endpoint appears to be vulnerable to broken object level authorization attack. The original request was replayed by adding private resources in query params (for eg: <b>user_id=1234&account_id=436783).</b>. " +
-                        " The server responded with 2XX success codes and less than <b>{{percentageMatch}}%</b> of the response body matched with original response body. <br><br>" +
-                        "<b>Background:</b> Object level authorization is an access control mechanism that is usually implemented at the code level to validate that one user can only access objects that they should have access to.",
-                "Unauthorized access can result in data disclosure to unauthorized parties, data loss, or data manipulation. Unauthorized access to objects can also lead to full account takeover.",
+                "An attacker can construct a URL within the application that causes a redirection to an arbitrary external domain.",
+                "Open redirection vulnerabilities arise when an application incorporates user-controllable data into the target of a redirection in an unsafe way." +
+                        "The ability to use an authentic application URL, targeting the correct domain and with a valid SSL certificate (if SSL is used), lends credibility to the phishing attack because many users, even if they verify these features, will not notice the subsequent redirection to a different domain",
+                "This behavior can be leveraged to facilitate phishing attacks against users of the application.",
                 new String[]{
-                        "https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/04-Testing_for_HTTP_Parameter_Pollution",
-                        "https://www.madlab.it/slides/BHEU2011/whitepaper-bhEU2011.pdf",
-                        "https://www.akto.io/blog/what-is-broken-object-level-authorization-bola",
-                        "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa1-broken-object-level-authorization.md",
-                        "https://cwe.mitre.org/data/definitions/284.html"
+                        "https://portswigger.net/kb/issues/00500100_open-redirection-reflected"
                 }, new IssueTags[]{
                 IssueTags.BL,
                 IssueTags.OWASPTOP10,
@@ -362,6 +357,21 @@ public class GlobalEnums {
                         "Fuzzing",
                 new String[]{
                         "fuzzing"
+                }, new IssueTags[]{
+                IssueTags.BL,
+                IssueTags.OWASPTOP10,
+                IssueTags.HACKERONETOP10,
+        }),
+
+        PAGINATION_MISCONFIGURATION(
+                "PAGINATION_MISCONFIGURATION",
+                TestCategory.RL,
+                "Possible DOS due to pagination misconfiguration",
+                "Quite often, APIs do not impose any restrictions on the size or number of resources that can be requested by the user.",
+                "Such vulnerabilities arise when there is no max limit imposed on the number of resources returned. Typically, the number of objects to be returned is provided by a parameter in the API call. An attacker can set it as a large number. ",
+                "This can impact the API server performance, leading to  Denial of Service (DoS). It also leaves the door open to authentication flaws such as brute force.",
+                new String[]{
+                        "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa4-lack-of-resources-and-rate-limiting.md#scenario-2"
                 }, new IssueTags[]{
                 IssueTags.BL,
                 IssueTags.OWASPTOP10,

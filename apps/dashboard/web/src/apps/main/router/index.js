@@ -70,6 +70,11 @@ const router =  new Router({
                     components: {
                         default: PageTesting
                     },
+                    props: {
+                        default: route => ({
+                            tab: route.query.tab
+                        })
+                    },
                     children: [
                         {
                             path: 'active',
