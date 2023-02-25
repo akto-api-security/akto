@@ -147,7 +147,7 @@ export default {
         var d = date.getDate();
         var m = strArray[date.getMonth()];
         var y = date.getFullYear();
-        return m + ' ' + d + ', ' + (needYear ? y: '' ) + ' ' + date.toISOString().substr(11,5)
+        return m + ' ' + d + ', ' + (needYear ? y: '' ) + ' ' + date.toTimeString().substr(0, 5)
     },
     toDateStrShort(date) {
         var d = "" + date.getDate();
