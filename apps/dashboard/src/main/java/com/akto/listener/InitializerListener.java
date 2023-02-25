@@ -415,6 +415,31 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 15, TimeUnit.MINUTES);
     }
 
+    public void saveDefaultResponse(){
+        scheduler.scheduleAtFixedRate(() -> {
+            List<SingleTypeInfo> hosts = SingleTypeInfoDao.instance.findAll(SingleTypeInfoDao.filterForHostHeader(1, false));
+            for(SingleTypeInfo singleTypeInfo : hosts){
+                if(singleTypeInfo.getValues().count()>0){
+                    String host = singleTypeInfo.getValues().getElements().iterator().next();
+                    Map<String, List<String>> headers = new HashMap<>();
+                    headers.put("host", Arrays.asList(host));
+                    OriginalHttpRequest request = new OriginalHttpRequest("/justarandomstring", "", "GET", "", headers, "");
+                    try {
+                        OriginalHttpResponse response = ApiExecutor.sendRequest(request, true);
+                        if(HttpResponseParams.validHttpResponseCode(response.getStatusCode())){
+                            String defaultPayload = response.getBody();
+                            DefaultResponseDao.instance.updateOne(
+                                Filters.eq("host",host),
+                                Updates.addToSet("defaultPayloads", defaultPayload));
+                        }
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+                    }
+                }
+            }
+        }, 0, 6, TimeUnit.HOURS);
+    }
+
     static class ChangesInfo {
         public Map<String, String> newSensitiveParams = new HashMap<>();
         public List<BasicDBObject> newSensitiveParamsObject = new ArrayList<>();
@@ -717,6 +742,7 @@ public class InitializerListener implements ServletContextListener {
         RuntimeLogsDao.instance.createIndicesIfAbsent();
         LogsDao.instance.createIndicesIfAbsent();
         DashboardLogsDao.instance.createIndicesIfAbsent();
+        saveDefaultResponse();
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
         if (backwardCompatibility == null) {
             backwardCompatibility = new BackwardCompatibility();

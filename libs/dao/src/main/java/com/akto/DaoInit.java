@@ -158,6 +158,8 @@ public class DaoInit {
 
         ClassModel<LoginFlowStepsData> loginFlowStepsData = ClassModel.builder(LoginFlowStepsData.class)
         .enableDiscriminator(true).build();
+        ClassModel<DefaultResponse> defaultResponseModel = ClassModel.builder(DefaultResponse.class).enableDiscriminator(true).build();
+        ClassModel<IgnoredEndpoint> ignoredEndpointModel = ClassModel.builder(IgnoredEndpoint.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel,
@@ -178,7 +180,8 @@ public class DaoInit {
                 nodeResultClassModel, awsResourcesModel, AktoDataTypeClassModel, testingRunIssuesClassModel,
                 testingIssuesIdClassModel, testSourceConfigClassModel, endpointLogicalGroupClassModel, testRolesClassModel,
                 logicalGroupTestingEndpointClassModel, testInfoClassModel , bflaTestInfoClassModel, nucleiTestInfoClassModel, customAuthTypeModel,
-                containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData).automatic(true).build());
+                containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData,
+                defaultResponseModel, ignoredEndpointModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),

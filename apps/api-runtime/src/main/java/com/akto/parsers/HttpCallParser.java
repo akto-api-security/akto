@@ -5,8 +5,12 @@ import java.util.*;
 
 import com.akto.DaoInit;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.DefaultResponseDao;
+import com.akto.dao.IgnoredEndpointDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
+import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
@@ -237,6 +241,22 @@ public class HttpCallParser {
             }
 
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
+
+            if (hostName != null) {
+                DefaultResponse defaultResponse = DefaultResponseDao.instance.findOne(Filters.eq("host", hostName));
+                if (defaultResponse != null
+                        && defaultResponse.getDefaultPayloads().contains(httpResponseParam.getPayload())) {
+                    ApiInfoKey apiInfoKey = new ApiInfoKey(
+                        apiCollectionId,
+                        httpResponseParam.requestParams.getURL(),
+                        URLMethods.Method.fromString(httpResponseParam.requestParams.getMethod())
+                    );
+                    IgnoredEndpointDao.instance.updateOne(
+                        Filters.eq("apiInfoKey",apiInfoKey),
+                        Updates.set("apiInfoKey",apiInfoKey));
+                }
+            }
+
             filteredResponseParams.add(httpResponseParam);
         }
 
