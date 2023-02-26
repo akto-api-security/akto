@@ -41,6 +41,14 @@ Run the following commands to install Akto. You'll need to have curl and Docker 
 2. Download these 2 files [docker-compose.yml](https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/docker-compose.yml) [docker.env](https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/docker.env)
 3. Run `docker-compose up -d`
 
+### Use AWS EC2 Linux/Unix as your local machine (best Option for AWS with limited resource utilization)
+Run the following commands to install Akto. You'll need to have Docker and Docker-Compose installed in order to run the container, also Inbound security rule for port 9090 should be open in order to access Akto.
+1. Create an installation directory and `cd` to it.
+2. Create 2 empty files docker-compose.yml and docker.env and paste the content of [docker-compose.yml](https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/docker-compose.yml) [docker.env](https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/docker.env)
+3. Run `docker-compose up -d`
+
+Now visit your browser url using 'aws-machine-ip':9090
+
 ## Develop and contribute
 
 #### Prerequisites
