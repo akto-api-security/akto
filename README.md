@@ -4,12 +4,6 @@
 
 [How it works](https://docs.akto.io/#how-it-works) • [Getting-Started](https://docs.akto.io/#how-to-get-started) • [API Inventory](https://docs.akto.io/api-inventory/api-collections) • [API testing](https://docs.akto.io/testing/run-test) • [Add Test](https://docs.akto.io/testing/test-library) • [Join Discord community](https://discord.com/invite/Wpc6xVME4s) •
 
-# Contributors
-<a href="https://github.com/akto-api-security/akto/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=akto-api-security/akto" />
-</a>
-
-
 Akto is a plug-n-play API security platform that takes only 60 secs to get started. Akto is used by security teams to maintain a continuous inventory of APIs, test APIs for vulnerabilities and find runtime issues. Akto offers coverage for all OWASP top 10 and HackerOne Top 10 categories including BOLA, authentication, SSRF, XSS, security configurations, etc. Akto's powerful testing engine runs variety of business logic tests by reading traffic data to understand API traffic pattern leading to reduced false positives. Akto can integrate with multiple traffic sources - burpsuite, AWS, postman, GCP, gateways, etc. Here is our [public roadmap](https://github.com/orgs/akto-api-security/projects/8) for this quarter.
 
 
@@ -58,6 +52,13 @@ Run the following commands to install Akto. You'll need to have curl and Docker 
 
 Akto is really powerful in Cloud deployment if you can provide your application's mirrored traffic (0 performance impact). For that, you should install Akto Enterprise edition available [here](https://stairway.akto.io). Read more about it [here](https://www.akto.io/pricing)
 
+## Contributors
+<a href="https://github.com/akto-api-security/akto/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=akto-api-security/akto" />
+</a>
+
+
+
 ## Develop and contribute
 
 #### Prerequisites
@@ -101,8 +102,6 @@ OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), 
 4. `export AKTO_MONGO_CONN="mongodb://localhost:27017"`
 5. [OPTIONAL] To setup nuclei testing: Compile the nuclei executable from https://github.com/akto-api-security/nuclei-wrapper. Once executable is built add the path of executable to env variable "NUCLEI_EXECUTABLE_PATH".
 6. `mvn compile; mvn exec:java -Dexec.mainClass="com.akto.testing.Main"`
-
-
 
 
 #### Play around
