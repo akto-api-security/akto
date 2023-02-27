@@ -1,19 +1,18 @@
 package com.akto.har;
 
-import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.sstoehr.harreader.HarReader;
 import de.sstoehr.harreader.HarReaderException;
 import de.sstoehr.harreader.HarReaderMode;
 import de.sstoehr.harreader.model.*;
-import graphql.language.Field;
-import graphql.language.OperationDefinition;
-import graphql.language.Selection;
-import graphql.language.SelectionSet;
-import org.mortbay.util.ajax.JSON;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.net.URLDecoder;
 import java.util.*;
 
 public class HAR {
@@ -32,45 +31,24 @@ public class HAR {
         List<String> entriesList =  new ArrayList<>();
         int idx=0;
         for (HarEntry entry: entries) {
-            List<OperationDefinition> operationDefinitions = GraphQLUtils.getUtils().parseGraphQLRequest(entry.getRequest().getPostData().getText());
             idx += 1;
-            if (operationDefinitions.isEmpty()) {
-                loggerMaker.infoAndAddToDb("Adding via REST framework for collection_ID: " + collection_id, LogDb.DASHBOARD);
-                updateEntriesList(entry, null, null, null, collection_id, entriesList, idx);
-            } else {
-                loggerMaker.infoAndAddToDb("Adding via graphQL framework for collection_ID: "+ collection_id, LogDb.DASHBOARD);
-                for (OperationDefinition definition : operationDefinitions) {
-                    OperationDefinition.Operation operation = definition.getOperation();
-                    SelectionSet selectionSets = definition.getSelectionSet();
-                    List<Selection> selectionList = selectionSets.getSelections();
-                    for (Selection selection : selectionList) {
-                        if (selection instanceof Field) {
-                            Field field = (Field) selection;
-                            updateEntriesList(entry, operation, field.getName(), field, collection_id, entriesList, idx);
-                        }
-                    }
-
+            try {
+                Map<String,String> result = getResultMap(entry);
+                if (result != null) {
+                    result.put("akto_vxlan_id", collection_id+"");
+                    entriesList.add(mapper.writeValueAsString(result));
                 }
+
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error while parsing har file on entry: " + idx + " ERROR: " + e.toString(), LogDb.DASHBOARD);
+                errors.add("Error in entry " + idx);
             }
         }
+
         return entriesList;
     }
 
-    private void updateEntriesList(HarEntry entry, OperationDefinition.Operation operation, String fieldName, Field field1, int collection_id, List<String> entriesList, int idx) {
-        try {
-            Map<String,String> result = getResultMap(entry, operation, fieldName, field1);
-            loggerMaker.infoAndAddToDb("results map : " + mapper.writeValueAsString(result), LogDb.DASHBOARD);
-            result.put("akto_vxlan_id", collection_id +"");
-            entriesList.add(mapper.writeValueAsString(result));
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while parsing har file on entry: " + idx + " ERROR: " + e, LogDb.DASHBOARD);
-            errors.add("Error in entry " + idx);
-        }
-    }
-
-    public static Map<String,String> getResultMap(HarEntry entry,
-                                                  OperationDefinition.Operation operation,
-                                                  String fieldName, Field field) throws Exception {
+    public static Map<String,String> getResultMap(HarEntry entry) throws Exception {
         HarRequest request = entry.getRequest();
         HarResponse response = entry.getResponse();
         Date dateTime = entry.getStartedDateTime();
@@ -88,27 +66,6 @@ public class HAR {
 
         String akto_account_id = 1_000_000 + "";
         String path = getPath(request);
-        if (operation != null) {
-            path += "/" + operation.name().toLowerCase() + "/" + fieldName;
-        }
-
-        if (field != null) {
-            try {
-                Map<String, Object> map = GraphQLUtils.getUtils().fieldTraversal(field);
-                Object obj = JSON.parse(requestPayload);
-                if (obj instanceof Map) {
-                    Map tempMap = (Map) obj;
-                    for (String key : map.keySet()) {
-                        tempMap.put(GraphQLUtils.QUERY + key, map.get(key));
-                    }
-                    tempMap.remove(GraphQLUtils.QUERY);
-                    requestPayload = JSON.toString(obj);
-                }
-            } catch (Exception e) {
-                //eat exception, No changes to request payload, parse Exception
-            }
-        }
-
         String requestHeaders = mapper.writeValueAsString(requestHeaderMap);
         String responseHeaders = mapper.writeValueAsString(responseHeaderMap);
         String method = request.getMethod().toString();
