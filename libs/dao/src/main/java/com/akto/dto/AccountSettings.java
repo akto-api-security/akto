@@ -25,6 +25,9 @@ public class AccountSettings {
     public static final String MERGE_ASYNC_OUTSIDE = "mergeAsyncOutside";
     private boolean mergeAsyncOutside;
 
+    private int demoCollectionCreateTime = 0;
+    public static final String DEMO_COLLECTION_CREATE_TIME = "demoCollectionCreateTime";
+
     public AccountSettings() {
     }
 
@@ -122,4 +125,11 @@ public class AccountSettings {
     public static final int DEFAULT_CENTRAL_KAFKA_MAX_POLL_RECORDS_CONFIG = 1_000;
     public static final String DEFAULT_CENTRAL_KAFKA_TOPIC_NAME = "akto.central";
 
+    public int getDemoCollectionCreateTime() {
+        return demoCollectionCreateTime;
+    }
+
+    public void setDemoCollectionCreateTime(int demoCollectionCreateTime) {
+        this.demoCollectionCreateTime = demoCollectionCreateTime;
+    }
 }
