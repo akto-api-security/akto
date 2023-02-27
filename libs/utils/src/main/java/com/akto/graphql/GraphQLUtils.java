@@ -1,14 +1,13 @@
 package com.akto.graphql;
 
+import com.akto.dto.HttpResponseParams;
 import graphql.language.*;
 import graphql.parser.Parser;
 import graphql.validation.DocumentVisitor;
 import graphql.validation.LanguageTraversal;
 import org.mortbay.util.ajax.JSON;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 public class GraphQLUtils {//Singleton class
     Parser parser = new Parser();
@@ -17,6 +16,12 @@ public class GraphQLUtils {//Singleton class
     public static final String QUERY = "query";
 
     private static final GraphQLUtils utils = new GraphQLUtils();
+
+    private static Set<String> allowedPath = new HashSet();
+
+    static {
+        allowedPath.add("graphql");
+    }
 
     private GraphQLUtils() {
     }
@@ -70,6 +75,70 @@ public class GraphQLUtils {//Singleton class
         return map;
     }
 
+    public List<HttpResponseParams> parseGraphqlResponseParam(HttpResponseParams responseParams) {
+        List<HttpResponseParams> responseParamsList = new ArrayList<>();
+        String path = responseParams.getRequestParams().getURL();
+
+        boolean isAllowedForParse = false;
+
+        for (String graphqlPath : allowedPath) {
+            if (path.contains(graphqlPath)) {
+                isAllowedForParse = true;
+            }
+        }
+        String requestPayload = responseParams.getRequestParams().getPayload();
+        if (!isAllowedForParse || !requestPayload.contains(QUERY)) {
+            // DO NOT PARSE as it's not graphql query
+            return responseParamsList;
+        }
+
+        //Start process for graphql parsing
+        Map mapOfRequestPayload = null;
+        try {
+            Object obj = JSON.parse(requestPayload);
+            if (obj instanceof Map) {
+                mapOfRequestPayload = (Map) obj;
+            } else {
+                return responseParamsList;
+            }
+        } catch (Exception e) {
+            //Eat the exception
+            return responseParamsList;
+        }
+        List<OperationDefinition> operationDefinitions = parseGraphQLRequest(mapOfRequestPayload);
+
+        if (operationDefinitions.isEmpty()) {
+            return responseParamsList;
+        } else {
+            for (OperationDefinition definition : operationDefinitions) {
+                OperationDefinition.Operation operation = definition.getOperation();
+                SelectionSet selectionSets = definition.getSelectionSet();
+                List<Selection> selectionList = selectionSets.getSelections();
+                for (Selection selection : selectionList) {
+                    if (selection instanceof Field) {
+                        Field field = (Field) selection;
+                        String graphqlPath = path + "/" + operation.name().toLowerCase() + "/" + field.getName();
+                        HttpResponseParams httpResponseParamsCopy = responseParams.copy();
+                        httpResponseParamsCopy.requestParams.setUrl(graphqlPath);
+                        try {
+                            Map<String, Object> map = fieldTraversal(field);
+                            HashMap hashMap = new HashMap(mapOfRequestPayload);
+                                for (String key : map.keySet()) {
+                                    hashMap.put(GraphQLUtils.QUERY + key, map.get(key));
+                                }
+                                hashMap.remove(GraphQLUtils.QUERY);
+                                httpResponseParamsCopy.requestParams.setPayload(JSON.toString(hashMap));
+                                responseParamsList.add(httpResponseParamsCopy);
+                        } catch (Exception e) {
+                            //eat exception, No changes to request payload, parse Exception
+                        }
+                    }
+                }
+            }
+        }
+        return responseParamsList;
+    }
+
     public List<OperationDefinition> parseGraphQLRequest(String requestPayload) {
         List<OperationDefinition> result = new ArrayList<>();
         try {
@@ -83,6 +152,25 @@ public class GraphQLUtils {//Singleton class
                     if (definition instanceof OperationDefinition) {
                         result.add((OperationDefinition) definition);
                     }
+                }
+            }
+        } catch (Exception e) {
+            result.clear();
+            //eat exception
+            return result;
+        }
+        return result;
+    }
+
+    public List<OperationDefinition> parseGraphQLRequest(Map requestPayload) {
+        List<OperationDefinition> result = new ArrayList<>();
+        try {
+            String query = (String) requestPayload.get(QUERY);
+            Document document = parser.parseDocument(query);
+            List<Definition> definitionList = document.getDefinitions();
+            for (Definition definition : definitionList) {
+                if (definition instanceof OperationDefinition) {
+                    result.add((OperationDefinition) definition);
                 }
             }
         } catch (Exception e) {

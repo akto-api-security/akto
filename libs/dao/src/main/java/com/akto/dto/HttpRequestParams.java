@@ -29,6 +29,10 @@ public class HttpRequestParams {
 
     }
 
+    public HttpRequestParams copy() {
+        return new HttpRequestParams(this.method, this.url, this.type, this.headers, this.payload, this.apiCollectionId);
+    }
+
     public static List<HttpRequestParams> parseRequest(String request) throws IOException {
 
         List<HttpRequestParams> requests = new ArrayList<>();
@@ -97,6 +101,10 @@ public class HttpRequestParams {
 
     public String getURL() {
         return this.url;
+    }
+
+    public void setUrl(String url) {
+        this.url = url;
     }
 
     public String getMethod() {
