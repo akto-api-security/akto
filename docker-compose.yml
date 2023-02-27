@@ -1,0 +1,37 @@
+version: '3.3'
+
+services:
+  
+  mongo:
+    container_name: mongo
+    image: mongo:6.0.1
+    restart: on-failure:10
+    volumes:
+      - mongodata:/data/db
+    ports:
+      - "27017:27017"
+
+  akto-api-security-dashboard:
+    image: aktosecurity/akto-api-security-dashboard:local
+    env_file: ./docker.env
+    restart: always
+    ports: 
+      - "9090:8080"
+    depends_on:
+      - mongo
+    
+  akto-api-security-testing:
+    image: aktosecurity/akto-api-testing:local
+    env_file: ./docker.env
+    depends_on:
+      - mongo    
+    restart: always
+
+  akto-puppeteer-replay:
+    image: aktosecurity/akto-puppeteer-replay:latest
+    ports:
+      - "3000:3000"
+    restart: always
+
+volumes:
+  mongodata:
