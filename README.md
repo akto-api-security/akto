@@ -37,9 +37,12 @@ Run this script to create Akto at ~/akto and run the docker containers. You'll n
 
 ### Directly using docker-compose (best option for Windows)
 Run the following commands to install Akto. You'll need to have curl and Docker installed in order to run the container..
-1. Create an installation directory and `cd` to it.
-2. Download these 2 files [docker-compose.yml](https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/docker-compose.yml) [docker.env](https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/docker.env)
-3. Run `docker-compose up -d`
+
+1. `mkdir akto/infra`
+2. `cd akto/infra`
+3. `curl -o docker-compose.yml https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/docker-compose.yml`
+4. `curl -o docker.env https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/docker.env`
+5. `docker-compose up -d`
 
 ## Develop and contribute
 
