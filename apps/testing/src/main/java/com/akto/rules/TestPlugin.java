@@ -99,9 +99,14 @@ public abstract class TestPlugin {
         Map<String, Set<String>> currentResponseParamMap = new HashMap<>();
         try {
             extractAllValuesFromPayload(originalPayload, originalResponseParamMap);
-            extractAllValuesFromPayload(currentPayload, currentResponseParamMap);
         } catch (Exception e) {
             return 0.0;
+        }
+
+        try {
+            extractAllValuesFromPayload(currentPayload, currentResponseParamMap);
+        } catch (Exception e) {
+            return 100.0;
         }
 
         if (originalResponseParamMap.keySet().size() == 0 && currentResponseParamMap.keySet().size() == 0) {
