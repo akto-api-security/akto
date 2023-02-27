@@ -35,19 +35,22 @@ Run this script to create Akto at ~/akto and run the docker containers. You'll n
 
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/cf-deploy-akto)"
 
-### Directly using docker-compose (best option for Windows)
+### Directly using docker-compose (best option for Windows - works for any machine which has Docker installed)
 Run the following commands to install Akto. You'll need to have curl and Docker installed in order to run the container..
 1. Create an installation directory and `cd` to it.
 2. Download these 2 files [docker-compose.yml](https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/docker-compose.yml) [docker.env](https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/docker.env)
 3. Run `docker-compose up -d`
 
-### Use AWS EC2 Linux/Unix as your local machine (best Option for AWS with limited resource utilization)
-Run the following commands to install Akto. You'll need to have Docker and Docker-Compose installed in order to run the container, also Inbound security rule for port 9090 should be open in order to access Akto.
-1. Create an installation directory and `cd` to it.
-2. Create 2 empty files docker-compose.yml and docker.env and paste the content of [docker-compose.yml](https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/docker-compose.yml) [docker.env](https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/docker.env)
-3. Run `docker-compose up -d`
+#### Note - if you are setting this up on an instance in your own Cloud (AWS/GCP/Heroku etc.), please ensure the following for good security practices - 
+1. Open inbound security rule for port 9090 only. And restrict the source CIDR to VPC CIDR or your IP only. 
+2. Use an EC2 from a private subnet - 
+    a. This way, no one will be able to make an inbound request to your machine. 
+    b. Ensure this private subnet has access to Internet so that outbound calls can succeed!
+    c. You might have to set up tunneling to access instance via VPN using `ssh -i pemfile ec2-user@vpn-public-instance -L 9090:private-instance:9090`
+    d. In your browser, visit `http://private-instance:9090`
+3. Use an EC2 from a public subnet - please don't! If you still want to do this, you can skip 2.b and 2.c. Simply access your instance via `http://ip:9090`
 
-Now visit your browser url using 'aws-machine-ip':9090
+Akto is really powerful in Cloud deployment if you can provide your application's mirrored traffic (0 performance impact). For that, you should install Akto Enterprise edition available [here](https://stairway.akto.io). Read more about it [here](https://www.akto.io/pricing)
 
 ## Develop and contribute
 
