@@ -15,10 +15,10 @@ on:
         required: true
         type: choice
         options:
-          - akto1
-          - akto2
-          - akto3
-        default: akto1
+          - akto_staging1
+          - akto_staging2
+          - akto_staging3
+        default: akto_staging1
       Environment:
         required: true
         type: choice
