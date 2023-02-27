@@ -17,7 +17,7 @@ public class GraphQLUtils {//Singleton class
 
     private static final GraphQLUtils utils = new GraphQLUtils();
 
-    private static Set<String> allowedPath = new HashSet();
+    private static final Set<String> allowedPath = new HashSet<>();
 
     static {
         allowedPath.add("graphql");
@@ -93,7 +93,7 @@ public class GraphQLUtils {//Singleton class
         }
 
         //Start process for graphql parsing
-        Map mapOfRequestPayload = null;
+        Map mapOfRequestPayload;
         try {
             Object obj = JSON.parse(requestPayload);
             if (obj instanceof Map) {
@@ -137,29 +137,6 @@ public class GraphQLUtils {//Singleton class
             }
         }
         return responseParamsList;
-    }
-
-    public List<OperationDefinition> parseGraphQLRequest(String requestPayload) {
-        List<OperationDefinition> result = new ArrayList<>();
-        try {
-            Object obj = JSON.parse(requestPayload);
-            if (obj instanceof HashMap) {
-                HashMap map = (HashMap) obj;
-                String query = (String) map.get(QUERY);
-                Document document = parser.parseDocument(query);
-                List<Definition> definitionList = document.getDefinitions();
-                for (Definition definition : definitionList) {
-                    if (definition instanceof OperationDefinition) {
-                        result.add((OperationDefinition) definition);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            result.clear();
-            //eat exception
-            return result;
-        }
-        return result;
     }
 
     public List<OperationDefinition> parseGraphQLRequest(Map requestPayload) {
