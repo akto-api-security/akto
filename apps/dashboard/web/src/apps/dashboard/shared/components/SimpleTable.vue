@@ -56,7 +56,7 @@
                                 <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.value]"> 
                                     <template v-slot:activator="{ on, attrs }">
                                         <v-btn class = "showButtons" v-bind = "attrs" v-on = "on">
-                                            <span class="filterHeaderSpan" :style="filters[header.value].size > 0 ? {'color': '#6200EA'} : {}">
+                                            <span class="filterHeaderSpan" :style="filters[header.value].size > 0 ? {'color': '#6200EA !important'} : {}">
                                                 {{header.text}}
                                                 <v-icon :size="16">$fas_angle-down</v-icon>
                                             </span>
@@ -201,7 +201,7 @@
                             <span class="table-sub-header" />
                         </div> -->
                         <div v-if="index > 0">
-                                <span class="table-sub-header">
+                                <span class="table-sub-header" :style="index === 1 ? {'margin-left':'0px !important'} : {}">
                                     <span class="clickable"  @click="setSortOrInvertOrder(header)">
                                         {{header.text}} 
                                     </span>                                    
@@ -245,31 +245,32 @@
                         <td
                             v-for="(header, index) in headers.slice(1)"
                             :key="index"
-                            class="table-column clickable"
+                            class="table-column clickable table-entry"
                             @click="$emit('rowClicked', item)"
                             :style="adjustHeight"
                         >
                             <slot :name="[`item.${header.value}`]" :item="item" >
-                                <div 
-                                    class="table-entry" 
-                                    :style="currentRow === item ? {'color':'#FFFFFF'}: {}"
-                                >
-                                    {{item[header.value]}}
+                                <div class="table-entry" :style="index === 0 ? {'margin-left':'0px !important'} : {}">
+                                    <span v-if="item[header.value]" 
+                                        :style="currentRow === item ? {'color':'#FFFFFF'}: {}" 
+                                        class="changeColor"
+                                    > 
+                                        {{ item[header.value] }}
+                                    </span>
+                                    <span class="centerDiv changeColor" :style="currentRow === item ? {'color':'#FFFFFF'}: {}" v-else>-</span>
                                 </div>
                             </slot>
                         </td>
 
-                        <td v-if="actions && actions.length > 0" class="table-column" :style="adjustHeight">
+                        <div v-if="actions && actions.length > 0" class="table-row-actions" :style="adjustHeight">
                             <simple-menu :items="actionsFunction(item)">
                                 <template v-slot:activator2>
-                                    <v-icon                                       
-                                        :style="currentRow === item ? {'color':'#FFFFFF'}: {}"
-                                    >
+                                    <v-icon :style="currentRow === item ? {'color':'#FFFFFF'}: {}">
                                         $dropdown
                                     </v-icon>
                                 </template>
                             </simple-menu>
-                        </td>
+                        </div>
                     </tr>
                 </slot>
             </template>
@@ -757,11 +758,25 @@ export default {
 
     .table-row{
         &:hover{
-            .table-entry{
+            .changeColor{
                 color: #47466A !important;
+            }
+
+            .table-row-actions{
+                opacity: 1 !important;
             }
         }
     }
+
+    .centerDiv{
+        margin-left: 8px;
+    }
+
+    .v-chip-group .v-slide-group__content {
+        padding: 0px !important;
+        margin-left: 24px !important;
+    }
+
 </style>
 
 <style lang="sass" scoped>
@@ -798,6 +813,12 @@ export default {
 
         &:hover
             background-color: #edecf0 !important
+
+        .table-row-actions
+            opacity: 0
+            position: absolute
+            right: 30px
+            padding: 12px 16px !important
     .form-field-text
         padding-top: 8px !important
         margin-top: 0px !important
@@ -872,9 +893,6 @@ export default {
     overflow-x: auto;
     overflow-y: hidden;
     background: #FFFFFF;
-    border-width: 1px 1px 0px 1px;
-    border-style: solid;
-    border-color: #D9D9D9;
 }
 
 .noBorderButton{
@@ -959,9 +977,13 @@ export default {
 
 .v-data-table >>> .table-entry {
     font-size: 12px !important;
+    margin-left: 24px;
 }
+
 .v-data-table >>> .table-sub-header {
     font-size: 14px !important;
+    margin-left: 24px;
+    display: flex;
 }
 
 .board-table-cards >>> .v-data-footer__select {
