@@ -7,7 +7,8 @@ Vue.use(Vuex)
 
 const state = {
     loading: false,
-    selectedCollection: null
+    selectedCollection: null,
+    selectedTestSuite: null
 }
 
 const onboarding = {
@@ -17,11 +18,16 @@ const onboarding = {
         SELECT_COLLECTION (state, selectedCollection) {
             state.selectedCollection = selectedCollection
         },
+        SELECT_TEST_SUITE(state, selectedTestSuite) {
+            state.selectedTestSuite = selectedTestSuite
+        }
     },
     actions: {
         collectionSelected({commit}, selectedCollection) {
-            console.log(selectedCollection);
             commit('SELECT_COLLECTION', selectedCollection)
+        },
+        testSuiteSelected({commit}, selectedTestSuite) {
+            commit('SELECT_TEST_SUITE', selectedTestSuite)
         },
     },
     getters: {

@@ -61,6 +61,4 @@ export default {
 
 <style lang="sass">
 
-.options
-
 </style>
