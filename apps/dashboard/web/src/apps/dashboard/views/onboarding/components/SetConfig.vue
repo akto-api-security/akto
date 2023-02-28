@@ -1,0 +1,74 @@
+<template>
+    <div style="width: 550px;height: 250px; margin-bottom: 36px;" class="pa-3">
+        <div style="font-weight: 500;font-size: 20px; color: #47466A">Attacker Token</div>
+        <div>
+            <div style="display: flex; align-items: center; margin-top: 20px;font-weight: 400; font-size: 14px; color: #47466A">
+                <div>Auth header key</div>
+                <div>
+                    <v-icon>$far_question-circle</v-icon>
+                </div>
+            </div>
+            <div style="margin-top: 4px">
+                <v-text-field
+                    placeholder=""
+                    type="text"
+                    required
+                    dense
+                    outlined
+                    class="auth-text-field"
+                    background-color="#F9F9FA"
+                />
+            </div>
+        </div>
+        <div>
+            <div style="display: flex; align-items: center;font-weight: 400; font-size: 14px; color: #47466A">
+                <div>Auth header value</div>
+                <div>
+                    <v-icon>$far_question-circle</v-icon>
+                </div>
+            </div>
+            <div style="margin-top: 4px">
+                <v-textarea
+                    placeholder=""
+                    type="text"
+                    required
+                    dense
+                    multi
+                    outlined
+                    class="auth-text-field"
+                    rows="3"
+                    background-color="#F9F9FA"
+                />
+            </div>
+        </div>
+    </div>
+</template>
+
+<script>
+
+export default {
+    name: "SetConfig",
+    components: {
+    },
+    data () {
+        return {
+        }
+    }
+}
+
+
+</script>
+
+<style lang="sass" style="scoped">
+
+.auth-text-field.v-input .v-input__slot 
+    border-radius: 8px
+
+.auth-text-field.v-text-field--outlined fieldset 
+    color: #D0D5DD !important
+
+
+
+
+
+</style>

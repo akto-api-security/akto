@@ -106,7 +106,8 @@ import {
   faLaptopHouse,
   faAnchor,
   faArrowRight,
-  faGift
+  faGift,
+  faBook,
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -141,7 +142,7 @@ const faIcons = [
   faLaptopHouse,faAnchor,fabGithub,faArrowRight,faGift,
   
   farComments,farCalendar, farHandPointRight, farBuilding, farStar,farSquare, farCheckSquare,farFolder,farFolderOpen,farClock,
-  farQuestionCircle,
+  farQuestionCircle, faBook,
 
   fabSalesforce,fabHubspot
 ]
