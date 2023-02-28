@@ -1,11 +1,11 @@
 <template>
     <div style="width: 650px;height: 220px; margin-bottom: 36px;">
         <div class="test-suite-card-container">
-            <test-suite-card title="Business Logic Scan" subtitle="10 tests"/>
-            <test-suite-card title="Passive Scan" subtitle="30 tests"/>
+            <test-suite-card title="Business Logic Scan" subtitle="10 tests" id="BUSINESS_LOGIC_SCAN"/>
+            <test-suite-card title="Passive Scan" subtitle="30 tests" id="PASSIVE_SCAN"/>
         </div>
         <div class="test-suite-card-container">
-            <test-suite-card title="Deep Scan" subtitle="10 tests"/>
+            <test-suite-card title="Deep Scan" subtitle="10 tests" id="DEEP_SCAN"/>
         </div>
     </div>
 </template>
