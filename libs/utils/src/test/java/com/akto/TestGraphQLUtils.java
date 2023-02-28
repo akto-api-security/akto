@@ -6,7 +6,6 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.har.HAR;
 import com.google.gson.Gson;
-import de.sstoehr.harreader.HarReaderException;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.junit.Assert;
 import org.junit.Test;
@@ -32,7 +31,7 @@ public class TestGraphQLUtils{
         }
     }
 
-    public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
+    private static HttpResponseParams parseKafkaMessage(String message) throws Exception {
 
         //convert java object to JSON format
         Map<String, Object> json = gson.fromJson(message, Map.class);
