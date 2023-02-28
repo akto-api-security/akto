@@ -82,7 +82,7 @@ public class GraphQLUtils {//Singleton class
         boolean isAllowedForParse = false;
 
         for (String graphqlPath : allowedPath) {
-            if (path.contains(graphqlPath)) {
+            if (path != null && path.contains(graphqlPath)) {
                 isAllowedForParse = true;
             }
         }
