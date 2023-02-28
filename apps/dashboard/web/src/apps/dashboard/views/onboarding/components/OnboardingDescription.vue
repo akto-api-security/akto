@@ -58,7 +58,6 @@ export default {
     width: 420px
     flex: none
     order: 1
-    flex-grow
     flex: none
     margin-bottom: 24px
 

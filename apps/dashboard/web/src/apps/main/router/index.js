@@ -51,9 +51,12 @@ const router =  new Router({
             component: PageSignup
         },
         {
-            path: '/onboarding',
+            path: '/dashboard/onboarding',
             name: 'onboarding',
-            component: Onboarding
+            component: Onboarding,
+            beforeEnter (to, from, next) {
+                store.dispatch('collections/loadAllApiCollections').then(() => next()).catch(() => next())
+            },
         },
         {
             path: '/dashboard',
