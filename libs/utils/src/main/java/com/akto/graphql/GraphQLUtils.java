@@ -93,11 +93,14 @@ public class GraphQLUtils {//Singleton class
         }
 
         //Start process for graphql parsing
-        Map mapOfRequestPayload;
+        Map mapOfRequestPayload = null;
+        Object[] listOfRequestPayload = null;
         try {
             Object obj = JSON.parse(requestPayload);
             if (obj instanceof Map) {
                 mapOfRequestPayload = (Map) obj;
+            } else if (obj instanceof Object[]){
+                listOfRequestPayload = (Object[]) obj;
             } else {
                 return responseParamsList;
             }
@@ -105,11 +108,23 @@ public class GraphQLUtils {//Singleton class
             //Eat the exception
             return responseParamsList;
         }
+
+        if (listOfRequestPayload != null) {
+            for (Object obj : listOfRequestPayload) {
+                if (obj instanceof Map) {
+                    updateResponseParamList(responseParams, responseParamsList, path, (Map) obj);
+                }
+            }
+        } else {
+            updateResponseParamList(responseParams, responseParamsList, path, mapOfRequestPayload);
+        }
+        return responseParamsList;
+    }
+
+    private void updateResponseParamList(HttpResponseParams responseParams, List<HttpResponseParams> responseParamsList, String path, Map mapOfRequestPayload) {
         List<OperationDefinition> operationDefinitions = parseGraphQLRequest(mapOfRequestPayload);
 
-        if (operationDefinitions.isEmpty()) {
-            return responseParamsList;
-        } else {
+        if (!operationDefinitions.isEmpty())  {
             for (OperationDefinition definition : operationDefinitions) {
                 OperationDefinition.Operation operation = definition.getOperation();
                 SelectionSet selectionSets = definition.getSelectionSet();
@@ -136,7 +151,6 @@ public class GraphQLUtils {//Singleton class
                 }
             }
         }
-        return responseParamsList;
     }
 
     public List<OperationDefinition> parseGraphQLRequest(Map requestPayload) {
