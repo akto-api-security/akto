@@ -96,7 +96,6 @@ public class GraphQLUtils {//Singleton class
         Map mapOfRequestPayload = null;
         Object[] listOfRequestPayload = null;
         try {
-            System.out.println(requestPayload);
             Object obj = JSON.parse(requestPayload);
             if (obj instanceof Map) {
                 mapOfRequestPayload = (Map) obj;
