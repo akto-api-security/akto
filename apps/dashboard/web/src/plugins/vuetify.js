@@ -126,7 +126,8 @@ import {
 import {
   faSalesforce as fabSalesforce,
   faHubspot as fabHubspot,
-  faGithub as fabGithub
+  faGithub as fabGithub,
+  faDiscord as fabDiscord
 } from '@fortawesome/free-brands-svg-icons'
 
 const faIcons = [
@@ -143,7 +144,7 @@ const faIcons = [
   farComments,farCalendar, farHandPointRight, farBuilding, farStar,farSquare, farCheckSquare,farFolder,farFolderOpen,farClock,
   farQuestionCircle,
 
-  fabSalesforce,fabHubspot
+  fabSalesforce,fabHubspot,fabDiscord
 ]
 
 library.add(faIcons)
