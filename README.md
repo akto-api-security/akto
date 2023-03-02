@@ -44,10 +44,15 @@ Run the following commands to install Akto. You'll need to have curl and Docker 
 #### Note - if you are setting this up on an instance in your own Cloud (AWS/GCP/Heroku etc.), please ensure the following for good security practices - 
 1. Open inbound security rule for port 9090 only. And restrict the source CIDR to VPC CIDR or your IP only. 
 2. Use an EC2 from a private subnet - 
+    
     a. This way, no one will be able to make an inbound request to your machine. 
+    
     b. Ensure this private subnet has access to Internet so that outbound calls can succeed!
+    
     c. You might have to set up tunneling to access instance via VPN using `ssh -i pemfile ec2-user@vpn-public-instance -L 9090:private-instance:9090`
+    
     d. In your browser, visit `http://private-instance:9090`
+
 3. Use an EC2 from a public subnet - please don't! If you still want to do this, you can skip 2.b and 2.c. Simply access your instance via `http://ip:9090`
 
 Akto is really powerful in Cloud deployment if you can provide your application's mirrored traffic (0 performance impact). For that, you should install Akto Enterprise edition available [here](https://stairway.akto.io). Read more about it [here](https://www.akto.io/pricing)
