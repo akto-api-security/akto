@@ -8,7 +8,11 @@ Vue.use(Vuex)
 const state = {
     loading: false,
     selectedCollection: null,
-    selectedTestSuite: null
+    selectedTestSuite: null,
+    authMechanismLoading: false,
+    authKey: null,
+    authValue: null,
+    runTestLoading: false
 }
 
 const onboarding = {
@@ -20,15 +24,48 @@ const onboarding = {
         },
         SELECT_TEST_SUITE(state, selectedTestSuite) {
             state.selectedTestSuite = selectedTestSuite
+        },
+        UPDATE_AUTH_MECHANISM(state, authMechanism) {
+            state.authMechanism = authMechanism
+            let res = authMechanism && authMechanism.authParams && authMechanism.type == "HARDCODED" && authMechanism.authParams[0]
+            if (res) {
+                state.authKey = res.key
+                state.authValue = res.value
+            }
+        },
+        UPDATE_AUTH_MECHANISM_LOADING(state, authMechanismLoading) {
+            state.authMechanismLoading = authMechanismLoading
+        },
+        UPDATE_RUN_TEST_LOADING(state, runTestLoading) {
+            state.runTestLoading = runTestLoading
         }
     },
     actions: {
         collectionSelected({commit}, selectedCollection) {
             commit('SELECT_COLLECTION', selectedCollection)
+            commit('UPDATE_AUTH_MECHANISM_LOADING', true)
+            api.fetchAuthMechanismData().then((resp)=>{
+                commit('UPDATE_AUTH_MECHANISM', resp.authMechanism)
+                commit('UPDATE_AUTH_MECHANISM_LOADING', false)
+            }).catch((e) => {
+                commit('UPDATE_AUTH_MECHANISM_LOADING', false)
+            })
         },
         testSuiteSelected({commit}, selectedTestSuite) {
             commit('SELECT_TEST_SUITE', selectedTestSuite)
         },
+        runTestOnboarding({commit}) {
+            commit('UPDATE_RUN_TEST_LOADING', true)
+            api.runTestOnboarding(
+                [{"key": state.authKey, "value": state.authValue, "where": "HEADER"}],
+                state.selectedCollection.id,
+                state.selectedTestSuite
+            ).then(resp => {
+                UPDATE_RUN_TEST_LOADING(false)
+            }).catch(e => {
+                UPDATE_RUN_TEST_LOADING(false)
+            })
+        }
     },
     getters: {
     }

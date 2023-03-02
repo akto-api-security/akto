@@ -10,7 +10,7 @@
                 </v-btn>
                 <v-btn outlined>
                     <v-icon left>
-                        $fas_gift
+                        $discord
                     </v-icon>
                     <span style="color:#47466A; font-weight: bold;">Join our Discord</span>
                 </v-btn>
