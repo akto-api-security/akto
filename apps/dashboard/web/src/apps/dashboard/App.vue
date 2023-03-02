@@ -98,8 +98,8 @@
           </template>
         </router-view>
         <div class="akto-external-links">
-          <v-btn primary dark depressed color="#4A154B" @click='openSlackCommunity'>
-            Ask us on <v-icon size="16">$slack</v-icon>
+          <v-btn primary dark depressed color="#5865F2" @click='openDiscordCommunity'>
+            Ask us on <v-icon size="16">$fab_discord</v-icon>
           </v-btn>
           <v-btn primary dark depressed class="github-btn" @click='openGithubRepoPage'>    
             <v-icon size="16">$githubIcon</v-icon>  
@@ -208,8 +208,8 @@ export default {
   },
   methods: {
     ...mapGetters('auth', ['getUsername', 'getAvatar', 'getActiveAccount', 'getAccounts']),
-    openSlackCommunity() {
-      return window.open("https://join.slack.com/t/aktocommunity/shared_invite/zt-1nqfw3knb-XO~r7UZyzD9f8_Ddm4R1lg")
+    openDiscordCommunity() {
+      return window.open("https://discord.gg/Wpc6xVME4s")
     },
     openGithubRepoPage() {
       return window.open("https://github.com/akto-api-security/community-edition/")
