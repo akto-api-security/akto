@@ -19,7 +19,9 @@
                     :text="descriptionArr[currentStep-1].buttonText"
                     :icon="descriptionArr[currentStep-1].icon"
                     :prepend="descriptionArr[currentStep-1].prepend"
+                    :disabled="nextButtonDisable"
                     @next="next"
+                    :loading="runTestLoading"
                 />
             </v-card>
           </v-col>
@@ -36,6 +38,7 @@ import SelectCollectionComponent from '@/apps/dashboard/views/onboarding/compone
 import SelectTestSuite from '@/apps/dashboard/views/onboarding/components/SelectTestSuite'
 import NextButton from '@/apps/dashboard/views/onboarding/components/NextButton'
 import SetConfig from '@/apps/dashboard/views/onboarding/components/SetConfig'
+import {mapState} from 'vuex'
 
 export default {
     name: "OnboardingBuilder",
@@ -77,9 +80,23 @@ export default {
     },
     methods: {
         next() {
+            console.log(this.$store.state.onboarding.authKey);
+            console.log(this.$store.state.onboarding.authValue);
+            if (this.currentStep === this.totalSteps) {
+                console.log("b");
+                this.$store.dispatch("onboarding/runTestOnboarding")
+            }
             if (this.currentStep + 1 > this.totalSteps) return
             this.currentStep += 1
         },
+    },
+    computed: {
+        ...mapState('onboarding', ['selectedTestSuite', 'selectedCollection', 'runTestLoading']),
+        nextButtonDisable() {
+            if (this.currentStep === 1) return !Boolean(this.selectedCollection)
+            if (this.currentStep === 2) return !Boolean(this.selectedTestSuite)
+            if (this.currentStep === 3) return !Boolean(this.selectedTestSuite)
+        }
     }
 }
 </script>
