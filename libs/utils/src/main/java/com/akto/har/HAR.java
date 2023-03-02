@@ -38,7 +38,7 @@ public class HAR {
                     result.put("akto_vxlan_id", collection_id+"");
                     entriesList.add(mapper.writeValueAsString(result));
                 }
-                
+
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error while parsing har file on entry: " + idx + " ERROR: " + e.toString(), LogDb.DASHBOARD);
                 errors.add("Error in entry " + idx);
