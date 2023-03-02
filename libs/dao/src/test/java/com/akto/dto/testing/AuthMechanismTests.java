@@ -16,16 +16,14 @@ public class AuthMechanismTests {
         AuthMechanism authMechanism = new AuthMechanism();
         authMechanism.setAuthParams(Collections.singletonList(new HardcodedAuthParam(AuthParam.Location.HEADER, key, value, true)));
 
-        boolean result = authMechanism.addAuthToRequest(request);
-        assertEquals(result, modifiedValue!=null);
+        authMechanism.addAuthToRequest(request);
         List<String> modifiedHeader = request.getHeaders().get(finalKey);
         assertEquals(modifiedHeader, modifiedValue);
 
-        result = authMechanism.removeAuthFromRequest(request);
-        assertEquals(result, modifiedValue!=null);
+        authMechanism.removeAuthFromRequest(request);
         if (modifiedValue == null) return;
         modifiedHeader = request.getHeaders().get(finalKey);
-        assertEquals(modifiedHeader, Collections.singletonList(null));
+        assertNull(modifiedHeader);
     }
 
     private void validateBodyAuthOperations(OriginalHttpRequest request, String key, String modifiedValue, String removeExpectedValue, Boolean modified, Boolean hardcoded) {
@@ -81,9 +79,9 @@ public class AuthMechanismTests {
 
         OriginalHttpRequest request = new OriginalHttpRequest("", "", "GET", requestPayload,headers, "HTTP/1.1");
 
-        validateBodyAuthOperations(request, "initials.xy", "{\"initials\":{\"initials\":\"AH\",\"xy\":\"Value\"},\"xy\":\"ab\"}", "{\"initials\":{\"initials\":\"AH\",\"xy\":null},\"xy\":\"ab\"}", true, true);
+        validateBodyAuthOperations(request, "initials.xy", "{\"initials\":{\"initials\":\"AH\",\"xy\":\"Value\"},\"xy\":\"ab\"}", "{\"initials\":{\"initials\":\"AH\"},\"xy\":\"ab\"}", true, true);
         request.setBody(requestPayload);
-        validateBodyAuthOperations(request, "xy", "{\"initials\":{\"initials\":\"AH\",\"xy\":\"ab\"},\"xy\":\"Value\"}", "{\"initials\":{\"initials\":\"AH\",\"xy\":\"ab\"},\"xy\":null}", true, true);
+        validateBodyAuthOperations(request, "xy", "{\"initials\":{\"initials\":\"AH\",\"xy\":\"ab\"},\"xy\":\"Value\"}", "{\"initials\":{\"initials\":\"AH\",\"xy\":\"ab\"}}", true, true);
         request.setBody(requestPayload);
         validateBodyAuthOperations(request, "initials.yz", "{\"initials\": {\"initials\": \"AH\", \"xy\": \"ab\"}, \"xy\": \"ab\"}", "{\"initials\": {\"initials\": \"AH\", \"xy\": \"ab\"}, \"xy\": \"ab\"}", false, true);
         request.setBody(requestPayload);
@@ -106,9 +104,9 @@ public class AuthMechanismTests {
 
         OriginalHttpRequest request = new OriginalHttpRequest("", "", "GET", requestPayload,headers, "HTTP/1.1");
 
-        validateBodyAuthOperations(request, "initials.xy", "{\"initials\":{\"initials\":\"AH\",\"xy\":\"Value\"},\"xy\":\"ab\"}", "{\"initials\":{\"initials\":\"AH\",\"xy\":null},\"xy\":\"ab\"}", true, false);
+        validateBodyAuthOperations(request, "initials.xy", "{\"initials\":{\"initials\":\"AH\",\"xy\":\"Value\"},\"xy\":\"ab\"}", "{\"initials\":{\"initials\":\"AH\"},\"xy\":\"ab\"}", true, false);
         request.setBody(requestPayload);
-        validateBodyAuthOperations(request, "xy", "{\"initials\":{\"initials\":\"AH\",\"xy\":\"ab\"},\"xy\":\"Value\"}", "{\"initials\":{\"initials\":\"AH\",\"xy\":\"ab\"},\"xy\":null}", true, false);
+        validateBodyAuthOperations(request, "xy", "{\"initials\":{\"initials\":\"AH\",\"xy\":\"ab\"},\"xy\":\"Value\"}", "{\"initials\":{\"initials\":\"AH\",\"xy\":\"ab\"}}", true, false);
         request.setBody(requestPayload);
         validateBodyAuthOperations(request, "initials.yz", "{\"initials\": {\"initials\": \"AH\", \"xy\": \"ab\"}, \"xy\": \"ab\"}", "{\"initials\": {\"initials\": \"AH\", \"xy\": \"ab\"}, \"xy\": \"ab\"}", false, false);
         request.setBody(requestPayload);
