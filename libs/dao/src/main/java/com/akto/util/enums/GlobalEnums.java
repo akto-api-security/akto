@@ -361,6 +361,21 @@ public class GlobalEnums {
                 IssueTags.BL,
                 IssueTags.OWASPTOP10,
                 IssueTags.HACKERONETOP10,
+        }),
+
+        PAGINATION_MISCONFIGURATION(
+                "PAGINATION_MISCONFIGURATION",
+                TestCategory.RL,
+                "Possible DOS due to pagination misconfiguration",
+                "Quite often, APIs do not impose any restrictions on the size or number of resources that can be requested by the user.",
+                "Such vulnerabilities arise when there is no max limit imposed on the number of resources returned. Typically, the number of objects to be returned is provided by a parameter in the API call. An attacker can set it as a large number. ",
+                "This can impact the API server performance, leading to  Denial of Service (DoS). It also leaves the door open to authentication flaws such as brute force.",
+                new String[]{
+                        "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa4-lack-of-resources-and-rate-limiting.md#scenario-2"
+                }, new IssueTags[]{
+                IssueTags.BL,
+                IssueTags.OWASPTOP10,
+                IssueTags.HACKERONETOP10,
         });
 
 
