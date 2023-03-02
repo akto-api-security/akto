@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.bson.types.ObjectId;
+
 import com.akto.action.testing.AuthMechanismAction;
 import com.akto.action.testing.StartTestAction;
 import com.akto.dto.testing.AuthParamData;
@@ -16,6 +18,9 @@ public class OnboardingAction extends UserAction {
     private ArrayList<AuthParamData> authParamData;
     private int collectionId;
     private String testSuite;
+    private String testingRunHexId;
+
+    
     public String runTestOnboarding() {
 
         List<String> selectedTests = new ArrayList<>();
@@ -52,6 +57,8 @@ public class OnboardingAction extends UserAction {
         startTestAction.setMaxConcurrentRequests(100);
         startTestAction.startTest();
 
+        testingRunHexId = startTestAction.getTestingRunHexId();
+
 
         return SUCCESS.toUpperCase();
     }
@@ -64,7 +71,9 @@ public class OnboardingAction extends UserAction {
     public void setTestSuite(String testSuite) {
         this.testSuite = testSuite;
     }
-
+    public String getTestingRunHexId() {
+        return testingRunHexId;
+    }
 
     
     
