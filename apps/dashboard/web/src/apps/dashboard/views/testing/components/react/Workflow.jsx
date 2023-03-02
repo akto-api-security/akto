@@ -314,33 +314,45 @@ const Workflow = ({apiCollectionId, defaultOpenResult}) => {
     }
   }, []);
 
+  const iconData = [
+    {
+      title: "Schedule Test",
+      onClick: openScheduleBox,
+      icon: faCalendarPlus
+    },
+    {
+      title: "Save workflow",
+      onClick: onSave,
+      icon: faSave
+    },
+    {
+      title: "Run test",
+      onClick: runTest,
+      icon: faPlayCircle
+    },
+    {
+      title: "Show test results",
+      onClick: showResult,
+      icon: open ? faEyeSlash : faEye
+    },
+    {
+      title: "Download workflow",
+      onClick: downloadWorkflowAsJson,
+      icon: faArrowAltCircleDown
+    }
+  ];
+
   return (
     <div style={{height: "800px"}} ref={containerRef}>
-      <Tooltip title="Schedule Test">
-      <IconButton onClick={openScheduleBox} style={{float : "right"}}>
-        <FontAwesomeIcon icon={ faCalendarPlus } className="workflow-button" size="sm"/>
-      </IconButton>
-      </Tooltip>
-      <Tooltip title="Save workflow">
-      <IconButton onClick={onSave} style={{float : "right"}}>
-        <FontAwesomeIcon icon={faSave} className="workflow-button"  size="sm"/>
-      </IconButton>
-      </Tooltip>
-      <Tooltip title="Run test">
-      <IconButton onClick={runTest} style={{float : "right"}}>
-        <FontAwesomeIcon icon={faPlayCircle} className="workflow-button"  size="sm"/>
-      </IconButton>
-      </Tooltip>
-      <Tooltip title="Show test results">
-      <IconButton onClick={showResult} style={{float : "right"}}>
-        <FontAwesomeIcon icon={open ? faEyeSlash : faEye} className="workflow-button"  size="sm"/>
-      </IconButton>
-      </Tooltip>
-      <Tooltip title="Download workflow">
-      <IconButton onClick={downloadWorkflowAsJson} style={{float : "right"}}>
-        <FontAwesomeIcon icon={faArrowAltCircleDown} className="workflow-button"  size="sm"/>
-      </IconButton>
-      </Tooltip>
+      {
+        iconData.map((icon) =>
+          <Tooltip title={icon.title} key={icon.title}>
+            <IconButton onClick={icon.onClick} style={{ float: "right" }}>
+              <FontAwesomeIcon icon={icon.icon} className="workflow-button" size="sm" />
+            </IconButton>
+          </Tooltip>
+        )
+      }
       <Menu
         id="basic-menu"
         anchorEl={anchorEl}
