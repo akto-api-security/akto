@@ -1,6 +1,7 @@
 import Vue from 'vue'
 import Vuex from 'vuex'
 import api from '../api'
+import router from "@/apps/main/router";
 
 
 Vue.use(Vuex)
@@ -56,14 +57,15 @@ const onboarding = {
         },
         runTestOnboarding({commit}) {
             commit('UPDATE_RUN_TEST_LOADING', true)
-            api.runTestOnboarding(
+            return api.runTestOnboarding(
                 [{"key": state.authKey, "value": state.authValue, "where": "HEADER"}],
                 state.selectedCollection.id,
                 state.selectedTestSuite
             ).then(resp => {
-                UPDATE_RUN_TEST_LOADING(false)
+                commit('UPDATE_RUN_TEST_LOADING', false)
+                router.push('/dashboard/testing/' + resp.testingRunHexId + '/results')
             }).catch(e => {
-                UPDATE_RUN_TEST_LOADING(false)
+                commit('UPDATE_RUN_TEST_LOADING', false)
             })
         }
     },
