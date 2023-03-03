@@ -73,7 +73,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "Akto Open Source v${{ github.event.inputs.release_version }} released!",
+              "text": "Akto Open Source v${{ github.event.inputs.release_version }} released!"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
