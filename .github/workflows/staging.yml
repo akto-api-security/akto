@@ -1,3 +1,5 @@
+# This is a basic workflow to help you get started with Actions
+
 name: Staging
 
 # Controls when the workflow will run
@@ -15,17 +17,16 @@ on:
         required: true
         type: choice
         options:
-          - akto_staging1
-          - akto_staging2
-          - akto_staging3
-        default: akto_staging1
+          - mono_staging1
+          - mono_staging2
+          - mono_staging3
+        default: mono_staging1
       Environment:
         required: true
         type: choice
         options:
           - prod
-          - staging
-        default: staging  
+        default: prod  
       
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -51,6 +52,56 @@ jobs:
         working-directory: ./apps/dashboard/
         run: npm install && npm run build
       - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s")
+      - name: Configure AWS credentials
+        if: ${{ github.event.inputs.Environment == 'staging' }}
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Login to Amazon ECR
+        if: ${{ github.event.inputs.Environment == 'staging'}}
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+      - name: Build, tag, and push the image to Amazon ECR
+        if: ${{ github.event.inputs.Environment == 'staging' }}
+        id: build-image-awsecr
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: staging
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          # Build a docker container and push it to ECR 
+          cd apps/dashboard
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG .
+          echo "Pushing image to ECR..."
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG
+          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG"
+          cd ../api-runtime
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-api-runtime:$IMAGE_TAG .
+          echo "Pushing image to ECR..."
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY-api-runtime:$IMAGE_TAG
+          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-api-runtime:$IMAGE_TAG"
+          cd ../testing
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-api-testing:$IMAGE_TAG .
+          echo "Pushing image to ECR..."
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY-api-testing:$IMAGE_TAG
+          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-api-testing:$IMAGE_TAG"
+          cd ../api-analyser
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-api-context-analyzer:$IMAGE_TAG .
+          echo "Pushing image to ECR..."
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY-api-context-analyzer:$IMAGE_TAG
+          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-api-context-analyzer:$IMAGE_TAG"
+
+      - name: Deploy to AWS CloudFormation
+        if: ${{ github.event.inputs.Environment == 'staging'}}
+        uses: aws-actions/aws-cloudformation-github-deploy@v1
+        with:
+          name: instance-${{ github.sha }}
+          template: https://cf-templates-3jie41lht0xk-us-east-1.s3.amazonaws.com/templates/akto-instance-template.json
+          no-fail-on-empty-changeset: "1"
+          parameter-overrides: "VPC=vpc-004dbe2e7c81a2256,SubnetId=subnet-0d3ff2356d5470899"
+
       - name: DockerHub login
         if: ${{ github.event.inputs.Environment == 'prod' }}
         env:
@@ -70,11 +121,23 @@ jobs:
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
           cd apps/dashboard
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG . --push
-          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG"   
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG .
+          echo "Pushing image to ECR..."
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG
+          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG"
+          cd ../api-runtime
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-runtime:$IMAGE_TAG .
+          echo "Pushing image to ECR..."
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY-runtime:$IMAGE_TAG
+          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-runtime:$IMAGE_TAG"       
           cd ../testing
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG . --push
           echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"       
+          cd ../api-analyser
+          docker build -t $ECR_REGISTRY/akto-api-context-analyzer:$IMAGE_TAG .
+          echo "Pushing image to ECR..."
+          docker push $ECR_REGISTRY/akto-api-context-analyzer:$IMAGE_TAG
+          echo "::set-output name=image::$ECR_REGISTRY/akto-api-context-analyzer:$IMAGE_TAG"
       - name: Set up JDK 11
         uses: actions/setup-java@v1
         with:
@@ -91,3 +154,8 @@ jobs:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
+      - name: Build and analyze
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=akto-api-security_mono
