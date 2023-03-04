@@ -12,7 +12,11 @@
             Step {{ currentStep }} of {{ totalSteps }}
         </div>
         <div style="display: flex; flex-direction: row; align-items: stretch;">
-            <div class="step" v-for="idx in this.totalSteps" :key="idx" :class="idx <= currentStep ? 'step-selected':'step-not-selected'"></div>
+            <div 
+                class="step" v-for="idx in this.totalSteps" :key="idx" :class="idx <= currentStep ? 'step-selected':'step-not-selected'"
+                @click="goToStep(idx)"
+            >
+            </div>
         </div>
     </div>
 </template>
@@ -31,6 +35,11 @@ export default {
         totalSteps: obj.numR,
         currentStep: obj.numR
     },
+    methods: {
+        goToStep(index) {
+            this.$emit("goToStep", index)
+        }
+    }
 }
 </script>
 
@@ -41,6 +50,7 @@ export default {
     height: 5px
     flex: 1
     margin-right: 5px
+    cursor: pointer
 
 .step-selected
     background-color: #47466A

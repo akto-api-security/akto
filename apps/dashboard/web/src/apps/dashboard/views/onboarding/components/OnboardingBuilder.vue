@@ -8,6 +8,7 @@
                 :subtitle="descriptionArr[currentStep - 1].subtitle"
                 :totalSteps="totalSteps"
                 :currentStep="currentStep"
+                @goToStep="goToStep"
             />
 
 
@@ -80,15 +81,16 @@ export default {
     },
     methods: {
         next() {
-            console.log(this.$store.state.onboarding.authKey);
-            console.log(this.$store.state.onboarding.authValue);
             if (this.currentStep === this.totalSteps) {
-                console.log("b");
                 this.$store.dispatch("onboarding/runTestOnboarding")
             }
             if (this.currentStep + 1 > this.totalSteps) return
             this.currentStep += 1
         },
+        goToStep(index) {
+            if (this.nextButtonDisable && index > this.currentStep) return
+            this.currentStep = index
+        }
     },
     computed: {
         ...mapState('onboarding', ['selectedTestSuite', 'selectedCollection', 'runTestLoading']),

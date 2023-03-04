@@ -1,9 +1,9 @@
 <template>
     <div style="height: 100%">
         <div class="top-bar">
-            <v-card-title style="flex: 0 0 70%; padding-left: 120px">
+            <v-card-title style="flex: 0 0 70%; padding-left: 112px">
                 <h1 class="display-1 page-login_title">
-                  <img src="/public/favicon.svg" style="height: 30px;" />akto
+                  <img src="/public/akto_name_with_logo.svg" style="height: 42px;" />
                 </h1>
             </v-card-title>
             <div class="actions-box">
