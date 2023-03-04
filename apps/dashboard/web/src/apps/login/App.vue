@@ -143,11 +143,11 @@
     font-weight: 600
     font-size: 30px !important
     margin-left: 5px
-    color: #6200EA
+    color: var(--themeColor)
     font-family: Poppins, sans-serif !important
 
 .akto-background
-  background: linear-gradient(180deg, #D500F9 -7.13%, #6200EA 16.86%, #2E006D 64.29%)
+  background: linear-gradient(180deg, #D500F9 -7.13%, var(--themeColor) 16.86%, #2E006D 64.29%)
 
 .sign-in__button
   border-radius: 4px
@@ -162,7 +162,7 @@
   padding: 6px
 
 .all-logos-container
-  background: #6200EA  
+  background: var(--themeColor)  
   padding: 8px
   border-radius: 4px
   width: 100%
@@ -173,7 +173,7 @@
   justify-content: space-around
   position: relative
   &::before
-    border-top: 1px solid #6200EA
+    border-top: 1px solid var(--themeColor)
     content: ""
     position: absolute
     inset: 50% 0px 0px

@@ -9,7 +9,7 @@
         <div class="heading">
           <img src="/public/favicon.svg" height="32" class="mr-2"/>
           <span style="vertical-align: text-bottom">Sign up for</span>
-          <span style="vertical-align: text-bottom; color: #6200EA"> akto </span>
+          <span style="vertical-align: text-bottom; color: var(--themeColor)"> akto </span>
         </div>
         
 
@@ -40,7 +40,7 @@
         <!-- <div class="or">or</div> -->
 
         <login-fields @fieldsChanged="fieldsChanged" @enterPressed="signupUser" :isSignUp ="true" class="mt-4"/>
-        <v-btn class="signup-btn" :disabled="disableButtons" :loading="signupLoading" @click="signupUser" style="background-color:  #6200EA !important; color: #FFFFFF !important">
+        <v-btn class="signup-btn" :disabled="disableButtons" :loading="signupLoading" @click="signupUser" style="background-color:  var(--themeColor) !important; color: #FFFFFF !important">
           Sign up
         </v-btn>
         <div class="legal-docs">
@@ -143,7 +143,7 @@ export default {
   padding-left: 5px
 
 .akto-background
-  background: linear-gradient(180deg, #D500F9 -7.13%, #6200EA 16.86%, #2E006D 64.29%)
+  background: linear-gradient(180deg, #D500F9 -7.13%, var(--themeColor) 16.86%, #2E006D 64.29%)
   height: 100%
   text-align: center
 
@@ -189,7 +189,7 @@ export default {
     font-size: 16px
 
 .signup-btn
-  background-color: #6200EA !important
+  background-color: var(--themeColor) !important
   font-size: 16px
   font-weight: 600
   vertical-align: middle
@@ -208,6 +208,6 @@ export default {
 
 .clickable-docs
   cursor: pointer
-  color: #6200EA !important
+  color: var(--themeColor) !important
   text-decoration: underline
 </style>
