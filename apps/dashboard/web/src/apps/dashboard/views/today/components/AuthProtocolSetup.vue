@@ -36,7 +36,7 @@
         </div>
 
         <div>
-            <v-btn color="#6200EA" @click="completed" :disabled="!allFieldsFilled" style="float: right">
+            <v-btn color="var(--themeColor)" @click="completed" :disabled="!allFieldsFilled" style="float: right">
                 <span class="info-text">{{btnText}}</span>
             </v-btn>
         </div>
@@ -135,13 +135,13 @@ import { mapState } from 'vuex'
 <style scoped>
 .form-field-text >>> .v-label {
   font-size: 12px;
-  color: #6200EA;
+  color: var(--themeColor);
   font-weight: 400;
 }
 
 .form-field-text >>> input {
   font-size: 14px;
-  color: #6200EA;
+  color: var(--themeColor);
   font-weight: 500;
 }
 </style>

@@ -121,7 +121,7 @@
     text-decoration: auto
 
 .v-application .primary--text
-    color: #6200EA !important
+    color: var(--themeColor) !important
 
 .active-tab
     color: #2d2434
@@ -230,4 +230,10 @@
 
 .fw-500   
     font-weight: 500
+</style>
+
+<style lang="css">
+    :root{
+        --themeColor: #6200EA;
+    }
 </style>

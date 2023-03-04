@@ -37,7 +37,7 @@
                 >        
                     <div class="height-1">
                         <div v-if="testDetails && testDetails.attempts">
-                            <v-progress-linear class="mb-4" :value="progress" color="#6200EA"></v-progress-linear>
+                            <v-progress-linear class="mb-4" :value="progress" color="var(--themeColor)EA"></v-progress-linear>
                             <div> {{failedTests}} failed</div>
                             <div> {{testDetails.attempts.length}} attempted</div>
                         </div>
@@ -169,7 +169,7 @@
     margin-bottom: 24px 
 
 .testing-setup-btn
-    background-color: #6200EA !important
+    background-color: var(--themeColor)EA !important
     & .info-text
         color: #FFFFFF
 
