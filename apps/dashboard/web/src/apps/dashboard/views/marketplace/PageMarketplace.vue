@@ -168,9 +168,6 @@ export default {
         }
     },
     methods: {
-        logError(err){
-            // console.log(err)
-        },
         validateUrl() {
             let url = this.newTest.url
             let isGoodUrl = url != null && (url.startsWith("http://") || url.startsWith("https://")) && (url.endsWith(".yml") || url.endsWith(".yaml"))
@@ -233,12 +230,9 @@ export default {
         let aktoTestTypes = await issuesApi.fetchAllSubCategories()
         this.businessCategories = aktoTestTypes.categories
         this.businessSubCategories = aktoTestTypes.subCategories
-        this.$router.push(this.leftNavItems[0].items[0].link).catch(err => {
-            if (err.name !== 'NavigationDuplicated' &&
-                !err.message.includes('Avoided redundant navigation to current location')) {
-                    logError(err);
-            }
-        });
+        if(this.$route.path !== "/dashboard/library/default/BOLA"){
+            this.$router.push(this.leftNavItems[0].items[0].link)
+        }
     },
     computed: {
         ...mapState('marketplace', ['defaultSubcategories', 'userSubcategories', 'loading']),
