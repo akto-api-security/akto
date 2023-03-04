@@ -47,6 +47,23 @@ public class HttpResponseParams {
         return statusCode >= 200 && (statusCode < 300 || statusCode == 302);
     }
 
+    public HttpResponseParams copy() {
+        return new HttpResponseParams(
+                this.type,
+                this.statusCode,
+                this.status,
+                new HashMap<>(this.headers),
+                this.payload,
+                this.requestParams.copy(),
+                this.time,
+                this.accountId,
+                this.isPending,
+                this.source,
+                this.orig,
+                this.sourceIP
+        );
+    }
+
     public String getPayload() {
         return payload;
     }

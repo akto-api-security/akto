@@ -1,6 +1,6 @@
 # This is a basic workflow to help you get started with Actions
 
-name: CI
+name: Staging
 
 # Controls when the workflow will run
 on:
@@ -15,14 +15,18 @@ on:
     inputs:
       Tag:
         required: true
-        default: 'latest'
+        type: choice
+        options:
+          - mono_staging1
+          - mono_staging2
+          - mono_staging3
+        default: mono_staging1
       Environment:
         required: true
         type: choice
         options:
           - prod
-          - staging
-        default: staging  
+        default: prod  
       
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -105,14 +109,16 @@ jobs:
           DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
         run: |
           docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD 
-
+      - name: Convert github branch name to be compatible with docker tag name convention
+        id: docker_tag
+        run: echo "TAG_SUFFIX=$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/_/g')" >> $GITHUB_OUTPUT
       - name: Build, tag, and push the image to DockerHub
         if: ${{ github.event.inputs.Environment == 'prod' }}
         id: build-image-dockerhub
         env:
           ECR_REGISTRY: aktosecurity
           ECR_REPOSITORY: akto-api-security
-          IMAGE_TAG: ${{ github.event.inputs.Tag }}
+          IMAGE_TAG: ${{ github.event.inputs.Tag }}_${{ steps.docker_tag.outputs.TAG_SUFFIX }}
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
