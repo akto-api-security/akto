@@ -1,18 +1,18 @@
 <template>
     <layout-with-top-branding-pane>
         <template slot="actions">
-            <div style="padding-top: 20px; position: absolute; right: 24px">
-                <v-btn outlined style="margin-right: 12px">
+            <div style="padding-top: 20px; position: absolute; right: 112px">
+                <v-btn outlined style="margin-right: 12px" :height="44">
                     <v-icon left>
                         $fas_book
                     </v-icon>
-                    <span style="color:#47466A; font-weight: bold;">Docs</span>
+                    <span style="color:#47466A; font-weight: bold; font-size: 12px;">Docs</span>
                 </v-btn>
-                <v-btn outlined>
-                    <v-icon left>
+                <v-btn outlined :height="44">
+                    <v-icon left size="18">
                         $discord
                     </v-icon>
-                    <span style="color:#47466A; font-weight: bold;">Join our Discord</span>
+                    <span style="color:#47466A; font-weight: bold; font-size: 12px;">Join our Discord</span>
                 </v-btn>
             </div>
         </template>
