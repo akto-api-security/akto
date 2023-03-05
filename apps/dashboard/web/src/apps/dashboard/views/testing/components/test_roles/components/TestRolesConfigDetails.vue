@@ -41,7 +41,7 @@
             </div>
             <v-row style="padding-top: 30px">
                 <div style="padding: 12px">
-                    <v-btn @click="save" color="#6200EA" class="save-btn" height="40px" width="100px"
+                    <v-btn @click="save" color="var(--themeColor)" class="save-btn" height="40px" width="100px"
                         :loading="saveLoading">
                         Save
                     </v-btn>
@@ -285,7 +285,7 @@ export default {
             background-color: #FFFFFF
 
     .save-btn
-        background-color: #6200EA !important
+        background-color: var(--themeColor) !important
         font-size: 16px !important
         font-weight: 600
         vertical-align: middle

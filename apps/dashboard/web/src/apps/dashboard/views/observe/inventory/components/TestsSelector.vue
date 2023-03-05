@@ -24,7 +24,7 @@
                                     <div class="fw-500">{{getCategoryName(category)}}</div>
                                     <div class="grey-text fs-12">{{mapCategoryToSubcategory[category].selected.length}} of {{mapCategoryToSubcategory[category].all.length}} selected</div>
                                 </div>
-                                <v-icon v-if="mapCategoryToSubcategory[category].selected.length > 0" size="16" color="#6200EA">$fas_check</v-icon>
+                                <v-icon v-if="mapCategoryToSubcategory[category].selected.length > 0" size="16" color="var(--themeColor)">$fas_check</v-icon>
                             </div>
                         </v-list-item>
                     </v-list>
@@ -260,7 +260,7 @@ export default {
     font-weight: 500
 
 .clickable-link
-    color: #6200ea !important
+    color: var(--themeColor) !important
 
 .disable-div
     pointer-events: none

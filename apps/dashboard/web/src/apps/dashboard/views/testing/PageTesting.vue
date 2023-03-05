@@ -12,7 +12,7 @@
                                 <div class="nav-section">
                                     <api-collection-group :items=leftNavItems>
                                         <!-- <template #prependItem>
-                                            <v-btn primary dark color="#6200EA" tile style="width: -webkit-fill-available" class="mt-8 mb-8">
+                                            <v-btn primary dark color="var(--themeColor)" tile style="width: -webkit-fill-available" class="mt-8 mb-8">
                                                 <div style="width: 100%">
                                                     <v-icon>$fas_plus</v-icon> 
                                                     New test
@@ -29,7 +29,7 @@
         </template>
         <template slot="User config">
             <div class="pa-8">
-                <v-btn outlined color="#6200EA" @click="stopAllTests" :loading="stopAllTestsLoading" style="float:right">
+                <v-btn outlined color="var(--themeColor)" @click="stopAllTests" :loading="stopAllTestsLoading" style="float:right">
                     Stop all tests
                 </v-btn>
 
@@ -101,7 +101,7 @@
                                 <span class="auth-token-text">{{authTokenDate}}</span>
                             </div>
                         </div>
-                        <v-btn primary dark color="#6200EA" @click="toggleLoginStepBuilder">
+                        <v-btn primary dark color="var(--themeColor)" @click="toggleLoginStepBuilder">
                             <span v-if="originalDbState">Edit</span>
                             <span v-else>Create</span>
                         </v-btn>
@@ -401,7 +401,7 @@ export default {
 <style scoped>
 .page-testing>>>.v-label {
     font-size: 12px;
-    color: #6200EA;
+    color: var(--themeColor);
     font-weight: 400;
 }
 
@@ -416,14 +416,14 @@ export default {
     height: 24px;
     left: 0px;
     top: 0px;
-    border: 2px solid #6200EA;
+    border: 2px solid var(--themeColor);
     border-radius: 50%;
     text-align: center;
     font-style: normal;
     font-weight: 600;
     font-size: 16px;
     line-height: 22px;
-    color: #6200EA;
+    color: var(--themeColor);
 }
 
 .di-flex {

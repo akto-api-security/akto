@@ -13,7 +13,7 @@
                         <v-select v-model="workspace" :items="workspaces" item-text="name" item-value="id"
                             label="Select workspace" />
                             <v-btn
-                                color="#6200EA"
+                                color="var(--themeColor)"
                                 @click="importPostmanWorkspace"
                                 :disabled="importing_workspace"
                                 style="color:white">

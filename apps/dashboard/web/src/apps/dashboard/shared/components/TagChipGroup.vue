@@ -13,7 +13,7 @@
         >
             #{{toTitleCase(tag)}}
         </v-chip>
-        <span v-if="tags.length > 2" color="#6200EA" style="margin: auto 0px">
+        <span v-if="tags.length > 2" color="var(--themeColor)" style="margin: auto 0px">
             + {{tags.length-2}} more
         </span>
     </v-chip-group>

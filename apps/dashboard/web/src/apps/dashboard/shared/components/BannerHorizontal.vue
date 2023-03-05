@@ -52,7 +52,7 @@ export default {
   justify-content: center;
   margin-top: 2px !important;
   margin-bottom: 2px !important;
-  color: #6200EA;
+  color: var(--themeColor);
   height: 16.67px;
   width: 16.67px;
 }

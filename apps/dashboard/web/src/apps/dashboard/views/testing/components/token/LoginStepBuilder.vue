@@ -30,7 +30,7 @@
                 
               </div>
 
-              <v-btn dark outlined primary color="#6200EA" @click="pollOtpResponse" class="mt-2">
+              <v-btn dark outlined primary color="var(--themeColor)" @click="pollOtpResponse" class="mt-2">
                   Zapier Setup Done
               </v-btn>
 
@@ -42,11 +42,11 @@
 
                 <div :disabled="disableOtpSave" class="request-title">Extracted Otp : <b>{{tabData.responsePayload ? tabData.responsePayload.otp : ''}} </b></div>
                  
-              <v-btn :disabled="!finishedWebhookSetup" dark outlined primary color="#6200EA" @click="testRegex"  class="mt-2">
+              <v-btn :disabled="!finishedWebhookSetup" dark outlined primary color="var(--themeColor)" @click="testRegex"  class="mt-2">
                   Test Regex
               </v-btn>
 
-              <v-btn :disabled="disableOtpSave" dark outlined primary color="#6200EA" @click="testSingleStep"   class="mt-2 ml-2">
+              <v-btn :disabled="disableOtpSave" dark outlined primary color="var(--themeColor)" @click="testSingleStep"   class="mt-2 ml-2">
                 Save
              </v-btn>
             
@@ -136,7 +136,7 @@
 
             </div>
 
-            <v-btn dark outlined primary color="#6200EA" @click="testSingleStep" class="mt-8">
+            <v-btn dark outlined primary color="var(--themeColor)" @click="testSingleStep" class="mt-8">
                 Test
             </v-btn>
 

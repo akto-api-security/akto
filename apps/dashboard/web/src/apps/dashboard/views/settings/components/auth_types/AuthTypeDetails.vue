@@ -72,7 +72,7 @@
                 <div style="padding: 12px">
                   <v-btn
                         @click="save"
-                        color="#6200EA"
+                        color="var(--themeColor)"
                         class="save-btn"
                         height="40px"
                         width="100px"
@@ -173,7 +173,7 @@ export default {
             cursor: pointer
 
     .save-btn
-        background-color: #6200EA !important
+        background-color: var(--themeColor) !important
         font-size: 16px
         font-weight: 600
         vertical-align: middle

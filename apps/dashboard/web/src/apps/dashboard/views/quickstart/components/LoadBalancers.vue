@@ -44,7 +44,7 @@
 
                         <template slot="append-outer" >
                             <spinner v-if="progressBar.show"></spinner>
-                            <v-btn v-else primary dark color="#6200EA" @click="saveLBs" :disabled="selectedLBs.length === initialLBCount" class="ml-3">
+                            <v-btn v-else primary dark color="var(--themeColor)" @click="saveLBs" :disabled="selectedLBs.length === initialLBCount" class="ml-3">
                                 Apply
                             </v-btn>
                         </template>

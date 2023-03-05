@@ -40,7 +40,7 @@
                     dark
                     :style="{
                         'color': !allEmails || allEmails.length == 0 ? 'rgb(255, 255, 255, 0.3) !important' : '#FFFFFF !important',
-                        'background-color': !allEmails || allEmails.length == 0 ? '#FFFFFF !important' : '#6200EA !important',
+                        'background-color': !allEmails || allEmails.length == 0 ? '#FFFFFF !important' : 'var(--themeColor) !important',
                     }"
                     class="invite-btn"
                 >

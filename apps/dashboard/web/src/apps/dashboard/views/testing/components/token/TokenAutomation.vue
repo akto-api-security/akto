@@ -31,20 +31,20 @@
                         v-model="authParamsList[index].value"
                     />       
 
-                    <v-btn primary icon color="#6200EA" @click="deleteAuthElem(index)" class="ma-auto" v-if="authParamsList.length > 1">
+                    <v-btn primary icon color="var(--themeColor)" @click="deleteAuthElem(index)" class="ma-auto" v-if="authParamsList.length > 1">
                         <v-icon>$fas_trash</v-icon>
                     </v-btn>
 
                 </div>
               </div>
 
-              <v-btn primary icon color="#6200EA" @click='toggleShowAuthParamsAuthTab' >
+              <v-btn primary icon color="var(--themeColor)" @click='toggleShowAuthParamsAuthTab' >
                     <v-icon> $fas_arrow-left </v-icon>
                 </v-btn>
-                <v-btn primary icon color="#6200EA" @click='addNewAuthParamElem' >
+                <v-btn primary icon color="var(--themeColor)" @click='addNewAuthParamElem' >
                     <v-icon> $fas_plus </v-icon>
                 </v-btn>
-                <v-btn primary plain color="#6200EA" @click='saveLoginStep' >
+                <v-btn primary plain color="var(--themeColor)" @click='saveLoginStep' >
                     Done
                 </v-btn>
 
@@ -64,14 +64,14 @@
                             @pollOtpResponse=pollOtpResponse
                             @testRegex=testRegex
                         />
-                        <v-btn plain color="#6200EA" @click="removeTab(apiTabName)" class="top-right-btn">
+                        <v-btn plain color="var(--themeColor)" @click="removeTab(apiTabName)" class="top-right-btn">
                             Remove Step
                         </v-btn>
                         <div class="float-right ma-2">
-                            <v-btn :disabled="!stepData[apiTabName].testedSuccessfully" class="token-automation-primary-btn" @click="addTab(apiTabName)"  style="background-color:  #6200EA !important; color: #FFFFFF !important">
+                            <v-btn :disabled="!stepData[apiTabName].testedSuccessfully" class="token-automation-primary-btn" @click="addTab(apiTabName)"  style="background-color:  var(--themeColor) !important; color: #FFFFFF !important">
                                 Add step
                             </v-btn>
-                            <v-btn :disabled="!stepData[apiTabName].showAddStepOption" class="token-automation-primary-btn" @click="toggleShowAuthParams(apiTabName)"  style="background-color:  #6200EA !important; color: #FFFFFF !important">
+                            <v-btn :disabled="!stepData[apiTabName].showAddStepOption" class="token-automation-primary-btn" @click="toggleShowAuthParams(apiTabName)"  style="background-color:  var(--themeColor) !important; color: #FFFFFF !important">
                                 Extract
                             </v-btn>
                         </div>
@@ -408,7 +408,7 @@ export default {
     color: #47466A
 
 .token-automation-primary-btn
-    background-color: #6200EA !important
+    background-color: var(--themeColor) !important
     color: #FFFFFF !important
     margin-left: 12px
 

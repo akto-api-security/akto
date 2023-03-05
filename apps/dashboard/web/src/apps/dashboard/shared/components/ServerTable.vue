@@ -417,7 +417,7 @@ export default {
     position: relative
 
 .filter-icon
-    color: #6200EA !important
+    color: var(--themeColor) !important
     opacity:0.8
     min-width: 0px !important
     position: absolute
@@ -428,13 +428,13 @@ export default {
 <style scoped>
 .form-field-text >>> .v-label {
   font-size: 12px;
-  color: #6200EA;
+  color: var(--themeColor);
   font-weight: 400;
 }
 
 .form-field-text >>> input {
   font-size: 14px;
-  color: #6200EA;
+  color: var(--themeColor);
   font-weight: 500;
 }
 

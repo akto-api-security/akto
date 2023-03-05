@@ -22,11 +22,11 @@
 }
 
 .green-boundary {
-    border: 1px solid #6200EA !important;
+    border: 1px solid var(--themeColor) !important;
 }
 
 .green-boundary:hover {
-    box-shadow: 0px 0px 3px 3px #6200EA3d !important;
+    box-shadow: 0px 0px 3px 3px var(--themeColor)3d !important;
 }
 
 .MuiInput-input {
@@ -43,7 +43,7 @@
 }
 
 .MuiButton-root {
-    background-color: #6200EA !important;
+    background-color: var(--themeColor) !important;
     margin: 0 12px 12px 0 !important;
 }
 
@@ -56,7 +56,7 @@
     top: -8px;
     left: 0px;
     font-size: 10px !important;
-    color: #6200EA !important;
+    color: var(--themeColor) !important;
 }
 
 .autocomplete-options {
@@ -141,7 +141,7 @@
 }
 
 .primary-btn {
-    color: #6200EA;
+    color: var(--themeColor);
     font-size: 12px;
 }
   
@@ -159,7 +159,7 @@
 }
 
 .workflow-button {
-    color: #6200EA !important;
+    color: var(--themeColor) !important;
     font-weight: 600 !important;
 }
 
@@ -169,7 +169,7 @@
 }
 
 .request-editor-variable {
-    color: #6200EA !important;
+    color: var(--themeColor) !important;
     font-weight: 600 !important;
 }
 

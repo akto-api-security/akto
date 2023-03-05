@@ -16,7 +16,7 @@
         <a-card title="Changes" icon="$fas_chart-line" class="ma-5">
             <line-chart
                 type='spline'
-                color='#6200EA'
+                color='var(--themeColor)'
                 :areaFillHex="true"
                 :height="250"
                 title="New Endpoints"

@@ -45,7 +45,7 @@ export default {
 
 .customStyle
     --vjc-valueKey-color: green !important
-    --vjc-key-color: #6200EA !important
+    --vjc-key-color: var(--themeColor) !important
 
 .value-key 
     font-weight: unset !important

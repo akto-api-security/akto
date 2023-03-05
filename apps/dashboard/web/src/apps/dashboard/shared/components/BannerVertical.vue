@@ -45,7 +45,7 @@ export default{
 	font-weight: 600;
 	font-size: 14px !important;
 	line-height: 20px;
-	color: #6200EA;
+	color: var(--themeColor);
 }
 
 .content{
@@ -54,7 +54,7 @@ export default{
 	font-weight: 400;
 	font-size: 14px !important;
 	line-height: 20px;
-	color: #6200EA;
+	color: var(--themeColor);
 }
 
 .cta{
@@ -63,17 +63,17 @@ export default{
 	font-weight: 600;
 	font-size: 14px !important;
 	line-height: 20px;
-	color: #6200EA;
+	color: var(--themeColor);
 }
 .icon-nav-drawer{
   justify-content: center;
   margin-top: 2px !important;
   margin-bottom: 2px !important;
-  color: #6200EA;
+  color: var(--themeColor);
 }
 
 .info-icon{
-  color: #6200EA;
+  color: var(--themeColor);
 }
 
 .clickable-link{

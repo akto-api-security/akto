@@ -16,7 +16,7 @@
                                 floating
                                 width="250px"
                             >
-                                <v-btn primary outlined color="#6200EA" @click="showCreateTestDialog = true" class="ma-4">
+                                <v-btn primary outlined color="var(--themeColor)" @click="showCreateTestDialog = true" class="ma-4">
                                     <div class="d-flex">
                                         <div class="my-auto"><v-icon size="14">$fas_plus</v-icon></div>
                                         <div class="my-auto">Add test</div>
@@ -27,7 +27,7 @@
                                         :items=leftNavItems
                                     >
                                         <!-- <template #prependItem>
-                                            <v-btn primary dark color="#6200EA" tile style="width: -webkit-fill-available" class="mt-8 mb-8">
+                                            <v-btn primary dark color="var(--themeColor)" tile style="width: -webkit-fill-available" class="mt-8 mb-8">
                                                 <div style="width: 100%">
                                                     <v-icon>$fas_plus</v-icon> 
                                                     New test
@@ -97,7 +97,7 @@
                                                     </simple-text-field>
                                                 </div>
 
-                                                <div v-else class="primary--text fs-14"><v-icon color="#6200EA" size="12">$fas_plus</v-icon>Add new</div>
+                                                <div v-else class="primary--text fs-14"><v-icon color="var(--themeColor)" size="12">$fas_plus</v-icon>Add new</div>
                                             </v-list-item-title>
                                         </v-list-item>
                                     </v-list>
@@ -114,7 +114,7 @@
                             </div>
                             <div class="d-flex" style="justify-content: right">
                                 <v-btn primary outlined color="#47466A" @click="showCreateTestDialog = false" class="mr-4">Cancel</v-btn>
-                                <v-btn :disabled="validateUrl()" primary dark color="#6200EA" @click="addTest">Add</v-btn>
+                                <v-btn :disabled="validateUrl()" primary dark color="var(--themeColor)" @click="addTest">Add</v-btn>
                             </div>
                         </div>
                 </a-card>

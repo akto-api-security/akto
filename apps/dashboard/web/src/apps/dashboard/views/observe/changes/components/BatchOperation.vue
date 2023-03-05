@@ -22,7 +22,7 @@
         </div>
 
         <div class="d-flex jc-end pa-3">
-            <v-btn primary dark color="#6200EA" @click="btnClicked">
+            <v-btn primary dark color="var(--themeColor)" @click="btnClicked">
                 {{operationName}}
             </v-btn>
         </div>

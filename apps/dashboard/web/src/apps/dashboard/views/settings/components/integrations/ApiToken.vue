@@ -24,7 +24,7 @@
     </div>
     <slot>
       <div class="pt-2">
-        <v-btn color="#6200EA" style="color:white" @click="addBurpToken">{{                       addTokenTitle || "Generate Token"                       }}</v-btn>
+        <v-btn color="var(--themeColor)" style="color:white" @click="addBurpToken">{{                       addTokenTitle || "Generate Token"                       }}</v-btn>
       </div>
     </slot>
 

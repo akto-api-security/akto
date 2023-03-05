@@ -158,7 +158,7 @@
 <style lang="sass" scoped>
     .goal-name
         font-size: 14px
-        color: #6200EA
+        color: var(--themeColor)
         white-space: nowrap
         overflow: hidden
         text-overflow: ellipsis
@@ -199,13 +199,13 @@
 <style scoped>
 .form-field-text >>> .v-label {
   font-size: 12px;
-  color: #6200EA;
+  color: var(--themeColor);
   font-weight: 400;
 }
 
 .form-field-text >>> input {
   font-size: 14px;
-  color: #6200EA;
+  color: var(--themeColor);
   font-weight: 500;
 }
 
