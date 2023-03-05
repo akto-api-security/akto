@@ -186,7 +186,11 @@ export default {
       myAccountItems: [
         {
           label: "Settings",
-          click: () => this.$router.push('/dashboard/settings')
+          click: () => {
+            if(this.$route.path !== "/dashboard/settings"){
+              this.$router.push('/dashboard/settings')
+            }
+          }
         },
         {
           label: "Terms and Policies",
