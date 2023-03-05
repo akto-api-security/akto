@@ -34,7 +34,7 @@
                             >
                             <v-tooltip bottom>
                                 <template v-slot:activator='{ on, attrs }'>
-                                    <v-icon color="#6200EA" size="16" v-bind="attrs" v-on="on" >$fas_trash</v-icon>
+                                    <v-icon color="var(--themeColor)" size="16" v-bind="attrs" v-on="on" >$fas_trash</v-icon>
                                 </template>
                                 Delete multiple collections
                             </v-tooltip>

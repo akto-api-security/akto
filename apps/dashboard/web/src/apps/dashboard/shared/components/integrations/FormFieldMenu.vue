@@ -6,7 +6,7 @@
       :label="label"
       :placeholder="label"
       dense
-      color="#6200EA"
+      color="var(--themeColor)"
       class="form-field-menu"
       @change="$emit('input', currValue)"
   >
@@ -54,13 +54,13 @@ export default {
 
 .form-field-menu >>> .v-label {
   font-size: 12px;
-  color: #6200EA;
+  color: var(--themeColor);
   font-weight: 400;
 }
 
 .selected-col-text {
   font-size: 14px;
-  color: #6200EA;
+  color: var(--themeColor);
   font-weight: 500;
   margin-left: 0px !important;
 }

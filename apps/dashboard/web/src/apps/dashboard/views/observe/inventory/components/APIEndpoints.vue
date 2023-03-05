@@ -137,7 +137,7 @@
             <template slot="Tests">
                 <div>
                     <div class="d-flex jc-end ma-2">
-                        <v-btn v-if="!showWorkflowTestBuilder" primary dark color="#6200EA" @click="() => {originalStateFromDb = null; showWorkflowTestBuilder = true}">
+                        <v-btn v-if="!showWorkflowTestBuilder" primary dark color="var(--themeColor)" @click="() => {originalStateFromDb = null; showWorkflowTestBuilder = true}">
                             Create new workflow
                         </v-btn>
                         <div style="align-items: center; display: flex; padding-right: 12px ">
@@ -155,7 +155,7 @@
                         v-if="showWorkflowTestBuilder"
                         width="80%"
                     >
-                        <v-btn icon primary dark color="#6200EA" class="float-right" @click="() => {originalStateFromDb = null; showWorkflowTestBuilder = false}">
+                        <v-btn icon primary dark color="var(--themeColor)" class="float-right" @click="() => {originalStateFromDb = null; showWorkflowTestBuilder = false}">
                             <v-icon>$fas_times</v-icon>
                         </v-btn>
                         <workflow-test-builder :endpointsList=allEndpoints :apiCollectionId="apiCollectionId" :originalStateFromDb="originalStateFromDb" :defaultOpenResult="false" class="white-background"/>

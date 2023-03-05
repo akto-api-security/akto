@@ -13,7 +13,7 @@
                     <spinner v-if="loadingTrafficData"/>
                     <line-chart
                         type='spline'
-                        color='#6200EA'
+                        color='var(--themeColor)'
                         :areaFillHex="true"
                         :height="230"
                         title="Traffic"

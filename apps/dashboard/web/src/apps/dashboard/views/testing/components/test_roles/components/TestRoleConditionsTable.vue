@@ -189,7 +189,7 @@ export default {
         border-top-width: 1px
 
 .addRowIcon
-    color: #6200EA
+    color: var(--themeColor)
     width: 100%
     height: 100%
 

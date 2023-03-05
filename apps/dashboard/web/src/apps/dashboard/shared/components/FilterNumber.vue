@@ -9,7 +9,7 @@
             :max="max"
             hide-details
             @change="updatedRange"
-            color="#6200EA"
+            color="var(--themeColor)"
             :ripple="false"
             dense
             :thumb-size="13"

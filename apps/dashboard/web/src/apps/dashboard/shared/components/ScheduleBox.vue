@@ -42,7 +42,7 @@
                     </div>
                 </div>
             </div>
-            <v-btn primary dark color="#6200EA" @click="schedule">
+            <v-btn primary dark color="var(--themeColor)" @click="schedule">
                 {{ scheduleString }}
             </v-btn>
 

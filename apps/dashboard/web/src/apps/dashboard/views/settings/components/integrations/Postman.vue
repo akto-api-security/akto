@@ -49,7 +49,7 @@
 
       <div style="padding-top:20px">
         <v-btn
-            color="#6200EA"
+            color="var(--themeColor)"
             @click="save"
             :disabled="!can_be_saved"
             :loading="save_loading"

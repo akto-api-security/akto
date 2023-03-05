@@ -50,7 +50,7 @@ export default {
     margin-left: 4px
 
   & .custom-input
-    color: #6200EA !important
+    color: var(--themeColor) !important
     font-weight: 500
 
 .heading

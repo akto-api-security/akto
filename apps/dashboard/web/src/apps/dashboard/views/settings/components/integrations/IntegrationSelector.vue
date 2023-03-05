@@ -5,9 +5,9 @@
             v-model="tabName"
             vertical
             active-class="active-tab"
-            slider-color="#6200ea"
+            slider-color="var(--themeColor)"
         >
-          <v-tabs-slider color="#6200EA" style="width: 4px"></v-tabs-slider>
+          <v-tabs-slider color="var(--themeColor)" style="width: 4px"></v-tabs-slider>
           <v-tab
               v-for="(category, index) in integrationsList"
               :key="index"
@@ -171,7 +171,7 @@ export default {
 
 .active-tab
   background-color: #47466A2F
-  color: #6200EA
+  color: var(--themeColor)
 
 .right-pane-tab
   justify-content: left

@@ -4,8 +4,8 @@
             <v-expand-transition>
                 <div class="akto-left-pane" :style="{'width' : showRightPane ? '78%' : '98%', 'transition': 'all 0.2s linear'}">
                     <span class="hide-right-pane clickable" @click="toggleRightPane">
-                        <v-icon v-if="showRightPane" color="#6200ea">$fas_angle-right</v-icon>
-                        <v-icon v-else color="#6200ea">$fas_angle-left</v-icon>
+                        <v-icon v-if="showRightPane" color="var(--themeColor)">$fas_angle-right</v-icon>
+                        <v-icon v-else color="var(--themeColor)">$fas_angle-left</v-icon>
                     </span>
 
                     <div>

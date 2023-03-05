@@ -13,7 +13,7 @@
             <v-icon color="#FFFFFF" size ="14" v-if="!hideTag">{{getTagIcon(tag)}}</v-icon>
             <span style="color: #FFFFFF">{{ toTitleCase(tag) }}</span>
         </v-chip>
-        <span v-if="sensitiveTags.length > 2" :color='chipColor || "#6200EA"'>
+        <span v-if="sensitiveTags.length > 2" :color='chipColor || "var(--themeColor)"'>
             + {{sensitiveTags.length-2}} more
         </span>
     </v-chip-group>

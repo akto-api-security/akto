@@ -1,6 +1,6 @@
 <template>
     <div class='condition-block'>
-        <span class="inline-block-child" style="color: #6200EA">
+        <span class="inline-block-child" style="color: var(--themeColor)">
             {{ initial_string }}
         </span>
         <div class="inline-block-child pl-5">

@@ -40,7 +40,7 @@
                     <div class="py-4">
                         <v-dialog v-model="showDialog" width="500">
                             <template v-slot:activator="{ on, attrs }">
-                                <v-btn primary dark color="#6200EA" @click="showDialog = true" v-bind="attrs" v-on="on">
+                                <v-btn primary dark color="var(--themeColor)" @click="showDialog = true" v-bind="attrs" v-on="on">
                                     Update Akto
                                 </v-btn>
                             </template>
@@ -48,7 +48,7 @@
                                 <div class="entry-text"> Please note that this will incur a downtime of 10 mins to
                                     update the system. </div>
                                 <div class="d-flex jc-end">
-                                    <v-btn primary dark color="#6200EA" @click="takeUpdate">
+                                    <v-btn primary dark color="var(--themeColor)" @click="takeUpdate">
                                         Proceed
                                     </v-btn>
                                 </div>

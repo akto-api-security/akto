@@ -29,11 +29,11 @@
                 <v-text-field
                     v-model="searchText"
                     dense
-                    color="#6200EA"
+                    color="var(--themeColor)"
                     prepend-inner-icon="$fas_search"
                 >
                     <template v-slot:prepend-inner>
-                        <v-icon size="12" color="#6200EA">$fas_search</v-icon>
+                        <v-icon size="12" color="var(--themeColor)">$fas_search</v-icon>
                     </template>
                 </v-text-field>
             </v-list-item>
@@ -176,7 +176,7 @@ export default {
     font-size: 14px
 .underline
     text-decoration: underline 
-    color: #6200EA !important
+    color: var(--themeColor) !important
 .operator
     color: #47466A99
     min-width: unset !important

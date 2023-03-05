@@ -3,8 +3,8 @@
     <v-navigation-drawer v-model="drawer" app width="200px" :mini-variant.sync="mini" class="akto-nav" dark permanent>
 
       <span class="expand-nav clickable" @click="mini = !mini">
-        <v-icon v-if="mini" color="#6200ea">$fas_angle-right</v-icon>
-        <v-icon v-else color="#6200ea">$fas_angle-left</v-icon>
+        <v-icon v-if="mini" color="var(--themeColor)">$fas_angle-right</v-icon>
+        <v-icon v-else color="var(--themeColor)">$fas_angle-left</v-icon>
       </span>
 
       <template #prepend>
@@ -258,10 +258,10 @@ export default {
   color: #47466A
 
 .akto-background
-  background: linear-gradient(180deg, #D500F9 -7.13%, #6200EA 16.86%, #2E006D 64.29%)
+  background: linear-gradient(180deg, #D500F9 -7.13%, var(--themeColor) 16.86%, #2E006D 64.29%)
 
 .akto-nav
-  background: linear-gradient(180deg, #D500F9 -7.13%, #6200EA 16.86%, #2E006D 64.29%)
+  background: linear-gradient(180deg, #D500F9 -7.13%, var(--themeColor) 16.86%, #2E006D 64.29%)
   z-index: 20
   overflow: unset
 
