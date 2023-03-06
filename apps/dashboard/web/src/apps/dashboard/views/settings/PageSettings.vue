@@ -169,9 +169,9 @@ export default {
 .entry-text
     font-weight: 500
     margin-right: 16px
-    color: #47466A
+    color: var(--themeColorDark)
 
 .dialog-box
     padding: 16px
-    background: #ffffff    
+    background: var(--white)  
 </style>

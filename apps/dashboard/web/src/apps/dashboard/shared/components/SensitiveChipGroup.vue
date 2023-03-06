@@ -10,8 +10,8 @@
             :color='chipColor || "#47466ACC"'
             class="sensitive-tag-chip"
         >
-            <v-icon color="#FFFFFF" size ="14" v-if="!hideTag">{{getTagIcon(tag)}}</v-icon>
-            <span style="color: #FFFFFF">{{ toTitleCase(tag) }}</span>
+            <v-icon color="var(--white)" size ="14" v-if="!hideTag">{{getTagIcon(tag)}}</v-icon>
+            <span style="color: var(--white)">{{ toTitleCase(tag) }}</span>
         </v-chip>
         <span v-if="sensitiveTags.length > 2" :color='chipColor || "var(--themeColor)"'>
             + {{sensitiveTags.length-2}} more

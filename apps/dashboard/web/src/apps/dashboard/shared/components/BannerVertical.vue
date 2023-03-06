@@ -35,7 +35,7 @@ export default{
 
 .bg{
 	background: #F9F9FA;
-	border: 1px solid #DADAE1;
+	border: 1px solid var(--lighten2);
 	border-radius: 12px;
 	padding: 16px;
 }

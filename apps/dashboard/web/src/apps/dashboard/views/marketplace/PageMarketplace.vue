@@ -113,7 +113,7 @@
                                 />
                             </div>
                             <div class="d-flex" style="justify-content: right">
-                                <v-btn primary outlined color="#47466A" @click="showCreateTestDialog = false" class="mr-4">Cancel</v-btn>
+                                <v-btn primary outlined color="var(--themeColorDark)" @click="showCreateTestDialog = false" class="mr-4">Cancel</v-btn>
                                 <v-btn :disabled="validateUrl()" primary dark color="var(--themeColor)" @click="addTest">Add</v-btn>
                             </div>
                         </div>
@@ -276,12 +276,12 @@ export default {
 
 <style lang="sass" scoped>
 .category-tests
-    color: #47466A
+    color: var(--themeColorDark)
     font-family: Poppins, sans-serif !important
 
 .input-title
     display: flex
-    color: #47466A
+    color: var(--themeColorDark)
     padding-bottom: 8px
     & > div:first-child
         font-size: 14px
@@ -299,12 +299,12 @@ export default {
 <style scoped>
 .form-field-select >>> .v-list-item__title {
     font-size: 14px !important;
-    color: #47466A !important;
+    color: var(--themeColorDark) !important;
 }
 
 .category-selection {
     font-size: 14px !important;
-    color: #47466A !important;
+    color: var(--themeColorDark) !important;
     margin: 0px !important;
     width: 100%;
     padding-bottom: 8px;
@@ -313,13 +313,13 @@ export default {
 
 .form-field-select >>> .v-select__selection {
     font-size: 14px !important;
-    color: #47466A !important;
+    color: var(--themeColorDark) !important;
     margin: 0px !important;
 }
 
 .form-field-select >>> .v-list-item__content {
     padding: 0px !important;
-    color: #47466A !important;
+    color: var(--themeColorDark) !important;
 }
 
 .form-field-select >>> .v-list-item {
@@ -328,7 +328,7 @@ export default {
 
 .form-field-text >>> input {
     font-size: 14px !important;
-    color: #47466A !important;    
+    color: var(--themeColorDark) !important;    
 }
 
 .c-item--selected {

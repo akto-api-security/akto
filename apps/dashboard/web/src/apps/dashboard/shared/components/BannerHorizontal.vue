@@ -14,18 +14,18 @@ export default {
 }
 </script>
 
-<style scoped>
+<style scoped >
 
 .bg{
 	background: #F9F9FA;
-	border: 1px solid #DADAE1;
+	border: 1px solid var(--lighten2);
 	border-radius: 12px;
 	padding: 16px;
 }
 
 .col_2 {
 	width: 100%;
-	color: #47466A;
+	color: var(--themeColorDark);
 	position: relative;
 	top: 0px;
 	left: 0px;

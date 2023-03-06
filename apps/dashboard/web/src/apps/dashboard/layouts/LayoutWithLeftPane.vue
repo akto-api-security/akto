@@ -35,7 +35,7 @@
     font-size: 24px
     font-weight: 600
     padding-bottom: 4px
-    color:  #47466A
+    color:  var(--themeColorDark)
 
 .akto-page-subtitle
   font-size: 13px
@@ -54,13 +54,13 @@
     position: relative
     width: -webkit-fill-available
     border-radius: 0 4px 4px 0
-    border: 1px solid #E4E3E5
+    border: 1px solid var(--borderColor)
 
 .akto-right-pane
     border-radius: 4px 0 0 4px
     overflow: hidden
     height: 100%
-    border: 1px solid #E4E3E5
+    border: 1px solid var(--borderColor)
     border-right: 0px
 
 </style>

@@ -116,10 +116,10 @@ export default {
   padding-top: 25px  
 .text-detail
   font-weight: normal
-  color: #47466A
+  color: var(--themeColorDark)
   font-size: 13px  
 .title-text
-  color: #47466A
+  color: var(--themeColorDark)
   font-size: 16px
   font-weight: 500  
   margin-left: 16px

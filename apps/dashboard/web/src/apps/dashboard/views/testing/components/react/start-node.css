@@ -1,8 +1,8 @@
 .start-node {
-    background: #fff;
-    border: 1px solid #47466A;
+    background: var(--white);
+    border: 1px solid var(--themeColorDark);
     border-radius: 3px;
-    color: #47466A;
+    color: var(--themeColorDark);
     font-size: 12px;
     padding: 10px;
     text-align: center;
@@ -14,7 +14,7 @@
 }
 
 .red-boundary {
-    border: 1px solid #f44336 !important;
+    border: 1px solid var(--redMetric) !important;
 }
 
 .red-boundary:hover {
@@ -26,11 +26,11 @@
 }
 
 .green-boundary:hover {
-    box-shadow: 0px 0px 3px 3px var(--themeColor)3d !important;
+    box-shadow: 0px 0px 3px 3px #6200EA3d !important;
 }
 
 .MuiInput-input {
-    color: #47466A !important;
+    color: var(--themeColorDark) !important;
     font-size: 12px !important;
 }
 
@@ -61,7 +61,7 @@
 
 .autocomplete-options {
     font-size: 12px !important;
-    color: #47466A !important;
+    color: var(--themeColorDark) !important;
     text-overflow: ellipsis;
     overflow: hidden;
     white-space: nowrap;
@@ -146,13 +146,13 @@
 }
   
 .MuiPaper-root {
-    color: #47466A !important
+    color: var(--themeColorDark) !important
 }
 
 .request-editor {
     font-size: 12px !important;
     font-family: monospace !important;
-    color: #47466A !important;
+    color: var(--themeColorDark) !important;
     letter-spacing: unset !important;
     line-height: 23px !important;
     word-wrap: break-word !important;
@@ -176,7 +176,7 @@
 .request-title {
     padding-top: 12px;
     font-size: 13px;
-    color: #47466A;
+    color: var(--themeColorDark);
     font-family: 'Poppins';
     font-weight: 500;
 }

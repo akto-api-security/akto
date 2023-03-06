@@ -65,7 +65,7 @@
     font-size: 24px
     font-weight: 600
     padding-bottom: 4px
-    color:  #47466A
+    color:  var(--themeColorDark)
 
 .akto-page-subtitle
   font-size: 13px
@@ -88,11 +88,11 @@
     position: absolute
     top: 80px
     right: -10px
-    border: 1px solid #E4E3E5
+    border: 1px solid var(--borderColor)
     box-sizing: border-box
-    box-shadow: 2px 2px 4px #E4E3E5
+    box-shadow: 2px 2px 4px var(--borderColor)
     border-radius: 8px
-    background-color: #ffffff
+    background-color: var(--white)
     z-index: 2
     min-width: 24px
     justify-content: space-around

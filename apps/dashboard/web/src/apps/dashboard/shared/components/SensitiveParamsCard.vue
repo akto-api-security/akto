@@ -49,7 +49,7 @@ export default {
 
 <style lang="sass" scoped>
 .legend-text
-    color: #47466A
+    color: var(--themeColorDark)
     font-size: 13px
     font-weight: 500
 

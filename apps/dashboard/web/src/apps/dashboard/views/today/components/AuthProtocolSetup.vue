@@ -107,23 +107,23 @@ import { mapState } from 'vuex'
 
 <style scoped lang="sass">
 .info-text
-    color: #FFFFFF
+    color: var(--white)
     
 .dialog-title
     font-size: 16px
     font-weight: 600
-    color: #47466A
+    color: var(--themeColorDark)
     margin-bottom: 16px
 
 .heading
     font-size: 14px
     font-weight: 500
-    color: #47466A
+    color: var(--themeColorDark)
 
 .protocol-type
     font-size: 14px
     font-weight: 500   
-    color: #47466A
+    color: var(--themeColorDark)
     opacity: 0.5
 
 .form-field-text

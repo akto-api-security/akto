@@ -43,7 +43,7 @@ export default {
 .v-card
   width: -webkit-fill-available
   margin: 12px
-  background: #FFFFFF
+  background: var(--white)
   border: 1px solid rgba(71, 70, 106, 0.2)
   border-radius: 4px
   box-shadow: none !important

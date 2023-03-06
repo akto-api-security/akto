@@ -94,11 +94,11 @@ export default {
 
 .log-content {
     font-size: 14px;
-    color: #47466A;
+    color: var(--themeColorDark);
     width: 100%;
     height: 100%;
     font-family: monospace;
-    background: #FFFFFF;
+    background: var(--white);
 }
 
 </style>

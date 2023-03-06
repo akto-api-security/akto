@@ -360,14 +360,14 @@ export default {
         vertical-align: bottom
         text-align: left
         padding: 12px 8px !important
-        border: 1px solid #FFFFFF !important
+        border: 1px solid var(--white) !important
 
     .table-column
         padding: 4px 8px !important
-        border-top: 1px solid #FFFFFF !important
-        border-bottom: 1px solid #FFFFFF !important
+        border-top: 1px solid var(--white) !important
+        border-bottom: 1px solid var(--white) !important
         background: rgba(71, 70, 106, 0.03)
-        color: #47466A
+        color: var(--themeColorDark)
         max-width: 250px
         text-overflow: ellipsis
         overflow : hidden
@@ -380,11 +380,11 @@ export default {
 
 
     .table-row
-        border: 0px solid #FFFFFF !important
+        border: 0px solid var(--white) !important
         position: relative
 
         &:hover
-            background-color: #edecf0 !important
+            background-color: var(--colTableBackground) !important
             
     .form-field-text
         padding-top: 8px !important

@@ -9,7 +9,7 @@
                                 <div>
                                     <span class="column-title">Select time: </span>
                                     <span class="column-title clickable-line">{{ label }}</span>
-                                    <v-icon size="14" color="#47466A">$fas_angle-down</v-icon>
+                                    <v-icon size="14" color="var(--themeColorDark)">$fas_angle-down</v-icon>
                                 </div>
                             </template>
                         </simple-menu>
@@ -24,7 +24,7 @@
                                 <div>
                                     <span class="column-title">Test run time: </span>
                                     <span class="column-title clickable-line">{{ testRunTimeLabel }}</span>
-                                    <v-icon size="14" color="#47466A">$fas_angle-down</v-icon>
+                                    <v-icon size="14" color="var(--themeColorDark)">$fas_angle-down</v-icon>
                                 </div>
                             </template>
                         </simple-menu>
@@ -35,7 +35,7 @@
                                 <div>
                                     <span class="column-title">Max concurrent requests: </span>
                                     <span class="column-title clickable-line">{{ maxConcurrentRequestsLabel }}</span>
-                                    <v-icon size="14" color="#47466A">$fas_angle-down</v-icon>
+                                    <v-icon size="14" color="var(--themeColorDark)">$fas_angle-down</v-icon>
                                 </div>
                             </template>
                         </simple-menu>
@@ -157,8 +157,8 @@ export default {
 
 <style lang="sass" scoped>
 .show-schedule-box
-    background: #FFFFFF
-    color: #47466A
+    background: var(--white)
+    color: var(--themeColorDark)
     margin-top: 16px
 
 .column-title
@@ -176,7 +176,7 @@ export default {
 .run-daily-box>>>label {
     font-size: 14px;
     font-weight: 500;
-    color: #47466A !important;
+    color: var(--themeColorDark) !important;
     opacity: 1 !important
 }
 </style>

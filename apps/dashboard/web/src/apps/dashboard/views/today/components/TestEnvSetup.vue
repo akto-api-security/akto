@@ -67,13 +67,13 @@
 .dialog-title
     font-size: 16px
     font-weight: 600
-    color: #47466A
+    color: var(--themeColorDark)
     margin-bottom: 16px
 
 .heading
     font-size: 14px
     font-weight: 500
-    color: #47466A
+    color: var(--themeColorDark)
 
 .form-field-text
     padding-top: 8px !important

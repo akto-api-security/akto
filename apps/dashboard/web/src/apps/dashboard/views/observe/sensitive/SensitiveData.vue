@@ -16,7 +16,7 @@
                         <template v-slot:activator='{on, attrs}'>
                             <v-btn 
                                 icon 
-                                color="#47466A" 
+                                color="var(--themeColorDark)" 
                                 @click="refreshPage(false)"
                                 v-on="on"
                                 v-bind="attrs"

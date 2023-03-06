@@ -355,7 +355,7 @@ export default {
   overflow-wrap: anywhere !important
 
 .response-data 
-  color: #47466A99
+  color: var(--themeColorDark2)
   font-size: 14px
   margin: auto
   overflow-y: scroll
@@ -389,7 +389,7 @@ export default {
 
 .steps
     margin-top: 6px
-    color: #47466A
+    color: var(--themeColorDark)
     font-size: 13px
 
 

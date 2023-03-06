@@ -75,7 +75,7 @@ export default {
 
 <style lang="sass" scoped>
 .main
-    background-color: #47466A
+    background-color: var(--themeColorDark)
     
 .details-container
     flex: 1 1 80%

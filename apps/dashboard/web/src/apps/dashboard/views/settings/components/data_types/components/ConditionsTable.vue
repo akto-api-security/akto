@@ -1,7 +1,7 @@
 <template>
     <div style="width: 100%;">
         <div style="padding-bottom: 10px; font-weight: bold; display: inline-block">
-            <span style="color: #47466a">
+            <span style="color: var(--themeColorDark)">
                 {{table_header}}
             </span>
             <v-icon @click="addNewRow" class="addRowIcon">

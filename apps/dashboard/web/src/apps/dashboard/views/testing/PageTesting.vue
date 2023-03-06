@@ -389,12 +389,12 @@ export default {
 <style lang="sass" scoped>
 .heading
     font-size: 16px
-    color: #47466A
+    color: var(--themeColorDark)
     font-weight: 500
 
 .input-value
     padding-right: 8px
-    color: #47466A
+    color: var(--themeColorDark)
 
 </style>
 

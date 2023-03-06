@@ -83,7 +83,7 @@
     @import url('https://fonts.googleapis.com/css?family=Poppins:400,500,600&display=swap');
     .v-application {
         font-family: Poppins, sans-serif !important;
-        color: #2d2434;
+        color: var(--base);
         letter-spacing: unset !important;
     }
 
@@ -124,7 +124,7 @@
     color: var(--themeColor) !important
 
 .active-tab
-    color: #2d2434
+    color: var(--base)
     font-weight: 500
 
 .tabs-container
@@ -156,7 +156,7 @@
 .v-tooltip__content
   font-size: 10px !important
   opacity: 1 !important
-  background-color: #7e7e97
+  background-color: var(--lightGrey)
   border-radius: 2px
   transition: all 0s !important
 
@@ -167,7 +167,7 @@
 .v-tooltip__content:after
   border-left: solid transparent 4px
   border-right: solid transparent 4px
-  border-bottom: solid #7e7e97 4px
+  border-bottom: solid var(--lightGrey) 4px
   top: -4px
   content: " "
   height: 0
@@ -217,7 +217,7 @@
     color: #949597
 
 .white-background
-    background-color: #FFFFFF   
+    background-color: var(--white)   
      
 .fs-12
     font-size: 12px
@@ -226,7 +226,7 @@
     font-size: 14px
 
 .text-primary    
-    color: #47466A
+    color: var(--themeColorDark)
 
 .fw-500   
     font-weight: 500
@@ -235,5 +235,35 @@
 <style lang="css">
     :root{
         --themeColor: #6200EA;
+        --themeColorDark: #47466A ;
+        --themeColorDark2: #47466A99 ;
+        --primary: #126BFF;
+        --secondary: #434761;
+        --secondaryBtn: #4900AF;
+        --errorBtn: #FF5353;
+        --toggleBtn: #ECEDF2;
+        --error: #FF5252;
+        --info: #2196F3;
+        --success: #4CAF50;
+        --warning: #FFC107;
+        --base: #2d2434;
+        --darken1: #63698F;
+        --lighten2: #DADAE1;
+        --lighten1: #D0D2E1;
+        --anchor: #085ce7;
+        --redMetric: #f44336;
+        --greenMetric: #00bfa5;
+        --white: #ffffff;
+        --black: #000000;
+        --lightGrey: #7e7e97 ;
+        --askUs: #4A154B ;
+        --backgroundColor1: #D500F9;
+        --backgroundColor2: #2E006D;
+        --borderColor: #e4e3e5;
+        --colTableBackground:#EDECF0;
+        --quickStartTheme:#6200B0;
+        --white2: #fcfcfd;
+        --teamColor: #304ffe;
+        --teamColor2: #2D243480;
     }
 </style>

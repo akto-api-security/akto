@@ -186,8 +186,8 @@ export default {
 .category-header
   width: 100%
   padding-bottom: 8px
-  color: #47466A
-  border-bottom: 1px solid #47466A
+  color: var(--themeColorDark)
+  border-bottom: 1px solid var(--themeColorDark)
   margin-bottom: 16px
   font-weight: 500
 </style>

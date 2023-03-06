@@ -46,7 +46,7 @@ export default {
   padding-top: 20px
   & span
     font-size: 14px
-    color: #47466A
+    color: var(--themeColorDark)
     margin-left: 4px
 
   & .custom-input
@@ -56,6 +56,6 @@ export default {
 .heading
   font-size: 16px
   font-weight: 500
-  color: #47466A
+  color: var(--themeColorDark)
   padding-top: 20px
 </style>

@@ -350,7 +350,7 @@ export default {
 
 <style lang="sass" scoped>
 .testing-run-results-container
-    color: #47466A !important
+    color: var(--themeColorDark) !important
     
 .testing-run-title
     font-weight: 500 

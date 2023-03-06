@@ -249,7 +249,7 @@ export default {
     font-size: 20px;
     /* identical to box height */
     text-align: left;
-    color: #47466A;
+    color: var(--themeColorDark);
 }
 
 .issue-description {
@@ -260,7 +260,7 @@ export default {
 
 .issue-box {
     height: fit-content;
-    background: #FCFCFD;
+    background: var(--white2);
     border: 1px solid #D6D3DA;
     border-radius: 6px;
 }
