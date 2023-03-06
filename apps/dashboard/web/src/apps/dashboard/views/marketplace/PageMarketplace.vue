@@ -230,9 +230,7 @@ export default {
         let aktoTestTypes = await issuesApi.fetchAllSubCategories()
         this.businessCategories = aktoTestTypes.categories
         this.businessSubCategories = aktoTestTypes.subCategories
-        if(this.$route.path !== "/dashboard/library/default/BOLA"){
-            this.$router.push(this.leftNavItems[0].items[0].link)
-        }
+        this.$router.push(this.leftNavItems[0].items[0].link)        
     },
     computed: {
         ...mapState('marketplace', ['defaultSubcategories', 'userSubcategories', 'loading']),
