@@ -4,7 +4,7 @@
             <div>{{title}}</div>
             <div>{{Object.values(checkedMap).filter(x => x).length}}/{{Object.values(checkedMap).length}}</div>
         </div>
-        <div v-if="!hideOperators" class="d-flex jc-end pr-2" style="background-color: #FFFFFF">
+        <div v-if="!hideOperators" class="d-flex jc-end pr-2" style="background-color: var(--white)">
             <v-btn 
                 v-for="key, index in operators" 
                 plain 
@@ -156,21 +156,21 @@ export default {
     padding: 0px !important
 .item-subtitle
     font-size: 9px
-    color: #47466A99
+    color: var(--themeColorDark2)
 .checkbox-btn
     min-height: 24px !important
-    color: #47466A !important
+    color: var(--themeColorDark) !important
 .filter-list
     height: 350px
     overflow-y: scrollbar
     overflow-x: hidden
 .list-header
-    border-bottom: 1px solid #47466A    
+    border-bottom: 1px solid var(--themeColorDark)    
     font-weight: 500
     display: flex
     justify-content: space-between
     padding: 8px 16px
-    color: #47466A
+    color: var(--themeColorDark)
     background: white
     opacity: 1
     font-size: 14px
@@ -178,7 +178,7 @@ export default {
     text-decoration: underline 
     color: var(--themeColor) !important
 .operator
-    color: #47466A99
+    color: var(--themeColorDark2)
     min-width: unset !important
     padding: 0px 8px !important
 

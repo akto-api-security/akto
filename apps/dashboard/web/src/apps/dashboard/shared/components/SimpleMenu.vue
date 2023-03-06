@@ -42,7 +42,7 @@ export default {
     opacity: 0 !important
   &:hover
     text-decoration: underline      
-    text-decoration-color: #FFFFFF      
+    text-decoration-color: var(--white)      
 .content-nav-drawer
   padding: 4px 0
 
@@ -69,10 +69,10 @@ export default {
     opacity: 0 !important
   &:hover
     text-decoration: underline      
-    text-decoration-color: #FFFFFF      
+    text-decoration-color: var(--white)      
   
 .title-nav-drawer
-  color:  #FFFFFF
+  color:  var(--white)
   margin-left: 0px !important
   font-weight: 400 !important
   font-size: 13px

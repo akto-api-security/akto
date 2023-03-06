@@ -68,10 +68,10 @@
                             Remove Step
                         </v-btn>
                         <div class="float-right ma-2">
-                            <v-btn :disabled="!stepData[apiTabName].testedSuccessfully" class="token-automation-primary-btn" @click="addTab(apiTabName)"  style="background-color:  var(--themeColor) !important; color: #FFFFFF !important">
+                            <v-btn :disabled="!stepData[apiTabName].testedSuccessfully" class="token-automation-primary-btn" @click="addTab(apiTabName)"  style="background-color:  var(--themeColor) !important; color: var(--white) !important">
                                 Add step
                             </v-btn>
-                            <v-btn :disabled="!stepData[apiTabName].showAddStepOption" class="token-automation-primary-btn" @click="toggleShowAuthParams(apiTabName)"  style="background-color:  var(--themeColor) !important; color: #FFFFFF !important">
+                            <v-btn :disabled="!stepData[apiTabName].showAddStepOption" class="token-automation-primary-btn" @click="toggleShowAuthParams(apiTabName)"  style="background-color:  var(--themeColor) !important; color: var(--white) !important">
                                 Extract
                             </v-btn>
                         </div>
@@ -402,14 +402,14 @@ export default {
   right: 0px  
 
 .automation-container
-    background-color: #FFFFFF 
+    background-color: var(--white) 
     height: 550px
     overflow-y: scroll
-    color: #47466A
+    color: var(--themeColorDark)
 
 .token-automation-primary-btn
     background-color: var(--themeColor) !important
-    color: #FFFFFF !important
+    color: var(--white) !important
     margin-left: 12px
 
     &.v-btn--disabled
@@ -424,15 +424,15 @@ export default {
     display: flex
     padding: 0px
     padding-left: 12px
-    color: #47466A !important
-    background-color: #FFFFFF !important
+    color: var(--themeColorDark) !important
+    background-color: var(--white) !important
     padding: 0 6px
     height:50px
     width: 86px
     opacity: 1 !important
     &.true
-        color: #FFFFFF !important
-        background-color: #47466A !important
+        color: var(--white) !important
+        background-color: var(--themeColorDark) !important
     &:hover
         cursor: pointer
     &.v-btn:before

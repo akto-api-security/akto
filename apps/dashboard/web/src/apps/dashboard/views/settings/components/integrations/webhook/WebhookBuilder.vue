@@ -164,7 +164,7 @@ export default {
 .request-title
   padding-top: 12px
   font-size: 14px
-  color: #47466A
+  color: var(--themeColorDark)
   font-family: 'Poppins'
   font-weight: 500
 

@@ -169,7 +169,7 @@ export default {
         display: flex
         padding: 0px
         padding-left: 12px
-        color: #47466A
+        color: var(--themeColorDark)
         &.true
             color: var(--v-redMetric-base)
         &:hover
@@ -186,7 +186,7 @@ export default {
         width: 100%
         height: 48px !important
         margin-bottom: 24px
-        color: #FFFFFF
+        color: var(--white)
 
         &.v-btn--disabled
             opacity: 0.3
@@ -201,7 +201,7 @@ export default {
         width: 100%
         height: 48px !important
         margin-bottom: 24px
-        color: #47466A
+        color: var(--themeColorDark)
 
 
     .form-text
@@ -215,6 +215,6 @@ export default {
 
 <style>
     .v-input, .v-input input, .v-input textarea {
-        color:  #47466a !important
+        color:  var(--themeColorDark) !important
     }
 </style>

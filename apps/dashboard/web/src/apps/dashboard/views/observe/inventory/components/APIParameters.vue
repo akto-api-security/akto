@@ -340,7 +340,7 @@ export default {
 <style lang="sass" scoped>
     .table-title
         font-size: 16px    
-        color: #47466A
+        color: var(--themeColorDark)
         font-weight: 500
         padding-top: 16px
     .v-tooltip__content

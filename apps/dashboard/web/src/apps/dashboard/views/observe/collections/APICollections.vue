@@ -25,7 +25,7 @@
                         >
                         <template v-slot:activator="{ on, attrs }">
                             <v-btn
-                                color="#47466A"
+                                color="var(--themeColorDark)"
                                 icon
                                 dark
                                 v-bind="attrs"
@@ -265,7 +265,7 @@ export default {
 
 <style lang="sass" scoped>
 .default-info
-    color: #47466A
+    color: var(--themeColorDark)
     font-size: 12px
     margin-top: 16px
 
@@ -273,8 +273,8 @@ export default {
 
 <style lang="sass">
 .v-time-picker-clock__item
-    color: #47466A
+    color: var(--themeColorDark)
 
 .v-time-picker-clock__item--active
-    color: #FFFFFF    
+    color: var(--white)    
 </style>

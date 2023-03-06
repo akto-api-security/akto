@@ -41,7 +41,7 @@ export default {
   min-height: 30px !important;
   height: 30px;
   max-height: 30px;
-  color: #FFFFFF;
+  color: var(--white);
 }
 
 .form-field-menu >>> .v-text-field__details {

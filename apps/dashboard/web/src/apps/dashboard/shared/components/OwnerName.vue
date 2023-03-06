@@ -49,7 +49,7 @@ export default {
 .action-item-owner
   font-size: 16px
   font-weight: 400
-  color: #47466A
+  color: var(--themeColorDark)
 
 .initials
   cursor: default

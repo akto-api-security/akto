@@ -314,7 +314,7 @@ export default {
         margin-top: 6px
         &.inactive
             color: #475467
-            background-color: #FCFCFD
+            background-color: var(--white2)
         &.true
             color: #12B76A
             background-color: #E8FFF4
@@ -324,7 +324,7 @@ export default {
         &:hover
             cursor: pointer
         &.v-btn:before
-            background-color: #FFFFFF
+            background-color: var(--white)
 
     .save-btn
         background-color: var(--themeColor) !important
@@ -337,7 +337,7 @@ export default {
         width: 100%
         height: 48px !important
         margin-bottom: 24px
-        color: #FFFFFF
+        color: var(--white)
 
         &.v-btn--disabled
             opacity: 0.3
@@ -352,7 +352,7 @@ export default {
         width: 100%
         height: 48px !important
         margin-bottom: 24px
-        color: #47466A
+        color: var(--themeColorDark)
 
 
     .form-text
@@ -366,6 +366,6 @@ export default {
 
 <style>
     .v-input, .v-input input, .v-input textarea {
-        color:  #47466a !important
+        color:  var(--themeColorDark) !important
     }
 </style>

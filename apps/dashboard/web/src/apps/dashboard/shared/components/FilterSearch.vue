@@ -3,7 +3,7 @@
         <div class="list-header">
             <div>{{title}}</div>
         </div>
-        <div v-if="!hideOperators" class="d-flex jc-end pr-2" style="background-color: #FFFFFF">
+        <div v-if="!hideOperators" class="d-flex jc-end pr-2" style="background-color: var(--white)">
             <v-btn 
                 v-for="key, index in operators" 
                 plain 
@@ -33,7 +33,7 @@
                 :ripple="false" 
                 @click=applyClicked
             >
-                <div style="color: #FFFFFF">Apply</div>
+                <div style="color: var(--white)">Apply</div>
             </v-btn>
         </div>
 
@@ -71,15 +71,15 @@ export default {
 
 <style lang="sass" scoped>
 .filter-container
-    background-color: #FFFFFF
+    background-color: var(--white)
     width: 250px
 .list-header
-    border-bottom: 1px solid #47466A    
+    border-bottom: 1px solid var(--themeColorDark)    
     font-weight: 500
     display: flex
     justify-content: space-between
     padding: 8px 16px
-    color: #47466A
+    color: var(--themeColorDark)
     background: white
     opacity: 1
     font-size: 14px
@@ -87,7 +87,7 @@ export default {
     text-decoration: underline 
     color: var(--themeColor) !important
 .operator
-    color: #47466A99
+    color: var(--themeColorDark2)
     min-width: unset !important
     padding: 0px 8px !important
 

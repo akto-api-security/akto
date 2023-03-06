@@ -86,11 +86,11 @@ export default {
 
 <style lang="sass" scoped>
 .container
-    background: #FFFFFF
+    background: var(--white)
 
 .info-text
     padding-top: 12px
     font-size: 12px
-    color: #47466A
+    color: var(--themeColorDark)
 
 </style>

@@ -69,7 +69,7 @@ export default {
 
 .count-title
   font-size: 11px
-  color: #2d2434
+  color: var(--base)
   margin: auto
 
 </style>

@@ -374,7 +374,7 @@ export default {
     width: fit-content;
     height: 40px;
 
-    background: #FFFFFF;
+    background: var(--white);
     border: 1px solid #D0D5DD;
 
     font-weight: 500;

@@ -287,7 +287,7 @@ export default Vue.extend({
 .key-class {
     text-decoration-line: underline;
     text-decoration-style: wavy;
-    text-decoration-color: #f44336;
+    text-decoration-color: var(--redMetric);
 }
 
 .sensitive-hightlight-class {

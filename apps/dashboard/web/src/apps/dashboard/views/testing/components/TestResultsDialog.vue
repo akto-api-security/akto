@@ -39,7 +39,7 @@
                                             </v-col>
                                             <v-col class="my-0 mr-0 ml-7 pa-0">
                                                 <v-chip :style="{ 'height': '24px !important' }" color="#47466AB2"
-                                                    class="issue-summary mr-2" text-color="#FFFFFF" :key="index"
+                                                    class="issue-summary mr-2" text-color="var(--white)" :key="index"
                                                     v-for="(chipItem, index) in subCatogoryMap[issuesDetails.id.testSubCategory].issueTags">
                                                     {{ chipItem.name }}
                                                 </v-chip>
@@ -109,7 +109,7 @@
                                     <span class="description-title mt-4">
                                         Test response matches {{ percentageMatch }}% with original API response
 
-                                        <v-chip v-if="isVulnerableAttempt" :style="{ 'height': '18px !important' }" class="ml-2 mr-2" color="rgba(255, 0, 0, 0.5)" text-color="#FFFFFF">
+                                        <v-chip v-if="isVulnerableAttempt" :style="{ 'height': '18px !important' }" class="ml-2 mr-2" color="rgba(255, 0, 0, 0.5)" text-color="var(--white)">
                                             Vulnerable Attempt
                                         </v-chip>
                                     </span>
@@ -287,7 +287,7 @@ export default {
 
 .table-column
   padding: 4px 8px !important
-  color: #47466A
+  color: var(--themeColorDark)
 
 .table-row
   position: relative
@@ -295,31 +295,31 @@ export default {
   line-height: 32px
 
   &:hover
-      background-color: #edecf0 !important
+      background-color: var(--colTableBackground) !important
 </style>
 
 <style scoped>
 .description-title {
     font-size: 14px !important;
     font-weight: 500;
-    color: #47466A;
+    color: var(--themeColorDark);
 }
 
 .description-content {
     font-size: 12px !important;
     font-weight: 400;
-    color: #47466A;
+    color: var(--themeColorDark);
 }
 
 .issue-summary {
     font-size: 12px !important;
     font-weight: 500;
-    color: #47466A;
+    color: var(--themeColorDark);
 }
 
 .issue-summary-border {
     border-width: 1px 0px;
-    border-color: #DADAE1;
+    border-color: var(--lighten2);
     border-style: solid;
 }
 </style>

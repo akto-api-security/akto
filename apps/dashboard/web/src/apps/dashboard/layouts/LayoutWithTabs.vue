@@ -25,7 +25,7 @@
                             <v-tab class="right-pane-tab" v-for="tab in tabs" :key="tab">
                                 {{tab}}
                                 <v-chip v-if="tabsContent && tabsContent[tab]" :style="{ 'height': '18px !important' }"
-                                 class="ml-2 mr-2" color="#47466AB2" text-color="#FFFFFF">
+                                 class="ml-2 mr-2" color="#47466AB2" text-color="var(--white)">
                                         {{ tabsContent[tab] }}
                                 </v-chip>
                             </v-tab>
@@ -87,12 +87,12 @@
 .board-name
     font-weight: 600
     font-size: 24px
-    color: #47466A
+    color: var(--themeColorDark)
 
 .board-description
     font-weight: 500
     font-size: 13px
-    color: #47466A
+    color: var(--themeColorDark)
     opacity: 0.7
     padding-top: 4px
 
@@ -103,7 +103,7 @@
     margin: 0 16px 0 0
     font-weight: 400
     font-size: 13px
-    color: #2d2434
+    color: var(--base)
     opacity: 0.5
 
     &.active-tab

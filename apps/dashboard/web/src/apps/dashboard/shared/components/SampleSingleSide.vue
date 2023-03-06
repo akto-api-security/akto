@@ -207,11 +207,11 @@ export default {
         &-key
             font-weight: 500  
         &-val
-            color: #47466A99
+            color: var(--themeColorDark2)
       
     &-message
         padding-top: 16px   
-        color: #47466A99 
+        color: var(--themeColorDark2) 
         overflow-wrap: anywhere
 
 </style>
@@ -219,7 +219,7 @@ export default {
 
 <style lang="scss">
 .wrapper .value-key {
-  color: #47466A99;
+  color: var(--themeColorDark2);
   padding: 1px 5px 2px 10px;
 }
 

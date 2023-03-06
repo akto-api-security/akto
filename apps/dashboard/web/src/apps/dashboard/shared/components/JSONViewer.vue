@@ -55,11 +55,11 @@ export default {
 
 .properties
     opacity: 1.0 !important 
-    color: #f44336
+    color: var(--redMetric)
 
 .v-file-input__text
     font-size: 13px
-    color: #47466A
+    color: var(--themeColorDark)
 
 
 </style>

@@ -133,26 +133,26 @@ export default {
 <style scoped lang="sass">
 .brand-logo
   height:  48px
-  color: #FFFFFF
+  color: var(--white)
 
 .brand-name
   font-size: 48px
-  color: #FFFFFF
+  color: var(--white)
   font-size: 48px
   vertical-align: super
   padding-left: 5px
 
 .akto-background
-  background: linear-gradient(180deg, #D500F9 -7.13%, var(--themeColor) 16.86%, #2E006D 64.29%)
+  background: linear-gradient(180deg, var(--backgroundColor1) -7.13%, var(--themeColor) 16.86%, var(--backgroundColor2) 64.29%)
   height: 100%
   text-align: center
 
 .signup-container
-  background: #FFFFFF
+  background: var(--white)
   box-shadow: 0px 8px 12px rgba(0, 0, 0, 0.25)
   border-radius: 8px
   padding: 32px
-  color: #47466A
+  color: var(--themeColorDark)
   width: 450px
   margin: auto
 

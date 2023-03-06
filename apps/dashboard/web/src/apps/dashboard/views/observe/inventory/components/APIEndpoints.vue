@@ -7,7 +7,7 @@
                         <template v-slot:activator='{on, attrs}'>
                             <v-btn 
                                 icon 
-                                color="#47466A" 
+                                color="var(--themeColorDark)" 
                                 @click="refreshPage(false)"
                                 v-on="on"
                                 v-bind="attrs"
@@ -45,7 +45,7 @@
                         <div style="align-items: center; display: flex;">
                             <v-tooltip>
                                 <template v-slot:activator='{ on, attrs }'>
-                                    <v-btn icon primary dark color="#47466A" @click="showScheduleDialog(filteredItems)">
+                                    <v-btn icon primary dark color="var(--themeColorDark)" @click="showScheduleDialog(filteredItems)">
                                         <v-icon>$fas_play</v-icon>
                                     </v-btn>
                                 </template>

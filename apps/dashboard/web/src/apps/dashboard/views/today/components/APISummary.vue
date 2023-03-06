@@ -158,7 +158,7 @@
 
 <style scoped lang="sass">
 .heading-key
-    color: #47466a
+    color: var(--themeColorDark)
     font-weight: 600
     font-size: 13px
 
@@ -171,7 +171,7 @@
 .testing-setup-btn
     background-color: var(--themeColor)EA !important
     & .info-text
-        color: #FFFFFF
+        color: var(--white)
 
 .height-1
     height: 200px    

@@ -81,12 +81,12 @@ import { mapState } from 'vuex'
 .dialog-title
     font-weight: 600
     font-size: 24px
-    color: #47466A
+    color: var(--themeColorDark)
 
 .dialog-subtitle
     font-weight: 600
     font-size: 16px
-    color: #47466A
+    color: var(--themeColorDark)
     opacity: 0.5
 
 
