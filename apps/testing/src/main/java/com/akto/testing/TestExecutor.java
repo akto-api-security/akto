@@ -17,6 +17,7 @@ import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.*;
+import com.akto.rules.SSRFOnAwsMetadataEndpoint;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.testing_issues.TestingIssuesHandler;
@@ -537,6 +538,7 @@ public class TestExecutor {
         BFLATest bflaTest = new BFLATest();//BFLA
         PageSizeDosTest pageSizeDosTest = new PageSizeDosTest(testRunId.toHexString(), testRunResultSummaryId.toHexString());//PAGE_SIZE_DOS
         OpenRedirectTest openRedirectTest = new OpenRedirectTest(testRunId.toHexString(), testRunResultSummaryId.toHexString());
+        SSRFOnAwsMetadataEndpoint ssrfOnAwsMetadataEndpoint = new SSRFOnAwsMetadataEndpoint(testRunId.toHexString(), testRunResultSummaryId.toHexString());
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
 
@@ -612,6 +614,12 @@ public class TestExecutor {
         if (testSubCategories == null || testSubCategories.contains(TestSubCategory.OPEN_REDIRECT.name())) {
             TestingRunResult openRedirectResult = runTest(openRedirectTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
             if (openRedirectResult != null) testingRunResults.add(openRedirectResult);
+        }
+
+        if (testSubCategories == null || testSubCategories.contains(TestSubCategory.SSRF_AWS_METADATA_EXPOSED.name())) {
+            TestingRunResult ssrfAwsMetadataExposedResult = runTest(ssrfOnAwsMetadataEndpoint, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            if (ssrfAwsMetadataExposedResult != null)
+                testingRunResults.add(ssrfAwsMetadataExposedResult);
         }
 
         return testingRunResults;
