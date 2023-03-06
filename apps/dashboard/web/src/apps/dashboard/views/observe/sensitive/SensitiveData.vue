@@ -210,10 +210,10 @@ export default {
     },
     methods: {
         async fetchRecentParamsForRequest(sortKey, sortOrder, skip, limit, filters, filterOperators) {
-            return await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, this.startTimestamp, this.endTimestamp, true, true)
+            return await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, 0, this.endTimestamp, true, true)
         },
         async fetchRecentParamsForResponse(sortKey, sortOrder, skip, limit, filters, filterOperators) {
-            return await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, this.startTimestamp, this.endTimestamp, true, false)
+            return await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, 0, this.endTimestamp, true, false)
         },
         ignoreForThisAPI(item) {
             this.ignoredCollection = item.name
