@@ -4,12 +4,21 @@ import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.graphql.GraphQLUtils;
+import com.akto.grpc.ProtoBufUtils;
 import com.akto.har.HAR;
 import com.google.gson.Gson;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.CodedInputStream;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.WireFormat;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.junit.Assert;
 import org.junit.Test;
+import org.mortbay.util.ajax.JSON;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
@@ -30,6 +39,37 @@ public class TestGraphQLUtils{
             Assert.assertTrue(responseParams.getRequestParams().url.contains("graphql") != list.isEmpty());
         }
     }
+
+    @Test
+    public void testGRPC () throws IOException {
+
+        String[] arrays = new String[] {
+                "AAAAAAwIARDABxoFL3Rlc3Q=",
+                "AAAAAAcKBVdvcmxk",
+                "AAAAAA4KDEhlbGxvISBXb3JsZA==",
+                "gAAAACBncnBjLXN0YXR1czowDQpncnBjLW1lc3NhZ2U6T0sNCg=="
+        };
+
+        for (String str : arrays) {
+            byte[] arr = Base64.getDecoder().decode(str);
+            byte[] arr2 = new byte[arr.length - 5];
+            for (int i = 5; i < arr.length; i++ ) {
+                arr2[i - 5] = arr[i];
+            }
+
+            try {
+                String str4 = ProtoBufUtils.getInstance().decodeProto(arr2, true);
+                System.out.println(str4);
+
+                Object obj = JSON.parse(str4);
+                System.out.println(obj.toString());
+            }catch (Exception e) {
+                e.printStackTrace();
+            }
+
+        }
+    }
+
 
     private static HttpResponseParams parseKafkaMessage(String message) throws Exception {
 
