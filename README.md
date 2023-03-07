@@ -1,4 +1,28 @@
-<img src="https://img.shields.io/github/commit-activity/m/akto-api-security/akto?label=commits&logo=github"/>  <img src="https://img.shields.io/github/release-date/akto-api-security/akto?label=latest%20release&logo=docker"/>  <img src="https://img.shields.io/discord/1070706429402562733?logo=Discord"/>  <img src="https://img.shields.io/docker/image-size/aktosecurity/akto-api-security-dashboard?logo=docker"/>  <img src="https://img.shields.io/github/issues/akto-api-security/akto/hackfest?logo=github"/>  <img src="https://img.shields.io/docker/pulls/aktosecurity/akto-api-security-dashboard?logo=docker"/>
+<a href="https://github.com/akto-api-security/akto/commits/master" _target="blank">
+  <img src="https://img.shields.io/github/commit-activity/m/akto-api-security/akto?label=commits&logo=github"/>
+</a>  
+
+<a href="https://github.com/akto-api-security/akto/releases" _target="blank">
+  <img src="https://img.shields.io/github/release-date/akto-api-security/akto?label=latest%20release&logo=docker"/>
+</a>
+
+<a href="https://discord.gg/Wpc6xVME4s" _target="blank">
+  <img src="https://img.shields.io/discord/1070706429402562733?logo=Discord"/>
+</a>
+
+<a href="https://hub.docker.com/r/aktosecurity/akto-api-security-dashboard/tags?page=1&name=local" _target="blank">
+  <img src="https://img.shields.io/docker/image-size/aktosecurity/akto-api-security-dashboard?logo=docker"/>
+</a>
+
+<a href="https://github.com/akto-api-security/akto/issues?q=label%3Ahackfest" _target="blank">
+  <img src="https://img.shields.io/github/issues/akto-api-security/akto/hackfest?logo=github"/>
+</a>
+
+<a href="https://hub.docker.com/r/aktosecurity/akto-api-security-dashboard" _target="blank">
+  <img src="https://img.shields.io/docker/pulls/aktosecurity/akto-api-security-dashboard?logo=docker"/>
+</a>
+
+
 # Akto.io API Security
 
 # What is Akto?
