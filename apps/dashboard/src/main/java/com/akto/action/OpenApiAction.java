@@ -37,7 +37,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
             if (apiCollection == null) return ERROR.toUpperCase();
             String host =  apiCollection.getHostName();
 
-            int limit = 500;
+            int limit = 200;
             List<SampleData> sampleDataList = SampleDataDao.instance.fetchSampleDataPaginated(
                     apiCollectionId, lastFetchedUrl, lastFetchedMethod, limit, 1
             );
