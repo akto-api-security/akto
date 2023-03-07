@@ -1,6 +1,7 @@
 package com.akto.dto;
 
 import com.akto.dto.type.RequestTemplate;
+import com.akto.util.grpc.ProtoBufUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
@@ -11,6 +12,8 @@ import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.util.*;
+
+import static com.akto.util.grpc.ProtoBufUtils.RAW_QUERY;
 
 public class OriginalHttpRequest {
 
@@ -67,6 +70,7 @@ public class OriginalHttpRequest {
 
     public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
     public static final String JSON_CONTENT_TYPE = "application/json";
+    public static final String GRPC_CONTENT_TYPE = "application/grpc";
 
     public static String rawToJsonString(String rawRequest, Map<String,List<String>> requestHeaders) {
         rawRequest = rawRequest.trim();
@@ -75,10 +79,23 @@ public class OriginalHttpRequest {
             // only if request payload is of FORM_URL_ENCODED_CONTENT_TYPE we convert it to json
             if (acceptableContentType.equals(FORM_URL_ENCODED_CONTENT_TYPE)) {
                 return convertFormUrlEncodedToJson(rawRequest);
+            } else if (acceptableContentType.equals(GRPC_CONTENT_TYPE)) {
+                return convertGRPCEncodedToJson(rawRequest);
             }
         }
 
         return rawRequest;
+    }
+
+    private static String convertGRPCEncodedToJson(String rawRequest) {
+        byte[] decodedByteArray = Base64.getDecoder().decode(rawRequest);
+        HashMap<Object, Object> map = ProtoBufUtils.getInstance().decodeProto(decodedByteArray);
+        map.put(RAW_QUERY, rawRequest);
+        try {
+            return mapper.writeValueAsString(map);
+        } catch (Exception e) {
+            return rawRequest;
+        }
     }
 
     public boolean isJsonRequest() {
