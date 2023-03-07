@@ -256,7 +256,13 @@ public class InitializerListener implements ServletContextListener {
 
                     if (!dt.getBoolean("active", true)) {
                         PIISourceDao.instance.updateOne(findQ, Updates.unset("mapNameToPIIType." + piiKey));
-                        CustomDataTypeDao.instance.updateOne("name", piiKey, Updates.set("active", false));
+                        CustomDataType existingCDT = CustomDataTypeDao.instance.findOne("name", piiKey);
+                        if (existingCDT == null) {
+                            CustomDataTypeDao.instance.insertOne(getCustomDataTypeFromPiiType(piiSource, piiType, false));
+                            continue;
+                        } else {
+                            CustomDataTypeDao.instance.updateOne("name", piiKey, Updates.set("active", false));
+                        }
                     }
 
                     if (currTypes.containsKey(piiKey) && currTypes.get(piiKey).equals(piiType)) {
@@ -795,6 +801,13 @@ public class InitializerListener implements ServletContextListener {
                 PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
                 piiSource.setId("A");
 
+                PIISourceDao.instance.insertOne(piiSource);
+            }
+
+            if (PIISourceDao.instance.findOne("_id", "Fin") == null) {
+                String fileUrl = "https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/fintech.json";
+                PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
+                piiSource.setId("Fin");
                 PIISourceDao.instance.insertOne(piiSource);
             }
 
