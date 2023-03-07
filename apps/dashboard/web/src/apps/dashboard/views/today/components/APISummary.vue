@@ -7,7 +7,7 @@
                     title="Data errors" 
                     icon="$fas_clipboard-list" 
                     :subtitle="getAuditTs(auditId)"
-                    color="rgba(246, 190, 79)"
+                    color="var(--rgbaColor5)"
                 >        
                     <div class="height-1">
                         <div><span>{{getCriticalDataErrors()}}</span> <span>critical</span> </div>
@@ -33,7 +33,7 @@
                     title="Test report" 
                     icon="$fas_stethoscope" 
                     :subtitle="testDetails ? getAuditTs(testDetails.id) : ''"
-                    color="rgba(33, 150, 243)"
+                    color="var(--rgbaColor6)"
                 >        
                     <div class="height-1">
                         <div v-if="testDetails && testDetails.attempts">
@@ -163,7 +163,7 @@
     font-size: 13px
 
 .heading-value
-    color: rgba(71, 70, 106, 0.75)
+    color: var(--appBorder3)
     font-weight: 500
     font-size: 13px   
     margin-bottom: 24px 

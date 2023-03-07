@@ -22,7 +22,7 @@
                 title="New Endpoints"
                 :data="newEndpointsTrend"
                 :defaultChartOptions="{legend:{enabled: false}}"
-                background-color="rgba(0,0,0,0.0)"
+                background-color="var(--transparent)"
                 :text="true"
                 :input-metrics="[{data: newParamsTrend, name: 'New Parameters'}]"
                 class="pa-5"

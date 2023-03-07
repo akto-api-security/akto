@@ -251,7 +251,7 @@
         .table-parent-header
             font-weight: 700
             font-size: 13px
-            color: rgba(71, 70, 106, 0.75)
+            color: var(--appBorder3)
             padding-bottom: 6px
 
         .table-sub-header
@@ -276,7 +276,7 @@
             padding: 8px 16px !important
             z-index: 1
             border: 1px solid var(--white) !important
-            background: rgba(71, 70, 106, 0.03)
+            background: var(--appBorder2)
             color: var(--themeColorDark)
             &:nth-child(1)
                 left: 0px

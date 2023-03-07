@@ -71,7 +71,7 @@
   font-size: 13px
   font-weight: 500
   padding-bottom: 4px
-  color: rgb(71, 70, 106, 0.7)
+  color: var(--pageSubtitle)
 
 
 .akto-panes
