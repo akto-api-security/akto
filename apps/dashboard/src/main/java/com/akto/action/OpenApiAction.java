@@ -27,20 +27,33 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
     private int apiCollectionId;
     private String openAPIString = null;
     private boolean includeHeaders = true;
+
+    private String lastFetchedUrl;
+    private String lastFetchedMethod;
     @Override
     public String execute() {
         try {
-            
-            List<SampleData> sampleData = SampleDataDao.instance.findAll(
-                Filters.eq("_id.apiCollectionId", apiCollectionId)
-            );
             ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("_id", apiCollectionId);
-            if (apiCollection == null) {
-                return ERROR.toUpperCase();
-            }
+            if (apiCollection == null) return ERROR.toUpperCase();
             String host =  apiCollection.getHostName();
+
+            int limit = 500;
+            List<SampleData> sampleDataList = SampleDataDao.instance.fetchSampleDataPaginated(
+                    apiCollectionId, lastFetchedUrl, lastFetchedMethod, limit, 1
+            );
+
+            int size = sampleDataList.size();
+            if (size < limit) {
+                lastFetchedUrl = null;
+                lastFetchedMethod = null;
+            } else {
+                SampleData last = sampleDataList.get(size-1);
+                lastFetchedUrl = last.getId().getUrl();
+                lastFetchedMethod = last.getId().getMethod().name();
+            }
+
             SampleDataToSTI sampleDataToSTI = new SampleDataToSTI();
-            sampleDataToSTI.setSampleDataToSTI(sampleData);
+            sampleDataToSTI.setSampleDataToSTI(sampleDataList);
             Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList = sampleDataToSTI.getSingleTypeInfoMap();
             OpenAPI openAPI = Main.init(apiCollection.getDisplayName(),stiList, includeHeaders, host);
             openAPIString = Main.convertOpenApiToJSON(openAPI);
@@ -83,5 +96,21 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
 
     public void setIncludeHeaders(boolean includeHeaders) {
         this.includeHeaders = includeHeaders;
+    }
+
+    public String getLastFetchedUrl() {
+        return lastFetchedUrl;
+    }
+
+    public void setLastFetchedUrl(String lastFetchedUrl) {
+        this.lastFetchedUrl = lastFetchedUrl;
+    }
+
+    public String getLastFetchedMethod() {
+        return lastFetchedMethod;
+    }
+
+    public void setLastFetchedMethod(String lastFetchedMethod) {
+        this.lastFetchedMethod = lastFetchedMethod;
     }
 }

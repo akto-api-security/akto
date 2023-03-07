@@ -38,7 +38,7 @@ public class TestSampleDataDao extends MongoBasedTest {
 
 
         sampleDataList = SampleDataDao.instance.fetchSampleDataPaginated(
-                123, null, null, limit
+                123, null, null, limit, 1
         );
 
         int lastIdx = sampleDataList.size()-1;
@@ -53,7 +53,7 @@ public class TestSampleDataDao extends MongoBasedTest {
 
         // continue
         sampleDataList = SampleDataDao.instance.fetchSampleDataPaginated(
-                123, lastSampleData.getId().getUrl(), lastSampleData.getId().getMethod().name(), limit
+                123, lastSampleData.getId().getUrl(), lastSampleData.getId().getMethod().name(), limit, 1
         );
 
         lastIdx = sampleDataList.size()-1;
