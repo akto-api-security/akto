@@ -365,7 +365,7 @@ export default {
         refreshPage(hardRefresh) {
             if (hardRefresh || ((new Date() / 1000) - this.lastFetched > 60*5)) {
                 this.$store.dispatch('changes/fetchDataTypeNames')
-                api.fetchSubTypeCountMap(this.startTimestamp, this.endTimestamp).then((resp)=> {
+                api.fetchSubTypeCountMap(0, this.endTimestamp).then((resp)=> {
                     this.subTypeCountMap = resp.response.subTypeCountMap
                 })
             }
