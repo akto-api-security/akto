@@ -1,18 +1,17 @@
 package com.akto.dao;
 
 import com.akto.dao.context.Context;
-import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 public class SampleDataDao extends AccountsContextDao<SampleData> {
 
@@ -62,7 +61,7 @@ public class SampleDataDao extends AccountsContextDao<SampleData> {
     }
 
     public List<SampleData> fetchSampleDataPaginated(int apiCollectionId, String lastFetchedUrl,
-                                                     String lastFetchedMethod, int limit) {
+                                                     String lastFetchedMethod, int limit, int sliceLimit) {
         List<Bson> filters = new ArrayList<>();
         filters.add(Filters.eq("_id.apiCollectionId", apiCollectionId));
 
@@ -81,10 +80,25 @@ public class SampleDataDao extends AccountsContextDao<SampleData> {
 
         Bson sort = Sorts.ascending("_id.url", "_id.method");
 
+        MongoCursor<SampleData> cursor = SampleDataDao.instance.getMCollection()
+                .find(Filters.and(filters))
+                .projection(Projections.slice("samples", sliceLimit))
+                .skip(0)
+                .limit(limit)
+                .sort(sort)
+                .cursor();
 
-        return SampleDataDao.instance.findAll(
-                Filters.and(filters), 0, limit, sort
-        );
+        List<SampleData> sampleDataList = new ArrayList<>();
+
+        while (cursor.hasNext()) {
+            SampleData sampleData = cursor.next();
+            sampleDataList.add(sampleData);
+        }
+
+        cursor.close();
+
+        return sampleDataList;
     }
+
 
 }
