@@ -119,8 +119,16 @@ export default {
             newRouteObject.disabled = true
             return newRouteObject
         },
-        selectedItem (event) {
-            this.$router.push(this.getRouteObject(event).to)
+        selectedItem (event,onNewPage) {
+            if(!onNewPage){
+                this.$router.push(this.getRouteObject(event).to)
+            }else{
+                if(event.type === 1){
+                    window.open(`${this.$route.path}` + '/' + `${event.apiCollectionId}`)
+                }else if(event.type === 2){
+                    window.open(`${this.$route.path}` + '/' + `${btoa(event.urlAndMethod)}`)
+                }
+            }
         }
     },
     created () {

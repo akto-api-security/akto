@@ -135,7 +135,7 @@
                             v-for="(header, index) in headers.slice(1)"
                             :key="index"
                             class="table-column clickable"
-                            @click="$emit('rowClicked', item)"
+                            @click="$emit('rowClicked', item, $event.ctrlKey)"
                         >
                             <slot :name="[`item.${header.value}`]" :item="item">
                                 <div class="table-entry">{{item[header.value]}}</div>
