@@ -45,7 +45,7 @@ public class ExportSampleDataAction extends UserAction {
 
         int apiCollectionId = apiCollection.getId();
 
-        List<SampleData> sampleDataList = SampleDataDao.instance.fetchSampleDataPaginated(apiCollectionId, lastUrlFetched, lastMethodFetched, limit);
+        List<SampleData> sampleDataList = SampleDataDao.instance.fetchSampleDataPaginated(apiCollectionId, lastUrlFetched, lastMethodFetched, limit, 1);
 
         lastMethodFetched = null;
         lastUrlFetched = null;
