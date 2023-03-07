@@ -19,7 +19,7 @@
                 title="Test results"
                 :data="testResultsChartData()"
                 :defaultChartOptions="{legend:{enabled: false}}"
-                background-color="rgba(0,0,0,0.0)"
+                background-color="var(--transparent)"
                 :text="true"
                 class="pa-5"
                 @dateClicked=dateClicked
@@ -61,7 +61,7 @@
                 <div class="details-dialog">
                     <a-card
                         title="Test details"
-                        color="rgba(33, 150, 243)"
+                        color="var(--rgbaColor6)"
                         subtitle=""
                         icon="$fas_stethoscope"
                     >

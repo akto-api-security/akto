@@ -1,6 +1,6 @@
 <template>
     <div class="data-types-container d-flex">
-        <a-card :title="title" color="rgba(33, 150, 243)" style="min-height: 600px; flex: 1 1 20%"
+        <a-card :title="title" color="var(--rgbaColor6)" style="min-height: 600px; flex: 1 1 20%"
             icon_right="$fas_plus" icon_right_color="var(--themeColor)" @icon_right_clicked="openCreateRoleDialog">
             <div v-for="(testRole, index) in testRoles" :key="index">
                 <test-role-card :item="testRole" @selectedEntry="entryUpdated" />

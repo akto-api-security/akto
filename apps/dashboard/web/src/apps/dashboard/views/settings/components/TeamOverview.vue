@@ -3,7 +3,7 @@
         <div v-if="isLocalDeploy">
             <banner-vertical class="ma-3"></banner-vertical>
         </div>
-        <a-card title="Members" icon="$fas_users" color="rgba(33, 150, 243)">
+        <a-card title="Members" icon="$fas_users" color="var(--rgbaColor6)">
             <div v-if="isAdmin && !isLocalDeploy" class="email-invite-container">
                 <v-combobox
                     v-model="allEmails"

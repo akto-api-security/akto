@@ -136,19 +136,19 @@
     padding: 0
 
 .brda
-  border: 1px solid rgba(71, 70, 106, 0.2) !important
+  border: 1px solid var(--appBorder) !important
 
 .brdb
-  border-bottom: 1px solid rgba(71, 70, 106, 0.2) !important
+  border-bottom: 1px solid var(--appBorder) !important
 
 .brdt
-  border-top: 1px solid rgba(71, 70, 106, 0.2) !important
+  border-top: 1px solid var(--appBorder) !important
 
 .brdl
-  border-left: 1px solid rgba(71, 70, 106, 0.2) !important
+  border-left: 1px solid var(--appBorder) !important
 
 .brdr
-  border-right: 1px solid rgba(71, 70, 106, 0.2) !important
+  border-right: 1px solid var(--appBorder) !important
 
 .highcharts-credits
   display: none
@@ -265,5 +265,12 @@
         --white2: #fcfcfd;
         --teamColor: #304ffe;
         --teamColor2: #2D243480;
+        --appBorder: rgba(71, 70, 106, 0.2) ;
+        --pageSubtitle: rgb(71, 70, 106, 0.7);
+        --appBorder2: rgba(71, 70, 106, 0.03);
+        --appBorder3: rgba(71, 70, 106, 0.75) ;
+        --rgbaColor5: rgba(246, 190, 79);
+        --rgbaColor6: rgba(33, 150, 243);
+        --transparent: rgba(0,0,0,0.0);
     }
 </style>

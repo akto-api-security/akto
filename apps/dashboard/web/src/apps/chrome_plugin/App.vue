@@ -198,7 +198,7 @@
     padding: 0
 
 .brdb
-  border-bottom: 1px solid rgba(71, 70, 106, 0.2) !important
+  border-bottom: 1px solid var(--appBorder) !important
 
 .highcharts-credits
   display: none

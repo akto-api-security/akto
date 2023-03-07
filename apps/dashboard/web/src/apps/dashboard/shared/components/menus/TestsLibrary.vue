@@ -75,7 +75,7 @@ export default {
 <style lang="sass" scoped>
 .menu-item
     padding-left: 24px !important
-    background: rgba(71, 70, 106, 0.03)
+    background: var(--appBorder2)
     border-radius: 0px !important
     margin-bottom: 0px !important
     color: var(--themeColorDark) !important
@@ -96,7 +96,7 @@ export default {
         border-radius: 0px !important
 
 .menu-item-active
-    background: rgba(71, 70, 106, 0.7) !important
+    background: var(--pageSubtitle) !important
     color: var(--white) !important
 
 .category-content

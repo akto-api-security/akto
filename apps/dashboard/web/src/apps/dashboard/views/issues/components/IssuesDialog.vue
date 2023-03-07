@@ -1,7 +1,7 @@
 <template>
     <v-dialog v-model="dialogBoxVariable">
         <div class="details-dialog">
-            <a-card title="Issue details" color="rgba(33, 150, 243)" subtitle="" icon="$fas_stethoscope">
+            <a-card title="Issue details" color="var(--rgbaColor6)" subtitle="" icon="$fas_stethoscope">
                 <template #title-bar>
                     <v-btn plain icon @click="closeDialogBox()" style="margin-left: auto">
                         <v-icon>$fas_times</v-icon>

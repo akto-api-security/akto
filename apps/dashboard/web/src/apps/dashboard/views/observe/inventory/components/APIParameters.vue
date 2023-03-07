@@ -19,7 +19,7 @@
                         title="Traffic"
                         :data="trafficTrend"
                         :defaultChartOptions="{legend:{enabled: false}}"
-                        background-color="rgba(0,0,0,0.0)"
+                        background-color="var(--transparent)"
                         :text="true"
                         :input-metrics="[]"
                         class="pa-5"

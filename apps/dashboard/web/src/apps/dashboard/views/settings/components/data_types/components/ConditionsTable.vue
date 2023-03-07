@@ -131,7 +131,7 @@ export default {
     width: 100%
     border-style: solid
     padding: 16px
-    border-color: rgba(71,70,106,0.2)
+    border-color: var(--appBorder)
     border-top-width: 0.5px
     border-bottom-width: 1px
     border-left-width: 1px
