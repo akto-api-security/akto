@@ -1,3 +1,4 @@
+<img src="https://img.shields.io/github/commit-activity/m/akto-api-security/akto?label=commits&logo=github"/>  <img src="https://img.shields.io/github/release-date/akto-api-security/akto?label=latest%20release&logo=docker"/>  <img src="https://img.shields.io/discord/1070706429402562733?logo=Discord"/>  <img src="https://img.shields.io/docker/image-size/aktosecurity/akto-api-security-dashboard?logo=docker"/>  <img src="https://img.shields.io/github/issues/akto-api-security/akto/hackfest?logo=github"/>  <img src="https://img.shields.io/docker/pulls/aktosecurity/akto-api-security-dashboard?logo=docker"/>
 # Akto.io API Security
 
 # What is Akto?
