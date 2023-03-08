@@ -36,32 +36,6 @@ public class TestGraphQLUtils{
         }
     }
 
-    @Test
-    public void testGRPC () throws IOException {
-
-        String[] arrays = new String[] {
-                "AAAAAAwIARDABxoFL3Rlc3Q=",
-                "AAAAAAcKBVdvcmxk",
-                "AAAAAA4KDEhlbGxvISBXb3JsZA==",
-                "AAAAAAkKBVdvcmxkEAU=",
-                "gAAAACBncnBjLXN0YXR1czowDQpncnBjLW1lc3NhZ2U6T0sNCg=="
-//                "AAAAAA4KDEhlbGxvISBXb3JsZA==gAAAACBncnBjLXN0YXR1czowDQpncnBjLW1lc3NhZ2U6T0sNCg=="
-        };
-
-        for (String str : arrays) {
-            byte[] arr = Base64.getDecoder().decode(str);
-            byte[] arr2 = new byte[arr.length - 5];
-            for (int i = 5; i < arr.length; i++ ) {
-                arr2[i - 5] = arr[i];
-            }
-
-            HashMap<Object, Object> str4 = ProtoBufUtils.getInstance().decodeProto(arr2);
-            String obj = JSON.toString(str4);
-            System.out.println(obj);
-        }
-    }
-
-
     private static HttpResponseParams parseKafkaMessage(String message) throws Exception {
 
         //convert java object to JSON format

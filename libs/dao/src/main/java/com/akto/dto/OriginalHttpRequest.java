@@ -13,6 +13,7 @@ import java.net.URI;
 import java.net.URLDecoder;
 import java.util.*;
 
+import static com.akto.util.grpc.ProtoBufUtils.DECODED_QUERY;
 import static com.akto.util.grpc.ProtoBufUtils.RAW_QUERY;
 
 public class OriginalHttpRequest {
@@ -88,11 +89,12 @@ public class OriginalHttpRequest {
     }
 
     private static String convertGRPCEncodedToJson(String rawRequest) {
-        byte[] decodedByteArray = Base64.getDecoder().decode(rawRequest);
-        HashMap<Object, Object> map = ProtoBufUtils.getInstance().decodeProto(decodedByteArray);
+        HashMap<Object, Object> map = ProtoBufUtils.getInstance().decodeProto(rawRequest);
+        HashMap<String, HashMap> finalRequest = new HashMap<>();
         map.put(RAW_QUERY, rawRequest);
+        finalRequest.put(DECODED_QUERY, map);
         try {
-            return mapper.writeValueAsString(map);
+            return mapper.writeValueAsString(finalRequest);
         } catch (Exception e) {
             return rawRequest;
         }
@@ -127,8 +129,8 @@ public class OriginalHttpRequest {
     }
 
     public static String getAcceptableContentType(Map<String,List<String>> headers) {
-        List<String> acceptableContentTypes = Arrays.asList(JSON_CONTENT_TYPE, FORM_URL_ENCODED_CONTENT_TYPE);
-        List<String> contentTypeValues = new ArrayList<>();
+        List<String> acceptableContentTypes = Arrays.asList(JSON_CONTENT_TYPE, FORM_URL_ENCODED_CONTENT_TYPE, GRPC_CONTENT_TYPE);
+        List<String> contentTypeValues;
         for (String k: headers.keySet()) {
             if (k.equalsIgnoreCase("content-type")) {
                 contentTypeValues = headers.get(k);
