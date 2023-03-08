@@ -132,7 +132,14 @@ public class GraphQLUtils {//Singleton class
                 for (Selection selection : selectionList) {
                     if (selection instanceof Field) {
                         Field field = (Field) selection;
-                        String graphqlPath = path + "/" + operation.name().toLowerCase() + "/" + field.getName();
+                        String defName =  definition.getName() == null ? "" : ( "/" + definition.getName());
+
+                        String graphqlPath = path.split("\\?")[0] + "/" + operation.name().toLowerCase() + defName + "/"+ field.getName();
+
+                        if (path.contains("?")) {
+                            graphqlPath += ("?"+path.split("\\?")[1]);
+                        }
+
                         HttpResponseParams httpResponseParamsCopy = responseParams.copy();
                         httpResponseParamsCopy.requestParams.setUrl(graphqlPath);
                         try {
