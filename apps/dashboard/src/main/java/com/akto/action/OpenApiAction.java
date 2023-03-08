@@ -35,14 +35,18 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
         try {
             ApiCollection apiCollection = ApiCollectionsDao.instance.findOne("_id", apiCollectionId);
             if (apiCollection == null) return ERROR.toUpperCase();
+
+            loggerMaker.infoAndAddToDb("Found API Collection " + apiCollection.getHostName(), LogDb.DASHBOARD);
             String host =  apiCollection.getHostName();
 
-            int limit = 200;
+            int limit = 100;
             List<SampleData> sampleDataList = SampleDataDao.instance.fetchSampleDataPaginated(
                     apiCollectionId, lastFetchedUrl, lastFetchedMethod, limit, 1
             );
 
             int size = sampleDataList.size();
+            loggerMaker.infoAndAddToDb("Fetched sample data list " + size, LogDb.DASHBOARD);
+
             if (size < limit) {
                 lastFetchedUrl = null;
                 lastFetchedMethod = null;
@@ -51,12 +55,19 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
                 lastFetchedUrl = last.getId().getUrl();
                 lastFetchedMethod = last.getId().getMethod().name();
             }
+            loggerMaker.infoAndAddToDb("Fetching for " + lastFetchedUrl + " " + lastFetchedMethod, LogDb.DASHBOARD);
 
             SampleDataToSTI sampleDataToSTI = new SampleDataToSTI();
             sampleDataToSTI.setSampleDataToSTI(sampleDataList);
+            loggerMaker.infoAndAddToDb("Converted to STI", LogDb.DASHBOARD);
+
             Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList = sampleDataToSTI.getSingleTypeInfoMap();
             OpenAPI openAPI = Main.init(apiCollection.getDisplayName(),stiList, includeHeaders, host);
+            loggerMaker.infoAndAddToDb("Initialized openAPI", LogDb.DASHBOARD);
+
             openAPIString = Main.convertOpenApiToJSON(openAPI);
+            loggerMaker.infoAndAddToDb("Initialize openAPI", LogDb.DASHBOARD);
+
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("ERROR while downloading openApi file " + e, LogDb.DASHBOARD);
             return ERROR.toUpperCase();
