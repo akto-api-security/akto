@@ -7,15 +7,28 @@ import com.google.protobuf.WireFormat;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.HashMap;
 
 public class ProtoBufUtils {
 
     public static final String RAW_QUERY = "raw_query";
+    public static final String DECODED_QUERY = "query";
+    public static final String KEY_PREFIX = "param_";
     private ProtoBufUtils() {}
     private static final ProtoBufUtils instance = new ProtoBufUtils();
     public static ProtoBufUtils getInstance() {
         return instance;
+    }
+
+    public HashMap<Object, Object> decodeProto(String encodedString) {
+        byte[] originalByteArray = Base64.getDecoder().decode(encodedString);
+        //Remove initial 5 bytes for unnecessary proto headers
+        byte[] truncatedByteArray = new byte[originalByteArray.length - 5];
+        for (int index = 5; index < originalByteArray.length; index++) {
+            truncatedByteArray[index - 5] = originalByteArray[index];
+        }
+        return decodeProto(truncatedByteArray);
     }
 
     public HashMap<Object, Object> decodeProto(byte[] data) {
@@ -41,13 +54,14 @@ public class ProtoBufUtils {
             }
 
             final int number = WireFormat.getTagFieldNumber(tag);
+            String keyPrefix = KEY_PREFIX + number;
 
             switch (type) {
                 case WireFormat.WIRETYPE_VARINT:
-                    map.put(number, input.readInt64());
+                    map.put(keyPrefix, input.readInt64());
                     break;
                 case WireFormat.WIRETYPE_FIXED64:
-                    map.put(number, Double.longBitsToDouble(input.readFixed64()));
+                    map.put(keyPrefix, Double.longBitsToDouble(input.readFixed64()));
                     break;
                 case WireFormat.WIRETYPE_LENGTH_DELIMITED:
                     ByteString data = input.readBytes();
@@ -62,19 +76,19 @@ public class ProtoBufUtils {
                             }
                         }
                         if (probablyString) {
-                            map.put(number, str);
+                            map.put(keyPrefix, str);
                         } else if (!submessage.isEmpty()){
-                            map.put(number, submessage);
+                            map.put(keyPrefix, submessage);
                         } else {
                             new String(data.toByteArray());
                         }
                     }
                     break;
                 case WireFormat.WIRETYPE_START_GROUP:
-                    map.put(number, decodeProtoInput(input, depth + 1));
+                    map.put(keyPrefix, decodeProtoInput(input, depth + 1));
                     break;
                 case WireFormat.WIRETYPE_FIXED32:
-                    map.put(number, Float.intBitsToFloat(input.readFixed32()));
+                    map.put(keyPrefix, Float.intBitsToFloat(input.readFixed32()));
                     break;
                 default:
                     throw new InvalidProtocolBufferException("Invalid wire type");
