@@ -8,6 +8,7 @@ import org.bson.types.ObjectId;
 
 import com.akto.action.testing.AuthMechanismAction;
 import com.akto.action.testing.StartTestAction;
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dto.testing.AuthParamData;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.util.enums.LoginFlowEnums;
@@ -59,6 +60,7 @@ public class OnboardingAction extends UserAction {
 
         testingRunHexId = startTestAction.getTestingRunHexId();
 
+        AccountSettingsDao.instance.updateOnboardingFlag(false);
 
         return SUCCESS.toUpperCase();
     }

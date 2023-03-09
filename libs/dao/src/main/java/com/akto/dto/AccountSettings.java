@@ -28,6 +28,9 @@ public class AccountSettings {
     private int demoCollectionCreateTime = 0;
     public static final String DEMO_COLLECTION_CREATE_TIME = "demoCollectionCreateTime";
 
+    private boolean showOnboarding;
+    public static final String SHOW_ONBOARDING = "showOnboarding";
+
     public AccountSettings() {
     }
 
@@ -132,4 +135,14 @@ public class AccountSettings {
     public void setDemoCollectionCreateTime(int demoCollectionCreateTime) {
         this.demoCollectionCreateTime = demoCollectionCreateTime;
     }
+
+    public boolean isShowOnboarding() {
+        return showOnboarding;
+    }
+
+    public void setShowOnboarding(boolean showOnboarding) {
+        this.showOnboarding = showOnboarding;
+    }
+
+    
 }
