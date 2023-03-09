@@ -9,6 +9,7 @@
  import com.akto.log.LoggerMaker;
  import com.akto.store.SampleMessageStore;
  import com.akto.store.TestingUtil;
+ import com.akto.util.HttpRequestResponseUtils;
  import com.akto.util.JSONUtils;
  import com.akto.util.modifier.NestedObjectModifier;
  import com.akto.util.modifier.SetValueModifier;
@@ -52,7 +53,7 @@
                  continue;
              }
 
-             String queryJson = OriginalHttpRequest.convertFormUrlEncodedToJson(req.getQueryParams());
+             String queryJson = HttpRequestResponseUtils.convertFormUrlEncodedToJson(req.getQueryParams());
              BasicDBObject queryParams = BasicDBObject.parse(queryJson);
 
              String paginatedKeyPresent = null;

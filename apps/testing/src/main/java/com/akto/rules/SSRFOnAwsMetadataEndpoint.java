@@ -8,6 +8,7 @@ import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
+import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
 import com.akto.util.modifier.SetValueModifier;
 import com.mongodb.BasicDBList;
@@ -51,7 +52,7 @@ public class SSRFOnAwsMetadataEndpoint extends TestPlugin {
             }
 
             // find if url is present in queryParams
-            String queryJson = OriginalHttpRequest.convertFormUrlEncodedToJson(req.getQueryParams());
+            String queryJson = HttpRequestResponseUtils.convertFormUrlEncodedToJson(req.getQueryParams());
             BasicDBObject queryObj = BasicDBObject.parse(queryJson);
             for (String key: queryObj.keySet()) {
                 Object valueObj = queryObj.get(key);
