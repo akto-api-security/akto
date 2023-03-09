@@ -69,6 +69,9 @@ public class HttpCallParser {
         String status = (String) json.get("status");
         Map<String,List<String>> responseHeaders = OriginalHttpRequest.buildHeadersMap(json, "responseHeaders");
         String payload = (String) json.get("responsePayload");
+        if (OriginalHttpRequest.GRPC_CONTENT_TYPE.equals(OriginalHttpRequest.getAcceptableContentType(requestHeaders))) {
+            payload = OriginalHttpRequest.convertGRPCEncodedToJson(payload);
+        }
         int time = Integer.parseInt(json.get("time").toString());
         String accountId = (String) json.get("akto_account_id");
         String sourceIP = (String) json.get("ip");
