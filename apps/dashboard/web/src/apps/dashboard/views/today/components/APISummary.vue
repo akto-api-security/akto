@@ -20,7 +20,7 @@
                     title="Security errors" 
                     icon="$fas_unlock-alt" 
                     :subtitle="getAuditTs(auditId)"
-                    color="rgba(243, 107, 107)"
+                    color="var(--rgbaColor22)"
                 >        
                     <div class="height-1">
                         <div><span>{{getCriticalSecurityErrors()}}</span> <span>critical</span> </div>

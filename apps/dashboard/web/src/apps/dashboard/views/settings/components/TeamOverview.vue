@@ -39,7 +39,7 @@
                     :disabled="!allEmails || allEmails.length == 0"
                     dark
                     :style="{
-                        'color': !allEmails || allEmails.length == 0 ? 'rgb(255, 255, 255, 0.3) !important' : 'var(--white) !important',
+                        'color': !allEmails || allEmails.length == 0 ? 'var(--rgbaColor26) !important' : 'var(--white) !important',
                         'background-color': !allEmails || allEmails.length == 0 ? 'var(--white) !important' : 'var(--themeColor) !important',
                     }"
                     class="invite-btn"
@@ -281,7 +281,7 @@
             margin-bottom: auto
 
     &-details
-        background-color: #47466A0d
+        background-color: var(--themeColorDark7)
         border-radius: 4px
         height: 60px
 

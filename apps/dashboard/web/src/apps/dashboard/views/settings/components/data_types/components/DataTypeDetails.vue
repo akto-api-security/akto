@@ -313,14 +313,14 @@ export default {
         margin-bottom: 6px
         margin-top: 6px
         &.inactive
-            color: #475467
+            color: var(--hexColor10)
             background-color: var(--white2)
         &.true
-            color: #12B76A
-            background-color: #E8FFF4
+            color: var(--hexColor5)
+            background-color: var(--hexColor25)
         &.false
-            color: #F04438
-            background-color: #FFE9E8
+            color: var(--hexColor28)
+            background-color: var(--hexColor32)
         &:hover
             cursor: pointer
         &.v-btn:before

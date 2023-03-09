@@ -110,7 +110,7 @@
 
     .clickable-bg:hover {
         cursor: pointer;
-        background-color: #47466A0D;
+        background-color: var(--themeColorDark7);
     }
 
 </style>
@@ -185,7 +185,7 @@
     height: 271px
     margin-top: auto
     margin-bottom: auto
-    color: #47466A3D
+    color: var(--themeColorDark3)
     font-size: 13px
 
 .jc-end
@@ -214,7 +214,7 @@
     float: right
 
 .grey-text
-    color: #949597
+    color: var(--hexColor19)
 
 .white-background
     background-color: var(--white)   
@@ -235,8 +235,77 @@
 <style lang="css">
     :root{
         --themeColor: #6200EA;
+        --themeColor2: #6200EA19;
+        --themeColor3: #6200EA99;
+        --themeColor4: #6200EADF;
+        --themeColor5: #6200EABF;
+        --themeColor6: #6200EA1F;
+        --themeColor7: #6200EA3F;
+        --themeColor8: #6200EA5F;
+        --themeColor9: #6200EA7F;
+        --themeColor10: #6200EA9F;
+        --themeColor11: #6200EA3D;
+        --quickStartTheme:#6200B0;
+
         --themeColorDark: #47466A ;
         --themeColorDark2: #47466A99 ;
+        --themeColorDark3: #47466a3d ;
+        --themeColorDark4: #47466AB2 ;
+        --themeColorDark5: #47466A19 ;
+        --themeColorDark6: #47466Acc ;
+        --themeColorDark7: #47466A0D ;
+        --themeColorDark8: #47466A2f ;
+        --themeColorDark9: #47466A80 ;
+        --appBorder: rgba(71, 70, 106, 0.2) ;
+        --pageSubtitle: rgb(71, 70, 106, 0.7);
+        --appBorder2: rgba(71, 70, 106, 0.03);
+        --appBorder3: rgba(71, 70, 106, 0.75) ;
+        --rgbaColor7: rgba(71, 70, 106, 0.45);
+        --themeColorDark10: rgba(71, 70, 106, 0.15);
+        --themeColorDark11: rgba(71, 70, 106, 0.35);
+        --themeColorDark12: rgba(71, 70, 106, 0.55);
+        --themeColorDark13: rgba(71, 70, 106, 0.85);
+
+        --hexColor1: #1790FF;
+        --hexColor2: #FF8717;
+        --hexColor3: #FF1717;
+        --hexColor4: #101828;
+        --hexColor5: #12B76A;
+        --hexColor6: #24292f;
+        --hexColor7: #2193ef33;
+        --hexColor8: #33a852;
+        --hexColor9: #3366ff;
+        --hexColor10: #475467;
+        --hexColor11: #49cc90;
+        --hexColor12: #5c04d5;
+        --hexColor13: #50e3C2;
+        --hexColor14: #61AFFe;
+        --hexColor15: #73728D;
+        --hexColor16: #7D787838;
+        --hexColor17: #949494;
+        --hexColor18: #9012fe;
+        --hexColor19: #949597;
+        --hexColor20: #d2d3d4;
+        --hexColor21: #d6d3da;
+        --hexColor22: #d0d5dd;
+        --hexColor23: #ebf0f4;
+        --hexColor24: #e8d8f8;
+        --hexColor25: #e8fff4;
+        --hexColor26: #f6f8fa;
+        --hexColor27: #f9f9fa;
+        --hexColor28: #f04438;
+        --hexColor29: #f4f4f4;
+        --hexColor30: #FF000033;
+        --hexColor31: #f6f6f6;
+        --hexColor32: #ffe9e8;
+        --hexColor33: #FF000080;
+        --hexColor34: #FF5C0080;
+        --hexColor35: #F9B30080;
+        --hexColor36: #fca130;
+        --hexColor37: #f93e3e;
+        --hexColor38: #00f;
+        --hexColor39: #f2f2f2;
+
         --primary: #126BFF;
         --secondary: #434761;
         --secondaryBtn: #4900AF;
@@ -261,16 +330,32 @@
         --backgroundColor2: #2E006D;
         --borderColor: #e4e3e5;
         --colTableBackground:#EDECF0;
-        --quickStartTheme:#6200B0;
         --white2: #fcfcfd;
         --teamColor: #304ffe;
         --teamColor2: #2D243480;
-        --appBorder: rgba(71, 70, 106, 0.2) ;
-        --pageSubtitle: rgb(71, 70, 106, 0.7);
-        --appBorder2: rgba(71, 70, 106, 0.03);
-        --appBorder3: rgba(71, 70, 106, 0.75) ;
         --rgbaColor5: rgba(246, 190, 79);
         --rgbaColor6: rgba(33, 150, 243);
         --transparent: rgba(0,0,0,0.0);
+
+        --rgbaColor8: rgba(27,31,36,.15);
+        --rgbaColor9: rgba(255, 255, 255, 0.4);
+        --rgbaColor10: rgba(45, 36, 52, 0.15);
+        --rgbaColor11: rgba(239, 239, 239, 0.5);
+        --rgbaColor12: rgba(98, 0, 234, 1);
+        --rgbaColor13: rgba(246, 190, 79, 0.2);
+        --rgbaColor14: rgba(243, 107, 107, 0.2);
+        --rgbaColor15: rgba(0, 191, 165, 0.2);
+        --rgbaColor16: rgba(0, 0, 0, 0.08);
+        --rgbaColor17: rgba(16, 24, 40, 0.05);
+        --rgbaColor18: rgba(98, 0, 234, 0.2);
+        --rgbaColor19: rgba(45, 44, 87, 0.08);
+        --rgbaColor20: rgba(255, 0, 0, 0.5);
+        --rgbaColor21: rgba(16, 24, 40, 0.05);
+        --rgbaColor22: rgba(243, 107, 107);
+        --rgbaColor23: rgba(0, 0, 0, 0.25);
+        --rgbaColor24: rgba(255, 255, 255, 0.5);
+        --rgbaColor25: rgb(45 44 87 / 10%);
+        --rgbaColor24: rgba(255, 255, 255, 0.3);
+
     }
 </style>

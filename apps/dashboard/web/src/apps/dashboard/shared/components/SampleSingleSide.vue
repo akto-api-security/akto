@@ -191,10 +191,10 @@ export default {
 <style scoped lang="sass">
 .sample-data
     &-container
-        background-color: #47466A0D
+        background-color: var(--themeColorDark7)
         font-size: 13px
         padding: 8px
-        color: #47466A
+        color: var(--themeColorDark)
         height: 100%
     &-title
         font-weight: 500
@@ -224,7 +224,7 @@ export default {
 }
 
 .wrapper .data-key {
-  color: #47466A;
+  color: var(--themeColorDark);
   padding: 1px 5px 2px 7px;
 }
 

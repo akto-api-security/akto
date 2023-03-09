@@ -53,7 +53,7 @@
                 <div class="text_msg" v-html="text_msg"></div>
                 <div v-if="progressBar.show">
                     <div class="d-flex">
-                        <v-progress-linear class="mt-2" background-color="rgba(98, 0, 234,0.2)" color="rgb(98, 0, 234)"
+                        <v-progress-linear class="mt-2" background-color="var(--rgbaColor18)" color="var(--rgbaColor12)"
                             :value="progressBar.value">
                         </v-progress-linear>
                         <div class="ml-2">{{ progressBar.value }}%</div>

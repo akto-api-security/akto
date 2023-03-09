@@ -235,7 +235,7 @@
     height: 271px
     margin-top: auto
     margin-bottom: auto
-    color: #47466A3D
+    color: var(--themeColorDark3)
     font-size: 13px
 
 

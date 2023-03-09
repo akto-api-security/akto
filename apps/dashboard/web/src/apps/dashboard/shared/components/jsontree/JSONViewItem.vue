@@ -233,7 +233,7 @@ export default Vue.extend({
   &.can-select {
     cursor: pointer;
     &:hover {
-      background-color: rgba(0, 0, 0, 0.08);
+      background-color: var(--rgbaColor16);
       text-overflow: clip;
       white-space: normal;
       word-break: break-all
@@ -291,7 +291,7 @@ export default Vue.extend({
 }
 
 .sensitive-hightlight-class {
-  background-color: #FF000033;
+  background-color: var(--hexColor30);
 }
 
 

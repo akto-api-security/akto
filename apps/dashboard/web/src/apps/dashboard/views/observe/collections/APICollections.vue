@@ -248,7 +248,7 @@ export default {
             return this.apiCollections.map(c => {
                 return {
                     ...c,
-                    color: "#FFFFFF",
+                    color: "var(--white)",
                     endpoints: c["urlsCount"] || 0,
                     detected: func.prettifyEpoch(c.startTs)
                 }

@@ -34,7 +34,7 @@ export default{
 <style scoped>
 
 .bg{
-	background: #F9F9FA;
+	background: var(--hexColor27);
 	border: 1px solid var(--lighten2);
 	border-radius: 12px;
 	padding: 16px;

@@ -62,7 +62,7 @@ export default {
     max-width: 16px
 
 .gray-menu
-  background-color: #73728D
+  background-color: var(--hexColor15)
 
 .active-item
   &:before

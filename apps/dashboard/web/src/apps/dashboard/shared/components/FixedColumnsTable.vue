@@ -258,13 +258,13 @@
         .table-sub-header
             font-weight: 500
             font-size: 13px
-            color: rgba(71, 70, 106, 0.55)
+            color: var(--themeColorDark12)
 
         .grey-color-entry
-            color: rgba(71, 70, 106, 0.35)
+            color: var(--themeColorDark11)
 
         .black-color-entry
-            color: rgba(71, 70, 106, 0.85)
+            color: var(--themeColorDark13)
 
         .table-header
             vertical-align: bottom
