@@ -88,13 +88,13 @@ public class OriginalHttpRequest {
         return rawRequest;
     }
 
-    private static String convertGRPCEncodedToJson(String rawRequest) {
+    public static String convertGRPCEncodedToJson(String rawRequest) {
         HashMap<Object, Object> map = ProtoBufUtils.getInstance().decodeProto(rawRequest);
-        HashMap<String, HashMap> finalRequest = new HashMap<>();
-        map.put(RAW_QUERY, rawRequest);
-        finalRequest.put(DECODED_QUERY, map);
         try {
-            return mapper.writeValueAsString(finalRequest);
+            if (map.isEmpty()) {
+                return rawRequest;
+            }
+            return mapper.writeValueAsString(map);
         } catch (Exception e) {
             return rawRequest;
         }
