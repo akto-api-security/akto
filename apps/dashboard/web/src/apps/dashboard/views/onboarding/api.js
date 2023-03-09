@@ -22,4 +22,14 @@ export default {
             return resp
         })
     },
+
+    fetchTestSuites() {
+        return request({
+            url: '/api/fetchTestSuites',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
+    },
 }
