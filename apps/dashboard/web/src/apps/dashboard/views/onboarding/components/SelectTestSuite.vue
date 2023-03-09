@@ -1,11 +1,19 @@
 <template>
     <div style="width: 650px;height: 220px; margin-bottom: 36px;">
-        <div class="test-suite-card-container">
-            <test-suite-card title="Business Logic Scan" subtitle="10 tests" id="BUSINESS_LOGIC_SCAN"/>
-            <test-suite-card title="Passive Scan" subtitle="30 tests" id="PASSIVE_SCAN"/>
+        <div v-if="this.testSuitesArr">
+            <div class="test-suite-card-container" v-for="(arr,idx1) in this.testSuitesArr">
+                <test-suite-card 
+                    v-for="(testSuite, idx2) in arr" 
+                    :key="idx2"
+                    :title="testSuite['name']" 
+                    :subtitle="generateSubtitle(testSuite['tests'].length)"
+                    :id="testSuite['_name']"
+                    :description="testSuite['description']"
+                />
+            </div>
         </div>
-        <div class="test-suite-card-container">
-            <test-suite-card title="Deep Scan" subtitle="10 tests" id="DEEP_SCAN"/>
+        <div v-else style="display: flex; justify-content: center; height: 100%; align-items: center;">
+            <spinner :size="50"/>
         </div>
     </div>
 </template>
@@ -13,16 +21,35 @@
 <script>
 
 import TestSuiteCard from '@/apps/dashboard/views/onboarding/components/TestSuiteCard'
+import Spinner from '@/apps/dashboard/shared/components/Spinner'
+import {mapState} from 'vuex'
 
 export default {
     name: "SelectTestSuite",
     components: {
-        TestSuiteCard
+        TestSuiteCard,
+        Spinner
     },
     data () {
         return {
         }
     },
+    methods: {
+        generateSubtitle(num) {
+            return num + " tests"
+        }
+    },
+
+    computed: {
+        ...mapState('onboarding', ['testSuites']),
+        testSuitesArr () {
+            let newArr = []
+            let arr = this.testSuites.map(a => ({...a}))
+            while(arr.length) newArr.push(arr.splice(0,2));
+            return newArr
+        }
+    }
+
 }
 </script>
 

@@ -13,7 +13,8 @@ const state = {
     authMechanismLoading: false,
     authKey: null,
     authValue: null,
-    runTestLoading: false
+    runTestLoading: false,
+    testSuites: null
 }
 
 const onboarding = {
@@ -39,6 +40,9 @@ const onboarding = {
         },
         UPDATE_RUN_TEST_LOADING(state, runTestLoading) {
             state.runTestLoading = runTestLoading
+        },
+        UPDATE_TEST_SUITES(state, testSuites) {
+            state.testSuites = testSuites
         }
     },
     actions: {
@@ -54,6 +58,11 @@ const onboarding = {
         },
         testSuiteSelected({commit}, selectedTestSuite) {
             commit('SELECT_TEST_SUITE', selectedTestSuite)
+        },
+        fetchTestSuites() {
+            api.fetchTestSuites().then((resp) => {
+                state.testSuites = resp.testSuites
+            })
         },
         runTestOnboarding({commit}) {
             commit('UPDATE_RUN_TEST_LOADING', true)

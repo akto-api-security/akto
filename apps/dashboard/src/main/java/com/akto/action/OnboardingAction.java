@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.bson.types.ObjectId;
+import com.akto.dto.testing.TestSuite;
 
 import com.akto.action.testing.AuthMechanismAction;
 import com.akto.action.testing.StartTestAction;
@@ -16,29 +16,27 @@ import com.akto.util.enums.LoginFlowEnums;
 public class OnboardingAction extends UserAction {
 
 
+    private TestSuite[] testSuites;
+    public String fetchTestSuites() {
+        this.testSuites = TestSuite.values();
+        return SUCCESS.toUpperCase();
+    }
+
+
     private ArrayList<AuthParamData> authParamData;
     private int collectionId;
-    private String testSuite;
+    private TestSuite testSuite;
     private String testingRunHexId;
 
     
     public String runTestOnboarding() {
 
-        List<String> selectedTests = new ArrayList<>();
-        switch (testSuite) {
-            case "BUSINESS_LOGIC_SCAN":
-                selectedTests = Arrays.asList("REPLACE_AUTH_TOKEN", "ADD_USER_ID", "PARAMETER_POLLUTION", "REPLACE_AUTH_TOKEN_OLD_VERSION");
-                break;
-            case "PASSIVE_SCAN":
-                selectedTests = Arrays.asList("REPLACE_AUTH_TOKEN", "ADD_USER_ID");
-                break;
-            case "DEEP_SCAN":
-                selectedTests = Arrays.asList("REPLACE_AUTH_TOKEN", "ADD_USER_ID", "PARAMETER_POLLUTION", "REPLACE_AUTH_TOKEN_OLD_VERSION", "https://raw.githubusercontent.com/akto-api-security/testing_sources/master/Misconfiguration/swagger-detection/swagger_file_basic.yml");
-                break;
-        
-            default:
-                break;
+        if (testSuite == null) {
+            addActionError("Test suite can't be null");
+            return ERROR.toUpperCase();
         }
+
+        List<String> selectedTests = testSuite.tests;
 
         AuthMechanismAction authMechanismAction = new AuthMechanismAction();
         authMechanismAction.setSession(getSession());
@@ -67,16 +65,20 @@ public class OnboardingAction extends UserAction {
     public void setAuthParamData(ArrayList<AuthParamData> authParamData) {
         this.authParamData = authParamData;
     }
+
     public void setCollectionId(int collectionId) {
         this.collectionId = collectionId;
     }
-    public void setTestSuite(String testSuite) {
+
+    public void setTestSuite(TestSuite testSuite) {
         this.testSuite = testSuite;
     }
+
     public String getTestingRunHexId() {
         return testingRunHexId;
     }
 
-    
-    
+    public TestSuite[] getTestSuites() {
+        return testSuites;
+    }
 }

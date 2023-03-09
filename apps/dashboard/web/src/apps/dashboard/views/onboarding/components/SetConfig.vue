@@ -8,9 +8,7 @@
             <div>
                 <div style="display: flex; align-items: center; margin-top: 20px;font-weight: 400; font-size: 14px; color: #47466A">
                     <div>Auth header key</div>
-                    <div>
-                        <v-icon>$far_question-circle</v-icon>
-                    </div>
+                    <hint-icon value="Attacker token header key"/>
                 </div>
                 <div style="margin-top: 4px">
                     <v-text-field
@@ -28,9 +26,7 @@
             <div>
                 <div style="display: flex; align-items: center;font-weight: 400; font-size: 14px; color: #47466A">
                     <div>Auth header value</div>
-                    <div>
-                        <v-icon>$far_question-circle</v-icon>
-                    </div>
+                    <hint-icon value="Attacker token value"/>
                 </div>
                 <div style="margin-top: 4px">
                     <v-textarea
@@ -54,11 +50,13 @@
 <script>
 import {mapState} from 'vuex'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
+import HintIcon from "./HintIcon";
 
 export default {
     name: "SetConfig",
     components: {
-        Spinner
+        Spinner,
+        HintIcon
     },
     data () {
         return {

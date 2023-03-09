@@ -92,6 +92,9 @@ export default {
             this.currentStep = index
         }
     },
+    mounted() {
+        this.$store.dispatch("onboarding/fetchTestSuites")
+    },
     computed: {
         ...mapState('onboarding', ['selectedTestSuite', 'selectedCollection', 'runTestLoading']),
         nextButtonDisable() {

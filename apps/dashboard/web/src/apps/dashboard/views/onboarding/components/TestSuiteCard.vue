@@ -4,9 +4,7 @@
             <div style="color: #47466A; font-size: 22px; font-weight: 500">
                 {{ title }}
             </div>
-            <div>
-                <v-icon>$far_question-circle</v-icon>
-            </div>
+            <hint-icon :value="description"/>
         </div>
         <div style="color: #474667; font-weight: 500; font-size: 16px;">
             {{ subtitle }}
@@ -17,13 +15,18 @@
 <script>
 import obj from "@/util/obj";
 import {mapState} from 'vuex'
+import HintIcon from "./HintIcon";
 
 export default {
     name: "TestSuiteCard",
     props: {
         title: obj.strR,
         subtitle: obj.strR,
-        id: obj.strR
+        id: obj.strR,
+        description: obj.strR
+    },
+    components: {
+        HintIcon
     },
     data () {
         return {
