@@ -16,6 +16,9 @@
                     </div>
                     <v-checkbox v-model="recurringDaily" label="Run daily" on-icon="$far_check-square"
                         off-icon="$far_square" class="run-daily-box" :ripple="false" />
+
+                    <v-checkbox v-model="selectRecommendedTests" label="Select Akto Recommended Tests" on-icon="$far_check-square"
+                        off-icon="$far_square" class="run-daily-box" :ripple="false" @change="passData(selectRecommendedTests)"/>
                 </div>
                 <div class="d-flex" style="gap: 20px">
                     <div>
@@ -96,6 +99,7 @@ export default {
         }, [])
 
         return {
+            selectRecommendedTests:false,
             startTimestamp: func.timeNow(),
             label: "Now",
             recurringDaily: false,
@@ -109,6 +113,9 @@ export default {
         }
     },
     methods: {
+        passData(isTrue){
+            this.$emit("selectTests",isTrue)
+        },
         setHour(label, hour) {
             let dayStart = +func.dayStart(+new Date());
             this.startTimestamp = parseInt(dayStart / 1000) + hour * 60 * 60

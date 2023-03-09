@@ -248,9 +248,14 @@ export default {
                 columnToSort = sortKey
             }
 
-            let ret = items.sort((a, b) => {
-                
-                let ret = a[columnToSort] > b[columnToSort] ? 1 : -1
+            var ret = items.sort((a, b) => {
+                let ret = 1
+                if(columnToSort == "detected" || columnToSort == "last_seen"){
+                    ret = Date.parse(a[columnToSort]) > Date.parse(b[columnToSort]) ? 1 : -1
+                }
+                else{
+                    ret = a[columnToSort] > b[columnToSort] ? 1 : -1
+                }
                 if (isDesc[0]) {
                     ret = -ret
                 }

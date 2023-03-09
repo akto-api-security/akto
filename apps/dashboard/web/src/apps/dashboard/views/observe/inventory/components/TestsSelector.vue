@@ -61,7 +61,7 @@
                 </div>
             </div>
 
-            <schedule-box @schedule="emitTestSelection" class="mt-2"/>
+            <schedule-box @schedule="emitTestSelection" @selectTests="selectRecommendedTests" class="mt-2"/>
             </div>
         </div>
     </a-card>
@@ -92,6 +92,7 @@ export default {
     },
     data () {
         return {
+            selectRecommended:false,
             testSourceConfigs: [],
             businessLogicSubcategories: [],
             categories: [],
@@ -127,6 +128,10 @@ export default {
         
     },
     methods: {
+        selectRecommendedTests(item){
+            this.selectRecommended = item
+            this.mapCategoryToSubcategory = this.populateMapCategoryToSubcategory()
+        },
         getCategoryName(category) {
             return this.categories.find(x => x.name === category).displayName
         },
@@ -186,7 +191,9 @@ export default {
                     icon: "$aktoWhite"
                 }
                 ret[x.superCategory.name].all.push(obj)
-                ret[x.superCategory.name].selected.push(obj)
+                if(this.selectRecommended){
+                    ret[x.superCategory.name].selected.push(obj)
+                }
             })
             this.selectedCategory = Object.keys(ret)[0]
             return ret
