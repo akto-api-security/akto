@@ -13,7 +13,7 @@
                     </span>
                     <span class="panel-subtitle text-primary">
                         <span v-if="subtitle">
-                            <v-chip small color="#6200EA19" text-color="#6200EA99">{{ subtitle }}</v-chip>
+                            <v-chip small color="var(--themeColor2)" text-color="var(--themeColor3)">{{ subtitle }}</v-chip>
                         </span>
                     </span>
                 </div>
@@ -49,7 +49,7 @@ export default {
 
 .all-pointer-events
     pointer-events: all
-    box-shadow: -1px -1px 12px rgba(45, 44, 87, 0.08), 0px 2px 10px rgba(45, 44, 87, 0.08)
+    box-shadow: -1px -1px 12px var(--rgbaColor19), 0px 2px 10px var(--rgbaColor19)
     border-radius: 8px
     padding: 32px
     margin: 16px 0px

@@ -271,14 +271,14 @@ export default {
         margin-bottom: 6px
         margin-top: 6px
         &.inactive
-            color: #475467
+            color: var(--hexColor10)
             background-color: var(--white2)
         &.true
-            color: #12B76A
-            background-color: #E8FFF4
+            color: var(--hexColor5)
+            background-color: var(--hexColor25)
         &.false
-            color: #F04438
-            background-color: #FFE9E8
+            color: var(--hexColor28)
+            background-color: var(--hexColor32)
         &:hover
             cursor: pointer
         &.v-btn:before
@@ -295,7 +295,7 @@ export default {
         width: 100%
         height: 48px !important
         margin-bottom: 24px
-        color: #FFFFFF
+        color: var(--white)
 
         &.v-btn--disabled
             opacity: 0.3
@@ -321,7 +321,7 @@ export default {
         display: flex
     
     .inline-block-child .value_predicate .v-text-field__slot input 
-        color: #00f !important
+        color: var(--hexColor38) !important
     
         
 </style>

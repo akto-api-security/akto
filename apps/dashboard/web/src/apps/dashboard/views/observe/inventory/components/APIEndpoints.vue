@@ -376,7 +376,7 @@ export default {
                     } else if (type === "uploadWorkflow") {
                         let resp = await this.$store.dispatch('inventory/uploadWorkflowJson', { content: reader.result, filename: file.name})
                         resp.workflowTests.forEach((x) => {
-                          this.workflowTests.push({...x, color: "#FFFFFF"})
+                          this.workflowTests.push({...x, color: "var(--white)"})
                         })
                     }
                 }
@@ -425,7 +425,7 @@ export default {
             this.workflowTests = (await api.fetchWorkflowTests()).workflowTests.filter(x => x.apiCollectionId === this.apiCollectionId).map(x => {
                 return {
                     ...x,
-                    color: "#FFFFFF"
+                    color: "var(--white)"
                 }
             })
 

@@ -40,7 +40,7 @@
         <!-- <div class="or">or</div> -->
 
         <login-fields @fieldsChanged="fieldsChanged" @enterPressed="signupUser" :isSignUp ="true" class="mt-4"/>
-        <v-btn class="signup-btn" :disabled="disableButtons" :loading="signupLoading" @click="signupUser" style="background-color:  var(--themeColor) !important; color: #FFFFFF !important">
+        <v-btn class="signup-btn" :disabled="disableButtons" :loading="signupLoading" @click="signupUser" style="background-color:  var(--themeColor) !important; color: var(--white) !important">
           Sign up
         </v-btn>
         <div class="legal-docs">
@@ -149,7 +149,7 @@ export default {
 
 .signup-container
   background: var(--white)
-  box-shadow: 0px 8px 12px rgba(0, 0, 0, 0.25)
+  box-shadow: 0px 8px 12px var(--rgbaColor23)
   border-radius: 8px
   padding: 32px
   color: var(--themeColorDark)
@@ -166,7 +166,7 @@ export default {
 
   & .sign-up-third-party
     margin-bottom: 16px
-    border: 1px solid rgba(71, 70, 106, 0.15)
+    border: 1px solid var(--themeColorDark10)
     box-sizing: border-box
     border-radius: 4px
     text-align: center

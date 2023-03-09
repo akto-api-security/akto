@@ -252,7 +252,7 @@ export default {
     color: var(--themeColorDark) !important
 
 .selected-category
-    background-color: #F4F4F4
+    background-color: var(--hexColor29)
 
 .name-div
     margin: auto 8px auto 0

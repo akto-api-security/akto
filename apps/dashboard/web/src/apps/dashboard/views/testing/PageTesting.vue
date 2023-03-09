@@ -72,7 +72,7 @@
                             </v-text-field>
                         </div>
 
-                        <v-btn primary dark color="#3366ff" @click="saveAuthMechanism" v-if="someAuthChanged">
+                        <v-btn primary dark color="var(--hexColor9)" @click="saveAuthMechanism" v-if="someAuthChanged">
                             Save changes
                         </v-btn>
                     </div>

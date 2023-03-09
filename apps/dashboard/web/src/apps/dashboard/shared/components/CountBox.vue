@@ -29,11 +29,11 @@ export default {
     },
     titleToBackgroundColor() {
       var colors = {
-        Total: 'rgba(71, 70, 106, 0.2)',
-        Pending: 'rgba(246, 190, 79, 0.2)',
-        Overdue: 'rgba(243, 107, 107, 0.2)',
-        Completed: 'rgba(0, 191, 165, 0.2)',
-        'This week': '#2193ef33'
+        Total: 'var(--appBorder)',
+        Pending: 'var(--rgbaColor13)',
+        Overdue: 'var(--rgbaColor14)',
+        Completed: 'var(--rgbaColor15)',
+        'This week': 'var(--hexColor7)'
       }
 
       return colors[this.colorTitle || this.title]

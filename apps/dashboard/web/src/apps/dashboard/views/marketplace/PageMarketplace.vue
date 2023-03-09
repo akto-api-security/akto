@@ -308,7 +308,7 @@ export default {
     margin: 0px !important;
     width: 100%;
     padding-bottom: 8px;
-    border-bottom: 1px solid #949494;
+    border-bottom: 1px solid var(--hexColor17);
 }
 
 .form-field-select >>> .v-select__selection {
@@ -332,10 +332,10 @@ export default {
 }
 
 .c-item--selected {
-    background: #e8d8fd;
+    background: var(--hexColor24);
 }
 
 .c-item--title:hover {
-    background: #f6f6f6;
+    background: var(--hexColor31);
 }
 </style>

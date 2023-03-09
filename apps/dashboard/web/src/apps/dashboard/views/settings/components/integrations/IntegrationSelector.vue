@@ -170,7 +170,7 @@ export default {
   width: fit-content
 
 .active-tab
-  background-color: #47466A2F
+  background-color: var(--themeColorDark8)
   color: var(--themeColor)
 
 .right-pane-tab

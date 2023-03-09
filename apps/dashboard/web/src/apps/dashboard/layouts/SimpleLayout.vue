@@ -45,5 +45,5 @@
     opacity: 0.7
     padding-top: 4px
 .layout-border
-    border-bottom: 1px solid #47466A19
+    border-bottom: 1px solid var(--themeColorDark5)
 </style>

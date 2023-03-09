@@ -80,7 +80,7 @@
 
 .akto-left-pane
     padding: 16px 32px
-    box-shadow: 4px -5px 8px rgba(45, 36, 52, 0.15)
+    box-shadow: 4px -5px 8px var(--rgbaColor10)
     z-index: 1
     position: relative
 

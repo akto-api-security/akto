@@ -2,7 +2,7 @@
   <v-card>
     <v-card-title>
       <span>
-        <v-icon class="header-icon" :color="this.color ? this.color : 'rgba(71, 70, 106, 0.5)'" v-if="this.icon">
+        <v-icon class="header-icon" :color="this.color ? this.color : 'var(--themeColorDark9)'" v-if="this.icon">
           {{icon}}
         </v-icon>
         <span class="acard-title">{{title}}</span>
@@ -11,7 +11,7 @@
       <v-card-subtitle>{{subtitle}}</v-card-subtitle>
       <span>
         <v-btn icon @click="$emit('icon_right_clicked')"  v-if="this.icon_right">
-          <v-icon :color="this.icon_right_color ? this.icon_right_color : 'rgba(71, 70, 106, 0.5)'">
+          <v-icon :color="this.icon_right_color ? this.icon_right_color : 'var(--themeColorDark9)'">
             {{icon_right}}
           </v-icon>
         </v-btn>
@@ -55,9 +55,9 @@ export default {
   padding: 12px 16px
   font-size: 16px
   font-weight: 500
-  color: rgba(71, 70, 106, 1) !important
+  color: var(--themeColorDark) !important
   letter-spacing: normal
-  background-color: rgba(239, 239, 239, 0.5)
+  background-color: var(--rgbaColor11)
 
 .v-card__subtitle
   font-size: 12px

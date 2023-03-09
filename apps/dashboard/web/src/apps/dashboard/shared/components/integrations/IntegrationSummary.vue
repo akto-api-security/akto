@@ -10,7 +10,7 @@
       <span>Data source: </span>
       <span class="custom-input">{{dataSourceInfo.worksheetName}}</span>
       <span>in</span>
-      <v-icon :size="12" color="#33a852">$fas_file-csv</v-icon>
+      <v-icon :size="12" color="var(--hexColor8)">$fas_file-csv</v-icon>
       <span class="custom-input">{{dataSourceInfo.sheetName}}</span>
     </div>
 

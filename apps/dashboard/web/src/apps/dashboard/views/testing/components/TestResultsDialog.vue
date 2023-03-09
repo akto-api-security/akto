@@ -38,7 +38,7 @@
                                                 <span class="description-content">Tags</span>
                                             </v-col>
                                             <v-col class="my-0 mr-0 ml-7 pa-0">
-                                                <v-chip :style="{ 'height': '24px !important' }" color="#47466AB2"
+                                                <v-chip :style="{ 'height': '24px !important' }" color="var(--themeColorDark4)"
                                                     class="issue-summary mr-2" text-color="var(--white)" :key="index"
                                                     v-for="(chipItem, index) in subCatogoryMap[issuesDetails.id.testSubCategory].issueTags">
                                                     {{ chipItem.name }}
@@ -99,7 +99,7 @@
                         <div >
                             <div v-if="getNucleiFileName(testingRunResult.testSubType)" style="margin-left: 24px" class="description-title mt-4" >
                                 <span> Nuclei template:</span> 
-                                <a target="_blank" :href="testingRunResult.testSubType"> <span style="color: rgb(98, 0, 234)" >{{getNucleiFileName(testingRunResult.testSubType)}}</span> </a>
+                                <a target="_blank" :href="testingRunResult.testSubType"> <span style="color: var(--rgbaColor12)" >{{getNucleiFileName(testingRunResult.testSubType)}}</span> </a>
                             </div>
                             <div v-if="jsonBasic['errors']" class="test-errors-class">
                                 {{ this.jsonBasic["errors"] }}
@@ -109,7 +109,7 @@
                                     <span class="description-title mt-4">
                                         Test response matches {{ percentageMatch }}% with original API response
 
-                                        <v-chip v-if="isVulnerableAttempt" :style="{ 'height': '18px !important' }" class="ml-2 mr-2" color="rgba(255, 0, 0, 0.5)" text-color="var(--white)">
+                                        <v-chip v-if="isVulnerableAttempt" :style="{ 'height': '18px !important' }" class="ml-2 mr-2" color="var(--rgbaColor20)" text-color="var(--white)">
                                             Vulnerable Attempt
                                         </v-chip>
                                     </span>

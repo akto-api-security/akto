@@ -168,12 +168,12 @@ export default {
     height: 40px;
 
     background: var(--white);
-    border: 1px solid #D0D5DD;
+    border: 1px solid var(--hexColor22);
 
     font-weight: 500;
     font-size: 14px;
 
-    box-shadow: 0px 1px 2px rgba(16, 24, 40, 0.05);
+    box-shadow: 0px 1px 2px var(--rgbaColor21);
     border-radius: 4px;
 }
 
@@ -189,6 +189,6 @@ export default {
 }
 
 .inline-block-child .value_predicate .v-text-field__slot input {
-    color: #00f !important;
+    color: var(--hexColor38) !important;
 }
 </style>
