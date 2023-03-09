@@ -7,6 +7,8 @@ import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -40,6 +42,7 @@ public class InventoryAction extends UserAction {
     // }
 
     public final static int DELTA_PERIOD_VALUE = 60 * 24 * 60 * 60;
+    private static final LoggerMaker loggerMaker = new LoggerMaker(InventoryAction.class);
 
     private String subType;
     public List<SingleTypeInfo> fetchSensitiveParams() {
@@ -578,6 +581,7 @@ public class InventoryAction extends UserAction {
             }
         }
 
+        loggerMaker.infoAndAddToDb(filterList.toString(), LogDb.DASHBOARD);
         return Filters.and(filterList);
 
     }
@@ -606,6 +610,7 @@ public class InventoryAction extends UserAction {
 
         Bson sort = sortOrder == 1 ? Sorts.ascending(sortFields) : Sorts.descending(sortFields);
 
+        loggerMaker.infoAndAddToDb(String.format("skip: %s, limit: %s, sort: %s", skip, limit, sort), LogDb.DASHBOARD);
         List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.and(prepareFilters()), skip, limit, sort);
         return list;        
     }
@@ -616,7 +621,14 @@ public class InventoryAction extends UserAction {
 
     public String fetchChanges() {
         response = new BasicDBObject();
-        response.put("data", new BasicDBObject("endpoints", getMongoResults()).append("total", getTotalParams()));
+
+        long totalParams = getTotalParams();
+        loggerMaker.infoAndAddToDb("Total params: " + totalParams, LogDb.DASHBOARD);
+
+        List<SingleTypeInfo> singleTypeInfos = getMongoResults();
+        loggerMaker.infoAndAddToDb("STI count: " + singleTypeInfos.size(), LogDb.DASHBOARD);
+
+        response.put("data", new BasicDBObject("endpoints", singleTypeInfos ).append("total", totalParams));
 
         return Action.SUCCESS.toUpperCase();
     }
