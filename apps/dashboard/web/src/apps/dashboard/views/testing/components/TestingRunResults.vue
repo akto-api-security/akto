@@ -45,6 +45,7 @@
                 name="" 
                 sortKeyDefault="vulnerable" 
                 :sortDescDefault="true"
+                :defaultRowHeight="24"
                 @rowClicked="openDetails"
             >
                 <template #item.severity="{item}">

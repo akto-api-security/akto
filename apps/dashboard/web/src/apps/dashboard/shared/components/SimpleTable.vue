@@ -308,6 +308,7 @@ export default {
         leftView:obj.boolN,
         hideMoreActions:obj.boolN,
         slotActions:obj.boolN,
+        defaultRowHeight: obj.numN
     },
     data () {
         return {
@@ -325,7 +326,7 @@ export default {
             filters: this.headers.reduce((map, e) => {map[e.value] = new Set(); return map}, {}),
             showFilterMenu: this.headers.reduce((map, e) => {map[e.value] = false; return map}, {}),
             filterOperators: this.headers.reduce((map, e) => {map[e.value] = 'OR'; return map}, {}),
-            toggle_exclusive: 48,
+            toggle_exclusive: this.defaultRowHeight || 48,
             arrayItems:[
                 {
                     value: 48,
