@@ -41,7 +41,7 @@
   font-size: 13px
   font-weight: 500
   padding-bottom: 4px
-  color: var(--pageSubtitle)
+  color: var(--themeColorDark5)
 
 .akto-panes
     display: flex

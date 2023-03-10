@@ -61,7 +61,7 @@
                 <div class="details-dialog">
                     <a-card
                         title="Test details"
-                        color="var(--rgbaColor6)"
+                        color="var(--rgbaColor2)"
                         subtitle=""
                         icon="$fas_stethoscope"
                     >

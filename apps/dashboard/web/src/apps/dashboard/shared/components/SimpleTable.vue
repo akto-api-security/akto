@@ -379,7 +379,7 @@ export default {
         padding: 4px 8px !important
         border-top: 1px solid var(--white) !important
         border-bottom: 1px solid var(--white) !important
-        background: var(--appBorder2)
+        background: var(--themeColorDark18)
         color: var(--themeColorDark)
         max-width: 250px
         text-overflow: ellipsis

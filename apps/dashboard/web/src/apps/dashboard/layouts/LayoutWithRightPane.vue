@@ -71,7 +71,7 @@
   font-size: 13px
   font-weight: 500
   padding-bottom: 4px
-  color: var(--pageSubtitle)
+  color: var(--themeColorDark5)
 
 
 .akto-panes
@@ -80,7 +80,7 @@
 
 .akto-left-pane
     padding: 16px 32px
-    box-shadow: 4px -5px 8px var(--rgbaColor10)
+    box-shadow: 4px -5px 8px var(--rgbaColor5)
     z-index: 1
     position: relative
 

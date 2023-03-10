@@ -76,7 +76,7 @@ export default {
 
 .table-row
     position: relative
-    background: var(--appBorder2)
+    background: var(--themeColorDark18)
     line-height: 40px
 
     &:hover

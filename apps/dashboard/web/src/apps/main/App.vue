@@ -110,7 +110,7 @@
 
     .clickable-bg:hover {
         cursor: pointer;
-        background-color: var(--themeColorDark7);
+        background-color: var(--themeColorDark17);
     }
 
 </style>
@@ -136,19 +136,19 @@
     padding: 0
 
 .brda
-  border: 1px solid var(--appBorder) !important
+  border: 1px solid var(--themeColorDark13) !important
 
 .brdb
-  border-bottom: 1px solid var(--appBorder) !important
+  border-bottom: 1px solid var(--themeColorDark13) !important
 
 .brdt
-  border-top: 1px solid var(--appBorder) !important
+  border-top: 1px solid var(--themeColorDark13) !important
 
 .brdl
-  border-left: 1px solid var(--appBorder) !important
+  border-left: 1px solid var(--themeColorDark13) !important
 
 .brdr
-  border-right: 1px solid var(--appBorder) !important
+  border-right: 1px solid var(--themeColorDark13) !important
 
 .highcharts-credits
   display: none
@@ -185,7 +185,7 @@
     height: 271px
     margin-top: auto
     margin-bottom: auto
-    color: var(--themeColorDark3)
+    color: var(--themeColorDark12)
     font-size: 13px
 
 .jc-end
@@ -235,37 +235,36 @@
 <style lang="css">
     :root{
         --themeColor: #6200EA;
-        --themeColor2: #6200EA19;
-        --themeColor3: #6200EA99;
-        --themeColor4: #6200EADF;
-        --themeColor5: #6200EABF;
-        --themeColor6: #6200EA1F;
-        --themeColor7: #6200EA3F;
-        --themeColor8: #6200EA5F;
-        --themeColor9: #6200EA7F;
-        --themeColor10: #6200EA9F;
-        --themeColor11: #6200EA3D;
-        --quickStartTheme:#6200B0;
+        --themeColor2: #6200EADF;
+        --themeColor3: #6200EABF;
+        --themeColor4: #6200EA9F;
+        --themeColor5: #6200EA99;
+        --themeColor6: #6200EA7F;
+        --themeColor7: #6200EA5F;
+        --themeColor8: #6200EA3F;
+        --themeColor9: #6200EA3D;
+        --themeColor10: #6200EA19;
+        --themeColor11: #6200EA1F;
 
         --themeColorDark: #47466A ;
-        --themeColorDark2: #47466A99 ;
-        --themeColorDark3: #47466a3d ;
-        --themeColorDark4: #47466AB2 ;
-        --themeColorDark5: #47466A19 ;
-        --themeColorDark6: #47466Acc ;
-        --themeColorDark7: #47466A0D ;
-        --themeColorDark8: #47466A2f ;
+        --themeColorDark2: #47466AD9;
+        --themeColorDark3: #47466ACC ;
+        --themeColorDark4: #47466ABF; 
+        --themeColorDark5: #47466AB3;
+        --themeColorDark6: #47466AB2 ;
+        --themeColorDark7: #47466A99 ;
+        --themeColorDark8: #47466A8C;
         --themeColorDark9: #47466A80 ;
-        --appBorder: rgba(71, 70, 106, 0.2) ;
-        --pageSubtitle: rgb(71, 70, 106, 0.7);
-        --appBorder2: rgba(71, 70, 106, 0.03);
-        --appBorder3: rgba(71, 70, 106, 0.75) ;
-        --rgbaColor7: rgba(71, 70, 106, 0.45);
-        --themeColorDark10: rgba(71, 70, 106, 0.15);
-        --themeColorDark11: rgba(71, 70, 106, 0.35);
-        --themeColorDark12: rgba(71, 70, 106, 0.55);
-        --themeColorDark13: rgba(71, 70, 106, 0.85);
-
+        --themeColorDark10: #47466A73;
+        --themeColorDark11: #47466A59;
+        --themeColorDark12: #47466a3D ;
+        --themeColorDark13: #47466A33;
+        --themeColorDark14: #47466A2F ;
+        --themeColorDark15: #47466A26;
+        --themeColorDark16: #47466A19 ;
+        --themeColorDark17: #47466A0D ;
+        --themeColorDark18: #47466A08;
+         
         --hexColor1: #1790FF;
         --hexColor2: #FF8717;
         --hexColor3: #FF1717;
@@ -307,6 +306,7 @@
         --hexColor39: #f2f2f2;
 
         --primary: #126BFF;
+        --quickStartTheme:#6200B0;
         --secondary: #434761;
         --secondaryBtn: #4900AF;
         --errorBtn: #FF5353;
@@ -333,29 +333,28 @@
         --white2: #fcfcfd;
         --teamColor: #304ffe;
         --teamColor2: #2D243480;
-        --rgbaColor5: rgba(246, 190, 79);
-        --rgbaColor6: rgba(33, 150, 243);
         --transparent: rgba(0,0,0,0.0);
 
-        --rgbaColor8: rgba(27,31,36,.15);
-        --rgbaColor9: rgba(255, 255, 255, 0.4);
-        --rgbaColor10: rgba(45, 36, 52, 0.15);
-        --rgbaColor11: rgba(239, 239, 239, 0.5);
-        --rgbaColor12: rgba(98, 0, 234, 1);
-        --rgbaColor13: rgba(246, 190, 79, 0.2);
-        --rgbaColor14: rgba(243, 107, 107, 0.2);
-        --rgbaColor15: rgba(0, 191, 165, 0.2);
-        --rgbaColor16: rgba(0, 0, 0, 0.08);
-        --rgbaColor17: rgba(16, 24, 40, 0.05);
-        --rgbaColor18: rgba(98, 0, 234, 0.2);
-        --rgbaColor19: rgba(45, 44, 87, 0.08);
-        --rgbaColor20: rgba(255, 0, 0, 0.5);
-        --rgbaColor21: rgba(16, 24, 40, 0.05);
-        --rgbaColor22: rgba(243, 107, 107);
-        --rgbaColor23: rgba(0, 0, 0, 0.25);
-        --rgbaColor24: rgba(255, 255, 255, 0.5);
-        --rgbaColor25: rgb(45 44 87 / 10%);
-        --rgbaColor24: rgba(255, 255, 255, 0.3);
-
+        --rgbaColor1: rgba(246, 190, 79);
+        --rgbaColor2: rgba(33, 150, 243);
+        --rgbaColor3: rgba(27,31,36,.15);
+        --rgbaColor4: rgba(255, 255, 255, 0.4);
+        --rgbaColor5: rgba(45, 36, 52, 0.15);
+        --rgbaColor6: rgba(239, 239, 239, 0.5);
+        --rgbaColor7: rgba(98, 0, 234, 1);
+        --rgbaColor8: rgba(246, 190, 79, 0.2);
+        --rgbaColor9: rgba(243, 107, 107, 0.2);
+        --rgbaColor10: rgba(0, 191, 165, 0.2);
+        --rgbaColor11: rgba(0, 0, 0, 0.08);
+        --rgbaColor12: rgba(16, 24, 40, 0.05);
+        --rgbaColor13: rgba(98, 0, 234, 0.2);
+        --rgbaColor14: rgba(45, 44, 87, 0.08);
+        --rgbaColor15: rgba(255, 0, 0, 0.5);
+        --rgbaColor16: rgba(16, 24, 40, 0.05);
+        --rgbaColor17: rgba(243, 107, 107);
+        --rgbaColor18: rgba(0, 0, 0, 0.25);
+        --rgbaColor19: rgba(255, 255, 255, 0.5);
+        --rgbaColor20: rgb(45 44 87 / 10%);
+        --rgbaColor21: rgba(255, 255, 255, 0.3);
     }
 </style>

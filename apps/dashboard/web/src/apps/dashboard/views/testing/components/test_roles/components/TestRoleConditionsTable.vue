@@ -179,7 +179,7 @@ export default {
     width: 100%
     border-style: solid
     padding: 16px
-    border-color: var(--appBorder)
+    border-color: var(--themeColorDark13)
     border-top-width: 0.5px
     border-bottom-width: 1px
     border-left-width: 1px

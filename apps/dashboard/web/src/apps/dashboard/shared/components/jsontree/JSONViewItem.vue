@@ -233,7 +233,7 @@ export default Vue.extend({
   &.can-select {
     cursor: pointer;
     &:hover {
-      background-color: var(--rgbaColor16);
+      background-color: var(--rgbaColor11);
       text-overflow: clip;
       white-space: normal;
       word-break: break-all

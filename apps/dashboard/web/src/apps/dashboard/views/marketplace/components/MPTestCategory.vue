@@ -120,7 +120,7 @@ export default {
 
 .icon-border
     border-radius: 50%
-    box-shadow: 0px 2px 4px var(--rgbaColor25)
+    box-shadow: 0px 2px 4px var(--rgbaColor20)
     min-width: 40px    
     min-height: 40px
     margin-right: 8px

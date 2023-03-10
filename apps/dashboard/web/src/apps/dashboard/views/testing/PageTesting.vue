@@ -118,7 +118,7 @@
         <template slot="Roles">
             <test-roles title="Roles" :testRoles="testRoles">
                 <template #details-container="{}">
-                    <a-card title="Details" color="var(--rgbaColor6)" style="min-height: 600px">
+                    <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
                         <test-roles-config-details></test-roles-config-details>
                     </a-card>
                 </template>
@@ -327,7 +327,7 @@ export default {
                     icon: "$fas_plus",
                     title: "Previous tests",
                     group: "/dashboard/testing/",
-                    color: "var(--rgbaColor5)",
+                    color: "var(--rgbaColor1)",
                     active: true,
                     items: [
                         {

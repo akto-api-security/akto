@@ -38,7 +38,7 @@ export default {
 
 .col_3 {
 	width: 120px;
-	color: var(--rgbaColor12);
+	color: var(--rgbaColor7);
 	position: relative;
 	top: 0px;
 	left: 0px;

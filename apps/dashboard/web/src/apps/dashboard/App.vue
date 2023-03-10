@@ -321,7 +321,7 @@ export default {
   width: 24px
   height: 24px
   background: var(--white)
-  box-shadow: 0px 2px 7px var(--rgbaColor7)
+  box-shadow: 0px 2px 7px var(--themeColorDark10)
   border-radius: 4px
   justify-content: space-around
   display: flex
@@ -333,11 +333,11 @@ export default {
   padding: 4px 0
 
 .nav-section
-  border-bottom: 1px solid var(--rgbaColor9)
+  border-bottom: 1px solid var(--rgbaColor4)
 
 .add-teams-row
   cursor: pointer
-  color: var(--rgbaColor24)
+  color: var(--rgbaColor19)
   font-size: 12px
   align-items: center
   padding: 8px 16px
@@ -345,7 +345,7 @@ export default {
   justify-content: space-between
 
 .add-teams-icon
-  color: var(--rgbaColor24)
+  color: var(--rgbaColor19)
   font-size: 10px
   height: 100% !important
 
@@ -390,7 +390,7 @@ export default {
 .github-btn
   background: linear-gradient(180deg, var(--hexColor26), var(--hexColor23) 90%)  
   color: var(--hexColor6) !important
-  border: 1px solid var(--rgbaColor8)
+  border: 1px solid var(--rgbaColor3)
   margin-left: 8px
 
 .akto-external-links

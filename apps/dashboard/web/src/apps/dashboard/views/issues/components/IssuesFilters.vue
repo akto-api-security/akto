@@ -380,7 +380,7 @@ export default {
     font-weight: 500;
     font-size: 14px;
 
-    box-shadow: 0px 1px 2px var(--rgbaColor17);
+    box-shadow: 0px 1px 2px var(--rgbaColor12);
     border-radius: 4px;
 }
 </style>

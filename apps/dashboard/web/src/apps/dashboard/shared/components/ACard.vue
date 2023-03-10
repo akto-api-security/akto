@@ -44,7 +44,7 @@ export default {
   width: -webkit-fill-available
   margin: 12px
   background: var(--white)
-  border: 1px solid var(--appBorder)
+  border: 1px solid var(--themeColorDark13)
   border-radius: 4px
   box-shadow: none !important
 
@@ -57,12 +57,12 @@ export default {
   font-weight: 500
   color: var(--themeColorDark) !important
   letter-spacing: normal
-  background-color: var(--rgbaColor11)
+  background-color: var(--rgbaColor6)
 
 .v-card__subtitle
   font-size: 12px
   font-weight: 400
-  color: var(--appBorder3) !important
+  color: var(--themeColorDark4) !important
   padding: 0
 
 .header-icon

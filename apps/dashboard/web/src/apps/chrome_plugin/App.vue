@@ -198,7 +198,7 @@
     padding: 0
 
 .brdb
-  border-bottom: 1px solid var(--appBorder) !important
+  border-bottom: 1px solid var(--themeColorDark13) !important
 
 .highcharts-credits
   display: none
@@ -235,7 +235,7 @@
     height: 271px
     margin-top: auto
     margin-bottom: auto
-    color: var(--themeColorDark3)
+    color: var(--themeColorDark12)
     font-size: 13px
 
 

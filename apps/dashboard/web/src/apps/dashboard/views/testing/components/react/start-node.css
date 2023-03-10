@@ -10,7 +10,7 @@
 }
 
 .start-node:hover {
-    box-shadow: 0px 0px 3px 3px var(--themeColorDark3);
+    box-shadow: 0px 0px 3px 3px var(--themeColorDark12);
 }
 
 .red-boundary {
@@ -26,7 +26,7 @@
 }
 
 .green-boundary:hover {
-    box-shadow: 0px 0px 3px 3px var(--themeColor11) !important;
+    box-shadow: 0px 0px 3px 3px var(--themeColor9) !important;
 }
 
 .MuiInput-input {
@@ -136,7 +136,7 @@
   
 .react-flow__edge-path:hover {
     stroke-width: 2px;
-    filter: drop-shadow(3px 5px 2px var(--themeColorDark3));
+    filter: drop-shadow(3px 5px 2px var(--themeColorDark12));
     cursor: pointer;
 }
 

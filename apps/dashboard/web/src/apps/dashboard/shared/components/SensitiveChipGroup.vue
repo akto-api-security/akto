@@ -7,7 +7,7 @@
             v-for="tag in sensitiveTags.slice(0,2)"
             :key="tag"
             small
-            :color='chipColor || "var(--themeColorDark6)"'
+            :color='chipColor || "var(--themeColorDark3)"'
             class="sensitive-tag-chip"
         >
             <v-icon color="var(--white)" size ="14" v-if="!hideTag">{{getTagIcon(tag)}}</v-icon>

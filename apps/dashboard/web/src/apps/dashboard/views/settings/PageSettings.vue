@@ -4,7 +4,7 @@
             <data-types title="Data types" :data_types="data_types" :toggleActivateFieldFunc='toggleActivateDataTypes'
                 :createNewDataType="createNewDataType" @selectedEntry="selectedDataType">
                 <template #details-container="{}">
-                    <a-card title="Details" color="var(--rgbaColor6)" style="min-height: 600px">
+                    <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
                         <data-type-details :data_type="data_type" />
                     </a-card>
                 </template>
@@ -14,7 +14,7 @@
             <data-types title="Auth types" :data_types="auth_types" :toggleActivateFieldFunc='toggleActivateAuthTypes'
                 :createNewDataType="createNewAuthType" @selectedEntry="selectedAuthType">
                 <template #details-container="{}">
-                    <a-card title="Details" color="var(--rgbaColor6)" style="min-height: 600px">
+                    <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
                         <auth-type-details :auth_type_copy="auth_type" />
                     </a-card>
                 </template>
@@ -24,7 +24,7 @@
             <data-types title="Tags" :data_types="tag_configs" :toggleActivateFieldFunc='toggleActivateTagConfig'
                 :createNewDataType="createNewTagConfig" @selectedEntry="selectedTagConfig">
                 <template #details-container="{}">
-                    <a-card title="Details" color="var(--rgbaColor6)" style="min-height: 600px">
+                    <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
                         <tag-config-details :tag_config_copy="tag_config" />
                     </a-card>
                 </template>
