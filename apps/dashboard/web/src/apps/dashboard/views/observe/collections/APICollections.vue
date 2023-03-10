@@ -153,8 +153,8 @@ export default {
                 this.$store.dispatch('collections/loadAllApiCollections')
             }
         },
-        rowClicked(item) {
-            this.$emit("selectedItem", {type: 1, collectionName: item.name, apiCollectionId: item.id})
+        rowClicked(item,onNewPage) {
+            this.$emit("selectedItem", {type: 1, collectionName: item.name, apiCollectionId: item.id},onNewPage)
         },
         createCollection(name) {
           this.$store.dispatch('collections/createCollection', {name})
