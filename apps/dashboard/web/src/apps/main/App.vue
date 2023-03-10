@@ -10,6 +10,7 @@
                 v-model="snackbar.show"
         >
             {{ snackbar.text }}
+            <a v-if="snackbar.url" :href="snackbar.url"> Follow Here </a>
             <template v-slot:action="{ attrs }">
                 <v-btn icon v-bind="attrs" @click="snackbar.show = false">
                     <v-icon>$fas_times</v-icon>
@@ -47,7 +48,8 @@
                 this.snackbar = {
                     show: true,
                     text: e.text,
-                    color: e.color
+                    color: e.color,
+                    url: e.url
                 }
             })
             this.$on('AUTH_FAILED', () => {

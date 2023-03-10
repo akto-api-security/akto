@@ -467,12 +467,23 @@ export default {
             } else {
                 await store.dispatch('testing/scheduleTestForCustomEndpoints', {apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests})
             }
+
+            if(this.pastTestingRuns.length > 0){
+                var testingUrl = '/dashboard/testing/' + this.pastTestingRuns[0].hexId + '/results'
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: `Tests Started`,
+                    color: 'green',
+                    url:testingUrl
+                })
+            }
             
             this.showTestSelectorDialog = false            
         }      
     },
     computed: {
         ...mapState('inventory', ['apiCollection', 'endpointsLoading', 'swaggerContent', 'apiInfoList', 'filters', 'lastFetched', 'unusedEndpoints']),
+        ...mapState['testing',['pastTestingRuns']],
         apiCollectionName() {
             return this.$store.state.collections.apiCollections.find(x => x.id === this.apiCollectionId).displayName
         },
