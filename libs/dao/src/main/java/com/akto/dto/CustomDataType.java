@@ -55,6 +55,14 @@ public class CustomDataType {
     }
 
     public boolean validate(Object value, Object key) {
+        try {
+            return this.validateRaw(value, key);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public boolean validateRaw(Object value, Object key) throws Exception {
         if (this.keyConditions == null && this.valueConditions==null) return false;
         boolean keyResult = true;
         if (this.keyConditions != null) {
