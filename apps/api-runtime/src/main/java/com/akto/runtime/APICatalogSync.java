@@ -1122,6 +1122,7 @@ public class APICatalogSync {
     private int lastMergeAsyncOutsideTs = 0;
     public void buildFromDB(boolean calcDiff, boolean fetchAllSTI) {
 
+        loggerMaker.infoAndAddToDb("Started building from dB", LogDb.RUNTIME);
         if (mergeAsyncOutside) {
             if (Context.now() - lastMergeAsyncOutsideTs > 600) {
                 this.lastMergeAsyncOutsideTs = Context.now();
@@ -1138,7 +1139,10 @@ public class APICatalogSync {
                     try {
                         List<ApiCollection> allCollections = ApiCollectionsDao.instance.getMetaAll();
                         for(ApiCollection apiCollection: allCollections) {
+                            int start = Context.now();
+                            loggerMaker.infoAndAddToDb("Started merging API collection " + apiCollection.getId(), LogDb.RUNTIME);
                             mergeUrlsAndSave(apiCollection.getId());
+                            loggerMaker.infoAndAddToDb("Finished merging API collection " + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
                         }
                     } catch (Exception e) {
                         System.out.println("mergeUrlsAndSave: " + e.getMessage());
