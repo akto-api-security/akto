@@ -355,7 +355,7 @@ export default {
   overflow-wrap: anywhere !important
 
 .response-data 
-  color: var(--themeColorDark2)
+  color: var(--themeColorDark7)
   font-size: 14px
   margin: auto
   overflow-y: scroll

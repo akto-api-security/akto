@@ -2,7 +2,7 @@
     <div class="data-types-container d-flex">
                 <a-card
                     :title="title" 
-                    color="var(--rgbaColor6)"
+                    color="var(--rgbaColor2)"
                     style="min-height: 600px; flex: 1 1 20%"
                     icon_right="$fas_plus"
                     icon_right_color="var(--themeColor)"

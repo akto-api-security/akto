@@ -252,19 +252,19 @@
         .table-parent-header
             font-weight: 700
             font-size: 13px
-            color: var(--appBorder3)
+            color: var(--themeColorDark4)
             padding-bottom: 6px
 
         .table-sub-header
             font-weight: 500
             font-size: 13px
-            color: var(--themeColorDark12)
+            color: var(--themeColorDark8)
 
         .grey-color-entry
             color: var(--themeColorDark11)
 
         .black-color-entry
-            color: var(--themeColorDark13)
+            color: var(--themeColorDark2)
 
         .table-header
             vertical-align: bottom
@@ -277,7 +277,7 @@
             padding: 8px 16px !important
             z-index: 1
             border: 1px solid var(--white) !important
-            background: var(--appBorder2)
+            background: var(--themeColorDark18)
             color: var(--themeColorDark)
             &:nth-child(1)
                 left: 0px

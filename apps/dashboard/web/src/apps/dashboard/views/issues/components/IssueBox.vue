@@ -255,7 +255,7 @@ export default {
 .issue-description {
     font-weight: 400;
     font-size: 14px;
-    color: var(--themeColorDark6);
+    color: var(--themeColorDark3);
 }
 
 .issue-box {

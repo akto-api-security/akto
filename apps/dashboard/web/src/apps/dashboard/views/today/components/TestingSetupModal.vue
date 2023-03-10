@@ -1,7 +1,7 @@
 <template>
     <a-card
         title="Test setup"
-        color="var(--rgbaColor6)"
+        color="var(--rgbaColor2)"
         subtitle=""
         icon="$fas_stethoscope"
         class="test-setup-modal"

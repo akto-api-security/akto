@@ -29,10 +29,10 @@ export default {
     },
     titleToBackgroundColor() {
       var colors = {
-        Total: 'var(--appBorder)',
-        Pending: 'var(--rgbaColor13)',
-        Overdue: 'var(--rgbaColor14)',
-        Completed: 'var(--rgbaColor15)',
+        Total: 'var(--themeColorDark13)',
+        Pending: 'var(--rgbaColor8)',
+        Overdue: 'var(--rgbaColor9)',
+        Completed: 'var(--rgbaColor10)',
         'This week': 'var(--hexColor7)'
       }
 

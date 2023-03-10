@@ -3,7 +3,7 @@
         <div v-if="isLocalDeploy">
             <banner-vertical class="ma-3"></banner-vertical>
         </div>
-        <a-card title="Members" icon="$fas_users" color="var(--rgbaColor6)">
+        <a-card title="Members" icon="$fas_users" color="var(--rgbaColor2)">
             <div v-if="isAdmin && !isLocalDeploy" class="email-invite-container">
                 <v-combobox
                     v-model="allEmails"
@@ -39,7 +39,7 @@
                     :disabled="!allEmails || allEmails.length == 0"
                     dark
                     :style="{
-                        'color': !allEmails || allEmails.length == 0 ? 'var(--rgbaColor26) !important' : 'var(--white) !important',
+                        'color': !allEmails || allEmails.length == 0 ? 'var(--rgbaColor21) !important' : 'var(--white) !important',
                         'background-color': !allEmails || allEmails.length == 0 ? 'var(--white) !important' : 'var(--themeColor) !important',
                     }"
                     class="invite-btn"
@@ -281,7 +281,7 @@
             margin-bottom: auto
 
     &-details
-        background-color: var(--themeColorDark7)
+        background-color: var(--themeColorDark17)
         border-radius: 4px
         height: 60px
 

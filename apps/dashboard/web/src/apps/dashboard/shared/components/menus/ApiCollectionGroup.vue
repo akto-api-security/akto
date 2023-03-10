@@ -51,7 +51,7 @@ export default {
 <style lang="sass" scoped>
 .menu-item
     padding-left: 24px !important
-    background: var(--appBorder2)
+    background: var(--themeColorDark18)
     border-radius: 0px !important
     margin-bottom: 0px !important
     color: var(--themeColorDark) !important
@@ -72,7 +72,7 @@ export default {
         border-radius: 0px !important
 
 .menu-item-active
-    background: var(--pageSubtitle) !important
+    background: var(--themeColorDark5) !important
     color: var(--white) !important
 
 </style>

@@ -156,7 +156,7 @@ export default {
     padding: 0px !important
 .item-subtitle
     font-size: 9px
-    color: var(--themeColorDark2)
+    color: var(--themeColorDark7)
 .checkbox-btn
     min-height: 24px !important
     color: var(--themeColorDark) !important
@@ -178,7 +178,7 @@ export default {
     text-decoration: underline 
     color: var(--themeColor) !important
 .operator
-    color: var(--themeColorDark2)
+    color: var(--themeColorDark7)
     min-width: unset !important
     padding: 0px 8px !important
 

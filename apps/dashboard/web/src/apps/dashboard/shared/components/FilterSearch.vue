@@ -87,7 +87,7 @@ export default {
     text-decoration: underline 
     color: var(--themeColor) !important
 .operator
-    color: var(--themeColorDark2)
+    color: var(--themeColorDark7)
     min-width: unset !important
     padding: 0px 8px !important
 

@@ -268,7 +268,7 @@ export default {
                 return {
                     name: x[0],
                     y: x[1],
-                    color: ["var(--themeColor)", "var(--themeColor4)", "var(--themeColor5)", "var(--themeColor10)", "var(--themeColor9)", "var(--themeColor8)", "var(--themeColor7)", "var(--themeColor6)"][i]
+                    color: ["var(--themeColor)", "var(--themeColor2)", "var(--themeColor3)", "var(--themeColor4)", "var(--themeColor6)", "var(--themeColor7)", "var(--themeColor8)", "var(--themeColor11)"][i]
                 }
             })
 

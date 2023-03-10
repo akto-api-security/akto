@@ -7,8 +7,8 @@
             v-for="tag in tags.slice(0,2)"
             :key="tag"
             label
-            color="var(--themeColor2)"
-            text-color="var(--themeColor3)"
+            color="var(--themeColor10)"
+            text-color="var(--themeColor5)"
             class="tag-chip"
         >
             #{{toTitleCase(tag)}}

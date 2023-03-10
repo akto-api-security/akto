@@ -120,7 +120,7 @@
 
 .sign-up-third-party
   margin-bottom: 16px
-  border: 1px solid var(--themeColorDark10)
+  border: 1px solid var(--themeColorDark15)
   box-sizing: border-box
   border-radius: 4px
   text-align: center
