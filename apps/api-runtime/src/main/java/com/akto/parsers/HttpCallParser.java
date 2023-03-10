@@ -73,7 +73,7 @@ public class HttpCallParser {
         String acceptableContentType = OriginalHttpRequest.getAcceptableContentType(requestHeaders);
         if (OriginalHttpRequest.GRPC_CONTENT_TYPE.equals(acceptableContentType)) {
             payload = OriginalHttpRequest.convertGRPCEncodedToJson(payload);
-        } else if (OriginalHttpRequest.JSON_CONTENT_TYPE.equals(acceptableContentType)) {
+        } else {
 
             payload = JSONUtils.parseIfJsonP(payload);
         }

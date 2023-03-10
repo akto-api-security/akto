@@ -3,6 +3,7 @@ package com.akto.util;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.util.modifier.PayloadModifier;
 import com.google.gson.Gson;
+import com.google.gson.JsonParser;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
@@ -152,13 +153,15 @@ public class JSONUtils {
     }
 
     public static String parseIfJsonP(String payload) {
-        if (!payload.startsWith("{")) {//candidate for json with padding handleRequest ({abc : abc})
-            int indexOfMethodStart = payload.indexOf("(");
-            int indexOfMethodEnd = payload.indexOf(")");
-            String json = payload.substring(indexOfMethodStart + 1, indexOfMethodEnd - 1);//Getting the content of method
-            json = json.trim();
-            if (json.startsWith("{") && json.endsWith("}")) {//JSON
+        if (!payload.startsWith("{") && !payload.startsWith("[")) {//candidate for json with padding handleRequest ({abc : abc})
+            int indexOfMethodStart = payload.indexOf('(');
+            int indexOfMethodEnd = payload.lastIndexOf(')');
+            try {
+                String json = payload.substring(indexOfMethodStart + 1, indexOfMethodEnd);//Getting the content of method
+                JsonParser.parseString(json);
                 return json;
+            }catch (Exception e) {
+                return payload;
             }
         }
         return payload;
