@@ -152,10 +152,19 @@ public class InventoryAction extends UserAction {
     }
 
     public List<BasicDBObject> fetchEndpoints(int apiCollectionId, int page) {
-        ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
         Bson filters = Filters.eq("apiCollectionId", apiCollectionId);
         List<SingleTypeInfoView> singleTypeInfos = SingleTypeInfoViewDao.instance.findAll(filters, page * fetchEndpointsLimit, fetchEndpointsLimit, null);
-        return null;
+
+        List<BasicDBObject> endpoints = new ArrayList<>();
+        
+        for(SingleTypeInfoView singleTypeInfo: singleTypeInfos) {
+            BasicDBObject groupId = new BasicDBObject("apiCollectionId", apiCollectionId)
+                .append("url", singleTypeInfo.getApiInfoKey().getUrl())
+                .append("method", singleTypeInfo.getApiInfoKey().getMethod());
+            endpoints.add(new BasicDBObject("startTs", singleTypeInfo.getDiscoveredTs()).append("_id", groupId));
+
+        }
+        return endpoints;
     }
 
     private String hostName;
@@ -378,7 +387,7 @@ public class InventoryAction extends UserAction {
     }
 
     public String fetchAPICollection() {
-        List<BasicDBObject> list = fetchEndpointsInCollectionUsingHost(apiCollectionId);
+        List<BasicDBObject> list = fetchEndpoints(apiCollectionId, collectionPage);
 
         APISpec apiSpec = APISpecDao.instance.findById(apiCollectionId);
         Set<String> unused = null;
@@ -521,6 +530,7 @@ public class InventoryAction extends UserAction {
     private Map<String, String> filterOperators;
     private boolean sensitive;
     private boolean request;
+    private int collectionPage;
 
     private Bson prepareFilters() {
         ArrayList<Bson> filterList = new ArrayList<>();
@@ -775,5 +785,13 @@ public class InventoryAction extends UserAction {
     
     public void setSubType(String subType) {
         this.subType = subType;
+    }
+
+    public int getCollectionPage() {
+        return this.collectionPage;
+    }
+
+    public void setCollectionPage(int collectionPage) {
+        this.collectionPage = collectionPage;
     }
 }
