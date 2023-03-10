@@ -45,6 +45,7 @@
                 name="" 
                 sortKeyDefault="vulnerable" 
                 :sortDescDefault="true"
+                :defaultRowHeight="24"
                 @rowClicked="openDetails"
             >
                 <template #item.severity="{item}">
@@ -57,10 +58,10 @@
             
             </simple-table>
 
-            <v-dialog v-model="openDetailsDialog">
-                <div class="details-dialog">
+            <v-dialog v-model="openDetailsDialog" v-if="!showBelow">
+                <div class="details-dialogBox">
                     <a-card
-                        title="Test details"
+                        title="Test Details"
                         color="rgba(33, 150, 243)"
                         subtitle=""
                         icon="$fas_stethoscope"
@@ -87,6 +88,37 @@
                     </a-card>
                 </div>
             </v-dialog>
+
+            <div v-if="openDetailsDialog && showBelow">
+                <div class="details-dialog">
+                    <a-card
+                        title="Test Details"
+                        color="rgba(33, 150, 243)"
+                        subtitle=""
+                        icon="$fas_stethoscope"
+                    >
+                        <template #title-bar>
+                            <v-btn
+                                plain
+                                icon
+                                @click="openDetailsDialog = false"
+                                style="margin-left: auto"
+                            >
+                                <v-icon>$fas_times</v-icon>
+                            </v-btn>
+                        </template>
+                        <div class="pa-4">
+                            <test-results-dialog 
+                                :similarlyAffectedIssues="similarlyAffectedIssues"
+                                :testingRunResult="testingRunResult"
+                                :subCatogoryMap="subCatogoryMap"
+                                :issuesDetails="dialogBoxIssue"
+                                isTestingPage
+                                :mapCollectionIdToName="mapCollectionIdToName"/>
+                        </div>
+                    </a-card>
+                </div>
+            </div>
         </div>
         <div v-else>
             <workflow-test-builder :endpointsList="[]" apiCollectionId=0 :originalStateFromDb="originalStateFromDb" :defaultOpenResult="true" class="white-background"/>
@@ -117,7 +149,8 @@ export default {
     props: {
         testingRunHexId: obj.strR,
         defaultStartTimestamp: obj.numN,
-        defaultEndTimestamp: obj.numN
+        defaultEndTimestamp: obj.numN,
+        showBelow:obj.boolN
     },
     components: {
         DateRange,
@@ -365,7 +398,24 @@ export default {
     font-size: 14px        
     font-weight: 500
     color: #47466A80
+    margin-bottom:10px
     display: flex
     justify-content: space-between
     padding-right: 24px
+
+    
+</style>
+
+<style lang="scss" scoped>
+
+.details-dialog{
+    width: 1200px !important;
+    align-items:center;
+    justify-content:center;
+}
+
+.button-toggle{
+    padding-left: 60px;
+}
+
 </style>
