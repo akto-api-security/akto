@@ -5,6 +5,7 @@ import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.testing.SingleTypeInfoView;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
@@ -30,6 +31,7 @@ import java.util.*;
 public class InventoryAction extends UserAction {
 
     int apiCollectionId = -1;
+    int fetchEndpointsLimit = 50;
 
     BasicDBObject response;
 
@@ -147,6 +149,13 @@ public class InventoryAction extends UserAction {
     
             return endpoints;
         }
+    }
+
+    public List<BasicDBObject> fetchEndpoints(int apiCollectionId, int page) {
+        ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+        Bson filters = Filters.eq("apiCollectionId", apiCollectionId);
+        List<SingleTypeInfoView> singleTypeInfos = SingleTypeInfoViewDao.instance.findAll(filters, page * fetchEndpointsLimit, fetchEndpointsLimit, null);
+        return null;
     }
 
     private String hostName;

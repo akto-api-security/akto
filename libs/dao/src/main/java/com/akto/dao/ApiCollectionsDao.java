@@ -87,27 +87,8 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         return apiCollectionIds;
     }
 
-    public Map<Integer, Integer> buildEndpointsCountToApiCollectionMap() {
-        Map<Integer, Integer> countMap = new HashMap<>();
-        List<Bson> pipeline = new ArrayList<>();
-
-        pipeline.add(Aggregates.match(SingleTypeInfoDao.filterForHostHeader(0, false)));
-
-        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$apiCollectionId");
-        pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count",1)));
-
-        MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
-        while(endpointsCursor.hasNext()) {
-            try {
-                BasicDBObject basicDBObject = endpointsCursor.next();
-                int apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
-                int count = basicDBObject.getInt("count");
-                countMap.put(apiCollectionId, count);
-            } catch (Exception e) {
-                ;
-            }
-        }
-
-        return countMap;
+    public int getUrlCount(int apiCollectionId) {
+        Bson filters = Filters.eq("apiCollectionId", apiCollectionId);
+        return (int) SingleTypeInfoViewDao.instance.findCount(filters);
     }
 }

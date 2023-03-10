@@ -22,18 +22,10 @@ public class ApiCollectionsAction extends UserAction {
 
     public String fetchAllCollections() {
         this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
-
-        Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap();
-
+        // todo: add logic for logical groups
         for (ApiCollection apiCollection: apiCollections) {
-            int apiCollectionId = apiCollection.getId();
-            Integer count = countMap.get(apiCollectionId);
-            if (count != null && apiCollection.getHostName() != null) {
-                apiCollection.setUrlsCount(count);
-            } else {
-                apiCollection.setUrlsCount(apiCollection.getUrls().size());
-            }
-            apiCollection.setUrls(new HashSet<>());
+            int urlCount = ApiCollectionsDao.instance.getUrlCount(apiCollection.getId());
+            apiCollection.setUrlsCount(urlCount);
         }
 
         return Action.SUCCESS.toUpperCase();

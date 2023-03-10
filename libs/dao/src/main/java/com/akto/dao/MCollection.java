@@ -59,6 +59,10 @@ public abstract class MCollection<T> {
         return findAll(q, null);
     }
 
+    public long findCount(Bson q) {
+        return this.getMCollection().countDocuments(q);
+    }
+
     public List<T> findAll(Bson q, Bson projection) {
         return findAll(q, 0, 1_000_000, null, projection);
     }
