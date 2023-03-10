@@ -88,7 +88,7 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
     }
 
     public int getUrlCount(int apiCollectionId) {
-        Bson filters = Filters.eq("apiCollectionId", apiCollectionId);
+        Bson filters = Filters.eq("_id.apiCollectionId", apiCollectionId);
         return (int) SingleTypeInfoViewDao.instance.findCount(filters);
     }
 }

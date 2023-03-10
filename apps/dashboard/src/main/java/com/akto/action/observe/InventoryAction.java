@@ -152,7 +152,7 @@ public class InventoryAction extends UserAction {
     }
 
     public List<BasicDBObject> fetchEndpoints(int apiCollectionId, int page) {
-        Bson filters = Filters.eq("apiCollectionId", apiCollectionId);
+        Bson filters = Filters.eq("_id.apiCollectionId", apiCollectionId);
         List<SingleTypeInfoView> singleTypeInfos = SingleTypeInfoViewDao.instance.findAll(filters, page * fetchEndpointsLimit, fetchEndpointsLimit, null);
 
         List<BasicDBObject> endpoints = new ArrayList<>();
