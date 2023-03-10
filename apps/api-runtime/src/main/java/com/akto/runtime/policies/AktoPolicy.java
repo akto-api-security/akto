@@ -319,7 +319,6 @@ public class AktoPolicy {
     }
 
     public void process(HttpResponseParams httpResponseParams) throws Exception {
-        logger.info("processing....");
         List<CustomAuthType> customAuthTypes = SingleTypeInfo.activeCustomAuthTypes;
         ApiInfo.ApiInfoKey apiInfoKey = ApiInfo.ApiInfoKey.generateFromHttpResponseParams(httpResponseParams);
         PolicyCatalog policyCatalog = getApiInfoFromMap(apiInfoKey);
