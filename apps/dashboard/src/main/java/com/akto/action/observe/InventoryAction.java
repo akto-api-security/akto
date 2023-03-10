@@ -48,9 +48,35 @@ public class InventoryAction extends UserAction {
 
     private String subType;
     public List<SingleTypeInfo> fetchSensitiveParams() {
-        Bson filterStandardSensitiveParams = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId, url, method, subType);
+        Bson filterStandardSensitiveParams = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId, url, method, subType, null);
 
         List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(filterStandardSensitiveParams, 0, 1_000, null, Projections.exclude("values"));
+        return list;        
+    }
+    
+    public List<SingleTypeInfo> fetchSensitiveParamsForUrls(List<ApiInfoKey> apiInfoList) {
+
+        List<String> urls = new ArrayList<>();
+        Set<ApiInfoKey> apiInfoKeySet = new HashSet<ApiInfoKey>();
+
+        for (ApiInfoKey apiInfoKey: apiInfoList) {
+            urls.add(apiInfoKey.getUrl());
+            apiInfoKeySet.add(new ApiInfoKey(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod()));
+        }
+
+        Bson filterStandardSensitiveParams = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId, url, method, subType, urls);
+
+        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(filterStandardSensitiveParams, 0, 1_000, null, Projections.exclude("values"));
+
+        List<SingleTypeInfo> filteredList = new ArrayList<>();
+
+        for (SingleTypeInfo singleTypeInfo: list) {
+            ApiInfoKey apiInfoKey = new ApiInfoKey(singleTypeInfo.getApiCollectionId(), singleTypeInfo.getUrl(), Method.fromString(singleTypeInfo.getMethod()));
+            if (apiInfoKeySet.contains(apiInfoKey)) {
+                filteredList.add(singleTypeInfo);
+            }
+        }
+
         return list;        
     }
 
@@ -419,7 +445,7 @@ public class InventoryAction extends UserAction {
         List<SingleTypeInfo> list = new ArrayList<>();
         for (int i = 0; i < urls.size(); i += batchSize) {
             List<String> slice = urls.subList(i, Math.min(i+batchSize, urls.size()));
-            Bson sensitiveFilters = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(null, null, null, null);
+            Bson sensitiveFilters = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(null, null, null, null, null);
             Bson sensitiveFiltersWithUrls = 
                 Filters.and(Filters.in("url", slice), sensitiveFilters);
             List<SingleTypeInfo> sensitiveSTIs = SingleTypeInfoDao.instance.findAll(sensitiveFiltersWithUrls, 0, 2000, null, Projections.exclude("values"));
@@ -442,6 +468,39 @@ public class InventoryAction extends UserAction {
     public String loadSensitiveParameters() {
 
         List list = fetchSensitiveParams();
+        List<Bson> filterCustomSensitiveParams = new ArrayList<>();
+
+        if (subType == null) {
+            filterCustomSensitiveParams.add(Filters.eq("sensitive", true));
+            
+            if (apiCollectionId != -1) {
+                Bson apiCollectionIdFilter = Filters.eq("apiCollectionId", apiCollectionId);
+                filterCustomSensitiveParams.add(apiCollectionIdFilter);
+            }
+
+            if (url != null) {
+                Bson urlFilter = Filters.eq("url", url);
+                filterCustomSensitiveParams.add(urlFilter);
+            }
+
+            if (method != null) {
+                Bson methodFilter = Filters.eq("method", method);
+                filterCustomSensitiveParams.add(methodFilter);
+            }
+
+            List<SensitiveParamInfo> customSensitiveList = SensitiveParamInfoDao.instance.findAll(Filters.and(filterCustomSensitiveParams));
+            list.addAll(customSensitiveList);
+        }
+
+        response = new BasicDBObject();
+        response.put("data", new BasicDBObject("endpoints", list));
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchSensitiveParameters() {
+
+        List list = fetchSensitiveParamsForUrls(apiInfoList);
         List<Bson> filterCustomSensitiveParams = new ArrayList<>();
 
         if (subType == null) {
@@ -531,6 +590,7 @@ public class InventoryAction extends UserAction {
     private boolean sensitive;
     private boolean request;
     private int collectionPage;
+    private List<ApiInfoKey> apiInfoList;
 
     private Bson prepareFilters() {
         ArrayList<Bson> filterList = new ArrayList<>();
@@ -793,5 +853,13 @@ public class InventoryAction extends UserAction {
 
     public void setCollectionPage(int collectionPage) {
         this.collectionPage = collectionPage;
+    }
+
+    public List<ApiInfoKey> getApiInfoList(List<ApiInfoKey> apiInfoList) {
+        return this.apiInfoList;
+    }
+
+    public void setApiInfoList(List<ApiInfoKey> apiInfoList) {
+        this.apiInfoList = apiInfoList;
     }
 }

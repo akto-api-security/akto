@@ -124,7 +124,15 @@ const inventory = {
             }
             return api.fetchAPICollection(apiCollectionId).then((resp) => {
                 commit('SAVE_API_COLLECTION', {data: resp.data, apiCollectionId: apiCollectionId, unusedEndpoints: resp.unusedEndpoints}, options)
-                api.loadSensitiveParameters(apiCollectionId).then(allSensitiveFields => {
+
+                let apiInfoList = []
+                if (resp.data.endpoints != null) {
+                    resp.data.endpoints.forEach(data => {
+                        apiInfoList.push({"apiCollectionId": data._id.apiCollectionId, "url": data._id.url, "method": data._id.method})
+                    })
+                }
+
+                api.fetchSensitiveParameters(apiInfoList).then(allSensitiveFields => {
                     commit('SAVE_SENSITIVE', allSensitiveFields.data.endpoints)
                 })
                 api.loadContent(apiCollectionId).then(resp => {

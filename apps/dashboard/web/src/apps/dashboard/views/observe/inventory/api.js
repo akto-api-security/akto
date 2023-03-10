@@ -130,6 +130,17 @@ export default {
             return resp
         })
     },
+    fetchSensitiveParameters (apiInfoList) {
+        return request({
+            url: '/api/fetchSensitiveParameters',
+            method: 'post',
+            data: {
+                apiInfoList
+            }
+        }).then((resp) => {
+            return resp
+        })
+    },
     loadParamsOfEndpoint (apiCollectionId, url, method) {
         return request({
             url: '/api/loadParamsOfEndpoint',
