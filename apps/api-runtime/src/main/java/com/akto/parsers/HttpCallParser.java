@@ -8,6 +8,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
+import com.akto.util.JSONUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.client.model.Filters;
@@ -69,6 +70,13 @@ public class HttpCallParser {
         String status = (String) json.get("status");
         Map<String,List<String>> responseHeaders = OriginalHttpRequest.buildHeadersMap(json, "responseHeaders");
         String payload = (String) json.get("responsePayload");
+        String acceptableContentType = OriginalHttpRequest.getAcceptableContentType(requestHeaders);
+        if (OriginalHttpRequest.GRPC_CONTENT_TYPE.equals(acceptableContentType)) {
+            payload = OriginalHttpRequest.convertGRPCEncodedToJson(payload);
+        } else {
+
+            payload = JSONUtils.parseIfJsonP(payload);
+        }
         int time = Integer.parseInt(json.get("time").toString());
         String accountId = (String) json.get("akto_account_id");
         String sourceIP = (String) json.get("ip");
