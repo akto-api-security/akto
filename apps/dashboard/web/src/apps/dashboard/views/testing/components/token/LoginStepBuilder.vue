@@ -284,7 +284,6 @@ export default {
         },
         onChange(key, newData) {
             this.updatedData[key] = newData
-            console.log(key, newData)
         },
         testSingleStep() {
           this.$emit('testSingleStep', this.updatedData, this.tabName)
