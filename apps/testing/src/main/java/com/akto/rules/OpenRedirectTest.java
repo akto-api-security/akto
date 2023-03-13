@@ -9,6 +9,7 @@ import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
+import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
 import com.akto.util.modifier.NestedObjectModifier;
 import com.akto.util.modifier.SetValueModifier;
@@ -67,7 +68,7 @@ public class OpenRedirectTest extends TestPlugin {
             }
 
             // find if location is being passed in queryParams
-            String queryJson = OriginalHttpRequest.convertFormUrlEncodedToJson(req.getQueryParams());
+            String queryJson = HttpRequestResponseUtils.convertFormUrlEncodedToJson(req.getQueryParams());
             BasicDBObject queryObj = BasicDBObject.parse(queryJson);
             for (String key: queryObj.keySet()) {
                 Object valueObj = queryObj.get(key);
