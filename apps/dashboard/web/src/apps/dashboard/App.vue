@@ -98,7 +98,7 @@
           </template>
         </router-view>
         <div class="akto-external-links">
-          <v-btn primary dark depressed color="var(--hexColor40ad)" @click='openDiscordCommunity'>
+          <v-btn primary dark depressed color="var(--hexColor40)" @click='openDiscordCommunity'>
             Ask us on <v-icon size="16">$fab_discord</v-icon>
           </v-btn>
           <v-btn primary dark depressed class="github-btn" @click='openGithubRepoPage'>    
