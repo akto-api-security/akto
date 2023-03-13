@@ -4,12 +4,12 @@
       <v-avatar size="40px" style="margin-right: 15px">
         <v-icon :size="50" style="width: 50px !important">$postman</v-icon>
       </v-avatar>
-      <h2 style="color: #47466A; font-size: 16px; font-weight: 500" class="fd-column jc-sa">Postman</h2>
+      <h2 style="color: var(--themeColorDark); font-size: 16px; font-weight: 500" class="fd-column jc-sa">Postman</h2>
     </div>
     <div>
       <div class="d-flex">
         <div style="width: 150px" class="fd-column jc-sa">
-          <h3 style="color: #47466A; font-size: 13px">API Key</h3>
+          <h3 style="color: var(--themeColorDark); font-size: 13px">API Key</h3>
         </div>
         <div style="width: 550px">
           <v-text-field
@@ -28,7 +28,7 @@
 
       <div class="d-flex"  v-if="postman_api_key && postman_api_key.length > 0">
         <div style="width: 150px">
-          <h3 style="color: #47466A; font-size: 13px">Workspace</h3>
+          <h3 style="color: var(--themeColorDark); font-size: 13px">Workspace</h3>
         </div>
         <div style="width: 550px">
           <v-select
@@ -49,7 +49,7 @@
 
       <div style="padding-top:20px">
         <v-btn
-            color="#6200EA"
+            color="var(--themeColor)"
             @click="save"
             :disabled="!can_be_saved"
             :loading="save_loading"

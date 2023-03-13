@@ -3,7 +3,7 @@
         <div v-if="isLocalDeploy">
             <banner-vertical class="ma-3"></banner-vertical>
         </div>
-        <a-card title="Members" icon="$fas_users" color="rgba(33, 150, 243)">
+        <a-card title="Members" icon="$fas_users" color="var(--rgbaColor2)">
             <div v-if="isAdmin && !isLocalDeploy" class="email-invite-container">
                 <v-combobox
                     v-model="allEmails"
@@ -39,8 +39,8 @@
                     :disabled="!allEmails || allEmails.length == 0"
                     dark
                     :style="{
-                        'color': !allEmails || allEmails.length == 0 ? 'rgb(255, 255, 255, 0.3) !important' : '#FFFFFF !important',
-                        'background-color': !allEmails || allEmails.length == 0 ? '#FFFFFF !important' : '#6200EA !important',
+                        'color': !allEmails || allEmails.length == 0 ? 'var(--rgbaColor21) !important' : 'var(--white) !important',
+                        'background-color': !allEmails || allEmails.length == 0 ? 'var(--white) !important' : 'var(--themeColor) !important',
                     }"
                     class="invite-btn"
                 >
@@ -214,8 +214,8 @@
 
         &-icon
             font-size: 16px !important
-            color: #304ffe
-            border: 2px solid #304ffe
+            color: var(--teamColor)
+            border: 2px solid var(--teamColor)
             border-radius: 50%
             width: 30px !important
             height: 30px !important
@@ -223,7 +223,7 @@
 
         &-cta
             font-size: 16px
-            color: #304ffe
+            color: var(--teamColor)
             font-weight: 400
             margin-top: auto
             margin-bottom: auto
@@ -240,17 +240,17 @@
 
         &-name
             font-size: 12px
-            color: #47466A
+            color: var(--themeColorDark)
             font-weight: 500
 
         &-login
             font-size: 12px
-            color: #2D243480
+            color: var(--teamColor2)
             font-weight: 400
 
         &-type
             font-size: 12px
-            color: #2D243480
+            color: var(--teamColor2)
             font-weight: 400
             width: 20%
             margin-top: auto
@@ -266,8 +266,8 @@
 
         &-icon
             font-size: 16px !important
-            color: #304ffe
-            border: 2px solid #304ffe
+            color: var(--teamColor)
+            border: 2px solid var(--teamColor)
             border-radius: 50%
             width: 30px !important
             height: 30px !important
@@ -275,19 +275,19 @@
 
         &-cta
             font-size: 16px
-            color: #304ffe
+            color: var(--teamColor)
             font-weight: 400
             margin-top: auto
             margin-bottom: auto
 
     &-details
-        background-color: #47466A0d
+        background-color: var(--themeColorDark17)
         border-radius: 4px
         height: 60px
 
         &-cards
             font-size: 12px
-            color: #2D243480
+            color: var(--teamColor2)
             font-weight: 400
             margin-top: auto
             margin-bottom: auto
@@ -296,7 +296,7 @@
 
         &-name
             font-size: 13px
-            color: #47466A !important
+            color: var(--themeColorDark) !important
             font-weight: 500
             margin-top: auto
             margin-bottom: auto
@@ -314,10 +314,10 @@
   padding: 8px 0px 8px 8px
   height: 32px
   margin: 8px 8px 4px 0 !important
-  background-color: #FFFFFF !important
+  background-color: var(--white) !important
 
 .v-select__slot
-  border: 1px solid #000000
+  border: 1px solid var(--black)
 
   & .v-label-active
     top: -10px

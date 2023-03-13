@@ -10,7 +10,7 @@
         width=100
       >
         <div>
-            <v-icon color="#6200EA">$fas_angle-left</v-icon> <span class="btn-text"> Back</span>
+            <v-icon color="var(--themeColor)">$fas_angle-left</v-icon> <span class="btn-text"> Back</span>
         </div>
         
       </v-btn>
@@ -67,7 +67,7 @@ export default {
   margin: 0px !important
 
 .btn-text
-  color: #6200EA
+  color: var(--themeColor)
   vertical-align: text-top
 
 </style>

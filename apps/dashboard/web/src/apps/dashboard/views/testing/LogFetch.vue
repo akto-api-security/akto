@@ -1,7 +1,7 @@
 <template>
     <div class="pa-4 automation-container">
         <div>
-            <v-btn primary plain color="#6200EA" @click='fetchPreviousLogs' >
+            <v-btn primary plain color="var(--themeColor)" @click='fetchPreviousLogs' >
                 Previous
             </v-btn>
             <div class="log-content">
@@ -11,7 +11,7 @@
             <div style="font-weight: bold; font-size: 14px;">
                 Logs Fetched Between {{logsFetchBetween}}
             </div>
-            <v-btn primary plain color="#6200EA" @click='fetchNextLogs' >
+            <v-btn primary plain color="var(--themeColor)" @click='fetchNextLogs' >
                 Next
             </v-btn>
 
@@ -94,11 +94,11 @@ export default {
 
 .log-content {
     font-size: 14px;
-    color: #47466A;
+    color: var(--themeColorDark);
     width: 100%;
     height: 100%;
     font-family: monospace;
-    background: #FFFFFF;
+    background: var(--white);
 }
 
 </style>

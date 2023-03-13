@@ -16,7 +16,7 @@
                         <template v-slot:activator='{on, attrs}'>
                             <v-btn 
                                 icon 
-                                color="#47466A" 
+                                color="var(--themeColorDark)" 
                                 @click="refreshPage(false)"
                                 v-on="on"
                                 v-bind="attrs"
@@ -347,7 +347,7 @@ export default {
                 return {
                     name: x[0],
                     y: x[1],
-                    color: x[0] === 'General' ? "#7D787838" : (["#6200EAFF", "#6200EADF", "#6200EABF", "#6200EA9F", "#6200EA7F", "#6200EA5F", "#6200EA3F", "#6200EA1F"][i])
+                    color: x[0] === 'General' ? "var(--hexColor16)" : (["var(--themeColor)", "var(--themeColor2)", "var(--themeColor3)", "var(--themeColor4)", "var(--themeColor6)", "var(--themeColor7)", "var(--themeColor8)", "var(--themeColor11)"][i])
                 }
             })
         },
@@ -376,7 +376,7 @@ export default {
                 return {
                     "name": x[0],
                     "y": x[1],
-                    "color": x[0] === 'General' ? "#7D787838" : (["#6200EAFF", "#6200EADF", "#6200EABF", "#6200EA9F", "#6200EA7F", "#6200EA5F", "#6200EA3F", "#6200EA1F"][i])
+                    "color": x[0] === 'General' ? "var(--hexColor16)" : (["var(--themeColor)", "var(--themeColor2)", "var(--themeColor3)", "var(--themeColor4)", "var(--themeColor6)", "var(--themeColor7)", "var(--themeColor8)", "var(--themeColor11)"][i])
                 }
             })
         }

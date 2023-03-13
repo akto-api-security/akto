@@ -80,7 +80,7 @@ export default {
 }
 
 .codeblock {
-    background-color: rgb(242, 242, 242);
+    background-color: var(--hexColor39);
     min-width: 500px;
     max-width: 100%;
     max-height: 300px;

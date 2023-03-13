@@ -13,13 +13,13 @@
             </div>
             <stacked-chart
                 type='column'
-                color='#FF000080'
+                color='var(--hexColor33)'
                 :areaFillHex="false"
                 :height="250"
                 title="Test results"
                 :data="testResultsChartData()"
                 :defaultChartOptions="{legend:{enabled: false}}"
-                background-color="rgba(0,0,0,0.0)"
+                background-color="var(--transparent)"
                 :text="true"
                 class="pa-5"
                 @dateClicked=dateClicked
@@ -61,7 +61,7 @@
                 <div class="details-dialog">
                     <a-card
                         title="Test details"
-                        color="rgba(33, 150, 243)"
+                        color="var(--rgbaColor2)"
                         subtitle=""
                         icon="$fas_stethoscope"
                     >
@@ -175,9 +175,9 @@ export default {
     methods: {
         getColor(severity) {
             switch (severity) {
-                case "HIGH": return "#FF000080"
-                case "MEDIUM":  return "#FF5C0080"
-                case "LOW": return "#F9B30080"
+                case "HIGH": return "var(--hexColor33)"
+                case "MEDIUM":  return "var(--hexColor34)"
+                case "LOW": return "var(--hexColor35)"
             }
             
         },
@@ -212,17 +212,17 @@ export default {
             return [
                 {
                     data: retH,
-                    color: "#FF000080",
+                    color: "var(--hexColor33)",
                     name: "High"
                 },
                 {
                     data: retM,
-                    color: "#FF5C0080",
+                    color: "var(--hexColor34)",
                     name: "Medium"
                 },
                 {
                     data: retL,
-                    color: "#F9B30080",
+                    color: "var(--hexColor35)",
                     name: "Low"
                 }
             ]
@@ -350,7 +350,7 @@ export default {
 
 <style lang="sass" scoped>
 .testing-run-results-container
-    color: #47466A !important
+    color: var(--themeColorDark) !important
     
 .testing-run-title
     font-weight: 500 
@@ -364,7 +364,7 @@ export default {
 .testing-results-header
     font-size: 14px        
     font-weight: 500
-    color: #47466A80
+    color: var(--themeColorDark9)
     display: flex
     justify-content: space-between
     padding-right: 24px

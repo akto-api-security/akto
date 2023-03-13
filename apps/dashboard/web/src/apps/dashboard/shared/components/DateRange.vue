@@ -6,7 +6,7 @@
     >
         <template v-slot:activator="{ on, attrs }" v-bind:dates="currDates" v-bind:formatTitleDate="formatTitleDate">
             <v-btn
-                color="#6200EA"
+                color="var(--themeColor)"
                 dark
                 v-bind="attrs"
                 v-on="on"
@@ -21,7 +21,7 @@
                 <v-date-picker
                     v-model="dates"
                     range
-                    color="#6200EA"
+                    color="var(--themeColor)"
                     :allowed-dates="isDateAllowed"
                     :titleDateFormat="formatTitleDate"
                     @input="datesSelected"

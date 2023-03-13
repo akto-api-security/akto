@@ -359,14 +359,14 @@ export default {
         vertical-align: bottom
         text-align: left
         padding: 12px 8px !important
-        border: 1px solid #FFFFFF !important
+        border: 1px solid var(--white) !important
 
     .table-column
         padding: 4px 8px !important
-        border-top: 1px solid #FFFFFF !important
-        border-bottom: 1px solid #FFFFFF !important
-        background: rgba(71, 70, 106, 0.03)
-        color: #47466A
+        border-top: 1px solid var(--white) !important
+        border-bottom: 1px solid var(--white) !important
+        background: var(--themeColorDark18)
+        color: var(--themeColorDark)
         max-width: 250px
         text-overflow: ellipsis
         overflow : hidden
@@ -379,11 +379,11 @@ export default {
 
 
     .table-row
-        border: 0px solid #FFFFFF !important
+        border: 0px solid var(--white) !important
         position: relative
 
         &:hover
-            background-color: #edecf0 !important
+            background-color: var(--colTableBackground) !important
             
     .form-field-text
         padding-top: 8px !important
@@ -416,7 +416,7 @@ export default {
     position: relative
 
 .filter-icon
-    color: #6200EA !important
+    color: var(--themeColor) !important
     opacity:0.8
     min-width: 0px !important
     position: absolute
@@ -427,13 +427,13 @@ export default {
 <style scoped>
 .form-field-text >>> .v-label {
   font-size: 12px;
-  color: #6200EA;
+  color: var(--themeColor);
   font-weight: 400;
 }
 
 .form-field-text >>> input {
   font-size: 14px;
-  color: #6200EA;
+  color: var(--themeColor);
   font-weight: 500;
 }
 

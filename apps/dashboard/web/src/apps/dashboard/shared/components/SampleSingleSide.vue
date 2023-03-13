@@ -191,10 +191,10 @@ export default {
 <style scoped lang="sass">
 .sample-data
     &-container
-        background-color: #47466A0D
+        background-color: var(--themeColorDark17)
         font-size: 13px
         padding: 8px
-        color: #47466A
+        color: var(--themeColorDark)
         height: 100%
     &-title
         font-weight: 500
@@ -207,11 +207,11 @@ export default {
         &-key
             font-weight: 500  
         &-val
-            color: #47466A99
+            color: var(--themeColorDark7)
       
     &-message
         padding-top: 16px   
-        color: #47466A99 
+        color: var(--themeColorDark7) 
         overflow-wrap: anywhere
 
 </style>
@@ -219,12 +219,12 @@ export default {
 
 <style lang="scss">
 .wrapper .value-key {
-  color: #47466A99;
+  color: var(--themeColorDark7);
   padding: 1px 5px 2px 10px;
 }
 
 .wrapper .data-key {
-  color: #47466A;
+  color: var(--themeColorDark);
   padding: 1px 5px 2px 7px;
 }
 

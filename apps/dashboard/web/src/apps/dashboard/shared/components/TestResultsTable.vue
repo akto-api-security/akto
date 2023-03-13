@@ -158,18 +158,18 @@
 <style lang="sass" scoped>
     .goal-name
         font-size: 14px
-        color: #6200EA
+        color: var(--themeColor)
         white-space: nowrap
         overflow: hidden
         text-overflow: ellipsis
         cursor: pointer
         &:hover
-            text-underline: #47466A
+            text-underline: var(--themeColorDark)
 
     .goal-period
         font-weight: 500
         font-size: 12px
-        color: #47466A
+        color: var(--themeColorDark)
         opacity: 0.5
 
     .goal-action
@@ -178,12 +178,12 @@
     .goal-status
         font-weight: 600
         font-size: 14px
-        color: #47466A
+        color: var(--themeColorDark)
 
     .goal-achieved
         font-weight: 500
         font-size: 12px
-        color: #47466A
+        color: var(--themeColorDark)
         opacity: 0.5
         padding-top: 8px
 
@@ -199,13 +199,13 @@
 <style scoped>
 .form-field-text >>> .v-label {
   font-size: 12px;
-  color: #6200EA;
+  color: var(--themeColor);
   font-weight: 400;
 }
 
 .form-field-text >>> input {
   font-size: 14px;
-  color: #6200EA;
+  color: var(--themeColor);
   font-weight: 500;
 }
 
@@ -246,38 +246,38 @@
             width: 16px
             border-radius: 2px
             ::before
-                color: #FFFFFF
+                color: var(--white)
 
         .table-parent-header
             font-weight: 700
             font-size: 13px
-            color: rgba(71, 70, 106, 0.75)
+            color: var(--themeColorDark4)
             padding-bottom: 6px
 
         .table-sub-header
             font-weight: 500
             font-size: 13px
-            color: rgba(71, 70, 106, 0.55)
+            color: var(--themeColorDark12)
 
         .grey-color-entry
-            color: rgba(71, 70, 106, 0.35)
+            color: var(--themeColorDark11)
 
         .black-color-entry
-            color: rgba(71, 70, 106, 0.85)
+            color: var(--themeColorDark2)
 
         .table-header
             vertical-align: bottom
             text-align: left
             padding: 12px 8px !important
             z-index: 1
-            border: 1px solid #FFFFFF !important
+            border: 1px solid var(--white) !important
 
         .table-column
             padding: 8px 16px !important
             z-index: 1
-            border: 1px solid #FFFFFF !important
-            background: rgba(71, 70, 106, 0.03)
-            color: #47466A
+            border: 1px solid var(--white) !important
+            background: var(--themeColorDark18)
+            color: var(--themeColorDark)
             &:nth-child(1)
                 left: 0px
                 min-width: 8px !important
@@ -302,7 +302,7 @@
             top: auto
             z-index: 10 !important
             opacity: 1
-            background-color: #FFFFFF
+            background-color: var(--white)
             &:nth-child(2)
                 left: 0px
                 min-width: 8px !important
@@ -325,7 +325,7 @@
             top: auto
             z-index: 10 !important
             opacity: 1
-            background-color: #edecf0
+            background-color: var(--colTableBackground)
             &:nth-child(1)
                 left: 0px
                 min-width: 8px !important
@@ -345,9 +345,9 @@
                 min-width: 136px !important
 
         .table-row
-            border: 0px solid #FFFFFF !important
+            border: 0px solid var(--white) !important
 
             &:hover
-                background-color: #edecf0 !important
+                background-color: var(--colTableBackground) !important
 
 </style>

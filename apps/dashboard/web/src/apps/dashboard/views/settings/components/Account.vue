@@ -52,7 +52,7 @@
             <div class="entry-text">Redact sample data</div>
             <div class="entry-value">
                 <v-switch
-                    color="#6200EA"
+                    color="var(--themeColor)"
                     v-model="localRedactPayload"
                 />
             </div>
@@ -62,7 +62,7 @@
             <div class="entry-text">Activate new merging</div>
             <div class="entry-value">
                 <v-switch
-                    color="#6200EA"
+                    color="var(--themeColor)"
                     v-model="localMergeAsyncOutside"
                 />
             </div>

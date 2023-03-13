@@ -233,7 +233,7 @@ export default Vue.extend({
   &.can-select {
     cursor: pointer;
     &:hover {
-      background-color: rgba(0, 0, 0, 0.08);
+      background-color: var(--rgbaColor11);
       text-overflow: clip;
       white-space: normal;
       word-break: break-all
@@ -287,11 +287,11 @@ export default Vue.extend({
 .key-class {
     text-decoration-line: underline;
     text-decoration-style: wavy;
-    text-decoration-color: #f44336;
+    text-decoration-color: var(--redMetric);
 }
 
 .sensitive-hightlight-class {
-  background-color: #FF000033;
+  background-color: var(--hexColor30);
 }
 
 

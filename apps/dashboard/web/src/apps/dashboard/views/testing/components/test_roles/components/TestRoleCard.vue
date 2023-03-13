@@ -60,15 +60,15 @@ export default {
 
 .table-column
     padding: 4px 8px !important
-    color: #47466A
+    color: var(--themeColorDark)
 
 .table-row
     position: relative
-    background: rgba(71, 70, 106, 0.03)
+    background: var(--themeColorDark18)
     line-height: 40px
 
     &:hover
-        background-color: #edecf0 !important
+        background-color: var(--colTableBackground) !important
 
 .table-row-actions
   padding-top: 5px !important

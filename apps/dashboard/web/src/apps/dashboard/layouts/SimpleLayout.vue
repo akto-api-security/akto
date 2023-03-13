@@ -36,14 +36,14 @@
 .board-name
     font-weight: 600
     font-size: 24px
-    color: #47466A
+    color: var(--themeColorDark)
 
 .board-description
     font-weight: 500
     font-size: 13px
-    color: #47466A
+    color: var(--themeColorDark)
     opacity: 0.7
     padding-top: 4px
 .layout-border
-    border-bottom: 1px solid #47466A19
+    border-bottom: 1px solid var(--themeColorDark16)
 </style>

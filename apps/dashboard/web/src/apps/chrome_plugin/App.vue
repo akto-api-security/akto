@@ -170,7 +170,7 @@
     @import url('https://fonts.googleapis.com/css?family=Poppins:400,500,600&display=swap');
     .v-application {
         font-family: Poppins, sans-serif !important;
-        color: #2d2434;
+        color: var(--base);
         letter-spacing: unset !important;
     }
 
@@ -186,7 +186,7 @@
     text-decoration: auto
 
 .active-tab
-    color: #2d2434
+    color: var(--base)
     font-weight: 500
 
 .tabs-container
@@ -198,7 +198,7 @@
     padding: 0
 
 .brdb
-  border-bottom: 1px solid rgba(71, 70, 106, 0.2) !important
+  border-bottom: 1px solid var(--themeColorDark13) !important
 
 .highcharts-credits
   display: none
@@ -206,7 +206,7 @@
 .v-tooltip__content
   font-size: 10px !important
   opacity: 1 !important
-  background-color: #7e7e97
+  background-color: var(--lightGrey)
   border-radius: 2px
   transition: all 0s !important
 
@@ -217,7 +217,7 @@
 .v-tooltip__content:after
   border-left: solid transparent 4px
   border-right: solid transparent 4px
-  border-bottom: solid #7e7e97 4px
+  border-bottom: solid var(--lightGrey) 4px
   top: -4px
   content: " "
   height: 0
@@ -235,7 +235,7 @@
     height: 271px
     margin-top: auto
     margin-bottom: auto
-    color: #47466A3D
+    color: var(--themeColorDark12)
     font-size: 13px
 
 

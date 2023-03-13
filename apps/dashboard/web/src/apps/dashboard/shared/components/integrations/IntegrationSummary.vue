@@ -10,7 +10,7 @@
       <span>Data source: </span>
       <span class="custom-input">{{dataSourceInfo.worksheetName}}</span>
       <span>in</span>
-      <v-icon :size="12" color="#33a852">$fas_file-csv</v-icon>
+      <v-icon :size="12" color="var(--hexColor8)">$fas_file-csv</v-icon>
       <span class="custom-input">{{dataSourceInfo.sheetName}}</span>
     </div>
 
@@ -46,16 +46,16 @@ export default {
   padding-top: 20px
   & span
     font-size: 14px
-    color: #47466A
+    color: var(--themeColorDark)
     margin-left: 4px
 
   & .custom-input
-    color: #6200EA !important
+    color: var(--themeColor) !important
     font-weight: 500
 
 .heading
   font-size: 16px
   font-weight: 500
-  color: #47466A
+  color: var(--themeColorDark)
   padding-top: 20px
 </style>

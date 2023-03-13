@@ -111,7 +111,7 @@
                 <div style="padding: 12px">
                   <v-btn
                         @click="save"
-                        color="#6200EA"
+                        color="var(--themeColor)"
                         class="save-btn"
                         height="40px"
                         width="100px"
@@ -136,7 +136,7 @@
                                 :size="30"
                                 :width="5"
                                 :value="computeLoading"
-                                color="#6200EA"
+                                color="var(--themeColor)"
                             >
                             </v-progress-circular>
                             {{ computeLoading + "%"}}
@@ -313,21 +313,21 @@ export default {
         margin-bottom: 6px
         margin-top: 6px
         &.inactive
-            color: #475467
-            background-color: #FCFCFD
+            color: var(--hexColor10)
+            background-color: var(--white2)
         &.true
-            color: #12B76A
-            background-color: #E8FFF4
+            color: var(--hexColor5)
+            background-color: var(--hexColor25)
         &.false
-            color: #F04438
-            background-color: #FFE9E8
+            color: var(--hexColor28)
+            background-color: var(--hexColor32)
         &:hover
             cursor: pointer
         &.v-btn:before
-            background-color: #FFFFFF
+            background-color: var(--white)
 
     .save-btn
-        background-color: #6200EA !important
+        background-color: var(--themeColor) !important
         font-size: 16px
         font-weight: 600
         vertical-align: middle
@@ -337,7 +337,7 @@ export default {
         width: 100%
         height: 48px !important
         margin-bottom: 24px
-        color: #FFFFFF
+        color: var(--white)
 
         &.v-btn--disabled
             opacity: 0.3
@@ -352,7 +352,7 @@ export default {
         width: 100%
         height: 48px !important
         margin-bottom: 24px
-        color: #47466A
+        color: var(--themeColorDark)
 
 
     .form-text
@@ -366,6 +366,6 @@ export default {
 
 <style>
     .v-input, .v-input input, .v-input textarea {
-        color:  #47466a !important
+        color:  var(--themeColorDark) !important
     }
 </style>

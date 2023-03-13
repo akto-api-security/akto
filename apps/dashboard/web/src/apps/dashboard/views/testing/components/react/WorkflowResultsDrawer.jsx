@@ -54,7 +54,7 @@ const WorkflowResultsDrawer = (props) => {
                     {testStatus()}
                 </Grid>
                 <Grid item xs={12} style={{padding: 0, margin:0}}>
-                    {testRunning ?  <LinearProgress style={{backgroundColor: "#6200EA"}}/> : null}
+                    {testRunning ?  <LinearProgress style={{backgroundColor: "var(--themeColor)"}}/> : null}
                 </Grid>
             </Grid>
         )

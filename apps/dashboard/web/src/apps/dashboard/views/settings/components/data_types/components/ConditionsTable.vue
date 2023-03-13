@@ -1,7 +1,7 @@
 <template>
     <div style="width: 100%;">
         <div style="padding-bottom: 10px; font-weight: bold; display: inline-block">
-            <span style="color: #47466a">
+            <span style="color: var(--themeColorDark)">
                 {{table_header}}
             </span>
             <v-icon @click="addNewRow" class="addRowIcon">
@@ -131,7 +131,7 @@ export default {
     width: 100%
     border-style: solid
     padding: 16px
-    border-color: rgba(71,70,106,0.2)
+    border-color: var(--themeColorDark13)
     border-top-width: 0.5px
     border-bottom-width: 1px
     border-left-width: 1px
@@ -141,7 +141,7 @@ export default {
         border-top-width: 1px
 
 .addRowIcon
-    color: #6200EA
+    color: var(--themeColor)
     width: 100%
     height: 100%
 

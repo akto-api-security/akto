@@ -5,9 +5,9 @@
             v-model="tabName"
             vertical
             active-class="active-tab"
-            slider-color="#6200ea"
+            slider-color="var(--themeColor)"
         >
-          <v-tabs-slider color="#6200EA" style="width: 4px"></v-tabs-slider>
+          <v-tabs-slider color="var(--themeColor)" style="width: 4px"></v-tabs-slider>
           <v-tab
               v-for="(category, index) in integrationsList"
               :key="index"
@@ -170,8 +170,8 @@ export default {
   width: fit-content
 
 .active-tab
-  background-color: #47466A2F
-  color: #6200EA
+  background-color: var(--themeColorDark14)
+  color: var(--themeColor)
 
 .right-pane-tab
   justify-content: left
@@ -186,8 +186,8 @@ export default {
 .category-header
   width: 100%
   padding-bottom: 8px
-  color: #47466A
-  border-bottom: 1px solid #47466A
+  color: var(--themeColorDark)
+  border-bottom: 1px solid var(--themeColorDark)
   margin-bottom: 16px
   font-weight: 500
 </style>
