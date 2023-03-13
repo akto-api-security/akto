@@ -5,6 +5,9 @@ import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.testing.EndpointDataFilterCondition;
+import com.akto.dto.testing.EndpointDataQuery;
+import com.akto.dto.testing.EndpointDataSortCondition;
 import com.akto.dto.testing.SingleTypeInfoView;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
@@ -120,6 +123,50 @@ public class InventoryAction extends UserAction {
         }
 
         return endpoints;
+    }
+
+    public List<SingleTypeInfoView> executeEndpointDataQuery(EndpointDataQuery endpointDataQuery) {
+
+        ArrayList<Bson> filterList = new ArrayList<>();
+        List<Bson> sorts = new ArrayList<>();
+        String key;
+        ArrayList<Object> values;
+        int sortOrder;
+        for (EndpointDataFilterCondition endpointDataFilterCondition: endpointDataQuery.getFilterConditions()) {
+            key = endpointDataFilterCondition.getKey();
+            values = endpointDataFilterCondition.getValues();
+
+            if (key == "apiCollectionId") {
+                filterList.add((Filters.eq(key, (int) values.get(0))));
+            }
+
+            if (key == "url") {
+                filterList.add(Filters.regex(key, ".*"+values.get(0)+".*"));
+            }
+
+            if (key == "accessTypes" || key == "authTypes" || key == "sensitiveParams") {
+                filterList.add((Filters.in(key, values)));
+            }
+
+            if (key == "lastSeenTs" || key == "discoveredTs") {
+                filterList.add(Filters.eq(key, (int) values.get(0)));
+            }
+        }
+
+        for (EndpointDataSortCondition endpointDataSortCondition: endpointDataQuery.getSortConditions()) {
+            key = endpointDataSortCondition.getKey();
+            sortOrder = endpointDataSortCondition.getSortOrder();
+
+            if (sortOrder == 1) {
+                sorts.add(Sorts.ascending(key));
+            } else {
+                sorts.add(Sorts.descending(key));
+            }
+        }
+        
+        Bson sort = Sorts.orderBy(sorts);
+        List<SingleTypeInfoView> data = SingleTypeInfoViewDao.instance.findAll(Filters.and(filterList), collectionPage * fetchEndpointsLimit, fetchEndpointsLimit, sort);
+        return data;
     }
 
     public static final int LIMIT = 2000;
@@ -438,6 +485,13 @@ public class InventoryAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchEndpointData() {
+
+        List<SingleTypeInfoView> endpointDataResponse = executeEndpointDataQuery(endpointDataQuery);
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
     private List<String> urls;
     public String fetchSensitiveParamsForEndpoints() {
 
@@ -591,6 +645,8 @@ public class InventoryAction extends UserAction {
     private boolean request;
     private int collectionPage;
     private List<ApiInfoKey> apiInfoList;
+    private EndpointDataQuery endpointDataQuery;
+    private List<SingleTypeInfoView> endpointDataResponse;
 
     private Bson prepareFilters() {
         ArrayList<Bson> filterList = new ArrayList<>();
@@ -855,11 +911,28 @@ public class InventoryAction extends UserAction {
         this.collectionPage = collectionPage;
     }
 
-    public List<ApiInfoKey> getApiInfoList(List<ApiInfoKey> apiInfoList) {
+    public List<ApiInfoKey> getApiInfoList() {
         return this.apiInfoList;
     }
 
     public void setApiInfoList(List<ApiInfoKey> apiInfoList) {
         this.apiInfoList = apiInfoList;
     }
+
+    public EndpointDataQuery getEndpointDataQuery() {
+        return this.endpointDataQuery;
+    }
+
+    public void setEndpointDataQuery(EndpointDataQuery endpointDataQuery) {
+        this.endpointDataQuery = endpointDataQuery;
+    }
+
+    public List<SingleTypeInfoView> getEndpointDataResponse() {
+        return this.endpointDataResponse;
+    }
+
+    public void setEndpointDataResponse(List<SingleTypeInfoView> endpointDataResponse) {
+        this.endpointDataResponse = endpointDataResponse;
+    }
+
 }
