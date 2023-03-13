@@ -304,6 +304,7 @@
         --hexColor37: #f93e3e;
         --hexColor38: #00f;
         --hexColor39: #f2f2f2;
+        --hexColor40: #5865F2;
 
         --primary: #126BFF;
         --quickStartTheme:#6200B0;
