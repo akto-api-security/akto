@@ -90,7 +90,7 @@ public class OriginalHttpRequest {
 
     public static String convertGRPCEncodedToJson(String rawRequest) {
         try {
-            HashMap<Object, Object> map = ProtoBufUtils.getInstance().decodeProto(rawRequest);
+            Map<Object, Object> map = ProtoBufUtils.getInstance().decodeProto(rawRequest);
             if (map.isEmpty()) {
                 return rawRequest;
             }

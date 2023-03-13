@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.Map;
 
 public class ProtoBufUtils {
 
@@ -21,7 +22,7 @@ public class ProtoBufUtils {
         return instance;
     }
 
-    public HashMap<Object, Object> decodeProto(String encodedString) {
+    public Map<Object, Object> decodeProto(String encodedString) {
         byte[] originalByteArray = Base64.getDecoder().decode(encodedString);
         //Remove initial 5 bytes for unnecessary proto headers
         byte[] truncatedByteArray = new byte[originalByteArray.length - 5];
@@ -31,11 +32,11 @@ public class ProtoBufUtils {
         return decodeProto(truncatedByteArray);
     }
 
-    public HashMap<Object, Object> decodeProto(byte[] data) {
+    public Map<Object, Object> decodeProto(byte[] data) {
         return decodeProto(ByteString.copyFrom(data), 0);
     }
 
-    public static HashMap<Object, Object> decodeProto(ByteString data, int depth) {
+    public static Map<Object, Object> decodeProto(ByteString data, int depth) {
         final CodedInputStream input = CodedInputStream.newInstance(data.asReadOnlyByteBuffer());
         try {
             return decodeProtoInput(input, depth);
@@ -44,7 +45,7 @@ public class ProtoBufUtils {
         }
     }
 
-    private static HashMap<Object, Object> decodeProtoInput(CodedInputStream input, int depth) throws IOException {
+    private static Map<Object, Object> decodeProtoInput(CodedInputStream input, int depth) throws IOException {
         HashMap<Object, Object> map = new HashMap<>();
         while (true) {
             final int tag = input.readTag();
@@ -65,7 +66,7 @@ public class ProtoBufUtils {
                     break;
                 case WireFormat.WIRETYPE_LENGTH_DELIMITED:
                     ByteString data = input.readBytes();
-                    HashMap<Object, Object> submessage = decodeProto(data, depth + 1);
+                    Map<Object, Object> subMessage = decodeProto(data, depth + 1);
                     if (data.size() < 30) {
                         boolean probablyString = true;
                         String str = new String(data.toByteArray(), StandardCharsets.UTF_8);
@@ -77,8 +78,8 @@ public class ProtoBufUtils {
                         }
                         if (probablyString) {
                             map.put(keyPrefix, str);
-                        } else if (!submessage.isEmpty()){
-                            map.put(keyPrefix, submessage);
+                        } else if (!subMessage.isEmpty()){
+                            map.put(keyPrefix, subMessage);
                         } else {
                             new String(data.toByteArray());
                         }

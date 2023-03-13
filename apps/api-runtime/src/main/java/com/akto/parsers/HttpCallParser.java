@@ -9,7 +9,6 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
 import com.akto.util.JSONUtils;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
@@ -22,9 +21,6 @@ import java.util.*;
 
 public class HttpCallParser {
     
-    private static final String AKTO_REQUEST = "##AKTO_REQUEST##";
-    private static final String AKTO_RESPONSE = "##AKTO_RESPONSE##";
-    private final static ObjectMapper mapper = new ObjectMapper();
     private final int sync_threshold_count;
     private final int sync_threshold_time;
     private int sync_count = 0;
