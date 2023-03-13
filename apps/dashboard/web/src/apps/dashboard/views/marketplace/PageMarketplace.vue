@@ -230,7 +230,7 @@ export default {
         let aktoTestTypes = await issuesApi.fetchAllSubCategories()
         this.businessCategories = aktoTestTypes.categories
         this.businessSubCategories = aktoTestTypes.subCategories
-        this.$router.push(this.leftNavItems[0].items[0].link)
+        this.$router.push(this.leftNavItems[0].items[0].link)        
     },
     computed: {
         ...mapState('marketplace', ['defaultSubcategories', 'userSubcategories', 'loading']),

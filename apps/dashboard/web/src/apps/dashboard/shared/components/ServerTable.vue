@@ -254,8 +254,7 @@ export default {
                 let params = resp.endpoints
                 let total = resp.total
                 this.total = total
-                let now = func.timeNow()
-                let listParams = params.filter(x => x.timestamp > now - func.recencyPeriod).map(this.processParams)
+                let listParams = params.map(this.processParams)
                 let sortedParams = listParams.sort((a, b) => {
                     if (a.detectedTs > b.detectedTs + 3600) {
                         return -1
