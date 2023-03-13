@@ -74,7 +74,6 @@ public class HttpCallParser {
         if (OriginalHttpRequest.GRPC_CONTENT_TYPE.equals(acceptableContentType)) {
             payload = OriginalHttpRequest.convertGRPCEncodedToJson(payload);
         } else {
-
             payload = JSONUtils.parseIfJsonP(payload);
         }
         int time = Integer.parseInt(json.get("time").toString());
