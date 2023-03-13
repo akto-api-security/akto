@@ -136,19 +136,31 @@ public class InventoryAction extends UserAction {
             key = endpointDataFilterCondition.getKey();
             values = endpointDataFilterCondition.getValues();
 
-            if (key == "apiCollectionId") {
-                filterList.add((Filters.eq(key, (int) values.get(0))));
+            if (key.equals("apiCollectionId")) {
+                if (values.size() > 1) {
+                    filterList.add((Filters.in("_id." + key, values)));
+                } else if (values.size() == 1) {
+                    filterList.add((Filters.eq("_id." + key, ((Long) values.get(0)).intValue())));
+                }
             }
 
-            if (key == "url") {
-                filterList.add(Filters.regex(key, ".*"+values.get(0)+".*"));
+            if (key.equals("method")) {
+                if (values.size() > 1) {
+                    filterList.add((Filters.in("_id." + key, values)));
+                } else if (values.size() == 1) {
+                    filterList.add((Filters.eq("_id." + key, values.get(0))));
+                }
             }
 
-            if (key == "accessTypes" || key == "authTypes" || key == "sensitiveParams") {
+            if (key.equals("url")) {
+                filterList.add(Filters.regex("_id." + key, ".*"+values.get(0)+".*"));
+            }
+
+            if (key.equals("accessTypes") || key.equals("authTypes") || key.equals("sensitiveParams")) {
                 filterList.add((Filters.in(key, values)));
             }
 
-            if (key == "lastSeenTs" || key == "discoveredTs") {
+            if (key.equals( "lastSeenTs") || key.equals("discoveredTs")) {
                 filterList.add(Filters.eq(key, (int) values.get(0)));
             }
         }
@@ -156,6 +168,10 @@ public class InventoryAction extends UserAction {
         for (EndpointDataSortCondition endpointDataSortCondition: endpointDataQuery.getSortConditions()) {
             key = endpointDataSortCondition.getKey();
             sortOrder = endpointDataSortCondition.getSortOrder();
+
+            if (key.equals("apiCollectionId") || key.equals("method") || key.equals("url")) {
+                key = "_id." + key;
+            }
 
             if (sortOrder == 1) {
                 sorts.add(Sorts.ascending(key));
@@ -487,8 +503,7 @@ public class InventoryAction extends UserAction {
 
     public String fetchEndpointData() {
 
-        List<SingleTypeInfoView> endpointDataResponse = executeEndpointDataQuery(endpointDataQuery);
-
+        endpointDataResponse = executeEndpointDataQuery(endpointDataQuery);
         return Action.SUCCESS.toUpperCase();
     }
 
