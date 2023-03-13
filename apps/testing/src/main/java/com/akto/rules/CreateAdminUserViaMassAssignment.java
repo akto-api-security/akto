@@ -42,15 +42,19 @@ public class CreateAdminUserViaMassAssignment extends TestPlugin{
             OriginalHttpRequest request = rawApi.getRequest();
             OriginalHttpResponse response = rawApi.getResponse();
             Set<String> extraParams;
-            try {
-                extraParams = checkIfApiIsEligibleForTest(request, response);
-            } catch (Exception e) {
-                logger.info("Skipping api due to: {}", e.getMessage());
+            Optional<String> validationResult = checkIfApiIsEligibleForTest(request, response);
+            if(validationResult.isPresent()){
+                logger.info("Skipping api: {} due to: {}", request.getUrl(), validationResult.get());
+                continue;
+            }
+            extraParams = checkForExtraParams(request, response);
+            if(extraParams == null || extraParams.isEmpty()){
+                logger.info("Skipping api: {} due to: no extra params found in response", request.getUrl());
                 continue;
             }
             String body = createBodyForTest(request, response, extraParams);
             if(StringUtils.isEmpty(body)){
-                logger.info("Skipping api due to empty modified body");
+                logger.info("Skipping api: {} due to empty modified body", request.getUrl());
                 continue;
             }
             request.setBody(body);
@@ -105,36 +109,32 @@ public class CreateAdminUserViaMassAssignment extends TestPlugin{
         return jsonRequestBodyObj.toJson();
     }
 
-    protected Set<String> checkIfApiIsEligibleForTest(OriginalHttpRequest request, OriginalHttpResponse response) throws Exception{
+    protected Optional<String> checkIfApiIsEligibleForTest(OriginalHttpRequest request, OriginalHttpResponse response){
         if(response.getStatusCode() < 200 && response.getStatusCode() >= 300){
-            throw new Exception("Response code is not 200");
+            return Optional.of("Response code is not 200");
         }
         if(!allowedMethods.contains(request.getMethod())){
-            throw new Exception("Request type is not allowed");
+            return Optional.of("Request type is not allowed");
         }
         if(StringUtils.isEmpty(request.getBody())){
-            throw new Exception("Request body is empty");
+            return Optional.of("Request body is empty");
         }
         if(StringUtils.isEmpty(response.getBody())){
-            throw new Exception("Response body is empty");
+            return Optional.of("Response body is empty");
         }
         boolean endpointNameMatched = stringMatchContains(request.getUrl(), allowedEndpointNames);
         if(!endpointNameMatched){
-            throw new Exception("Doesn't match any of the allowed endpoint names");
+            return Optional.of("Doesn't match any of the allowed endpoint names");
         }
         boolean reqBodyContainsRequiredKeys = stringMatchContains(request.getBody(), allowedKeysInRequest);
         if(!reqBodyContainsRequiredKeys){
-            throw new Exception("Request body doesn't contain any of the allowed keys");
+            return Optional.of("Request body doesn't contain any of the allowed keys");
         }
         boolean respBodyContainsRequiredKeys = stringMatchContains(response.getBody(), allowedKeysInResponse);
         if(!respBodyContainsRequiredKeys){
-            throw new Exception("Response body doesn't contain any of the allowed keys");
+            return Optional.of("Response body doesn't contain any of the allowed keys");
         }
-        Set<String> extraParams = checkForExtraParams(request, response);
-        if(extraParams.isEmpty()){
-            throw new Exception("No extra params found");
-        }
-        return extraParams;
+        return Optional.empty();
     }
 
     private static boolean stringMatchContains(String str, List<String> allowedStrings) {
@@ -148,11 +148,12 @@ public class CreateAdminUserViaMassAssignment extends TestPlugin{
         return stringMatched;
     }
 
-    private Set<String> checkForExtraParams(OriginalHttpRequest request, OriginalHttpResponse response) throws Exception{
+    private Set<String> checkForExtraParams(OriginalHttpRequest request, OriginalHttpResponse response){
         BasicDBObject flattenedRequest =  JSONUtils.flattenWithDots(RequestTemplate.parseRequestPayload(request.getJsonRequestBody(), null));
         BasicDBObject flattenedResponse = JSONUtils.flattenWithDots(RequestTemplate.parseRequestPayload(response.getJsonResponseBody(), null));
         if(flattenedRequest.keySet().size() > flattenedResponse.keySet().size()){
-            throw new Exception("Request body has more params than response body");
+            logger.info("Request body has more params than response body");
+            return null;
         }
         Set<String> extraParams = new HashSet<>();
         for(String responseKey: flattenedResponse.keySet()){
