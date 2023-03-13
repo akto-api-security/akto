@@ -136,6 +136,13 @@ public class CustomDataTypeAction extends UserAction{
             return ERROR.toUpperCase();
         }
 
+        try {
+            customDataType.validateRaw("some_key", "some_value");
+        } catch (Exception e) {
+            addActionError("There is something wrong in the data type conditions");
+            return ERROR.toUpperCase();
+        }
+
         if (this.createNew) {
             CustomDataType customDataTypeFromDb = CustomDataTypeDao.instance.findOne(Filters.eq(CustomDataType.NAME, name));
             if (customDataTypeFromDb != null) {

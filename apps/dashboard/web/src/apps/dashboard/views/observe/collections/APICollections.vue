@@ -7,8 +7,8 @@
                 :items="apiCollectionsForTable"  
                 :actions="actions"
                 name="API Collections" 
-                sortKeyDefault="name" 
-                :sortDescDefault="false"   
+                sortKeyDefault="endpoints" 
+                :sortDescDefault="true"   
                 @rowClicked=rowClicked
                 hide-default-footer ="true"
                 :hideDownloadCSVIcon="true"

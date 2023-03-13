@@ -36,8 +36,8 @@ public class Main {
     public static final String GROUP_NAME = "group_name";
     public static final String VXLAN_ID = "vxlanId";
     public static final String VPC_CIDR = "vpc_cidr";
-    private static final Logger logger = LoggerFactory.getLogger(HttpCallParser.class);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class);
+    private static final Logger logger = LoggerFactory.getLogger(Main.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
 
     // this sync threshold time is used for deleting sample data
     public static final int sync_threshold_time = 120;
@@ -256,6 +256,7 @@ public class Main {
                     if ((Context.now() - accountInfo.lastEstimatedCountTime) > 60*60) {
                         accountInfo.lastEstimatedCountTime = Context.now();
                         accountInfo.estimatedCount = SingleTypeInfoDao.instance.getMCollection().estimatedDocumentCount();
+                        loggerMaker.infoAndAddToDb("STI Estimated count: " + accountInfo.estimatedCount, LogDb.RUNTIME);
                     }
 
                     if (!isDashboardInstance && accountInfo.estimatedCount> 20_000_000) {

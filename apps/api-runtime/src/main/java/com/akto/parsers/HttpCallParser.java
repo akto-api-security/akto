@@ -1,28 +1,23 @@
 package com.akto.parsers;
 
-import java.net.URLDecoder;
-import java.util.*;
-
-import com.akto.DaoInit;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
+import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
-
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import java.util.*;
 
 public class HttpCallParser {
     
@@ -58,6 +53,8 @@ public class HttpCallParser {
         String rawRequestPayload = (String) json.get("requestPayload");
         String requestPayload = OriginalHttpRequest.rawToJsonString(rawRequestPayload,requestHeaders);
 
+
+
         String apiCollectionIdStr = json.getOrDefault("akto_vxlan_id", "0").toString();
         int apiCollectionId = 0;
         if (NumberUtils.isDigits(apiCollectionIdStr)) {
@@ -84,7 +81,6 @@ public class HttpCallParser {
         return new HttpResponseParams(
                 type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP
         );
-
     }
 
     private static final Gson gson = new Gson();
@@ -199,6 +195,7 @@ public class HttpCallParser {
 
             String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
 
+
             int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
             int apiCollectionId ;
 
@@ -237,7 +234,13 @@ public class HttpCallParser {
             }
 
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
-            filteredResponseParams.add(httpResponseParam);
+
+            List<HttpResponseParams> responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
+            if (responseParamsList.isEmpty()) {
+                filteredResponseParams.add(httpResponseParam);
+            } else {
+                filteredResponseParams.addAll(responseParamsList);
+            }
         }
 
         return filteredResponseParams;

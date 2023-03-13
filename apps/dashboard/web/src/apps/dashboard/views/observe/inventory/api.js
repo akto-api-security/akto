@@ -39,12 +39,12 @@ export default {
             }
         })
     },
-    downloadOpenApiFile(apiCollectionId) {
+    downloadOpenApiFile(apiCollectionId,lastFetchedUrl, lastFetchedMethod) {
         return request({
             url: '/api/generateOpenApiFile',
             method: 'post',
             data: {
-                apiCollectionId
+                apiCollectionId, lastFetchedUrl, lastFetchedMethod
             }
         })
     },

@@ -383,19 +383,31 @@ export default {
             }
         },
         async downloadOpenApiFile() {
-          var result = await this.$store.dispatch('inventory/downloadOpenApiFile')
-          let openApiString = result["openAPIString"]
-          var blob = new Blob([openApiString], {
-            type: "application/json",
-          });
-          const fileName = "open_api_" +this.apiCollectionName+ ".json";
-          saveAs(blob, fileName);
+          let lastFetchedUrl = null;
+          let lastFetchedMethod = null;
+          for (let index =0; index < 10; index++) {
+                var result = await this.$store.dispatch('inventory/downloadOpenApiFile', {lastFetchedUrl, lastFetchedMethod})
+                let openApiString = result["openAPIString"]
+                var blob = new Blob([openApiString], {
+                    type: "application/json",
+                });
+                const fileName = "open_api_" +this.apiCollectionName+ ".json";
+                saveAs(blob, fileName);
+
+                lastFetchedUrl = result["lastFetchedUrl"]
+                lastFetchedMethod = result["lastFetchedMethod"]
+
+                if (!lastFetchedUrl || !lastFetchedMethod) break;
+          }
+
+
           window._AKTO.$emit('SHOW_SNACKBAR', {
             show: true,
-            text: fileName + " downloaded !",
+            text: "OpenAPI spec file downloaded !",
             color: 'green'
           })
         },
+
         async exportToPostman() {
           var result = await this.$store.dispatch('inventory/exportToPostman')
           window._AKTO.$emit('SHOW_SNACKBAR', {
