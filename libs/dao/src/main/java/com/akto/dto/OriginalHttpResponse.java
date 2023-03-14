@@ -1,5 +1,6 @@
 package com.akto.dto;
 
+import com.akto.util.HttpRequestResponseUtils;
 import com.google.gson.Gson;
 
 import org.apache.commons.lang3.math.NumberUtils;
@@ -111,5 +112,9 @@ public class OriginalHttpResponse {
         } else {
             return false;
         }
+    }
+
+    public String getJsonResponseBody() {
+        return HttpRequestResponseUtils.rawToJsonString(body, headers);
     }
 }

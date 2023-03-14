@@ -3,14 +3,13 @@ package com.akto.dto;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.util.grpc.ProtoBufUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.akto.util.HttpRequestResponseUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import okhttp3.HttpUrl;
 
-import java.io.UnsupportedEncodingException;
 import java.net.URI;
-import java.net.URLDecoder;
 import java.util.*;
 
 import static com.akto.util.grpc.ProtoBufUtils.DECODED_QUERY;
@@ -66,10 +65,9 @@ public class OriginalHttpRequest {
     }
 
     public String getJsonRequestBody() {
-        return rawToJsonString(body, headers);
+        return HttpRequestResponseUtils.rawToJsonString(this.body, this.headers);
     }
 
-    public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
     public static final String JSON_CONTENT_TYPE = "application/json";
     public static final String GRPC_CONTENT_TYPE = "application/grpc";
 
@@ -101,7 +99,7 @@ public class OriginalHttpRequest {
     }
 
     public boolean isJsonRequest() {
-        String acceptableContentType = getAcceptableContentType(this.headers);
+        String acceptableContentType = HttpRequestResponseUtils.getAcceptableContentType(this.headers);
         return acceptableContentType != null && acceptableContentType.equals(JSON_CONTENT_TYPE);
     }
 

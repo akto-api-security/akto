@@ -8,6 +8,7 @@ import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
+import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
 import com.akto.util.modifier.SetValueModifier;
 import com.mongodb.BasicDBList;
@@ -51,21 +52,23 @@ public class SSRFOnAwsMetadataEndpoint extends TestPlugin {
             }
 
             // find if url is present in queryParams
-            String queryJson = OriginalHttpRequest.convertFormUrlEncodedToJson(req.getQueryParams());
-            BasicDBObject queryObj = BasicDBObject.parse(queryJson);
-            for (String key: queryObj.keySet()) {
-                Object valueObj = queryObj.get(key);
-                if (valueObj == null) continue;
-                String value = valueObj.toString();
-                if (detectUrl(value)) {
-                    flag = true;
-                    queryObj.put(key, URL_TEMP);
+            String queryJson = HttpRequestResponseUtils.convertFormUrlEncodedToJson(req.getQueryParams());
+            if (queryJson != null) {
+                BasicDBObject queryObj = BasicDBObject.parse(queryJson);
+                for (String key: queryObj.keySet()) {
+                    Object valueObj = queryObj.get(key);
+                    if (valueObj == null) continue;
+                    String value = valueObj.toString();
+                    if (detectUrl(value)) {
+                        flag = true;
+                        queryObj.put(key, URL_TEMP);
+                    }
                 }
-            }
-            String modifiedQueryParamString = OriginalHttpRequest.getRawQueryFromJson(queryObj.toJson());
-            if (modifiedQueryParamString != null) {
-                modifiedQueryParamString = modifiedQueryParamString.replaceAll(URL_TEMP, URL);
-                req.setQueryParams(modifiedQueryParamString);
+                String modifiedQueryParamString = OriginalHttpRequest.getRawQueryFromJson(queryObj.toJson());
+                if (modifiedQueryParamString != null) {
+                    modifiedQueryParamString = modifiedQueryParamString.replaceAll(URL_TEMP, URL);
+                    req.setQueryParams(modifiedQueryParamString);
+                }
             }
 
             // find if url is present in request body

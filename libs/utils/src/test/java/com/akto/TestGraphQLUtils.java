@@ -6,6 +6,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.util.grpc.ProtoBufUtils;
 import com.akto.har.HAR;
+import com.akto.util.HttpRequestResponseUtils;
 import com.google.gson.Gson;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.junit.Assert;
@@ -47,7 +48,7 @@ public class TestGraphQLUtils{
         Map<String,List<String>> requestHeaders = OriginalHttpRequest.buildHeadersMap(json, "requestHeaders");
 
         String rawRequestPayload = (String) json.get("requestPayload");
-        String requestPayload = OriginalHttpRequest.rawToJsonString(rawRequestPayload,requestHeaders);
+        String requestPayload = HttpRequestResponseUtils.rawToJsonString(rawRequestPayload,requestHeaders);
 
 
 
