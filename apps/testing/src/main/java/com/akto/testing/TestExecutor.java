@@ -539,6 +539,7 @@ public class TestExecutor {
         PageSizeDosTest pageSizeDosTest = new PageSizeDosTest(testRunId.toHexString(), testRunResultSummaryId.toHexString());//PAGE_SIZE_DOS
         OpenRedirectTest openRedirectTest = new OpenRedirectTest(testRunId.toHexString(), testRunResultSummaryId.toHexString());
         SSRFOnAwsMetadataEndpoint ssrfOnAwsMetadataEndpoint = new SSRFOnAwsMetadataEndpoint(testRunId.toHexString(), testRunResultSummaryId.toHexString());
+        CreateAdminUserViaMassAssignment createAdminUserViaMassAssignment = new CreateAdminUserViaMassAssignment(testRunId.toHexString(), testRunResultSummaryId.toHexString());
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
 
@@ -620,6 +621,11 @@ public class TestExecutor {
             TestingRunResult ssrfAwsMetadataExposedResult = runTest(ssrfOnAwsMetadataEndpoint, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
             if (ssrfAwsMetadataExposedResult != null)
                 testingRunResults.add(ssrfAwsMetadataExposedResult);
+        }
+
+        if(testSubCategories == null || testSubCategories.contains(TestSubCategory.MASS_ASSIGNMENT_CREATE_ADMIN_ROLE.name())) {
+            TestingRunResult createAdminUserViaMassAssignmentResult = runTest(createAdminUserViaMassAssignment, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            if (createAdminUserViaMassAssignmentResult != null) testingRunResults.add(createAdminUserViaMassAssignmentResult);
         }
 
         return testingRunResults;
