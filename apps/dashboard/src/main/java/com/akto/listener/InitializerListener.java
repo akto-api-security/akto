@@ -155,6 +155,9 @@ public class InitializerListener implements ServletContextListener {
                 BasicDBObject fileDetails = (BasicDBObject) fileObj;
                 String filePath = fileDetails.getString("path");
                 if (filePath.endsWith(".yaml") || filePath.endsWith(".yml")) {
+                    if(filePath.contains("bussiness-logic")){
+                        continue;
+                    }
                     String categoryFolder = filePath.split("/")[0];
                     filePath = "https://github.com/akto-api-security/tests-library/blob/master/" + filePath;
                     if (!currConfigsMap.containsKey(filePath)) {

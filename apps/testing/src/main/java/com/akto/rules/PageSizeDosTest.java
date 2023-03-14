@@ -9,6 +9,7 @@
  import com.akto.log.LoggerMaker;
  import com.akto.store.SampleMessageStore;
  import com.akto.store.TestingUtil;
+ import com.akto.util.HttpRequestResponseUtils;
  import com.akto.util.JSONUtils;
  import com.akto.util.modifier.NestedObjectModifier;
  import com.akto.util.modifier.SetValueModifier;
@@ -52,35 +53,38 @@
                  continue;
              }
 
-             String queryJson = OriginalHttpRequest.convertFormUrlEncodedToJson(req.getQueryParams());
-             BasicDBObject queryParams = BasicDBObject.parse(queryJson);
+             String queryJson = HttpRequestResponseUtils.convertFormUrlEncodedToJson(req.getQueryParams());
+             if (queryJson != null) {
+                 BasicDBObject queryParams = BasicDBObject.parse(queryJson);
 
-             String paginatedKeyPresent = null;
-             String paginationValue = "";
-             for (String paginatedKey : PAGINATED_KEYWORDS) {
-                 if (queryParams.containsKey(paginatedKey)) {
-                     paginatedKeyPresent = paginatedKey;
-                     paginationValue = queryParams.getString(paginatedKey);
-                     queryParams.put(paginatedKey, MODIFIED_COUNT);
-                     break;
+                 String paginatedKeyPresent = null;
+                 String paginationValue = "";
+                 for (String paginatedKey : PAGINATED_KEYWORDS) {
+                     if (queryParams.containsKey(paginatedKey)) {
+                         paginatedKeyPresent = paginatedKey;
+                         paginationValue = queryParams.getString(paginatedKey);
+                         queryParams.put(paginatedKey, MODIFIED_COUNT);
+                         break;
+                     }
                  }
-             }
 
-             if (paginatedKeyPresent == null) {
-                 loggerMaker.infoAndAddToDb("No paginated keyword found for endpoint: " + req.getUrl() + " skipping this endpoint", LoggerMaker.LogDb.TESTING);
-                 continue;
+                 if (paginatedKeyPresent == null) {
+                     loggerMaker.infoAndAddToDb("No paginated keyword found for endpoint: " + req.getUrl() + " skipping this endpoint", LoggerMaker.LogDb.TESTING);
+                     continue;
+                 }
+
+
+                 //modify query param
+                 String modifiedQueryParamString = OriginalHttpRequest.getRawQueryFromJson(queryParams.toJson());
+                 if (modifiedQueryParamString != null) {
+                     modifiedQueryParamString = modifiedQueryParamString.replaceAll(MODIFIED_COUNT, paginationValue+"0");
+                     req.setQueryParams(modifiedQueryParamString);
+                 }
+                 logger.info("Modified query params: " + modifiedQueryParamString);
              }
 
              OriginalHttpResponse resp = rawApi.getResponse();
              int originalResponseLength = resp.getBody().length();
-
-             //modify query param
-             String modifiedQueryParamString = OriginalHttpRequest.getRawQueryFromJson(queryParams.toJson());
-             if (modifiedQueryParamString != null) {
-                 modifiedQueryParamString = modifiedQueryParamString.replaceAll(MODIFIED_COUNT, paginationValue+"0");
-                 req.setQueryParams(modifiedQueryParamString);
-             }
-             logger.info("Modified query params: " + modifiedQueryParamString);
 
              String origTemplatePath = "https://raw.githubusercontent.com/Ankush12389/tests-library/master/Lack%20of%20Resources%20and%20Rate%20Limiting/resource-limiting/pagesize_dos.yaml";
              String testSourceConfigCategory = "";
