@@ -246,6 +246,7 @@ export default {
     padding: 16px 24px
     color: var(--themeColorDark) !important
     font-size: 14px       
+    min-height: 60px !important      
     
 .test-item
     font-size: 12px
