@@ -9,15 +9,56 @@ import com.akto.log.LoggerMaker.LogDb;
 
 import kotlin.Pair;
 import okhttp3.*;
+import okhttp3.OkHttpClient.Builder;
 
 import java.io.IOException;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
 import java.util.*;
+
+import javax.net.ssl.*;
 
 public class ApiExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
+
+    private static final TrustManager[] trustAllCerts = new TrustManager[] {
+        new X509TrustManager() {
+            @Override
+            public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) throws CertificateException {
+            }
+    
+            @Override
+            public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) throws CertificateException {
+            }
+    
+            @Override
+            public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+              return new java.security.cert.X509Certificate[]{};
+            }
+        }
+    };
+
+    private static final SSLContext trustAllSslContext;
+    static {
+        try {
+            trustAllSslContext = SSLContext.getInstance("SSL");
+            trustAllSslContext.init(null, trustAllCerts, new java.security.SecureRandom());
+        } catch (NoSuchAlgorithmException | KeyManagementException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static final SSLSocketFactory trustAllSslSocketFactory = trustAllSslContext.getSocketFactory();
+
     public static OriginalHttpResponse common(Request request, boolean followRedirects) throws Exception {
 
         OkHttpClient client = HTTPClientHandler.instance.getHTTPClient(followRedirects);
+
+        Builder builder = client.newBuilder();
+        builder.sslSocketFactory(trustAllSslSocketFactory, (X509TrustManager)trustAllCerts[0]);
+        builder.hostnameVerifier((hostname, session) -> true);
+        client = builder.build();
 
         Call call = client.newCall(request);
         Response response = null;
