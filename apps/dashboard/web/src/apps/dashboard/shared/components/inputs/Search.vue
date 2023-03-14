@@ -1,7 +1,7 @@
 <template>
     <div class="d-flex jc-end">
         <div class="fd-column jc-sa">
-            <v-icon color="#6200EA" size="12" class="mr-2">$fas_search</v-icon>
+            <v-icon color="var(--themeColor)" size="12" class="mr-2">$fas_search</v-icon>
         </div>
         <div style="width: 400px">
             <simple-text-field 

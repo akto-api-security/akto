@@ -12,7 +12,7 @@
                                 <div class="nav-section">
                                     <api-collection-group :items=leftNavItems>
                                         <!-- <template #prependItem>
-                                            <v-btn primary dark color="#6200EA" tile style="width: -webkit-fill-available" class="mt-8 mb-8">
+                                            <v-btn primary dark color="var(--themeColor)" tile style="width: -webkit-fill-available" class="mt-8 mb-8">
                                                 <div style="width: 100%">
                                                     <v-icon>$fas_plus</v-icon> 
                                                     New test
@@ -29,7 +29,7 @@
         </template>
         <template slot="User config">
             <div class="pa-8">
-                <v-btn outlined color="#6200EA" @click="stopAllTests" :loading="stopAllTestsLoading" style="float:right">
+                <v-btn outlined color="var(--themeColor)" @click="stopAllTests" :loading="stopAllTestsLoading" style="float:right">
                     Stop all tests
                 </v-btn>
 
@@ -72,7 +72,7 @@
                             </v-text-field>
                         </div>
 
-                        <v-btn primary dark color="#3366ff" @click="saveAuthMechanism" v-if="someAuthChanged">
+                        <v-btn primary dark color="var(--hexColor9)" @click="saveAuthMechanism" v-if="someAuthChanged">
                             Save changes
                         </v-btn>
                     </div>
@@ -101,7 +101,7 @@
                                 <span class="auth-token-text">{{authTokenDate}}</span>
                             </div>
                         </div>
-                        <v-btn primary dark color="#6200EA" @click="toggleLoginStepBuilder">
+                        <v-btn primary dark color="var(--themeColor)" @click="toggleLoginStepBuilder">
                             <span v-if="originalDbState">Edit</span>
                             <span v-else>Create</span>
                         </v-btn>
@@ -118,7 +118,7 @@
         <template slot="Roles">
             <test-roles title="Roles" :testRoles="testRoles">
                 <template #details-container="{}">
-                    <a-card title="Details" color="rgba(33, 150, 243)" style="min-height: 600px">
+                    <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
                         <test-roles-config-details></test-roles-config-details>
                     </a-card>
                 </template>
@@ -327,7 +327,7 @@ export default {
                     icon: "$fas_plus",
                     title: "Previous tests",
                     group: "/dashboard/testing/",
-                    color: "rgba(246, 190, 79)",
+                    color: "var(--rgbaColor1)",
                     active: true,
                     items: [
                         {
@@ -389,19 +389,19 @@ export default {
 <style lang="sass" scoped>
 .heading
     font-size: 16px
-    color: #47466A
+    color: var(--themeColorDark)
     font-weight: 500
 
 .input-value
     padding-right: 8px
-    color: #47466A
+    color: var(--themeColorDark)
 
 </style>
 
 <style scoped>
 .page-testing>>>.v-label {
     font-size: 12px;
-    color: #6200EA;
+    color: var(--themeColor);
     font-weight: 400;
 }
 
@@ -416,14 +416,14 @@ export default {
     height: 24px;
     left: 0px;
     top: 0px;
-    border: 2px solid #6200EA;
+    border: 2px solid var(--themeColor);
     border-radius: 50%;
     text-align: center;
     font-style: normal;
     font-weight: 600;
     font-size: 16px;
     line-height: 22px;
-    color: #6200EA;
+    color: var(--themeColor);
 }
 
 .di-flex {

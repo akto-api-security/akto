@@ -144,11 +144,11 @@ export default {
         getSeverityColor(severity) {
             switch (severity) {
                 case "HIGH":
-                    return "#FF1717";
+                    return "var(--hexColor3)";
                 case "MEDIUM":
-                    return "#FF8717"
+                    return "var(--hexColor2)"
                 case "LOW":
-                    return "#1790FF"
+                    return "var(--hexColor1)"
             }
         },
         getSeverityClass(severity) {
@@ -220,7 +220,7 @@ export default {
     font-weight: 500;
     font-size: 14px;
     align-items: right;
-    color: #101828;
+    color: var(--hexColor5);
 }
 
 .issue-endpoint {
@@ -235,7 +235,7 @@ export default {
     font-size: 14px;
     /* identical to box height */
     align-items: left;
-    color: #5C04D5;
+    color: var(--hexColor12)
 }
 
 .display-flex-url {
@@ -249,31 +249,31 @@ export default {
     font-size: 20px;
     /* identical to box height */
     text-align: left;
-    color: #47466A;
+    color: var(--themeColorDark);
 }
 
 .issue-description {
     font-weight: 400;
     font-size: 14px;
-    color: #47466ACC;
+    color: var(--themeColorDark3);
 }
 
 .issue-box {
     height: fit-content;
-    background: #FCFCFD;
-    border: 1px solid #D6D3DA;
+    background: var(--white2);
+    border: 1px solid var(--hexColor21);
     border-radius: 6px;
 }
 
 .severity-high {
-    border-left: 6px solid #FF1717;
+    border-left: 6px solid var(--hexColor3);
 }
 
 .severity-medium {
-    border-left: 6px solid #FF8717;
+    border-left: 6px solid var(--hexColor2);
 }
 
 .severity-low {
-    border-left: 6px solid #1790FF;
+    border-left: 6px solid var(--hexColor1);
 }
 </style>
