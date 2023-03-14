@@ -153,13 +153,16 @@ public class JSONUtils {
     }
 
     public static String parseIfJsonP(String payload) {
-        if (!payload.startsWith("{") && !payload.startsWith("[")) {//candidate for json with padding handleRequest ({abc : abc})
+        if (!payload.startsWith("{") && !payload.startsWith("[") && !payload.startsWith("<")) {//candidate for json with padding handleRequest ({abc : abc})
             int indexOfMethodStart = payload.indexOf('(');
             int indexOfMethodEnd = payload.lastIndexOf(')');
             try {
-                String json = payload.substring(indexOfMethodStart + 1, indexOfMethodEnd);//Getting the content of method
-                JsonParser.parseString(json);
-                return json;
+                String nextChar = payload.substring(indexOfMethodStart + 1, indexOfMethodStart + 5);
+                if (nextChar.startsWith("{")) {
+                    String json = payload.substring(indexOfMethodStart + 1, indexOfMethodEnd);//Getting the content of method
+                    JsonParser.parseString(json);
+                    return json;
+                }
             }catch (Exception e) {
                 return payload;
             }
