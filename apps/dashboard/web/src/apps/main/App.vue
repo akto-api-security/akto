@@ -83,7 +83,7 @@
     @import url('https://fonts.googleapis.com/css?family=Poppins:400,500,600&display=swap');
     .v-application {
         font-family: Poppins, sans-serif !important;
-        color: #2d2434;
+        color: var(--base);
         letter-spacing: unset !important;
     }
 
@@ -110,7 +110,7 @@
 
     .clickable-bg:hover {
         cursor: pointer;
-        background-color: #47466A0D;
+        background-color: var(--themeColorDark17);
     }
 
 </style>
@@ -121,10 +121,10 @@
     text-decoration: auto
 
 .v-application .primary--text
-    color: #6200EA !important
+    color: var(--themeColor) !important
 
 .active-tab
-    color: #2d2434
+    color: var(--base)
     font-weight: 500
 
 .tabs-container
@@ -136,19 +136,19 @@
     padding: 0
 
 .brda
-  border: 1px solid rgba(71, 70, 106, 0.2) !important
+  border: 1px solid var(--themeColorDark13) !important
 
 .brdb
-  border-bottom: 1px solid rgba(71, 70, 106, 0.2) !important
+  border-bottom: 1px solid var(--themeColorDark13) !important
 
 .brdt
-  border-top: 1px solid rgba(71, 70, 106, 0.2) !important
+  border-top: 1px solid var(--themeColorDark13) !important
 
 .brdl
-  border-left: 1px solid rgba(71, 70, 106, 0.2) !important
+  border-left: 1px solid var(--themeColorDark13) !important
 
 .brdr
-  border-right: 1px solid rgba(71, 70, 106, 0.2) !important
+  border-right: 1px solid var(--themeColorDark13) !important
 
 .highcharts-credits
   display: none
@@ -156,7 +156,7 @@
 .v-tooltip__content
   font-size: 10px !important
   opacity: 1 !important
-  background-color: #7e7e97
+  background-color: var(--lightGrey)
   border-radius: 2px
   transition: all 0s !important
 
@@ -167,7 +167,7 @@
 .v-tooltip__content:after
   border-left: solid transparent 4px
   border-right: solid transparent 4px
-  border-bottom: solid #7e7e97 4px
+  border-bottom: solid var(--lightGrey) 4px
   top: -4px
   content: " "
   height: 0
@@ -185,7 +185,7 @@
     height: 271px
     margin-top: auto
     margin-bottom: auto
-    color: #47466A3D
+    color: var(--themeColorDark12)
     font-size: 13px
 
 .jc-end
@@ -214,10 +214,10 @@
     float: right
 
 .grey-text
-    color: #949597
+    color: var(--hexColor19)
 
 .white-background
-    background-color: #FFFFFF   
+    background-color: var(--white)   
      
 .fs-12
     font-size: 12px
@@ -226,8 +226,136 @@
     font-size: 14px
 
 .text-primary    
-    color: #47466A
+    color: var(--themeColorDark)
 
 .fw-500   
     font-weight: 500
+</style>
+
+<style lang="css">
+    :root{
+        --themeColor: #6200EA;
+        --themeColor2: #6200EADF;
+        --themeColor3: #6200EABF;
+        --themeColor4: #6200EA9F;
+        --themeColor5: #6200EA99;
+        --themeColor6: #6200EA7F;
+        --themeColor7: #6200EA5F;
+        --themeColor8: #6200EA3F;
+        --themeColor9: #6200EA3D;
+        --themeColor10: #6200EA19;
+        --themeColor11: #6200EA1F;
+
+        --themeColorDark: #47466A ;
+        --themeColorDark2: #47466AD9;
+        --themeColorDark3: #47466ACC ;
+        --themeColorDark4: #47466ABF; 
+        --themeColorDark5: #47466AB3;
+        --themeColorDark6: #47466AB2 ;
+        --themeColorDark7: #47466A99 ;
+        --themeColorDark8: #47466A8C;
+        --themeColorDark9: #47466A80 ;
+        --themeColorDark10: #47466A73;
+        --themeColorDark11: #47466A59;
+        --themeColorDark12: #47466a3D ;
+        --themeColorDark13: #47466A33;
+        --themeColorDark14: #47466A2F ;
+        --themeColorDark15: #47466A26;
+        --themeColorDark16: #47466A19 ;
+        --themeColorDark17: #47466A0D ;
+        --themeColorDark18: #47466A08;
+         
+        --hexColor1: #1790FF;
+        --hexColor2: #FF8717;
+        --hexColor3: #FF1717;
+        --hexColor4: #101828;
+        --hexColor5: #12B76A;
+        --hexColor6: #24292f;
+        --hexColor7: #2193ef33;
+        --hexColor8: #33a852;
+        --hexColor9: #3366ff;
+        --hexColor10: #475467;
+        --hexColor11: #49cc90;
+        --hexColor12: #5c04d5;
+        --hexColor13: #50e3C2;
+        --hexColor14: #61AFFe;
+        --hexColor15: #73728D;
+        --hexColor16: #7D787838;
+        --hexColor17: #949494;
+        --hexColor18: #9012fe;
+        --hexColor19: #949597;
+        --hexColor20: #d2d3d4;
+        --hexColor21: #d6d3da;
+        --hexColor22: #d0d5dd;
+        --hexColor23: #ebf0f4;
+        --hexColor24: #e8d8f8;
+        --hexColor25: #e8fff4;
+        --hexColor26: #f6f8fa;
+        --hexColor27: #f9f9fa;
+        --hexColor28: #f04438;
+        --hexColor29: #f4f4f4;
+        --hexColor30: #FF000033;
+        --hexColor31: #f6f6f6;
+        --hexColor32: #ffe9e8;
+        --hexColor33: #FF000080;
+        --hexColor34: #FF5C0080;
+        --hexColor35: #F9B30080;
+        --hexColor36: #fca130;
+        --hexColor37: #f93e3e;
+        --hexColor38: #00f;
+        --hexColor39: #f2f2f2;
+        --hexColor40: #5865F2;
+
+        --primary: #126BFF;
+        --quickStartTheme:#6200B0;
+        --secondary: #434761;
+        --secondaryBtn: #4900AF;
+        --errorBtn: #FF5353;
+        --toggleBtn: #ECEDF2;
+        --error: #FF5252;
+        --info: #2196F3;
+        --success: #4CAF50;
+        --warning: #FFC107;
+        --base: #2d2434;
+        --darken1: #63698F;
+        --lighten2: #DADAE1;
+        --lighten1: #D0D2E1;
+        --anchor: #085ce7;
+        --redMetric: #f44336;
+        --greenMetric: #00bfa5;
+        --white: #ffffff;
+        --black: #000000;
+        --lightGrey: #7e7e97 ;
+        --askUs: #4A154B ;
+        --backgroundColor1: #D500F9;
+        --backgroundColor2: #2E006D;
+        --borderColor: #e4e3e5;
+        --colTableBackground:#EDECF0;
+        --white2: #fcfcfd;
+        --teamColor: #304ffe;
+        --teamColor2: #2D243480;
+        --transparent: rgba(0,0,0,0.0);
+
+        --rgbaColor1: rgba(246, 190, 79);
+        --rgbaColor2: rgba(33, 150, 243);
+        --rgbaColor3: rgba(27,31,36,.15);
+        --rgbaColor4: rgba(255, 255, 255, 0.4);
+        --rgbaColor5: rgba(45, 36, 52, 0.15);
+        --rgbaColor6: rgba(239, 239, 239, 0.5);
+        --rgbaColor7: rgba(98, 0, 234, 1);
+        --rgbaColor8: rgba(246, 190, 79, 0.2);
+        --rgbaColor9: rgba(243, 107, 107, 0.2);
+        --rgbaColor10: rgba(0, 191, 165, 0.2);
+        --rgbaColor11: rgba(0, 0, 0, 0.08);
+        --rgbaColor12: rgba(16, 24, 40, 0.05);
+        --rgbaColor13: rgba(98, 0, 234, 0.2);
+        --rgbaColor14: rgba(45, 44, 87, 0.08);
+        --rgbaColor15: rgba(255, 0, 0, 0.5);
+        --rgbaColor16: rgba(16, 24, 40, 0.05);
+        --rgbaColor17: rgba(243, 107, 107);
+        --rgbaColor18: rgba(0, 0, 0, 0.25);
+        --rgbaColor19: rgba(255, 255, 255, 0.5);
+        --rgbaColor20: rgb(45 44 87 / 10%);
+        --rgbaColor21: rgba(255, 255, 255, 0.3);
+    }
 </style>
