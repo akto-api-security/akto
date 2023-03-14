@@ -50,8 +50,8 @@ public class HttpRequestResponseUtils {
         String myStringDecoded = null;
         try {
             myStringDecoded = URLDecoder.decode(rawRequest, "UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            return rawRequest;
+        } catch (Exception e) {
+            return null;
         }
         String[] parts = myStringDecoded.split("&");
         Map<String,String> valueMap = new HashMap<>();
@@ -64,8 +64,8 @@ public class HttpRequestResponseUtils {
         }
         try {
             return mapper.writeValueAsString(valueMap);
-        } catch (JsonProcessingException e) {
-            return rawRequest;
+        } catch (Exception e) {
+            return null;
         }
     }
 
