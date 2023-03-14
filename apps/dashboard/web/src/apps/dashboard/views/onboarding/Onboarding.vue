@@ -2,13 +2,13 @@
     <layout-with-top-branding-pane>
         <template slot="actions">
             <div style="padding-top: 20px; position: absolute; right: 112px">
-                <v-btn outlined style="margin-right: 12px" :height="44">
+                <v-btn outlined style="margin-right: 12px" :height="44" @click="openDocs">
                     <v-icon left>
                         $fas_book
                     </v-icon>
                     <span style="color:#47466A; font-weight: bold; font-size: 12px;">Docs</span>
                 </v-btn>
-                <v-btn outlined :height="44">
+                <v-btn outlined :height="44" @click="openDiscordCommunity">
                     <v-icon left size="18">
                         $discord
                     </v-icon>
@@ -32,6 +32,14 @@ export default {
     components: {
         LayoutWithTopBrandingPane,
         OnboardingBuilder
+    },
+    methods: {
+        openDiscordCommunity() {
+            return window.open("https://discord.com/invite/Wpc6xVME4s")
+        },
+        openDocs() {
+            return window.open("https://docs.akto.io")
+        }
     },
 }
 </script>
