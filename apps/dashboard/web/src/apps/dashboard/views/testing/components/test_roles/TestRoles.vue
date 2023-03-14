@@ -1,7 +1,7 @@
 <template>
     <div class="data-types-container d-flex">
-        <a-card :title="title" color="rgba(33, 150, 243)" style="min-height: 600px; flex: 1 1 20%"
-            icon_right="$fas_plus" icon_right_color="#6200EA" @icon_right_clicked="openCreateRoleDialog">
+        <a-card :title="title" color="var(--rgbaColor2)" style="min-height: 600px; flex: 1 1 20%"
+            icon_right="$fas_plus" icon_right_color="var(--themeColor)" @icon_right_clicked="openCreateRoleDialog">
             <div v-for="(testRole, index) in testRoles" :key="index">
                 <test-role-card :item="testRole" @selectedEntry="entryUpdated" />
             </div>
@@ -114,7 +114,7 @@ export default {
 
 <style lang="sass" scoped>
 .main
-    background-color: #47466A
+    background-color: var(--themeColorDark)
     
 .details-container
     flex: 1 1 80%

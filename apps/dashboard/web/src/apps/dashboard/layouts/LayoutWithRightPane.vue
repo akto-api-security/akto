@@ -4,8 +4,8 @@
             <v-expand-transition>
                 <div class="akto-left-pane" :style="{'width' : showRightPane ? '78%' : '98%', 'transition': 'all 0.2s linear'}">
                     <span class="hide-right-pane clickable" @click="toggleRightPane">
-                        <v-icon v-if="showRightPane" color="#6200ea">$fas_angle-right</v-icon>
-                        <v-icon v-else color="#6200ea">$fas_angle-left</v-icon>
+                        <v-icon v-if="showRightPane" color="var(--themeColor)">$fas_angle-right</v-icon>
+                        <v-icon v-else color="var(--themeColor)">$fas_angle-left</v-icon>
                     </span>
 
                     <div>
@@ -65,13 +65,13 @@
     font-size: 24px
     font-weight: 600
     padding-bottom: 4px
-    color:  #47466A
+    color:  var(--themeColorDark)
 
 .akto-page-subtitle
   font-size: 13px
   font-weight: 500
   padding-bottom: 4px
-  color: rgb(71, 70, 106, 0.7)
+  color: var(--themeColorDark5)
 
 
 .akto-panes
@@ -80,7 +80,7 @@
 
 .akto-left-pane
     padding: 16px 32px
-    box-shadow: 4px -5px 8px rgba(45, 36, 52, 0.15)
+    box-shadow: 4px -5px 8px var(--rgbaColor5)
     z-index: 1
     position: relative
 
@@ -88,11 +88,11 @@
     position: absolute
     top: 80px
     right: -10px
-    border: 1px solid #E4E3E5
+    border: 1px solid var(--borderColor)
     box-sizing: border-box
-    box-shadow: 2px 2px 4px #E4E3E5
+    box-shadow: 2px 2px 4px var(--borderColor)
     border-radius: 8px
-    background-color: #ffffff
+    background-color: var(--white)
     z-index: 2
     min-width: 24px
     justify-content: space-around

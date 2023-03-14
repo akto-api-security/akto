@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="d-flex jc-end ma-2">
-        <v-btn v-if="!showWebhookBuilder" primary dark color="#6200EA" @click="createNewWebhookFn">
+        <v-btn v-if="!showWebhookBuilder" primary dark color="var(--themeColor)" @click="createNewWebhookFn">
             Create new webhook
         </v-btn>
     </div>
@@ -21,7 +21,7 @@
     >
         <div style="padding: 12px 24px 12px 24px; background: white">
           <div style="margin-bottom: 24px">
-            <v-btn icon primary dark color="#6200EA" class="float-right" @click="() => { showWebhookBuilder = false; originalStateFromDb = null;}">
+            <v-btn icon primary dark color="var(--themeColor)" class="float-right" @click="() => { showWebhookBuilder = false; originalStateFromDb = null;}">
                 <v-icon>$fas_times</v-icon>
             </v-btn>
           </div>

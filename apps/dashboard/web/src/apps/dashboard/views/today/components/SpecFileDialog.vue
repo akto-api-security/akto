@@ -75,18 +75,18 @@ import { mapState } from 'vuex'
     height: 100%
     opacity: 1
     width: 43%
-    background-color: rgb(255, 255, 255)
+    background-color: var(--white)
     overflow-y: scroll
 
 .dialog-title
     font-weight: 600
     font-size: 24px
-    color: #47466A
+    color: var(--themeColorDark)
 
 .dialog-subtitle
     font-weight: 600
     font-size: 16px
-    color: #47466A
+    color: var(--themeColorDark)
     opacity: 0.5
 
 

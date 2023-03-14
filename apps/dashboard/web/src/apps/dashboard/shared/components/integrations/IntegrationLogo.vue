@@ -43,7 +43,7 @@ export default {
   width: 110px
   padding: 8px
   margin-right: 16px
-  background-color: #FFFFFF !important
+  background-color: var(--white) !important
 
 .integration-details
   display: flex
@@ -57,7 +57,7 @@ export default {
 .integration-name
   font-weight: 400
   font-size: 14px
-  color: #47466A
+  color: var(--themeColorDark)
   margin: auto
 
 </style>

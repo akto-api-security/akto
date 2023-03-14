@@ -7,7 +7,7 @@
                     title="Data errors" 
                     icon="$fas_clipboard-list" 
                     :subtitle="getAuditTs(auditId)"
-                    color="rgba(246, 190, 79)"
+                    color="var(--rgbaColor1)"
                 >        
                     <div class="height-1">
                         <div><span>{{getCriticalDataErrors()}}</span> <span>critical</span> </div>
@@ -20,7 +20,7 @@
                     title="Security errors" 
                     icon="$fas_unlock-alt" 
                     :subtitle="getAuditTs(auditId)"
-                    color="rgba(243, 107, 107)"
+                    color="var(--rgbaColor17)"
                 >        
                     <div class="height-1">
                         <div><span>{{getCriticalSecurityErrors()}}</span> <span>critical</span> </div>
@@ -33,11 +33,11 @@
                     title="Test report" 
                     icon="$fas_stethoscope" 
                     :subtitle="testDetails ? getAuditTs(testDetails.id) : ''"
-                    color="rgba(33, 150, 243)"
+                    color="var(--rgbaColor2)"
                 >        
                     <div class="height-1">
                         <div v-if="testDetails && testDetails.attempts">
-                            <v-progress-linear class="mb-4" :value="progress" color="#6200EA"></v-progress-linear>
+                            <v-progress-linear class="mb-4" :value="progress" color="var(--themeColor)EA"></v-progress-linear>
                             <div> {{failedTests}} failed</div>
                             <div> {{testDetails.attempts.length}} attempted</div>
                         </div>
@@ -158,20 +158,20 @@
 
 <style scoped lang="sass">
 .heading-key
-    color: #47466a
+    color: var(--themeColorDark)
     font-weight: 600
     font-size: 13px
 
 .heading-value
-    color: rgba(71, 70, 106, 0.75)
+    color: var(--themeColorDark4)
     font-weight: 500
     font-size: 13px   
     margin-bottom: 24px 
 
 .testing-setup-btn
-    background-color: #6200EA !important
+    background-color: var(--themeColor)EA !important
     & .info-text
-        color: #FFFFFF
+        color: var(--white)
 
 .height-1
     height: 200px    

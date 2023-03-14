@@ -27,7 +27,7 @@
             ></v-text-field>
 
         <div>
-            <v-btn color="#6200EA" dark @click="completed" :disabled="false" style="float: right">
+            <v-btn color="var(--themeColor)" dark @click="completed" :disabled="false" style="float: right">
                 <span class="info-text">{{btnText}}</span>
             </v-btn>
             
@@ -67,13 +67,13 @@
 .dialog-title
     font-size: 16px
     font-weight: 600
-    color: #47466A
+    color: var(--themeColorDark)
     margin-bottom: 16px
 
 .heading
     font-size: 14px
     font-weight: 500
-    color: #47466A
+    color: var(--themeColorDark)
 
 .form-field-text
     padding-top: 8px !important
@@ -84,13 +84,13 @@
 <style scoped>
 .form-field-text >>> .v-label {
   font-size: 12px;
-  color: #6200EA;
+  color: var(--themeColor);
   font-weight: 400;
 }
 
 .form-field-text >>> input {
   font-size: 14px;
-  color: #6200EA;
+  color: var(--themeColor);
   font-weight: 500;
 }
 </style>

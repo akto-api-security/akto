@@ -28,7 +28,7 @@ export default {
     defaultChartOptions: obj.objR,
     backgroundColor: {
       type: String,
-      default: "#FFFFFF"
+      default: "var(--white)"
     },
     text: obj.boolR
   },
@@ -43,7 +43,7 @@ export default {
           linearGradient: {x1:0, y1:0, x2:0, y2:1},
           stops: [
             [0, this.color+"3b"],
-            [1, "#FFFFFF"]
+            [1, "var(--white)"]
           ]
         }
 
@@ -136,6 +136,6 @@ export default {
 
 <style scoped lang="sass">
 .no-data-chart
-  color: #d2d3d4
+  color: var(--hexColor20)
   font-size: 18px
 </style>
