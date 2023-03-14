@@ -15,7 +15,7 @@
                 </div>
             </template>
             <v-list>
-                <v-list-item v-for="(item, index) in this.apiCollections" :key="index" @click="collectionSelected(item)">
+                <v-list-item v-for="(item, index) in this.demoCollections" :key="index" @click="collectionSelected(item)">
                     <v-list-item-title class="options">{{ item.displayName}}</v-list-item-title>
                 </v-list-item>
             </v-list>
@@ -40,8 +40,8 @@ export default {
         }
     },
     mounted() {
-        if (this.apiCollections || this.apiCollections.size > 0) {
-            this.$store.dispatch('onboarding/collectionSelected', this.apiCollections[0])
+        if (this.demoCollections || this.demoCollections.size > 0) {
+            this.$store.dispatch('onboarding/collectionSelected', this.demoCollections[0])
         }
     },
 
@@ -54,6 +54,9 @@ export default {
     computed: {
         ...mapState('collections', ['apiCollections']),
         ...mapState('onboarding', ['selectedCollection']),
+        demoCollections() {
+            return this.apiCollections.filter((x) => x.displayName.toLowerCase() !== "default")
+        }
     }
 }
 
