@@ -323,7 +323,7 @@ export default {
                 this.refreshSummaries().then(() => {
                 if (this.testingRunResultSummaries.length !== 0) {
                     this.loading = false
-                    clearInterval(interval)
+                    clearInterval(this.refreshSummariesInterval)
                 }
                 })
             }, 5000)
