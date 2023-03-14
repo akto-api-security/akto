@@ -245,7 +245,8 @@ export default {
 .category-item
     padding: 16px 24px
     color: #47466A !important
-    font-size: 14px       
+    font-size: 14px
+    min-height: 60px !important      
     
 .test-item
     font-size: 12px
