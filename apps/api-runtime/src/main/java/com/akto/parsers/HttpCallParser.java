@@ -9,6 +9,8 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
 import com.akto.util.JSONUtils;
+import com.akto.util.HttpRequestResponseUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
@@ -48,7 +50,7 @@ public class HttpCallParser {
         Map<String,List<String>> requestHeaders = OriginalHttpRequest.buildHeadersMap(json, "requestHeaders");
 
         String rawRequestPayload = (String) json.get("requestPayload");
-        String requestPayload = OriginalHttpRequest.rawToJsonString(rawRequestPayload,requestHeaders);
+        String requestPayload = HttpRequestResponseUtils.rawToJsonString(rawRequestPayload,requestHeaders);
 
 
 
