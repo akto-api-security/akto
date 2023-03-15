@@ -32,4 +32,14 @@ export default {
             return resp
         })
     },
+
+    skipOnboarding() {
+        return request({
+            url: '/api/skipOnboarding',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
+    },
 }

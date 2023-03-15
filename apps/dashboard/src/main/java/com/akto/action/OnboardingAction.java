@@ -22,6 +22,11 @@ public class OnboardingAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String skipOnboarding() {
+        AccountSettingsDao.instance.updateOnboardingFlag(false);
+        return SUCCESS.toUpperCase();
+    }
+
 
     private ArrayList<AuthParamData> authParamData;
     private int collectionId;
