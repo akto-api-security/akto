@@ -76,6 +76,9 @@ const onboarding = {
             }).catch(e => {
                 commit('UPDATE_RUN_TEST_LOADING', false)
             })
+        },
+        skipOnboarding() {
+            return api.skipOnboarding()
         }
     },
     getters: {

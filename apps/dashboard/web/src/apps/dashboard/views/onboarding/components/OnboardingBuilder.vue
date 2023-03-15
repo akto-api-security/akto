@@ -1,6 +1,9 @@
 <template>
     <div class="main">
-      <v-container style="padding-top: 80px;">
+      <div v-if="loading" class="spinner-div">
+            <spinner :size="50" color="var(--themeColor)"/>
+      </div>
+      <v-container style="padding-top: 80px;" v-else>
         <v-row>
           <v-col>
             <onboarding-description
@@ -25,6 +28,10 @@
                     :loading="runTestLoading"
                 />
             </v-card>
+
+            <div class="skip-text" @click="skipOnboarding">
+                I am a ninja. I don't need onboarding
+            </div>
           </v-col>
         </v-row>
 
@@ -40,6 +47,7 @@ import SelectTestSuite from '@/apps/dashboard/views/onboarding/components/Select
 import NextButton from '@/apps/dashboard/views/onboarding/components/NextButton'
 import SetConfig from '@/apps/dashboard/views/onboarding/components/SetConfig'
 import {mapState} from 'vuex'
+import Spinner from '@/apps/dashboard/shared/components/Spinner'
 
 export default {
     name: "OnboardingBuilder",
@@ -48,7 +56,8 @@ export default {
         SelectCollectionComponent,
         SelectTestSuite,
         NextButton,
-        SetConfig
+        SetConfig,
+        Spinner
     },
     data () {
         return {
@@ -76,7 +85,8 @@ export default {
                     "icon": "$fas_bolt",
                     "prepend": true
                 },
-            ]
+            ],
+            loading: false
         }
     },
     methods: {
@@ -90,6 +100,12 @@ export default {
         goToStep(index) {
             if (this.nextButtonDisable && index > this.currentStep) return
             this.currentStep = index
+        },
+        skipOnboarding() {
+            this.loading = true
+            this.$store.dispatch("onboarding/skipOnboarding").then((resp) => {
+                window.location.href = "/dashboard/quick-start"
+            })
         }
     },
     mounted() {
@@ -118,5 +134,21 @@ export default {
     position: relative
     box-shadow: unset
     width: fit-content
+
+.skip-text
+    margin-top: 32px
+    display: flex
+    justify-content: center
+    font-weight: 600
+    font-size: 12px
+    color: #AAAAAA
+    text-decoration: underline
+    cursor: pointer
+
+.spinner-div
+    display: flex
+    justify-content: center
+    height: 100%
+    align-items: center
 
 </style>
