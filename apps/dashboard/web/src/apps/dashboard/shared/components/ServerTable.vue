@@ -161,7 +161,7 @@ export default {
             itemsPerPage: [rowsPerPage],
             filteredItems: [],
             total: 0,
-            loading: true,
+            loading: false,
             currPage: 1,
             search: null,
             sortKey: this.sortKeyDefault || null,
@@ -245,25 +245,19 @@ export default {
             return ret
         },
         fetchRecentParams() {
-            const { sortBy, sortDesc, page, itemsPerPage } = this.options
+            this.loading = true
+            const { sortBy, sortDesc, page, itemsPerPage } = {...this.options, sortKey: this.sortKey, sortDesc: [this.sortDesc]}
             this.currPage = page
             this.rowsPerPage = itemsPerPage
             let skip = (this.currPage-1)*this.rowsPerPage
+            
             this.fetchParams(sortBy[0], sortDesc[0] ? -1: 1, skip, this.rowsPerPage, this.filters, this.filterOperators).then(resp => {
                 this.loading = false
                 let params = resp.endpoints
                 let total = resp.total
                 this.total = total
                 let listParams = params.map(this.processParams)
-                let sortedParams = listParams.sort((a, b) => {
-                    if (a.detectedTs > b.detectedTs + 3600) {
-                        return -1
-                    } else if (a.detectedTs < b.detectedTs - 3600) {
-                        return 1
-                    } else {
-                        return func.isSubTypeSensitive(a.x) > func.isSubTypeSensitive(b.x) ? -1 : 1
-                    }
-                })
+                let sortedParams = listParams
                 this.filteredItems = sortedParams
             }).catch(e => {
                 this.loading = false
@@ -284,7 +278,11 @@ export default {
             if (this.filters[header].size < 1) {
                 return true
             } 
-            
+
+            if (itemValue instanceof Array) {
+                itemValue = new Set(itemValue);
+            }
+          
             if(itemValue instanceof Set) {
                 switch(this.filterOperators[header]) {
                     case "OR":
