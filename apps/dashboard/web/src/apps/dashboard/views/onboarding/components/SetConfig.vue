@@ -1,12 +1,13 @@
 <template>
-    <div style="width: 550px;height: 250px; margin-bottom: 36px;" class="pa-3">
-        <div style="font-weight: 500;font-size: 20px; color: #47466A">Attacker Token</div>
-        <div style="display: flex; justify-content: center; height: 100%; align-items: center;" v-if="authMechanismLoading">
+    <div class="pa-3 set-config-div">
+        <div class="config-heading">Attacker Token</div>
+        <div class="spinner-div" v-if="authMechanismLoading">
             <spinner :size="50"/>
         </div>
         <div v-else>
             <div>
-                <div style="display: flex; align-items: center; margin-top: 20px;font-weight: 400; font-size: 14px; color: #47466A">
+                <div style="margin-top: 20px;"></div>
+                <div class="form-key">
                     <div>Auth header key</div>
                     <hint-icon value="Attacker token header key"/>
                 </div>
@@ -24,7 +25,7 @@
                 </div>
             </div>
             <div>
-                <div style="display: flex; align-items: center;font-weight: 400; font-size: 14px; color: #47466A">
+                <div class="form-key">
                     <div>Auth header value</div>
                     <hint-icon value="Attacker token value"/>
                 </div>
@@ -94,10 +95,29 @@ export default {
     border-radius: 8px
 
 .auth-text-field.v-text-field--outlined fieldset 
-    color: #D0D5DD !important
+    color: var(--hexColor22) !important
 
+.set-config-div
+    width: 550px
+    height: 250px
+    margin-bottom: 36px
 
+.spinner-div
+    display: flex
+    justify-content: center
+    height: 100%
+    align-items: center
 
+.form-key
+    display: flex
+    align-items: center
+    font-weight: 400
+    font-size: 14px
+    color: var(--themeColorDark)
 
+.config-heading
+    font-weight: 500
+    font-size: 20px
+    color: var(--themeColorDark)
 
 </style>

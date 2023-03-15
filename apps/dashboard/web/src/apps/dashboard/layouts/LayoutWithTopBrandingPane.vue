@@ -1,7 +1,7 @@
 <template>
     <div style="height: 100%">
         <div class="top-bar">
-            <v-card-title style="flex: 0 0 70%; padding-left: 112px">
+            <v-card-title class="top-bar-branding">
                 <h1 class="display-1 page-login_title">
                   <img src="/public/akto_name_with_logo.svg" style="height: 42px;" />
                 </h1>
@@ -17,7 +17,6 @@
 </template>
 
 <script>
-    import obj from "@/util/obj";
 
     export default {
         name: "LayoutWithTopBrandingPane",
@@ -35,12 +34,12 @@
     flex-wrap: wrap
     width: 100%
 
+.top-bar-branding
+    flex: 0 0 70%
+    padding-left: 112px
+
 .page-login_title
-    font-weight: 600
-    font-size: 30px !important
     margin-left: 5px
-    color: #6200EA
-    font-family: Poppins, sans-serif !important
 
 .main
     height: 100%

@@ -1,5 +1,5 @@
 <template>
-    <div style="width: 650px;height: 220px; margin-bottom: 36px;">
+    <div class="test-suites">
         <div v-if="this.testSuitesArr">
             <div class="test-suite-card-container" v-for="(arr,idx1) in this.testSuitesArr">
                 <test-suite-card 
@@ -12,7 +12,7 @@
                 />
             </div>
         </div>
-        <div v-else style="display: flex; justify-content: center; height: 100%; align-items: center;">
+        <div v-else class="spinner-div">
             <spinner :size="50"/>
         </div>
     </div>
@@ -58,5 +58,16 @@ export default {
     display: flex
     padding: 20px 20px 5px 20px
     justify-content: space-between
+
+.spinner-div
+    display: flex
+    justify-content: center
+    height: 100%
+    align-items: center
+
+.test-suites
+    width: 650px
+    height: 220px
+    margin-bottom: 36px
 
 </style>

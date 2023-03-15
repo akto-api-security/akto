@@ -11,7 +11,7 @@
         <div class="page-steps">
             Step {{ currentStep }} of {{ totalSteps }}
         </div>
-        <div style="display: flex; flex-direction: row; align-items: stretch;">
+        <div class="step-builder">
             <div 
                 class="step" v-for="idx in this.totalSteps" :key="idx" :class="idx <= currentStep ? 'step-selected':'step-not-selected'"
                 @click="goToStep(idx)"
@@ -52,15 +52,16 @@ export default {
     margin-right: 5px
     cursor: pointer
 
+.step-builder
+    display: flex
+    flex-direction: row
+    align-items: stretch
+
 .step-selected
-    background-color: #47466A
+    background-color: var(--themeColorDark)
 
 .step-not-selected
-    background-color: #DADAE1
-
-.main
-    background-color: #F7F7F7
-    height: 100%
+    background-color: var(--lighten2)
 
 .page-text
     margin: 0 auto
@@ -74,12 +75,12 @@ export default {
 .page-heading
     font-weight: 600
     font-size: 32px
-    color: #47466A
+    color: var(--themeColorDark)
 
 .page-description
     font-weight: 500
     font-size: 16px
-    color: #47466A
+    color: var(--themeColorDark)
     padding: 0px 0px 12px 0px
 
 .page-steps
@@ -96,23 +97,5 @@ export default {
     position: relative
     box-shadow: unset
     height: 240px
-
-.collection-prompt
-    height: 72px
-    border: 1px solid #DADAE1
-    font-weight: 600
-    font-size: 14px
-    color: #344054
-    border: 2px
-    border-radius: 12px !important
-
-.collection-name
-    font-weight: 500
-    color: #344054
-    font-size: 16px
-    height: 72px
-    line-height: 44px
-    padding-left: 16px
-
 
 </style>

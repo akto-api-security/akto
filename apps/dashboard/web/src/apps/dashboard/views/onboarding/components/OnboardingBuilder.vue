@@ -108,7 +108,7 @@ export default {
 
 <style lang="sass">
 .main
-    background-color: #F7F7F7
+    background-color: var(--hexColor41)
     height: 100%
 
 .main_card
