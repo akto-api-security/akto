@@ -1,6 +1,6 @@
 <template>
     <div style="height:120px ;width: 482px">
-        <div class="ma-4" style="font-weight: 600; font-size: 14px; color: #47466A">
+        <div class="ma-4 api-collection-label">
             API COLLECTION
         </div>
         <v-menu offset-y v-if="selectedCollection">
@@ -20,7 +20,7 @@
                 </v-list-item>
             </v-list>
         </v-menu>
-        <div style="display: flex; justify-content: center;" v-else>
+        <div class="spinner-div" v-else>
             <spinner :size="50"/>
         </div>
     </div>
@@ -63,5 +63,12 @@ export default {
 </script>
 
 <style lang="sass">
+.api-collection-label
+    font-weight: 600
+    font-size: 14px
+    color: #47466A
 
+.spinner-div
+    display: flex
+    justify-content: center
 </style>

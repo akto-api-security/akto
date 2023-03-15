@@ -1,12 +1,12 @@
 <template>
     <v-card :outlined="true" class="test-suite-card pa-3" @click="clicked" :class="{'selected': (selectedTestSuite === id)}">
-        <div style="display: flex; align-items: center;  justify-content: space-between; margin-bottom: 16px;">
-            <div style="color: #47466A; font-size: 22px; font-weight: 500">
+        <div class="test-suite-title-box">
+            <div class="test-suite-title">
                 {{ title }}
             </div>
             <hint-icon :value="description"/>
         </div>
-        <div style="color: #474667; font-weight: 500; font-size: 16px;">
+        <div class="test-suite-subtitle">
             {{ subtitle }}
         </div>
     </v-card>
@@ -49,6 +49,22 @@ export default {
     height: 100px
     border-radius: 8px !important
 .selected
-    border-color: #47466A !important
+    border-color: var(--themeColorDark) !important
     border-width: 3px !important
+
+.test-suite-card
+    color: var(--themeColorDark)
+    font-size: 22px
+    font-weight: 500
+
+.test-suite-subtitle
+    color: var(--themeColorDark19)
+    font-weight: 500
+    font-size: 16px
+
+.test-suite-title-box
+    display: flex
+    align-items: center
+    justify-content: space-between
+    margin-bottom: 16px
 </style>

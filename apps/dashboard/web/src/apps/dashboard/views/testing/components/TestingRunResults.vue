@@ -9,7 +9,7 @@
 
         <div class="loading-bar" v-if="loading">
             <div>
-                <spinner :size="50" color="#6200EA"/>
+                <spinner :size="50" color="var(--themeColor)"/>
             </div>
             <div style="padding-top: 12px;">
                 <div class="joke-line" v-for="line in jokes[jokeIndex]">
@@ -442,7 +442,7 @@ export default {
     align-items: center
     display: flex
     justify-content: center
-    color: #6200EA
+    color: var(--themeColor)
     font-weight: 500
     font-size: 16px
 

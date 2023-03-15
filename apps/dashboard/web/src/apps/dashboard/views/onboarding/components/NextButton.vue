@@ -1,6 +1,6 @@
 <template>
     <div class="ma-4" style="padding-top: 12px">
-        <v-btn block color="#47466A" height="48px" @click="next" :disabled="disabled">
+        <v-btn block color="var(--themeColorDark)" height="48px" @click="next" :disabled="disabled">
             <div v-if="loading"><spinner :size="30" color="white"/></div>
             <div v-else>
                 <v-icon left color="white" v-if="prepend">
