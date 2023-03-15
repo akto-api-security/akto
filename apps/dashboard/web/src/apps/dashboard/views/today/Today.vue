@@ -14,7 +14,7 @@
                 <template v-if="content && Object.keys(content).length > 0 && !loading">
                     <v-tabs
                         active-class="active-tab"
-                        slider-color="#6200ea"
+                        slider-color="var(--themeColor)"
                         height="40px"
                         v-model="tabName"
                         :show-arrows="false"

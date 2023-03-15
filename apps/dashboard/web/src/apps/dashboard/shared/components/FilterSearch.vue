@@ -3,7 +3,7 @@
         <div class="list-header">
             <div>{{title}}</div>
         </div>
-        <div v-if="!hideOperators" class="d-flex jc-end pr-2" style="background-color: #FFFFFF">
+        <div v-if="!hideOperators" class="d-flex jc-end pr-2" style="background-color: var(--white)">
             <v-btn 
                 v-for="key, index in operators" 
                 plain 
@@ -18,22 +18,22 @@
         <v-text-field
             v-model="searchText"
             dense
-            color="#6200EA"
+            color="var(--themeColor)"
             prepend-inner-icon="$fas_search"
             class="px-2 py-3"
         >
             <template v-slot:prepend-inner>
-                <v-icon size="12" color="#6200EA">$fas_search</v-icon>
+                <v-icon size="12" color="var(--themeColor)">$fas_search</v-icon>
             </template>
         </v-text-field>
         <div class="d-flex jc-end pr-4 pb-2">
             <v-btn 
                 primary
-                color="#6200EA" 
+                color="var(--themeColor)" 
                 :ripple="false" 
                 @click=applyClicked
             >
-                <div style="color: #FFFFFF">Apply</div>
+                <div style="color: var(--white)">Apply</div>
             </v-btn>
         </div>
 
@@ -71,23 +71,23 @@ export default {
 
 <style lang="sass" scoped>
 .filter-container
-    background-color: #FFFFFF
+    background-color: var(--white)
     width: 250px
 .list-header
-    border-bottom: 1px solid #47466A    
+    border-bottom: 1px solid var(--themeColorDark)    
     font-weight: 500
     display: flex
     justify-content: space-between
     padding: 8px 16px
-    color: #47466A
+    color: var(--themeColorDark)
     background: white
     opacity: 1
     font-size: 14px
 .underline
     text-decoration: underline 
-    color: #6200EA !important
+    color: var(--themeColor) !important
 .operator
-    color: #47466A99
+    color: var(--themeColorDark7)
     min-width: unset !important
     padding: 0px 8px !important
 
