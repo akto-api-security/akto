@@ -9,6 +9,7 @@ import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
+import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
 import com.akto.util.modifier.NestedObjectModifier;
 import com.akto.util.modifier.SetValueModifier;
@@ -67,21 +68,23 @@ public class OpenRedirectTest extends TestPlugin {
             }
 
             // find if location is being passed in queryParams
-            String queryJson = OriginalHttpRequest.convertFormUrlEncodedToJson(req.getQueryParams());
-            BasicDBObject queryObj = BasicDBObject.parse(queryJson);
-            for (String key: queryObj.keySet()) {
-                Object valueObj = queryObj.get(key);
-                if (valueObj == null) continue;
-                String value = valueObj.toString();
-                if (value.equalsIgnoreCase(location)) {
-                    flag = true;
-                    queryObj.put(key, REDIRECT_KEYWORD_TEMP);
+            String queryJson = HttpRequestResponseUtils.convertFormUrlEncodedToJson(req.getQueryParams());
+            if (queryJson != null) {
+                BasicDBObject queryObj = BasicDBObject.parse(queryJson);
+                for (String key: queryObj.keySet()) {
+                    Object valueObj = queryObj.get(key);
+                    if (valueObj == null) continue;
+                    String value = valueObj.toString();
+                    if (value.equalsIgnoreCase(location)) {
+                        flag = true;
+                        queryObj.put(key, REDIRECT_KEYWORD_TEMP);
+                    }
                 }
-            }
-            String modifiedQueryParamString = OriginalHttpRequest.getRawQueryFromJson(queryObj.toJson());
-            if (modifiedQueryParamString != null) {
-                modifiedQueryParamString = modifiedQueryParamString.replaceAll(REDIRECT_KEYWORD_TEMP, REDIRECT_KEYWORD);
-                req.setQueryParams(modifiedQueryParamString);
+                String modifiedQueryParamString = OriginalHttpRequest.getRawQueryFromJson(queryObj.toJson());
+                if (modifiedQueryParamString != null) {
+                    modifiedQueryParamString = modifiedQueryParamString.replaceAll(REDIRECT_KEYWORD_TEMP, REDIRECT_KEYWORD);
+                    req.setQueryParams(modifiedQueryParamString);
+                }
             }
 
             // find if location is being passed in request body

@@ -16,7 +16,7 @@
                         <template v-slot:activator='{on, attrs}'>
                             <v-btn 
                                 icon 
-                                color="#47466A" 
+                                color="var(--themeColorDark)" 
                                 @click="refreshPage(false)"
                                 v-on="on"
                                 v-bind="attrs"
@@ -210,10 +210,10 @@ export default {
     },
     methods: {
         async fetchRecentParamsForRequest(sortKey, sortOrder, skip, limit, filters, filterOperators) {
-            return await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, this.startTimestamp, this.endTimestamp, true, true)
+            return await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, 0, this.endTimestamp, true, true)
         },
         async fetchRecentParamsForResponse(sortKey, sortOrder, skip, limit, filters, filterOperators) {
-            return await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, this.startTimestamp, this.endTimestamp, true, false)
+            return await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, 0, this.endTimestamp, true, false)
         },
         ignoreForThisAPI(item) {
             this.ignoredCollection = item.name
@@ -347,7 +347,7 @@ export default {
                 return {
                     name: x[0],
                     y: x[1],
-                    color: x[0] === 'General' ? "#7D787838" : (["#6200EAFF", "#6200EADF", "#6200EABF", "#6200EA9F", "#6200EA7F", "#6200EA5F", "#6200EA3F", "#6200EA1F"][i])
+                    color: x[0] === 'General' ? "var(--hexColor16)" : (["var(--themeColor)", "var(--themeColor2)", "var(--themeColor3)", "var(--themeColor4)", "var(--themeColor6)", "var(--themeColor7)", "var(--themeColor8)", "var(--themeColor11)"][i])
                 }
             })
         },
@@ -365,7 +365,7 @@ export default {
         refreshPage(hardRefresh) {
             if (hardRefresh || ((new Date() / 1000) - this.lastFetched > 60*5)) {
                 this.$store.dispatch('changes/fetchDataTypeNames')
-                api.fetchSubTypeCountMap(this.startTimestamp, this.endTimestamp).then((resp)=> {
+                api.fetchSubTypeCountMap(0, this.endTimestamp).then((resp)=> {
                     this.subTypeCountMap = resp.response.subTypeCountMap
                 })
             }
@@ -376,7 +376,7 @@ export default {
                 return {
                     "name": x[0],
                     "y": x[1],
-                    "color": x[0] === 'General' ? "#7D787838" : (["#6200EAFF", "#6200EADF", "#6200EABF", "#6200EA9F", "#6200EA7F", "#6200EA5F", "#6200EA3F", "#6200EA1F"][i])
+                    "color": x[0] === 'General' ? "var(--hexColor16)" : (["var(--themeColor)", "var(--themeColor2)", "var(--themeColor3)", "var(--themeColor4)", "var(--themeColor6)", "var(--themeColor7)", "var(--themeColor8)", "var(--themeColor11)"][i])
                 }
             })
         }

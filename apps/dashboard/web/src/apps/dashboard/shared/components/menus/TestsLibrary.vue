@@ -75,10 +75,10 @@ export default {
 <style lang="sass" scoped>
 .menu-item
     padding-left: 24px !important
-    background: rgba(71, 70, 106, 0.03)
+    background: var(--themeColorDark18)
     border-radius: 0px !important
     margin-bottom: 0px !important
-    color: #47466A !important
+    color: var(--themeColorDark) !important
     padding-left: 24px !important
 
     .menu-item-text
@@ -96,14 +96,14 @@ export default {
         border-radius: 0px !important
 
 .menu-item-active
-    background: rgba(71, 70, 106, 0.7) !important
-    color: #FFFFFF !important
+    background: var(--themeColorDark5) !important
+    color: var(--white) !important
 
 .category-content
     font-size: 12px
     padding: 0px !important
     font-weight: 500
-    color: #47466A
+    color: var(--themeColorDark)
 
 .category-item
     min-height: unset !important

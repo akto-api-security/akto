@@ -2,7 +2,7 @@
     <div>
         <div v-if="testResults && Object.keys(testResults).length > 0"> 
             <test-results-table
-                color="#6200EA"
+                color="var(--themeColor)"
                 title=""
                 :rows="testResults || []"
                 @rowClicked=rowClicked

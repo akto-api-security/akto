@@ -7,8 +7,8 @@
                 :items="apiCollectionsForTable"  
                 :actions="actions"
                 name="API Collections" 
-                sortKeyDefault="name" 
-                :sortDescDefault="false"   
+                sortKeyDefault="endpoints" 
+                :sortDescDefault="true"   
                 @rowClicked=rowClicked
                 hide-default-footer ="true"
                 :hideDownloadCSVIcon="true"
@@ -25,7 +25,7 @@
                         >
                         <template v-slot:activator="{ on, attrs }">
                             <v-btn
-                                color="#47466A"
+                                color="var(--themeColorDark)"
                                 icon
                                 dark
                                 v-bind="attrs"
@@ -34,7 +34,7 @@
                             >
                             <v-tooltip bottom>
                                 <template v-slot:activator='{ on, attrs }'>
-                                    <v-icon color="#6200EA" size="16" v-bind="attrs" v-on="on" >$fas_trash</v-icon>
+                                    <v-icon color="var(--themeColor)" size="16" v-bind="attrs" v-on="on" >$fas_trash</v-icon>
                                 </template>
                                 Delete multiple collections
                             </v-tooltip>
@@ -248,7 +248,7 @@ export default {
             return this.apiCollections.map(c => {
                 return {
                     ...c,
-                    color: "#FFFFFF",
+                    color: "var(--white)",
                     endpoints: c["urlsCount"] || 0,
                     detected: func.prettifyEpoch(c.startTs)
                 }
@@ -265,7 +265,7 @@ export default {
 
 <style lang="sass" scoped>
 .default-info
-    color: #47466A
+    color: var(--themeColorDark)
     font-size: 12px
     margin-top: 16px
 
@@ -273,8 +273,8 @@ export default {
 
 <style lang="sass">
 .v-time-picker-clock__item
-    color: #47466A
+    color: var(--themeColorDark)
 
 .v-time-picker-clock__item--active
-    color: #FFFFFF    
+    color: var(--white)    
 </style>
