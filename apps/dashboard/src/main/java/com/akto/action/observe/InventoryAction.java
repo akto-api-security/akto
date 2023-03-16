@@ -176,20 +176,20 @@ public class InventoryAction extends UserAction {
     
                 for (String param: sensitiveInRequest) {
                     if (sensitiveReqSet.contains(param)) {
-                        combinedValues.add("reqSensitive_" + param.toString());
+                        combinedValues.add("reqSensitive_" + param);
                     }
                 }
 
                 for (String param: sensitiveInResponse) {
                     if (sensitiveReqSet.contains(param)) {
-                        combinedValues.add("respSensitive_" + param.toString());
+                        combinedValues.add("respSensitive_" + param);
                     }
                 }
 
                 for (String param: alwaysSensitiveSubTypes) {
                     if (sensitiveReqSet.contains(param)) {
-                        combinedValues.add("reqSensitive_" + param.toString());
-                        combinedValues.add("respSensitive_" + param.toString());
+                        combinedValues.add("reqSensitive_" + param);
+                        combinedValues.add("respSensitive_" + param);
                     }
                 }
 
