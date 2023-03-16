@@ -43,7 +43,7 @@
                     :slotActions="true"
                 >
                     <template #add-new-row-btn="{filteredItems}">
-                        <div class="pt-4">
+                        <div>
                             <secondary-button 
                                 @click="showScheduleDialog(filteredItems)"
                                 icon="$fas_play"

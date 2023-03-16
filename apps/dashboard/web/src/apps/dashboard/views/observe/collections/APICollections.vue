@@ -246,6 +246,7 @@ export default {
                 return {
                     ...c,
                     color: "var(--white)",
+                    width: '0px',
                     endpoints: c["urlsCount"] || 0,
                     detected: func.prettifyEpoch(c.startTs)
                 }
