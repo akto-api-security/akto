@@ -131,7 +131,9 @@ public class InventoryAction extends UserAction {
         List<Bson> sorts = new ArrayList<>();
         String key;
         ArrayList<Object> values;
+        ArrayList<String> combinedValues = new ArrayList<>();
         int sortOrder;
+        String prefix;
         for (EndpointDataFilterCondition endpointDataFilterCondition: endpointDataQuery.getFilterConditions()) {
             key = endpointDataFilterCondition.getKey();
             values = endpointDataFilterCondition.getValues();
@@ -144,24 +146,65 @@ public class InventoryAction extends UserAction {
                 }
             }
 
-            if (key.equals("method")) {
-                if (values.size() > 1) {
-                    filterList.add((Filters.in("_id." + key, values)));
-                } else if (values.size() == 1) {
-                    filterList.add((Filters.eq("_id." + key, values.get(0))));
+            if (key.equals("method") || key.equals("authTypes") || key.equals("accessTypes")) {
+
+                prefix = "method_";
+                if (key.equals("authTypes")) {
+                    prefix = "authType_";
                 }
+                if (key.equals("accessTypes")) {
+                    prefix = "accessType_";
+                }
+
+                for (Object value: values) {
+                    combinedValues.add(prefix + value.toString());
+                }
+            }
+            
+            if (key.equals("sensitiveParams")) {
+                List<String> alwaysSensitiveSubTypes = SingleTypeInfoDao.instance.sensitiveSubTypeNames();
+
+                List<String> sensitiveInResponse;
+                List<String> sensitiveInRequest;
+                sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
+                sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
+    
+                Set<String> sensitiveReqSet = new HashSet<>();
+                for (String param: sensitiveInRequest) {
+                    sensitiveReqSet.add(param.toString());
+                }
+    
+                for (String param: sensitiveInRequest) {
+                    if (sensitiveReqSet.contains(param)) {
+                        combinedValues.add("reqSensitive_" + param.toString());
+                    }
+                }
+
+                for (String param: sensitiveInResponse) {
+                    if (sensitiveReqSet.contains(param)) {
+                        combinedValues.add("respSensitive_" + param.toString());
+                    }
+                }
+
+                for (String param: alwaysSensitiveSubTypes) {
+                    if (sensitiveReqSet.contains(param)) {
+                        combinedValues.add("reqSensitive_" + param.toString());
+                        combinedValues.add("respSensitive_" + param.toString());
+                    }
+                }
+
+            }
+
+            if (combinedValues.size() > 0) {
+                filterList.add((Filters.all("combinedValues", values)));
             }
 
             if (key.equals("url")) {
                 filterList.add(Filters.regex("_id." + key, ".*"+values.get(0)+".*"));
             }
 
-            if (key.equals("accessTypes") || key.equals("authTypes") || key.equals("sensitiveParams")) {
-                filterList.add((Filters.in(key, values)));
-            }
-
             if (key.equals( "lastSeenTs") || key.equals("discoveredTs")) {
-                filterList.add(Filters.eq(key, (int) values.get(0)));
+                filterList.add(Filters.gt(key, (int) values.get(0)));
             }
         }
 
