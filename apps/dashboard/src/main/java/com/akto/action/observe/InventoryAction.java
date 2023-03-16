@@ -132,8 +132,10 @@ public class InventoryAction extends UserAction {
         String key;
         ArrayList<Object> values;
         ArrayList<String> combinedValues = new ArrayList<>();
+        ArrayList<String> sensitiveParamsToBeAdded = new ArrayList<>();
         int sortOrder;
         String prefix;
+        Boolean sensitiveParamInQuery = false;
         for (EndpointDataFilterCondition endpointDataFilterCondition: endpointDataQuery.getFilterConditions()) {
             key = endpointDataFilterCondition.getKey();
             values = endpointDataFilterCondition.getValues();
@@ -153,7 +155,7 @@ public class InventoryAction extends UserAction {
                     prefix = "authType_";
                 }
                 if (key.equals("accessTypes")) {
-                    prefix = "accessType_";
+                    prefix = "accessType";
                 }
 
                 for (Object value: values) {
@@ -162,6 +164,7 @@ public class InventoryAction extends UserAction {
             }
             
             if (key.equals("sensitiveParams")) {
+                sensitiveParamInQuery = true;
                 List<String> alwaysSensitiveSubTypes = SingleTypeInfoDao.instance.sensitiveSubTypeNames();
 
                 List<String> sensitiveInResponse;
@@ -170,33 +173,29 @@ public class InventoryAction extends UserAction {
                 sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
     
                 Set<String> sensitiveReqSet = new HashSet<>();
-                for (String param: sensitiveInRequest) {
+                for (Object param: values) {
                     sensitiveReqSet.add(param.toString());
                 }
     
                 for (String param: sensitiveInRequest) {
                     if (sensitiveReqSet.contains(param)) {
-                        combinedValues.add("reqSensitive_" + param);
+                        sensitiveParamsToBeAdded.add("reqSensitive_" + param);
                     }
                 }
 
                 for (String param: sensitiveInResponse) {
                     if (sensitiveReqSet.contains(param)) {
-                        combinedValues.add("respSensitive_" + param);
+                        sensitiveParamsToBeAdded.add("respSensitive_" + param);
                     }
                 }
 
                 for (String param: alwaysSensitiveSubTypes) {
                     if (sensitiveReqSet.contains(param)) {
-                        combinedValues.add("reqSensitive_" + param);
-                        combinedValues.add("respSensitive_" + param);
+                        sensitiveParamsToBeAdded.add("reqSensitive_" + param);
+                        sensitiveParamsToBeAdded.add("respSensitive_" + param);
                     }
                 }
 
-            }
-
-            if (combinedValues.size() > 0) {
-                filterList.add((Filters.all("combinedValues", values)));
             }
 
             if (key.equals("url")) {
@@ -208,20 +207,35 @@ public class InventoryAction extends UserAction {
             }
         }
 
+        if (sensitiveParamInQuery && sensitiveParamsToBeAdded.size() == 0) {
+            return new ArrayList<SingleTypeInfoView>();
+        } else {
+            for (String param: sensitiveParamsToBeAdded) {
+                combinedValues.add(param);
+            }
+        }
+
+        if (combinedValues.size() > 0) {
+            filterList.add((Filters.all("combinedData", combinedValues)));
+        }
+
+        Bson discoveredTsSort = Sorts.ascending("discoveredTs");
+        Bson lastSeenTs = Sorts.ascending("lastSeenTs");
+
         for (EndpointDataSortCondition endpointDataSortCondition: endpointDataQuery.getSortConditions()) {
             key = endpointDataSortCondition.getKey();
             sortOrder = endpointDataSortCondition.getSortOrder();
 
-            if (key.equals("apiCollectionId") || key.equals("method") || key.equals("url")) {
-                key = "_id." + key;
+            if (key.equals("discoveredTs") && sortOrder == -1) {
+                discoveredTsSort = Sorts.descending("discoveredTs");
             }
-
-            if (sortOrder == 1) {
-                sorts.add(Sorts.ascending(key));
-            } else {
-                sorts.add(Sorts.descending(key));
+            if (key.equals("lastSeenTs") && sortOrder == -1) {
+                discoveredTsSort = Sorts.descending("lastSeenTs");
             }
         }
+
+        sorts.add(discoveredTsSort);
+        sorts.add(lastSeenTs);
         
         Bson sort = Sorts.orderBy(sorts);
         List<SingleTypeInfoView> data = SingleTypeInfoViewDao.instance.findAll(Filters.and(filterList), collectionPage * fetchEndpointsLimit, fetchEndpointsLimit, sort);
