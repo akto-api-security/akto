@@ -54,15 +54,14 @@
 
 import obj from "@/util/obj"
 import { saveAs } from 'file-saver'
-import ActionsTray from './ActionsTray'
 import FilterList from './FilterList'
 import SimpleTextField from '@/apps/dashboard/shared/components/SimpleTextField'
 import ServerTable from './ServerTable'
 
+
 export default {
     name: "SimpleTable",
     components: {
-        ActionsTray,
         FilterList,
         SimpleTextField,
         ServerTable
@@ -76,7 +75,12 @@ export default {
         actions: obj.arrN,
         allowNewRow: obj.boolN,
         hideDownloadCSVIcon: obj.boolN,
-        showName: obj.boolN
+        showName: obj.boolN,
+        showGridView:obj.boolN,
+        leftView:obj.boolN,
+        hideMoreActions:obj.boolN,
+        slotActions:obj.boolN,
+        defaultRowHeight: obj.numN
     },
     data () {
         return {
@@ -190,7 +194,15 @@ export default {
                         return !selectedValues.has(itemValue)
                 }
             }
-        }
+        },
+        
+    },
+    mounted() {
+        window.addEventListener('keydown',this.moveRowsOnKeys,null)
+    },
+    destroyed() {
+        window.removeEventListener('keydown',this.moveRowsOnKeys,null)
+        this.$store.state.globalUid = -1
     },
     computed: {
         columnValueList: {
