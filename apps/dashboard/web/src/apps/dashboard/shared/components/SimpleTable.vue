@@ -14,6 +14,7 @@
             :hideDownloadCSVIcon="hideDownloadCSVIcon"
             :showName="showName"
             :key="reRenderKey"
+            :dense="dense"
             @rowClicked="rowClicked"
         >
             <template v-slot:add-new-row-btn="{filters, filterOperators, sortKey, sortDesc}">
@@ -80,7 +81,8 @@ export default {
         leftView:obj.boolN,
         hideMoreActions:obj.boolN,
         slotActions:obj.boolN,
-        defaultRowHeight: obj.numN
+        defaultRowHeight: obj.numN,
+        dense: obj.boolN
     },
     data () {
         return {

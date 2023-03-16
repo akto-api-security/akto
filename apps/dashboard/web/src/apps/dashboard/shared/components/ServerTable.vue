@@ -8,7 +8,7 @@
             :options.sync="options"
             :sort-by="sortKey"
             :sort-desc="sortDesc"
-            :items-per-page="rowsPerPage"            
+            :items-per-page="rowsPerPage"           
             :hide-default-footer="false"
             :footer-props="{
                 showFirstLastPage: false,
@@ -21,24 +21,67 @@
             :loading="loading"
         >
             <template v-slot:top="{ pagination, options, updateOptions }">
-                <div class="d-flex jc-sb">
-                    <div v-if="showName" class="table-name">
-                      {{name}}
-                    </div>
-                    <div>
-                        <slot name="massActions"/>
-                    </div>
-                    <div class="d-flex jc-end">
-                        <div class="d-flex board-table-cards jc-end">
-                            <slot name="add-new-row-btn" 
-                                v-bind:filters="filters"  
-                                v-bind:filterOperators="filterOperators"
-                                v-bind:sortKey="sortKey"
-                                v-bind:sortDesc="sortDesc"
-                                v-bind:total="total"
-                            />
+                <div class="d-flex jc-sb mt-4">
+                    
+                        <div v-if="showName" class="table-name">
+                        {{name}}
                         </div>
-                    </div>
+                        <div class="d-flex jc-sb">
+
+                            <template v-for = "(header,index) in selectedHeaders">
+                                <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.value]"> 
+                                    <template v-slot:activator="{ on, attrs }">
+                                        <secondary-button 
+                                            :text="header.text" 
+                                            v-bind="attrs"
+                                            v-on="on"
+                                            :color="filters[header.sortKey || header.value].size > 0 ? '#6200EA !important' : null"
+                                        />
+                                    </template>
+                                    <filter-column 
+                                        :title="header.text"
+                                        :typeAndItems="getColumnValueList(header.sortKey || header.value)" 
+                                        @clickedItem="appliedFilter(header.sortKey || header.value, $event)" 
+                                        @operatorChanged="operatorChanged(header.sortKey || header.value, $event)"
+                                        @selectedAll="selectedAll(header.sortKey || header.value, $event)"
+                                    />
+                                </v-menu>
+                            </template>
+                            <v-menu offset-y :close-on-content-click="false" v-if="headers.length > 4">
+                                <template v-slot:activator="{ on, attrs }">
+                                    <secondary-button 
+                                        text="More Filters" 
+                                        v-bind="attrs"
+                                        v-on="on"
+                                    />
+                                </template>
+
+                                <filter-list
+                                    :title="headers[1].text"
+                                    hideOperators
+                                    hideListTitle
+                                    :items="convertHeadersList()"
+                                    @clickedItem = "pushIntoNew($event)"
+                                />
+
+                            </v-menu>
+
+                        </div>
+                        <div>
+                            <slot name="massActions"/>
+                        </div>
+                        <div class="d-flex jc-end">
+                            <div class="d-flex board-table-cards jc-end">
+                                <slot name="add-new-row-btn" 
+                                    v-bind:filters="filters"  
+                                    v-bind:filterOperators="filterOperators"
+                                    v-bind:sortKey="sortKey"
+                                    v-bind:sortDesc="sortDesc"
+                                    v-bind:total="total"
+                                />
+                            </div>
+                        </div>
+                    
                 </div>
             </template>
             <template v-slot:footer.prepend="{}">
@@ -57,30 +100,6 @@
                                         <span class="clickable"  @click="setSortOrInvertOrder(header)">
                                             {{header.text}} 
                                         </span>
-                                        <span v-if="header.showFilterMenu">
-                                            <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.sortKey || header.value]"> 
-                                                <template v-slot:activator="{ on, attrs }">                         
-                                                    <v-btn 
-                                                        :ripple="false" 
-                                                        v-bind="attrs" 
-                                                        v-on="on"
-                                                        primary 
-                                                        icon
-                                                        class="filter-icon" 
-                                                        :style="{display: hover || showFilterMenu[header.sortKey || header.value] || !showHideFilterIcon(header.sortKey || header.value) ? '' : 'none'}"
-                                                    >
-                                                        <v-icon :size="14">$fas_filter</v-icon>
-                                                    </v-btn>
-                                                </template>
-                                                <filter-column
-                                                    :title="header.text"
-                                                    :typeAndItems="getColumnValueList(header.sortKey || header.value)" 
-                                                    @clickedItem="appliedFilter(header.sortKey || header.value, $event)" 
-                                                    @operatorChanged="operatorChanged(header.sortKey || header.value, $event)"
-                                                    @selectedAll="selectedAll(header.sortKey || header.value, $event)"
-                                                />
-                                            </v-menu>
-                                        </span>
                                     </span>
                                 
                             </div>
@@ -98,16 +117,17 @@
                 <v-hover
                     v-slot="{ hover }"
                 >
-                    <tr class="table-row" >
+                    <tr class="table-row">
                         <td
                             class="table-column"
-                            :style="{'background-color':item.color, 'padding' : '0px !important'}"
+                            :style="{'background-color':item.color, 'padding' : '0px !important', 'width': item.width, 'height': dense ? '24px !important' : '48px'}"
                         />
                         <td 
                             v-for="(header, index) in headers.slice(1)"
                             :key="index"
                             class="table-column clickable"
                             @click="$emit('rowClicked', item)"
+                            :style="{'height': dense ? '24px !important' : '48px'}"
                         >
                             <slot :name="[`item.${header.value}`]" :item="item">
                                 <div class="table-entry">{{item[header.value]}}</div>
@@ -131,14 +151,18 @@ import func from "@/util/func"
 import { saveAs } from 'file-saver'
 import ActionsTray from './ActionsTray'
 import FilterColumn from './FilterColumn'
+import FilterList from './FilterList'
 import SimpleTextField from '@/apps/dashboard/shared/components/SimpleTextField.vue'
+import SecondaryButton from './buttons/SecondaryButton'
 
 export default {
     name: "ServerTable",
     components: {
         ActionsTray,
         FilterColumn,
-        SimpleTextField
+        SimpleTextField,
+        FilterList,
+        SecondaryButton
     },
     props: {
         headers: obj.arrR,
@@ -151,7 +175,8 @@ export default {
         actions: obj.arrN,
         allowNewRow: obj.boolN,
         hideDownloadCSVIcon: obj.boolN,
-        showName: obj.boolN
+        showName: obj.boolN,
+        dense: obj.boolN
     },
     data () {
         let rowsPerPage = 100
@@ -160,6 +185,7 @@ export default {
             rowsPerPage: rowsPerPage,
             itemsPerPage: [rowsPerPage],
             filteredItems: [],
+            selectedHeaders: [],
             total: 0,
             loading: false,
             currPage: 1,
@@ -306,6 +332,28 @@ export default {
         getDataFromApi () {
             this.loading = true
             this.fetchRecentParams()
+        },
+        convertHeadersList(){
+            let skipCount = this.headers[0].value == 'color' ? 5 : 4
+            return this.headers.slice(skipCount).map(x => {return {title: x.text, ...x}})
+        },
+        pushIntoNew({item , checked}){
+            if(checked) {
+                this.selectedHeaders.push(item)
+            }
+            else{
+                let index = this.selectedHeaders.findIndex(x => x.value === item.value)
+                this.selectedHeaders.splice(index, 1)
+
+                this.filters[item.sortKey || item.value] = new Set()
+                this.filters = {...this.filters}
+
+                this.operatorChanged(item.sortKey || item.value, {operator: "OR"})
+            }
+        },
+        fillInitial(){
+            let skipCount = this.headers[0].value == 'color' ? 1 : 0
+            this.selectedHeaders = this.headers.slice(skipCount, skipCount + 4)
         }
     },
     watch: {
@@ -318,6 +366,7 @@ export default {
     },
     mounted () {
         this.fetchRecentParams()
+        this.fillInitial()
     }
 
 }

@@ -1,7 +1,7 @@
 <template>
     <v-btn class="show-buttons mr-2" :disabled="disabled" @click="(e) => {$emit('click', e)}">
-        <span class="filter-header-span">
-            <v-icon :size="16">{{icon}}</v-icon>
+        <span class="filter-header-span" :style="{color: color}">
+            <v-icon v-if="icon" :size="16">{{icon}}</v-icon>
             {{text}}
         </span>
     </v-btn>
@@ -15,9 +15,10 @@ export default {
     name: "SecondaryButton",
     props: {
         click: Function,
-        icon: obj.strR,
+        icon: obj.strN,
         text: obj.strR,
-        disabled: obj.boolN
+        disabled: obj.boolN,
+        color: obj.strN
     }
 }
 </script>
