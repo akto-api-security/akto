@@ -40,18 +40,15 @@
                     name="All" 
                     sortKeyDefault="sensitiveTags" 
                     :sortDescDefault="true"
+                    :slotActions="true"
                 >
                     <template #add-new-row-btn="{filteredItems}">
-                        <div style="align-items: center; display: flex;">
-                            <v-tooltip>
-                                <template v-slot:activator='{ on, attrs }'>
-                                    <v-btn icon primary dark color="var(--themeColorDark)" @click="showScheduleDialog(filteredItems)">
-                                        <v-icon>$fas_play</v-icon>
-                                    </v-btn>
-                                </template>
-                                "Run test"
-                            </v-tooltip>
-                            
+                        <div class="pt-4">
+                            <secondary-button 
+                                @click="showScheduleDialog(filteredItems)"
+                                icon="$fas_play"
+                                text="Run Test" 
+                            />                            
                         </div>
                         
                     </template>
@@ -190,6 +187,7 @@ import JsonViewer from "@/apps/dashboard/shared/components/JSONViewer"
 import IconMenu from '@/apps/dashboard/shared/components/IconMenu'
 import WorkflowTestBuilder from './WorkflowTestBuilder'
 import TestsSelector from './TestsSelector'
+import SecondaryButton from '@/apps/dashboard/shared/components/buttons/SecondaryButton'
 
 export default {
     name: "ApiEndpoints",
@@ -204,7 +202,8 @@ export default {
         JsonViewer,
         IconMenu,
         WorkflowTestBuilder,
-        TestsSelector
+        TestsSelector,
+        SecondaryButton
     },
     props: {
         apiCollectionId: obj.numR
@@ -546,5 +545,4 @@ export default {
 .menu
     display: flex
     justify-content: right
-
 </style>
