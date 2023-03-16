@@ -18,6 +18,7 @@ import TrashSingleTick from "../apps/dashboard/shared/icons/TrashSingleTick"
 import TrashDoubleTick from "../apps/dashboard/shared/icons/TrashDoubleTick"
 import AktoWhite from "../apps/dashboard/shared/icons/AktoWhite"
 import BookBookmark from "../apps/dashboard/shared/icons/BookBookmark"
+import NGINX from "../apps/dashboard/shared/icons/NGINX"
 
 Vue.component('font-awesome-icon', FontAwesomeIcon)
 
@@ -233,6 +234,10 @@ faIconsOpts.trashSingleTick = {
 
 faIconsOpts.trashDoubleTick = {
   component: TrashDoubleTick
+}
+
+faIconsOpts.nginx = {
+  component: NGINX
 }
 
 faIcons.forEach(x => faIconsOpts[x.prefix+"_"+x.iconName] = {
