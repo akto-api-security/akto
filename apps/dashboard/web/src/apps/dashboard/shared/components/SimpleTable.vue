@@ -7,6 +7,7 @@
             :processParams="processParams"
             :getColumnValueList="getColumnValueList"
             :name="name"
+            :pageSize="pageSize"
             :actions="actions"
             :sortKeyDefault="sortKeyDefault"
             :sortDescDefault="sortDescDefault"
@@ -88,7 +89,8 @@ export default {
         hideMoreActions:obj.boolN,
         slotActions:obj.boolN,
         defaultRowHeight: obj.numN,
-        dense: obj.boolN
+        dense: obj.boolN,
+        pageSize: obj.numN
     },
     data () {
         return {
