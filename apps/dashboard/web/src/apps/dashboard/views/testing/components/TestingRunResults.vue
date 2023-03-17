@@ -57,6 +57,7 @@
                     name="" 
                     sortKeyDefault="vulnerable" 
                     :sortDescDefault="true"
+                    :dense="true"
                     @rowClicked="openDetails"
                 >
                     <template #item.severity="{item}">
@@ -64,41 +65,23 @@
                             :sensitiveTags="item.severity ? [item.severity] : []" 
                             :chipColor="getColor(item.severity)"
                             :hideTag="true"
+                            class="z-80"
                         />
                     </template>
                 
                 </simple-table>
-
-                <v-dialog v-model="openDetailsDialog">
-                    <div class="details-dialog">
-                        <a-card
-                            title="Test details"
-                            color="var(--rgbaColor2)"
-                            subtitle=""
-                            icon="$fas_stethoscope"
-                        >
-                            <template #title-bar>
-                                <v-btn
-                                    plain
-                                    icon
-                                    @click="openDetailsDialog = false"
-                                    style="margin-left: auto"
-                                >
-                                    <v-icon>$fas_times</v-icon>
-                                </v-btn>
-                            </template>
-                            <div class="pa-4">
-                                <test-results-dialog 
-                                    :similarlyAffectedIssues="similarlyAffectedIssues"
-                                    :testingRunResult="testingRunResult"
-                                    :subCatogoryMap="subCatogoryMap"
-                                    :issuesDetails="dialogBoxIssue"
-                                    isTestingPage
-                                    :mapCollectionIdToName="mapCollectionIdToName"/>
-                            </div>
-                        </a-card>
+                <div v-if="openDetailsDialog">
+                    <div class="details-dialog z-80">
+                        <test-results-dialog 
+                            :similarlyAffectedIssues="similarlyAffectedIssues"
+                            :testingRunResult="testingRunResult"
+                            :subCatogoryMap="subCatogoryMap"
+                            :issuesDetails="dialogBoxIssue"
+                            isTestingPage
+                            :mapCollectionIdToName="mapCollectionIdToName"/>
                     </div>
-                </v-dialog>
+                </div>
+                
             </div>
             <div v-else>
                 <workflow-test-builder :endpointsList="[]" apiCollectionId=0 :originalStateFromDb="originalStateFromDb" :defaultOpenResult="true" class="white-background"/>
@@ -426,10 +409,10 @@ export default {
     font-size: 14px        
     font-weight: 500
     color: var(--themeColorDark9)
+    margin-bottom:10px
     display: flex
     justify-content: space-between
     padding-right: 24px
-
 .loading-bar
     display: flex
     justify-content: center
@@ -445,5 +428,14 @@ export default {
     color: var(--themeColor)
     font-weight: 500
     font-size: 16px
+    
+</style>
+<style lang="scss" scoped>
+
+.details-dialog{
+    width: 1200px !important;
+    align-items:center;
+    justify-content:center;
+}
 
 </style>

@@ -230,6 +230,10 @@
 
 .fw-500   
     font-weight: 500
+
+.z-80
+    zoom: 0.8
+        
 </style>
 
 <style lang="css">

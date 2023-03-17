@@ -247,23 +247,19 @@ export default {
                 },
                 {
                   text: 'Access Type',
-                  value: 'access_type',
-                  sortKey: 'access_type'
+                  value: 'access_type'
                 },
                 {
                   text: 'Auth Type',
-                  value: 'auth_type',
-                  sortKey: 'auth_type'
+                  value: 'auth_type'
                 },
                 {
                   text: 'Last Seen',
-                  value: 'last_seen',
-                  sortKey: 'last_seen'
+                  value: 'last_seen'
                 },
                 {
                     text: constants.DISCOVERED,
-                    value: 'added',
-                    sortKey: 'detectedTs'
+                    value: 'added'
                 }
             ],
             parameterHeaders: [
