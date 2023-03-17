@@ -184,10 +184,11 @@ export default {
         allowNewRow: obj.boolN,
         hideDownloadCSVIcon: obj.boolN,
         showName: obj.boolN,
-        dense: obj.boolN
+        dense: obj.boolN,
+        pageSize: obj.numN
     },
     data () {
-        let rowsPerPage = 100
+        let rowsPerPage = this.pageSize || 100
         return {
             tableId: "table_"+parseInt(Math.random() * 10000000),
             options:{},

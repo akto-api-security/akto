@@ -1,5 +1,5 @@
 <template>
-    <div class="testing-run-results-container">
+    <div class="testing-run-results-container" ref="detailsDialog">
         <div class="testing-run-header">
             <span class="testing-run-title">{{(testingRun && testingRun.name) || "Tests"}}</span>
             <span>({{endpoints}})</span> | 
@@ -56,6 +56,7 @@
                     :items="testingRunResultsItems" 
                     name="" 
                     sortKeyDefault="vulnerable" 
+                    :pageSize="10"
                     :sortDescDefault="true"
                     :dense="true"
                     @rowClicked="openDetails"
@@ -130,6 +131,7 @@ export default {
     data () {
         let endTimestamp = this.defaultEndTimestamp || func.timeNow()
         return {
+            sticky: false,
             title: "Test",
             testTypes: ["Bola", "Workflow", "Bua"],
             startTimestamp: this.defaultStartTimestamp || (func.timeNow() - func.recencyPeriod/9),
@@ -279,20 +281,27 @@ export default {
             }
         },
         async openDetails(row) {
+            let _this = this
             await api.fetchTestRunResultDetails(row["hexId"]).then(async resp => {
-                this.testingRunResult = resp["testingRunResult"]
-                if (this.testingRunResult) {
+                _this.testingRunResult = resp["testingRunResult"]
+                if (_this.testingRunResult) {
                     await api.fetchIssueFromTestRunResultDetails(row["hexId"]).then(async respIssue => {
-                        this.dialogBoxIssue = respIssue['runIssues']
-                        if (this.dialogBoxIssue) {
-                            await issuesApi.fetchAffectedEndpoints(this.dialogBoxIssue.id).then(affectedResp => {
-                                this.similarlyAffectedIssues = affectedResp['similarlyAffectedIssues']
+                        _this.dialogBoxIssue = respIssue['runIssues']
+                        if (_this.dialogBoxIssue) {
+                            await issuesApi.fetchAffectedEndpoints(_this.dialogBoxIssue.id).then(affectedResp => {
+                                _this.similarlyAffectedIssues = affectedResp['similarlyAffectedIssues']
                             })
                         }
                     })
-                    this.openDetailsDialog = true
+                    _this.openDetailsDialog = true
                 }
             })
+            if (!_this.sticky) {
+                let detailsDialogEl = _this.$refs['detailsDialog']
+                detailsDialogEl.scrollIntoView({block: "end", inline: "nearest", behavior: 'smooth'})
+            } else {
+                _this.sticky = true                        
+            }
         },
     },
     async mounted() {
@@ -433,9 +442,14 @@ export default {
 <style lang="scss" scoped>
 
 .details-dialog{
-    width: 1200px !important;
     align-items:center;
     justify-content:center;
+    max-height: 500px !important;
+    min-height: 500px !important;
+    height: 500px !important;
+    overflow: scroll;
+    width: 1200px !important;
+    background: var(--white);
 }
 
 </style>
