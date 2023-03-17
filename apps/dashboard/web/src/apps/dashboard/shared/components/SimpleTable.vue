@@ -17,7 +17,7 @@
             :dense="dense"
             @rowClicked="rowClicked"
         >
-            <template v-slot:add-new-row-btn="{filters, filterOperators, sortKey, sortDesc}">
+            <template v-slot:add-at-top="{filters, filterOperators, sortKey, sortDesc}">
                 <div class="d-flex jc-end">
                     <div class="d-flex board-table-cards jc-end">
                         <div class="clickable download-csv ma-1">
@@ -26,7 +26,13 @@
                                     <v-btn 
                                         v-on="on"
                                         v-bind="attrs" 
-                                        icon color="var(--themeColorDark)" @click="downloadData(fetchParamsSync(sortKey, sortDesc, 0, 10000, filters, filterOperators))" v-if="!hideDownloadCSVIcon">
+                                        icon 
+                                        :ripple="false"
+                                        color="var(--themeColorDark)" 
+                                        @click="downloadData(fetchParamsSync(sortKey, sortDesc, 0, 10000, filters, filterOperators))" 
+                                        class="download-csv-btn"
+                                        v-if="!hideDownloadCSVIcon"
+                                    >
                                             <v-icon>$fas_file-csv</v-icon>
                                     </v-btn>
                                 </template>
@@ -34,7 +40,7 @@
                             </v-tooltip>
                         </div>
                         <slot name="add-new-row-btn" 
-                            :filteredItems="fetchParamsSync(sortKey, sortDesc, 0, 10000, filters, filterOperators)"
+                            v-bind:filteredItems="fetchParamsSync(sortKey, sortDesc, 0, 10000, filters, filterOperators)"
                         />
                     </div>
                 </div>
@@ -238,3 +244,9 @@ export default {
     }
 }
 </script>
+
+<style scoped lang="sass">
+.download-csv-btn
+    height: 20px !important
+    width: 20px !important
+</style>
