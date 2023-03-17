@@ -18,6 +18,7 @@ import TrashSingleTick from "../apps/dashboard/shared/icons/TrashSingleTick"
 import TrashDoubleTick from "../apps/dashboard/shared/icons/TrashDoubleTick"
 import AktoWhite from "../apps/dashboard/shared/icons/AktoWhite"
 import BookBookmark from "../apps/dashboard/shared/icons/BookBookmark"
+import Discord from "../apps/dashboard/shared/icons/Discord"
 import DeleteIcon from "../apps/dashboard/shared/icons/DeleteIcon"
 import DropDown from "../apps/dashboard/shared/icons/DropDown"
 import PlusIcon from "../apps/dashboard/shared/icons/PlusIcon"
@@ -110,6 +111,7 @@ import {
   faAnchor,
   faArrowRight,
   faGift,
+  faBook,
   faGripLines,
   faAlignJustify,
 } from '@fortawesome/free-solid-svg-icons'
@@ -147,7 +149,7 @@ const faIcons = [
   faLaptopHouse,faAnchor,fabGithub,faArrowRight,faGift,faGripLines,faAlignJustify,
   
   farComments,farCalendar, farHandPointRight, farBuilding, farStar,farSquare, farCheckSquare,farFolder,farFolderOpen,farClock,
-  farQuestionCircle,
+  farQuestionCircle, faBook,
 
   fabSalesforce,fabHubspot,fabDiscord
 ]
@@ -226,6 +228,10 @@ faIconsOpts.gcp = {
 
 faIconsOpts.slack = {
   component: Slack
+}
+
+faIconsOpts.discord = {
+  component: Discord
 }
 
 faIconsOpts.restapi = {
