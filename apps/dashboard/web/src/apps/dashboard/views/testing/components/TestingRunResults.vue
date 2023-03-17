@@ -53,12 +53,13 @@
                         :sensitiveTags="item.severity ? [item.severity] : []" 
                         :chipColor="getColor(item.severity)"
                         :hideTag="true"
+                        class="z-80"
                     />
                 </template>
             
             </simple-table>
             <div v-if="openDetailsDialog">
-                <div class="details-dialog" style="zoom: 0.8">
+                <div class="details-dialog z-80">
                     <test-results-dialog 
                         :similarlyAffectedIssues="similarlyAffectedIssues"
                         :testingRunResult="testingRunResult"
