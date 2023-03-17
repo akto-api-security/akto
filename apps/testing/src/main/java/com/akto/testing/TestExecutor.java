@@ -540,6 +540,7 @@ public class TestExecutor {
         OpenRedirectTest openRedirectTest = new OpenRedirectTest(testRunId.toHexString(), testRunResultSummaryId.toHexString());
         SSRFOnAwsMetadataEndpoint ssrfOnAwsMetadataEndpoint = new SSRFOnAwsMetadataEndpoint(testRunId.toHexString(), testRunResultSummaryId.toHexString());
         CreateAdminUserViaMassAssignment createAdminUserViaMassAssignment = new CreateAdminUserViaMassAssignment(testRunId.toHexString(), testRunResultSummaryId.toHexString());
+        PortScanningViaSSRF portScanningViaSSRF = new PortScanningViaSSRF(testRunId.toHexString(), testRunResultSummaryId.toHexString());
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
 
@@ -626,6 +627,11 @@ public class TestExecutor {
         if(testSubCategories == null || testSubCategories.contains(TestSubCategory.MASS_ASSIGNMENT_CREATE_ADMIN_ROLE.name())) {
             TestingRunResult createAdminUserViaMassAssignmentResult = runTest(createAdminUserViaMassAssignment, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
             if (createAdminUserViaMassAssignmentResult != null) testingRunResults.add(createAdminUserViaMassAssignmentResult);
+        }
+
+        if(testSubCategories == null || testSubCategories.contains(TestSubCategory.PORT_SCANNING.name())) {
+            TestingRunResult portScanningViaSSRFResult = runTest(portScanningViaSSRF, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            if (portScanningViaSSRFResult != null) testingRunResults.add(portScanningViaSSRFResult);
         }
 
         return testingRunResults;

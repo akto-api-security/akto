@@ -20,7 +20,6 @@ public class SSRFOnAwsMetadataEndpoint extends TestPlugin {
 
     private final String testRunId;
     private final String testRunResultSummaryId;
-    private static final String URL = "{{metadata_url}}";
     private static final String URL_TEMP = "url_temp";
     public SSRFOnAwsMetadataEndpoint(String testRunId, String testRunResultSummaryId) {
         this.testRunId = testRunId;
@@ -33,8 +32,8 @@ public class SSRFOnAwsMetadataEndpoint extends TestPlugin {
         RawApi rawApi = null;
         boolean flag = false;
         for (RawApi message: messages) {
-            if (message.getResponse().getStatusCode() != 200) continue;
             rawApi = message.copy();
+            if(isResponseStatusCodeAllowed(rawApi.getResponse().getStatusCode())) continue;
             OriginalHttpRequest req = rawApi.getRequest();
 
             // find if there is any url in header
@@ -46,7 +45,7 @@ public class SSRFOnAwsMetadataEndpoint extends TestPlugin {
                     String v = values.get(idx);
                     if (detectUrl(v)) {
                         flag = true;
-                        values.set(idx, URL);
+                        values.set(idx, getUrlPlaceholder());
                     }
                 }
             }
@@ -66,7 +65,7 @@ public class SSRFOnAwsMetadataEndpoint extends TestPlugin {
                 }
                 String modifiedQueryParamString = OriginalHttpRequest.getRawQueryFromJson(queryObj.toJson());
                 if (modifiedQueryParamString != null) {
-                    modifiedQueryParamString = modifiedQueryParamString.replaceAll(URL_TEMP, URL);
+                    modifiedQueryParamString = modifiedQueryParamString.replaceAll(URL_TEMP, getTemplateUrl());
                     req.setQueryParams(modifiedQueryParamString);
                 }
             }
@@ -88,7 +87,7 @@ public class SSRFOnAwsMetadataEndpoint extends TestPlugin {
                 }
 
                 Map<String, Object> store = new HashMap<>();
-                for (String k : payloadKeysToFuzz) store.put(k, URL);
+                for (String k : payloadKeysToFuzz) store.put(k, getUrlPlaceholder());
 
                 String modifiedPayload = JSONUtils.modify(jsonBody, payloadKeysToFuzz, new SetValueModifier(store));
                 req.setBody(modifiedPayload);
@@ -104,7 +103,7 @@ public class SSRFOnAwsMetadataEndpoint extends TestPlugin {
         System.out.println("******************");
 
 
-        String templateUrl = "https://raw.githubusercontent.com/bhavik-dand/tests-library/temp/ssrf_aws_endpoint/SSRF/ssrf_aws_metadata_endpoint.yaml";
+        String templateUrl = getTemplateUrl();
         String testSourceConfigCategory = "";
 
         Map<String, Object> valuesMap = new HashMap<>();
@@ -133,11 +132,12 @@ public class SSRFOnAwsMetadataEndpoint extends TestPlugin {
 
     }
 
+    protected String getTemplateUrl() {
+        return "https://raw.githubusercontent.com/bhavik-dand/tests-library/temp/ssrf_aws_endpoint/SSRF/ssrf_aws_metadata_endpoint.yaml";
+    }
+
     private boolean detectUrl(String value) {
-        if (value.contains("http://") || value.contains("https://")) {
-            return true;
-        }
-        return false;
+        return value.contains("http://") || value.contains("https://");
     }
 
     private boolean detectUrl(Object value) {
@@ -178,5 +178,13 @@ public class SSRFOnAwsMetadataEndpoint extends TestPlugin {
     @Override
     public String subTestName() {
         return "SSRF_AWS_METADATA_EXPOSED";
+    }
+
+    protected String getUrlPlaceholder() {
+        return "{{metadata_url}}";
+    }
+
+    protected boolean isResponseStatusCodeAllowed(int statusCode) {
+        return statusCode == 200;
     }
 }
