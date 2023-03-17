@@ -171,10 +171,7 @@ public class JSONUtils {
         return payload;
     }
 
-    /*
-    callbackFunc({....})
 
-     */
 
     public static Map<String, List<String>> modifyHeaderValues(Map<String, List<String>> headers, PayloadModifier payloadModifier) {
         if (headers == null) return null;
