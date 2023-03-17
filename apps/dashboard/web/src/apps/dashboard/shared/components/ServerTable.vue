@@ -19,6 +19,13 @@
 
             hide-default-header
             :loading="loading"
+            tabindex="0"
+            @keydown.native.37="moveLeft"
+            @keydown.native.38="moveUp"
+            @keydown.native.39="moveRight"
+            @keydown.native.40="moveDown"
+            @keydown.native.13="pressEnter"
+            :ref="tableId"
         >
             <template v-slot:top="{ pagination, options, updateOptions }">
                 <div class="d-flex jc-sb mt-4">
@@ -27,7 +34,6 @@
                         {{name}}
                         </div>
                         <div class="d-flex jc-sb">
-
                             <template v-for = "(header,index) in selectedHeaders">
                                 <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.value]"> 
                                     <template v-slot:activator="{ on, attrs }">
@@ -113,20 +119,22 @@
                 </template>
 
             </template>
-            <template v-slot:item="{item}">
+            <template v-slot:item="{item, index}">
                 <v-hover
                     v-slot="{ hover }"
                 >
-                    <tr class="table-row">
+                    <tr
+                        :class="['table-row', index == currRowIndex ? 'highlight-row' : '']"
+                    >
                         <td
                             class="table-column"
                             :style="{'background-color':item.color, 'padding' : '0px !important', 'width': item.width, 'height': dense ? '24px !important' : '48px'}"
                         />
                         <td 
-                            v-for="(header, index) in headers.slice(1)"
-                            :key="index"
+                            v-for="(header, ii) in headers.slice(1)"
+                            :key="ii"
                             class="table-column clickable"
-                            @click="$emit('rowClicked', item)"
+                            @click="clickRow(item, index)"
                             :style="{'height': dense ? '24px !important' : '48px'}"
                         >
                             <slot :name="[`item.${header.value}`]" :item="item">
@@ -181,12 +189,14 @@ export default {
     data () {
         let rowsPerPage = 100
         return {
+            tableId: "table_"+parseInt(Math.random() * 10000000),
             options:{},
             rowsPerPage: rowsPerPage,
             itemsPerPage: [rowsPerPage],
             filteredItems: [],
             selectedHeaders: [],
             total: 0,
+            currRowIndex: 0,
             loading: false,
             currPage: 1,
             search: null,
@@ -331,7 +341,10 @@ export default {
         },
         getDataFromApi () {
             this.loading = true
+            this.$refs[this.tableId].$el.focus()
             this.fetchRecentParams()
+            this.$refs[this.tableId].$el.focus()
+            this.currRowIndex = 0
         },
         convertHeadersList(){
             let skipCount = this.headers[0].value == 'color' ? 5 : 4
@@ -354,6 +367,43 @@ export default {
         fillInitial(){
             let skipCount = this.headers[0].value == 'color' ? 1 : 0
             this.selectedHeaders = this.headers.slice(skipCount, skipCount + 4)
+        },
+        changePage(page) {
+            this.options = {...this.options, page}
+        },
+        moveLeft(){
+            let currPage = this.options.page
+            if (currPage == 1) return
+            
+            this.changePage(currPage-1)
+        },
+        moveUp() {
+            if (this.currRowIndex == 0) {
+                this.moveLeft()
+            } else {
+                this.currRowIndex--
+            }
+        },
+        moveRight(){
+            let currPage = this.options.page
+            if (currPage * this.rowsPerPage >= this.total) return
+            
+            this.changePage(currPage+1)
+        },
+        moveDown() {
+            if (this.currRowIndex == this.filteredItems.length-1) {
+                this.moveRight()
+            } else {
+                this.currRowIndex++
+            }
+        },
+        pressEnter() {
+            let item = this.filteredItems[this.currRowIndex]
+            this.$emit('rowClicked', item)
+        },
+        clickRow(item, index) {
+            this.currRowIndex = index
+            this.pressEnter()
         }
     },
     watch: {
@@ -458,9 +508,15 @@ export default {
         position: absolute
         right: 30px
         padding: 8px 16px !important
+    
+    &:focus    
+        outline: none !important
 
 .table-sub-header
     position: relative
+
+.highlight-row
+    background-color: var(--themeColorDark14)        
 
 .filter-icon
     color: var(--themeColor) !important
