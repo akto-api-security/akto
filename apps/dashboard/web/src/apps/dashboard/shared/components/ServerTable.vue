@@ -78,7 +78,7 @@
                         </div>
                         <div class="d-flex jc-end">
                             <div class="d-flex board-table-cards jc-end">
-                                <slot name="add-new-row-btn" 
+                                <slot name="add-at-top" 
                                     v-bind:filters="filters"  
                                     v-bind:filterOperators="filterOperators"
                                     v-bind:sortKey="sortKey"
