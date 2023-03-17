@@ -57,6 +57,4 @@ export default {
 .sensitive-tag-chip
     margin: 0px 4px !important
     padding: 4px    
-    font-size: 10px !important
-    height: 20px !important
 </style>
