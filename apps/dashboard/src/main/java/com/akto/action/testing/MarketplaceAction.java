@@ -38,6 +38,7 @@ public class MarketplaceAction extends UserAction {
     TestCategory category;
     Severity severity;
     String description;
+    List<String> tags;
     public String addCustomTest() {
         TestSourceConfig alreadyExists = TestSourceConfigsDao.instance.findOne("_id", url);
         if (alreadyExists != null) {
@@ -45,7 +46,7 @@ public class MarketplaceAction extends UserAction {
             return ERROR.toUpperCase();            
         }
 
-        TestSourceConfig elem = new TestSourceConfig(url, category, subcategory, severity, description, getSUser().getLogin(), Context.now());
+        TestSourceConfig elem = new TestSourceConfig(url, category, subcategory, severity, description, getSUser().getLogin(), Context.now(),tags);
         TestSourceConfigsDao.instance.insertOne(elem);
         return Action.SUCCESS.toUpperCase();
     }
@@ -108,5 +109,13 @@ public class MarketplaceAction extends UserAction {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public List<String> getTags() {
+        return this.tags;
+    }
+
+    public void setTags(List<String> tags) {
+        this.tags = tags;
     }
 }
