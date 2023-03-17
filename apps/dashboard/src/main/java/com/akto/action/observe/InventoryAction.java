@@ -155,7 +155,7 @@ public class InventoryAction extends UserAction {
                     prefix = "authType_";
                 }
                 if (key.equals("accessTypes")) {
-                    prefix = "accessType";
+                    prefix = "accessType_";
                 }
 
                 for (Object value: values) {
@@ -219,24 +219,30 @@ public class InventoryAction extends UserAction {
             filterList.add((Filters.all("combinedData", combinedValues)));
         }
 
-        Bson discoveredTsSort = Sorts.ascending("discoveredTs");
-        Bson lastSeenTs = Sorts.ascending("lastSeenTs");
+        Bson discoveredTsSort = Sorts.descending("discoveredTs");
+        Bson lastSeenTsSort = null;
 
         for (EndpointDataSortCondition endpointDataSortCondition: endpointDataQuery.getSortConditions()) {
             key = endpointDataSortCondition.getKey();
             sortOrder = endpointDataSortCondition.getSortOrder();
 
-            if (key.equals("discoveredTs") && sortOrder == -1) {
-                discoveredTsSort = Sorts.descending("discoveredTs");
+            if (key.equals("discoveredTs") && sortOrder == 1) {
+                discoveredTsSort = Sorts.ascending("discoveredTs");
             }
-            if (key.equals("lastSeenTs") && sortOrder == -1) {
-                discoveredTsSort = Sorts.descending("lastSeenTs");
+            if (key.equals("lastSeenTs")) {
+                if (sortOrder == -1) {
+                    lastSeenTsSort = Sorts.descending("lastSeenTs");
+                } else {
+                    lastSeenTsSort = Sorts.ascending("lastSeenTs");
+                }
             }
         }
 
         sorts.add(discoveredTsSort);
-        sorts.add(lastSeenTs);
-        
+        if (lastSeenTsSort != null) {
+            sorts.add(lastSeenTsSort);
+        }
+
         Bson sort = Sorts.orderBy(sorts);
         List<SingleTypeInfoView> data = SingleTypeInfoViewDao.instance.findAll(Filters.and(filterList), collectionPage * fetchEndpointsLimit, fetchEndpointsLimit, sort);
         return data;
