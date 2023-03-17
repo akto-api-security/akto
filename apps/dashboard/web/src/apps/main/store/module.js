@@ -36,6 +36,9 @@ const store = new Vuex.Store({
         test_roles,
         marketplace,
         onboarding
+    },
+    state:{
+        globalUid:-1
     }
 })
 
