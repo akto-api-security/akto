@@ -153,6 +153,7 @@ public class JSONUtils {
     }
 
     public static String parseIfJsonP(String payload) {
+        if (payload == null) return null;
         if (!payload.startsWith("{") && !payload.startsWith("[") && !payload.startsWith("<")) {//candidate for json with padding handleRequest ({abc : abc})
             int indexOfMethodStart = payload.indexOf('(');
             int indexOfMethodEnd = payload.lastIndexOf(')');
@@ -169,6 +170,11 @@ public class JSONUtils {
         }
         return payload;
     }
+
+    /*
+    callbackFunc({....})
+
+     */
 
     public static Map<String, List<String>> modifyHeaderValues(Map<String, List<String>> headers, PayloadModifier payloadModifier) {
         if (headers == null) return null;
