@@ -100,6 +100,7 @@ public class StartTestAction extends UserAction {
             return ERROR.toUpperCase();
         } else {
             TestingRunDao.instance.insertOne(testingRun);
+            testingRunHexId = testingRun.getId().toHexString();
         }
         
         this.startTimestamp = 0;
@@ -297,6 +298,10 @@ public class StartTestAction extends UserAction {
 
     public void setTestingRunHexId(String testingRunHexId) {
         this.testingRunHexId = testingRunHexId;
+    }
+
+    public String getTestingRunHexId() {
+        return testingRunHexId;
     }
 
     public List<TestingRunResultSummary> getTestingRunResultSummaries() {
