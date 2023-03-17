@@ -49,7 +49,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
         }
 
         // get har file from github
-        String url = "https://raw.githubusercontent.com/avneesh-akto/tests-library/temp/har_file/juice_onboarding_aws.har";
+        String url = "https://raw.githubusercontent.com/akto-api-security/tests-library/master/resources/juiceshop.har";
         String harString = "";
         try {
             harString = new Scanner(new URL(url).openStream(), "UTF-8").useDelimiter("\\A").next();
@@ -58,7 +58,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
             return;
         }
 
-        String tokensUrl = "https://raw.githubusercontent.com/avneesh-akto/tests-library/temp/har_file/juice_shop_tokens";
+        String tokensUrl = "https://raw.githubusercontent.com/akto-api-security/tests-library/master/resources/juiceshop_tokens.json";
         Map<String, String> tokens = new HashMap<>();
         try {
             String tokenJsonString = new Scanner(new URL(tokensUrl).openStream(), "UTF-8").useDelimiter("\\A").next();
