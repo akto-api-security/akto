@@ -31,6 +31,6 @@ export default {
 <style lang="sass" scoped>
 .clickable-docs
     cursor: pointer
-    color: #6200B0 !important
+    color: var(--quickStartTheme) !important
     text-decoration: underline 
 </style>

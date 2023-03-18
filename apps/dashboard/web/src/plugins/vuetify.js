@@ -18,6 +18,10 @@ import TrashSingleTick from "../apps/dashboard/shared/icons/TrashSingleTick"
 import TrashDoubleTick from "../apps/dashboard/shared/icons/TrashDoubleTick"
 import AktoWhite from "../apps/dashboard/shared/icons/AktoWhite"
 import BookBookmark from "../apps/dashboard/shared/icons/BookBookmark"
+import Discord from "../apps/dashboard/shared/icons/Discord"
+import DeleteIcon from "../apps/dashboard/shared/icons/DeleteIcon"
+import DropDown from "../apps/dashboard/shared/icons/DropDown"
+import PlusIcon from "../apps/dashboard/shared/icons/PlusIcon"
 
 Vue.component('font-awesome-icon', FontAwesomeIcon)
 
@@ -106,7 +110,10 @@ import {
   faLaptopHouse,
   faAnchor,
   faArrowRight,
-  faGift
+  faGift,
+  faBook,
+  faGripLines,
+  faAlignJustify,
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -139,10 +146,10 @@ const faIcons = [
   faCreditCard,faAddressCard,faChalkboard,faFilter,faKey,faAngleDoubleDown,faAngleDoubleUp,faUpload,faRedo,faGlobe,faAngleDown,
   faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faCaretSquareUp,
   faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faThumbsUp,faCaretUp,faShareAlt,faUserPlus,faCaretDown,
-  faLaptopHouse,faAnchor,fabGithub,faArrowRight,faGift,
+  faLaptopHouse,faAnchor,fabGithub,faArrowRight,faGift,faGripLines,faAlignJustify,
   
   farComments,farCalendar, farHandPointRight, farBuilding, farStar,farSquare, farCheckSquare,farFolder,farFolderOpen,farClock,
-  farQuestionCircle,
+  farQuestionCircle, faBook,
 
   fabSalesforce,fabHubspot,fabDiscord
 ]
@@ -174,6 +181,18 @@ const ctTheme = {
 }
 
 const faIconsOpts = {}
+
+faIconsOpts.deleteIcon = {
+  component: DeleteIcon
+}
+
+faIconsOpts.dropdown = {
+  component: DropDown
+}
+
+faIconsOpts.plusIcon = {
+  component: PlusIcon
+}
 
 faIconsOpts.bookBookmark = {
   component: BookBookmark
@@ -209,6 +228,10 @@ faIconsOpts.gcp = {
 
 faIconsOpts.slack = {
   component: Slack
+}
+
+faIconsOpts.discord = {
+  component: Discord
 }
 
 faIconsOpts.restapi = {

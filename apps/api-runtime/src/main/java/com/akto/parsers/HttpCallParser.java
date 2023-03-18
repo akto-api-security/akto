@@ -8,6 +8,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
+import com.akto.util.JSONUtils;
 import com.akto.util.HttpRequestResponseUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
@@ -22,9 +23,6 @@ import java.util.*;
 
 public class HttpCallParser {
     
-    private static final String AKTO_REQUEST = "##AKTO_REQUEST##";
-    private static final String AKTO_RESPONSE = "##AKTO_RESPONSE##";
-    private final static ObjectMapper mapper = new ObjectMapper();
     private final int sync_threshold_count;
     private final int sync_threshold_time;
     private int sync_count = 0;
@@ -70,6 +68,8 @@ public class HttpCallParser {
         String status = (String) json.get("status");
         Map<String,List<String>> responseHeaders = OriginalHttpRequest.buildHeadersMap(json, "responseHeaders");
         String payload = (String) json.get("responsePayload");
+        payload = HttpRequestResponseUtils.rawToJsonString(payload, responseHeaders);
+        payload = JSONUtils.parseIfJsonP(payload);
         int time = Integer.parseInt(json.get("time").toString());
         String accountId = (String) json.get("akto_account_id");
         String sourceIP = (String) json.get("ip");

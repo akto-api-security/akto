@@ -49,4 +49,11 @@ public class AccountSettingsDao extends AccountsContextDao<AccountSettings> {
             }
         }
     }
+
+    public void updateOnboardingFlag(boolean value) {
+        instance.updateOne(
+            AccountSettingsDao.generateFilter(),
+            Updates.set(AccountSettings.SHOW_ONBOARDING, value)
+        );
+    }
 }

@@ -1,8 +1,8 @@
 .start-node {
-    background: #fff;
-    border: 1px solid #47466A;
+    background: var(--white);
+    border: 1px solid var(--themeColorDark);
     border-radius: 3px;
-    color: #47466A;
+    color: var(--themeColorDark);
     font-size: 12px;
     padding: 10px;
     text-align: center;
@@ -10,11 +10,11 @@
 }
 
 .start-node:hover {
-    box-shadow: 0px 0px 3px 3px #47466a3d;
+    box-shadow: 0px 0px 3px 3px var(--themeColorDark12);
 }
 
 .red-boundary {
-    border: 1px solid #f44336 !important;
+    border: 1px solid var(--redMetric) !important;
 }
 
 .red-boundary:hover {
@@ -22,15 +22,15 @@
 }
 
 .green-boundary {
-    border: 1px solid #6200EA !important;
+    border: 1px solid var(--themeColor) !important;
 }
 
 .green-boundary:hover {
-    box-shadow: 0px 0px 3px 3px #6200EA3d !important;
+    box-shadow: 0px 0px 3px 3px var(--themeColor9) !important;
 }
 
 .MuiInput-input {
-    color: #47466A !important;
+    color: var(--themeColorDark) !important;
     font-size: 12px !important;
 }
 
@@ -43,7 +43,7 @@
 }
 
 .MuiButton-root {
-    background-color: #6200EA !important;
+    background-color: var(--themeColor) !important;
     margin: 0 12px 12px 0 !important;
 }
 
@@ -56,12 +56,12 @@
     top: -8px;
     left: 0px;
     font-size: 10px !important;
-    color: #6200EA !important;
+    color: var(--themeColor) !important;
 }
 
 .autocomplete-options {
     font-size: 12px !important;
-    color: #47466A !important;
+    color: var(--themeColorDark) !important;
     text-overflow: ellipsis;
     overflow: hidden;
     white-space: nowrap;
@@ -74,27 +74,27 @@
 }
 
 .GET {
-    color: #61affe !important;
+    color: var(--hexColor14) !important;
 }
 
 .POST {
-    color: #49cc90 !important;
+    color: var(--hexColor11) !important;
 }
 
 .PUT {
-    color: #fca130 !important;
+    color: var(--hexColor36) !important;
 }
 
 .DELETE {
-    color: #f93e3e !important;
+    color: var(--hexColor37) !important;
 }
 
 .PATCH {
-    color: #50e3c2 !important;
+    color: var(--hexColor13) !important;
 }
 
 .HEAD {
-    color: #9012fe !important;
+    color: var(--hexColor18) !important;
 }
 
 .OPTIONS {
@@ -102,27 +102,27 @@
 }
 
 [method="GET"] {
-    color: #61affe !important;
+    color: var(--hexColor14) !important;
 }
 
 [method="POST"] {
-    color: #49cc90 !important;
+    color: var(--hexColor11) !important;
 }
 
 [method="PUT"] {
-    color: #fca130 !important;
+    color: var(--hexColor36) !important;
 }
 
 [method="DELETE"] {
-    color: #f93e3e !important;
+    color: var(--hexColor37) !important;
 }
 
 [method="PATCH"] {
-    color: #50e3c2 !important;
+    color: var(--hexColor13) !important;
 }
 
 [method="HEAD"] {
-    color: #9012fe !important;
+    color: var(--hexColor18) !important;
 }
 
 [method="OPTIONS"] {
@@ -136,30 +136,30 @@
   
 .react-flow__edge-path:hover {
     stroke-width: 2px;
-    filter: drop-shadow(3px 5px 2px #47466A3d);
+    filter: drop-shadow(3px 5px 2px var(--themeColorDark12));
     cursor: pointer;
 }
 
 .primary-btn {
-    color: #6200EA;
+    color: var(--themeColor);
     font-size: 12px;
 }
   
 .MuiPaper-root {
-    color: #47466A !important
+    color: var(--themeColorDark) !important
 }
 
 .request-editor {
     font-size: 12px !important;
     font-family: monospace !important;
-    color: #47466A !important;
+    color: var(--themeColorDark) !important;
     letter-spacing: unset !important;
     line-height: 23px !important;
     word-wrap: break-word !important;
 }
 
 .workflow-button {
-    color: #6200EA !important;
+    color: var(--themeColor) !important;
     font-weight: 600 !important;
 }
 
@@ -169,14 +169,14 @@
 }
 
 .request-editor-variable {
-    color: #6200EA !important;
+    color: var(--themeColor) !important;
     font-weight: 600 !important;
 }
 
 .request-title {
     padding-top: 12px;
     font-size: 13px;
-    color: #47466A;
+    color: var(--themeColorDark);
     font-family: 'Poppins';
     font-weight: 500;
 }

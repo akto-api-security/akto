@@ -7,7 +7,7 @@
                         <template v-slot:activator='{on, attrs}'>
                             <v-btn 
                                 icon 
-                                color="#47466A" 
+                                color="var(--themeColorDark)" 
                                 @click="refreshPage(false)"
                                 v-on="on"
                                 v-bind="attrs"
@@ -40,18 +40,15 @@
                     name="All" 
                     sortKeyDefault="sensitiveTags" 
                     :sortDescDefault="true"
+                    :slotActions="true"
                 >
                     <template #add-new-row-btn="{filteredItems}">
-                        <div style="align-items: center; display: flex;">
-                            <v-tooltip>
-                                <template v-slot:activator='{ on, attrs }'>
-                                    <v-btn icon primary dark color="#47466A" @click="showScheduleDialog(filteredItems)">
-                                        <v-icon>$fas_play</v-icon>
-                                    </v-btn>
-                                </template>
-                                "Run test"
-                            </v-tooltip>
-                            
+                        <div>
+                            <secondary-button 
+                                @click="showScheduleDialog(filteredItems)"
+                                icon="$fas_play"
+                                text="Run Test" 
+                            />                            
                         </div>
                         
                     </template>
@@ -137,7 +134,7 @@
             <template slot="Tests">
                 <div>
                     <div class="d-flex jc-end ma-2">
-                        <v-btn v-if="!showWorkflowTestBuilder" primary dark color="#6200EA" @click="() => {originalStateFromDb = null; showWorkflowTestBuilder = true}">
+                        <v-btn v-if="!showWorkflowTestBuilder" primary dark color="var(--themeColor)" @click="() => {originalStateFromDb = null; showWorkflowTestBuilder = true}">
                             Create new workflow
                         </v-btn>
                         <div style="align-items: center; display: flex; padding-right: 12px ">
@@ -155,7 +152,7 @@
                         v-if="showWorkflowTestBuilder"
                         width="80%"
                     >
-                        <v-btn icon primary dark color="#6200EA" class="float-right" @click="() => {originalStateFromDb = null; showWorkflowTestBuilder = false}">
+                        <v-btn icon primary dark color="var(--themeColor)" class="float-right" @click="() => {originalStateFromDb = null; showWorkflowTestBuilder = false}">
                             <v-icon>$fas_times</v-icon>
                         </v-btn>
                         <workflow-test-builder :endpointsList=allEndpoints :apiCollectionId="apiCollectionId" :originalStateFromDb="originalStateFromDb" :defaultOpenResult="false" class="white-background"/>
@@ -190,6 +187,7 @@ import JsonViewer from "@/apps/dashboard/shared/components/JSONViewer"
 import IconMenu from '@/apps/dashboard/shared/components/IconMenu'
 import WorkflowTestBuilder from './WorkflowTestBuilder'
 import TestsSelector from './TestsSelector'
+import SecondaryButton from '@/apps/dashboard/shared/components/buttons/SecondaryButton'
 
 export default {
     name: "ApiEndpoints",
@@ -204,7 +202,8 @@ export default {
         JsonViewer,
         IconMenu,
         WorkflowTestBuilder,
-        TestsSelector
+        TestsSelector,
+        SecondaryButton
     },
     props: {
         apiCollectionId: obj.numR
@@ -247,28 +246,23 @@ export default {
                 },
                 {
                   text: 'Last Seen',
-                  value: 'last_seen',
-                  sortKey: 'last_seen'
+                  value: 'last_seen'
                 },
                 {
                   text: 'Access Type',
-                  value: 'access_type',
-                  sortKey: 'access_type'
+                  value: 'access_type'
                 },
                 {
                   text: 'Auth Type',
-                  value: 'auth_type',
-                  sortKey: 'auth_type'
+                  value: 'auth_type'
                 },
                 {
                     text: constants.DISCOVERED,
-                    value: 'added',
-                    sortKey: 'detectedTs'
+                    value: 'added'
                 },
                 {
                     text: 'Changes',
                     value: 'changes',
-                    sortKey: 'changesCount',
                     hideFilter: true
                 }
             ],
@@ -376,7 +370,7 @@ export default {
                     } else if (type === "uploadWorkflow") {
                         let resp = await this.$store.dispatch('inventory/uploadWorkflowJson', { content: reader.result, filename: file.name})
                         resp.workflowTests.forEach((x) => {
-                          this.workflowTests.push({...x, color: "#FFFFFF"})
+                          this.workflowTests.push({...x, color: "var(--white)"})
                         })
                     }
                 }
@@ -437,7 +431,7 @@ export default {
             this.workflowTests = (await api.fetchWorkflowTests()).workflowTests.filter(x => x.apiCollectionId === this.apiCollectionId).map(x => {
                 return {
                     ...x,
-                    color: "#FFFFFF"
+                    color: "var(--white)"
                 }
             })
 
@@ -551,5 +545,4 @@ export default {
 .menu
     display: flex
     justify-content: right
-
 </style>

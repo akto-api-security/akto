@@ -14,18 +14,18 @@ export default {
 }
 </script>
 
-<style scoped>
+<style scoped >
 
 .bg{
-	background: #F9F9FA;
-	border: 1px solid #DADAE1;
+	background: var(--hexColor27);
+	border: 1px solid var(--lighten2);
 	border-radius: 12px;
 	padding: 16px;
 }
 
 .col_2 {
 	width: 100%;
-	color: #47466A;
+	color: var(--themeColorDark);
 	position: relative;
 	top: 0px;
 	left: 0px;
@@ -38,7 +38,7 @@ export default {
 
 .col_3 {
 	width: 120px;
-	color: rgba(98,0,234,1);
+	color: var(--rgbaColor7);
 	position: relative;
 	top: 0px;
 	left: 0px;
@@ -52,7 +52,7 @@ export default {
   justify-content: center;
   margin-top: 2px !important;
   margin-bottom: 2px !important;
-  color: #6200EA;
+  color: var(--themeColor);
   height: 16.67px;
   width: 16.67px;
 }

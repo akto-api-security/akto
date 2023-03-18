@@ -13,13 +13,13 @@
                     <spinner v-if="loadingTrafficData"/>
                     <line-chart
                         type='spline'
-                        color='#6200EA'
+                        color='var(--themeColor)'
                         :areaFillHex="true"
                         :height="230"
                         title="Traffic"
                         :data="trafficTrend"
                         :defaultChartOptions="{legend:{enabled: false}}"
-                        background-color="rgba(0,0,0,0.0)"
+                        background-color="var(--transparent)"
                         :text="true"
                         :input-metrics="[]"
                         class="pa-5"
@@ -153,8 +153,7 @@ export default {
                 },
                 {
                     text: 'Discovered',
-                    value: 'date',
-                    sortKey: 'detectedTs'
+                    value: 'date'
                 },
                 {
                   text: 'Values',
@@ -268,14 +267,14 @@ export default {
                 return {
                     name: x[0],
                     y: x[1],
-                    color: ["#6200EAFF", "#6200EADF", "#6200EABF", "#6200EA9F", "#6200EA7F", "#6200EA5F", "#6200EA3F", "#6200EA1F"][i]
+                    color: ["var(--themeColor)", "var(--themeColor2)", "var(--themeColor3)", "var(--themeColor4)", "var(--themeColor6)", "var(--themeColor7)", "var(--themeColor8)", "var(--themeColor11)"][i]
                 }
             })
 
             ret.push({
                 name: "Generic",
                 y: numGenericParams,
-                color: "#7D787838"
+                color: "var(--hexColor16)"
             })
             
             return ret
@@ -340,7 +339,7 @@ export default {
 <style lang="sass" scoped>
     .table-title
         font-size: 16px    
-        color: #47466A
+        color: var(--themeColorDark)
         font-weight: 500
         padding-top: 16px
     .v-tooltip__content
