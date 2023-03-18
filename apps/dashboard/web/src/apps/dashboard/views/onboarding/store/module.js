@@ -14,7 +14,8 @@ const state = {
     authKey: null,
     authValue: null,
     runTestLoading: false,
-    testSuites: null
+    testSuites: null,
+    testingRunHexId: null
 }
 
 const onboarding = {
@@ -72,7 +73,7 @@ const onboarding = {
                 state.selectedTestSuite
             ).then(resp => {
                 commit('UPDATE_RUN_TEST_LOADING', false)
-                router.push('/dashboard/testing/' + resp.testingRunHexId + '/results')
+                state.testingRunHexId = resp.testingRunHexId
             }).catch(e => {
                 commit('UPDATE_RUN_TEST_LOADING', false)
             })
