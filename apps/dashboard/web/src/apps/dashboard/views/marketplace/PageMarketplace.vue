@@ -165,7 +165,7 @@ export default {
             },
             searchText: "",
             businessSubCategories: [],
-            testSourceConfigs:[],
+            searchTestResults:[],
         }
     },
     methods: {
@@ -198,18 +198,6 @@ export default {
         },
         onSearch(searchText) {
             this.searchText = searchText
-            var arr1 = this.searchTests(this.testSourceConfigs, "default")
-            var arr2 = this.searchTests(this.businessSubCategories, "default")
-            var arr3 = this.searchTests(this.userSubcategories,"custom")
-            if(arr2.length > 0){
-                Array.prototype.push.apply(arr1,arr2)
-            }
-            if(arr3.length > 0){
-                Array.prototype.push.apply(arr1,arr3)
-            }
-
-            if(arr1.length > 0)
-                this.leftNavItems[0].items = arr1
         },
         createCategoryObj(arrCategoryKv, creatorTitle, creatorType, colorType) {
             return {
@@ -230,53 +218,6 @@ export default {
                 ]
             }
         },
-        searchTests(list,creatorType){
-            if(creatorType == 'custom'){
-                return this.filterOnSearchText(list).map(category => {
-                        return {
-                            title: category.text,
-                            link: "/dashboard/library/"+creatorType+"/"+category.value,
-                            icon: "$fas_plus",
-                            active: false
-                        }
-                    })
-            }
-            if (this.searchText && this.searchText != null) {
-                let arr = []
-                const objSet = new Set()
-                list.filter(item=>{
-                    var testName = ""
-                    var text = ""
-                    var link = "/dashboard/library/" + creatorType + "/"
-                    if(item.testName){
-                        if(item.testName.toLowerCase().indexOf(this.searchText.toLowerCase()) > -1){
-                            text =  item.superCategory.shortName + "/business-logic" 
-                            link = link + item.superCategory.name
-                        }
-                    }else if(item.addedEpoch){
-                        let name = item.id.split("/")
-                        var testName = name[name.length - 1].split(".")[0]
-                        if(testName.toLowerCase().indexOf(this.searchText.toLowerCase()) > -1){
-                            text = name[name.length - 3] + "/" + item.subcategory
-                            link = link + item.subcategory
-                        }
-                    }
-
-                    const obj = {
-                        title : text,
-                        link: link,
-                        icon: "$fas_plus",
-                        active: false,
-                    }
-                    
-                    if(!objSet.has(obj.link) && text.length > 0){
-                        objSet.add(obj.link)
-                        arr.push(obj)
-                    }
-                })
-                return arr
-            }
-        },
         filterOnSearchText(list) {
             if (this.searchText && this.searchText != null) {
                 return list.filter(x => JSON.stringify(x).toLowerCase().indexOf(this.searchText.toLowerCase()) > -1)
@@ -288,11 +229,11 @@ export default {
     async mounted() {
         await this.$store.dispatch('marketplace/fetchAllMarketplaceSubcategories')
         let aktoTestTypes = await issuesApi.fetchAllSubCategories()
-        let aktoTests = await api.fetchAllMarketplaceSubcategories()
+        let search = await api.searchTestResults("linux")
         this.testSourceConfigs = aktoTests.testSourceConfigs
         this.businessCategories = aktoTestTypes.categories
         this.businessSubCategories = aktoTestTypes.subCategories
-        this.$router.push(this.leftNavItems[0].items[0].link)        
+        this.$router.push(this.leftNavItems[0].items[0].link)   
     },
     computed: {
         ...mapState('marketplace', ['defaultSubcategories', 'userSubcategories', 'loading']),

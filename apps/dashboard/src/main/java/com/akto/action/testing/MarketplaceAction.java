@@ -1,18 +1,22 @@
 package com.akto.action.testing;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.akto.action.UserAction;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
+import com.akto.util.enums.GlobalEnums.TestSubCategory;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 
 import org.bson.conversions.Bson;
+import static com.akto.util.enums.GlobalEnums.*;
 
 public class MarketplaceAction extends UserAction {
     
@@ -39,6 +43,10 @@ public class MarketplaceAction extends UserAction {
     Severity severity;
     String description;
     List<String> tags;
+    String searchText;
+    List<TestSourceConfig> searchResults;
+    TestSubCategory[] searchAktoTests;
+
     public String addCustomTest() {
         TestSourceConfig alreadyExists = TestSourceConfigsDao.instance.findOne("_id", url);
         if (alreadyExists != null) {
@@ -48,6 +56,19 @@ public class MarketplaceAction extends UserAction {
 
         TestSourceConfig elem = new TestSourceConfig(url, category, subcategory, severity, description, getSUser().getLogin(), Context.now(),tags);
         TestSourceConfigsDao.instance.insertOne(elem);
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String searchTestResults(){
+        this.searchResults = new ArrayList<>();
+        this.searchResults = TestSourceConfigsDao.instance.findAll(Filters.or(
+            Filters.regex("severity", this.searchText, "i"),
+            Filters.regex("category", this.searchText, "i"),
+            Filters.regex("tags", this.searchText, "i"),
+            Filters.regex("description", this.searchText, "i")
+        ));
+
+        this.searchAktoTests = GlobalEnums.TestSubCategory.getValuesArray();
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -118,4 +139,25 @@ public class MarketplaceAction extends UserAction {
     public void setTags(List<String> tags) {
         this.tags = tags;
     }
+
+    public List<TestSourceConfig> getSearchResults() {
+        return this.searchResults;
+    }
+
+    public void setSearchResults(List<TestSourceConfig> searchResults) {
+        this.searchResults = searchResults;
+    }
+
+    public String getSearchText() {
+        return this.searchText;
+    }
+
+    public void setSearchText(String searchText) {
+        this.searchText = searchText;
+    }
+
+    public TestSubCategory[] getSearchAktoTests() {
+        return this.searchAktoTests;
+    }
+    
 }
