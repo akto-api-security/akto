@@ -27,7 +27,6 @@ public class RuntimeListener extends AfterMongoConnectListener {
     public static HttpCallParser httpCallParser = null;
     public static AktoPolicy aktoPolicy = null;
     public static ResourceAnalyser resourceAnalyser = null;
-    private boolean ranOnce = false;
 
     private final LoggerMaker loggerMaker= new LoggerMaker(RuntimeListener.class);
 
@@ -37,6 +36,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
         Main.initializeRuntime();
         httpCallParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
         aktoPolicy = new AktoPolicy(RuntimeListener.httpCallParser.apiCatalogSync, false);
+        resourceAnalyser = new ResourceAnalyser(300_000, 0.01, 100_000, 0.01);
 
         try {
             initialiseDemoCollections();
@@ -82,7 +82,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
         harAction.setSession(session);
         // todo: skipKafka = true for onPrem also
         try {
-            harAction.execute();
+            harAction.executeWithSkipKafka(true);
         } catch (IOException e) {
             loggerMaker.errorAndAddToDb("Error: " + e, LoggerMaker.LogDb.DASHBOARD);
         }
