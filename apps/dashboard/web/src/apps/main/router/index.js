@@ -22,6 +22,7 @@ const SensitiveData = () => import("@/apps/dashboard/views/observe/sensitive/Sen
 const ApiChanges = () => import("@/apps/dashboard/views/observe/changes/Changes")
 const ParamState = () => import("@/apps/dashboard/views/observe/misc/ParamState")
 const MPTestCategory = () => import("@/apps/dashboard/views/marketplace/components/MPTestCategory")
+const Onboarding = () => import("@/apps/dashboard/views/onboarding/Onboarding.vue")
 
 Vue.use(Router)
 
@@ -48,6 +49,14 @@ const router =  new Router({
             path: '/signup',
             name: 'signup',
             component: PageSignup
+        },
+        {
+            path: '/dashboard/onboarding',
+            name: 'onboarding',
+            component: Onboarding,
+            beforeEnter (to, from, next) {
+                store.dispatch('collections/loadAllApiCollections').then(() => next()).catch(() => next())
+            },
         },
         {
             path: '/dashboard',

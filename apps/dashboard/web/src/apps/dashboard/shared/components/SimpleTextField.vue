@@ -31,6 +31,7 @@
             onSubmit(e) {
                 let finalName = this.newName
                 this.newName = ''
+                e.stopPropagation()
                 this.$emit('changed', finalName)
             },
             onEscape() {
