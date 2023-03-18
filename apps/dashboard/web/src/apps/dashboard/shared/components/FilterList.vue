@@ -134,9 +134,9 @@ export default {
         filteredItems () {
             this.pageNumber = 1
             if (this.searchText && this.searchText.length > 0) {
-                return this.items.filter(x => x.title.toLowerCase().indexOf(this.searchText) != -1)
+                return this.items.filter(x => x.title.toLowerCase().indexOf(this.searchText) != -1).sort((x,y) => x.title > y.title ? 1 : -1)
             } else {
-                return this.items
+                return this.items.sort((x,y) => x.title > y.title ? 1 : -1)
             }
             
         },
