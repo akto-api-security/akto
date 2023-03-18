@@ -35,7 +35,7 @@
                         </div>
                         <div class="d-flex jc-sb">
                             <template v-for = "(header,index) in selectedHeaders">
-                                <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.value]"> 
+                                <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.sortKey || header.value]"> 
                                     <template v-slot:activator="{ on, attrs }">
                                         <secondary-button 
                                             :text="header.text" 
@@ -53,7 +53,7 @@
                                     />
                                 </v-menu>
                             </template>
-                            <v-menu offset-y :close-on-content-click="false" v-if="headers.length > 4">
+                            <v-menu offset-y :close-on-content-click="false" v-if="convertHeadersList().length > 4">
                                 <template v-slot:activator="{ on, attrs }">
                                     <secondary-button 
                                         text="More Filters" 
@@ -348,8 +348,7 @@ export default {
             this.currRowIndex = 0
         },
         convertHeadersList(){
-            let skipCount = this.headers[0].value == 'color' ? 5 : 4
-            return this.headers.slice(skipCount).map(x => {return {title: x.text, ...x}})
+            return this.headers.filter(x => (x.value !== 'color' && (typeof x.showFilterMenu === "undefined") || x.showFilterMenu )).slice(4).map(x => {return {title: x.text, ...x}})
         },
         pushIntoNew({item , checked}){
             if(checked) {
@@ -366,8 +365,7 @@ export default {
             }
         },
         fillInitial(){
-            let skipCount = this.headers[0].value == 'color' ? 1 : 0
-            this.selectedHeaders = this.headers.slice(skipCount, skipCount + 4)
+            this.selectedHeaders = this.headers.filter(x => (x.value !== 'color' && (typeof x.showFilterMenu === "undefined") || x.showFilterMenu)).slice(0, 4)
         },
         changePage(page) {
             this.options = {...this.options, page}
