@@ -82,7 +82,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
         harAction.setSession(session);
         // todo: skipKafka = true for onPrem also
         try {
-            harAction.execute(true);
+            harAction.executeWithSkipKafka(true);
         } catch (IOException e) {
             loggerMaker.errorAndAddToDb("Error: " + e, LoggerMaker.LogDb.DASHBOARD);
         }
