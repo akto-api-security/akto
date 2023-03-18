@@ -2,7 +2,7 @@
     <div>
 
         <server-table
-            :headers="headers.map(x => {return {...x, showFilterMenu: true}})"
+            :headers="headers"
             :fetchParams="fetchParams"
             :processParams="processParams"
             :getColumnValueList="getColumnValueList"
