@@ -12,13 +12,16 @@
                 :totalSteps="totalSteps"
                 :currentStep="currentStep"
                 @goToStep="goToStep"
+                :showStepBuilder="descriptionArr[currentStep-1].showStepBuilder"
+                :centerAlignText="descriptionArr[currentStep-1].centerAlignText"
             />
 
 
             <v-card class="pa-3 main_card" plain :outlined="true">
-                <select-collection-component v-if="currentStep === 1"/>
-                <select-test-suite v-if="currentStep === 2"/>
-                <set-config v-if="currentStep===3"/>
+                <select-collection-component v-if="currentStep === 1 && !this.testingRunHexId"/>
+                <select-test-suite v-if="currentStep === 2 && !this.testingRunHexId"/>
+                <set-config v-if="currentStep===3 && !this.testingRunHexId"/>
+                <testing-results-summary v-if="this.testingRunHexId" :testingRunHexId="testingRunHexId"/>
                 <next-button 
                     :text="descriptionArr[currentStep-1].buttonText"
                     :icon="descriptionArr[currentStep-1].icon"
@@ -44,6 +47,7 @@
 import OnboardingDescription from '@/apps/dashboard/views/onboarding/components/OnboardingDescription'
 import SelectCollectionComponent from '@/apps/dashboard/views/onboarding/components/SelectCollectionComponent'
 import SelectTestSuite from '@/apps/dashboard/views/onboarding/components/SelectTestSuite'
+import TestingResultsSummary from '@/apps/dashboard/views/onboarding/components/TestingResultsSummary'
 import NextButton from '@/apps/dashboard/views/onboarding/components/NextButton'
 import SetConfig from '@/apps/dashboard/views/onboarding/components/SetConfig'
 import {mapState} from 'vuex'
@@ -55,6 +59,7 @@ export default {
         OnboardingDescription,
         SelectCollectionComponent,
         SelectTestSuite,
+        TestingResultsSummary,
         NextButton,
         SetConfig,
         Spinner
@@ -69,21 +74,36 @@ export default {
                     "subtitle": "Add API collection you want to test. Here we have an existing API collection for you.",
                     "buttonText": "Select tests",
                     "icon": "$fas_arrow-right",
-                    "prepend": false
+                    "prepend": false,
+                    "centerAlignText": false,
+                    "showStepBuilder": true
                 },
                 {
                     "title": "Select Tests",
                     "subtitle": "Select tests you wish to run on your API endpoints.",
                     "buttonText": "Set Config",
                     "icon": "$fas_arrow-right",
-                    "prepend": false
+                    "prepend": false,
+                    "centerAlignText": false,
+                    "showStepBuilder": true
                 },
                 {
                     "title": "Set config",
                     "subtitle": "We have pre-filled token for you!",
                     "buttonText": "Run tests",
                     "icon": "$fas_bolt",
-                    "prepend": true
+                    "prepend": true,
+                    "centerAlignText": false,
+                    "showStepBuilder": true
+                },
+                {
+                    "title": "Test results",
+                    "subtitle": "Here are the results for the tests you recently ran",
+                    "buttonText": "See all issues",
+                    "icon": "$fas_arrow-right",
+                    "prepend": false,
+                    "centerAlignText": true,
+                    "showStepBuilder": false
                 },
             ],
             loading: false
@@ -91,7 +111,7 @@ export default {
     },
     methods: {
         next() {
-            if (this.currentStep === this.totalSteps) {
+            if (this.currentStep === 3) {
                 this.$store.dispatch("onboarding/runTestOnboarding")
             }
             if (this.currentStep + 1 > this.totalSteps) return
@@ -112,11 +132,12 @@ export default {
         this.$store.dispatch("onboarding/fetchTestSuites")
     },
     computed: {
-        ...mapState('onboarding', ['selectedTestSuite', 'selectedCollection', 'runTestLoading']),
+        ...mapState('onboarding', ['selectedTestSuite', 'selectedCollection', 'runTestLoading', 'testingRunHexId']),
         nextButtonDisable() {
             if (this.currentStep === 1) return !Boolean(this.selectedCollection)
             if (this.currentStep === 2) return !Boolean(this.selectedTestSuite)
             if (this.currentStep === 3) return !Boolean(this.selectedTestSuite)
+            if (this.currentStep === 4) return false
         }
     }
 }
