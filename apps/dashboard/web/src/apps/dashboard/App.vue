@@ -393,6 +393,11 @@ export default {
   border: 1px solid var(--rgbaColor3)
   margin-left: 8px
 
+.discord-btn
+  background: #ffffff !important
+  color: #24292f !important
+  border: 1px solid rgba(27,31,36,.15)
+
 .akto-external-links
   position: absolute
   right: 0px

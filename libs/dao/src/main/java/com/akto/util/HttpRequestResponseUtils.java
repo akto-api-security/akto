@@ -20,6 +20,7 @@ public class HttpRequestResponseUtils {
     public static final String GRPC_CONTENT_TYPE = "application/grpc";
 
     public static String rawToJsonString(String rawRequest, Map<String,List<String>> requestHeaders) {
+        if (rawRequest == null) return null;
         rawRequest = rawRequest.trim();
         String acceptableContentType = getAcceptableContentType(requestHeaders);
         if (acceptableContentType != null && rawRequest.length() > 0) {

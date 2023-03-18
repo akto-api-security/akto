@@ -265,7 +265,7 @@ public class TestExecutor {
 
     }
 
-    public String findHost(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) throws URISyntaxException {
+    public static String findHost(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) throws URISyntaxException {
         Map<ApiInfo.ApiInfoKey, List<String>> sampleMessagesMap =  testingUtil.getSampleMessages();
         List<String> sampleMessages = sampleMessagesMap.get(apiInfoKey);
         if (sampleMessages == null || sampleMessagesMap.isEmpty()) return null;
@@ -278,7 +278,8 @@ public class TestExecutor {
         String baseUrl = originalHttpRequest.getUrl();
         if (baseUrl.startsWith("http")) {
             URI uri = new URI(baseUrl);
-            return uri.getScheme() + "://" + uri.getHost();
+            String host = uri.getScheme() + "://" + uri.getHost();
+            return (uri.getPort() != -1)  ? host + ":" + uri.getPort() : host;
         } else {
             return "https://" + originalHttpRequest.findHostFromHeader();
         }
