@@ -4,7 +4,7 @@
         <div v-for='title in titles' :key="title">
             <div class="title">
                 {{ title }} connections
-                <v-icon color="#47466A">$fas_caret-down</v-icon>
+                <v-icon color="var(--themeColorDark)">$fas_caret-down</v-icon>
             </div>
             <div v-for="source in getSourcesInOrder()" :key="source.title + title">
                 <single-data-source v-if="source.connected === title" :icon=source.icon :title=source.title
@@ -114,7 +114,7 @@ export default {
 <style lang="sass" scoped>
 .no-pointer-events
     pointer-events: none
-    color: #47466A
+    color: var(--themeColorDark)
 
 .title
     font-weight: 600

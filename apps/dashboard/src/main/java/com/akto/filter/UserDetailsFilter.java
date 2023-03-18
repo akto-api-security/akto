@@ -229,7 +229,7 @@ public class UserDetailsFilter implements Filter {
             }
 
             if (accessTokenFromRequest == null) {
-                ProfileAction.executeMeta1(user, httpServletRequest);
+                ProfileAction.executeMeta1(user, httpServletRequest, httpServletResponse);
             }
         } else {
             redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);

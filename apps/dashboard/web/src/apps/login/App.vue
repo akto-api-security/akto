@@ -120,7 +120,7 @@
 
 .sign-up-third-party
   margin-bottom: 16px
-  border: 1px solid rgba(71, 70, 106, 0.15)
+  border: 1px solid var(--themeColorDark15)
   box-sizing: border-box
   border-radius: 4px
   text-align: center
@@ -137,17 +137,17 @@
   font-size: 16px
   font-weight: 600
   margin-left: 5px
-  color: #fff
+  color: var(--white)
 
 .page-login_title
     font-weight: 600
     font-size: 30px !important
     margin-left: 5px
-    color: #6200EA
+    color: var(--themeColor)
     font-family: Poppins, sans-serif !important
 
 .akto-background
-  background: linear-gradient(180deg, #D500F9 -7.13%, #6200EA 16.86%, #2E006D 64.29%)
+  background: linear-gradient(180deg, var(--backgroundColor1) -7.13%, var(--themeColor) 16.86%, var(--backgroundColor2) 64.29%)
 
 .sign-in__button
   border-radius: 4px
@@ -155,14 +155,14 @@
   min-width: 0px !important
 
 .logo-container  
-  background: #fff
+  background: var(--white)
   height: 44px
   width: 44px
   border-radius: 4px
   padding: 6px
 
 .all-logos-container
-  background: #6200EA  
+  background: var(--themeColor)  
   padding: 8px
   border-radius: 4px
   width: 100%
@@ -173,13 +173,13 @@
   justify-content: space-around
   position: relative
   &::before
-    border-top: 1px solid #6200EA
+    border-top: 1px solid var(--themeColor)
     content: ""
     position: absolute
     inset: 50% 0px 0px
 
   > span
-    background: #fff
+    background: var(--white)
     z-index: 20
     padding: 0px 8px
   

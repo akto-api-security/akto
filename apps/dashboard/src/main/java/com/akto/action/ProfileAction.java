@@ -1,6 +1,7 @@
 package com.akto.action;
 
 
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
@@ -12,6 +13,8 @@ import com.mongodb.BasicDBObject;
 import org.bson.internal.Base64;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -29,7 +32,7 @@ public class ProfileAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public static void executeMeta1(User user, HttpServletRequest request) {
+    public static void executeMeta1(User user, HttpServletRequest request, HttpServletResponse response) {
         BasicDBObject userDetails = new BasicDBObject();
         BasicDBObject accounts = new BasicDBObject();
         Integer sessionAccId = Context.accountId.get();
@@ -61,6 +64,19 @@ public class ProfileAction extends UserAction {
         }
 
         BasicDBList listDashboards = new BasicDBList();
+
+
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        boolean showOnboarding = accountSettings == null ? true : accountSettings.isShowOnboarding();
+
+        if (showOnboarding && request.getRequestURI().startsWith("/dashboard") && !request.getRequestURI().equals("/dashboard/onboarding")) {
+            try {
+                response.sendRedirect("/dashboard/onboarding"); 
+            }  catch (Exception e) {
+                e.printStackTrace();
+            }
+            return;
+        }
 
         userDetails.append("accounts", accounts)
                 .append("username",user.getName())
