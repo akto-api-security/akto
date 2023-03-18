@@ -13,7 +13,7 @@
                         <v-select v-model="workspace" :items="workspaces" item-text="name" item-value="id"
                             label="Select workspace" />
                             <v-btn
-                                color="#6200EA"
+                                color="var(--themeColor)"
                                 @click="importPostmanWorkspace"
                                 :disabled="importing_workspace"
                                 style="color:white">
@@ -88,6 +88,6 @@ export default {
 <style lang="sass" scoped>
 .clickable-docs
     cursor: pointer
-    color: #6200B0 !important
+    color: var(--quickStartTheme) !important
     text-decoration: underline 
 </style>

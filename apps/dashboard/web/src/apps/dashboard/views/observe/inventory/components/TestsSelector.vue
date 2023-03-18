@@ -24,7 +24,7 @@
                                     <div class="fw-500">{{getCategoryName(category)}}</div>
                                     <div class="grey-text fs-12">{{mapCategoryToSubcategory[category].selected.length}} of {{mapCategoryToSubcategory[category].all.length}} selected</div>
                                 </div>
-                                <v-icon v-if="mapCategoryToSubcategory[category].selected.length > 0" size="16" color="#6200EA">$fas_check</v-icon>
+                                <v-icon v-if="mapCategoryToSubcategory[category].selected.length > 0" size="16" color="var(--themeColor)">$fas_check</v-icon>
                             </div>
                         </v-list-item>
                     </v-list>
@@ -32,7 +32,7 @@
                 <div class="test-list-container">
                     <v-list-item class="brdb">
                         <div class="pa-0 column-title">
-                            <v-btn icon plain color="#47466A" size="12" @click="globalCheckboxClicked()" :ripple="false">
+                            <v-btn icon plain color="var(--themeColorDark)" size="12" @click="globalCheckboxClicked()" :ripple="false">
                                 <v-icon>{{globalCheckbox? '$far_check-square' : '$far_square'}}</v-icon>
                             </v-btn>
                             Tests
@@ -40,10 +40,10 @@
                     </v-list-item>
                     <v-list dense class="test-list pa-0" v-if="selectedCategory">
                         <v-list-item v-for="(item, index) in mapCategoryToSubcategory[selectedCategory].selected" :key="'selected_'+index" class="brdb test-item">
-                            <v-btn icon plain size="12" color="#47466A" @click="mapCategoryToSubcategory[selectedCategory].selected.splice(index, 1);" :ripple="false">
+                            <v-btn icon plain size="12" color="var(--themeColorDark)" @click="mapCategoryToSubcategory[selectedCategory].selected.splice(index, 1);" :ripple="false">
                                 <v-icon>$far_check-square</v-icon>
                             </v-btn> 
-                            <v-icon color="#47466A" size="12">{{item.icon}}</v-icon>
+                            <v-icon color="var(--themeColorDark)" size="12">{{item.icon}}</v-icon>
                             {{item.label}}
                         </v-list-item>
                         <v-list-item 
@@ -51,10 +51,10 @@
                             :key="'all_'+index" 
                             class="brdb test-item"
                         >
-                                <v-btn icon plain size="12" color="#47466A" @click="mapCategoryToSubcategory[selectedCategory].selected.push(item)" :ripple="false">
+                                <v-btn icon plain size="12" color="var(--themeColorDark)" @click="mapCategoryToSubcategory[selectedCategory].selected.push(item)" :ripple="false">
                                     <v-icon>$far_square</v-icon>
                                 </v-btn> 
-                                <v-icon color="#47466A" size="12">{{item.icon}}</v-icon>
+                                <v-icon color="var(--themeColorDark)" size="12">{{item.icon}}</v-icon>
                                 {{item.label}}
                         </v-list-item>
                     </v-list>
@@ -203,9 +203,9 @@ export default {
 <style lang="sass" scoped>
 .tests-selector-container
     width: 800px
-    background-color: #FFFFFF
+    background-color: var(--white)
     margin: 0px !important
-    color: #47466A
+    color: var(--themeColorDark)
 
 .item-title
     font-size: 12px
@@ -240,20 +240,20 @@ export default {
     padding: 0px 8px
     font-size: 12px
     font-weight: 500
-    color: #47466A    
+    color: var(--themeColorDark)    
         
 .category-item
     padding: 16px 24px
-    color: #47466A !important
-    font-size: 14px
+    color: var(--themeColorDark) !important
+    font-size: 14px       
     min-height: 60px !important      
     
 .test-item
     font-size: 12px
-    color: #47466A !important
+    color: var(--themeColorDark) !important
 
 .selected-category
-    background-color: #F4F4F4
+    background-color: var(--hexColor29)
 
 .name-div
     margin: auto 8px auto 0
@@ -261,7 +261,7 @@ export default {
     font-weight: 500
 
 .clickable-link
-    color: #6200ea !important
+    color: var(--themeColor) !important
 
 .disable-div
     pointer-events: none

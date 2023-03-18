@@ -9,7 +9,7 @@
             />
         </div>
         <div v-else class="fs-12">
-            {{finalName}} <v-btn icon plain color="#47466A" @click="editingInProcess = true"><v-icon size="12">$fas_edit</v-icon></v-btn>
+            {{finalName}} <v-btn icon plain color="var(--themeColorDark)" @click="editingInProcess = true"><v-icon size="12">$fas_edit</v-icon></v-btn>
         </div>
     </div>    
 </template>
