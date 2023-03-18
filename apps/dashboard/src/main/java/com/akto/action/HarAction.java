@@ -45,6 +45,12 @@ public class HarAction extends UserAction {
     private byte[] tcpContent;
     private static final Logger logger = LoggerFactory.getLogger(HarAction.class);
 
+    public String execute(boolean skipKafka) throws IOException {
+        this.skipKafka = true;
+        execute();
+        return SUCCESS.toUpperCase();
+    }
+
     @Override
     public String execute() throws IOException {
         ApiCollection apiCollection = null;
