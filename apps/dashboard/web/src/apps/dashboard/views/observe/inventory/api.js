@@ -372,6 +372,19 @@ export default {
         }).then((resp) => {
             return resp
         })
-    }
+    },
+
+    fetchEndpointData (endpointDataQuery, pageNo) {
+        return request({
+            url: '/api/fetchEndpointData',
+            method: 'post',
+            data: {
+                endpointDataQuery: endpointDataQuery,
+                collectionPage: pageNo
+            }
+        }).then((resp) => {
+            return resp.response.data
+        })
+    },
 
 }

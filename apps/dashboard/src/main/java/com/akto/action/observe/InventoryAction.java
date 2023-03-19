@@ -7,6 +7,7 @@ import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.EndpointDataFilterCondition;
 import com.akto.dto.testing.EndpointDataQuery;
+import com.akto.dto.testing.EndpointDataResponse;
 import com.akto.dto.testing.EndpointDataSortCondition;
 import com.akto.dto.testing.SingleTypeInfoView;
 import com.akto.dto.type.SingleTypeInfo;
@@ -125,17 +126,21 @@ public class InventoryAction extends UserAction {
         return endpoints;
     }
 
-    public List<SingleTypeInfoView> executeEndpointDataQuery(EndpointDataQuery endpointDataQuery) {
+    public BasicDBObject executeEndpointDataQuery(EndpointDataQuery endpointDataQuery) {
 
         ArrayList<Bson> filterList = new ArrayList<>();
         List<Bson> sorts = new ArrayList<>();
         String key;
         ArrayList<Object> values;
-        ArrayList<String> combinedValues = new ArrayList<>();
+        // ArrayList<String> combinedValues = new ArrayList<>();
+        ArrayList<String> orValues = new ArrayList<>();
+        ArrayList<String> andValues = new ArrayList<>();
+        ArrayList<String> notValues = new ArrayList<>();
         ArrayList<String> sensitiveParamsToBeAdded = new ArrayList<>();
         int sortOrder;
         String prefix;
         Boolean sensitiveParamInQuery = false;
+        response = new BasicDBObject();
         for (EndpointDataFilterCondition endpointDataFilterCondition: endpointDataQuery.getFilterConditions()) {
             key = endpointDataFilterCondition.getKey();
             values = endpointDataFilterCondition.getValues();
@@ -150,16 +155,15 @@ public class InventoryAction extends UserAction {
 
             if (key.equals("method") || key.equals("authTypes") || key.equals("accessTypes")) {
 
-                prefix = "method_";
-                if (key.equals("authTypes")) {
-                    prefix = "authType_";
-                }
-                if (key.equals("accessTypes")) {
-                    prefix = "accessType_";
-                }
-
+                prefix = key + "_";
                 for (Object value: values) {
-                    combinedValues.add(prefix + value.toString());
+                    if (endpointDataFilterCondition.getOperator() == "OR") {
+                        orValues.add(prefix + value.toString());
+                    } else if (endpointDataFilterCondition.getOperator() == "AND") {
+                        andValues.add(prefix + value.toString());
+                    } else if (endpointDataFilterCondition.getOperator() == "NOT") {
+                        notValues.add(prefix + value.toString());
+                    }
                 }
             }
             
@@ -196,6 +200,20 @@ public class InventoryAction extends UserAction {
                     }
                 }
 
+                if (sensitiveParamInQuery && sensitiveParamsToBeAdded.size() == 0) {
+                    response.put("data", new BasicDBObject("endpoints", new ArrayList<EndpointDataResponse>()).append("total", 0));
+                    return response;
+                } else {
+                    for (String param: sensitiveParamsToBeAdded) {
+                        if (endpointDataFilterCondition.getOperator() == "OR") {
+                            orValues.add(param);
+                        } else if (endpointDataFilterCondition.getOperator() == "AND") {
+                            andValues.add(param);
+                        } else if (endpointDataFilterCondition.getOperator() == "NOT") {
+                            notValues.add(param);
+                        }
+                    }
+                }
             }
 
             if (key.equals("url")) {
@@ -203,20 +221,31 @@ public class InventoryAction extends UserAction {
             }
 
             if (key.equals( "lastSeenTs") || key.equals("discoveredTs")) {
-                filterList.add(Filters.gt(key, (int) values.get(0)));
+
+                int ltTs = (int) values.get(0);
+                int gtTs = (int) values.get(1);
+
+                if (gtTs > ltTs) {
+                    int temp = ltTs;
+                    ltTs = gtTs;
+                    gtTs = temp;   
+                }
+
+                filterList.add(Filters.lt(key, ltTs));
+                filterList.add(Filters.gt(key, gtTs));
             }
         }
 
-        if (sensitiveParamInQuery && sensitiveParamsToBeAdded.size() == 0) {
-            return new ArrayList<SingleTypeInfoView>();
-        } else {
-            for (String param: sensitiveParamsToBeAdded) {
-                combinedValues.add(param);
-            }
+        if (andValues.size() > 0) {
+            filterList.add((Filters.all("combinedData", andValues)));
         }
 
-        if (combinedValues.size() > 0) {
-            filterList.add((Filters.all("combinedData", combinedValues)));
+        if (notValues.size() > 0) {
+            filterList.add((Filters.nin("combinedData", andValues)));
+        }
+
+        if (orValues.size() > 0) {
+            filterList.add((Filters.in("combinedData", andValues)));
         }
 
         Bson discoveredTsSort = Sorts.descending("discoveredTs");
@@ -244,8 +273,27 @@ public class InventoryAction extends UserAction {
         }
 
         Bson sort = Sorts.orderBy(sorts);
-        List<SingleTypeInfoView> data = SingleTypeInfoViewDao.instance.findAll(Filters.and(filterList), collectionPage * fetchEndpointsLimit, fetchEndpointsLimit, sort);
-        return data;
+        List<SingleTypeInfoView> endpoints = SingleTypeInfoViewDao.instance.findAll(Filters.and(filterList), collectionPage * fetchEndpointsLimit, fetchEndpointsLimit, sort);
+
+        List<EndpointDataResponse> resp = new ArrayList<>();
+        for (SingleTypeInfoView data: endpoints) {
+
+            List<String> authTypes = SingleTypeInfoViewDao.instance.calculateAuthTypes(data);
+            List<String> sensitiveTypes = SingleTypeInfoViewDao.instance.calculateAuthTypes(data);
+
+            EndpointDataResponse endpointDataResp = new EndpointDataResponse(data.getId().getUrl(), data.getId().getMethod().toString(), 
+            data.getId().getApiCollectionId(), data.getDiscoveredTs(), data.getLastSeenTs(), 
+            data.getAccessType(), authTypes, sensitiveTypes);
+
+            resp.add(endpointDataResp);
+
+        }
+
+        int docCount = (int) SingleTypeInfoViewDao.instance.findCount(Filters.and(filterList));
+
+        response.put("data", new BasicDBObject("endpoints", resp).append("total", docCount));
+
+        return response;
     }
 
     public static final int LIMIT = 2000;
@@ -566,7 +614,47 @@ public class InventoryAction extends UserAction {
 
     public String fetchEndpointData() {
 
-        endpointDataResponse = executeEndpointDataQuery(endpointDataQuery);
+        response = executeEndpointDataQuery(endpointDataQuery);
+
+        //AendpointDataResponse = response.get("data");
+
+        // move all this inside 
+
+        // List<String> alwaysSensitiveSubTypes = SingleTypeInfoDao.instance.sensitiveSubTypeNames();
+        // List<String> sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();;
+        // List<String> sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
+
+        // Set<String> sensitiveParamSet = new HashSet<>();
+
+        // for (String param: alwaysSensitiveSubTypes) {
+        //     sensitiveParamSet.add(param);
+        // }
+        // for (String param: sensitiveInResponse) {
+        //     sensitiveParamSet.add(param);
+        // }
+        // for (String param: sensitiveInRequest) {
+        //     sensitiveParamSet.add(param);
+        // }
+
+        // for (SingleTypeInfoView endpointData: endpointDataResponse) {
+        //     List<String> sensitiveParams = new ArrayList<>();
+        //     Set<String> endpointSubtypesSet = new HashSet<>();
+
+        //     for (String subtype: endpointData.getReqSubTypes()) {
+        //         endpointSubtypesSet.add(subtype);
+        //     }
+        //     for (String subtype: endpointData.getRespSubTypes()) {
+        //         endpointSubtypesSet.add(subtype);
+        //     }
+
+        //     for (String subtype: endpointSubtypesSet) {
+        //         if (sensitiveParamSet.contains(subtype)) {
+        //             sensitiveParams.add(subtype);
+        //         }
+        //     }
+
+        // }
+
         return Action.SUCCESS.toUpperCase();
     }
 

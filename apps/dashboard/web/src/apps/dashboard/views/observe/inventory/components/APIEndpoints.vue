@@ -33,7 +33,21 @@
             <template slot="actions-tray">
             </template>
             <template slot="All">
-                <simple-table 
+
+                <server-table 
+                    :headers="allEndpointsTableHeaders" 
+                    name="All" 
+                    sortKeyDefault="discoveredTs" 
+                    :sortDescDefault="true"
+                    @rowClicked="rowClicked"
+                    :fetchParams="fetchRecentParams"
+                    :processParams="prepareItemForTable"
+                    :getColumnValueList="getColumnValueList"
+                >
+                </server-table>
+
+                <!--                     
+                    <simple-table 
                     :headers=tableHeaders 
                     :items=allEndpoints 
                     @rowClicked=rowClicked 
@@ -58,7 +72,7 @@
                     <template #item.tags="{item}">
                         <tag-chip-group :tags="Array.from(item.tags || [])" />
                     </template>
-                </simple-table>
+                </simple-table> -->
             </template>
             <template slot="Sensitive">
                 <simple-table 
@@ -188,6 +202,7 @@ import IconMenu from '@/apps/dashboard/shared/components/IconMenu'
 import WorkflowTestBuilder from './WorkflowTestBuilder'
 import TestsSelector from './TestsSelector'
 import SecondaryButton from '@/apps/dashboard/shared/components/buttons/SecondaryButton'
+import ServerTable from '@/apps/dashboard/shared/components/ServerTable'
 
 export default {
     name: "ApiEndpoints",
@@ -203,7 +218,8 @@ export default {
         IconMenu,
         WorkflowTestBuilder,
         TestsSelector,
-        SecondaryButton
+        SecondaryButton,
+        ServerTable
     },
     props: {
         apiCollectionId: obj.numR
@@ -222,6 +238,43 @@ export default {
                 ],
             swaggerFile: null,
             showMenu: false,
+            allEndpointsTableHeaders: [
+                {
+                    text: '',
+                    value: 'color',
+                    hideFilter: true
+                },
+                {
+                    text: 'Endpoint',
+                    value: 'url',
+                },
+                {
+                    text: 'Method',
+                    value: 'method'
+                },
+                {
+                    text: 'Sensitive Params',
+                    value: 'sensitiveTags'
+                },
+                {
+                  text: 'Last Seen',
+                  value: 'lastSeenTs',
+                  sortKey: 'lastSeenTs'
+                },
+                {
+                  text: 'Access Type',
+                  value: 'accessType'
+                },
+                {
+                  text: 'Auth Type',
+                  value: 'authType'
+                },
+                {
+                    text: constants.DISCOVERED,
+                    value: 'discoveredTs',
+                    sortKey: 'discoveredTs'
+                }
+            ],
             tableHeaders: [
                 {
                     text: '',
@@ -235,10 +288,6 @@ export default {
                 {
                     text: 'Method',
                     value: 'method'
-                },
-                {
-                    text: 'Tags',
-                    value: 'tags'
                 },
                 {
                     text: 'Sensitive Params',
@@ -376,6 +425,115 @@ export default {
                 }
             }
         },
+        getColumnValueList(headerValue) {
+            switch (headerValue) {
+                case "method": 
+                    return {
+                        type: "STRING",
+                        values: ["GET", "POST", "PUT", "HEAD", "OPTIONS"].map(x => {return {
+                            title: x, 
+                            subtitle: '',
+                            value: x
+                        }})
+                    }
+                
+                case "sensitiveTags": 
+                    return {
+                        type: "STRING",
+                        values: ["GENERIC", "INTEGER_32"].map(x => {return {
+                            title: x, 
+                            subtitle: '',
+                            value: x
+                        }})
+                    }
+                
+                case "accessType": 
+                    return {
+                        type: "STRING",
+                        values: ["PUBLIC", "PRIVATE"].map(x => {return {
+                            title: x, 
+                            subtitle: '',
+                            value: x
+                        }})
+                    }
+                
+                case "authType": 
+                    return {
+                        type: "STRING",
+                        values: ["JWT", "CUSTOM", "AUTHENTICATED", "UNAUTHENTICATED", "BEARER", "BASIC"].map(x => {return {
+                            title: x, 
+                            subtitle: '',
+                            value: x
+                        }})
+                    }
+
+                case "discoveredTs":
+                case "lastSeenTs": 
+                    return {
+                        type: "INTEGER",
+                        values: {
+                            min: 0,
+                            max: 600
+                        }
+                    }
+                 
+                default: 
+                    return  {type: "SEARCH", values: []}
+            }
+        },
+        prepareItemForTable(x) {
+            return {
+                color: this.$vuetify.theme.themes.dark.redMetric,
+                url: x.apiInfoKey.url,
+                method: x.apiInfoKey.method,
+                sensitiveTags: "",
+                lastSeenTs: x.lastSeenTs,
+                accessType: x.accessType,
+                authType: "JWT_val",
+                discoveredTs: x.discoveredTs
+            }
+        },
+
+        async fetchRecentParams(sortKey, sortOrder, skip, limit, filters, filterOperators) {
+
+            let filterConditions = []
+
+            for (let key in filters) {
+                // console.log(key)
+                // console.log(values)
+                let values = Array.from(filters[key])
+                let operator = filterOperators[key]
+                
+                if (operator == "AND" && (key == "method" || key == "accessType")) {
+                    operator = "OR"
+                }
+
+                if (operator == "OR" && (key == "sensitiveTags" || key == "authType")) {
+                    operator = "AND"
+                }
+
+                if ((key == "lastSeenTs" || key == "discoveredTs") && values.length > 0 ) {
+                    values[0] = func.timeNow() - values[0] * 24 * 60 * 60
+                    values[1] = func.timeNow() - values[1] * 24 * 60 * 60
+                }
+
+                if (values.length > 0) { 
+                    filterConditions.push({key, operator, values})
+                }
+            }
+            filterConditions.push({"key" : "apiCollectionId", "operator": "OR", "values": [1678958857]});
+            let endpointQuery = {
+                "filterConditions": filterConditions,
+                "sortConditions": [
+                    {
+                        "key": sortKey,
+                        "sortOrder": sortOrder
+                    }
+                ]
+            }
+            return api.fetchEndpointData(endpointQuery, skip/50)
+        },
+
         async downloadOpenApiFile() {
           let lastFetchedUrl = null;
           let lastFetchedMethod = null;
