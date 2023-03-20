@@ -185,4 +185,22 @@ public abstract class MCollection<T> {
     public Logger getLogger() {
         return logger;
     }
+
+    public void createView(String viewName, List<Bson> pipeline) {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+        mongoDatabase.createView(viewName, getCollName(), pipeline);
+    }
+
+    public void createOnDemandView(List<Bson> pipeline) {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+        AggregateIterable<Document> res = mongoDatabase.getCollection(getCollName()).aggregate(pipeline);
+        Document doc = res.first();
+    }
+
+    public void mergeCollections(List<Bson> pipeline) {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+        AggregateIterable<Document> res = mongoDatabase.getCollection(getCollName()).aggregate(pipeline);
+        Document doc = res.first();
+    }
+
 }

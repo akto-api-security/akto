@@ -8,6 +8,7 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomDataType;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.SensitiveParamInfo;
+import com.akto.dto.testing.SingleTypeInfoView;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -397,4 +398,136 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
         return countMap;
     }
+
+    public void createCollectionView() {
+
+        int ts = 0;
+        
+        while(true) {
+
+            SingleTypeInfoView singleTypeInfoView = SingleTypeInfoViewDao.instance.findLatestOne(new BasicDBObject(), Sorts.descending("discoveredTs"));
+            if (singleTypeInfoView == null) {
+                ts = -1;
+            } else {
+                ts = singleTypeInfoView.getDiscoveredTs();
+            }
+
+            Bson filters = Filters.gt("timestamp", ts);
+
+            int count = (int) SingleTypeInfoDao.instance.findCount(filters);
+            if (count == 0) {
+                break;
+            }
+
+            String reqSensitiveComputedJson = "{'$cond': [{'$eq': ['$responseCode', 200]}, '$subType', '$REMOVE']}";
+            String respSensitiveComputedJson = "{'$cond': [{'$eq': ['$responseCode', -1]}, '$subType', '$REMOVE']}";
+            String sensitiveComputedJson = "{'$cond': [{'$eq': ['$responseCode', 200]}, {'$concat': ['reqSenstive', '_', '$subType']}, {'$concat': ['respSenstive', '_', '$subType']}]}";
+
+            List<Bson> pipeline = new ArrayList<>();
+            BasicDBObject groupedId = 
+                    new BasicDBObject("apiCollectionId", "$apiCollectionId")
+                    .append("method", "$method")
+                    .append("url", "$url");
+            
+            pipeline.add(Aggregates.match(Filters.gte("timestamp", ts)));
+            pipeline.add(Aggregates.sort(Sorts.ascending("timestamp")));
+            pipeline.add(Aggregates.limit(1000000));
+
+            pipeline.add(Aggregates.group(
+                groupedId, Accumulators.min("discoveredTs", "$timestamp"),
+                Accumulators.addToSet("reqSubTypes", Document.parse(reqSensitiveComputedJson)),
+                Accumulators.addToSet("respSubTypes", Document.parse(respSensitiveComputedJson)),
+                Accumulators.addToSet("combinedData", Document.parse(sensitiveComputedJson))
+            ));
+
+            pipeline.add(Aggregates.merge(SingleTypeInfoViewDao.instance.getCollName()));
+            instance.createOnDemandView(pipeline);
+            
+            SingleTypeInfoViewDao.instance.getMCollection().createIndex(Indexes.text("discoveredTs"));
+        }
+    }
+
+    public void mergeCollectionsWithLet() {
+
+        try {
+            List<Bson> pipeline = new ArrayList<>();
+            List<Bson> pipeline2 = new ArrayList<>();
+            
+            String filterJson = "{'$eq': ['$_id', '$$view_id']}";
+            Bson filter = Filters.expr(Document.parse(filterJson));
+            pipeline2.add(Aggregates.match(filter));
+            pipeline2.add(Aggregates.unwind("$allAuthTypesFound"));
+
+            String combinedDataComputedJson = "{'$setUnion':[{'$ifNull': [ { '$map': {'input': '$$req_sens', 'as': 'reqs', 'in': {'$concat': ['reqSensitive_', '$$reqs']}} }, []]}, {'$ifNull': [ { '$map': {'input': '$$resp_sens', 'as': 'resps', 'in': {'$concat': ['respSensitive_', '$$resps']}} }, []]}, {'$ifNull': [ { '$map': {'input': '$allAuthTypesFound', 'as': 'auth', 'in': {'$concat': ['authType_', '$$auth']}} }, []]}, {'$ifNull': [[ {'$concat': ['accessType', '_', {'$first': '$apiAccessTypes'}]}], []]}, {'$ifNull': [[ {'$concat': ['method', '_', '$_id.method']}], []]}]}";
+
+            String accessTypeComputedJson = "{'$first': '$item.apiAccessTypes'}";
+
+            //pipeline.add(Aggregates.unwind("$item.apiAccessTypes"));
+
+            //pipeline2.add(Aggregates.unwind("$$req_sens"));
+
+            pipeline2.add(
+                Aggregates.project(
+                    Projections.fields(
+                        Projections.include("_id", "allAuthTypesFound", "apiAccessTypes", "lastSeen"),
+                        Projections.computed(
+                            "combinedData",
+                            Document.parse(combinedDataComputedJson)
+                        ),
+                        Projections.computed(
+                            "lastSeenTs",
+                            "$lastSeen"
+                        )
+                    )
+                )
+            );
+
+            List<Variable<String>> vars = new ArrayList<>();
+            vars.add(new Variable<>("view_id", "$_id"));
+            vars.add(new Variable<>("req_sens", "$reqSubTypes"));
+            vars.add(new Variable<>("resp_sens", "$respSubTypes"));
+
+
+            //pipeline2.add(Aggregates.unwind("$item"));
+
+            pipeline.add(Aggregates.lookup(ApiInfoDao.instance.getCollName(), vars, pipeline2, "item"));
+
+            pipeline.add(Aggregates.unwind("$item"));
+
+            pipeline.add(
+                Aggregates.project(
+                    Projections.fields(
+                        Projections.include("_id"),
+                        Projections.computed(
+                            "authTypes",
+                            "$item.allAuthTypesFound"
+                        ),
+                        Projections.computed(
+                            "accessType",
+                            Document.parse(accessTypeComputedJson)
+                        ),
+                        Projections.computed(
+                            "combinedData",
+                            "$item.combinedData"
+                        ),
+                        Projections.computed(
+                            "lastSeenTs", 
+                            "$item.lastSeenTs"
+                        )
+                    )
+                )
+            );
+
+            pipeline.add(Aggregates.merge(SingleTypeInfoViewDao.instance.getCollName()));
+
+            System.out.println(pipeline.toString());
+            
+            SingleTypeInfoViewDao.instance.mergeCollections(pipeline);
+
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+        }
+
+    }
+
 }
