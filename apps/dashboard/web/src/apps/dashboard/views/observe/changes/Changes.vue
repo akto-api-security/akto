@@ -266,7 +266,7 @@ export default {
                 {
                     text: '',
                     value: 'color',
-                    showFilterMenu: true
+                    showFilterMenu: false
                 },
                 {
                     text: 'Name',
