@@ -9,7 +9,7 @@
             :sort-by="sortKey"
             :sort-desc="sortDesc"
             :items-per-page="rowsPerPage"           
-            :hide-default-footer="false"
+            :hide-default-footer="!(filteredItems && filteredItems.length > 0)"
             :footer-props="{
                 showFirstLastPage: false,
                 prevIcon: '$fas_angle-left',
@@ -53,7 +53,7 @@
                                     />
                                 </v-menu>
                             </template>
-                            <v-menu offset-y :close-on-content-click="false" v-if="convertHeadersList().length > 4">
+                            <v-menu offset-y :close-on-content-click="false" v-if="convertHeadersList().length > 0">
                                 <template v-slot:activator="{ on, attrs }">
                                     <secondary-button 
                                         text="More Filters" 
