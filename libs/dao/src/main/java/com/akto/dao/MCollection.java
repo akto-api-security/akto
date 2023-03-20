@@ -165,7 +165,16 @@ public abstract class MCollection<T> {
         return getMCollection().insertMany(elems);
     }
 
+    public T findLatestOne(Bson q, Bson sort) {
+        MongoCursor<T> cursor = this.getMCollection().find(q).limit(1).sort(sort).cursor();
 
+        while(cursor.hasNext()) {
+            T elem = cursor.next();
+            return elem;
+        }
+
+        return null;
+    }
     
     public DeleteResult deleteAll(Bson q) {
         return this.getMCollection().deleteMany(q);

@@ -399,7 +399,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return countMap;
     }
 
-    public void createCollectionView() {
+    public void createStiCollectionView() {
 
         int ts = 0;
         
@@ -447,7 +447,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         }
     }
 
-    public void mergeCollectionsWithLet() {
+    public void mergeStiViewAndApiInfo() {
 
         try {
             List<Bson> pipeline = new ArrayList<>();

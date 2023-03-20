@@ -327,12 +327,31 @@ public class Main {
         }
     }
 
+    public static void createStiCollectionView() {
+        SingleTypeInfoDao.instance.createStiCollectionView();
+        SingleTypeInfoDao.instance.mergeStiViewAndApiInfo();
+    }
+
+    public static void updateStiCollectionView() {
+        SingleTypeInfoDao.instance.createStiCollectionView();
+        SingleTypeInfoDao.instance.mergeStiViewAndApiInfo();
+    }
+
     public static void initializeRuntime(){
         SingleTypeInfoDao.instance.getMCollection().updateMany(Filters.exists("apiCollectionId", false), Updates.set("apiCollectionId", 0));
         SingleTypeInfo.init();
 
         createIndices();
         insertRuntimeFilters();
+        createStiCollectionView();
+
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                Context.accountId.set(1_000_000);
+                updateStiCollectionView();
+            }
+        }, 10, 1, TimeUnit.MINUTES);
+
         try {
             AccountSettingsDao.instance.updateVersion(AccountSettings.API_RUNTIME_VERSION);
         } catch (Exception e) {
