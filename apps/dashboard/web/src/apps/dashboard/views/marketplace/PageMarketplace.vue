@@ -165,7 +165,6 @@ export default {
             },
             searchText: "",
             businessSubCategories: [],
-            searchTestResults:[],
         }
     },
     methods: {
@@ -196,8 +195,14 @@ export default {
                 }
             })
         },
-        onSearch(searchText) {
+        async onSearch(searchText) {
             this.searchText = searchText
+            if(this.searchText && this.searchText != null){
+                await api.searchTestResults(this.searchText).then((resp) =>{
+                    this.businessSubCategories = resp.searchAktoTests
+                    this.leftNavItems
+                })
+            }
         },
         createCategoryObj(arrCategoryKv, creatorTitle, creatorType, colorType) {
             return {
@@ -207,7 +212,7 @@ export default {
                 color: func.actionItemColors()[colorType],
                 active: true,
                 items: [
-                    ...this.filterOnSearchText(arrCategoryKv).map(category => {
+                    ...arrCategoryKv.map(category => {
                         return {
                             title: category.text,
                             link: "/dashboard/library/"+creatorType+"/"+category.value,
@@ -218,19 +223,10 @@ export default {
                 ]
             }
         },
-        filterOnSearchText(list) {
-            if (this.searchText && this.searchText != null) {
-                return list.filter(x => JSON.stringify(x).toLowerCase().indexOf(this.searchText.toLowerCase()) > -1)
-            } else {
-                return list
-            }
-        }
     },
     async mounted() {
         await this.$store.dispatch('marketplace/fetchAllMarketplaceSubcategories')
         let aktoTestTypes = await issuesApi.fetchAllSubCategories()
-        let search = await api.searchTestResults("linux")
-        this.testSourceConfigs = aktoTests.testSourceConfigs
         this.businessCategories = aktoTestTypes.categories
         this.businessSubCategories = aktoTestTypes.subCategories
         this.$router.push(this.leftNavItems[0].items[0].link)   

@@ -2,6 +2,7 @@ package com.akto.action.testing;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import com.akto.action.UserAction;
 import com.akto.dao.context.Context;
@@ -16,11 +17,11 @@ import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 
 import org.bson.conversions.Bson;
-import static com.akto.util.enums.GlobalEnums.*;
 
 public class MarketplaceAction extends UserAction {
     
     List<TestSourceConfig> testSourceConfigs;
+    List<TestSourceConfig> searchResults = new ArrayList<>();
     public String fetchAllMarketplaceSubcategories() {
         this.testSourceConfigs = TestSourceConfigsDao.instance.findAll(new BasicDBObject());
         return Action.SUCCESS.toUpperCase();
@@ -44,8 +45,7 @@ public class MarketplaceAction extends UserAction {
     String description;
     List<String> tags;
     String searchText;
-    List<TestSourceConfig> searchResults;
-    TestSubCategory[] searchAktoTests;
+    List<TestSubCategory> searchAktoTests;
 
     public String addCustomTest() {
         TestSourceConfig alreadyExists = TestSourceConfigsDao.instance.findOne("_id", url);
@@ -60,7 +60,8 @@ public class MarketplaceAction extends UserAction {
     }
 
     public String searchTestResults(){
-        this.searchResults = new ArrayList<>();
+        this.searchAktoTests = new ArrayList<>();
+        //fill from Updated test-source-config collection in mongodb
         this.searchResults = TestSourceConfigsDao.instance.findAll(Filters.or(
             Filters.regex("severity", this.searchText, "i"),
             Filters.regex("category", this.searchText, "i"),
@@ -68,7 +69,23 @@ public class MarketplaceAction extends UserAction {
             Filters.regex("description", this.searchText, "i")
         ));
 
-        this.searchAktoTests = GlobalEnums.TestSubCategory.getValuesArray();
+        this.searchText = this.searchText.toLowerCase();
+        //fill from akto tests in global enums
+        for(TestSubCategory tsc : GlobalEnums.TestSubCategory.getValuesArray()){
+            String category = tsc.getSuperCategory().getName().toLowerCase();
+            String severity = tsc.getSuperCategory().getSeverity().toString().toLowerCase();
+            
+            if(tsc.getIssueDescription().toLowerCase().matches("(.*)" + this.searchText + "(.*)")){
+                this.searchAktoTests.add(tsc);
+            }else if(tsc.getTestName().toLowerCase().matches("(.*)" + this.searchText + "(.*)")){
+                this.searchAktoTests.add(tsc);
+            }else if(category.matches("(.*)" + this.searchText + "(.*)")){
+                this.searchAktoTests.add(tsc);
+            }else if(severity.matches("(.*)" + this.searchText + "(.*)")){
+                this.searchAktoTests.add(tsc);
+            }
+
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -156,7 +173,7 @@ public class MarketplaceAction extends UserAction {
         this.searchText = searchText;
     }
 
-    public TestSubCategory[] getSearchAktoTests() {
+    public List<TestSubCategory> getSearchAktoTests() {
         return this.searchAktoTests;
     }
     
