@@ -9,7 +9,7 @@
             :sort-by="sortKey"
             :sort-desc="sortDesc"
             :items-per-page="rowsPerPage"           
-            :hide-default-footer="(filteredItems !== undefined) && !(filteredItems.length > 0)"
+            :hide-default-footer="!(filteredItems && filteredItems.length > 0)"
             :footer-props="{
                 showFirstLastPage: false,
                 prevIcon: '$fas_angle-left',
