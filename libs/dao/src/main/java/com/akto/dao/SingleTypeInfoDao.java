@@ -421,7 +421,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
             String reqSensitiveComputedJson = "{'$cond': [{'$eq': ['$responseCode', 200]}, '$subType', '$REMOVE']}";
             String respSensitiveComputedJson = "{'$cond': [{'$eq': ['$responseCode', -1]}, '$subType', '$REMOVE']}";
-            String sensitiveComputedJson = "{'$cond': [{'$eq': ['$responseCode', 200]}, {'$concat': ['reqSenstive', '_', '$subType']}, {'$concat': ['respSenstive', '_', '$subType']}]}";
+            String sensitiveComputedJson = "{'$cond': [{'$eq': ['$responseCode', 200]}, {'$concat': ['reqSensitive', '_', '$subType']}, {'$concat': ['respSensitive', '_', '$subType']}]}";
 
             List<Bson> pipeline = new ArrayList<>();
             BasicDBObject groupedId = 

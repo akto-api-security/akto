@@ -132,7 +132,8 @@ public class InventoryAction extends UserAction {
         List<Bson> sorts = new ArrayList<>();
         String key, operator;
         ArrayList<Object> values;
-        ArrayList<String> sensitiveParamsToBeAdded = new ArrayList<>();
+        ArrayList<String> reqSensitiveParamsToBeAdded = new ArrayList<>();
+        ArrayList<String> respSensitiveParamsToBeAdded = new ArrayList<>();
         int sortOrder;
         String prefix;
         Boolean sensitiveParamInQuery = false;
@@ -189,30 +190,34 @@ public class InventoryAction extends UserAction {
                     for (Object param: values) {
 
                         if (alwaysSensitiveSubTypes.contains(param)) {
-                            sensitiveParamsToBeAdded.add("reqSensitive_" + param);
-                            sensitiveParamsToBeAdded.add("respSensitive_" + param);
+                            reqSensitiveParamsToBeAdded.add("reqSensitive_" + param);
+                            respSensitiveParamsToBeAdded.add("respSensitive_" + param);
 
                         } else if (sensitiveInRequest.contains(param)) {
-                            sensitiveParamsToBeAdded.add("reqSensitive_" + param);
+                            reqSensitiveParamsToBeAdded.add("reqSensitive_" + param);
                             
                         } else if (sensitiveInResponse.contains(param)) {
-                            sensitiveParamsToBeAdded.add("respSensitive_" + param);
+                            respSensitiveParamsToBeAdded.add("respSensitive_" + param);
                         }
                         // SingleTypeInfo.SubType subtype = SingleTypeInfo.subTypeMap.get(param);
                         // subtype.getSensitivePosition()
                         sensitiveReqSet.add(param.toString());
                     }
     
-                    if (sensitiveParamInQuery && sensitiveParamsToBeAdded.size() == 0) {
+                    if (sensitiveParamInQuery && (reqSensitiveParamsToBeAdded.size() + respSensitiveParamsToBeAdded.size()) == 0) {
                         response.put("data", new BasicDBObject("endpoints", new ArrayList<EndpointDataResponse>()).append("total", 0));
                         return response;
                     } else {
                         if (operator.equals("AND")) {
-                            filterList.add(Filters.all("combinedData", sensitiveParamsToBeAdded));
+                            filterList.add(Filters.or(Filters.all("combinedData", reqSensitiveParamsToBeAdded), 
+                            Filters.all("combinedData", reqSensitiveParamsToBeAdded)));
                         } else if (operator.equals("NOT")) {
-                            filterList.add(Filters.nin("combinedData", sensitiveParamsToBeAdded));
+                            reqSensitiveParamsToBeAdded.addAll(respSensitiveParamsToBeAdded);
+                            filterList.add(Filters.nin("combinedData", respSensitiveParamsToBeAdded));
                         } else if (operator.equals("OR")) {
-                            filterList.add(Filters.in("combinedData", sensitiveParamsToBeAdded));
+
+                            filterList.add(Filters.or(Filters.in("combinedData", reqSensitiveParamsToBeAdded), 
+                            Filters.in("combinedData", reqSensitiveParamsToBeAdded)));
                         } 
                     }
                 }
