@@ -202,7 +202,6 @@
                 </div>
             </template>
         </layout-with-tabs>
-        
         <v-dialog v-model="showTestSelectorDialog" width="800px"> 
             <tests-selector :collectionName="apiCollectionName" @testsSelected=startTest v-if="showTestSelectorDialog"/>
         </v-dialog>
@@ -682,7 +681,7 @@ export default {
             }
             
             this.showTestSelectorDialog = false            
-        }      
+        }  
     },
     computed: {
         ...mapState('inventory', ['apiCollection', 'endpointsLoading', 'swaggerContent', 'apiInfoList', 'filters', 'lastFetched', 'unusedEndpoints']),
@@ -730,6 +729,17 @@ export default {
             }
             return ret
         }
+        // endpointCountInfo() {
+        //     let totalEndpointCount = 0
+        //     let sensitiveEndpointCount = 0
+        //     let result = api.fetchCollectionEndpointCountInfo(this.apiCollectionId)
+        //     result.then((resp) => {
+        //         return {totalEndpointCount, sensitiveEndpointCount}
+        //         totalEndpointCount = resp.totalEndpointCount
+        //         sensitiveEndpointCount = resp.sensitiveEndpointCount
+        //     })
+        //     return {totalEndpointCount, sensitiveEndpointCount}
+        // }
     },
     async mounted() {
         // let sensitiveDataKeys = []
