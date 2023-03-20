@@ -23,10 +23,10 @@
             </div>
         </div>
         <div class="d-flex">
-            <count-box title="Sensitive Endpoints" :count="sensitiveEndpoints.length" colorTitle="Overdue"/>
+            <count-box title="Sensitive Endpoints" :count="this.sensitiveEndpointCount" colorTitle="Overdue"/>
             <count-box title="Undocumented Endpoints" :count="shadowEndpoints.length" colorTitle="Pending"/>
             <count-box title="Deprecated Endpoints" :count="unusedEndpoints.length" colorTitle="This week"/>
-            <count-box title="All Endpoints" :count="allEndpoints.length" colorTitle="Total"/>
+            <count-box title="All Endpoints" :count="this.totalEndpointCount" colorTitle="Total"/>
         </div> 
         
         <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Unauthenticated', 'Undocumented', 'Deprecated', 'Documented', 'Tests']">
@@ -39,8 +39,8 @@
                     name="All" 
                     sortKeyDefault="discoveredTs" 
                     :sortDescDefault="true"
-                    @rowClicked="rowClicked"
-                    :fetchParams="fetchRecentParams"
+                    @rowClicked="allEndpointTableRowClicked"
+                    :fetchParams="fetchAllTableParams"
                     :processParams="prepareItemForTable"
                     :getColumnValueList="getColumnValueList"
                 >
@@ -75,8 +75,21 @@
                 </simple-table> -->
             </template>
             <template slot="Sensitive">
-                <simple-table 
-                    :headers=tableHeaders 
+
+                <server-table 
+                    :headers="allEndpointsTableHeaders" 
+                    name="Sensitive" 
+                    sortKeyDefault="discoveredTs" 
+                    :sortDescDefault="true"
+                    @rowClicked="allEndpointTableRowClicked"
+                    :fetchParams="fetchSensitiveTableParams"
+                    :processParams="prepareItemForTable"
+                    :getColumnValueList="getColumnValueList"
+                >
+                </server-table>
+                
+                <!-- <simple-table 
+                    :headers="allEndpointsTableHeaders" 
                     :items=sensitiveEndpoints 
                     @rowClicked=rowClicked name="Sensitive"
                 >
@@ -86,7 +99,7 @@
                     <template #item.tags="{item}">
                         <tag-chip-group :tags="Array.from(item.tags || [])" />
                     </template>
-                </simple-table>
+                </simple-table> -->
             </template>
             <template slot="Undocumented">
                 <simple-table 
@@ -129,7 +142,20 @@
                 />
             </template>
             <template slot="Unauthenticated">
-                <simple-table 
+
+                <server-table 
+                    :headers="allEndpointsTableHeaders" 
+                    name="Sensitive" 
+                    sortKeyDefault="discoveredTs" 
+                    :sortDescDefault="true"
+                    @rowClicked="allEndpointTableRowClicked"
+                    :fetchParams="fetchUnauthenticatedTableParams"
+                    :processParams="prepareItemForTable"
+                    :getColumnValueList="getColumnValueList"
+                >
+                </server-table>
+
+                <!-- <simple-table 
                     :headers=tableHeaders 
                     :items=openEndpoints
                     @rowClicked=rowClicked 
@@ -143,7 +169,7 @@
                     <template #item.tags="{item}">
                         <tag-chip-group :tags="Array.from(item.tags || [])" />
                     </template>
-                </simple-table>
+                </simple-table> -->
             </template>
             <template slot="Tests">
                 <div>
@@ -365,10 +391,16 @@ export default {
             ],
             showWorkflowTestBuilder: false,
             originalStateFromDb: null,
-            workflowTests: []
+            workflowTests: [],
+            sensitiveDataKeys: [],
+            totalEndpointCount: [],
+            sensitiveEndpointCount: []
         }
     },
     methods: {
+        allEndpointTableRowClicked(row) {
+            this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.url + " " + row.method, type: 2})
+        },
         rowClicked(row) {
             this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.endpoint + " " + row.method, type: 2})
         },
@@ -440,7 +472,7 @@ export default {
                 case "sensitiveTags": 
                     return {
                         type: "STRING",
-                        values: ["GENERIC", "INTEGER_32"].map(x => {return {
+                        values: this.sensitiveDataKeys.map(x => {return {
                             title: x, 
                             subtitle: '',
                             value: x
@@ -484,19 +516,49 @@ export default {
         prepareItemForTable(x) {
             return {
                 color: this.$vuetify.theme.themes.dark.redMetric,
-                url: x.apiInfoKey.url,
-                method: x.apiInfoKey.method,
-                sensitiveTags: "",
+                url: x.url,
+                method: x.method,
+                sensitiveTags: x.sensitiveParams.join(', '),
                 lastSeenTs: x.lastSeenTs,
                 accessType: x.accessType,
-                authType: "JWT_val",
+                authType: x.authTypes.join(', '),
                 discoveredTs: x.discoveredTs
             }
         },
 
-        async fetchRecentParams(sortKey, sortOrder, skip, limit, filters, filterOperators) {
+        async fetchAllTableParams(sortKey, sortOrder, skip, limit, filters, filterOperators) {
+            let query = this.buildFetchParamQuery(sortKey, sortOrder, skip, limit, filters, filterOperators)
+            return api.fetchEndpointData(query, skip/50)
+        },
 
+        async fetchUnauthenticatedTableParams(sortKey, sortOrder, skip, limit, filters, filterOperators) {
+            let query = this.buildFetchParamQuery(sortKey, sortOrder, skip, limit, filters, filterOperators)
+            query.filterConditions.push({"key" : "authType", "operator": "AND", "values": ["UNAUTHENTICATED"]})
+            return api.fetchEndpointData(query, skip/50)
+        },
+
+        async fetchSensitiveTableParams(sortKey, sortOrder, skip, limit, filters, filterOperators) {
+            let query = this.buildFetchParamQuery(sortKey, sortOrder, skip, limit, filters, filterOperators)
+
+            let sensitiveKeyFound = false;
+            for (let data in query.filterConditions) {
+                if (data.key == "sensitiveTags"){
+                    sensitiveKeyFound = true;
+                }
+            }
+
+            if (!sensitiveKeyFound) {
+                query.filterConditions.push({"key" : "sensitiveTags", "operator": "OR", "values": this.sensitiveDataKeys})
+            }
+
+            //check if sensitive is present, if not append, else modify value
+
+            return api.fetchEndpointData(query, skip/50)
+        },
+
+        buildFetchParamQuery(sortKey, sortOrder, skip, limit, filters, filterOperators) {
             let filterConditions = []
+            filterConditions.push({"key" : "apiCollectionId", "operator": "OR", "values": [this.apiCollectionId]})
 
             for (let key in filters) {
                 // console.log(key)
@@ -517,11 +579,10 @@ export default {
                     values[1] = func.timeNow() - values[1] * 24 * 60 * 60
                 }
 
-                if (values.length > 0) { 
-                    filterConditions.push({key, operator, values})
+                if (values.length > 0) {
+                    filterConditions.push({"key": key, "operator": operator, "values": values})
                 }
             }
-            filterConditions.push({"key" : "apiCollectionId", "operator": "OR", "values": [1678958857]});
             let endpointQuery = {
                 "filterConditions": filterConditions,
                 "sortConditions": [
@@ -531,7 +592,7 @@ export default {
                     }
                 ]
             }
-            return api.fetchEndpointData(endpointQuery, skip/50)
+            return endpointQuery
         },
 
         async downloadOpenApiFile() {
@@ -670,7 +731,18 @@ export default {
             return ret
         }
     },
-    async mounted() {}
+    async mounted() {
+        // let sensitiveDataKeys = []
+        api.fetchDataTypeNames().then((resp) => {
+            this.sensitiveDataKeys = resp.allDataTypes
+        })
+
+        api.fetchCollectionEndpointCountInfo(this.apiCollectionId).then((resp) => {
+            this.totalEndpointCount = resp.totalEndpointCount
+            this.sensitiveEndpointCount = resp.sensitiveEndpointCount
+        })
+
+    }
 }
 </script>
 

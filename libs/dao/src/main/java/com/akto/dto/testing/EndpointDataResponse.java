@@ -34,7 +34,7 @@ public class EndpointDataResponse {
         this.url = url;
     }
 
-    public String geMethod() {
+    public String getMethod() {
         return this.method;
     }
 
@@ -75,11 +75,11 @@ public class EndpointDataResponse {
         this.accessType = accessType;
     }
 
-    public List<String> getAllAuthTypes() {
+    public List<String> getAuthTypes() {
         return authTypes;
     }
 
-    public void setAllAuthTypes(List<String> authTypes) {
+    public void setAuthTypes(List<String> authTypes) {
         this.authTypes = authTypes;
     }
 

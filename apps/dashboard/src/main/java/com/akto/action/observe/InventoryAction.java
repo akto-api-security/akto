@@ -130,122 +130,110 @@ public class InventoryAction extends UserAction {
 
         ArrayList<Bson> filterList = new ArrayList<>();
         List<Bson> sorts = new ArrayList<>();
-        String key;
+        String key, operator;
         ArrayList<Object> values;
-        // ArrayList<String> combinedValues = new ArrayList<>();
-        ArrayList<String> orValues = new ArrayList<>();
-        ArrayList<String> andValues = new ArrayList<>();
-        ArrayList<String> notValues = new ArrayList<>();
         ArrayList<String> sensitiveParamsToBeAdded = new ArrayList<>();
         int sortOrder;
         String prefix;
         Boolean sensitiveParamInQuery = false;
         response = new BasicDBObject();
-        for (EndpointDataFilterCondition endpointDataFilterCondition: endpointDataQuery.getFilterConditions()) {
-            key = endpointDataFilterCondition.getKey();
-            values = endpointDataFilterCondition.getValues();
 
-            if (key.equals("apiCollectionId")) {
-                if (values.size() > 1) {
-                    filterList.add((Filters.in("_id." + key, values)));
-                } else if (values.size() == 1) {
-                    filterList.add((Filters.eq("_id." + key, ((Long) values.get(0)).intValue())));
+        List<String> queryOrder = Arrays.asList("apiCollectionId", "method", "authType", "accessType", "sensitiveTags", "url", "discoveredTs", "lastSeenTs");
+        
+        for (String queryParam: queryOrder) {
+            for (EndpointDataFilterCondition endpointDataFilterCondition: endpointDataQuery.getFilterConditions()) {
+
+                key = endpointDataFilterCondition.getKey();
+                values = endpointDataFilterCondition.getValues();
+                operator = endpointDataFilterCondition.getOperator();
+                if (!key.equals(queryParam)) {
+                    continue;
                 }
-            }
 
-            if (key.equals("method") || key.equals("authTypes") || key.equals("accessTypes")) {
-
-                prefix = key + "_";
-                for (Object value: values) {
-                    if (endpointDataFilterCondition.getOperator() == "OR") {
-                        orValues.add(prefix + value.toString());
-                    } else if (endpointDataFilterCondition.getOperator() == "AND") {
-                        andValues.add(prefix + value.toString());
-                    } else if (endpointDataFilterCondition.getOperator() == "NOT") {
-                        notValues.add(prefix + value.toString());
+                if (queryParam.equals("apiCollectionId")) {
+                    if (values.size() > 1) {
+                        filterList.add(Filters.in("_id." + key, values));
+                    } else if (values.size() == 1) {
+                        filterList.add(Filters.eq("_id." + key, ((Long) values.get(0)).intValue()));
                     }
                 }
-            }
-            
-            if (key.equals("sensitiveParams")) {
-                sensitiveParamInQuery = true;
-                List<String> alwaysSensitiveSubTypes = SingleTypeInfoDao.instance.sensitiveSubTypeNames();
 
-                List<String> sensitiveInResponse;
-                List<String> sensitiveInRequest;
-                sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
-                sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
+                if (key.equals("method") || key.equals("authType") || key.equals("accessType")) {
+
+                    List<String> valuesWithPrefix = new ArrayList<>();
+                    prefix = key + "_";
+                    for (Object value: values) {
+                        valuesWithPrefix.add(prefix + value.toString());
+                    }
+
+                    if (operator.equals("AND")) {
+                        filterList.add(Filters.all("combinedData", valuesWithPrefix));
+                    } else if (operator.equals("NOT")) {
+                        filterList.add(Filters.nin("combinedData", valuesWithPrefix));
+                    } else if (operator.equals("OR")) {
+                        filterList.add(Filters.in("combinedData", valuesWithPrefix));
+                    }    
+                }
+
+                if (key.equals("sensitiveTags")) {
+                    sensitiveParamInQuery = true;
+                    List<String> alwaysSensitiveSubTypes = SingleTypeInfoDao.instance.sensitiveSubTypeNames();
     
-                Set<String> sensitiveReqSet = new HashSet<>();
-                for (Object param: values) {
-                    sensitiveReqSet.add(param.toString());
-                }
-    
-                for (String param: sensitiveInRequest) {
-                    if (sensitiveReqSet.contains(param)) {
-                        sensitiveParamsToBeAdded.add("reqSensitive_" + param);
-                    }
-                }
+                    List<String> sensitiveInResponse;
+                    List<String> sensitiveInRequest;
+                    sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
+                    sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
+                    //Map<String> sen
+        
+                    Set<String> sensitiveReqSet = new HashSet<>();
+                    for (Object param: values) {
 
-                for (String param: sensitiveInResponse) {
-                    if (sensitiveReqSet.contains(param)) {
-                        sensitiveParamsToBeAdded.add("respSensitive_" + param);
-                    }
-                }
+                        if (alwaysSensitiveSubTypes.contains(param)) {
+                            sensitiveParamsToBeAdded.add("reqSensitive_" + param);
+                            sensitiveParamsToBeAdded.add("respSensitive_" + param);
 
-                for (String param: alwaysSensitiveSubTypes) {
-                    if (sensitiveReqSet.contains(param)) {
-                        sensitiveParamsToBeAdded.add("reqSensitive_" + param);
-                        sensitiveParamsToBeAdded.add("respSensitive_" + param);
-                    }
-                }
-
-                if (sensitiveParamInQuery && sensitiveParamsToBeAdded.size() == 0) {
-                    response.put("data", new BasicDBObject("endpoints", new ArrayList<EndpointDataResponse>()).append("total", 0));
-                    return response;
-                } else {
-                    for (String param: sensitiveParamsToBeAdded) {
-                        if (endpointDataFilterCondition.getOperator() == "OR") {
-                            orValues.add(param);
-                        } else if (endpointDataFilterCondition.getOperator() == "AND") {
-                            andValues.add(param);
-                        } else if (endpointDataFilterCondition.getOperator() == "NOT") {
-                            notValues.add(param);
+                        } else if (sensitiveInRequest.contains(param)) {
+                            sensitiveParamsToBeAdded.add("reqSensitive_" + param);
+                            
+                        } else if (sensitiveInResponse.contains(param)) {
+                            sensitiveParamsToBeAdded.add("respSensitive_" + param);
                         }
+                        // SingleTypeInfo.SubType subtype = SingleTypeInfo.subTypeMap.get(param);
+                        // subtype.getSensitivePosition()
+                        sensitiveReqSet.add(param.toString());
+                    }
+    
+                    if (sensitiveParamInQuery && sensitiveParamsToBeAdded.size() == 0) {
+                        response.put("data", new BasicDBObject("endpoints", new ArrayList<EndpointDataResponse>()).append("total", 0));
+                        return response;
+                    } else {
+                        if (operator.equals("AND")) {
+                            filterList.add(Filters.all("combinedData", sensitiveParamsToBeAdded));
+                        } else if (operator.equals("NOT")) {
+                            filterList.add(Filters.nin("combinedData", sensitiveParamsToBeAdded));
+                        } else if (operator.equals("OR")) {
+                            filterList.add(Filters.in("combinedData", sensitiveParamsToBeAdded));
+                        } 
                     }
                 }
-            }
 
-            if (key.equals("url")) {
-                filterList.add(Filters.regex("_id." + key, ".*"+values.get(0)+".*"));
-            }
-
-            if (key.equals( "lastSeenTs") || key.equals("discoveredTs")) {
-
-                int ltTs = (int) values.get(0);
-                int gtTs = (int) values.get(1);
-
-                if (gtTs > ltTs) {
-                    int temp = ltTs;
-                    ltTs = gtTs;
-                    gtTs = temp;   
+                if (key.equals("url")) {
+                    filterList.add(Filters.regex("_id." + key, ".*"+values.get(0)+".*"));
+                }
+    
+                if (key.equals( "lastSeenTs") || key.equals("discoveredTs")) {
+    
+                    int ltTs = (int) values.get(0);
+                    int gtTs = (int) values.get(1);
+                    if (gtTs > ltTs) {
+                        int temp = ltTs;
+                        ltTs = gtTs;
+                        gtTs = temp;   
+                    }
+                    filterList.add(Filters.and(Filters.lt(key, ltTs), Filters.gt(key, gtTs)));
                 }
 
-                filterList.add(Filters.lt(key, ltTs));
-                filterList.add(Filters.gt(key, gtTs));
             }
-        }
-
-        if (andValues.size() > 0) {
-            filterList.add((Filters.all("combinedData", andValues)));
-        }
-
-        if (notValues.size() > 0) {
-            filterList.add((Filters.nin("combinedData", andValues)));
-        }
-
-        if (orValues.size() > 0) {
-            filterList.add((Filters.in("combinedData", andValues)));
         }
 
         Bson discoveredTsSort = Sorts.descending("discoveredTs");
@@ -279,7 +267,7 @@ public class InventoryAction extends UserAction {
         for (SingleTypeInfoView data: endpoints) {
 
             List<String> authTypes = SingleTypeInfoViewDao.instance.calculateAuthTypes(data);
-            List<String> sensitiveTypes = SingleTypeInfoViewDao.instance.calculateAuthTypes(data);
+            List<String> sensitiveTypes = SingleTypeInfoViewDao.instance.calculateSensitiveTypes(data);
 
             EndpointDataResponse endpointDataResp = new EndpointDataResponse(data.getId().getUrl(), data.getId().getMethod().toString(), 
             data.getId().getApiCollectionId(), data.getDiscoveredTs(), data.getLastSeenTs(), 
@@ -294,6 +282,52 @@ public class InventoryAction extends UserAction {
         response.put("data", new BasicDBObject("endpoints", resp).append("total", docCount));
 
         return response;
+    }
+
+    public BasicDBObject buildEndpointCountInfo(int apiCollectionId) {
+        BasicDBObject resp = new BasicDBObject();
+
+        //int depreCatedEndpoint = 
+        // init sensitiveEndpoint =
+
+        // List<String> allDataTypes = new ArrayList<>();
+        Set<String> sensitiveSet = new HashSet<>();
+        List<String> sensitiveReqList = new ArrayList<>();
+        List<CustomDataType> customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject());
+        for (CustomDataType cdt: customDataTypes) {
+            if (SingleTypeInfoViewDao.instance.isSensitive(cdt.getName(), true)) {
+                sensitiveSet.add("reqSensitive_" + cdt.getName());
+            }
+
+            if (SingleTypeInfoViewDao.instance.isSensitive(cdt.getName(), false)) {
+                sensitiveSet.add("respSensitive_" + cdt.getName());
+            }
+        }
+        for (SingleTypeInfo.SubType subType: SingleTypeInfo.subTypeMap.values()) {
+            if (SingleTypeInfoViewDao.instance.isSensitive(subType.getName(), true)) {
+                sensitiveSet.add("reqSensitive_" + subType.getName());
+            }
+
+            if (SingleTypeInfoViewDao.instance.isSensitive(subType.getName(), false)) {
+                sensitiveSet.add("respSensitive_" + subType.getName());
+            }
+        }
+
+        for (String param: sensitiveSet) {
+            sensitiveReqList.add(param);
+        }
+
+        Bson collectionFilter = Filters.eq("_id.apiCollectionId", apiCollectionId);
+        int totalEndpointCount = (int) SingleTypeInfoViewDao.instance.findCount(collectionFilter);
+
+        Bson filter = Filters.in("combinedData", sensitiveReqList);
+
+        int sensitiveEndpointCount = (int) SingleTypeInfoViewDao.instance.findCount(Filters.and(filter, collectionFilter));
+
+        resp.put("data", new BasicDBObject("totalEndpointCount", totalEndpointCount).append("sensitiveEndpointCount", sensitiveEndpointCount));
+
+        return resp;
+
     }
 
     public static final int LIMIT = 2000;
@@ -616,44 +650,12 @@ public class InventoryAction extends UserAction {
 
         response = executeEndpointDataQuery(endpointDataQuery);
 
-        //AendpointDataResponse = response.get("data");
+        return Action.SUCCESS.toUpperCase();
+    }
 
-        // move all this inside 
+    public String fetchCollectionEndpointCountInfo() {
 
-        // List<String> alwaysSensitiveSubTypes = SingleTypeInfoDao.instance.sensitiveSubTypeNames();
-        // List<String> sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();;
-        // List<String> sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
-
-        // Set<String> sensitiveParamSet = new HashSet<>();
-
-        // for (String param: alwaysSensitiveSubTypes) {
-        //     sensitiveParamSet.add(param);
-        // }
-        // for (String param: sensitiveInResponse) {
-        //     sensitiveParamSet.add(param);
-        // }
-        // for (String param: sensitiveInRequest) {
-        //     sensitiveParamSet.add(param);
-        // }
-
-        // for (SingleTypeInfoView endpointData: endpointDataResponse) {
-        //     List<String> sensitiveParams = new ArrayList<>();
-        //     Set<String> endpointSubtypesSet = new HashSet<>();
-
-        //     for (String subtype: endpointData.getReqSubTypes()) {
-        //         endpointSubtypesSet.add(subtype);
-        //     }
-        //     for (String subtype: endpointData.getRespSubTypes()) {
-        //         endpointSubtypesSet.add(subtype);
-        //     }
-
-        //     for (String subtype: endpointSubtypesSet) {
-        //         if (sensitiveParamSet.contains(subtype)) {
-        //             sensitiveParams.add(subtype);
-        //         }
-        //     }
-
-        // }
+        response = buildEndpointCountInfo(apiCollectionId);
 
         return Action.SUCCESS.toUpperCase();
     }
@@ -812,7 +814,7 @@ public class InventoryAction extends UserAction {
     private int collectionPage;
     private List<ApiInfoKey> apiInfoList;
     private EndpointDataQuery endpointDataQuery;
-    private List<SingleTypeInfoView> endpointDataResponse;
+    //private List<SingleTypeInfoView> endpointDataResponse;
 
     private Bson prepareFilters() {
         ArrayList<Bson> filterList = new ArrayList<>();
@@ -1093,12 +1095,12 @@ public class InventoryAction extends UserAction {
         this.endpointDataQuery = endpointDataQuery;
     }
 
-    public List<SingleTypeInfoView> getEndpointDataResponse() {
-        return this.endpointDataResponse;
-    }
+    // public List<SingleTypeInfoView> getEndpointDataResponse() {
+    //     return this.endpointDataResponse;
+    // }
 
-    public void setEndpointDataResponse(List<SingleTypeInfoView> endpointDataResponse) {
-        this.endpointDataResponse = endpointDataResponse;
-    }
+    // public void setEndpointDataResponse(List<SingleTypeInfoView> endpointDataResponse) {
+    //     this.endpointDataResponse = endpointDataResponse;
+    // }
 
 }

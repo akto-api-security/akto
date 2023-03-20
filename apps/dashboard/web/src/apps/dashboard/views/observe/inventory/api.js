@@ -387,4 +387,16 @@ export default {
         })
     },
 
+    fetchCollectionEndpointCountInfo (apiCollectionId) {
+        return request({
+            url: '/api/fetchCollectionEndpointCountInfo',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId
+            }
+        }).then((resp) => {
+            return resp.response.data
+        })
+    },
+
 }

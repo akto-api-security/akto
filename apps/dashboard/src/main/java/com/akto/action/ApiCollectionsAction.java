@@ -9,6 +9,7 @@ import com.akto.dao.APISpecDao;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.SingleTypeInfoViewDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.mongodb.client.model.Filters;
@@ -24,7 +25,7 @@ public class ApiCollectionsAction extends UserAction {
         this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         // todo: add logic for logical groups
         for (ApiCollection apiCollection: apiCollections) {
-            int urlCount = ApiCollectionsDao.instance.getUrlCount(apiCollection.getId());
+            int urlCount = SingleTypeInfoViewDao.instance.getUrlCount(apiCollection.getId());
             apiCollection.setUrlsCount(urlCount);
         }
 
