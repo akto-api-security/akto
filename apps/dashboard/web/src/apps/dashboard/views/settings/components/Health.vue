@@ -26,7 +26,7 @@
                         <template v-slot:activator='{on, attrs}'>
                             <v-btn 
                                 icon 
-                                color="#47466A" 
+                                color="var(--themeColorDark)" 
                                 @click="refreshClick()"
                                 v-on="on"
                                 v-bind="attrs"
@@ -42,7 +42,7 @@
                         <template v-slot:activator='{on, attrs}'>
                             <v-btn 
                                 icon 
-                                color="#47466A" 
+                                color="var(--themeColorDark)" 
                                 @click="previousClick()"
                                 v-on="on"
                                 v-bind="attrs"
@@ -60,7 +60,7 @@
                     <v-btn 
                         v-on="on"
                         v-bind="attrs" 
-                        icon color="#47466A" @click="downloadData">
+                        icon color="var(--themeColorDark)" @click="downloadData">
                             <v-icon>$fas_file-csv</v-icon>
                     </v-btn>
                 </template>
@@ -169,13 +169,13 @@ export default {
 .log-title
     font-weight: 500
     font-size: 16px
-    color: #47466A
+    color: var(--themeColorDark)
 
 .log-content
     font-size: 12px
-    color: #47466A
+    color: var(--themeColorDark)
     width: 100%
     height: 100%
     font-family: monospace
-    background: #FFFFFF
+    background: var(--white)
 </style>

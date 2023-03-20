@@ -68,6 +68,6 @@ export default {
     line-height: 1.5
 
 .panel-icon
-    color: #6200EA
+    color: var(--themeColor)
     padding-right: 32px
 </style>
