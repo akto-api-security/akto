@@ -459,12 +459,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             pipeline2.add(Aggregates.unwind("$allAuthTypesFound"));
 
             String combinedDataComputedJson = "{'$setUnion':[{'$ifNull': [ { '$map': {'input': '$$req_sens', 'as': 'reqs', 'in': {'$concat': ['reqSensitive_', '$$reqs']}} }, []]}, {'$ifNull': [ { '$map': {'input': '$$resp_sens', 'as': 'resps', 'in': {'$concat': ['respSensitive_', '$$resps']}} }, []]}, {'$ifNull': [ { '$map': {'input': '$allAuthTypesFound', 'as': 'auth', 'in': {'$concat': ['authType_', '$$auth']}} }, []]}, {'$ifNull': [[ {'$concat': ['accessType', '_', {'$first': '$apiAccessTypes'}]}], []]}, {'$ifNull': [[ {'$concat': ['method', '_', '$_id.method']}], []]}]}";
-
             String accessTypeComputedJson = "{'$first': '$item.apiAccessTypes'}";
-
-            //pipeline.add(Aggregates.unwind("$item.apiAccessTypes"));
-
-            //pipeline2.add(Aggregates.unwind("$$req_sens"));
 
             pipeline2.add(
                 Aggregates.project(
@@ -486,9 +481,6 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             vars.add(new Variable<>("view_id", "$_id"));
             vars.add(new Variable<>("req_sens", "$reqSubTypes"));
             vars.add(new Variable<>("resp_sens", "$respSubTypes"));
-
-
-            //pipeline2.add(Aggregates.unwind("$item"));
 
             pipeline.add(Aggregates.lookup(ApiInfoDao.instance.getCollName(), vars, pipeline2, "item"));
 
