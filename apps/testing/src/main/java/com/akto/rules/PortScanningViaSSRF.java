@@ -2,8 +2,7 @@ package com.akto.rules;
 
 import com.akto.util.enums.GlobalEnums;
 
-public class PortScanningViaSSRF extends SSRFOnAwsMetadataEndpoint{
-
+public class PortScanningViaSSRF extends BaseSSRFTest{
 
     public PortScanningViaSSRF(String testRunId, String testRunResultSummaryId) {
         super(testRunId, testRunResultSummaryId);
@@ -28,5 +27,10 @@ public class PortScanningViaSSRF extends SSRFOnAwsMetadataEndpoint{
     @Override
     protected String getUrlPlaceholder() {
         return "http://localhost:{{port}}";
+    }
+
+    @Override
+    protected boolean isResponseStatusCodeAllowed(int statusCode) {
+        return true; //allowing all status codes
     }
 }
