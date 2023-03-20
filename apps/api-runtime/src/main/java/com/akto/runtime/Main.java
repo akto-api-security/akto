@@ -328,11 +328,13 @@ public class Main {
     }
 
     public static void createStiCollectionView() {
+        logger.info("create view called " + Context.now());
         SingleTypeInfoDao.instance.createStiCollectionView();
         SingleTypeInfoDao.instance.mergeStiViewAndApiInfo();
     }
 
     public static void updateStiCollectionView() {
+        logger.info("update view called " + Context.now());
         SingleTypeInfoDao.instance.createStiCollectionView();
         SingleTypeInfoDao.instance.mergeStiViewAndApiInfo();
     }

@@ -210,14 +210,14 @@ public class InventoryAction extends UserAction {
                     } else {
                         if (operator.equals("AND")) {
                             filterList.add(Filters.or(Filters.all("combinedData", reqSensitiveParamsToBeAdded), 
-                            Filters.all("combinedData", reqSensitiveParamsToBeAdded)));
+                            Filters.all("combinedData", respSensitiveParamsToBeAdded)));
                         } else if (operator.equals("NOT")) {
                             reqSensitiveParamsToBeAdded.addAll(respSensitiveParamsToBeAdded);
-                            filterList.add(Filters.nin("combinedData", respSensitiveParamsToBeAdded));
+                            filterList.add(Filters.nin("combinedData", reqSensitiveParamsToBeAdded));
                         } else if (operator.equals("OR")) {
 
                             filterList.add(Filters.or(Filters.in("combinedData", reqSensitiveParamsToBeAdded), 
-                            Filters.in("combinedData", reqSensitiveParamsToBeAdded)));
+                            Filters.in("combinedData", respSensitiveParamsToBeAdded)));
                         } 
                     }
                 }
@@ -228,8 +228,8 @@ public class InventoryAction extends UserAction {
     
                 if (key.equals( "lastSeenTs") || key.equals("discoveredTs")) {
     
-                    int ltTs = (int) values.get(0);
-                    int gtTs = (int) values.get(1);
+                    int ltTs = ((Long) values.get(0)).intValue();
+                    int gtTs =  ((Long) values.get(1)).intValue();
                     if (gtTs > ltTs) {
                         int temp = ltTs;
                         ltTs = gtTs;
