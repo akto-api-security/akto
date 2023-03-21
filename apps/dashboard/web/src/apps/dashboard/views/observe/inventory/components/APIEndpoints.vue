@@ -509,12 +509,12 @@ export default {
             }
             return endpointQuery
         },
-
         async downloadOpenApiFile() {
           let lastFetchedUrl = null;
           let lastFetchedMethod = null;
+          let apiCollectionId = this.apiCollectionId
           for (let index =0; index < 10; index++) {
-                var result = await this.$store.dispatch('inventory/downloadOpenApiFile', {lastFetchedUrl, lastFetchedMethod})
+                var result = await this.$store.dispatch('inventory/downloadOpenApiFile', {apiCollectionId, lastFetchedUrl, lastFetchedMethod})
                 let openApiString = result["openAPIString"]
                 var blob = new Blob([openApiString], {
                     type: "application/json",

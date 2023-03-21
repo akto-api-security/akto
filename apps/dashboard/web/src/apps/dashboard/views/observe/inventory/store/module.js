@@ -189,8 +189,8 @@ const inventory = {
                 return resp
             })
         },
-        downloadOpenApiFile({commit,state}, {lastFetchedUrl, lastFetchedMethod}) {
-            return api.downloadOpenApiFile(state.apiCollectionId, lastFetchedUrl, lastFetchedMethod).then(resp => {
+        downloadOpenApiFile({commit,state}, {apiCollectionId, lastFetchedUrl, lastFetchedMethod}) {
+            return api.downloadOpenApiFile(apiCollectionId, lastFetchedUrl, lastFetchedMethod).then(resp => {
                 return resp
             })
         },
