@@ -56,9 +56,7 @@
 								"commands": [
 												"export AKTO_MONGO_CONN=\"mongodb://localhost:27017\"",
 												"export DASHBOARD_MODE=\"local_deploy\"",
-												"cd apps/testing", 
-												"mvn compile",
-												"mvn exec:java -Dexec.mainClass=\"com.akto.testing.Main\""
+												"java -jar apps/testing/target/testing-1.0-SNAPSHOT-jar-with-dependencies.jar"
 											]
 							}
 						]
