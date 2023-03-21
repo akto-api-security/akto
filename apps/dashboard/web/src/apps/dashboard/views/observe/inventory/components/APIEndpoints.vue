@@ -24,12 +24,10 @@
         </div>
         <div class="d-flex">
             <count-box title="Sensitive Endpoints" :count="this.sensitiveEndpointCount" colorTitle="Overdue"/>
-            <count-box title="Undocumented Endpoints" :count="shadowEndpoints.length" colorTitle="Pending"/>
-            <count-box title="Deprecated Endpoints" :count="unusedEndpoints.length" colorTitle="This week"/>
             <count-box title="All Endpoints" :count="this.totalEndpointCount" colorTitle="Total"/>
         </div> 
         
-        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Unauthenticated', 'Undocumented', 'Deprecated', 'Documented', 'Tests']">
+        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Unauthenticated', 'Workflows']">
             <template slot="actions-tray">
             </template>
             <template slot="All">
@@ -43,36 +41,10 @@
                     :fetchParams="fetchAllTableParams"
                     :processParams="prepareItemForTable"
                     :getColumnValueList="getColumnValueList"
+                    :rowsPerPage=50
                 >
                 </server-table>
 
-                <!--                     
-                    <simple-table 
-                    :headers=tableHeaders 
-                    :items=allEndpoints 
-                    @rowClicked=rowClicked 
-                    name="All" 
-                    sortKeyDefault="sensitiveTags" 
-                    :sortDescDefault="true"
-                    :slotActions="true"
-                >
-                    <template #add-new-row-btn="{filteredItems}">
-                        <div>
-                            <secondary-button 
-                                @click="showScheduleDialog(filteredItems)"
-                                icon="$fas_play"
-                                text="Run Test" 
-                            />                            
-                        </div>
-                        
-                    </template>
-                    <template #item.sensitiveTags="{item}">
-                        <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
-                    </template>
-                    <template #item.tags="{item}">
-                        <tag-chip-group :tags="Array.from(item.tags || [])" />
-                    </template>
-                </simple-table> -->
             </template>
             <template slot="Sensitive">
 
@@ -101,46 +73,7 @@
                     </template>
                 </simple-table> -->
             </template>
-            <template slot="Undocumented">
-                <simple-table 
-                    :headers=tableHeaders 
-                    :items=shadowEndpoints 
-                    @rowClicked=rowClicked 
-                    name="Undocumented"  
-                    sortKeyDefault="sensitiveTags" 
-                    :sortDescDefault="true"
-                >
-                    <template #item.sensitiveTags="{item}">
-                        <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
-                    </template>
-                    <template #item.tags="{item}">
-                        <tag-chip-group :tags="Array.from(item.tags || [])" />
-                    </template>
-                </simple-table>
-            </template>
-            <template slot="Deprecated">
-                <simple-table 
-                    :headers=unusedHeaders 
-                    :items=deprecatedEndpoints
-                    name="Deprecated"
-                />
-            </template>
-            <template slot="Documented">
-                <v-file-input
-                    :rules=swaggerUploadRules
-                    show-size
-                    label="Upload JSON file"
-                    prepend-icon="$curlyBraces"
-                    accept=".json"
-                    @change="handleSwaggerFileUpload"
-                    v-model=swaggerFile
-                ></v-file-input>
-                <json-viewer
-                    v-if="swaggerContent"
-                    :contentJSON="swaggerContent"
-                    :errors="{}"
-                />
-            </template>
+
             <template slot="Unauthenticated">
 
                 <server-table 
@@ -155,23 +88,8 @@
                 >
                 </server-table>
 
-                <!-- <simple-table 
-                    :headers=tableHeaders 
-                    :items=openEndpoints
-                    @rowClicked=rowClicked 
-                    name="Unauthenticated" 
-                    sortKeyDefault="sensitiveTags" 
-                    :sortDescDefault="true"
-                >
-                    <template #item.sensitiveTags="{item}">
-                        <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
-                    </template>
-                    <template #item.tags="{item}">
-                        <tag-chip-group :tags="Array.from(item.tags || [])" />
-                    </template>
-                </simple-table> -->
             </template>
-            <template slot="Tests">
+            <template slot="Workflows">
                 <div>
                     <div class="d-flex jc-end ma-2">
                         <v-btn v-if="!showWorkflowTestBuilder" primary dark color="var(--themeColor)" @click="() => {originalStateFromDb = null; showWorkflowTestBuilder = true}">
@@ -392,8 +310,8 @@ export default {
             originalStateFromDb: null,
             workflowTests: [],
             sensitiveDataKeys: [],
-            totalEndpointCount: [],
-            sensitiveEndpointCount: []
+            totalEndpointCount: 0,
+            sensitiveEndpointCount: 0
         }
     },
     methods: {
@@ -646,6 +564,11 @@ export default {
                 this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId, shouldLoad: shouldLoad})
             }
 
+            api.fetchCollectionEndpointCountInfo(this.apiCollectionId).then(resp => {
+                this.totalEndpointCount = resp.totalEndpointCount
+                this.sensitiveEndpointCount = resp.sensitiveEndpointCount                
+            })
+
             this.workflowTests = (await api.fetchWorkflowTests()).workflowTests.filter(x => x.apiCollectionId === this.apiCollectionId).map(x => {
                 return {
                     ...x,
@@ -688,70 +611,14 @@ export default {
         apiCollectionName() {
             return this.$store.state.collections.apiCollections.find(x => x.id === this.apiCollectionId).displayName
         },
-        openEndpoints() {
-          return this.allEndpoints.filter(x => x.open)
-        },
         allEndpoints () {
             return func.mergeApiInfoAndApiCollection(this.apiCollection, this.apiInfoList)
-        },
-        sensitiveEndpoints() {
-            return this.allEndpoints.filter(x => x.sensitive && x.sensitive.size > 0)
-        },
-        shadowEndpoints () {
-            return this.allEndpoints.filter(x => x.shadow)
-        },
-        deprecatedEndpoints() {
-            let ret = []
-            this.apiInfoList.forEach(apiInfo => {
-                if (apiInfo.lastSeen < (func.timeNow() - func.recencyPeriod)) {
-                    ret.push({
-                        endpoint: apiInfo.id.url, 
-                        method: apiInfo.id.method,
-                        lastSeen: func.prettifyEpoch(apiInfo.lastSeen),
-                        color: func.actionItemColors()["This week"]
-                    })
-                }
-            })
-
-            try {
-                this.unusedEndpoints.forEach((x) => {
-                    if (!x) return;
-                    let arr = x.split(" ");
-                    if (arr.length < 2) return;
-                    ret.push({
-                      endpoint : arr[0],
-                      method : arr[1],
-                      color: func.actionItemColors()["This week"],
-                      lastSeen: 'in API spec file'
-                    })
-                })
-            } catch (e) {
-            }
-            return ret
         }
-        // endpointCountInfo() {
-        //     let totalEndpointCount = 0
-        //     let sensitiveEndpointCount = 0
-        //     let result = api.fetchCollectionEndpointCountInfo(this.apiCollectionId)
-        //     result.then((resp) => {
-        //         return {totalEndpointCount, sensitiveEndpointCount}
-        //         totalEndpointCount = resp.totalEndpointCount
-        //         sensitiveEndpointCount = resp.sensitiveEndpointCount
-        //     })
-        //     return {totalEndpointCount, sensitiveEndpointCount}
-        // }
     },
     async mounted() {
-        // let sensitiveDataKeys = []
         api.fetchDataTypeNames().then((resp) => {
             this.sensitiveDataKeys = resp.allDataTypes
         })
-
-        api.fetchCollectionEndpointCountInfo(this.apiCollectionId).then((resp) => {
-            this.totalEndpointCount = resp.totalEndpointCount
-            this.sensitiveEndpointCount = resp.sensitiveEndpointCount
-        })
-
     }
 }
 </script>
