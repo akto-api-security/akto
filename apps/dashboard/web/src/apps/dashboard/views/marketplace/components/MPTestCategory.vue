@@ -38,7 +38,7 @@ export default {
     name: "MPTestCategory",
     props: {
         categoryType: obj.strR, 
-        categoryId: obj.strR
+        categoryId: obj.strR,
     },
     components: {
         Spinner
@@ -66,10 +66,9 @@ export default {
     },
     async mounted() {
         this.loading = true
-        let aktoTestTypes = await issuesApi.fetchAllSubCategories()
-        this.businessCategories = aktoTestTypes.subCategories
+        let searchedTests = await api.searchTestResults(this.$route.query.searchText)
+        this.businessCategories = searchedTests.searchAktoTests
         let isDefaultCategory = this.categoryType === "default"
-
         if (isDefaultCategory) {
             let businessTests = this.businessCategories.filter(x => x.superCategory.name.toLowerCase() === this.categoryId.toLowerCase())
             this.testSourceConfigs = [...this.testSourceConfigs, ...businessTests.map(test => {
@@ -80,7 +79,6 @@ export default {
             })]
         }
         
-
         api.fetchTestingSources(isDefaultCategory, this.categoryId).then(resp => {
             this.testSourceConfigs = [...this.testSourceConfigs, ...resp.testSourceConfigs];
             this.loading = false

@@ -21,7 +21,6 @@ import org.bson.conversions.Bson;
 public class MarketplaceAction extends UserAction {
     
     List<TestSourceConfig> testSourceConfigs;
-    List<TestSourceConfig> searchResults = new ArrayList<>();
     public String fetchAllMarketplaceSubcategories() {
         this.testSourceConfigs = TestSourceConfigsDao.instance.findAll(new BasicDBObject());
         return Action.SUCCESS.toUpperCase();
@@ -34,7 +33,6 @@ public class MarketplaceAction extends UserAction {
         Bson creatorQ = Filters.ne(TestSourceConfig.CREATOR, "default");
         Bson subcategoryQ = Filters.eq(TestSourceConfig.SUBCATEGORY, subcategory);
         Bson filterQ = defaultCreator ? subcategoryQ : Filters.and(creatorQ, subcategoryQ);
-        
         this.testSourceConfigs = TestSourceConfigsDao.instance.findAll(filterQ);
         return Action.SUCCESS.toUpperCase();
     }   
@@ -45,7 +43,9 @@ public class MarketplaceAction extends UserAction {
     String description;
     List<String> tags;
     String searchText;
-    List<TestSubCategory> searchAktoTests;
+    List<TestSourceConfig> searchResults = new ArrayList<>();
+    private List<TestSubCategory> searchAktoTests;
+    private TestCategory[] categories;
 
     public String addCustomTest() {
         TestSourceConfig alreadyExists = TestSourceConfigsDao.instance.findOne("_id", url);
@@ -59,33 +59,44 @@ public class MarketplaceAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String searchTestResults(){
+    private void searchUtilityFunction(){
         this.searchAktoTests = new ArrayList<>();
-        //fill from Updated test-source-config collection in mongodb
-        this.searchResults = TestSourceConfigsDao.instance.findAll(Filters.or(
-            Filters.regex("severity", this.searchText, "i"),
-            Filters.regex("category", this.searchText, "i"),
-            Filters.regex("tags", this.searchText, "i"),
-            Filters.regex("description", this.searchText, "i")
-        ));
-
-        this.searchText = this.searchText.toLowerCase();
-        //fill from akto tests in global enums
-        for(TestSubCategory tsc : GlobalEnums.TestSubCategory.getValuesArray()){
-            String category = tsc.getSuperCategory().getName().toLowerCase();
-            String severity = tsc.getSuperCategory().getSeverity().toString().toLowerCase();
-            
-            if(tsc.getIssueDescription().toLowerCase().matches("(.*)" + this.searchText + "(.*)")){
-                this.searchAktoTests.add(tsc);
-            }else if(tsc.getTestName().toLowerCase().matches("(.*)" + this.searchText + "(.*)")){
-                this.searchAktoTests.add(tsc);
-            }else if(category.matches("(.*)" + this.searchText + "(.*)")){
-                this.searchAktoTests.add(tsc);
-            }else if(severity.matches("(.*)" + this.searchText + "(.*)")){
+        this.categories = GlobalEnums.TestCategory.values();
+        if(this.searchText == null){
+            for(TestSubCategory tsc : GlobalEnums.TestSubCategory.getValuesArray()){
                 this.searchAktoTests.add(tsc);
             }
-
+            this.searchResults = TestSourceConfigsDao.instance.findAll(new BasicDBObject());
         }
+
+        //fill from Updated test-source-config collection in mongodb
+        else{
+            this.searchResults = TestSourceConfigsDao.instance.findAll(Filters.or(
+                Filters.regex("severity", this.searchText, "i"),
+                Filters.regex("category", this.searchText, "i"),
+                Filters.regex("tags", this.searchText, "i"),
+                Filters.regex("description", this.searchText, "i"),
+                Filters.regex("subcategory", this.searchText, "i")
+            ));
+
+            this.searchText = this.searchText.toLowerCase();
+            //fill from akto tests in global enums
+            for(TestSubCategory tsc : GlobalEnums.TestSubCategory.getValuesArray()){
+                String testCategory = tsc.getSuperCategory().getName().toLowerCase();
+                String testSeverity = tsc.getSuperCategory().getSeverity().toString().toLowerCase();
+
+                String matchedString = tsc.getIssueDescription().toLowerCase() + " " + tsc.getTestName().toLowerCase() + " " + testCategory  + " " + testSeverity;
+
+                if(matchedString.matches("(.*)" + this.searchText + "(.*)")){
+                    this.searchAktoTests.add(tsc);
+                }
+
+            }
+        }
+    }
+
+    public String searchTestResults(){
+        this.searchUtilityFunction();
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -175,6 +186,14 @@ public class MarketplaceAction extends UserAction {
 
     public List<TestSubCategory> getSearchAktoTests() {
         return this.searchAktoTests;
+    }
+
+    public TestCategory[] getCategories() {
+        return categories;
+    }
+
+    public void setCategories(TestCategory[] categories) {
+        this.categories = categories;
     }
     
 }

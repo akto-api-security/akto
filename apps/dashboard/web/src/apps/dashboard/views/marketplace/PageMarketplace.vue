@@ -164,7 +164,9 @@ export default {
                 description: ""
             },
             searchText: "",
+            searchItems:[],
             businessSubCategories: [],
+            searchUserItems:[],
         }
     },
     methods: {
@@ -183,26 +185,62 @@ export default {
                 })
             })
         },
-        nameToKvObj(names) {
-            return names.map(x => {
-                let category = x.split("/")[0]
-                let subCategory = x.split("/")[1]
-
-                let categoryShortName = this.businessCategoryShortNamesMap[category]
-                return {
-                    text: categoryShortName+"/"+subCategory,
-                    value: subCategory.toLowerCase().replaceAll(" ", "_")
-                }
-            })
-        },
         async onSearch(searchText) {
             this.searchText = searchText
-            if(this.searchText && this.searchText != null){
-                await api.searchTestResults(this.searchText).then((resp) =>{
-                    this.businessSubCategories = resp.searchAktoTests
-                    this.leftNavItems
+            this.searchItems = []
+            this.searchUserItems = []
+            await api.searchTestResults(this.searchText).then((resp) =>{
+                this.businessCategories = resp.categories
+                this.businessSubCategories = resp.searchAktoTests
+                let urlLink = "/dashboard/library/default/"
+                const objLink = new Set()
+                resp.searchAktoTests.forEach(item => {
+                    let obj = {
+                        title:item.superCategory.shortName + "/business-logic",
+                        link: urlLink + item.superCategory.name,
+                        icon: "$fas_plus",
+                        active:false,
+                    }
+
+                    if(!objLink.has(obj.link)){
+                        objLink.add(obj.link)
+                        this.searchItems.push(obj)
+                    }
+                });
+
+                resp.searchResults.forEach((item)=>{
+                    let name = item.id.split("/")
+                    let obj = {}
+                    let isUser = false
+                    if(item.creator == 'default'){
+                        obj = {
+                            title: name[name.length - 3] + "/" + item.subcategory,
+                            link: urlLink + item.subcategory,
+                            icon: "$fas_plus",
+                            active:false,
+                        }
+                    }
+                    else{
+                        isUser = true
+                        obj = {
+                            title: name[name.length - 3] + "/" + item.subcategory,
+                            link: "/dashboard/library/custom/" + item.subcategory,
+                            icon: "$fas_plus",
+                            active:false,
+                        }
+                    }
+                    if(!objLink.has(obj.link)){
+                        objLink.add(obj.link)
+                        if(isUser)
+                            this.searchUserItems.push(obj)
+                        else{
+                            this.searchItems.push(obj)
+                        }
+                    }
                 })
-            }
+            })
+            this.$router.push(this.searchItems[0].link)
+            this.$router.push({query:{searchText:searchText}})
         },
         createCategoryObj(arrCategoryKv, creatorTitle, creatorType, colorType) {
             return {
@@ -211,25 +249,13 @@ export default {
                 group: "/dashboard/library/"+creatorType,
                 color: func.actionItemColors()[colorType],
                 active: true,
-                items: [
-                    ...arrCategoryKv.map(category => {
-                        return {
-                            title: category.text,
-                            link: "/dashboard/library/"+creatorType+"/"+category.value,
-                            icon: "$fas_plus",
-                            active: false
-                        }
-                    })
-                ]
+                items: arrCategoryKv
             }
         },
     },
     async mounted() {
         await this.$store.dispatch('marketplace/fetchAllMarketplaceSubcategories')
-        let aktoTestTypes = await issuesApi.fetchAllSubCategories()
-        this.businessCategories = aktoTestTypes.categories
-        this.businessSubCategories = aktoTestTypes.subCategories
-        this.$router.push(this.leftNavItems[0].items[0].link)   
+        await this.onSearch(this.searchText)
     },
     computed: {
         ...mapState('marketplace', ['defaultSubcategories', 'userSubcategories', 'loading']),
@@ -265,8 +291,8 @@ export default {
         },
         leftNavItems() {
             return [
-                this.createCategoryObj(this.businessCategoryNames.concat(this.nameToKvObj(this.defaultSubcategories)), "Categories", "default", "This week"),
-                this.createCategoryObj(this.nameToKvObj(this.userSubcategories), "Your tests", "custom", "Total")
+                this.createCategoryObj(this.searchItems, "Categories", "default", "This week"),
+                this.createCategoryObj(this.searchUserItems, "Your tests", "custom", "Total")
             ]
         }
     }
