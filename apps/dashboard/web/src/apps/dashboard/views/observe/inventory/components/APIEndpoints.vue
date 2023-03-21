@@ -1,6 +1,5 @@
 <template>
-    <spinner v-if="endpointsLoading" />
-    <div class="pr-4 api-endpoints" v-else>
+    <div class="pr-4 api-endpoints">
         <div>
             <div class="d-flex jc-end pb-3 pt-3">
                     <v-tooltip bottom>
@@ -113,7 +112,7 @@
                         <v-btn icon primary dark color="var(--themeColor)" class="float-right" @click="() => {originalStateFromDb = null; showWorkflowTestBuilder = false}">
                             <v-icon>$fas_times</v-icon>
                         </v-btn>
-                        <workflow-test-builder :endpointsList=allEndpoints :apiCollectionId="apiCollectionId" :originalStateFromDb="originalStateFromDb" :defaultOpenResult="false" class="white-background"/>
+                        <workflow-test-builder :endpointsList="this.allEndpointsData" :apiCollectionId="apiCollectionId" :originalStateFromDb="originalStateFromDb" :defaultOpenResult="false" class="white-background"/>
                     </div>
                     
                 
@@ -311,7 +310,8 @@ export default {
             workflowTests: [],
             sensitiveDataKeys: [],
             totalEndpointCount: 0,
-            sensitiveEndpointCount: 0
+            sensitiveEndpointCount: 0,
+            allEndpointsData: []
         }
     },
     methods: {
@@ -325,7 +325,7 @@ export default {
             let headerTextToValueMap = Object.fromEntries(this.tableHeaders.map(x => [x.text, x.value]).filter(x => x[0].length > 0));
 
             let csv = Object.keys(headerTextToValueMap).join(",")+"\r\n"
-            this.allEndpoints.forEach(i => {
+            this.allEndpointsData.forEach(i => {
                 csv += Object.values(headerTextToValueMap).map(h => (i[h] || "-")).join(",") + "\r\n"
             })
             let blob = new Blob([csv], {
@@ -478,8 +478,6 @@ export default {
             filterConditions.push({"key" : "apiCollectionId", "operator": "OR", "values": [this.apiCollectionId]})
 
             for (let key in filters) {
-                // console.log(key)
-                // console.log(values)
                 let values = Array.from(filters[key])
                 let operator = filterOperators[key]
                 
@@ -559,14 +557,14 @@ export default {
         async refreshPage(shouldLoad) {
             // if (!this.apiCollection || this.apiCollection.length === 0 || this.$store.state.inventory.apiCollectionId !== this.apiCollectionId) {
             this.showWorkflowTestBuilder = false
-            let collectionIdChanged = this.$store.state.inventory.apiCollectionId !== this.apiCollectionId
-            if (collectionIdChanged || !shouldLoad || ((new Date() / 1000) - this.lastFetched > 60*5)) {
-                this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId, shouldLoad: shouldLoad})
-            }
 
             api.fetchCollectionEndpointCountInfo(this.apiCollectionId).then(resp => {
                 this.totalEndpointCount = resp.totalEndpointCount
                 this.sensitiveEndpointCount = resp.sensitiveEndpointCount                
+            })
+
+            api.fetchAllEndpointData(this.apiCollectionId).then(resp => {
+                this.allEndpointsData = this.buildAllEndpointData(resp.allEndpoints)   
             })
 
             this.workflowTests = (await api.fetchWorkflowTests()).workflowTests.filter(x => x.apiCollectionId === this.apiCollectionId).map(x => {
@@ -577,6 +575,9 @@ export default {
             })
 
             this.$emit('mountedView', {type: 1, apiCollectionId: this.apiCollectionId})
+        },
+        buildAllEndpointData(allEndpoints) {
+            return func.buildAllEndpointData(allEndpoints)
         },
         showScheduleDialog(filteredItems) {
             this.showTestSelectorDialog = true
@@ -593,7 +594,7 @@ export default {
         },
         async startTest({recurringDaily, startTimestamp, selectedTests, testName, testRunTime, maxConcurrentRequests}) {
             let apiInfoKeyList = this.toApiInfoKeyList(this.filteredItemsForScheduleTest)
-            let filtersSelected = this.filteredItemsForScheduleTest.length === this.allEndpoints.length
+            let filtersSelected = this.filteredItemsForScheduleTest.length === this.allEndpointsData.length
             let store = this.$store
             let apiCollectionId = this.apiCollectionId
             
@@ -607,13 +608,15 @@ export default {
         }  
     },
     computed: {
-        ...mapState('inventory', ['apiCollection', 'endpointsLoading', 'swaggerContent', 'apiInfoList', 'filters', 'lastFetched', 'unusedEndpoints']),
         apiCollectionName() {
-            return this.$store.state.collections.apiCollections.find(x => x.id === this.apiCollectionId).displayName
+            let collectionName = ""
+            for (const [key, value] of this.$store.state.collections.apiCollections.entries()) {
+                if (value.id == this.apiCollectionId) {
+                    collectionName = value.displayName
+                }
+            }
+            return collectionName
         },
-        allEndpoints () {
-            return func.mergeApiInfoAndApiCollection(this.apiCollection, this.apiInfoList)
-        }
     },
     async mounted() {
         api.fetchDataTypeNames().then((resp) => {

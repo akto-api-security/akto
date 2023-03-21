@@ -399,4 +399,16 @@ export default {
         })
     },
 
+    fetchAllEndpointData (apiCollectionId) {
+        return request({
+            url: '/api/fetchAllEndpointData',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId
+            }
+        }).then((resp) => {
+            return resp.response.data
+        })
+    },
+
 }

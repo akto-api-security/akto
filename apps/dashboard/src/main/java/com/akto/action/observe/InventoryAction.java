@@ -335,6 +335,30 @@ public class InventoryAction extends UserAction {
 
     }
 
+    public BasicDBObject fetchAllEndpointData(int apiCollectionId) {
+        BasicDBObject resp = new BasicDBObject();
+
+        Bson filter = Filters.eq("_id.apiCollectionId", apiCollectionId);
+        List<SingleTypeInfoView> endpoints = SingleTypeInfoViewDao.instance.findAll(filter);
+        List<EndpointDataResponse> allEndpoints = new ArrayList<>();
+        for (SingleTypeInfoView data: endpoints) {
+
+            List<String> authTypes = SingleTypeInfoViewDao.instance.calculateAuthTypes(data);
+            List<String> sensitiveTypes = SingleTypeInfoViewDao.instance.calculateSensitiveTypes(data);
+
+            EndpointDataResponse endpointDataResp = new EndpointDataResponse(data.getId().getUrl(), data.getId().getMethod().toString(), 
+            data.getId().getApiCollectionId(), data.getDiscoveredTs(), data.getLastSeenTs(), 
+            data.getAccessType(), authTypes, sensitiveTypes);
+
+            allEndpoints.add(endpointDataResp);
+
+        }
+
+        resp.put("data", new BasicDBObject("allEndpoints", allEndpoints));
+        return resp;
+
+    }
+
     public static final int LIMIT = 2000;
     public List<BasicDBObject> fetchEndpointsInCollection(int apiCollectionId) {
         List<Bson> pipeline = new ArrayList<>();
@@ -661,6 +685,13 @@ public class InventoryAction extends UserAction {
     public String fetchCollectionEndpointCountInfo() {
 
         response = buildEndpointCountInfo(apiCollectionId);
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchAllEndpointData() {
+
+        response = fetchAllEndpointData(apiCollectionId);
 
         return Action.SUCCESS.toUpperCase();
     }

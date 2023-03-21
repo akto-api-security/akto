@@ -410,6 +410,40 @@ export default {
         return Object.values(ret) 
     },
 
+    buildAllEndpointData(allEndpoints) {
+        let ret = {}
+
+        if (!allEndpoints) {
+            return []
+        }
+
+
+        allEndpoints.forEach(x => {
+            let authType = x.authTypes.join(", ")
+            let key = x.apiCollectionId + "-" + x.url + "-" + x.method
+
+            ret[key] = {
+                shadow: false,
+                sensitive: x.sensitiveParams.length > 0,
+                endpoint: x.url,
+                parameterisedEndpoint: this.parameterizeUrl(x.url),
+                open: x.authTypes.indexOf("UNAUTHENTICATED") !== -1,
+                access_type: x.accessType,
+                method: x.method,
+                color: x.sensitiveParams.size > 0 ? "#f44336" : "#00bfa5",
+                apiCollectionId: x.apiCollectionId,
+                last_seen: x.lastSeenTs,
+                detectedTs: x.discoveredTs,
+                added: this.prettifyEpoch(x.discoveredTs),
+                apiCollectionName: '-',
+                auth_type: (authType || "").toLowerCase(),
+                sensitiveTags: x.sensitiveParams
+            }
+
+        })        
+        return Object.values(ret) 
+    },
+
     convertSensitiveTags(subTypeList) {
         let result = new Set()
         if (!subTypeList || subTypeList.size === 0) return result
