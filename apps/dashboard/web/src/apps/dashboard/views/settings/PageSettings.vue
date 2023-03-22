@@ -150,10 +150,11 @@ export default {
 
         },
         getTabs() {
-          if(window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'){
-            return ['Data types','Auth types', 'Tags', 'Users', 'Integrations'];
-          } else if(this.tab && this.tab=="health"){
+          if(this.tab && this.tab=="health"){
             return ['Health', 'Data types','Auth types', 'Tags', 'Account', 'Users', 'Integrations'];
+          }
+          else if(window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'){
+            return ['Data types','Auth types', 'Tags', 'Users', 'Health' ,'Integrations'];
           }
           return ['Data types','Auth types', 'Tags', 'Account', 'Users', 'Health', 'Integrations'];
         }

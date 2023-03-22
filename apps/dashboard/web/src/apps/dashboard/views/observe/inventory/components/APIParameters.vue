@@ -153,8 +153,7 @@ export default {
                 },
                 {
                     text: 'Discovered',
-                    value: 'date',
-                    sortKey: 'detectedTs'
+                    value: 'date'
                 },
                 {
                   text: 'Values',

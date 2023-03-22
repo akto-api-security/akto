@@ -56,5 +56,5 @@ export default {
 <style scoped lang="sass">
 .sensitive-tag-chip
     margin: 0px 4px !important
-    padding: 8px 8px 8px 4px 
+    padding: 4px    
 </style>

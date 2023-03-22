@@ -1,0 +1,120 @@
+{
+	"name": "Akto",
+	"dockerComposeFile": "docker-compose.devcontainer.yml",
+	"service": "akto",
+	"workspaceFolder": "/workspace",
+
+	"features": {
+		"ghcr.io/devcontainers/features/java:1": {
+			"version": "none",
+			"installMaven": "true",
+			"mavenVersion": "3.6.3"
+		},
+
+		"ghcr.io/devcontainers/features/node:1": {
+			"version": "17"
+		}
+	},
+	"overrideCommand": false,
+	"remoteUser": "vscode",
+	"hostRequirements": {
+		"memory": "4gb"
+	},
+    "forwardPorts": [8080, 27017],
+	"onCreateCommand": "cd apps/dashboard && npm install && cd ../.. && mvn clean install -DskipTests=true",
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"restoreTerminals.terminals": [
+					{
+						"splitTerminals": [
+							{
+								"name": "VueJS",
+								"commands": [
+												"cd apps/dashboard", 
+												"npm run hot"
+											]
+							}
+						]   
+					},
+					{
+						"splitTerminals": [
+							{
+								"name": "Dashboard",
+								"commands": [
+												"export AKTO_MONGO_CONN=\"mongodb://localhost:27017\"",
+												"export DASHBOARD_MODE=\"local_deploy\"",
+												"mvn --projects :dashboard --also-make jetty:run"
+											]
+							}
+						]
+					},
+					{
+						"splitTerminals": [
+							{
+								"name": "Testing",
+								"commands": [
+												"export AKTO_MONGO_CONN=\"mongodb://localhost:27017\"",
+												"export DASHBOARD_MODE=\"local_deploy\"",
+												"cd apps/testing", 
+												"mvn compile",
+												"mvn exec:java -Dexec.mainClass=\"com.akto.testing.Main\""
+											]
+							}
+						]
+					}
+			  ]
+			},
+			"extensions": [
+				"EthanSK.restore-terminals"
+			]
+		},
+		"codespaces": {
+			"settings": {
+				"restoreTerminals.terminals": [
+					{
+						"splitTerminals": [
+							{
+								"name": "VueJS",
+								"commands": [
+												"cd apps/dashboard", 
+												"npm run hot"
+											]
+							}
+						]   
+					},
+					{
+						"splitTerminals": [
+							{
+								"name": "Dashboard",
+								"commands": [
+												"export AKTO_MONGO_CONN=\"mongodb://localhost:27017\"",
+												"export DASHBOARD_MODE=\"local_deploy\"",
+												"mvn --projects :dashboard --also-make jetty:run"
+											]
+							}
+						]
+					},
+					{
+						"splitTerminals": [
+							{
+								"name": "Testing",
+								"commands": [
+												"export AKTO_MONGO_CONN=\"mongodb://localhost:27017\"",
+												"export DASHBOARD_MODE=\"local_deploy\"",
+												"cd apps/testing", 
+												"mvn compile",
+												"mvn exec:java -Dexec.mainClass=\"com.akto.testing.Main\""
+											]
+							}
+						]
+					}
+			  ]
+			},
+			"extensions": [
+				"EthanSK.restore-terminals"
+			]
+		}
+	}
+
+}

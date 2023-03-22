@@ -40,18 +40,15 @@
                     name="All" 
                     sortKeyDefault="sensitiveTags" 
                     :sortDescDefault="true"
+                    :slotActions="true"
                 >
                     <template #add-new-row-btn="{filteredItems}">
-                        <div style="align-items: center; display: flex;">
-                            <v-tooltip>
-                                <template v-slot:activator='{ on, attrs }'>
-                                    <v-btn icon primary dark color="var(--themeColorDark)" @click="showScheduleDialog(filteredItems)">
-                                        <v-icon>$fas_play</v-icon>
-                                    </v-btn>
-                                </template>
-                                "Run test"
-                            </v-tooltip>
-                            
+                        <div>
+                            <secondary-button 
+                                @click="showScheduleDialog(filteredItems)"
+                                icon="$fas_play"
+                                text="Run Test" 
+                            />                            
                         </div>
                         
                     </template>
@@ -190,6 +187,7 @@ import JsonViewer from "@/apps/dashboard/shared/components/JSONViewer"
 import IconMenu from '@/apps/dashboard/shared/components/IconMenu'
 import WorkflowTestBuilder from './WorkflowTestBuilder'
 import TestsSelector from './TestsSelector'
+import SecondaryButton from '@/apps/dashboard/shared/components/buttons/SecondaryButton'
 
 export default {
     name: "ApiEndpoints",
@@ -204,7 +202,8 @@ export default {
         JsonViewer,
         IconMenu,
         WorkflowTestBuilder,
-        TestsSelector
+        TestsSelector,
+        SecondaryButton
     },
     props: {
         apiCollectionId: obj.numR
@@ -247,28 +246,23 @@ export default {
                 },
                 {
                   text: 'Last Seen',
-                  value: 'last_seen',
-                  sortKey: 'last_seen'
+                  value: 'last_seen'
                 },
                 {
                   text: 'Access Type',
-                  value: 'access_type',
-                  sortKey: 'access_type'
+                  value: 'access_type'
                 },
                 {
                   text: 'Auth Type',
-                  value: 'auth_type',
-                  sortKey: 'auth_type'
+                  value: 'auth_type'
                 },
                 {
                     text: constants.DISCOVERED,
-                    value: 'added',
-                    sortKey: 'detectedTs'
+                    value: 'added'
                 },
                 {
                     text: 'Changes',
                     value: 'changes',
-                    sortKey: 'changesCount',
                     hideFilter: true
                 }
             ],
@@ -551,5 +545,4 @@ export default {
 .menu
     display: flex
     justify-content: right
-
 </style>
