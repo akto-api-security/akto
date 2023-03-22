@@ -1,6 +1,7 @@
 package com.akto.action;
 
 import com.akto.dao.*;
+import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.listener.InitializerListener;
 import com.akto.utils.JWT;
@@ -336,9 +337,11 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 }
             }
 
+            Context.accountId.set(accountId);
+            AccountSettingsDao.instance.updateOnboardingFlag(true);
             servletRequest.getSession().setAttribute("user", user);
             new LoginAction().loginUser(user, servletResponse, true, servletRequest);
-            servletResponse.sendRedirect("/dashboard/testing");
+            servletResponse.sendRedirect("/dashboard/onboarding");
 
     }
 

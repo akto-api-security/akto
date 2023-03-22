@@ -9,7 +9,7 @@
             :max="max"
             hide-details
             @change="updatedRange"
-            color="#6200EA"
+            color="var(--themeColor)"
             :ripple="false"
             dense
             :thumb-size="13"
@@ -46,10 +46,10 @@ export default {
 <style scoped lang="sass">
 .filter-container
     padding: 16px 12px
-    background: #FFFFFF
+    background: var(--white)
 
 .filter-title
     font-size: 13px
-    color: #47466A    
+    color: var(--themeColorDark)    
     padding-bottom: 20px
 </style>
