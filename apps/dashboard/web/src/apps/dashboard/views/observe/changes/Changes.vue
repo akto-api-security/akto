@@ -16,13 +16,13 @@
         <a-card title="Changes" icon="$fas_chart-line" class="ma-5">
             <line-chart
                 type='spline'
-                color='#6200EA'
+                color='var(--themeColor)'
                 :areaFillHex="true"
                 :height="250"
                 title="New Endpoints"
                 :data="newEndpointsTrend"
                 :defaultChartOptions="{legend:{enabled: false}}"
-                background-color="rgba(0,0,0,0.0)"
+                background-color="var(--transparent)"
                 :text="true"
                 :input-metrics="[{data: newParamsTrend, name: 'New Parameters'}]"
                 class="pa-5"
@@ -35,7 +35,7 @@
                         <template v-slot:activator='{on, attrs}'>
                             <v-btn 
                                 icon 
-                                color="#47466A" 
+                                color="var(--themeColorDark)" 
                                 @click="refreshPage(true)"
                                 v-on="on"
                                 v-bind="attrs"
@@ -105,7 +105,7 @@
                             >
                             <template v-slot:activator="{ on, attrs }">
                                 <v-btn
-                                    color="#47466A"
+                                    color="var(--themeColorDark)"
                                     icon
                                     dark
                                     v-bind="attrs"
@@ -114,7 +114,7 @@
                                 >
                                 <v-tooltip bottom>
                                     <template v-slot:activator='{ on, attrs }'>
-                                        <v-icon color="#47466A" size="16" v-bind="attrs" v-on="on" >$fas_lock</v-icon>
+                                        <v-icon color="var(--themeColorDark)" size="16" v-bind="attrs" v-on="on" >$fas_lock</v-icon>
                                     </template>
                                     Mark sensitive
                                 </v-tooltip>
@@ -135,7 +135,7 @@
                             >
                             <template v-slot:activator="{ on, attrs }">
                                 <v-btn
-                                    color="#47466A"
+                                    color="var(--themeColorDark)"
                                     icon
                                     dark
                                     v-bind="attrs"
@@ -144,7 +144,7 @@
                                 >
                                 <v-tooltip bottom>
                                     <template v-slot:activator='{ on, attrs }'>
-                                        <v-icon color="#47466A" size="16" v-bind="attrs" v-on="on" >$fas_lock-open</v-icon>
+                                        <v-icon color="var(--themeColorDark)" size="16" v-bind="attrs" v-on="on" >$fas_lock-open</v-icon>
                                     </template>
                                     Unmark sensitive
                                 </v-tooltip>
@@ -247,68 +247,73 @@ export default {
                 },
                 {
                   text: 'Access Type',
-                  value: 'access_type',
-                  sortKey: 'access_type'
+                  value: 'access_type'
                 },
                 {
                   text: 'Auth Type',
-                  value: 'auth_type',
-                  sortKey: 'auth_type'
+                  value: 'auth_type'
                 },
                 {
                   text: 'Last Seen',
-                  value: 'last_seen',
-                  sortKey: 'last_seen'
+                  value: 'last_seen'
                 },
                 {
                     text: constants.DISCOVERED,
-                    value: 'added',
-                    sortKey: 'detectedTs'
+                    value: 'added'
                 }
             ],
             parameterHeaders: [
                 {
                     text: '',
-                    value: 'color'
+                    value: 'color',
+                    showFilterMenu: false
                 },
                 {
                     text: 'Name',
                     value: 'name',
-                    sortKey: 'param'
+                    sortKey: 'param',
+                    showFilterMenu: true
                 },
                 {
                     text: 'Type',
                     value: 'type',
-                    sortKey: 'subType'
+                    sortKey: 'subType',
+                    showFilterMenu: true
                 },
                 {
                     text: 'Endpoint',
                     value: 'endpoint',
-                    sortKey: 'url'
+                    sortKey: 'url',
+                    showFilterMenu: true
                 },
                 {
                     text: 'Collection',
                     value: 'apiCollectionName',
-                    sortKey: 'apiCollectionId'
+                    sortKey: 'apiCollectionId',
+                    showFilterMenu: true
                 },
                 {
                     text: 'Method',
                     value: 'method',
-                    sortKey: 'method'
+                    sortKey: 'method',
+                    showFilterMenu: true
                 },
                 {
                     text: 'Location',
                     value: 'location',
-                    sortKey: 'isHeader'
+                    sortKey: 'isHeader',
+                    showFilterMenu: true
                 },
                 {
                     text: constants.DISCOVERED,
                     value: 'added',
-                    sortKey: 'timestamp'
+                    sortKey: 'timestamp',
+                    showFilterMenu: true
                 },
                 {
                   text: 'Values',
                   value: 'domain',
+                  showFilterMenu: true
                 }
             ]
         }
@@ -437,7 +442,7 @@ export default {
             }
         },
         async fetchRecentParams(sortKey, sortOrder, skip, limit, filters, filterOperators) {
-            return await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, this.startTimestamp, this.endTimestamp)
+            return await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, this.startTimestamp, this.endTimestamp, false, false)
         },
         async fetchSensitiveParams() {
             return await inventorApi.listAllSensitiveFields().then(resp => {

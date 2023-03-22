@@ -22,6 +22,7 @@ const SensitiveData = () => import("@/apps/dashboard/views/observe/sensitive/Sen
 const ApiChanges = () => import("@/apps/dashboard/views/observe/changes/Changes")
 const ParamState = () => import("@/apps/dashboard/views/observe/misc/ParamState")
 const MPTestCategory = () => import("@/apps/dashboard/views/marketplace/components/MPTestCategory")
+const Onboarding = () => import("@/apps/dashboard/views/onboarding/Onboarding.vue")
 
 Vue.use(Router)
 
@@ -50,6 +51,14 @@ const router =  new Router({
             component: PageSignup
         },
         {
+            path: '/dashboard/onboarding',
+            name: 'onboarding',
+            component: Onboarding,
+            beforeEnter (to, from, next) {
+                store.dispatch('collections/loadAllApiCollections').then(() => next()).catch(() => next())
+            },
+        },
+        {
             path: '/dashboard',
             name: 'dashboard',
             component: PageDashboard,
@@ -69,6 +78,11 @@ const router =  new Router({
                     redirect: 'testing/active',
                     components: {
                         default: PageTesting
+                    },
+                    props: {
+                        default: route => ({
+                            tab: route.query.tab
+                        })
                     },
                     children: [
                         {
@@ -121,9 +135,12 @@ const router =  new Router({
                 {
                     path: 'settings',
                     name: 'settings',
-                    components: {
-                        default: PageSettings
-                    }
+                    component: PageSettings,
+                    props: route => ({
+                        defaultStartTimestamp: route.query.start,
+                        defaultEndTimestamp: route.query.end,
+                        tab: route.query.tab
+                    })
                 },
                 {
                     path: 'observe',
@@ -172,7 +189,10 @@ const router =  new Router({
                         {
                             path: 'sensitive',
                             name: 'sensitive',
-                            component: SensitiveData
+                            component: SensitiveData,
+                            props: route => ({
+                                subType: route.query.type
+                            })
                         },
                         {
                             path: 'param_state',

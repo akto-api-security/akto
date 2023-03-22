@@ -1,5 +1,7 @@
 package com.akto.har;
 
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.sstoehr.harreader.HarReader;
@@ -16,7 +18,7 @@ import java.util.*;
 public class HAR {
     private final static ObjectMapper mapper = new ObjectMapper();
     private final List<String> errors = new ArrayList<>();
-    private static final Logger logger = LoggerFactory.getLogger(Har.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Har.class);
     public static final String JSON_CONTENT_TYPE = "application/json";
     public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
     public List<String> getMessages(String harString, int collection_id) throws HarReaderException {
@@ -36,9 +38,9 @@ public class HAR {
                     result.put("akto_vxlan_id", collection_id+"");
                     entriesList.add(mapper.writeValueAsString(result));
                 }
-                
+
             } catch (Exception e) {
-                logger.error("Error while parsing har file on entry: " + idx + " ERROR: " + e);
+                loggerMaker.errorAndAddToDb("Error while parsing har file on entry: " + idx + " ERROR: " + e.toString(), LogDb.DASHBOARD);
                 errors.add("Error in entry " + idx);
             }
         }
@@ -59,34 +61,8 @@ public class HAR {
 
         String requestContentType = getContentType(requestHarHeaders);
 
-        String requestPayload;
-        if (requestContentType == null) {
-            // get request data from querystring
-            Map<String,Object> paramMap = new HashMap<>();
-            requestPayload = mapper.writeValueAsString(paramMap);
-        } else if (requestContentType.contains(JSON_CONTENT_TYPE) || requestContentType.contains("text/plain")) {
-            String postData = request.getPostData().getText();
-            if (postData == null) {
-                postData = "{}";
-            }
-
-            if (postData.startsWith("[")) {
-                requestPayload = postData;
-            } else {
-                Map<String,Object> paramMap = mapper.readValue(postData, new TypeReference<HashMap<String,Object>>() {});
-                requestPayload = mapper.writeValueAsString(paramMap);
-            }
-        } else if (requestContentType.contains(FORM_URL_ENCODED_CONTENT_TYPE)) {
-            String postText = request.getPostData().getText();
-            if (postText == null) {
-                postText = "";
-            }
-
-            requestPayload = postText;
-        } else {
-            return null;
-        }
-
+        String requestPayload = request.getPostData().getText();
+        if (requestPayload == null) requestPayload = "";
 
         String akto_account_id = 1_000_000 + "";
         String path = getPath(request);

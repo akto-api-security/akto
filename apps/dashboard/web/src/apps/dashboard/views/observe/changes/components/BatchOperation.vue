@@ -22,7 +22,7 @@
         </div>
 
         <div class="d-flex jc-end pa-3">
-            <v-btn primary dark color="#6200EA" @click="btnClicked">
+            <v-btn primary dark color="var(--themeColor)" @click="btnClicked">
                 {{operationName}}
             </v-btn>
         </div>
@@ -86,11 +86,11 @@ export default {
 
 <style lang="sass" scoped>
 .container
-    background: #FFFFFF
+    background: var(--white)
 
 .info-text
     padding-top: 12px
     font-size: 12px
-    color: #47466A
+    color: var(--themeColorDark)
 
 </style>

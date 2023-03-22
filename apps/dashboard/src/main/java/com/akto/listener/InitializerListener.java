@@ -11,6 +11,7 @@ import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dao.pii.PIISourceDao;
 import com.akto.dao.testing.*;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.*;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
@@ -24,6 +25,8 @@ import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
 import com.akto.testing.ApiExecutor;
@@ -66,7 +69,11 @@ import static com.mongodb.client.model.Filters.eq;
 
 public class InitializerListener implements ServletContextListener {
     private static final Logger logger = LoggerFactory.getLogger(InitializerListener.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(InitializerListener.class);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
+    public static boolean connectedToMongo = false;
 
     private static String domain = null;
 
@@ -148,6 +155,9 @@ public class InitializerListener implements ServletContextListener {
                 BasicDBObject fileDetails = (BasicDBObject) fileObj;
                 String filePath = fileDetails.getString("path");
                 if (filePath.endsWith(".yaml") || filePath.endsWith(".yml")) {
+                    if(filePath.contains("business-logic")){
+                        continue;
+                    }
                     String categoryFolder = filePath.split("/")[0];
                     filePath = "https://github.com/akto-api-security/tests-library/blob/master/" + filePath;
                     if (!currConfigsMap.containsKey(filePath)) {
@@ -204,7 +214,13 @@ public class InitializerListener implements ServletContextListener {
 
                     if (!dt.getBoolean("active", true)) {
                         PIISourceDao.instance.updateOne(findQ, Updates.unset("mapNameToPIIType." + piiKey));
-                        CustomDataTypeDao.instance.updateOne("name", piiKey, Updates.set("active", false));
+                        CustomDataType existingCDT = CustomDataTypeDao.instance.findOne("name", piiKey);
+                        if (existingCDT == null) {
+                            CustomDataTypeDao.instance.insertOne(getCustomDataTypeFromPiiType(piiSource, piiType, false));
+                            continue;
+                        } else {
+                            CustomDataTypeDao.instance.updateOne("name", piiKey, Updates.set("active", false));
+                        }
                     }
 
                     if (currTypes.containsKey(piiKey) && currTypes.get(piiKey).equals(piiType)) {
@@ -225,7 +241,7 @@ public class InitializerListener implements ServletContextListener {
                 }
 
             } catch (IOException e) {
-                logger.error("failed to read file", e);
+                loggerMaker.errorAndAddToDb(String.format("failed to read file %s", e.toString()), LogDb.DASHBOARD);
                 continue;
             }
         }
@@ -279,7 +295,7 @@ public class InitializerListener implements ServletContextListener {
                             continue;
                         }
 
-                        logger.info(slackWebhook.toString());
+                        loggerMaker.infoAndAddToDb(slackWebhook.toString(), LogDb.DASHBOARD);
 
                         ChangesInfo ci = getChangesInfo(now - slackWebhook.getLastSentTimestamp(), now - slackWebhook.getLastSentTimestamp());
                         if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0) {
@@ -296,20 +312,20 @@ public class InitializerListener implements ServletContextListener {
                         slackWebhook.setLastSentTimestamp(now);
                         SlackWebhooksDao.instance.updateOne(eq("webhook", slackWebhook.getWebhook()), Updates.set("lastSentTimestamp", now));
 
-                        logger.info("******************DAILY INVENTORY SLACK******************");
+                        loggerMaker.infoAndAddToDb("******************DAILY INVENTORY SLACK******************", LogDb.DASHBOARD);
                         String webhookUrl = slackWebhook.getWebhook();
                         String payload = dailyUpdate.toJSON();
-                        logger.info(payload);
+                        loggerMaker.infoAndAddToDb(payload, LogDb.DASHBOARD);
                         WebhookResponse response = slack.send(webhookUrl, payload);
-                        logger.info("*********************************************************");
+                        loggerMaker.infoAndAddToDb("*********************************************************", LogDb.DASHBOARD);
 
                         // slack testing notification
-                        logger.info("******************TESTING SUMMARY SLACK******************");
+                        loggerMaker.infoAndAddToDb("******************TESTING SUMMARY SLACK******************", LogDb.DASHBOARD);
                         TestSummaryGenerator testSummaryGenerator = new TestSummaryGenerator(1_000_000);
                         payload = testSummaryGenerator.toJson(slackWebhook.getDashboardUrl());
-                        logger.info(payload);
+                        loggerMaker.infoAndAddToDb(payload, LogDb.DASHBOARD);
                         response = slack.send(webhookUrl, payload);
-                        logger.info("*********************************************************");
+                        loggerMaker.infoAndAddToDb("*********************************************************", LogDb.DASHBOARD);
 
                     }
 
@@ -365,7 +381,7 @@ public class InitializerListener implements ServletContextListener {
 
         try {
             response = ApiExecutor.sendRequest(request,true);
-            logger.info("webhook request sent");
+            loggerMaker.infoAndAddToDb("webhook request sent", LogDb.DASHBOARD);
         } catch(Exception e){
             errors.add("API execution failed");
         }
@@ -544,7 +560,7 @@ public class InitializerListener implements ServletContextListener {
 
             return ret;
         } catch (Exception e) {
-            logger.error("get new endpoints", e);
+            loggerMaker.errorAndAddToDb(String.format("get new endpoints %s", e.toString()), LogDb.DASHBOARD);
         }
 
         return null;
@@ -610,6 +626,22 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
+    public void deleteNullSubCategoryIssues(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getDeleteNullSubCategoryIssues() == 0) {
+            TestingRunIssuesDao.instance.deleteAll(
+                    Filters.or(
+                            Filters.exists("_id.testSubCategory", false),
+                            Filters.eq("_id.testSubCategory", null)
+                    )
+            );
+        }
+
+        BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.DELETE_NULL_SUB_CATEGORY_ISSUES, Context.now())
+        );
+    }
+
     public void readyForNewTestingFramework(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getReadyForNewTestingFramework() == 0) {
             TestingRunDao.instance.getMCollection().drop();
@@ -658,13 +690,42 @@ public class InitializerListener implements ServletContextListener {
         logger.info("MONGO URI " + mongoURI);
 
 
-        DaoInit.init(new ConnectionString(mongoURI));
+        executorService.schedule( new Runnable() {
+            public void run() {
+                boolean calledOnce = false;
+                do {
+                    try {
+                        if (!calledOnce) {
+                            DaoInit.init(new ConnectionString(mongoURI));
+                            Context.accountId.set(1_000_000);
+                            calledOnce = true;
+                        }
+                        AccountSettingsDao.instance.getStats();
+                        connectedToMongo = true;
+                        runInitializerFunctions();
+                    } catch (Exception e) {
+//                        e.printStackTrace();
+                    } finally {
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                } while (!connectedToMongo);
+            }
+        }, 0 , TimeUnit.SECONDS);
 
-        Context.accountId.set(1_000_000);
+    }
+
+    public void runInitializerFunctions() {
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
         TestRolesDao.instance.createIndicesIfAbsent();
 
         ApiInfoDao.instance.createIndicesIfAbsent();
+        RuntimeLogsDao.instance.createIndicesIfAbsent();
+        LogsDao.instance.createIndicesIfAbsent();
+        DashboardLogsDao.instance.createIndicesIfAbsent();
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
         if (backwardCompatibility == null) {
             backwardCompatibility = new BackwardCompatibility();
@@ -681,6 +742,7 @@ public class InitializerListener implements ServletContextListener {
             updateDeploymentStatus(backwardCompatibility);
             dropAuthMechanismData(backwardCompatibility);
             deleteAccessListFromApiToken(backwardCompatibility);
+            deleteNullSubCategoryIssues(backwardCompatibility);
 
             SingleTypeInfo.init();
 
@@ -694,6 +756,14 @@ public class InitializerListener implements ServletContextListener {
                 PIISourceDao.instance.insertOne(piiSource);
             }
 
+            if (PIISourceDao.instance.findOne("_id", "Fin") == null) {
+                String fileUrl = "https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/fintech.json";
+                PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
+                piiSource.setId("Fin");
+                PIISourceDao.instance.insertOne(piiSource);
+            }
+
+
             setUpDailyScheduler();
             setUpWebhookScheduler();
             setUpPiiAndTestSourcesScheduler();
@@ -701,13 +771,13 @@ public class InitializerListener implements ServletContextListener {
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             dropSampleDataIfEarlierNotDroped(accountSettings);
         } catch (Exception e) {
-            logger.error("error while setting up dashboard: " + e.getMessage());
+            loggerMaker.errorAndAddToDb("error while setting up dashboard: " + e.toString(), LogDb.DASHBOARD);
         }
 
         try {
             AccountSettingsDao.instance.updateVersion(AccountSettings.DASHBOARD_VERSION);
         } catch (Exception e) {
-            logger.error("error while updating dashboard version: " + e.getMessage());
+            loggerMaker.errorAndAddToDb("error while updating dashboard version: " + e.toString(), LogDb.DASHBOARD);
         }
 
         try {
@@ -748,7 +818,7 @@ public class InitializerListener implements ServletContextListener {
             return;
         }
         if (backwardCompatibility.isDeploymentStatusUpdated()) {
-            logger.info("Deployment status has already been updated, skipping this");
+            loggerMaker.infoAndAddToDb("Deployment status has already been updated, skipping this", LogDb.DASHBOARD);
             return;
         }
         String body = "{\n    \"ownerEmail\": \"" + ownerEmail + "\",\n    \"stackStatus\": \"COMPLETED\",\n    \"cloudType\": \"AWS\"\n}";
@@ -756,9 +826,9 @@ public class InitializerListener implements ServletContextListener {
         OriginalHttpRequest request = new OriginalHttpRequest(getUpdateDeploymentStatusUrl(), "", "POST", body, OriginalHttpRequest.buildHeadersMap(headers), "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, false);
-            logger.info("Update deployment status reponse: {}", response.getBody());
+            loggerMaker.infoAndAddToDb(String.format("Update deployment status reponse: %s", response.getBody()), LogDb.DASHBOARD);
         } catch (Exception e) {
-            logger.error("Failed to update deployment status, will try again on next boot up", e);
+            loggerMaker.errorAndAddToDb(String.format("Failed to update deployment status, will try again on next boot up : %s", e.toString()), LogDb.DASHBOARD);
             return;
         }
         BackwardCompatibilityDao.instance.updateOne(

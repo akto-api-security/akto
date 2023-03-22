@@ -6,12 +6,12 @@
                 detail="Akto is all about automation, which is made possible by connecting to your traffic sources. Real user traffic helps Akto create accurate inventory and run business logic tests on APIs"
             >
                 <template #icon>
-                    <v-icon size="50" class="invert-sideways" color="#6200EA">$fas_share-alt</v-icon>
+                    <v-icon size="50" class="invert-sideways" color="var(--themeColor)">$fas_share-alt</v-icon>
                 </template>
                 <template #subtitle>
                     <span>
                         <span>(Your data remains within your VPC strictly.</span>
-                        <span class="clickable-docs"><a target="_blank" href="https://docs.akto.io/what-is-akto/faqs#i-dont-want-the-data-to-leave-my-vpn.-does-akto-support-on-premise-deployment">See how Akto handles data)</a></span>
+                        <span class="clickable-docs"><a target="_blank" href="https://docs.akto.io/getting-started/faqs-on-data-concerns">See how Akto handles data)</a></span>
                     </span>
                 </template>
                 <template #content>
@@ -26,7 +26,7 @@
                 detail="Invite team members to analyze and test their APIs for vulnerabilties."
             >
                 <template #icon>
-                    <v-icon size="50" class="invert-sideways" color="#6200EA">$fas_user-plus</v-icon>
+                    <v-icon size="50" class="invert-sideways" color="var(--themeColor)">$fas_user-plus</v-icon>
                 </template>
                 
                 <template #content><team-overview></team-overview></template>
@@ -64,6 +64,6 @@ export default {
 
 .clickable-docs
     cursor: pointer
-    color: #6200EA !important
+    color: var(--themeColor) !important
     text-decoration: underline 
 </style>

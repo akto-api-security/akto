@@ -2,42 +2,49 @@ package com.akto.testing;
 
 import com.akto.DaoInit;
 import com.akto.dao.AuthMechanismsDao;
+import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.TestingRunDao;
-import com.akto.dao.testing.TestingRunResultDao;
-import com.akto.dao.testing.TestingRunResultSummariesDao;
-import com.akto.dao.testing.WorkflowTestsDao;
+import com.akto.dao.testing.*;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.CustomAuthType;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.RawApi;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
-import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.*;
+import com.akto.rules.SSRFOnAwsMetadataEndpoint;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.testing_issues.TestingIssuesHandler;
+import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
-import com.akto.util.enums.LoginFlowEnums;
 import com.akto.util.enums.GlobalEnums.TestSubCategory;
+import com.akto.util.enums.LoginFlowEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 
 public class TestExecutor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class);
-    private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
+    public static long acceptableSizeInBytes = 5_000_000;
 
 
 
@@ -54,14 +61,21 @@ public class TestExecutor {
         Context.accountId.set(1_000_000);
 
         TestExecutor testExecutor = new TestExecutor();
-        TestingRun testingRun = TestingRunDao.instance.findOne(new BasicDBObject());
+        TestingRun testingRun = TestingRunDao.instance.findLatestOne(new BasicDBObject());
+        if (testingRun.getTestIdConfig() > 1) {
+            TestingRunConfig testingRunConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
+            if (testingRunConfig != null) {
+                loggerMaker.infoAndAddToDb("Found testing run config with id :" + testingRunConfig.getId(), LogDb.TESTING);
+                testingRun.setTestingRunConfig(testingRunConfig);
+            }
+        }
         testExecutor.init(testingRun, new ObjectId());
     }
 
     public void workflowInit (TestingRun testingRun, ObjectId summaryId) {
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
         if (!testingEndpoints.getType().equals(TestingEndpoints.Type.WORKFLOW)) {
-            loggerMaker.errorAndAddToDb("Invalid workflow type");
+            loggerMaker.errorAndAddToDb("Invalid workflow type", LogDb.TESTING);
             return;
         }
 
@@ -73,7 +87,7 @@ public class TestExecutor {
         );
 
         if (workflowTest == null) {
-            loggerMaker.errorAndAddToDb("Workflow test has been deleted");
+            loggerMaker.errorAndAddToDb("Workflow test has been deleted", LogDb.TESTING);
             return ;
         }
 
@@ -81,7 +95,7 @@ public class TestExecutor {
         try {
             apiWorkflowExecutor.init(workflowTest, testingRun.getId(), summaryId);
         } catch (Exception e) {
-            ;
+            loggerMaker.errorAndAddToDb("Error while executing workflow test " + e, LogDb.TESTING);
         }
 
         Map<String, Integer> totalCountIssues = new HashMap<>();
@@ -110,23 +124,51 @@ public class TestExecutor {
         List<TestRoles> testRoles = SampleMessageStore.fetchTestRoles();
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
 
+        List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
+
+        List<AuthParam> authParams = authMechanism.getAuthParams();
+
+        Set<String> authParamKeys = new HashSet<>();
+
+        for (AuthParam authParam : authParams) {
+            authParamKeys.add(authParam.getKey());
+        }
+
+        for (CustomAuthType customAuthType : customAuthTypes) {
+            List<String> customAuthTypeHeaderKeys = customAuthType.getHeaderKeys();
+            for (String headerAuthKey: customAuthTypeHeaderKeys) {
+                if (authParamKeys.contains(headerAuthKey)) {
+                    continue;
+                }
+                authParams.add(new HardcodedAuthParam(AuthParam.Location.HEADER, headerAuthKey, null, true));
+            }
+            List<String> customAuthTypePayloadKeys = customAuthType.getPayloadKeys();
+            for (String payloadAuthKey: customAuthTypePayloadKeys) {
+                if (authParamKeys.contains(payloadAuthKey)) {
+                    continue;
+                }
+                authParams.add(new HardcodedAuthParam(AuthParam.Location.BODY, payloadAuthKey, null, true));
+            }
+        }
+
+        authMechanism.setAuthParams(authParams);
+
         TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessages, singleTypeInfoMap, testRoles);
 
         try {
             LoginFlowResponse loginFlowResponse = triggerLoginFlow(authMechanism, 3);
             if (!loginFlowResponse.getSuccess()) {
-                logger.error("login flow failed");
+                loggerMaker.errorAndAddToDb("login flow failed", LogDb.TESTING);
                 throw new Exception("login flow failed");
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e.getMessage());
+            loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.TESTING);
             return;
         }
 
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
-
-        loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size());
+        loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
 
         TestingRunResultSummariesDao.instance.updateOne(
             Filters.eq("_id", summaryId),
@@ -135,7 +177,17 @@ public class TestExecutor {
         CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
         ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentRequests);
         List<Future<List<TestingRunResult>>> futureTestingRunResults = new ArrayList<>();
+        Map<String, Integer> hostsToApiCollectionMap = new HashMap<>();
+
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
+            try {
+                String host = findHost(apiInfoKey, testingUtil);
+                if (host != null && hostsToApiCollectionMap.get(host) == null) {
+                    hostsToApiCollectionMap.put(host, apiInfoKey.getApiCollectionId());
+                }
+            } catch (URISyntaxException e) {
+                loggerMaker.errorAndAddToDb("Error while finding host: " + e, LogDb.TESTING);
+            }
             try {
                  Future<List<TestingRunResult>> future = threadPool.submit(
                          () -> startWithLatch(apiInfoKey,
@@ -144,11 +196,12 @@ public class TestExecutor {
                                  accountId, latch, now, testingRun.getTestRunTime()));
                  futureTestingRunResults.add(future);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error in API " + apiInfoKey + " : " + e.getMessage());
+                loggerMaker.errorAndAddToDb("Error in API " + apiInfoKey + " : " + e.getMessage(), LogDb.TESTING);
             }
         }
 
-        loggerMaker.infoAndAddToDb("Waiting...");
+        loggerMaker.infoAndAddToDb("hostsToApiCollectionMap : " + hostsToApiCollectionMap.keySet(), LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("Waiting...", LogDb.TESTING);
 
         try {
             latch.await();
@@ -156,7 +209,7 @@ public class TestExecutor {
             throw new RuntimeException(e);
         }
 
-        loggerMaker.infoAndAddToDb("Finished testing");
+        loggerMaker.infoAndAddToDb("Finished testing", LogDb.TESTING);
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
         for (Future<List<TestingRunResult>> future: futureTestingRunResults) {
@@ -166,22 +219,26 @@ public class TestExecutor {
                     testingRunResults.addAll(future.get());
                 }
             } catch (InterruptedException | ExecutionException e) {
-                ;
+                loggerMaker.errorAndAddToDb("Error while after running test : " + e, LogDb.TESTING);
             }
         }
 
-        loggerMaker.infoAndAddToDb("Finished adding " + testingRunResults.size() + " testingRunResults");
+        for (String host: hostsToApiCollectionMap.keySet()) {
+            Integer apiCollectionId = hostsToApiCollectionMap.get(host);
+            List<TestingRunResult> nucleiResults = runNucleiTests(new ApiInfo.ApiInfoKey(apiCollectionId, host, URLMethods.Method.GET), testingRun, testingUtil, summaryId);
+            if (nucleiResults != null && !nucleiResults.isEmpty()) {
+                testingRunResults.addAll(nucleiResults);
+            }
+        }
+
+        loggerMaker.infoAndAddToDb("Finished adding " + testingRunResults.size() + " testingRunResults", LogDb.TESTING);
 
         TestingRunResultSummariesDao.instance.updateOne(
             Filters.eq("_id", summaryId),
             Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, testingRunResults.size())
         );
 
-        //Creating issues from testingRunResults
-        TestingIssuesHandler handler = new TestingIssuesHandler();
-        handler.handleIssuesCreationFromTestingRunResults(testingRunResults);
-
-        loggerMaker.infoAndAddToDb("Finished adding issues");
+        loggerMaker.infoAndAddToDb("Finished adding issues", LogDb.TESTING);
 
         Map<String, Integer> totalCountIssues = new HashMap<>();
         totalCountIssues.put("HIGH", 0);
@@ -204,8 +261,28 @@ public class TestExecutor {
             )
         );
 
-        loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao");
+        loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao", LogDb.TESTING);
 
+    }
+
+    public static String findHost(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) throws URISyntaxException {
+        Map<ApiInfo.ApiInfoKey, List<String>> sampleMessagesMap =  testingUtil.getSampleMessages();
+        List<String> sampleMessages = sampleMessagesMap.get(apiInfoKey);
+        if (sampleMessages == null || sampleMessagesMap.isEmpty()) return null;
+
+        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
+        if (messages.isEmpty()) return null;
+
+        OriginalHttpRequest originalHttpRequest = messages.get(0).getRequest();
+
+        String baseUrl = originalHttpRequest.getUrl();
+        if (baseUrl.startsWith("http")) {
+            URI uri = new URI(baseUrl);
+            String host = uri.getScheme() + "://" + uri.getHost();
+            return (uri.getPort() != -1)  ? host + ":" + uri.getPort() : host;
+        } else {
+            return "https://" + originalHttpRequest.findHostFromHeader();
+        }
     }
 
     private LoginFlowResponse triggerLoginFlow(AuthMechanism authMechanism, int retries) {
@@ -214,30 +291,60 @@ public class TestExecutor {
             try {
                 loginFlowResponse = executeLoginFlow(authMechanism, null);
                 if (loginFlowResponse.getSuccess()) {
-                    logger.info("login flow success");
+                    loggerMaker.infoAndAddToDb("login flow success", LogDb.TESTING);
                     break;
                 }
             } catch (Exception e) {
-                logger.error("retrying login flow" + e.getMessage());
-                loggerMaker.errorAndAddToDb(e.getMessage());
+                loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.TESTING);
             }
         }
         return loginFlowResponse;
     }
 
+
+    public List<TestingRunResult> runNucleiTests(ApiInfo.ApiInfoKey apiInfoKey, TestingRun testingRun, TestingUtil testingUtil, ObjectId summaryId) {
+        List<TestingRunResult> testingRunResults = new ArrayList<>();
+        List<String> testSubCategories = testingRun.getTestingRunConfig().getTestSubCategoryList();
+        if (testSubCategories != null) {
+            for (String testSubCategory: testSubCategories) {
+                if (testSubCategory.startsWith("http://") || testSubCategory.startsWith("https://")) {
+                    try {
+                        String origTemplateURL = testSubCategory;
+                        origTemplateURL = origTemplateURL.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/");
+                        String subcategory = origTemplateURL.substring(origTemplateURL.lastIndexOf("/")+1).split("\\.")[0];
+
+                        FuzzingTest fuzzingTest = new FuzzingTest(testingRun.getId().toHexString(), summaryId.toHexString(), origTemplateURL, subcategory, testSubCategory, null);
+                        TestingRunResult fuzzResult = runTest(fuzzingTest, apiInfoKey, testingUtil, testingRun.getId(), summaryId);
+                        if (fuzzResult != null) {
+                            trim(fuzzResult);
+                            TestingRunResultDao.instance.insertOne(fuzzResult);
+                            TestingIssuesHandler handler = new TestingIssuesHandler();
+                            handler.handleIssuesCreationFromTestingRunResults(Collections.singletonList(fuzzResult));
+                            testingRunResults.add(fuzzResult);
+                        }
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("unable to execute fuzzing for " + testSubCategory, LogDb.TESTING);
+                    }
+                }
+            }
+        }
+
+        return testingRunResults;
+    }
+
     public LoginFlowResponse executeLoginFlow(AuthMechanism authMechanism, LoginFlowParams loginFlowParams) throws Exception {
 
         if (authMechanism.getType() == null) {
-            logger.info("auth type value is null");
+            loggerMaker.infoAndAddToDb("auth type value is null", LogDb.TESTING);
             return new LoginFlowResponse(null, null, true);
         }
 
         if (!authMechanism.getType().equals(LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString())) {
-            logger.info("invalid auth type for login flow execution");
+            loggerMaker.infoAndAddToDb("invalid auth type for login flow execution", LogDb.TESTING);
             return new LoginFlowResponse(null, null, true);
         }
 
-        logger.info("login flow execution started");
+        loggerMaker.infoAndAddToDb("login flow execution started", LogDb.TESTING);
 
         WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData(), loginFlowParams);
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
@@ -349,15 +456,26 @@ public class TestExecutor {
             ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId, TestingRunConfig testingRunConfig,
             TestingUtil testingUtil, ObjectId testRunResultSummaryId, int accountId, CountDownLatch latch, int startTime, int timeToKill) {
 
+        loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);
+
         Context.accountId.set(accountId);
         List<TestingRunResult> testingRunResults = new ArrayList<>();
         int now = Context.now();
         if ( timeToKill <= 0 || now - startTime <= timeToKill) {
             try {
                 testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId);
-                TestingRunResultDao.instance.insertMany(testingRunResults);
+                String size = testingRunResults == null ? "null" : testingRunResults.size()+"";
+                loggerMaker.infoAndAddToDb("testingRunResults size: " + size, LogDb.TESTING);
+                if (testingRunResults != null && !testingRunResults.isEmpty()) {
+                    trim(testingRunResults);
+                    TestingRunResultDao.instance.insertMany(testingRunResults);
+                    loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);
+                    //Creating issues from testingRunResults
+                   TestingIssuesHandler handler = new TestingIssuesHandler();
+                   handler.handleIssuesCreationFromTestingRunResults(testingRunResults);
+                }
             } catch (Exception e) {
-                e.printStackTrace();
+                loggerMaker.errorAndAddToDb("error while running tests: " + e, LogDb.TESTING);
             }
         }
 
@@ -365,11 +483,43 @@ public class TestExecutor {
         return testingRunResults;
     }
 
+    public static void trim(TestingRunResult testingRunResult) {
+        List<TestResult> testResults = testingRunResult.getTestResults();
+        int endIdx = testResults.size();
+        long currentSize = 0;
+
+        for (int idx=0;idx< testResults.size();idx++) {
+            TestResult testResult = testResults.get(idx);
+
+            String originalMessage = testResult.getOriginalMessage();
+            long originalMessageSize = originalMessage == null ? 0 : originalMessage.getBytes().length;
+
+            String message = testResult.getMessage();
+            long messageSize = message == null ? 0 : message.getBytes().length;
+
+            currentSize += originalMessageSize + messageSize;
+
+            if (currentSize > acceptableSizeInBytes) {
+                endIdx = idx;
+                break;
+            }
+        }
+
+        testResults = testResults.subList(0,endIdx);
+        testingRunResult.setTestResults(testResults);
+    }
+
+    public void trim(List<TestingRunResult> testingRunResults) {
+        for (TestingRunResult testingRunResult: testingRunResults) {
+            trim(testingRunResult);
+        }
+    }
+
     public List<TestingRunResult> start(ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId,
                                         TestingRunConfig testingRunConfig, TestingUtil testingUtil, ObjectId testRunResultSummaryId) {
 
         if (testIdConfig == 1) {
-            loggerMaker.errorAndAddToDb("Test id config is 1");
+            loggerMaker.errorAndAddToDb("Test id config is 1", LogDb.TESTING);
             return new ArrayList<>();
         }
 
@@ -387,14 +537,23 @@ public class TestExecutor {
         JWTInvalidSignatureTest jwtInvalidSignatureTest = new JWTInvalidSignatureTest();//JWT_INVALID_SIGNATURE
         AddJkuToJwtTest addJkuToJwtTest = new AddJkuToJwtTest();//ADD_JKU_TO_JWT
         BFLATest bflaTest = new BFLATest();//BFLA
+        PageSizeDosTest pageSizeDosTest = new PageSizeDosTest(testRunId.toHexString(), testRunResultSummaryId.toHexString());//PAGE_SIZE_DOS
+        OpenRedirectTest openRedirectTest = new OpenRedirectTest(testRunId.toHexString(), testRunResultSummaryId.toHexString());
+        SSRFOnAwsMetadataEndpoint ssrfOnAwsMetadataEndpoint = new SSRFOnAwsMetadataEndpoint(testRunId.toHexString(), testRunResultSummaryId.toHexString());
+        CreateAdminUserViaMassAssignment createAdminUserViaMassAssignment = new CreateAdminUserViaMassAssignment(testRunId.toHexString(), testRunResultSummaryId.toHexString());
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
 
         TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-        if (noAuthTestResult != null) testingRunResults.add(noAuthTestResult);
+        if (noAuthTestResult != null) {
+            testingRunResults.add(noAuthTestResult);
+        } else {
+            loggerMaker.infoAndAddToDb("No auth result is null for " + apiInfoKey, LogDb.TESTING);
+        }
         if (noAuthTestResult != null && !noAuthTestResult.isVulnerable()) {
 
             TestPlugin.TestRoleMatcher testRoleMatcher = new TestPlugin.TestRoleMatcher(testingUtil.getTestRoles(), apiInfoKey);
+            loggerMaker.infoAndAddToDb("Starting auth required tests for " + apiInfoKey, LogDb.TESTING);
             if ((testSubCategories == null || testSubCategories.contains(TestSubCategory.BFLA.name())) && testRoleMatcher.shouldDoBFLA())  {
                 TestingRunResult bflaTestResult = runTest(bflaTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
                 if (bflaTestResult != null) testingRunResults.add(bflaTestResult);
@@ -434,6 +593,11 @@ public class TestExecutor {
             }
         }
 
+       if(testSubCategories == null || testSubCategories.contains(TestSubCategory.PAGINATION_MISCONFIGURATION.name())) {
+            TestingRunResult paginationMisconfigurationTestResult = runTest(pageSizeDosTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            if (paginationMisconfigurationTestResult != null) testingRunResults.add(paginationMisconfigurationTestResult);
+        }
+
         if (testSubCategories == null || testSubCategories.contains(TestSubCategory.ADD_METHOD_IN_PARAMETER.name())) {
             TestingRunResult addMethodInParameterTestResult = runTest(addMethodInParameterTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
             if (addMethodInParameterTestResult != null) testingRunResults.add(addMethodInParameterTestResult);
@@ -449,24 +613,20 @@ public class TestExecutor {
             if (changeHttpMethodTestResult != null) testingRunResults.add(changeHttpMethodTestResult);
         }
 
-        if (testSubCategories != null) {
-            for (String testSubCategory: testSubCategories) {
-                if (testSubCategory.startsWith("http://") || testSubCategory.startsWith("https://")) {
-                    try {
-                        String origTemplateURL = testSubCategory;
+        if (testSubCategories == null || testSubCategories.contains(TestSubCategory.OPEN_REDIRECT.name())) {
+            TestingRunResult openRedirectResult = runTest(openRedirectTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            if (openRedirectResult != null) testingRunResults.add(openRedirectResult);
+        }
 
-                        origTemplateURL = origTemplateURL.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/");
+        if (testSubCategories == null || testSubCategories.contains(TestSubCategory.SSRF_AWS_METADATA_EXPOSED.name())) {
+            TestingRunResult ssrfAwsMetadataExposedResult = runTest(ssrfOnAwsMetadataEndpoint, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            if (ssrfAwsMetadataExposedResult != null)
+                testingRunResults.add(ssrfAwsMetadataExposedResult);
+        }
 
-                        String subcategory = origTemplateURL.substring(origTemplateURL.lastIndexOf("/")+1).split("\\.")[0];
-                        FuzzingTest fuzzingTest = new FuzzingTest(testRunId.toHexString(), testRunResultSummaryId.toHexString(), origTemplateURL, subcategory, testSubCategory);
-                        TestingRunResult fuzzResult = runTest(fuzzingTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-                        if (fuzzResult != null) testingRunResults.add(fuzzResult);        
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb("unable to execute fuzzing for " + testSubCategory);
-                        ;
-                    }
-                }
-            }
+        if(testSubCategories == null || testSubCategories.contains(TestSubCategory.MASS_ASSIGNMENT_CREATE_ADMIN_ROLE.name())) {
+            TestingRunResult createAdminUserViaMassAssignmentResult = runTest(createAdminUserViaMassAssignment, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            if (createAdminUserViaMassAssignmentResult != null) testingRunResults.add(createAdminUserViaMassAssignmentResult);
         }
 
         return testingRunResults;

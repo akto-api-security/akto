@@ -1,38 +1,33 @@
 package com.akto.parsers;
 
-import java.net.URLDecoder;
-import java.util.*;
-
-import com.akto.DaoInit;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
+import com.akto.graphql.GraphQLUtils;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
-
+import com.akto.util.JSONUtils;
+import com.akto.util.HttpRequestResponseUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
-
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import java.util.*;
 
 public class HttpCallParser {
     
-    private static final String AKTO_REQUEST = "##AKTO_REQUEST##";
-    private static final String AKTO_RESPONSE = "##AKTO_RESPONSE##";
-    private final static ObjectMapper mapper = new ObjectMapper();
     private final int sync_threshold_count;
     private final int sync_threshold_time;
     private int sync_count = 0;
     private int last_synced;
-    private static final Logger logger = LoggerFactory.getLogger(HttpCallParser.class);
-
+    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class);
     public APICatalogSync apiCatalogSync;
     private Map<String, Integer> hostNameToIdMap = new HashMap<>();
 
@@ -55,7 +50,9 @@ public class HttpCallParser {
         Map<String,List<String>> requestHeaders = OriginalHttpRequest.buildHeadersMap(json, "requestHeaders");
 
         String rawRequestPayload = (String) json.get("requestPayload");
-        String requestPayload = OriginalHttpRequest.rawToJsonString(rawRequestPayload,requestHeaders);
+        String requestPayload = HttpRequestResponseUtils.rawToJsonString(rawRequestPayload,requestHeaders);
+
+
 
         String apiCollectionIdStr = json.getOrDefault("akto_vxlan_id", "0").toString();
         int apiCollectionId = 0;
@@ -71,6 +68,8 @@ public class HttpCallParser {
         String status = (String) json.get("status");
         Map<String,List<String>> responseHeaders = OriginalHttpRequest.buildHeadersMap(json, "responseHeaders");
         String payload = (String) json.get("responsePayload");
+        payload = HttpRequestResponseUtils.rawToJsonString(payload, responseHeaders);
+        payload = JSONUtils.parseIfJsonP(payload);
         int time = Integer.parseInt(json.get("time").toString());
         String accountId = (String) json.get("akto_account_id");
         String sourceIP = (String) json.get("ip");
@@ -83,7 +82,6 @@ public class HttpCallParser {
         return new HttpResponseParams(
                 type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP
         );
-
     }
 
     private static final Gson gson = new Gson();
@@ -139,7 +137,7 @@ public class HttpCallParser {
                 flag = true;
                 break;
             } catch (Exception e) {
-                logger.error("Error while inserting apiCollection, trying again " + i + " " + e.getMessage());
+                loggerMaker.errorAndAddToDb("Error while inserting apiCollection, trying again " + i + " " + e.getMessage(), LogDb.RUNTIME);
             }
         }
         if (flag) { // flag tells if we were successfully able to insert collection
@@ -198,6 +196,7 @@ public class HttpCallParser {
 
             String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
 
+
             int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
             int apiCollectionId ;
 
@@ -218,7 +217,7 @@ public class HttpCallParser {
 
                         hostNameToIdMap.put(key, apiCollectionId);
                     } catch (Exception e) {
-                        logger.error("Failed to create collection for host : " + hostName);
+                        loggerMaker.errorAndAddToDb("Failed to create collection for host : " + hostName, LogDb.RUNTIME);
                         createCollectionSimple(vxlanId);
                         hostNameToIdMap.put("null " + vxlanId, vxlanId);
                         apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
@@ -236,7 +235,13 @@ public class HttpCallParser {
             }
 
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
-            filteredResponseParams.add(httpResponseParam);
+
+            List<HttpResponseParams> responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
+            if (responseParamsList.isEmpty()) {
+                filteredResponseParams.add(httpResponseParam);
+            } else {
+                filteredResponseParams.addAll(responseParamsList);
+            }
         }
 
         return filteredResponseParams;
@@ -274,7 +279,7 @@ public class HttpCallParser {
             }
         }
         
-        logger.info("added " + count + " urls");
+        loggerMaker.infoAndAddToDb("added " + count + " urls", LogDb.RUNTIME);
         return ret;
     }
 

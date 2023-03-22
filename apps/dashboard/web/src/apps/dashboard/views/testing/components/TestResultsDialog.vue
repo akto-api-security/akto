@@ -3,13 +3,13 @@
         <div>
             <div>
                 <layout-with-tabs :tabsContent="getTabsContent()" title=""
-                    :tabs="['Description', 'Original', 'Attempt']" ref="layoutWithTabs">
+                    :tabs="['Description', 'Original', 'Attempt']" ref="layoutWithTabs" class="details-container">
                     <template slot="Description">
                         <div class="description-title mt-4" :style="{ 'height': '500px' }"
                             v-if="issuesDetails === undefined || issuesDetails === null || Object.keys(issuesDetails).length === 0">
                             No vulnerabilities exists
                         </div>
-                        <div v-else class="d-flex flex-column">
+                        <div v-else class="d-flex flex-column description-details">
                             <div class="d-flex flex-column">
                                 <span class="description-title mt-4">Issue summary</span>
                                 <div class="mt-3 issue-summary-border">
@@ -38,8 +38,8 @@
                                                 <span class="description-content">Tags</span>
                                             </v-col>
                                             <v-col class="my-0 mr-0 ml-7 pa-0">
-                                                <v-chip :style="{ 'height': '24px !important' }" color="#47466AB2"
-                                                    class="issue-summary mr-2" text-color="#FFFFFF" :key="index"
+                                                <v-chip :style="{ 'height': '24px !important' }" color="var(--themeColorDark6)"
+                                                    class="issue-summary mr-2" text-color="var(--white)" :key="index"
                                                     v-for="(chipItem, index) in subCatogoryMap[issuesDetails.id.testSubCategory].issueTags">
                                                     {{ chipItem.name }}
                                                 </v-chip>
@@ -64,7 +64,7 @@
                             </div>
                             <div v-if="similarlyAffectedIssues || similarlyAffectedIssues.length === 0" class="mt-4">
                                 <span class="description-title">Api endpoints affected</span>
-                                <table :style="{ 'width': '100%' }" class="mt-3 mb-3">
+                                <table class="mt-3 mb-3">
                                     <tr class="table-row" v-for="(item, index) in similarlyAffectedIssues" :key="index">
                                         <td class="table-column clickable">
                                             <span class="description-content mr-1 ml-3">{{
@@ -97,12 +97,24 @@
                     </template>
                     <template slot="Attempt" v-if="jsonAdvance && jsonAdvance['message']">
                         <div >
+                            <div v-if="getNucleiFileName(testingRunResult.testSubType)" style="margin-left: 24px" class="description-title mt-4" >
+                                <span> Nuclei template:</span> 
+                                <a target="_blank" :href="testingRunResult.testSubType"> <span style="color: var(--rgbaColor7)" >{{getNucleiFileName(testingRunResult.testSubType)}}</span> </a>
+                            </div>
                             <div v-if="jsonBasic['errors']" class="test-errors-class">
                                 {{ this.jsonBasic["errors"] }}
                             </div>
-                            <div style="margin: 24px">
+                            <div style="margin-left: 24px">
                                 <div class="d-flex jc-sb mr-3">
-                                    <span>Test response matches {{ percentageMatch }}% with original API response</span>
+                                    <span class="description-title mt-4">
+                                        Test response matches {{ percentageMatch }}% with original API response
+
+                                        <v-chip v-if="isVulnerableAttempt" :style="{ 'height': '18px !important' }" class="ml-2 mr-2" color="var(--rgbaColor15)" text-color="var(--white)">
+                                            Vulnerable Attempt
+                                        </v-chip>
+                                    </span>
+                                    <span>
+                                    </span>
                                     <v-btn v-if="messagesBasic.length > 1" icon @click="nextClicked">
                                         <v-icon>$fas_angle-double-right</v-icon>
                                     </v-btn>
@@ -149,6 +161,9 @@ export default {
         }
     },
     methods: {
+        getNucleiFileName(path) {
+            return path.startsWith("http") ? path.substring(path.lastIndexOf('/')+1) : null
+        },
         getTabsContent() {
             if (this.messagesBasic.length > 1) {
                 return { 'Attempt': this.messagesBasic.length }
@@ -225,7 +240,7 @@ export default {
             let testSubType = this.testingRunResult["testSubType"]
             let singleTypeInfos = this.testingRunResult["singleTypeInfos"]
             let highlightPaths = this.buildHighlightPaths(singleTypeInfos);
-            return this.testingRunResult["testResults"].map(x => { return { message: x.originalMessage, title: testSubType, highlightPaths: highlightPaths, errors: x.errors, percentageMatch: x.percentageMatch } })
+            return this.testingRunResult["testResults"].map(x => { return { message: x.originalMessage, title: testSubType, highlightPaths: highlightPaths, errors: x.errors, percentageMatch: x.percentageMatch, vulnerable: x.vulnerable } })
         },
         jsonBasic: function () {
             if (this.testingRunResult == null) return null
@@ -247,6 +262,11 @@ export default {
                 return null
             }
         },
+        isVulnerableAttempt: function () {
+            if (this.testingRunResult == null) return null
+            let currentMessage = this.messagesAdvance[this.currentIndex]
+            return currentMessage ? currentMessage["vulnerable"] : null
+        },
         jsonAdvance: function () {
             if (this.testingRunResult == null) return null
             let currentMessage = this.messagesAdvance[this.currentIndex]
@@ -267,39 +287,42 @@ export default {
 
 .table-column
   padding: 4px 8px !important
-  color: #47466A
+  color: var(--themeColorDark)
 
 .table-row
   position: relative
-  background: rgba(71, 70, 106, 0.03)
+  background: var(--themeColorDark18)
   line-height: 32px
 
   &:hover
-      background-color: #edecf0 !important
+      background-color: var(--colTableBackground) !important
+
+.details-container
+    overflow: scroll
 </style>
 
 <style scoped>
 .description-title {
     font-size: 14px !important;
     font-weight: 500;
-    color: #47466A;
+    color: var(--themeColorDark);
 }
 
 .description-content {
     font-size: 12px !important;
     font-weight: 400;
-    color: #47466A;
+    color: var(--themeColorDark);
 }
 
 .issue-summary {
     font-size: 12px !important;
     font-weight: 500;
-    color: #47466A;
+    color: var(--themeColorDark);
 }
 
 .issue-summary-border {
     border-width: 1px 0px;
-    border-color: #DADAE1;
+    border-color: var(--lighten2);
     border-style: solid;
 }
 </style>

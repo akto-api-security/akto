@@ -29,7 +29,7 @@ public class TestSampleDataDao extends MongoBasedTest {
             String url = "/api/" + u;
             for (URLMethods.Method method: Arrays.asList(URLMethods.Method.POST, URLMethods.Method.GET)) {
                 Key key = new Key(123, url, method, 200, 0,0);
-                SampleData sampleData = new SampleData(key, Collections.singletonList(""));
+                SampleData sampleData = new SampleData(key, Arrays.asList("1", "2", "3", "4"));
                 sampleDataList.add(sampleData);
             }
         }
@@ -37,9 +37,14 @@ public class TestSampleDataDao extends MongoBasedTest {
         SampleDataDao.instance.insertMany(sampleDataList);
 
 
+        int sliceLimit = 1;
         sampleDataList = SampleDataDao.instance.fetchSampleDataPaginated(
-                123, null, null, limit
+                123, null, null, limit, sliceLimit
         );
+
+        for (SampleData sampleData: sampleDataList) {
+            assertEquals(sliceLimit,sampleData.getSamples().size());
+        }
 
         int lastIdx = sampleDataList.size()-1;
 
@@ -52,9 +57,14 @@ public class TestSampleDataDao extends MongoBasedTest {
         assertEquals("POST", lastSampleData.getId().getMethod().name());
 
         // continue
+        sliceLimit = 2;
         sampleDataList = SampleDataDao.instance.fetchSampleDataPaginated(
-                123, lastSampleData.getId().getUrl(), lastSampleData.getId().getMethod().name(), limit
+                123, lastSampleData.getId().getUrl(), lastSampleData.getId().getMethod().name(), limit, sliceLimit
         );
+
+        for (SampleData sampleData: sampleDataList) {
+            assertEquals(sliceLimit,sampleData.getSamples().size());
+        }
 
         lastIdx = sampleDataList.size()-1;
 

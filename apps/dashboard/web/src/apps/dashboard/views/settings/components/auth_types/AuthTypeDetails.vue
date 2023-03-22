@@ -57,7 +57,7 @@
                 <v-row
                     style="padding: 12px 12px 12px 12px"
                 >
-                    <operator-component :operator="auth_type_copy.operator" :onlyEqual="true"/>
+                    <operator-component :operators="operators" :operator="auth_type_copy.operator" :onlyEqual="true"/>
                 </v-row>
             <v-row style="padding: 12px"  >
                     <conditions-table
@@ -72,7 +72,7 @@
                 <div style="padding: 12px">
                   <v-btn
                         @click="save"
-                        color="#6200EA"
+                        color="var(--themeColor)"
                         class="save-btn"
                         height="40px"
                         width="100px"
@@ -102,6 +102,9 @@ export default {
         OperatorComponent,
     },
     data() {
+        var operators = [
+                "OR"
+            ]
         return {
             auth_type_copy: null,
             saveLoading: false,
@@ -113,6 +116,7 @@ export default {
                         return true
                     },
                 ],
+            operators
         }
     },
     methods: {
@@ -162,14 +166,14 @@ export default {
         display: flex
         padding: 0px
         padding-left: 12px
-        color: #47466A
+        color: var(--themeColorDark)
         &.true
             color: var(--v-redMetric-base)
         &:hover
             cursor: pointer
 
     .save-btn
-        background-color: #6200EA !important
+        background-color: var(--themeColor) !important
         font-size: 16px
         font-weight: 600
         vertical-align: middle
@@ -179,7 +183,7 @@ export default {
         width: 100%
         height: 48px !important
         margin-bottom: 24px
-        color: #FFFFFF
+        color: var(--white)
 
         &.v-btn--disabled
             opacity: 0.3
@@ -194,7 +198,7 @@ export default {
         width: 100%
         height: 48px !important
         margin-bottom: 24px
-        color: #47466A
+        color: var(--themeColorDark)
 
 
     .form-text
@@ -208,6 +212,6 @@ export default {
 
 <style>
     .v-input, .v-input input, .v-input textarea {
-        color:  #47466a !important
+        color:  var(--themeColorDark) !important
     }
 </style>

@@ -14,6 +14,8 @@ import com.akto.dto.type.EndpointInfo;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.SingleTypeInfo.SubType;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOneModel;
@@ -27,7 +29,7 @@ import org.slf4j.LoggerFactory;
 
 public class PayloadAnalyzer {
     private static final Logger logger = LoggerFactory.getLogger(PayloadAnalyzer.class);
-    
+    private static final LoggerMaker loggerMaker = new LoggerMaker(PayloadAnalyzer.class);
     private static EndpointInfo endpointInfo = null;
 
     public static EndpointInfo getEndpointInfo() {
@@ -77,7 +79,7 @@ public class PayloadAnalyzer {
                     try {    
                         SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkUpdates);
                     } catch (Exception e) {
-                        logger.error(e.getMessage(), e);
+                        loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
                     }
                 }
                 logger.info("updates completed");

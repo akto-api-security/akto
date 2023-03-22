@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 import static com.mongodb.client.model.Filters.*;
 
@@ -78,7 +79,7 @@ public abstract class MCollection<T> {
             commands = commands.sort(sort);
         }
 
-        MongoCursor<T> cursor = commands.cursor();
+        MongoCursor<T> cursor = commands.maxTime(30, TimeUnit.SECONDS).cursor();
 
         ArrayList<T> ret = new ArrayList<T>();
 

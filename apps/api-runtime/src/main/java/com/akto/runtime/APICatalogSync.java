@@ -21,6 +21,8 @@ import com.akto.dto.type.URLTemplate;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.merge.MergeOnHostOnly;
 import com.akto.task.Cluster;
@@ -43,6 +45,7 @@ public class APICatalogSync {
     public int thresh;
     public String userIdentifier;
     private static final Logger logger = LoggerFactory.getLogger(APICatalogSync.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(APICatalogSync.class);
     public Map<Integer, APICatalog> dbState;
     public Map<Integer, APICatalog> delta;
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
@@ -74,7 +77,7 @@ public class APICatalogSync {
                 processResponse(requestTemplate, iter.next(), deletedInfo);
             } catch (Exception e) {
                 e.printStackTrace();
-                logger.error("processResponse: " + e.getMessage());
+                loggerMaker.errorAndAddToDb("processResponse: " + e.getMessage(), LogDb.RUNTIME);
             }
         }
     }
@@ -141,7 +144,7 @@ public class APICatalogSync {
             }
 
         } catch (JsonParseException e) {
-            logger.error("Failed to parse json payload " + e.getMessage());
+            loggerMaker.errorAndAddToDb("Failed to parse json payload " + e.getMessage(), LogDb.RUNTIME);
         }
     }
 
@@ -772,7 +775,7 @@ public class APICatalogSync {
                 iterator.remove();
             }
         } catch (Exception e) {
-            logger.error(e.getMessage(), e);
+            loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
         }
 
         return ret;
@@ -803,7 +806,7 @@ public class APICatalogSync {
 
             }
         } catch (Exception e) {
-            logger.info(e.getMessage(), e);
+            loggerMaker.errorAndAddToDb(e.toString(),LogDb.RUNTIME);
         }
     }
 
@@ -1111,6 +1114,7 @@ public class APICatalogSync {
     private int lastMergeAsyncOutsideTs = 0;
     public void buildFromDB(boolean calcDiff, boolean fetchAllSTI) {
 
+        loggerMaker.infoAndAddToDb("Started building from dB", LogDb.RUNTIME);
         if (mergeAsyncOutside) {
             if (Context.now() - lastMergeAsyncOutsideTs > 600) {
                 this.lastMergeAsyncOutsideTs = Context.now();
@@ -1127,7 +1131,10 @@ public class APICatalogSync {
                     try {
                         List<ApiCollection> allCollections = ApiCollectionsDao.instance.getMetaAll();
                         for(ApiCollection apiCollection: allCollections) {
+                            int start = Context.now();
+                            loggerMaker.infoAndAddToDb("Started merging API collection " + apiCollection.getId(), LogDb.RUNTIME);
                             mergeUrlsAndSave(apiCollection.getId());
+                            loggerMaker.infoAndAddToDb("Finished merging API collection " + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
                         }
                     } catch (Exception e) {
                         ;
@@ -1248,7 +1255,7 @@ public class APICatalogSync {
                     }
                     keyTypes.getOccurrences().put(param.getSubType(), param);
                 } catch (Exception e) {
-                    logger.error("ERROR while parsing url param position: " + p);
+                    loggerMaker.errorAndAddToDb("ERROR while parsing url param position: " + p, LogDb.RUNTIME);
                 }
                 continue;
             }
@@ -1318,7 +1325,7 @@ public class APICatalogSync {
             writesForSampleData.addAll(getDBUpdatesForSampleData(apiCollectionId, deltaCatalog,dbCatalog, redact, forceUpdate));
         }
 
-        logger.info("adding " + writesForParams.size() + " updates for params");
+        loggerMaker.infoAndAddToDb("adding " + writesForParams.size() + " updates for params", LogDb.RUNTIME);
 
         long start = System.currentTimeMillis();
 
@@ -1329,23 +1336,23 @@ public class APICatalogSync {
                     writesForParams
                 );
 
-            logger.info((System.currentTimeMillis() - start) + ": " + res.getInserts().size() + " " +res.getUpserts().size());
+                loggerMaker.infoAndAddToDb((System.currentTimeMillis() - start) + ": " + res.getInserts().size() + " " +res.getUpserts().size(), LogDb.RUNTIME);
         }
 
-        logger.info("adding " + writesForTraffic.size() + " updates for traffic");
+        loggerMaker.infoAndAddToDb("adding " + writesForTraffic.size() + " updates for traffic", LogDb.RUNTIME);
         if(writesForTraffic.size() > 0) {
             BulkWriteResult res = TrafficInfoDao.instance.getMCollection().bulkWrite(writesForTraffic);
 
-            logger.info(res.getInserts().size() + " " +res.getUpserts().size());
+            loggerMaker.infoAndAddToDb(res.getInserts().size() + " " +res.getUpserts().size(), LogDb.RUNTIME);
 
         }
         
 
-        logger.info("adding " + writesForSampleData.size() + " updates for samples");
+        loggerMaker.infoAndAddToDb("adding " + writesForSampleData.size() + " updates for samples", LogDb.RUNTIME);
         if(writesForSampleData.size() > 0) {
             BulkWriteResult res = SampleDataDao.instance.getMCollection().bulkWrite(writesForSampleData);
 
-            logger.info(res.getInserts().size() + " " +res.getUpserts().size());
+            loggerMaker.infoAndAddToDb(res.getInserts().size() + " " +res.getUpserts().size(), LogDb.RUNTIME);
 
         }
 

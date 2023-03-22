@@ -30,6 +30,7 @@ public class GlobalEnums {
         INJ("INJ", Severity.HIGH, "Injection (INJ)", "Injection"),
         ILM("ILM", Severity.HIGH, "Insufficient Logging & Monitoring (ILM)", "Insufficient Logging and Monitoring"),
         SM("SM", Severity.HIGH, "Security Misconfiguration (SM)", "Misconfiguration"),
+        SSRF("SSRF", Severity.HIGH, "Server Side Request Forgery (SSRF)", "Server Side Request Forgery"),
         UC("UC", Severity.HIGH, "Uncategorized (UC)", "Uncategorized");
         private final String name;
         private final Severity severity;
@@ -332,6 +333,21 @@ public class GlobalEnums {
                 IssueTags.OWASPTOP10,
                 IssueTags.HACKERONETOP10,
         }),
+        OPEN_REDIRECT(
+                "OPEN_REDIRECT",
+                TestCategory.SM,
+                "Open redirect",
+                "An attacker can construct a URL within the application that causes a redirection to an arbitrary external domain.",
+                "Open redirection vulnerabilities arise when an application incorporates user-controllable data into the target of a redirection in an unsafe way." +
+                        "The ability to use an authentic application URL, targeting the correct domain and with a valid SSL certificate (if SSL is used), lends credibility to the phishing attack because many users, even if they verify these features, will not notice the subsequent redirection to a different domain",
+                "This behavior can be leveraged to facilitate phishing attacks against users of the application.",
+                new String[]{
+                        "https://portswigger.net/kb/issues/00500100_open-redirection-reflected"
+                }, new IssueTags[]{
+                IssueTags.BL,
+                IssueTags.OWASPTOP10,
+                IssueTags.HACKERONETOP10,
+        }),
 
         CUSTOM_IAM(
                 "CUSTOM_IAM",
@@ -346,7 +362,65 @@ public class GlobalEnums {
                 IssueTags.BL,
                 IssueTags.OWASPTOP10,
                 IssueTags.HACKERONETOP10,
+        }),
+
+        PAGINATION_MISCONFIGURATION(
+                "PAGINATION_MISCONFIGURATION",
+                TestCategory.RL,
+                "Possible DOS due to pagination misconfiguration",
+                "Quite often, APIs do not impose any restrictions on the size or number of resources that can be requested by the user.",
+                "Such vulnerabilities arise when there is no max limit imposed on the number of resources returned. Typically, the number of objects to be returned is provided by a parameter in the API call. An attacker can set it as a large number. ",
+                "This can impact the API server performance, leading to  Denial of Service (DoS). It also leaves the door open to authentication flaws such as brute force.",
+                new String[]{
+                        "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa4-lack-of-resources-and-rate-limiting.md#scenario-2"
+                }, new IssueTags[]{
+                IssueTags.BL,
+                IssueTags.OWASPTOP10,
+                IssueTags.HACKERONETOP10,
+        }),
+
+        SSRF_AWS_METADATA_EXPOSED(
+                "SSRF_AWS_METADATA_EXPOSED",
+                TestCategory.SSRF,
+                "Sensitive AWS details exposed due to SSRF",
+                "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing the URI parameter with metadata endpoint provided by AWS. The application responded with 2XX success code and also gave out sensitive AWS information in response.",
+                "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing the URI parameter with metadata endpoint provided by AWS. The application responded with 2XX success code and also gave out sensitive AWS information in response. Server-Side Request Forgery (SSRF) flaws occur whenever an API is fetching a remote resource without validating the user-supplied URL. It allows an attacker to coerce the application to send a crafted request to an unexpected destination, even when protected by a firewall or a VPN.\n" +
+                        "Modern concepts in application development make SSRF more common and more dangerous.\n" +
+                        "More common - the following concepts encourage developers to access an external resource based on user input: Webhooks, file fetching from URLs, custom SSO, and URL previews.\n" +
+                        "More dangerous - Modern technologies like cloud providers, Kubernetes, and Docker expose management and control channels over HTTP on predictable, well-known paths. Those channels are an easy target for an SSRF attack.\n" +
+                        "It is also more challenging to limit outbound traffic from your application, because of the connected nature of modern applications.\n" +
+                        "The SSRF risk can not always be completely eliminated. While choosing a protection mechanism, it is important to consider the business risks and needs.",
+                "Successful exploitation might compromise sensitive AWS information which attacker can use to get unauthorized access to AWS.",
+                new String[]{
+                        "https://github.com/OWASP/API-Security/blob/master/2023/en/src/0xa6-server-side-request-forgery.md",
+                        "https://www.akto.io/blog/how-to-prevent-server-side-request-forgery-ssrf-as-a-developer"
+                }, new IssueTags[]{
+                IssueTags.OWASPTOP10,
+                IssueTags.HACKERONETOP10,
+        }),
+
+        MASS_ASSIGNMENT_CREATE_ADMIN_ROLE(
+                "MASS_ASSIGNMENT_CREATE_ADMIN_ROLE",
+                TestCategory.MA,
+                "Mass assignment leading to creation of admin role",
+                "The endpoint appears to be vulnerable to Mass Assignment attack. The original request was replayed by adding role with admin permissions in request body. The application responded with 2XX success code in response.",
+                "The endpoint appears to be vulnerable to Mass Assignment attack. The original request was replayed by adding role with admin permissions in request body. The application responded with 2XX success code in response." +
+                        "<b>Background:</b>" +
+                        "Objects in modern applications might contain many properties. Some of these properties should be updated directly by the client (e.g., user.first_name or user.address) and some of them should not (e.g., user.is_vip flag).\n" +
+                        "An API endpoint is vulnerable if it automatically converts client parameters into internal object properties, without considering the sensitivity and the exposure level of these properties. This could allow an attacker to update object properties that they should not have access to.\n" +
+                        "Examples for sensitive properties:" +
+                        "Permission-related properties: user.is_admin, user.is_vip should only be set by admins." +
+                        "Process-dependent properties: user.cash should only be set internally after payment verification." +
+                        "Internal properties: article.created_time should only be set internally by the application.",
+                "Exploitation can lead to privilege escalation.",
+                new String[]{
+                        "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa6-mass-assignment.md",
+                }, new IssueTags[]{
+                IssueTags.OWASPTOP10,
+                IssueTags.HACKERONETOP10,
+                IssueTags.BL
         });
+
 
 
         private final String name;
@@ -375,6 +449,7 @@ public class GlobalEnums {
         }
 
         public static TestSubCategory getTestCategory(String category) {
+            if (category.startsWith("http")) return CUSTOM_IAM;
             for (TestSubCategory testSubCategory : valuesArray) {
                 if (testSubCategory.name.equalsIgnoreCase(category)) {
                     return testSubCategory;

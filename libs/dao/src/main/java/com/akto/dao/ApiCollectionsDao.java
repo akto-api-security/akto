@@ -46,7 +46,7 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
 
     public Map<Integer, ApiCollection> generateApiCollectionMap() {
         Map<Integer, ApiCollection> apiCollectionMap = new HashMap<>();
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        List<ApiCollection> apiCollections = getMetaAll();
         for (ApiCollection apiCollection: apiCollections) {
             apiCollectionMap.put(apiCollection.getId(), apiCollection);
         }

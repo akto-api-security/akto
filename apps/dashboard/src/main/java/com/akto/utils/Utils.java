@@ -8,6 +8,8 @@ import com.akto.dto.third_party_access.ThirdPartyAccess;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.listener.KafkaListener;
 import com.akto.listener.RuntimeListener;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.policies.AktoPolicy;
@@ -21,13 +23,11 @@ import java.sql.Timestamp;
 import java.util.*;
 
 import com.mongodb.client.model.Filters;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class Utils {
 
-    private static final Logger logger = LoggerFactory.getLogger(Utils.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class);
     private final static ObjectMapper mapper = new ObjectMapper();
     public static Map<String, String> getVariableMap(ArrayNode variables){
         Map<String,String> result = new HashMap<>();
@@ -46,7 +46,7 @@ public class Utils {
             JsonNode response = apiInfo.has("response") ?  apiInfo.get("response").get(0): null;
             String apiName = apiInfo.get("name").asText();
             if(response == null){
-                logger.info("There are no responses for this api {}, skipping this", apiName);
+                loggerMaker.infoAndAddToDb(String.format("There are no responses for this api %s, skipping this", apiName), LogDb.DASHBOARD);
                 return null;
             }
             Timestamp timestamp = new Timestamp(System.currentTimeMillis());
@@ -60,7 +60,7 @@ public class Utils {
                 result.put("requestHeaders", mapper.writeValueAsString(requestHeadersMap));
                 result.put("responseHeaders", mapper.writeValueAsString(responseHeadersMap));
             } catch (JsonProcessingException e) {
-                logger.error("Error while processing request/response headers", e);
+                loggerMaker.errorAndAddToDb(String.format("Error while processing request/response headers : %s", e.toString()), LogDb.DASHBOARD);
             }
 
             String contentType = getContentType(request, response, requestHeadersMap);
@@ -83,7 +83,7 @@ public class Utils {
                 }
                 requestPayload = postText;
             } else {
-                logger.info("Unsupported content type {} for api {}",contentType, apiName);
+                loggerMaker.infoAndAddToDb(String.format("Unsupported content type %s for api %s",contentType, apiName), LogDb.DASHBOARD);
                 return null;
             }
 
@@ -100,7 +100,7 @@ public class Utils {
 
             return result;
         } catch (Exception e){
-            logger.error("Failed to convert postman obj to Akto format", e);
+            loggerMaker.errorAndAddToDb(String.format("Failed to convert postman obj to Akto format : %s", e.toString()), LogDb.DASHBOARD);
             return null;
         }
     }

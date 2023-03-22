@@ -14,6 +14,10 @@ public class HomeAction implements Action, SessionAware {
         return "SUCCESS";
     }
 
+    public String error() {
+        return SUCCESS.toUpperCase();
+    }
+
     private String accessToken;
     private String signupInvitationCode;
     private String signupEmailId;

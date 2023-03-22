@@ -3,8 +3,8 @@
     <v-navigation-drawer v-model="drawer" app width="200px" :mini-variant.sync="mini" class="akto-nav" dark permanent>
 
       <span class="expand-nav clickable" @click="mini = !mini">
-        <v-icon v-if="mini" color="#6200ea">$fas_angle-right</v-icon>
-        <v-icon v-else color="#6200ea">$fas_angle-left</v-icon>
+        <v-icon v-if="mini" color="var(--themeColor)">$fas_angle-right</v-icon>
+        <v-icon v-else color="var(--themeColor)">$fas_angle-left</v-icon>
       </span>
 
       <template #prepend>
@@ -98,8 +98,8 @@
           </template>
         </router-view>
         <div class="akto-external-links">
-          <v-btn primary dark depressed color="#4A154B" @click='openSlackCommunity'>
-            Ask us on <v-icon size="16">$slack</v-icon>
+          <v-btn primary dark depressed color="var(--hexColor40)" @click='openDiscordCommunity'>
+            Ask us on <v-icon size="16">$fab_discord</v-icon>
           </v-btn>
           <v-btn primary dark depressed class="github-btn" @click='openGithubRepoPage'>    
             <v-icon size="16">$githubIcon</v-icon>  
@@ -208,8 +208,8 @@ export default {
   },
   methods: {
     ...mapGetters('auth', ['getUsername', 'getAvatar', 'getActiveAccount', 'getAccounts']),
-    openSlackCommunity() {
-      return window.open("https://join.slack.com/t/aktocommunity/shared_invite/zt-1nqfw3knb-XO~r7UZyzD9f8_Ddm4R1lg")
+    openDiscordCommunity() {
+      return window.open("https://discord.gg/Wpc6xVME4s")
     },
     openGithubRepoPage() {
       return window.open("https://github.com/akto-api-security/community-edition/")
@@ -246,7 +246,7 @@ export default {
     font-weight: 600
 
 .page-wrapper
-  background-color: #ffffff
+  background-color: var(--white)
   border-radius: 8px 0 0 8px
   height: 100%
   position: relative
@@ -255,13 +255,13 @@ export default {
   padding: 0px
 
 .akto-app
-  color: #47466A
+  color: var(--themeColorDark)
 
 .akto-background
-  background: linear-gradient(180deg, #D500F9 -7.13%, #6200EA 16.86%, #2E006D 64.29%)
+  background: linear-gradient(180deg, var(--backgroundColor1) -7.13%, var(--themeColor) 16.86%, var(--backgroundColor2) 64.29%)
 
 .akto-nav
-  background: linear-gradient(180deg, #D500F9 -7.13%, #6200EA 16.86%, #2E006D 64.29%)
+  background: linear-gradient(180deg, var(--backgroundColor1) -7.13%, var(--themeColor) 16.86%, var(--backgroundColor2) 64.29%)
   z-index: 20
   overflow: unset
 
@@ -286,7 +286,7 @@ export default {
     max-width: 16px
 
 .title-nav-drawer
-  color:  #FFFFFF
+  color:  var(--white)
   margin-left: 8px !important
   font-weight: 400 !important
 
@@ -294,7 +294,7 @@ export default {
   width: 100%
 
 .subtitle-nav-drawer
-  color:  #FFFFFF
+  color:  var(--white)
   margin-left: 8px !important
 
 .v-card__title
@@ -316,12 +316,12 @@ export default {
   position: absolute
   top: 25px
   right: -15px
-  background-color: #ffffff
+  background-color: var(--white)
   z-index: 2
   width: 24px
   height: 24px
-  background: #FFFFFF
-  box-shadow: 0px 2px 7px rgba(71, 70, 106, 0.45)
+  background: var(--white)
+  box-shadow: 0px 2px 7px var(--themeColorDark10)
   border-radius: 4px
   justify-content: space-around
   display: flex
@@ -333,11 +333,11 @@ export default {
   padding: 4px 0
 
 .nav-section
-  border-bottom: 1px solid rgba(255, 255, 255, 0.4)
+  border-bottom: 1px solid var(--rgbaColor4)
 
 .add-teams-row
   cursor: pointer
-  color: rgb(255, 255, 255, 0.5)
+  color: var(--rgbaColor19)
   font-size: 12px
   align-items: center
   padding: 8px 16px
@@ -345,7 +345,7 @@ export default {
   justify-content: space-between
 
 .add-teams-icon
-  color: rgb(255, 255, 255, 0.5)
+  color: var(--rgbaColor19)
   font-size: 10px
   height: 100% !important
 
@@ -367,7 +367,7 @@ export default {
   height: 32px !important
 
 .active-team-group
-  color: #FFFFFF !important
+  color: var(--white) !important
 
   & .v-icon
     transform: rotate(90deg) !important
@@ -378,7 +378,7 @@ export default {
   margin-right: 0px !important
 
 .active-team-group
-  color: #FFFFFF !important
+  color: var(--white) !important
 
   & .v-icon
     transform: rotate(90deg) !important
@@ -388,10 +388,15 @@ export default {
   flex-direction: column
 
 .github-btn
-  background: linear-gradient(180deg, #f6f8fa, #ebf0f4 90%)  
+  background: linear-gradient(180deg, var(--hexColor26), var(--hexColor23) 90%)  
+  color: var(--hexColor6) !important
+  border: 1px solid var(--rgbaColor3)
+  margin-left: 8px
+
+.discord-btn
+  background: #ffffff !important
   color: #24292f !important
   border: 1px solid rgba(27,31,36,.15)
-  margin-left: 8px
 
 .akto-external-links
   position: absolute

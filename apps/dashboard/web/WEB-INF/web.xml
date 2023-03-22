@@ -30,6 +30,15 @@
     </filter-mapping>
 
     <filter>
+        <filter-name>MongoConnectCheckFilter</filter-name>
+        <filter-class>com.akto.filter.MongoConnectCheckFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>MongoConnectCheckFilter</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+
+    <filter>
         <filter-name>HttpMethodFilter</filter-name>
         <filter-class>com.akto.filter.HttpMethodFilter</filter-class>
     </filter>

@@ -28,7 +28,9 @@ public class TestResult extends GenericTestResult {
         NO_AUTH_TOKEN_FOUND("No authentication token found"),
         FAILED_DOWNLOADING_NUCLEI_TEMPLATE("Failed downloading nuclei template"),
         FAILED_DOWNLOADING_PAYLOAD_FILES("Failed downloading payload files"),
-        FAILED_BUILDING_NUCLEI_TEMPLATE("Failed building nuclei template");
+        FAILED_BUILDING_NUCLEI_TEMPLATE("Failed building nuclei template"),
+        FAILED_BUILDING_URL_WITH_DOMAIN("Failed building URL with domain"),
+        FAILED_REPLACING_VARIABLES_IN_NUCLEI_TEMPLATE("Failed replacing variables in nuclei template");
 
         private final String message;
 

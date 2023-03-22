@@ -5,11 +5,11 @@ import com.akto.dao.context.Context;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.Markov;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
@@ -26,7 +26,7 @@ public class MarkovSync {
     private final int last_sync_thresh;
     private final int user_thresh;
 
-    private static final Logger logger = LoggerFactory.getLogger(MarkovSync.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(MarkovSync.class);
 
     public MarkovSync(int user_thresh,int counter_thresh, int last_sync_thresh) {
         this.last_sync = Context.now();
@@ -91,12 +91,12 @@ public class MarkovSync {
 
     private void syncWithDb() {
         List<WriteModel<Markov>> bulkUpdates = getBulkUpdates();
-        logger.info("adding " + bulkUpdates.size() + " updates");
+        loggerMaker.infoAndAddToDb("adding " + bulkUpdates.size() + " updates", LogDb.RUNTIME);
         if (bulkUpdates.size() > 0) {
             try {
                 MarkovDao.instance.getMCollection().bulkWrite(bulkUpdates);
             } catch (Exception e) {
-                logger.error(e.getMessage());
+                loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.RUNTIME);
             }
         }
 
@@ -113,7 +113,7 @@ public class MarkovSync {
             try {
                 userIdentifier = getUserIdentifier(userIdentifierName, httpRequestParams);
             } catch (Exception e) {
-                logger.error(e.getMessage());
+                loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.RUNTIME);
                 continue;
             }
             this.counter += 1;

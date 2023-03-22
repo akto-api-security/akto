@@ -26,6 +26,8 @@ import com.akto.dto.AwsResources;
 import com.akto.dto.BackwardCompatibility;
 import com.akto.dto.User;
 import com.akto.dto.third_party_access.PostmanCredential;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.cloud.CloudType;
 import com.akto.utils.cloud.Utils;
 import com.akto.utils.cloud.serverless.UpdateFunctionRequest;
@@ -59,7 +61,7 @@ public class QuickStartAction extends UserAction {
     private String aktoDashboardStackName;
 
 
-    private static final Logger logger = LoggerFactory.getLogger(QuickStartAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(QuickStartAction.class);
 
     public String fetchQuickStartPageState() {
 
@@ -120,7 +122,7 @@ public class QuickStartAction extends UserAction {
                 }
             }
         } catch (Exception e) {
-            logger.error("Error occurred while fetching LBs", e);
+            loggerMaker.errorAndAddToDb(String.format("Error occurred while fetching LBs %s", e), LogDb.DASHBOARD);
             this.dashboardHasNecessaryRole = false;
         }
         this.awsRegion = System.getenv(Constants.AWS_REGION);
@@ -152,14 +154,11 @@ public class QuickStartAction extends UserAction {
         if (!AwsStack.getInstance().checkIfStackExists(MirroringStackDetails.getStackName())) {
             this.isFirstSetup = true;
             try {
-                Map<String, String> parameters = new HashMap<String, String>() {
-                    {
-                        put("MongoIp", System.getenv("AKTO_MONGO_CONN"));
-                        put("KeyPair", System.getenv("EC2_KEY_PAIR"));
-                        put("SourceLBs", extractLBs());
-                        put("SubnetId", System.getenv("EC2_SUBNET_ID"));
-                    }
-                };
+                Map<String, String> parameters = new HashMap<>();
+                parameters.put("MongoIp", System.getenv("AKTO_MONGO_CONN"));
+                parameters.put("KeyPair", System.getenv("EC2_KEY_PAIR"));
+                parameters.put("SourceLBs", extractLBs());
+                parameters.put("SubnetId", System.getenv("EC2_SUBNET_ID"));
                 String template = convertStreamToString(AwsStack.class
                         .getResourceAsStream("/cloud_formation_templates/akto_aws_mirroring.template"));
                 List<Tag> tags = Utils.fetchTags(DashboardStackDetails.getStackName());
@@ -171,11 +170,8 @@ public class QuickStartAction extends UserAction {
         } else {
             this.isFirstSetup = false;
             try {
-                Map<String, String> updatedEnvVars = new HashMap<String, String>() {
-                    {
-                        put("ELB_NAMES", extractLBs());
-                    }
-                };
+                Map<String, String> updatedEnvVars = new HashMap<>();
+                updatedEnvVars.put("ELB_NAMES", extractLBs());
                 String functionName = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.CREATE_MIRROR_SESSION_LAMBDA);
                 UpdateFunctionRequest ufr = new UpdateFunctionRequest(updatedEnvVars);
                 Lambda.getInstance().updateFunctionConfiguration(functionName, ufr);
@@ -205,16 +201,16 @@ public class QuickStartAction extends UserAction {
         invokeLambdaIfNecessary(stackState);
         if(Stack.StackStatus.CREATION_FAILED.toString().equalsIgnoreCase(this.stackState.getStatus())){
             AwsResourcesDao.instance.getMCollection().deleteOne(Filters.eq("_id", Context.accountId.get()));
-            logger.info("Current stack status is failed, so we are removing entry from db");
+            loggerMaker.infoAndAddToDb("Current stack status is failed, so we are removing entry from db", LogDb.DASHBOARD);
         }
         if(Stack.StackStatus.DOES_NOT_EXISTS.toString().equalsIgnoreCase(this.stackState.getStatus())){
             AwsResources resources = AwsResourcesDao.instance.findOne(AwsResourcesDao.generateFilter());
             if(resources != null && resources.getLoadBalancers().size() > 0){
                 AwsResourcesDao.instance.getMCollection().deleteOne(AwsResourcesDao.generateFilter());
-                logger.info("Stack does not exists but entry present in DB, removing it");
+                loggerMaker.infoAndAddToDb("Stack does not exists but entry present in DB, removing it", LogDb.DASHBOARD);
                 fetchLoadBalancers();
             } else {
-                logger.info("Nothing set in DB, moving on");
+                loggerMaker.infoAndAddToDb("Nothing set in DB, moving on", LogDb.DASHBOARD);
             }
         }
         return Action.SUCCESS.toUpperCase();
@@ -233,12 +229,12 @@ public class QuickStartAction extends UserAction {
                                 Filters.eq("_id", backwardCompatibility.getId()),
                                 Updates.set(BackwardCompatibility.MIRRORING_LAMBDA_TRIGGERED, true)
                         );
-                        logger.info("Successfully triggered CreateMirrorSession");
+                        loggerMaker.infoAndAddToDb("Successfully triggered CreateMirrorSession", LogDb.DASHBOARD);
                     } catch(Exception e){
-                        logger.error("Failed to invoke lambda for the first time", e);
+                        loggerMaker.errorAndAddToDb(String.format("Failed to invoke lambda for the first time : %s", e), LogDb.DASHBOARD);
                     }
                 } else {
-                    logger.info("Already invoked");
+                    loggerMaker.infoAndAddToDb("Already invoked", LogDb.DASHBOARD);
                 }
             }
         };

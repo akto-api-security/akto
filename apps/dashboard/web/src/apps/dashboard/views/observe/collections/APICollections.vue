@@ -7,38 +7,33 @@
                 :items="apiCollectionsForTable"  
                 :actions="actions"
                 name="API Collections" 
-                sortKeyDefault="name" 
-                :sortDescDefault="false"   
+                sortKeyDefault="endpoints" 
+                :sortDescDefault="true"   
                 @rowClicked=rowClicked
                 hide-default-footer ="true"
                 :hideDownloadCSVIcon="true"
+                :hideMoreActions="true"
             >
                 <template v-slot:add-new-row-btn="{}">
-                    <div class="clickable download-csv ma-1">
-                        <v-btn icon :disabled=showNewRow :color="$vuetify.theme.themes.dark.themeColor"  @click="showNewRow = true">
-                            <v-icon>$fas_plus</v-icon>
-                        </v-btn>
+                    <div class="clickable download-csv d-flex">
+                        <secondary-button 
+                            :disabled=showNewRow 
+                            @click="showNewRow = true"
+                            icon="$plusIcon"
+                            text="Create new collections" />
 
                         <v-dialog
                             :model="showDeleteDialog"
                             width="600px"
                         >
                         <template v-slot:activator="{ on, attrs }">
-                            <v-btn
-                                color="#47466A"
-                                icon
-                                dark
+                            <secondary-button 
+                                @click="showDeleteDialog = !showDeleteDialog"
+                                icon="$fas_trash"
+                                text="Remove collections" 
                                 v-bind="attrs"
                                 v-on="on"
-                                @click="showDeleteDialog = !showDeleteDialog"
-                            >
-                            <v-tooltip bottom>
-                                <template v-slot:activator='{ on, attrs }'>
-                                    <v-icon color="#6200EA" size="16" v-bind="attrs" v-on="on" >$fas_trash</v-icon>
-                                </template>
-                                Delete multiple collections
-                            </v-tooltip>
-                            </v-btn>
+                            />
                         </template>
                             <batch-operation 
                                 title="Parameters" 
@@ -79,6 +74,7 @@ import Spinner from '@/apps/dashboard/shared/components/Spinner'
 import SimpleTextField from '@/apps/dashboard/shared/components/SimpleTextField'
 import BatchOperation from '../changes/components/BatchOperation'
 import ScheduleBox from '@/apps/dashboard/shared/components/ScheduleBox'
+import SecondaryButton from '@/apps/dashboard/shared/components/buttons/SecondaryButton'
 
 export default {
     name: "ApiCollections",
@@ -87,7 +83,8 @@ export default {
         Spinner,
         SimpleTextField,
         BatchOperation,
-        ScheduleBox
+        ScheduleBox,
+        SecondaryButton
     },
     
     data() {
@@ -248,7 +245,8 @@ export default {
             return this.apiCollections.map(c => {
                 return {
                     ...c,
-                    color: "#FFFFFF",
+                    color: "var(--white)",
+                    width: '0px',
                     endpoints: c["urlsCount"] || 0,
                     detected: func.prettifyEpoch(c.startTs)
                 }
@@ -265,7 +263,7 @@ export default {
 
 <style lang="sass" scoped>
 .default-info
-    color: #47466A
+    color: var(--themeColorDark)
     font-size: 12px
     margin-top: 16px
 
@@ -273,8 +271,9 @@ export default {
 
 <style lang="sass">
 .v-time-picker-clock__item
-    color: #47466A
+    color: var(--themeColorDark)
 
 .v-time-picker-clock__item--active
-    color: #FFFFFF    
+    color: var(--white)    
 </style>
+

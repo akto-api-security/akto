@@ -1,16 +1,20 @@
 package com.akto.testing;
 
+import com.akto.DaoInit;
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.AuthMechanismsDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.testing.AuthMechanism;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.SampleMessageStore;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.mongodb.ConnectionString;
 
 import java.util.*;
 
@@ -38,38 +42,57 @@ public class StatusCodeAnalyser {
         }
     }
 
-    private static final Logger logger = LoggerFactory.getLogger(StatusCodeAnalyser.class);
-
+    private static final LoggerMaker loggerMaker = new LoggerMaker(StatusCodeAnalyser.class);
     public static int MAX_COUNT = 30;
     public static void run() {
-        logger.info("Running status analyser");
+        loggerMaker.infoAndAddToDb("Running status analyser", LogDb.TESTING);
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = SampleMessageStore.fetchSampleMessages();
 
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
         if (authMechanism == null) {
-            logger.error("No auth mechanism");
+            loggerMaker.errorAndAddToDb("No auth mechanism", LogDb.TESTING);
             return;
         }
         Map<Set<String>, Map<String,Integer>> frequencyMap = new HashMap<>();
+        Map<Integer, ApiCollection> apiCollectionMap = ApiCollectionsDao.instance.generateApiCollectionMap();
 
         int count = 0;
         int inc = 0;
         for (ApiInfo.ApiInfoKey apiInfoKey: sampleDataMap.keySet()) {
+            ApiCollection apiCollection = apiCollectionMap.get(apiInfoKey.getApiCollectionId());
+            if (!apiInfoKey.url.startsWith("http")) { // mirroring
+                if (apiCollection == null || apiCollection.getHostName() == null || apiCollection.getHostName().isEmpty()) {
+                    continue;
+                }
+            }
+
+            if (inc >= 5) {
+                loggerMaker.infoAndAddToDb("5 error API calls. Exiting status code analyser", LogDb.TESTING);
+                break;
+            }
+
             if (count > MAX_COUNT) break;
             try {
                 List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleDataMap);
-                boolean success = fillFrequencyMap(messages, authMechanism, frequencyMap);
+                boolean success;
+                try {
+                    success = fillFrequencyMap(messages, authMechanism, frequencyMap);
+                } catch (Exception e) {
+                    inc += 1;
+                    continue;
+                }
                 if (success)  {
                     count += 1;
-                    logger.info("count: " + count);
+                    loggerMaker.infoAndAddToDb("count: " + count, LogDb.TESTING);
                 }
             } catch (Exception e) {
-                ;
+                loggerMaker.errorAndAddToDb("Error while filling frequency map: " + e, LogDb.TESTING);
             }
-            inc += 1;
         }
 
         calculateResult(frequencyMap, 5);
+
+        loggerMaker.infoAndAddToDb("result of status code analyser : " + result, LogDb.TESTING);
     }
 
     public static void calculateResult(Map<Set<String>, Map<String,Integer>> frequencyMap, int threshold) {
@@ -85,7 +108,7 @@ public class StatusCodeAnalyser {
         }
     }
 
-    public static boolean fillFrequencyMap(List<RawApi> messages, AuthMechanism authMechanism, Map<Set<String>, Map<String,Integer>> frequencyMap) {
+    public static boolean fillFrequencyMap(List<RawApi> messages, AuthMechanism authMechanism, Map<Set<String>, Map<String,Integer>> frequencyMap) throws Exception {
 
         // fetch sample message
         List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, authMechanism);
@@ -107,12 +130,7 @@ public class StatusCodeAnalyser {
         if (!result) return false;
 
         // execute API
-        OriginalHttpResponse finalResponse;
-        try {
-            finalResponse = ApiExecutor.sendRequest(request, true);
-        } catch (Exception e) {
-            return false;
-        }
+        OriginalHttpResponse finalResponse = ApiExecutor.sendRequest(request, true);
 
         // if non 2xx then skip this api
         if (finalResponse.getStatusCode() < 200 || finalResponse.getStatusCode() >= 300) return false;

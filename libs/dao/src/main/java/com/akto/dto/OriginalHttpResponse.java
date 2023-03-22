@@ -1,5 +1,6 @@
 package com.akto.dto;
 
+import com.akto.util.HttpRequestResponseUtils;
 import com.google.gson.Gson;
 
 import org.apache.commons.lang3.math.NumberUtils;
@@ -32,8 +33,8 @@ public class OriginalHttpResponse {
     public void buildFromSampleMessage(String message) {
         Map<String, Object> json = gson.fromJson(message, Map.class);
 
-        String requestPayload = (String) json.get("responsePayload");
-        this.body = requestPayload.trim();
+        String responsePayload = (String) json.get("responsePayload");
+        this.body = responsePayload != null ? responsePayload.trim() : null;
         this.headers = OriginalHttpRequest.buildHeadersMap(json, "responseHeaders");
         this.statusCode = Integer.parseInt(json.get("statusCode").toString());
     }
@@ -65,6 +66,13 @@ public class OriginalHttpResponse {
         }
 
         this.body += line;
+    }
+
+    public String findHeaderValue(String headerName) {
+        if (this.headers == null ) return null;
+        List<String> values = this.headers.get(headerName.trim().toLowerCase());
+        if (values == null || values.size() == 0) return null;
+        return values.get(0);
     }
 
     public String getBody() {
@@ -104,5 +112,9 @@ public class OriginalHttpResponse {
         } else {
             return false;
         }
+    }
+
+    public String getJsonResponseBody() {
+        return HttpRequestResponseUtils.rawToJsonString(body, headers);
     }
 }
