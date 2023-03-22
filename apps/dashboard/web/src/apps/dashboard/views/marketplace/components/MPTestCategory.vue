@@ -31,12 +31,12 @@
 import obj from "@/util/obj"
 import api from '../api'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
+import { mapState } from 'vuex'
 export default {
     name: "MPTestCategory",
     props: {
         categoryType: obj.strR, 
         categoryId: obj.strR,
-        searchText: obj.strN,
     },
     components: {
         Spinner
@@ -69,6 +69,7 @@ export default {
     },
     async mounted() {
         this.loading = true
+        console.log(this.searchText)
         let searchedTests = await api.searchTestResults(this.searchText)
         this.businessCategories = searchedTests.searchAktoTests
         let isDefaultCategory = this.categoryType === "default"
@@ -89,6 +90,9 @@ export default {
         }).catch(() => {
             this.loading = false
         })
+    },
+    computed:{
+        ...mapState('marketplace',['searchText'])
     }
 }
 </script>

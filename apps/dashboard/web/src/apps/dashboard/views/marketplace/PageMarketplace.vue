@@ -3,7 +3,7 @@
         <template>
             <div class="px-8">
                 <div class="py-4">
-                    <search placeholder="Search categories" @changed="onSearch" />
+                    <search placeholder="Search categories" @changed="setSearchText" />
                 </div>
                 <div>                
                     <layout-with-left-pane>
@@ -185,10 +185,15 @@ export default {
                 })
             })
         },
-        async onSearch(searchText) {
+        setSearchText(searchText){
             this.searchText = searchText
+            this.onSearch()
+            this.$store.commit('marketplace/searchTestResults', { 'searchText': this.searchText })
+        },
+        async onSearch() {
             this.searchItems = []
             this.searchUserItems = []
+
             await api.searchTestResults(this.searchText).then((resp) =>{
                 this.businessCategories = resp.categories
                 this.businessSubCategories = resp.searchAktoTests
@@ -254,7 +259,7 @@ export default {
     },
     async mounted() {
         await this.$store.dispatch('marketplace/fetchAllMarketplaceSubcategories')
-        await this.onSearch(this.searchText)
+        await this.onSearch()
     },
     computed: {
         ...mapState('marketplace', ['defaultSubcategories', 'userSubcategories', 'loading']),
