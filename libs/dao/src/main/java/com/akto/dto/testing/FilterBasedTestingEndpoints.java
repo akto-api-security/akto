@@ -34,7 +34,7 @@ public class FilterBasedTestingEndpoints extends TestingEndpoints {
         }
 
         Bson sort = endpointQueryBuilder.buildEndpointInfoSort(endpointDataQuery);
-        List<SingleTypeInfoView> endpoints = SingleTypeInfoViewDao.instance.findAll(Filters.and(filterList), 0, 2, sort);
+        List<SingleTypeInfoView> endpoints = SingleTypeInfoViewDao.instance.findAll(Filters.and(filterList), 0, 10000, sort);
 
         List<ApiInfo.ApiInfoKey> apiInfoKeys = new ArrayList<>();
         

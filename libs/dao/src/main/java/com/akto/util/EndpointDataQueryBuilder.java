@@ -117,7 +117,7 @@ public class EndpointDataQueryBuilder {
                 if (key.equals( "lastSeenTs") || key.equals("discoveredTs")) {
     
                     int ltTs = Integer.parseInt(values.get(0));
-                    int gtTs =  Integer.parseInt(values.get(0));
+                    int gtTs =  Integer.parseInt(values.get(1));
                     if (gtTs > ltTs) {
                         int temp = ltTs;
                         ltTs = gtTs;
