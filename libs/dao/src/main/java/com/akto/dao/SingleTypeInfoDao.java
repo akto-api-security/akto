@@ -522,4 +522,25 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
     }
 
+    public void createSingleTypeInfoTimeStampIndex() {
+        String[] fieldNames = {"timestamp"};
+        SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
+    }
+
+    public void createStiViewIndexes() {
+
+        String[] fieldNames = {"_id.apiCollectionId", "discoveredTs"};
+        SingleTypeInfoViewDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
+
+        fieldNames = new String []{"_id.apiCollectionId", "lastSeenTs"};
+        SingleTypeInfoViewDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
+
+        fieldNames = new String []{"_id.apiCollectionId", "combinedData", "discoveredTs", "lastSeenTs"};
+        SingleTypeInfoViewDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
+
+        fieldNames = new String []{"_id.apiCollectionId", "combinedData", "lastSeenTs", "discoveredTs"};
+        SingleTypeInfoViewDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
+
+    }
+
 }
