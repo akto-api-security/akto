@@ -93,7 +93,7 @@ Akto is really powerful in Cloud deployment if you can provide your application'
 1. Go to View > Command Palette and type: Dev Containers: Reopen in Container
 <img src="https://user-images.githubusercontent.com/125550503/225829693-0c627020-9fe3-4738-80e0-39f076780c3b.png"></img>
 2. Wait for the Dev Container to set up.
-3. Open **localhost:8080** in your web browser to see the Akto dashboard
+3. Open **localhost:9090** in your web browser to see the Akto dashboard
 
 ## Manual Setup Instructions
 
@@ -128,7 +128,7 @@ OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), 
 3. `export AKTO_MONGO_CONN="mongodb://localhost:27017"`
 4. `export DASHBOARD_MODE="local_deploy"`
 5. `mvn clean install`
-6. `mvn --projects :dashboard --also-make jetty:run`
+6. `mvn --projects :dashboard --also-make jetty:run -Djetty.port=9090`
 
 #### Setup Testing
 
@@ -142,7 +142,7 @@ OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), 
 
 ### Play around
 
-1. Open `localhost:8080` in your favourite browser
+1. Open `localhost:9090` in your favourite browser
 2. You will need to signup when logging in for the first time, next time onwards you can login
 
 ### Debug
