@@ -20,8 +20,14 @@
 	"hostRequirements": {
 		"memory": "4gb"
 	},
-    "forwardPorts": [8080, 27017],
-	"onCreateCommand": "cd apps/dashboard && npm install && cd ../.. && mvn clean install -DskipTests=true",
+  "forwardPorts": [27017],
+	"portsAttributes": {
+		"9090": {
+			"label": "Akto Dashboard",
+			"onAutoForward": "openBrowser"
+		}
+	},
+	"onCreateCommand": "cd apps/dashboard && npm install && cd ../.. && mvn clean install -DskipTests=true -Pdevcontainer",
 	"customizations": {
 		"vscode": {
 			"settings": {
@@ -36,6 +42,18 @@
 											]
 							}
 						]   
+					},					{
+						"splitTerminals": [
+							{
+								"name": "Testing",
+								"commands": [
+												"export AKTO_MONGO_CONN=\"mongodb://localhost:27017\"",
+												"export DASHBOARD_MODE=\"local_deploy\"",
+                        "export NUCLEI_EXECUTABLE_PATH=apps/testing/src/main/resources/nuclei_linux",                        
+												"java -jar apps/testing/target/testing-1.0-SNAPSHOT-jar-with-dependencies.jar"
+											]
+							}
+						]
 					},
 					{
 						"splitTerminals": [
@@ -44,21 +62,7 @@
 								"commands": [
 												"export AKTO_MONGO_CONN=\"mongodb://localhost:27017\"",
 												"export DASHBOARD_MODE=\"local_deploy\"",
-												"mvn --projects :dashboard --also-make jetty:run"
-											]
-							}
-						]
-					},
-					{
-						"splitTerminals": [
-							{
-								"name": "Testing",
-								"commands": [
-												"export AKTO_MONGO_CONN=\"mongodb://localhost:27017\"",
-												"export DASHBOARD_MODE=\"local_deploy\"",
-												"cd apps/testing", 
-												"mvn compile",
-												"mvn exec:java -Dexec.mainClass=\"com.akto.testing.Main\""
+												"mvn --projects :dashboard --also-make jetty:run -Pdevcontainer -Djetty.port=9090"
 											]
 							}
 						]
@@ -90,7 +94,7 @@
 								"commands": [
 												"export AKTO_MONGO_CONN=\"mongodb://localhost:27017\"",
 												"export DASHBOARD_MODE=\"local_deploy\"",
-												"mvn --projects :dashboard --also-make jetty:run"
+												"mvn --projects :dashboard --also-make jetty:run -Pdevcontainer -Djetty.port=9090"
 											]
 							}
 						]
@@ -102,9 +106,8 @@
 								"commands": [
 												"export AKTO_MONGO_CONN=\"mongodb://localhost:27017\"",
 												"export DASHBOARD_MODE=\"local_deploy\"",
-												"cd apps/testing", 
-												"mvn compile",
-												"mvn exec:java -Dexec.mainClass=\"com.akto.testing.Main\""
+                        "export NUCLEI_EXECUTABLE_PATH=apps/testing/src/main/resources/nuclei_linux",
+												"java -jar apps/testing/target/testing-1.0-SNAPSHOT-jar-with-dependencies.jar"
 											]
 							}
 						]
