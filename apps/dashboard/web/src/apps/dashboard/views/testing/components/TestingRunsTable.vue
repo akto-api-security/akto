@@ -29,11 +29,7 @@ export default {
     data() {
         return {
             testingRunsHeaders: [
-                {
-                    text: "color",
-                    value: "",
-                    hideFilter: true
-                },
+               
                 {
                     text: "Api collection",
                     value: "apiCollectionName"
