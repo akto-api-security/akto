@@ -21,7 +21,7 @@
 		"memory": "4gb"
 	},
     "forwardPorts": [8080, 27017],
-	"onCreateCommand": "cd apps/dashboard && npm install && cd ../.. && mvn clean install -DskipTests=true",
+	"onCreateCommand": "cd apps/dashboard && npm install && cd ../.. && mvn clean install -DskipTests=true -Pdevcontainer",
 	"customizations": {
 		"vscode": {
 			"settings": {
@@ -44,7 +44,7 @@
 								"commands": [
 												"export AKTO_MONGO_CONN=\"mongodb://localhost:27017\"",
 												"export DASHBOARD_MODE=\"local_deploy\"",
-												"mvn --projects :dashboard --also-make jetty:run"
+												"mvn --projects :dashboard --also-make jetty:run -Pdevcontainer"
 											]
 							}
 						]
@@ -88,7 +88,7 @@
 								"commands": [
 												"export AKTO_MONGO_CONN=\"mongodb://localhost:27017\"",
 												"export DASHBOARD_MODE=\"local_deploy\"",
-												"mvn --projects :dashboard --also-make jetty:run"
+												"mvn --projects :dashboard --also-make jetty:run -Pdevcontainer"
 											]
 							}
 						]
@@ -101,8 +101,8 @@
 												"export AKTO_MONGO_CONN=\"mongodb://localhost:27017\"",
 												"export DASHBOARD_MODE=\"local_deploy\"",
 												"cd apps/testing", 
-												"mvn compile",
-												"mvn exec:java -Dexec.mainClass=\"com.akto.testing.Main\""
+												"mvn compile -Pdevcontainer",
+												"mvn exec:java -Dexec.mainClass=\"com.akto.testing.Main\" -Pdevcontainer"
 											]
 							}
 						]
