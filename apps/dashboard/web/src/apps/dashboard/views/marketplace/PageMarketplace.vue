@@ -38,7 +38,7 @@
                                 </div>
                             </v-navigation-drawer>
                         </template>
-                    </layout-with-left-pane>
+                    </layout-with-left-pane>  
                 </div>
             </div>
             <v-dialog v-model="showCreateTestDialog" width="600px">
@@ -132,7 +132,6 @@ import SimpleTextField from '@/apps/dashboard/shared/components/SimpleTextField'
 import Search from  '@/apps/dashboard/shared/components/inputs/Search'
 
 import api from './api'
-import issuesApi from '../issues/api'
 import func from '@/util/func'
 import { mapState } from 'vuex'
 
@@ -144,9 +143,10 @@ export default {
         TestsLibrary,
         ACard,
         SimpleTextField,
-        Search
+        Search,
     },
     data() {
+      
         let allSeverities = ["HIGH", "MEDIUM", "LOW"]
         
         return {
@@ -240,7 +240,6 @@ export default {
                 })
             })
             this.$router.push(this.searchItems[0].link)
-            this.$router.push({query:{searchText:searchText}})
         },
         createCategoryObj(arrCategoryKv, creatorTitle, creatorType, colorType) {
             return {
