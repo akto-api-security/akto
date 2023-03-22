@@ -13,6 +13,8 @@ import com.akto.util.JSONUtils;
 import com.akto.util.modifier.SetValueModifier;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
@@ -38,20 +40,6 @@ public abstract class BaseSSRFTest extends TestPlugin{
             if(isResponseStatusCodeAllowed(rawApi.getResponse().getStatusCode())) continue;
             OriginalHttpRequest req = rawApi.getRequest();
 
-            // find if there is any url in header
-            Map<String, List<String>> reqHeaders = req.getHeaders();
-            for (String key: reqHeaders.keySet()) {
-                List<String> values = reqHeaders.get(key);
-                if (values == null) values = new ArrayList<>();
-                for (int idx=0; idx<values.size(); idx++) {
-                    String v = values.get(idx);
-                    if (detectUrl(v)) {
-                        flag = true;
-                        values.set(idx, getUrlPlaceholder());
-                    }
-                }
-            }
-
             // find if url is present in queryParams
             String queryJson = HttpRequestResponseUtils.convertFormUrlEncodedToJson(req.getQueryParams());
             if (queryJson != null) {
@@ -67,7 +55,7 @@ public abstract class BaseSSRFTest extends TestPlugin{
                 }
                 String modifiedQueryParamString = OriginalHttpRequest.getRawQueryFromJson(queryObj.toJson());
                 if (modifiedQueryParamString != null) {
-                    modifiedQueryParamString = modifiedQueryParamString.replaceAll(URL_TEMP, getTemplateUrl());
+                    modifiedQueryParamString = modifiedQueryParamString.replaceAll(URL_TEMP, getUrlPlaceholder());
                     req.setQueryParams(modifiedQueryParamString);
                 }
             }
@@ -98,7 +86,7 @@ public abstract class BaseSSRFTest extends TestPlugin{
             if (flag) break;
         }
 
-        if (rawApi == null) return null;
+        if (rawApi == null || !flag) return null;
 
         System.out.println("******************");
         System.out.println(rawApi.getRequest().toString());
@@ -127,7 +115,8 @@ public abstract class BaseSSRFTest extends TestPlugin{
                 testRunId, testRunResultSummaryId, templateUrl,subTestName(), testSourceConfigCategory, valuesMap
         );
         try {
-            return fuzzingTest.runNucleiTest(rawApi);
+            Result result = fuzzingTest.runNucleiTest(rawApi);
+            return processResult(result);
         } catch (Exception e ) {
             return null;
         }
@@ -137,7 +126,7 @@ public abstract class BaseSSRFTest extends TestPlugin{
     protected abstract String getTemplateUrl();
 
     private boolean detectUrl(String value) {
-        return value.contains("http://") || value.contains("https://");
+        return value.contains("http");
     }
 
     private boolean detectUrl(Object value) {
@@ -174,6 +163,10 @@ public abstract class BaseSSRFTest extends TestPlugin{
     protected abstract String getUrlPlaceholder();
 
     protected abstract boolean isResponseStatusCodeAllowed(int statusCode);
+
+    protected Result processResult(Result result) {
+        return result;
+    }
 
 
 }

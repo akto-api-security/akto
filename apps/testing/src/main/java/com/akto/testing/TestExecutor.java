@@ -541,6 +541,7 @@ public class TestExecutor {
         SSRFOnAwsMetadataEndpoint ssrfOnAwsMetadataEndpoint = new SSRFOnAwsMetadataEndpoint(testRunId.toHexString(), testRunResultSummaryId.toHexString());
         CreateAdminUserViaMassAssignment createAdminUserViaMassAssignment = new CreateAdminUserViaMassAssignment(testRunId.toHexString(), testRunResultSummaryId.toHexString());
         PortScanningViaSSRF portScanningViaSSRF = new PortScanningViaSSRF(testRunId.toHexString(), testRunResultSummaryId.toHexString());
+        FetchSensitiveFilesViaSSRF fetchSensitiveFilesViaSSRF = new FetchSensitiveFilesViaSSRF(testRunId.toHexString(), testRunResultSummaryId.toHexString());
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
 
@@ -632,6 +633,11 @@ public class TestExecutor {
         if(testSubCategories == null || testSubCategories.contains(TestSubCategory.PORT_SCANNING.name())) {
             TestingRunResult portScanningViaSSRFResult = runTest(portScanningViaSSRF, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
             if (portScanningViaSSRFResult != null) testingRunResults.add(portScanningViaSSRFResult);
+        }
+
+        if(testSubCategories == null || testSubCategories.contains(TestSubCategory.FETCH_SENSITIVE_FILES.name())) {
+            TestingRunResult fetchSensitiveFilesViaSSRFResult = runTest(fetchSensitiveFilesViaSSRF, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            if (fetchSensitiveFilesViaSSRFResult != null) testingRunResults.add(fetchSensitiveFilesViaSSRFResult);
         }
 
         return testingRunResults;
