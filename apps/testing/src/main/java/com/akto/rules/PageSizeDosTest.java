@@ -17,7 +17,8 @@
  import org.slf4j.Logger;
  import org.slf4j.LoggerFactory;
 
- import java.util.*;
+import java.net.URI;
+import java.util.*;
 
  public class PageSizeDosTest extends TestPlugin {
 
@@ -91,22 +92,22 @@
 
              Map<String, Object> valuesMap = new HashMap<>();
              valuesMap.put("Method", apiInfoKey.method);
-             String baseUrl;
+             URI uri;
              try {
-                 baseUrl = req.getFullUrlWithParams();
+                 String baseUrl = req.getFullUrlIncludingDomain();
+                 baseUrl = OriginalHttpRequest.getFullUrlWithParams(baseUrl,req.getQueryParams());
+                 uri = new URI(baseUrl);
              } catch (Exception e) {
                  loggerMaker.errorAndAddToDb("Error while getting full url including domain: " + e, LoggerMaker.LogDb.TESTING);
                  return addWithRequestError( rawApi.getOriginalMessage(), TestResult.TestError.FAILED_BUILDING_URL_WITH_DOMAIN,rawApi.getRequest(), null);
              }             
 
-             int endIndexDomain = baseUrl.indexOf("/", 7);
-             String domain = baseUrl.substring(0, endIndexDomain);
-             String path = baseUrl.substring(endIndexDomain, baseUrl.length());
-
-             valuesMap.put("MyPath", path.split("\\?")[0]);
-             valuesMap.put("QueryParams", baseUrl.split("\\?")[1]);
+             valuesMap.put("MyPath", uri.getPath());
+             valuesMap.put("QueryParams", uri.getRawQuery());
              valuesMap.put("Body", rawApi.getRequest().getBody());
-             
+
+             String domain = uri.getScheme() + "://" + uri.getHost();
+             domain = (uri.getPort() != -1)  ? domain + ":" + uri.getPort() : domain;
              req.setUrl(domain);
              rawApi.setRequest(req);
              FuzzingTest fuzzingTest = new FuzzingTest(
@@ -120,8 +121,13 @@
                  if(testResponseLength >= 3 * originalResponseLength){
                      result.confidencePercentage = 100;
                      result.isVulnerable = true;
-                     return result;
+                 } else {
+                     result.isVulnerable = false;
+                     for (TestResult tr: result.testResults) {
+                        tr.setVulnerable(false);
+                     }
                  }
+                 return result;
              } catch (Exception e ) {
                  return null;
              }
