@@ -11,7 +11,7 @@ public class PortScanningViaSSRF extends BaseSSRFTest{
 
     @Override
     protected String getTemplateUrl() {
-        return "https://raw.githubusercontent.com/akto-api-security/tests-library/feature/port_scanning/SSRF/business-logic/port_scanning.yaml";
+        return "https://raw.githubusercontent.com/akto-api-security/tests-library/feature/fetch_sensitive_files_via_ssrf/SSRF/business-logic/port_scanning.yaml";
     }
 
     @Override
