@@ -113,6 +113,8 @@ export default {
         next() {
             if (this.currentStep === 3) {
                 this.$store.dispatch("onboarding/runTestOnboarding")
+            } else if (this.currentStep === 4) {
+                this.$router.push('/dashboard/testing/' + this.testingRunHexId + '/results')
             }
             if (this.currentStep + 1 > this.totalSteps) return
             this.currentStep += 1
@@ -139,6 +141,16 @@ export default {
             if (this.currentStep === 3) return !Boolean(this.selectedTestSuite)
             if (this.currentStep === 4) return false
         }
+    },
+    watch: {
+        testingRunHexId(newValue) {
+            if (newValue) {
+                this.currentStep = 4
+            }
+        }
+    },
+    destroyed() {
+        this.$store.dispatch('onboarding/unsetValues')
     }
 }
 </script>

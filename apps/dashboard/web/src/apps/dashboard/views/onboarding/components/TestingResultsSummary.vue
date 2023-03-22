@@ -1,41 +1,53 @@
 <template>
-    <div class="pa-5 testing-summary-div">
-        <div v-if="loading && this.testResults && this.testResults.length > 0" class="spinner-div">
-            <spinner :size="50"/>
+    <div class="pa-5 pb-0 testing-summary-div">
+        <div v-if="!this.testResults" class="spinner-div height-class">
+            <div class="main-loading-text">Scheduling test</div>
+            <spinner :size="12"/>
         </div>
-        <v-tabs
-            v-else
-            v-model="tab"
-            background-color="transparent"
-            color="basil"
-            grow
-            class="tabs"
-            :hide-slider="true"
-        >
-            <v-tab
-                v-for="(item,idx) in this.items"
-                :key="item"
-                active-class="tab-selected"
+        <div v-else>
+            <div class="loading-bar" v-if="loading">
+                <v-progress-linear :indeterminate="true" height="8" color="#6200EA" rounded></v-progress-linear>
+            </div>
+
+            <v-tabs
+                v-model="tab"
+                grow
+                class="severity-tabs"
+                :hide-slider="true"
             >
-                {{ item }}
-                <div :class="idx === tab ? 'count-chip count-chip-selected' : 'count-chip'">
-                    {{ idx }}
-                </div>
-            </v-tab>
-            <v-tabs-items v-model="tab">
-                <div style="padding-top: 26px; ">
-                    <div v-for="testResult in this.testResults" style="padding: 6px 0px 6px 0px">
-                        <testing-result-card
-                            :method= "testResult['method']"
-                            :path= "testResult['path']"
-                            :severity= "testResult['severity']"
-                            :vulnerability= "testResult['vulnerability']"
-                            :testName= "testResult['testName']"
-                        />
+                <v-tab
+                    v-for="(item,idx) in this.items"
+                    :key="item"
+                    active-class="tab-selected"
+                >
+                    {{ item }}
+                    <div :class="idx === tab ? 'count-chip count-chip-selected' : 'count-chip'">
+                        {{ testResults[idx].length }}
                     </div>
-                </div>
-            </v-tabs-items>
-        </v-tabs>
+                </v-tab>
+                <v-tabs-items v-model="tab" v-if="this.testResults">
+                    <div style="padding-top: 32px" class="height-class">
+                        <div v-if="this.testResults[tab] && this.testResults[tab].length > 0" class="fd-column" style="gap: 12px">
+                            <div v-for="testResult in this.testResults[tab]">
+                                <testing-result-card
+                                    :method= "testResult['method']"
+                                    :path= "testResult['path']"
+                                    :severity= "testResult['severity']"
+                                    :vulnerability= "testResult['vulnerability']"
+                                    :testName= "testResult['testName']"
+                                />
+                            </div>
+                        </div>
+                        <div v-else class="zero-div">
+                            <div class="d-flex jc-sa">
+                                <img src="/public/zero_logo.svg" class="zero-svg"/>
+                            </div>
+                            <div class="zero-issues-text">We have found 0 {{ items[tab].toLowerCase()}} issues, YAY!</div>
+                        </div>
+                    </div>
+                </v-tabs-items>
+            </v-tabs>
+        </div>
     </div>
 </template>
 
@@ -109,14 +121,15 @@ export default {
         if (!this.testingRunSummary) {
             this.refreshSummariesInterval = setInterval(() => {
                 this.refreshSummaries().then(() => {
-                if (this.testingRunResultSummaries.length !== 0) {
+                if (this.testingRunResultSummaries &&  this.testingRunResultSummaries.length !== 0) {
                     clearInterval(this.refreshSummariesInterval)
                 }
                 })
-            }, 2000)
+            }, 1000)
         }
 
         this.refreshTestResultsInterval = setInterval(() => {
+            if (!this.testingRunSummary) return
             api.fetchTestingRunResults(this.testingRunSummary.hexId).then(resp => {
                 this.testingRunResults = resp.testingRunResults
             })
@@ -127,7 +140,7 @@ export default {
                 clearInterval(this.refreshTestResultsInterval)
                 this.loading = false
             }
-        }, 5000)
+        }, 1000)
     },
     computed: {
         testResults() {
@@ -136,7 +149,9 @@ export default {
             let subCategoryFromSourceConfigMap = this.$store.state.issues.subCategoryFromSourceConfigMap
             let temp = []
 
-            this.testingRunResults.forEach((x) => {
+            let t = [...this.testingRunResults]
+
+            t.reverse().forEach((x) => {
                 if (x["vulnerable"] && temp.length < 3) {
                     temp.push(
                         {
@@ -150,8 +165,12 @@ export default {
                 }
             })
 
-            return temp
+            return [temp, [], []]
         }
+    },
+    destroyed() {
+        clearInterval(this.refreshSummariesInterval)
+        clearInterval(this.refreshTestResultsInterval)
     }
 }
 </script>
@@ -160,9 +179,9 @@ export default {
 
 .testing-summary-div
     width: 490px
-    height: 470px
 
-.tabs
+
+.severity-tabs
     background-color: #FAFAFA
     border-radius: 12px
 
@@ -192,13 +211,42 @@ export default {
     width: 22px
     height: 22px
 
-
 .count-chip-selected
     background-color: #47466A
 
 .spinner-div
     display: flex
     justify-content: center
-    height: 100%
     align-items: center
+
+.height-class
+    height: 390px
+
+.main-loading-text
+    font-weight: 500
+    font-size: 16px
+    color: var(--themeColorDark)
+    margin: 0px 6px 0px 0px
+
+.loading-bar
+    padding: 0px 0px 32px 0px
+    display: flex
+    align-items: center
+
+.zero-issues-text
+    font-weight: 500
+    font-size: 16px
+    line-height: 24px
+    text-align: center
+    color: #47466A
+
+.zero-div
+    display: flex
+    justify-content: center
+    flex-direction: column
+    height: 90%
+
+.zero-svg
+    width: 158.5px
+    height: 197.16px
 </style>

@@ -6,17 +6,22 @@ import router from "@/apps/main/router";
 
 Vue.use(Vuex)
 
-const state = {
-    loading: false,
-    selectedCollection: null,
-    selectedTestSuite: null,
-    authMechanismLoading: false,
-    authKey: null,
-    authValue: null,
-    runTestLoading: false,
-    testSuites: null,
-    testingRunHexId: null
+const getDefaultState = () => {
+    return {
+        loading: false,
+        selectedCollection: null,
+        selectedTestSuite: null,
+        authMechanismLoading: false,
+        authKey: null,
+        authValue: null,
+        runTestLoading: false,
+        testSuites: null,
+        testingRunHexId: null
+    }
 }
+
+
+const state = getDefaultState()
 
 const onboarding = {
     namespaced: true,
@@ -80,7 +85,11 @@ const onboarding = {
         },
         skipOnboarding() {
             return api.skipOnboarding()
+        },
+        unsetValues() {
+            Object.assign(state, getDefaultState())
         }
+
     },
     getters: {
     }
