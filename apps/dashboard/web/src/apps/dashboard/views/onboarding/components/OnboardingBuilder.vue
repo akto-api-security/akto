@@ -79,7 +79,7 @@ export default {
                     "showStepBuilder": true
                 },
                 {
-                    "title": "Select Tests",
+                    "title": "Select tests",
                     "subtitle": "Select tests you wish to run on your API endpoints.",
                     "buttonText": "Set Config",
                     "icon": "$fas_arrow-right",
