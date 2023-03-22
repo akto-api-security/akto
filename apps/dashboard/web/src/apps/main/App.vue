@@ -230,6 +230,10 @@
 
 .fw-500   
     font-weight: 500
+
+.z-80
+    zoom: 0.8
+        
 </style>
 
 <style lang="css">
@@ -264,6 +268,7 @@
         --themeColorDark16: #47466A19 ;
         --themeColorDark17: #47466A0D ;
         --themeColorDark18: #47466A08;
+        --themeColorDark19: #474667;
          
         --hexColor1: #1790FF;
         --hexColor2: #FF8717;
@@ -305,6 +310,7 @@
         --hexColor38: #00f;
         --hexColor39: #f2f2f2;
         --hexColor40: #5865F2;
+        --hexColor41: #F7F7F7;
 
         --primary: #126BFF;
         --quickStartTheme:#6200B0;

@@ -6,7 +6,7 @@
             </div>
         </template>
 
-        <v-list class="gray-menu">
+        <v-list class="gray-menu" v-if="items && items.length > 0">
             <v-list-item 
                 v-for="(item, index) in items"
                 :key=index
@@ -15,7 +15,11 @@
                 @click="item.click"
             >
                 <v-list-item-content class="content-nav-drawer">
-                    <v-list-item-title class="title-nav-drawer">{{item.label}}</v-list-item-title>
+          
+                    <v-list-item-title class="title-nav-drawer">
+                      <v-icon v-if="item.icon" size="12" color="#fff">{{ item.icon }}</v-icon>
+                      {{item.label}}
+                    </v-list-item-title>
                 </v-list-item-content>
             </v-list-item>
         </v-list>
@@ -31,7 +35,7 @@ export default {
     name: "SimpleMenu",
     props: {
         items: obj.arrR
-    }
+    },
 }
 </script>
 
@@ -45,7 +49,6 @@ export default {
     text-decoration-color: var(--white)      
 .content-nav-drawer
   padding: 4px 0
-
 .icon-nav-drawer
   justify-content: center
   align-self: center
@@ -53,14 +56,11 @@ export default {
   margin-bottom: 2px !important
   margin-right: 8px !important
   font-size: 13px
-
   & .v-icon
     color: white
     font-size: 16px
-
   & img
     max-width: 16px
-
 .gray-menu
   background-color: var(--hexColor15)
 
@@ -76,5 +76,4 @@ export default {
   margin-left: 0px !important
   font-weight: 400 !important
   font-size: 13px
-
 </style>
