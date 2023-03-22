@@ -20,7 +20,13 @@
 	"hostRequirements": {
 		"memory": "4gb"
 	},
-    "forwardPorts": [8080, 27017],
+    "forwardPorts": [27017],
+	"portsAttributes": {
+		"9090": {
+			"label": "Akto Dashboard",
+			"onAutoForward": "openBrowser"
+		}
+	},
 	"onCreateCommand": "cd apps/dashboard && npm install && cd ../.. && mvn clean install -DskipTests=true",
 	"customizations": {
 		"vscode": {
@@ -44,7 +50,7 @@
 								"commands": [
 												"export AKTO_MONGO_CONN=\"mongodb://localhost:27017\"",
 												"export DASHBOARD_MODE=\"local_deploy\"",
-												"mvn --projects :dashboard --also-make jetty:run"
+												"mvn --projects :dashboard --also-make jetty:run -Djetty.port=9090"
 											]
 							}
 						]
@@ -90,7 +96,7 @@
 								"commands": [
 												"export AKTO_MONGO_CONN=\"mongodb://localhost:27017\"",
 												"export DASHBOARD_MODE=\"local_deploy\"",
-												"mvn --projects :dashboard --also-make jetty:run"
+												"mvn --projects :dashboard --also-make jetty:run -Djetty.port=9090"
 											]
 							}
 						]

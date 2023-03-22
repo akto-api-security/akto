@@ -6,14 +6,14 @@ services:
     volumes:
       - ..:/workspace:cached
     command: sleep infinity
-    network_mode: service:db
+    network_mode: service:akto-db
     user: vscode
 
-  db:
+  akto-db:
     image: mongo:latest
     restart: unless-stopped
     volumes:
-      - mongodb-data:/data/db
+      - akto-mongo-data:/data/db
 
 volumes:
-  mongodb-data:
+  akto-mongo-data:
