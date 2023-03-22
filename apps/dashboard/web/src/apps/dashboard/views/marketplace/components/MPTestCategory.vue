@@ -30,15 +30,13 @@
 <script>
 import obj from "@/util/obj"
 import api from '../api'
-import issuesApi from '../../issues/api'
-
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
-
 export default {
     name: "MPTestCategory",
     props: {
         categoryType: obj.strR, 
-        categoryId: obj.strR
+        categoryId: obj.strR,
+        searchText: obj.strN,
     },
     components: {
         Spinner
@@ -62,14 +60,18 @@ export default {
         },
         isAktoTest(item) {
             return item.id.indexOf("http") == -1
-        }
+        },
+        intersection (list1, list2, isUnion = true) {
+            return list1.filter(
+                (set => a => isUnion === set.has(a.id))(new Set(list2.map(b => b.id)))
+            );
+        },
     },
     async mounted() {
         this.loading = true
-        let aktoTestTypes = await issuesApi.fetchAllSubCategories()
-        this.businessCategories = aktoTestTypes.subCategories
+        let searchedTests = await api.searchTestResults(this.searchText)
+        this.businessCategories = searchedTests.searchAktoTests
         let isDefaultCategory = this.categoryType === "default"
-
         if (isDefaultCategory) {
             let businessTests = this.businessCategories.filter(x => x.superCategory.name.toLowerCase() === this.categoryId.toLowerCase())
             this.testSourceConfigs = [...this.testSourceConfigs, ...businessTests.map(test => {
@@ -80,9 +82,9 @@ export default {
             })]
         }
         
-
         api.fetchTestingSources(isDefaultCategory, this.categoryId).then(resp => {
-            this.testSourceConfigs = [...this.testSourceConfigs, ...resp.testSourceConfigs];
+            let arr = this.intersection(resp.testSourceConfigs,searchedTests.searchResults)
+            this.testSourceConfigs = [...this.testSourceConfigs, ...arr];
             this.loading = false
         }).catch(() => {
             this.loading = false
