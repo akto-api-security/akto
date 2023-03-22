@@ -439,6 +439,26 @@ public class GlobalEnums {
                 }, new IssueTags[]{
                 IssueTags.OWASPTOP10,
                 IssueTags.HACKERONETOP10,
+        }),
+
+        FETCH_SENSITIVE_FILES(
+                "FETCH_SENSITIVE_FILES",
+                TestCategory.SSRF,
+                "Sensitive AWS details exposed due to SSRF",
+                "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing the URI parameter with metadata endpoint provided by AWS. The application responded with 2XX success code and also gave out sensitive AWS information in response.",
+                "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing the URI parameter with metadata endpoint provided by AWS. The application responded with 2XX success code and also gave out sensitive AWS information in response. Server-Side Request Forgery (SSRF) flaws occur whenever an API is fetching a remote resource without validating the user-supplied URL. It allows an attacker to coerce the application to send a crafted request to an unexpected destination, even when protected by a firewall or a VPN.\n" +
+                        "Modern concepts in application development make SSRF more common and more dangerous.\n" +
+                        "More common - the following concepts encourage developers to access an external resource based on user input: Webhooks, file fetching from URLs, custom SSO, and URL previews.\n" +
+                        "More dangerous - Modern technologies like cloud providers, Kubernetes, and Docker expose management and control channels over HTTP on predictable, well-known paths. Those channels are an easy target for an SSRF attack.\n" +
+                        "It is also more challenging to limit outbound traffic from your application, because of the connected nature of modern applications.\n" +
+                        "The SSRF risk can not always be completely eliminated. While choosing a protection mechanism, it is important to consider the business risks and needs.",
+                "Successful exploitation might compromise sensitive AWS information which attacker can use to get unauthorized access to AWS.",
+                new String[]{
+                        "https://github.com/OWASP/API-Security/blob/master/2023/en/src/0xa6-server-side-request-forgery.md",
+                        "https://www.akto.io/blog/how-to-prevent-server-side-request-forgery-ssrf-as-a-developer"
+                }, new IssueTags[]{
+                IssueTags.OWASPTOP10,
+                IssueTags.HACKERONETOP10,
         });
 
 

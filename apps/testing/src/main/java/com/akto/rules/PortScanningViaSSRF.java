@@ -31,6 +31,6 @@ public class PortScanningViaSSRF extends BaseSSRFTest{
 
     @Override
     protected boolean isResponseStatusCodeAllowed(int statusCode) {
-        return true; //allowing all status codes
+        return false; //allowing all status codes
     }
 }
