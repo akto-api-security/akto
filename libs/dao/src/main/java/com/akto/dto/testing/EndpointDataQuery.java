@@ -4,7 +4,7 @@ import java.util.ArrayList;
 
 public class EndpointDataQuery {
 
-private ArrayList<EndpointDataFilterCondition> filterConditions;
+    private ArrayList<EndpointDataFilterCondition> filterConditions;
     private ArrayList<EndpointDataSortCondition> sortConditions;
 
     public EndpointDataQuery() {}

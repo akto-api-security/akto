@@ -15,6 +15,7 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
+import com.akto.util.EndpointDataQueryBuilder;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -128,144 +129,17 @@ public class InventoryAction extends UserAction {
 
     public BasicDBObject executeEndpointDataQuery(EndpointDataQuery endpointDataQuery) {
 
-        ArrayList<Bson> filterList = new ArrayList<>();
-        List<Bson> sorts = new ArrayList<>();
-        String key, operator;
-        ArrayList<Object> values;
-        ArrayList<String> reqSensitiveParamsToBeAdded = new ArrayList<>();
-        ArrayList<String> respSensitiveParamsToBeAdded = new ArrayList<>();
-        int sortOrder;
-        String prefix;
-        Boolean sensitiveParamInQuery = false;
         response = new BasicDBObject();
 
-        List<String> queryOrder = Arrays.asList("apiCollectionId", "method", "authType", "accessType", "sensitiveTags", "url", "discoveredTs", "lastSeenTs");
-        
-        for (String queryParam: queryOrder) {
-            for (EndpointDataFilterCondition endpointDataFilterCondition: endpointDataQuery.getFilterConditions()) {
+        EndpointDataQueryBuilder endpointQueryBuilder = new EndpointDataQueryBuilder();
+        ArrayList<Bson> filterList = endpointQueryBuilder.buildEndpointDataFilterList(endpointDataQuery);
 
-                key = endpointDataFilterCondition.getKey();
-                values = endpointDataFilterCondition.getValues();
-                operator = endpointDataFilterCondition.getOperator();
-                if (!key.equals(queryParam)) {
-                    continue;
-                }
-
-                if (queryParam.equals("apiCollectionId")) {
-                    if (values.size() > 1) {
-                        filterList.add(Filters.in("_id." + key, values));
-                    } else if (values.size() == 1) {
-                        filterList.add(Filters.eq("_id." + key, ((Long) values.get(0)).intValue()));
-                    }
-                }
-
-                if (key.equals("method") || key.equals("authType") || key.equals("accessType")) {
-
-                    List<String> valuesWithPrefix = new ArrayList<>();
-                    prefix = key + "_";
-                    for (Object value: values) {
-                        valuesWithPrefix.add(prefix + value.toString());
-                    }
-
-                    if (operator.equals("AND")) {
-                        filterList.add(Filters.all("combinedData", valuesWithPrefix));
-                    } else if (operator.equals("NOT")) {
-                        filterList.add(Filters.nin("combinedData", valuesWithPrefix));
-                    } else if (operator.equals("OR")) {
-                        filterList.add(Filters.in("combinedData", valuesWithPrefix));
-                    }    
-                }
-
-                if (key.equals("sensitiveTags")) {
-                    sensitiveParamInQuery = true;
-                    List<String> alwaysSensitiveSubTypes = SingleTypeInfoDao.instance.sensitiveSubTypeNames();
-    
-                    List<String> sensitiveInResponse;
-                    List<String> sensitiveInRequest;
-                    sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
-                    sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
-                    //Map<String> sen
-        
-                    Set<String> sensitiveReqSet = new HashSet<>();
-                    for (Object param: values) {
-
-                        if (alwaysSensitiveSubTypes.contains(param)) {
-                            reqSensitiveParamsToBeAdded.add("reqSensitive_" + param);
-                            respSensitiveParamsToBeAdded.add("respSensitive_" + param);
-
-                        } else if (sensitiveInRequest.contains(param)) {
-                            reqSensitiveParamsToBeAdded.add("reqSensitive_" + param);
-                            
-                        } else if (sensitiveInResponse.contains(param)) {
-                            respSensitiveParamsToBeAdded.add("respSensitive_" + param);
-                        }
-                        // SingleTypeInfo.SubType subtype = SingleTypeInfo.subTypeMap.get(param);
-                        // subtype.getSensitivePosition()
-                        sensitiveReqSet.add(param.toString());
-                    }
-    
-                    if (sensitiveParamInQuery && (reqSensitiveParamsToBeAdded.size() + respSensitiveParamsToBeAdded.size()) == 0) {
-                        response.put("data", new BasicDBObject("endpoints", new ArrayList<EndpointDataResponse>()).append("total", 0));
-                        return response;
-                    } else {
-                        if (operator.equals("AND")) {
-                            filterList.add(Filters.or(Filters.all("combinedData", reqSensitiveParamsToBeAdded), 
-                            Filters.all("combinedData", respSensitiveParamsToBeAdded)));
-                        } else if (operator.equals("NOT")) {
-                            reqSensitiveParamsToBeAdded.addAll(respSensitiveParamsToBeAdded);
-                            filterList.add(Filters.nin("combinedData", reqSensitiveParamsToBeAdded));
-                        } else if (operator.equals("OR")) {
-
-                            filterList.add(Filters.or(Filters.in("combinedData", reqSensitiveParamsToBeAdded), 
-                            Filters.in("combinedData", respSensitiveParamsToBeAdded)));
-                        } 
-                    }
-                }
-
-                if (key.equals("url")) {
-                    filterList.add(Filters.regex("_id." + key, ".*"+values.get(0)+".*"));
-                }
-    
-                if (key.equals( "lastSeenTs") || key.equals("discoveredTs")) {
-    
-                    int ltTs = ((Long) values.get(0)).intValue();
-                    int gtTs =  ((Long) values.get(1)).intValue();
-                    if (gtTs > ltTs) {
-                        int temp = ltTs;
-                        ltTs = gtTs;
-                        gtTs = temp;   
-                    }
-                    filterList.add(Filters.and(Filters.lt(key, ltTs), Filters.gt(key, gtTs)));
-                }
-
-            }
+        if (filterList == null) {
+            response.put("data", new BasicDBObject("endpoints", new ArrayList<EndpointDataResponse>()).append("total", 0));
+            return response;
         }
 
-        Bson discoveredTsSort = Sorts.descending("discoveredTs");
-        Bson lastSeenTsSort = null;
-
-        for (EndpointDataSortCondition endpointDataSortCondition: endpointDataQuery.getSortConditions()) {
-            key = endpointDataSortCondition.getKey();
-            sortOrder = endpointDataSortCondition.getSortOrder();
-
-            if (key.equals("discoveredTs") && sortOrder == 1) {
-                discoveredTsSort = Sorts.ascending("discoveredTs");
-            }
-            if (key.equals("lastSeenTs")) {
-                if (sortOrder == -1) {
-                    lastSeenTsSort = Sorts.descending("lastSeenTs");
-                } else {
-                    lastSeenTsSort = Sorts.ascending("lastSeenTs");
-                }
-            }
-        }
-
-        sorts.add(discoveredTsSort);
-        if (lastSeenTsSort != null) {
-            sorts.add(lastSeenTsSort);
-        }
-
-        Bson sort = Sorts.orderBy(sorts);
+        Bson sort = endpointQueryBuilder.buildEndpointInfoSort(endpointDataQuery);
         List<SingleTypeInfoView> endpoints = SingleTypeInfoViewDao.instance.findAll(Filters.and(filterList), collectionPage * fetchEndpointsLimit, fetchEndpointsLimit, sort);
 
         List<EndpointDataResponse> resp = new ArrayList<>();

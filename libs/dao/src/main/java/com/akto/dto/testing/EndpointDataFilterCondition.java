@@ -6,11 +6,11 @@ public class EndpointDataFilterCondition {
     
     private String key;
     private String operator;
-    private ArrayList<Object> values;
+    private ArrayList<String> values;
 
     public EndpointDataFilterCondition() {}
 
-    public EndpointDataFilterCondition(String key, ArrayList<Object> values, String operator) {
+    public EndpointDataFilterCondition(String key, ArrayList<String> values, String operator) {
 
         this.key = key;
         this.operator = operator;
@@ -25,11 +25,11 @@ public class EndpointDataFilterCondition {
         this.key = key;
     }
 
-    public ArrayList<Object> getValues() {
+    public ArrayList<String> getValues() {
         return this.values;
     }
 
-    public void setValues(ArrayList<Object> values) {
+    public void setValues(ArrayList<String> values) {
         this.values = values;
     }
 

@@ -40,8 +40,27 @@
                     :fetchParams="fetchAllTableParams"
                     :processParams="prepareItemForTable"
                     :getColumnValueList="getColumnValueList"
-                    :rowsPerPage=50
+                    :rowsPerPageDefault="50"
                 >
+                
+                 <template #add-new-row-btn="{filteredItems}">
+                        <div style="align-items: center; display: flex;">
+                            <v-tooltip>
+                                <template v-slot:activator='{ on, attrs }'>
+                                    <v-btn icon primary dark color="#47466A" @click="showScheduleDialog(filteredItems)">
+                                        <v-icon>$fas_play</v-icon>
+                                    </v-btn>
+                                </template>
+                                "Run test"
+                            </v-tooltip>
+                            
+                        </div>
+                        
+                    </template>
+                <template #item.sensitiveTags="{item}">
+                    <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
+                </template>
+
                 </server-table>
 
             </template>
@@ -57,6 +76,11 @@
                     :processParams="prepareItemForTable"
                     :getColumnValueList="getColumnValueList"
                 >
+<!-- 
+                    <template #item.sensitiveTags="{item}">
+                        <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
+                    </template> -->
+                    
                 </server-table>
                 
                 <!-- <simple-table 
@@ -112,7 +136,7 @@
                         <v-btn icon primary dark color="var(--themeColor)" class="float-right" @click="() => {originalStateFromDb = null; showWorkflowTestBuilder = false}">
                             <v-icon>$fas_times</v-icon>
                         </v-btn>
-                        <workflow-test-builder :endpointsList="this.allEndpointsData" :apiCollectionId="apiCollectionId" :originalStateFromDb="originalStateFromDb" :defaultOpenResult="false" class="white-background"/>
+                        <workflow-test-builder :fetchAllEndpointsForWorkflow="this.fetchAllEndpointsForWorkflow" :apiCollectionId="apiCollectionId" :originalStateFromDb="originalStateFromDb" :defaultOpenResult="false" class="white-background"/>
                     </div>
                     
                 
@@ -311,7 +335,8 @@ export default {
             sensitiveDataKeys: [],
             totalEndpointCount: 0,
             sensitiveEndpointCount: 0,
-            allEndpointsData: []
+            allEndpointsData: [],
+            endpointDataQuery: {},
         }
     },
     methods: {
@@ -321,11 +346,17 @@ export default {
         rowClicked(row) {
             this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.endpoint + " " + row.method, type: 2})
         },
-        downloadData() {
+        async downloadData() {
+            
+            let allEndpointsData = []
+            await api.fetchAllEndpointData(this.apiCollectionId).then(resp => {
+                allEndpointsData = this.buildAllEndpointData(resp.allEndpoints)   
+            })
+
             let headerTextToValueMap = Object.fromEntries(this.tableHeaders.map(x => [x.text, x.value]).filter(x => x[0].length > 0));
 
             let csv = Object.keys(headerTextToValueMap).join(",")+"\r\n"
-            this.allEndpointsData.forEach(i => {
+            allEndpointsData.forEach(i => {
                 csv += Object.values(headerTextToValueMap).map(h => (i[h] || "-")).join(",") + "\r\n"
             })
             let blob = new Blob([csv], {
@@ -358,8 +389,9 @@ export default {
                 }
                 reader.onload = async () => {
                     let skipKafka = false;//window.location.href.indexOf("http://localhost") != -1
+                    let apiCollectionId = this.apiCollectionId
                     if (isHar) {
-                        await this.$store.dispatch('inventory/uploadHarFile', { content: JSON.parse(reader.result), filename: file.name, skipKafka})
+                        await this.$store.dispatch('inventory/uploadHarFile', { content: JSON.parse(reader.result), filename: file.name, skipKafka, apiCollectionId})
                     } else if (isPcap) {
                         var arrayBuffer = reader.result
                         var bytes = new Uint8Array(arrayBuffer);
@@ -435,7 +467,7 @@ export default {
                 color: this.$vuetify.theme.themes.dark.redMetric,
                 url: x.url,
                 method: x.method,
-                sensitiveTags: x.sensitiveParams.join(', '),
+                sensitiveTags: new Set(x.sensitiveParams),
                 lastSeenTs: x.lastSeenTs,
                 accessType: x.accessType,
                 authType: x.authTypes.join(', '),
@@ -445,7 +477,16 @@ export default {
 
         async fetchAllTableParams(sortKey, sortOrder, skip, limit, filters, filterOperators) {
             let query = this.buildFetchParamQuery(sortKey, sortOrder, skip, limit, filters, filterOperators)
+            this.endpointDataQuery = query
             return api.fetchEndpointData(query, skip/50)
+        },
+
+        async fetchAllEndpointsForWorkflow(apiCollectionId) {
+            let allEndpointsData = []
+            await api.fetchAllEndpointData(apiCollectionId).then(resp => {
+                allEndpointsData = this.buildAllEndpointData(resp.allEndpoints)   
+            })
+            return allEndpointsData
         },
 
         async fetchUnauthenticatedTableParams(sortKey, sortOrder, skip, limit, filters, filterOperators) {
@@ -537,7 +578,8 @@ export default {
         },
 
         async exportToPostman() {
-          var result = await this.$store.dispatch('inventory/exportToPostman')
+          let apiCollectionId = this.apiCollectionId
+          var result = await this.$store.dispatch('inventory/exportToPostman', {apiCollectionId})
           window._AKTO.$emit('SHOW_SNACKBAR', {
             show: true,
             text: "Exported to Postman!",
@@ -561,10 +603,6 @@ export default {
             api.fetchCollectionEndpointCountInfo(this.apiCollectionId).then(resp => {
                 this.totalEndpointCount = resp.totalEndpointCount
                 this.sensitiveEndpointCount = resp.sensitiveEndpointCount                
-            })
-
-            api.fetchAllEndpointData(this.apiCollectionId).then(resp => {
-                this.allEndpointsData = this.buildAllEndpointData(resp.allEndpoints)   
             })
 
             this.workflowTests = (await api.fetchWorkflowTests()).workflowTests.filter(x => x.apiCollectionId === this.apiCollectionId).map(x => {
@@ -593,16 +631,11 @@ export default {
             })
         },
         async startTest({recurringDaily, startTimestamp, selectedTests, testName, testRunTime, maxConcurrentRequests}) {
-            let apiInfoKeyList = this.toApiInfoKeyList(this.filteredItemsForScheduleTest)
-            let filtersSelected = this.filteredItemsForScheduleTest.length === this.allEndpointsData.length
             let store = this.$store
             let apiCollectionId = this.apiCollectionId
+            let endpointDataQuery = this.endpointDataQuery
             
-            if (filtersSelected) {
-                await store.dispatch('testing/scheduleTestForCollection', {apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests})
-            } else {
-                await store.dispatch('testing/scheduleTestForCustomEndpoints', {apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests})
-            }
+            await store.dispatch('testing/scheduleTestForCollection', {apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, endpointDataQuery})
             
             this.showTestSelectorDialog = false            
         }  

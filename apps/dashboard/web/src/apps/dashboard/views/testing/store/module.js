@@ -67,8 +67,8 @@ const testing = {
                 commit('SAVE_TESTING_RUNS', resp)
             })
         },
-        scheduleTestForCollection({commit}, {apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName,testRunTime, maxConcurrentRequests} ) {
-            return api.scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests).then((resp) => {
+        scheduleTestForCollection({commit}, {apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName,testRunTime, maxConcurrentRequests, endpointDataQuery} ) {
+            return api.scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, endpointDataQuery).then((resp) => {
                 commit('SAVE_TESTING_RUNS', resp)
             })
         },

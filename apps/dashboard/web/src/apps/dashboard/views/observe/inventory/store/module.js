@@ -184,8 +184,8 @@ const inventory = {
                 return resp
             })
         },
-        uploadHarFile({commit,state},{content,filename, skipKafka}) {
-            return api.uploadHarFile(content,state.apiCollectionId,skipKafka).then(resp => {
+        uploadHarFile({commit,state},{content, filename, skipKafka, apiCollectionId}) {
+            return api.uploadHarFile(content, apiCollectionId, skipKafka).then(resp => {
                 return resp
             })
         },
@@ -194,8 +194,8 @@ const inventory = {
                 return resp
             })
         },
-        exportToPostman({commit,state}) {
-            return api.exportToPostman(state.apiCollectionId).then(resp => {
+        exportToPostman({commit,state}, {apiCollectionId}) {
+            return api.exportToPostman(apiCollectionId).then(resp => {
                 return resp
             })
         },
