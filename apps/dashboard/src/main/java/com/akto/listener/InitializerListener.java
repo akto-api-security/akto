@@ -44,12 +44,14 @@ import com.mongodb.client.model.Updates;
 import com.sendgrid.helpers.mail.Mail;
 import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.Yaml;
 
 import javax.servlet.ServletContextListener;
 import java.io.File;
@@ -63,8 +65,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
-
-import static com.akto.util.Constants.ID;
 import static com.mongodb.client.model.Filters.eq;
 
 public class InitializerListener implements ServletContextListener {
@@ -97,6 +97,7 @@ public class InitializerListener implements ServletContextListener {
                 Context.accountId.set(1_000_000);
                 try {
                     executeTestSourcesFetch();
+                    editTestSourceConfig();
                 } catch (Exception e) {
 
                 }
@@ -108,6 +109,51 @@ public class InitializerListener implements ServletContextListener {
                 }
             }
         }, 0, 4, TimeUnit.HOURS);
+    }
+    static void editTestSourceConfig() throws IOException{
+        try {
+            List<TestSourceConfig> detailsTest = TestSourceConfigsDao.instance.findAll(new BasicDBObject()) ;
+            for(TestSourceConfig tsc : detailsTest){
+                String filePath = tsc.getId() ;
+                filePath = filePath.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/");
+                try {
+                    FileUtils.copyURLToFile(new URL(filePath), new File(filePath));
+                } catch (IOException e1) {
+                    e1.printStackTrace();
+                    continue;
+                }
+
+                Yaml yaml = new Yaml();
+                InputStream inputStream = java.nio.file.Files.newInputStream(new File(filePath).toPath());
+                Map<String, Map<String,Object>> data = yaml.load(inputStream);
+                if (data == null) data = new HashMap<>();
+
+                Map<String ,Object> currObj = data.get("info");
+                String description = (String) currObj.get("name");
+                tsc.setDescription(description);
+
+                String severity = (String) currObj.get("severity");
+                Severity castedSeverity = Severity.LOW ;
+                if(severity.toLowerCase() != "unknown"){
+                    castedSeverity = Severity.valueOf(severity.toUpperCase()) ;
+                    tsc.setSeverity(castedSeverity);
+                }
+                
+                String stringTags = (String) currObj.get("tags") ;
+                List<String> tags = new ArrayList<>();
+                if(stringTags != null){
+                    tags = Arrays.asList(stringTags.split(","));
+		            tsc.setTags(tags);
+                }
+                
+
+                TestSourceConfigsDao.instance.updateOne(Filters.eq("_id", tsc.getId()),
+                        Updates.combine(Updates.set("description", description),
+                                Updates.set("severity", castedSeverity), Updates.set("tags", tags)));
+            }
+        } catch (Exception e) {
+            // TODO: handle exception
+        }
     }
 
     static TestCategory findTestCategory(String path, Map<String, TestCategory> shortNameToTestCategory) {
@@ -160,7 +206,7 @@ public class InitializerListener implements ServletContextListener {
                     if (!currConfigsMap.containsKey(filePath)) {
                         TestCategory testCategory = findTestCategory(categoryFolder, shortNameToTestCategory);
                         String subcategory = findTestSubcategory(filePath);
-                        TestSourceConfig testSourceConfig = new TestSourceConfig(filePath, testCategory, subcategory, Severity.HIGH, "", TestSourceConfig.DEFAULT, Context.now());
+                        TestSourceConfig testSourceConfig = new TestSourceConfig(filePath, testCategory, subcategory, Severity.HIGH, "", TestSourceConfig.DEFAULT, Context.now(), new ArrayList<>());
                         TestSourceConfigsDao.instance.insertOne(testSourceConfig);
                     }
                     currConfigsMap.remove(filePath);

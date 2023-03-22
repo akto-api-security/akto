@@ -38,7 +38,7 @@
                                 </div>
                             </v-navigation-drawer>
                         </template>
-                    </layout-with-left-pane>
+                    </layout-with-left-pane>  
                 </div>
             </div>
             <v-dialog v-model="showCreateTestDialog" width="600px">
@@ -132,7 +132,6 @@ import SimpleTextField from '@/apps/dashboard/shared/components/SimpleTextField'
 import Search from  '@/apps/dashboard/shared/components/inputs/Search'
 
 import api from './api'
-import issuesApi from '../issues/api'
 import func from '@/util/func'
 import { mapState } from 'vuex'
 
@@ -144,9 +143,10 @@ export default {
         TestsLibrary,
         ACard,
         SimpleTextField,
-        Search
+        Search,
     },
     data() {
+      
         let allSeverities = ["HIGH", "MEDIUM", "LOW"]
         
         return {
@@ -164,8 +164,9 @@ export default {
                 description: ""
             },
             searchText: "",
+            searchItems:[],
             businessSubCategories: [],
-            testSourceConfigs:[],
+            searchUserItems:[],
         }
     },
     methods: {
@@ -184,32 +185,61 @@ export default {
                 })
             })
         },
-        nameToKvObj(names) {
-            return names.map(x => {
-                let category = x.split("/")[0]
-                let subCategory = x.split("/")[1]
-
-                let categoryShortName = this.businessCategoryShortNamesMap[category]
-                return {
-                    text: categoryShortName+"/"+subCategory,
-                    value: subCategory.toLowerCase().replaceAll(" ", "_")
-                }
-            })
-        },
-        onSearch(searchText) {
+        async onSearch(searchText) {
             this.searchText = searchText
-            var arr1 = this.searchTests(this.testSourceConfigs, "default")
-            var arr2 = this.searchTests(this.businessSubCategories, "default")
-            var arr3 = this.searchTests(this.userSubcategories,"custom")
-            if(arr2.length > 0){
-                Array.prototype.push.apply(arr1,arr2)
-            }
-            if(arr3.length > 0){
-                Array.prototype.push.apply(arr1,arr3)
-            }
+            this.searchItems = []
+            this.searchUserItems = []
+            await api.searchTestResults(this.searchText).then((resp) =>{
+                this.businessCategories = resp.categories
+                this.businessSubCategories = resp.searchAktoTests
+                let urlLink = "/dashboard/library/default/"
+                const objLink = new Set()
+                resp.searchAktoTests.forEach(item => {
+                    let obj = {
+                        title:item.superCategory.shortName + "/business-logic",
+                        link: urlLink + item.superCategory.name,
+                        icon: "$fas_plus",
+                        active:false,
+                    }
 
-            if(arr1.length > 0)
-                this.leftNavItems[0].items = arr1
+                    if(!objLink.has(obj.link)){
+                        objLink.add(obj.link)
+                        this.searchItems.push(obj)
+                    }
+                });
+
+                resp.searchResults.forEach((item)=>{
+                    let name = item.id.split("/")
+                    let obj = {}
+                    let isUser = false
+                    if(item.creator == 'default'){
+                        obj = {
+                            title: name[name.length - 3] + "/" + item.subcategory,
+                            link: urlLink + item.subcategory,
+                            icon: "$fas_plus",
+                            active:false,
+                        }
+                    }
+                    else{
+                        isUser = true
+                        obj = {
+                            title: name[name.length - 3] + "/" + item.subcategory,
+                            link: "/dashboard/library/custom/" + item.subcategory,
+                            icon: "$fas_plus",
+                            active:false,
+                        }
+                    }
+                    if(!objLink.has(obj.link)){
+                        objLink.add(obj.link)
+                        if(isUser)
+                            this.searchUserItems.push(obj)
+                        else{
+                            this.searchItems.push(obj)
+                        }
+                    }
+                })
+            })
+            this.$router.push(this.searchItems[0].link)
         },
         createCategoryObj(arrCategoryKv, creatorTitle, creatorType, colorType) {
             return {
@@ -218,81 +248,13 @@ export default {
                 group: "/dashboard/library/"+creatorType,
                 color: func.actionItemColors()[colorType],
                 active: true,
-                items: [
-                    ...this.filterOnSearchText(arrCategoryKv).map(category => {
-                        return {
-                            title: category.text,
-                            link: "/dashboard/library/"+creatorType+"/"+category.value,
-                            icon: "$fas_plus",
-                            active: false
-                        }
-                    })
-                ]
+                items: arrCategoryKv
             }
         },
-        searchTests(list,creatorType){
-            if(creatorType == 'custom'){
-                return this.filterOnSearchText(list).map(category => {
-                        return {
-                            title: category.text,
-                            link: "/dashboard/library/"+creatorType+"/"+category.value,
-                            icon: "$fas_plus",
-                            active: false
-                        }
-                    })
-            }
-            if (this.searchText && this.searchText != null) {
-                let arr = []
-                const objSet = new Set()
-                list.filter(item=>{
-                    var testName = ""
-                    var text = ""
-                    var link = "/dashboard/library/" + creatorType + "/"
-                    if(item.testName){
-                        if(item.testName.toLowerCase().indexOf(this.searchText.toLowerCase()) > -1){
-                            text =  item.superCategory.shortName + "/business-logic" 
-                            link = link + item.superCategory.name
-                        }
-                    }else if(item.addedEpoch){
-                        let name = item.id.split("/")
-                        var testName = name[name.length - 1].split(".")[0]
-                        if(testName.toLowerCase().indexOf(this.searchText.toLowerCase()) > -1){
-                            text = name[name.length - 3] + "/" + item.subcategory
-                            link = link + item.subcategory
-                        }
-                    }
-
-                    const obj = {
-                        title : text,
-                        link: link,
-                        icon: "$fas_plus",
-                        active: false,
-                    }
-                    
-                    if(!objSet.has(obj.link) && text.length > 0){
-                        objSet.add(obj.link)
-                        arr.push(obj)
-                    }
-                })
-                return arr
-            }
-        },
-        filterOnSearchText(list) {
-            if (this.searchText && this.searchText != null) {
-                return list.filter(x => JSON.stringify(x).toLowerCase().indexOf(this.searchText.toLowerCase()) > -1)
-            } else {
-                return list
-            }
-        }
     },
     async mounted() {
         await this.$store.dispatch('marketplace/fetchAllMarketplaceSubcategories')
-        let aktoTestTypes = await issuesApi.fetchAllSubCategories()
-        let aktoTests = await api.fetchAllMarketplaceSubcategories()
-        this.testSourceConfigs = aktoTests.testSourceConfigs
-        this.businessCategories = aktoTestTypes.categories
-        this.businessSubCategories = aktoTestTypes.subCategories
-        this.$router.push(this.leftNavItems[0].items[0].link)        
+        await this.onSearch(this.searchText)
     },
     computed: {
         ...mapState('marketplace', ['defaultSubcategories', 'userSubcategories', 'loading']),
@@ -328,8 +290,8 @@ export default {
         },
         leftNavItems() {
             return [
-                this.createCategoryObj(this.businessCategoryNames.concat(this.nameToKvObj(this.defaultSubcategories)), "Categories", "default", "This week"),
-                this.createCategoryObj(this.nameToKvObj(this.userSubcategories), "Your tests", "custom", "Total")
+                this.createCategoryObj(this.searchItems, "Categories", "default", "This week"),
+                this.createCategoryObj(this.searchUserItems, "Your tests", "custom", "Total")
             ]
         }
     }

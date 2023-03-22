@@ -1,13 +1,17 @@
 package com.akto.action.testing;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import com.akto.action.UserAction;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
+import com.akto.util.enums.GlobalEnums.TestSubCategory;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
@@ -29,7 +33,6 @@ public class MarketplaceAction extends UserAction {
         Bson creatorQ = Filters.ne(TestSourceConfig.CREATOR, "default");
         Bson subcategoryQ = Filters.eq(TestSourceConfig.SUBCATEGORY, subcategory);
         Bson filterQ = defaultCreator ? subcategoryQ : Filters.and(creatorQ, subcategoryQ);
-        
         this.testSourceConfigs = TestSourceConfigsDao.instance.findAll(filterQ);
         return Action.SUCCESS.toUpperCase();
     }   
@@ -38,6 +41,12 @@ public class MarketplaceAction extends UserAction {
     TestCategory category;
     Severity severity;
     String description;
+    List<String> tags;
+    String searchText;
+    List<TestSourceConfig> searchResults = new ArrayList<>();
+    private List<TestSubCategory> searchAktoTests;
+    private TestCategory[] categories;
+
     public String addCustomTest() {
         TestSourceConfig alreadyExists = TestSourceConfigsDao.instance.findOne("_id", url);
         if (alreadyExists != null) {
@@ -45,8 +54,49 @@ public class MarketplaceAction extends UserAction {
             return ERROR.toUpperCase();            
         }
 
-        TestSourceConfig elem = new TestSourceConfig(url, category, subcategory, severity, description, getSUser().getLogin(), Context.now());
+        TestSourceConfig elem = new TestSourceConfig(url, category, subcategory, severity, description, getSUser().getLogin(), Context.now(),tags);
         TestSourceConfigsDao.instance.insertOne(elem);
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    private void searchUtilityFunction(){
+        this.searchAktoTests = new ArrayList<>();
+        this.categories = GlobalEnums.TestCategory.values();
+        if(this.searchText == null){
+            for(TestSubCategory tsc : GlobalEnums.TestSubCategory.getValuesArray()){
+                this.searchAktoTests.add(tsc);
+            }
+            this.searchResults = TestSourceConfigsDao.instance.findAll(new BasicDBObject());
+        }
+
+        //fill from Updated test-source-config collection in mongodb
+        else{
+            this.searchResults = TestSourceConfigsDao.instance.findAll(Filters.or(
+                Filters.regex("severity", this.searchText, "i"),
+                Filters.regex("category", this.searchText, "i"),
+                Filters.regex("tags", this.searchText, "i"),
+                Filters.regex("description", this.searchText, "i"),
+                Filters.regex("subcategory", this.searchText, "i")
+            ));
+
+            this.searchText = this.searchText.toLowerCase();
+            //fill from akto tests in global enums
+            for(TestSubCategory tsc : GlobalEnums.TestSubCategory.getValuesArray()){
+                String testCategory = tsc.getSuperCategory().getName().toLowerCase();
+                String testSeverity = tsc.getSuperCategory().getSeverity().toString().toLowerCase();
+
+                String matchedString = tsc.getIssueDescription().toLowerCase() + " " + tsc.getTestName().toLowerCase() + " " + testCategory  + " " + testSeverity;
+
+                if(matchedString.matches("(.*)" + this.searchText + "(.*)")){
+                    this.searchAktoTests.add(tsc);
+                }
+
+            }
+        }
+    }
+
+    public String searchTestResults(){
+        this.searchUtilityFunction();
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -109,4 +159,41 @@ public class MarketplaceAction extends UserAction {
     public void setDescription(String description) {
         this.description = description;
     }
+
+    public List<String> getTags() {
+        return this.tags;
+    }
+
+    public void setTags(List<String> tags) {
+        this.tags = tags;
+    }
+
+    public List<TestSourceConfig> getSearchResults() {
+        return this.searchResults;
+    }
+
+    public void setSearchResults(List<TestSourceConfig> searchResults) {
+        this.searchResults = searchResults;
+    }
+
+    public String getSearchText() {
+        return this.searchText;
+    }
+
+    public void setSearchText(String searchText) {
+        this.searchText = searchText;
+    }
+
+    public List<TestSubCategory> getSearchAktoTests() {
+        return this.searchAktoTests;
+    }
+
+    public TestCategory[] getCategories() {
+        return categories;
+    }
+
+    public void setCategories(TestCategory[] categories) {
+        this.categories = categories;
+    }
+    
 }
