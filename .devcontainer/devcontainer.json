@@ -36,6 +36,17 @@
 											]
 							}
 						]   
+					},					{
+						"splitTerminals": [
+							{
+								"name": "Testing",
+								"commands": [
+												"export AKTO_MONGO_CONN=\"mongodb://localhost:27017\"",
+												"export DASHBOARD_MODE=\"local_deploy\"",
+												"java -jar apps/testing/target/testing-1.0-SNAPSHOT-jar-with-dependencies.jar"
+											]
+							}
+						]
 					},
 					{
 						"splitTerminals": [
@@ -45,18 +56,6 @@
 												"export AKTO_MONGO_CONN=\"mongodb://localhost:27017\"",
 												"export DASHBOARD_MODE=\"local_deploy\"",
 												"mvn --projects :dashboard --also-make jetty:run -Pdevcontainer"
-											]
-							}
-						]
-					},
-					{
-						"splitTerminals": [
-							{
-								"name": "Testing",
-								"commands": [
-												"export AKTO_MONGO_CONN=\"mongodb://localhost:27017\"",
-												"export DASHBOARD_MODE=\"local_deploy\"",
-												"java -jar apps/testing/target/testing-1.0-SNAPSHOT-jar-with-dependencies.jar"
 											]
 							}
 						]
