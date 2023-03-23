@@ -246,7 +246,11 @@ export default {
                     }
                 })
             })
-            this.$router.push(this.searchItems[0].link)
+            if(this.searchItems && this.searchItems.length > 0){
+                if(this.$route.path !== this.searchItems[0].link){
+                    this.$router.push(this.searchItems[0].link)
+                }
+            }
         },
         createCategoryObj(arrCategoryKv, creatorTitle, creatorType, colorType) {
             return {

@@ -32,6 +32,7 @@ import obj from "@/util/obj"
 import api from '../api'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
 import { mapState } from 'vuex'
+import { watch } from 'vue'
 export default {
     name: "MPTestCategory",
     props: {
@@ -47,7 +48,8 @@ export default {
             testSourceConfigs: [],
             categoryTitle: this.categoryId.replaceAll("_", " "),
             loading: false,
-            businessCategories: []
+            businessCategories: [],
+            path:"",
         }
     },
     methods: {
@@ -66,32 +68,46 @@ export default {
                 (set => a => isUnion === set.has(a.id))(new Set(list2.map(b => b.id)))
             );
         },
+        async showTests(searchText){
+            this.loading = true
+            let searchedTests = await api.searchTestResults(searchText)
+            this.businessCategories = searchedTests.inbuiltTests
+            let isDefaultCategory = this.categoryType === "default"
+            if (isDefaultCategory) {
+                // console.log(this.businessCategories)
+                let businessTests = this.businessCategories.filter(x => x.superCategory.name.toLowerCase() === this.categoryId.toLowerCase())
+                this.testSourceConfigs = [...this.testSourceConfigs, ...businessTests.map(test => {
+                    return {
+                        id: test.testName,
+                        description: test.issueDescription
+                    }
+                })]
+            }
+            api.fetchTestingSources(isDefaultCategory, this.categoryId).then(resp => {
+                let arr = this.intersection(resp.testSourceConfigs,searchedTests.searchResults)
+                this.testSourceConfigs = [...this.testSourceConfigs, ...arr];
+                this.loading = false
+            }).catch(() => {
+                this.loading = false
+            })
+            this.path = this.$route.path
+        }
     },
     async mounted() {
-        this.loading = true
-        let searchedTests = await api.searchTestResults(this.searchText)
-        this.businessCategories = searchedTests.inbuiltTests
-        let isDefaultCategory = this.categoryType === "default"
-        if (isDefaultCategory) {
-            let businessTests = this.businessCategories.filter(x => x.superCategory.name.toLowerCase() === this.categoryId.toLowerCase())
-            this.testSourceConfigs = [...this.testSourceConfigs, ...businessTests.map(test => {
-                return {
-                    id: test.testName,
-                    description: test.issueDescription
-                }
-            })]
-        }
-        
-        api.fetchTestingSources(isDefaultCategory, this.categoryId).then(resp => {
-            let arr = this.intersection(resp.testSourceConfigs,searchedTests.searchResults)
-            this.testSourceConfigs = [...this.testSourceConfigs, ...arr];
-            this.loading = false
-        }).catch(() => {
-            this.loading = false
-        })
+        this.showTests(this.searchText)
     },
     computed:{
         ...mapState('marketplace',['searchText'])
+    },
+    watch:{
+        searchText(newVal){
+            // console.log("hey")
+            if(this.path == this.$router.history._startLocation){
+                this.testSourceConfigs = []
+                this.businessCategories = []
+                this.showTests(newVal)
+            }
+        }
     }
 }
 </script>
