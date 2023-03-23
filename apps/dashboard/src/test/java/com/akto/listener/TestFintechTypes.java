@@ -34,6 +34,11 @@ public class TestFintechTypes extends MongoBasedTest {
                     assertFalse(cdt.validate("ACDE9458J", "foo"));
                     break;
                 
+                case "US ADDRESS":
+                    assertTrue(cdt.validate("123 MAIN ST, SAN JOSE, CA 11111", "123 MAIN ST SAN JOSE, CA 11111"));
+                    assertFalse(cdt.validate("PO BOX 123, SAN JOSE, CA 11111", "123 1ST AVE, SAN JOSE, CA 11111"));
+                    break;
+                
                 default:
                     break;
             }
