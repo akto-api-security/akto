@@ -98,33 +98,8 @@
                     </execution>
                 </executions>
             </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>single</goal>
-                        </goals>
-                        <configuration>
-                            <archive>
-                                <manifest>
-                                    <mainClass>
-                                        com.akto.runtime.Main
-                                    </mainClass>
-                                </manifest>
-                            </archive>
-                            <descriptorRefs>
-                                <descriptorRef>jar-with-dependencies</descriptorRef>
-                            </descriptorRefs>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
         </plugins>
+
         <sourceDirectory>src/main/java</sourceDirectory>
         <testSourceDirectory>src/test/java</testSourceDirectory>
         <resources>
@@ -137,5 +112,80 @@
             </resource>
         </resources>
     </build>
+
+            <profiles>         
+        <profile>
+        <id>normal</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <build>
+            <plugins>
+                     <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-assembly-plugin</artifactId>
+            <executions>
+                <execution>
+                    <phase>package</phase>
+                    <goals>
+                        <goal>single</goal>
+                    </goals>
+                    <configuration>
+                        <archive>
+                            <manifest>
+                                <mainClass>
+                                    com.akto.runtime.Main
+                                </mainClass>
+                            </manifest>
+                        </archive>
+                        <descriptorRefs>
+                            <descriptorRef>jar-with-dependencies</descriptorRef>
+                        </descriptorRefs>
+                    </configuration>
+                </execution>
+            </executions>
+        </plugin>
+        </plugins>
+        </build>
+    </profile>
+
+        <profile> 
+            <id>devcontainer</id>
+            <build>
+            <plugins>
+            <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-jar-plugin</artifactId>
+            <configuration>
+                <finalName>api-runtime-1.0-SNAPSHOT-jar-with-dependencies</finalName>
+                <archive>
+                <manifest>
+                    <addClasspath>true</addClasspath>
+                    <mainClass>com.akto.runtime.Main</mainClass>
+                    <classpathPrefix>dependency-jars/</classpathPrefix>
+                </manifest>
+                </archive>
+            </configuration>
+            </plugin>
+            <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-dependency-plugin</artifactId>
+            <executions>
+                <execution>
+                <id>copy-dependencies</id>
+                <phase>package</phase>
+                <goals>
+                    <goal>copy-dependencies</goal>
+                </goals>
+                <configuration>
+                    <outputDirectory>${project.build.directory}/dependency-jars/</outputDirectory>
+                </configuration>
+                </execution>
+            </executions>
+            </plugin>
+            </plugins>
+            </build>
+         </profile>
+        </profiles>
 
 </project>

@@ -89,9 +89,40 @@ Akto is really powerful in Cloud deployment if you can provide your application'
 
 
 
-## Develop and contribute
+# Develop and contribute
 
-#### Prerequisites
+## Quicksetup using [VSCode Devcontainers](https://code.visualstudio.com/docs/devcontainers/containers)
+
+### Prerequisites:
+
+1. [Install VSCode](https://code.visualstudio.com/)
+2. [Install VSCode Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)  
+3. **Windows:** [Docker Desktop](https://www.docker.com/products/docker-desktop) 2.0+ on Windows 10 Pro/Enterprise. Windows 10 Home (2004+) requires Docker Desktop 2.3+ and the [WSL 2 back-end](https://aka.ms/vscode-remote/containers/docker-wsl2). 
+4. **macOS**: [Docker Desktop](https://www.docker.com/products/docker-desktop) 2.0+.
+5. **Linux**: [Docker CE/EE](https://docs.docker.com/install/#supported-platforms) 18.06+ and [Docker Compose](https://docs.docker.com/compose/install) 1.21+.
+
+**Note**: If using Docker Desktop, consider changing the memory allocation to 8 GB for better performance
+
+### Steps:
+
+#### Clone repo and open in vscode
+
+1. Open terminal
+2. `mkdir ~/akto_code`
+3. `cd ~/akto_code`
+4. `git clone https://github.com/akto-api-security/akto`
+5. Open in VScode: `code akto`
+
+#### Start Dev Container
+
+1. Go to View > Command Palette and type: Dev Containers: Reopen in Container
+<img src="https://user-images.githubusercontent.com/125550503/225829693-0c627020-9fe3-4738-80e0-39f076780c3b.png"></img>
+2. Wait for the Dev Container to set up.
+3. Open **localhost:9090** in your web browser to see the Akto dashboard
+
+## Manual Setup Instructions
+
+### Prerequisites
 OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), npm(v8.15.0+), maven (v3.6.3 [link](https://dlcdn.apache.org/maven/maven-3/3.6.3/binaries/)), MongoDB (v5.0.3+ [link](https://www.mongodb.com/docs/manual/administration/install-community/))
 
 
@@ -122,9 +153,9 @@ OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), 
 3. `export AKTO_MONGO_CONN="mongodb://localhost:27017"`
 4. `export DASHBOARD_MODE="local_deploy"`
 5. `mvn clean install`
-6. `mvn --projects :dashboard --also-make jetty:run`
+6. `mvn --projects :dashboard --also-make jetty:run -Djetty.port=9090`
 
-##### Setup Testing
+#### Setup Testing
 
 1. `Open a new terminal tab`
 2. `cd ~/akto_code/akto`
@@ -134,12 +165,12 @@ OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), 
 6. `mvn compile; mvn exec:java -Dexec.mainClass="com.akto.testing.Main"`
 
 
-#### Play around
+### Play around
 
-1. Open `localhost:8080` in your favourite browser
+1. Open `localhost:9090` in your favourite browser
 2. You will need to signup when logging in for the first time, next time onwards you can login
 
-#### Debug
+### Debug
 1. To debug front end, install Vue.js Chrome extension from [here](https://devtools.vuejs.org/guide/installation.html).
 2. To debug backend, run the following before running web server - 
     a. Set MAVEN_OPTS variable to enable debugging on your Java process
