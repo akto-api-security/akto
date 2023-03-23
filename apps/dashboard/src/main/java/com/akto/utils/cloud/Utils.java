@@ -5,6 +5,11 @@ import com.amazonaws.services.cloudformation.AmazonCloudFormationClientBuilder;
 import com.amazonaws.services.cloudformation.model.DescribeStacksRequest;
 import com.amazonaws.services.cloudformation.model.DescribeStacksResult;
 import com.amazonaws.services.cloudformation.model.Tag;
+import com.amazonaws.services.ec2.AmazonEC2;
+import com.amazonaws.services.ec2.AmazonEC2ClientBuilder;
+import com.amazonaws.services.ec2.model.RebootInstancesRequest;
+import com.amazonaws.services.ec2.model.RebootInstancesResult;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,4 +35,14 @@ public class Utils {
         return stack.getTags();
     }
 
+    public static void rebootInstance(String instanceId){
+        final AmazonEC2 ec2 = AmazonEC2ClientBuilder.defaultClient();
+
+        RebootInstancesRequest request = new RebootInstancesRequest()
+                .withInstanceIds(instanceId);
+
+        RebootInstancesResult response = ec2.rebootInstances(request);
+        String responseString = response.toString();
+        logger.info(responseString);
+    }
 }

@@ -4,9 +4,13 @@ import com.akto.dao.AccountsDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.UserAccountEntry;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.testing.ApiExecutor;
+import com.akto.utils.cloud.Utils;
 import com.akto.utils.cloud.serverless.aws.Lambda;
 import com.akto.utils.cloud.stack.aws.AwsStack;
 import com.akto.utils.cloud.stack.dto.StackState;
@@ -25,6 +29,7 @@ import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
 
 import static com.mongodb.client.model.Filters.eq;
@@ -130,6 +135,21 @@ public class AccountAction extends UserAction {
             }
     }
 
+    public void dashboardReboot(){
+        try{
+            OriginalHttpRequest request = new OriginalHttpRequest("http://169.254.169.254/latest/meta-data/instance-id", "", "GET", "", new HashMap<>(), "");
+            OriginalHttpResponse response = null;
+            response = ApiExecutor.sendRequest(request,true);
+            if(response!=null && response.getStatusCode()<300){
+                String instanceId = response.getBody();
+                Utils.rebootInstance(instanceId);
+                loggerMaker.infoAndAddToDb("Dashboard instance rebooted", LogDb.DASHBOARD);
+            }
+        } catch (Exception e){
+            loggerMaker.errorAndAddToDb("Failed to update Akto Dashboard via instance reboot" + e, LogDb.DASHBOARD);
+        }
+    }
+
     public String takeUpdate() {
         if(checkIfStairwayInstallation()) {
             RefreshPreferences refreshPreferences = new RefreshPreferences();
@@ -149,7 +169,7 @@ public class AccountAction extends UserAction {
             loggerMaker.infoAndAddToDb("This is an old installation, updating via old way", LogDb.DASHBOARD);
             listMatchingLambda("InstanceRefresh");
         }
-        
+        dashboardReboot();
         return Action.SUCCESS.toUpperCase();
     }
 
