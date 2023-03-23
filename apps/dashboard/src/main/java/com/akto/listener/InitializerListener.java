@@ -111,48 +111,55 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 4, TimeUnit.HOURS);
     }
     static void editTestSourceConfig() throws IOException{
-        try {
-            List<TestSourceConfig> detailsTest = TestSourceConfigsDao.instance.findAll(new BasicDBObject()) ;
-            for(TestSourceConfig tsc : detailsTest){
-                String filePath = tsc.getId() ;
-                filePath = filePath.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/");
-                try {
-                    FileUtils.copyURLToFile(new URL(filePath), new File(filePath));
-                } catch (IOException e1) {
-                    e1.printStackTrace();
-                    continue;
-                }
+        List<TestSourceConfig> detailsTest = TestSourceConfigsDao.instance.findAll(new BasicDBObject()) ;
+        for(TestSourceConfig tsc : detailsTest){
+            String filePath = tsc.getId() ;
+            filePath = filePath.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/");
+            try {
+                FileUtils.copyURLToFile(new URL(filePath), new File(filePath));
+            } catch (IOException e1) {
+                e1.printStackTrace();
+                continue;
+            }
 
-                Yaml yaml = new Yaml();
-                InputStream inputStream = java.nio.file.Files.newInputStream(new File(filePath).toPath());
+            Yaml yaml = new Yaml();
+            InputStream inputStream = java.nio.file.Files.newInputStream(new File(filePath).toPath());
+            try {
                 Map<String, Map<String,Object>> data = yaml.load(inputStream);
                 if (data == null) data = new HashMap<>();
 
-                Map<String ,Object> currObj = data.get("info");
-                String description = (String) currObj.get("name");
-                tsc.setDescription(description);
-
-                String severity = (String) currObj.get("severity");
-                Severity castedSeverity = Severity.LOW ;
-                if(severity.toLowerCase() != "unknown"){
-                    castedSeverity = Severity.valueOf(severity.toUpperCase()) ;
-                    tsc.setSeverity(castedSeverity);
+                Map<String ,Object> currObj = new HashMap<>() ;
+                if(data != null){
+                    currObj = data.get("info");
                 }
-                
-                String stringTags = (String) currObj.get("tags") ;
-                List<String> tags = new ArrayList<>();
-                if(stringTags != null){
-                    tags = Arrays.asList(stringTags.split(","));
-		            tsc.setTags(tags);
-                }
-                
+                if(currObj != null){
+                    String description = (String) currObj.get("name");
+                    if(description != null){
+                        tsc.setDescription(description);
+                    }
 
-                TestSourceConfigsDao.instance.updateOne(Filters.eq("_id", tsc.getId()),
-                        Updates.combine(Updates.set("description", description),
-                                Updates.set("severity", castedSeverity), Updates.set("tags", tags)));
+                    String severity = (String) currObj.get("severity");
+                    Severity castedSeverity = Severity.LOW ;
+                    if(severity != null && severity.toLowerCase() != "unknown"){
+                        castedSeverity = Severity.valueOf(severity.toUpperCase()) ;
+                        tsc.setSeverity(castedSeverity);
+                    }
+                    
+                    String stringTags = (String) currObj.get("tags") ;
+                    List<String> tags = new ArrayList<>();
+                    if(stringTags != null){
+                        tags = Arrays.asList(stringTags.split(","));
+                        tsc.setTags(tags);
+                    }
+
+                    TestSourceConfigsDao.instance.updateOne(Filters.eq("_id", tsc.getId()),
+                            Updates.combine(Updates.set("description", description),
+                                    Updates.set("severity", castedSeverity), Updates.set("tags", tags)));
+                }
+            } catch (Exception e) {
+                // TODO: handle exception
             }
-        } catch (Exception e) {
-            // TODO: handle exception
+            
         }
     }
 

@@ -69,9 +69,8 @@ export default {
     },
     async mounted() {
         this.loading = true
-        console.log(this.searchText)
         let searchedTests = await api.searchTestResults(this.searchText)
-        this.businessCategories = searchedTests.searchAktoTests
+        this.businessCategories = searchedTests.inbuiltTests
         let isDefaultCategory = this.categoryType === "default"
         if (isDefaultCategory) {
             let businessTests = this.businessCategories.filter(x => x.superCategory.name.toLowerCase() === this.categoryId.toLowerCase())

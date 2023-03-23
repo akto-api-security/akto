@@ -187,7 +187,9 @@ export default {
         },
         setSearchText(searchText){
             this.searchText = searchText
-            this.onSearch()
+            if(this.searchText && this.searchText != null){
+                this.onSearch()
+            }
             this.$store.commit('marketplace/searchTestResults', { 'searchText': this.searchText })
         },
         async onSearch() {
@@ -196,10 +198,10 @@ export default {
 
             await api.searchTestResults(this.searchText).then((resp) =>{
                 this.businessCategories = resp.categories
-                this.businessSubCategories = resp.searchAktoTests
+                this.businessSubCategories = resp.inbuiltTests
                 let urlLink = "/dashboard/library/default/"
                 const objLink = new Set()
-                resp.searchAktoTests.forEach(item => {
+                resp.inbuiltTests.forEach(item => {
                     let obj = {
                         title:item.superCategory.shortName + "/business-logic",
                         link: urlLink + item.superCategory.name,
