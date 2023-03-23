@@ -1,0 +1,5 @@
+{
+    "types": [
+        {"name": "PAN CARD", "regexPattern" : "[A-Z]{5}[0-9]{4}[A-Z]{1}", "sensitive":false, "onKey": false, "active" : false}
+    ]
+}
