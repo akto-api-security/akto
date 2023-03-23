@@ -2,7 +2,6 @@ package com.akto.action.testing;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import com.akto.action.UserAction;
 import com.akto.dao.context.Context;
@@ -44,7 +43,7 @@ public class MarketplaceAction extends UserAction {
     List<String> tags;
     String searchText;
     List<TestSourceConfig> searchResults = new ArrayList<>();
-    private List<TestSubCategory> searchAktoTests;
+    private List<TestSubCategory> inbuiltTests;
     private TestCategory[] categories;
 
     public String addCustomTest() {
@@ -60,11 +59,11 @@ public class MarketplaceAction extends UserAction {
     }
 
     private void searchUtilityFunction(){
-        this.searchAktoTests = new ArrayList<>();
+        this.inbuiltTests = new ArrayList<>();
         this.categories = GlobalEnums.TestCategory.values();
         if(this.searchText == null){
             for(TestSubCategory tsc : GlobalEnums.TestSubCategory.getValuesArray()){
-                this.searchAktoTests.add(tsc);
+                this.inbuiltTests.add(tsc);
             }
             this.searchResults = TestSourceConfigsDao.instance.findAll(new BasicDBObject());
         }
@@ -82,13 +81,13 @@ public class MarketplaceAction extends UserAction {
             this.searchText = this.searchText.toLowerCase();
             //fill from akto tests in global enums
             for(TestSubCategory tsc : GlobalEnums.TestSubCategory.getValuesArray()){
-                String testCategory = tsc.getSuperCategory().getName().toLowerCase();
+                String testCategory = tsc.getSuperCategory().getDisplayName().toLowerCase();
                 String testSeverity = tsc.getSuperCategory().getSeverity().toString().toLowerCase();
 
                 String matchedString = tsc.getIssueDescription().toLowerCase() + " " + tsc.getTestName().toLowerCase() + " " + testCategory  + " " + testSeverity;
 
                 if(matchedString.matches("(.*)" + this.searchText + "(.*)")){
-                    this.searchAktoTests.add(tsc);
+                    this.inbuiltTests.add(tsc);
                 }
 
             }
@@ -184,8 +183,8 @@ public class MarketplaceAction extends UserAction {
         this.searchText = searchText;
     }
 
-    public List<TestSubCategory> getSearchAktoTests() {
-        return this.searchAktoTests;
+    public List<TestSubCategory> getinbuiltTests() {
+        return this.inbuiltTests;
     }
 
     public TestCategory[] getCategories() {
