@@ -402,8 +402,9 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
     public void createStiCollectionView() {
 
         int ts = 0;
-        
-        while(true) {
+        int iterations = 0;
+
+        while(iterations < 100) {
 
             SingleTypeInfoView singleTypeInfoView = SingleTypeInfoViewDao.instance.findLatestOne(new BasicDBObject(), Sorts.descending("discoveredTs"));
             if (singleTypeInfoView == null) {
@@ -443,7 +444,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             pipeline.add(Aggregates.merge(SingleTypeInfoViewDao.instance.getCollName()));
             instance.createOnDemandView(pipeline);
             
-            SingleTypeInfoViewDao.instance.getMCollection().createIndex(Indexes.text("discoveredTs"));
+            iterations++;
         }
     }
 

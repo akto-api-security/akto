@@ -76,25 +76,13 @@
                     :processParams="prepareItemForTable"
                     :getColumnValueList="getColumnValueList"
                 >
-<!-- 
+
                     <template #item.sensitiveTags="{item}">
                         <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
-                    </template> -->
+                    </template>
                     
                 </server-table>
                 
-                <!-- <simple-table 
-                    :headers="allEndpointsTableHeaders" 
-                    :items=sensitiveEndpoints 
-                    @rowClicked=rowClicked name="Sensitive"
-                >
-                    <template #item.sensitiveTags="{item}">
-                        <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
-                    </template>
-                    <template #item.tags="{item}">
-                        <tag-chip-group :tags="Array.from(item.tags || [])" />
-                    </template>
-                </simple-table> -->
             </template>
 
             <template slot="Unauthenticated">
@@ -109,6 +97,10 @@
                     :processParams="prepareItemForTable"
                     :getColumnValueList="getColumnValueList"
                 >
+                    <template #item.sensitiveTags="{item}">
+                        <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
+                    </template>
+
                 </server-table>
 
             </template>

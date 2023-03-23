@@ -48,7 +48,24 @@ public class EndpointDataQueryBuilder {
                     }
                 }
 
-                if (key.equals("method") || key.equals("authType") || key.equals("accessType")) {
+                if (key.equals("method")) {
+
+                    List<String> valuesWithPrefix = new ArrayList<>();
+                    prefix = key + "_";
+                    for (Object value: values) {
+                        valuesWithPrefix.add(prefix + value.toString());
+                    }
+
+                    if (operator.equals("AND")) {
+                        filterList.add(Filters.all("_id.method", valuesWithPrefix));
+                    } else if (operator.equals("NOT")) {
+                        filterList.add(Filters.nin("_id.method", valuesWithPrefix));
+                    } else if (operator.equals("OR")) {
+                        filterList.add(Filters.in("_id.method", valuesWithPrefix));
+                    }
+                }
+
+                if (key.equals("authType") || key.equals("accessType")) {
 
                     List<String> valuesWithPrefix = new ArrayList<>();
                     prefix = key + "_";
