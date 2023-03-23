@@ -89,7 +89,7 @@ Akto is really powerful in Cloud deployment if you can provide your application'
 # Develop and contribute
 
 <details>
-  <summary><h3>Quicksetup using [VSCode Devcontainers](https://code.visualstudio.com/docs/devcontainers/containers)</h3></summary>
+  <summary><h3>Quicksetup using VSCode Devcontainers</h3></summary>
 
 ### Prerequisites:
 
