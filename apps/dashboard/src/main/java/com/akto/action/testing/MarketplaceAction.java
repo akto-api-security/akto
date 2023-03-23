@@ -61,22 +61,22 @@ public class MarketplaceAction extends UserAction {
     private void searchUtilityFunction(){
         this.inbuiltTests = new ArrayList<>();
         this.categories = GlobalEnums.TestCategory.values();
+        Bson filters = Filters.empty();
         if(this.searchText == null){
             for(TestSubCategory tsc : GlobalEnums.TestSubCategory.getValuesArray()){
                 this.inbuiltTests.add(tsc);
             }
-            this.searchResults = TestSourceConfigsDao.instance.findAll(new BasicDBObject());
         }
 
         //fill from Updated test-source-config collection in mongodb
         else{
-            this.searchResults = TestSourceConfigsDao.instance.findAll(Filters.or(
+            filters = Filters.or(
                 Filters.regex("severity", this.searchText, "i"),
                 Filters.regex("category", this.searchText, "i"),
                 Filters.regex("tags", this.searchText, "i"),
                 Filters.regex("description", this.searchText, "i"),
                 Filters.regex("subcategory", this.searchText, "i")
-            ));
+            );
 
             this.searchText = this.searchText.toLowerCase();
             //fill from akto tests in global enums
@@ -92,6 +92,7 @@ public class MarketplaceAction extends UserAction {
 
             }
         }
+        this.searchResults = TestSourceConfigsDao.instance.findAll(filters);
     }
 
     public String searchTestResults(){
