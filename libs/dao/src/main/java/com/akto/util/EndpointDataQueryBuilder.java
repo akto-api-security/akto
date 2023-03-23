@@ -50,7 +50,6 @@ public class EndpointDataQueryBuilder {
 
                 if (key.equals("method")) {
 
-                    List<String> valuesWithPrefix = new ArrayList<>();
                     prefix = "_id." + key;
 
                     if (operator.equals("AND")) {
