@@ -491,8 +491,9 @@ export default {
             let query = this.buildFetchParamQuery(sortKey, sortOrder, skip, limit, filters, filterOperators)
 
             let sensitiveKeyFound = false;
-            for (let data in query.filterConditions) {
-                if (data.key == "sensitiveTags"){
+            for (let k in query.filterConditions) {
+                let val = query.filterConditions[k]
+                if (val.key == "sensitiveTags"){
                     sensitiveKeyFound = true;
                 }
             }

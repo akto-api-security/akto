@@ -51,17 +51,14 @@ public class EndpointDataQueryBuilder {
                 if (key.equals("method")) {
 
                     List<String> valuesWithPrefix = new ArrayList<>();
-                    prefix = key + "_";
-                    for (Object value: values) {
-                        valuesWithPrefix.add(prefix + value.toString());
-                    }
+                    prefix = "_id." + key;
 
                     if (operator.equals("AND")) {
-                        filterList.add(Filters.all("_id.method", valuesWithPrefix));
+                        filterList.add(Filters.all("_id.method", values));
                     } else if (operator.equals("NOT")) {
-                        filterList.add(Filters.nin("_id.method", valuesWithPrefix));
+                        filterList.add(Filters.nin("_id.method", values));
                     } else if (operator.equals("OR")) {
-                        filterList.add(Filters.in("_id.method", valuesWithPrefix));
+                        filterList.add(Filters.in("_id.method", values));
                     }
                 }
 
