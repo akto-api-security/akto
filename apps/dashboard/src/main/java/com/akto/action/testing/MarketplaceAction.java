@@ -8,6 +8,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.IssueTags;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.TestSubCategory;
@@ -83,9 +84,13 @@ public class MarketplaceAction extends UserAction {
             for(TestSubCategory tsc : GlobalEnums.TestSubCategory.getValuesArray()){
                 String testCategory = tsc.getSuperCategory().getDisplayName().toLowerCase();
                 String testSeverity = tsc.getSuperCategory().getSeverity().toString().toLowerCase();
+                String businessTags = "";
+                IssueTags[] issueTags  = tsc.getIssueTags();
+                for(IssueTags tag : issueTags){
+                    businessTags = businessTags + tag.getName().toLowerCase();
+                }
 
-                String matchedString = tsc.getIssueDescription().toLowerCase() + " " + tsc.getTestName().toLowerCase() + " " + testCategory  + " " + testSeverity;
-
+                String matchedString = tsc.getIssueDescription().toLowerCase() + " " + tsc.getTestName().toLowerCase() + " " + testCategory  + " " + testSeverity + " " + businessTags;
                 if(matchedString.matches("(.*)" + this.searchText + "(.*)")){
                     this.inbuiltTests.add(tsc);
                 }
