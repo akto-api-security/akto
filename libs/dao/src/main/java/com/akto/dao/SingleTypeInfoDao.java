@@ -545,6 +545,9 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         fieldNames = new String []{"_id.apiCollectionId", "_id.method", "combinedData", "lastSeenTs", "discoveredTs"};
         SingleTypeInfoViewDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
 
+        fieldNames = new String []{"_id.apiCollectionId", "_id.method", "_id.url"};
+        SingleTypeInfoViewDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
+
     }
 
 }
