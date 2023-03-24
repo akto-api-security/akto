@@ -56,4 +56,11 @@ public class AccountSettingsDao extends AccountsContextDao<AccountSettings> {
             Updates.set(AccountSettings.SHOW_ONBOARDING, value)
         );
     }
+
+    public void updateRunCreateStiViewFlag(boolean value) {
+        instance.updateOne(
+            AccountSettingsDao.generateFilter(),
+            Updates.set(AccountSettings.RUN_CREATE_STI_VIEW, value)
+        );
+    }
 }

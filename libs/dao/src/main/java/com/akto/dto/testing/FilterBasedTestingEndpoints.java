@@ -39,7 +39,7 @@ public class FilterBasedTestingEndpoints extends TestingEndpoints {
         List<ApiInfo.ApiInfoKey> apiInfoKeys = new ArrayList<>();
         
         for (SingleTypeInfoView singleTypeInfoView : endpoints) {
-            apiInfoKeys.add(new ApiInfo.ApiInfoKey(singleTypeInfoView.getId().getApiCollectionId(), singleTypeInfoView.getId().getUrl(), singleTypeInfoView.getId().getMethod()));
+            apiInfoKeys.add(singleTypeInfoView.getId());
         }
 
         return apiInfoKeys;

@@ -330,8 +330,15 @@ public class Main {
     }
 
     public static void createStiCollectionView() {
-        logger.info("create view called " + Context.now());
-        SingleTypeInfoDao.instance.createStiCollectionView();
+
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        boolean runCreateStiView = accountSettings == null ? true : accountSettings.getRunCreateStiView();
+
+        if (runCreateStiView) {
+            logger.info("create view called " + Context.now());
+            SingleTypeInfoDao.instance.createStiCollectionView();
+            AccountSettingsDao.instance.updateRunCreateStiViewFlag(true);
+        }
         logger.info("create merge called " + Context.now());
         SingleTypeInfoDao.instance.mergeStiViewAndApiInfo();
         logger.info("create index called " + Context.now());

@@ -124,7 +124,7 @@ public class EndpointDataQueryBuilder {
                 }
 
                 if (key.equals("url")) {
-                    filterList.add(Filters.regex("_id." + key, ".*"+values.get(0)+".*"));
+                    filterList.add(Filters.regex("_id." + key, ".*"+values.get(0)+".*", "i"));
                 }
     
                 if (key.equals( "lastSeenTs") || key.equals("discoveredTs")) {
@@ -136,7 +136,7 @@ public class EndpointDataQueryBuilder {
                         ltTs = gtTs;
                         gtTs = temp;   
                     }
-                    filterList.add(Filters.and(Filters.lt(key, ltTs), Filters.gt(key, gtTs)));
+                    filterList.add(Filters.and(Filters.lte(key, ltTs), Filters.gte(key, gtTs)));
                 }
 
             }
@@ -148,33 +148,30 @@ public class EndpointDataQueryBuilder {
 
         List<Bson> sorts = new ArrayList<>();
         String key;
-        Bson discoveredTsSort = Sorts.descending("discoveredTs");
-        Bson lastSeenTsSort = null;
         int sortOrder;
 
         for (EndpointDataSortCondition endpointDataSortCondition: endpointDataQuery.getSortConditions()) {
             key = endpointDataSortCondition.getKey();
             sortOrder = endpointDataSortCondition.getSortOrder();
 
-            if (key.equals("discoveredTs") && sortOrder == 1) {
-                discoveredTsSort = Sorts.ascending("discoveredTs");
-            }
-            if (key.equals("lastSeenTs")) {
-                if (sortOrder == -1) {
-                    lastSeenTsSort = Sorts.descending("lastSeenTs");
+            if (key.equals("discoveredTs")) {
+                if (sortOrder == 1) {
+                    sorts.add(Sorts.ascending("discoveredTs"));
                 } else {
-                    lastSeenTsSort = Sorts.ascending("lastSeenTs");
+                    sorts.add(Sorts.descending("discoveredTs"));
+                }
+            }
+
+            if (key.equals("lastSeenTs")) {
+                if (sortOrder == 1) {
+                    sorts.add(Sorts.ascending("lastSeenTs"));
+                } else {
+                    sorts.add(Sorts.descending("lastSeenTs"));
                 }
             }
         }
 
-        sorts.add(discoveredTsSort);
-        if (lastSeenTsSort != null) {
-            sorts.add(lastSeenTsSort);
-        }
-
         Bson sort = Sorts.orderBy(sorts);
-
         return sort;
     }
 

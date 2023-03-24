@@ -48,7 +48,7 @@ public class SampleMessageStore {
                 FilterBasedTestingEndpoints filterBasedTestingEndpoints = (FilterBasedTestingEndpoints) testingEndpoints;
                 EndpointDataQuery endpointDataQuery = filterBasedTestingEndpoints.getEndpointDataQuery();
                 for (EndpointDataFilterCondition endpointDataFilterCondition: endpointDataQuery.getFilterConditions()) {
-                    if (endpointDataFilterCondition.getKey() == "apiCollectionId") {
+                    if (endpointDataFilterCondition.getKey().equals("apiCollectionId")) {
                         apiCollectionId = Integer.parseInt((endpointDataFilterCondition.getValues().get(0)));
                     }
                 }
