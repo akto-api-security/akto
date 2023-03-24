@@ -153,6 +153,7 @@
   border-radius: 4px
   padding: 0px !important
   min-width: 0px !important
+  background: linear-gradient(100deg,var(--backgroundColor1) -17.13%,var(--themeColor) 99.86%)
 
 .logo-container  
   background: var(--white)
