@@ -101,12 +101,9 @@ export default {
     },
     watch:{
         searchText(newVal){
-            // console.log("hey")
-            if(this.path == this.$router.history._startLocation){
-                this.testSourceConfigs = []
-                this.businessCategories = []
-                this.showTests(newVal)
-            }
+            this.testSourceConfigs = []
+            this.businessCategories = []
+            this.showTests(newVal)
         }
     }
 }
