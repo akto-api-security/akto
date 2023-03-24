@@ -3,10 +3,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-public class JsonStringPayloadModifier {
+public class JsonStringKVModifier {
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    public static String jsonStringPayloadModifier(String data, String path, String newVal) throws Exception {
+    public static String jsonStringKVModifier(String data, String path, String newVal) throws Exception {
 
         try {
             JsonNode origRequestNode = mapper.readValue(data, JsonNode.class);

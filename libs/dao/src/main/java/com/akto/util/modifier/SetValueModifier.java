@@ -3,7 +3,7 @@ package com.akto.util.modifier;
 import java.util.HashMap;
 import java.util.Map;
 
-public class SetValueModifier extends PayloadModifier {
+public class SetValueModifier extends KVModifier {
 
     Map<String, Object> store = new HashMap<>();
 

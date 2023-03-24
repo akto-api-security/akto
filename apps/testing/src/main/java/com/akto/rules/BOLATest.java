@@ -11,7 +11,7 @@ import com.akto.store.TestingUtil;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.StatusCodeAnalyser;
 import com.akto.util.JSONUtils;
-import com.akto.util.modifier.ConvertToArrayPayloadModifier;
+import com.akto.util.modifier.ConvertToArrayKVModifier;
 import com.akto.util.modifier.NestedObjectModifier;
 
 import java.util.*;
@@ -51,7 +51,7 @@ public class BOLATest extends AuthRequiredRunAllTestPlugin {
         Set<String> privateStiParams = containsPrivateResourceResult.findPrivateParams();
         if (testRequest.isJsonRequest()) {
             OriginalHttpRequest testRequestArray = testRequest.copy();
-            String modifiedPayload = JSONUtils.modify(testRequestArray.getJsonRequestBody(), privateStiParams, new ConvertToArrayPayloadModifier());
+            String modifiedPayload = JSONUtils.modify(testRequestArray.getJsonRequestBody(), privateStiParams, new ConvertToArrayKVModifier());
             if (modifiedPayload != null) {
                 testRequestArray.setBody(modifiedPayload);
                 ExecutorResult executorResultArray = util(testRequestArray, rawApi, containsPrivateResourceResult);

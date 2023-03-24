@@ -1,7 +1,7 @@
 package com.akto.util;
 
 import com.akto.dto.type.RequestTemplate;
-import com.akto.util.modifier.PayloadModifier;
+import com.akto.util.modifier.KVModifier;
 import com.google.gson.Gson;
 import com.google.gson.JsonParser;
 import com.mongodb.BasicDBList;
@@ -109,11 +109,11 @@ public class JSONUtils {
         }
     }
 
-    public static String modify(String jsonBody, Set<String> values, PayloadModifier payloadModifier) {
+    public static String modify(String jsonBody, Set<String> values, KVModifier kvModifier) {
         try {
             BasicDBObject payload = RequestTemplate.parseRequestPayload(jsonBody, null);
             if (payload.isEmpty()) return null;
-            BasicDBObject modifiedPayload = modify(payload, values, payloadModifier);
+            BasicDBObject modifiedPayload = modify(payload, values, kvModifier);
             if (modifiedPayload.containsKey("json")) {
                 return new Gson().toJson(modifiedPayload.get("json"));
             }
@@ -124,13 +124,13 @@ public class JSONUtils {
         }
     }
 
-    public static BasicDBObject modify(BasicDBObject obj, Set<String> values, PayloadModifier payloadModifier) {
+    public static BasicDBObject modify(BasicDBObject obj, Set<String> values, KVModifier kvModifier) {
         BasicDBObject result = (BasicDBObject) obj.copy();
-        modify(result, "" ,values, payloadModifier);
+        modify(result, "" ,values, kvModifier);
         return result;
     }
 
-    private static void modify(Object obj, String prefix, Set<String> values, PayloadModifier payloadModifier) {
+    private static void modify(Object obj, String prefix, Set<String> values, KVModifier kvModifier) {
         if (obj instanceof BasicDBObject) {
             BasicDBObject basicDBObject = (BasicDBObject) obj;
             Set<String> keySet = basicDBObject.keySet();
@@ -140,14 +140,14 @@ public class JSONUtils {
                 String fullKey = prefix + (prefix.isEmpty() ? "" : "#") + key;
                 Object value = basicDBObject.get(key);
                 if (values.contains(fullKey)) {
-                    basicDBObject.put(key, payloadModifier.modify(key, value));
+                    basicDBObject.put(key, kvModifier.modify(key, value));
                 }
-                modify(value, fullKey, values, payloadModifier);
+                modify(value, fullKey, values, kvModifier);
             }
 
         } else if (obj instanceof BasicDBList) {
             for (Object elem: (BasicDBList) obj) {
-                modify(elem, prefix+(prefix.isEmpty() ? "$" : "#$"), values, payloadModifier);
+                modify(elem, prefix+(prefix.isEmpty() ? "$" : "#$"), values, kvModifier);
             }
         }
     }
@@ -173,7 +173,7 @@ public class JSONUtils {
 
 
 
-    public static Map<String, List<String>> modifyHeaderValues(Map<String, List<String>> headers, PayloadModifier payloadModifier) {
+    public static Map<String, List<String>> modifyHeaderValues(Map<String, List<String>> headers, KVModifier kvModifier) {
         if (headers == null) return null;
         boolean flag = false;
         Map<String, List<String>> modifiedHeaders = new HashMap<>(headers);
@@ -181,7 +181,7 @@ public class JSONUtils {
             List<String> values = modifiedHeaders.get(header);
             List<String> newValues = new ArrayList<>();
             for (String value: values) {
-                Object modifiedHeader = payloadModifier.modify(header, value);
+                Object modifiedHeader = kvModifier.modify(header, value);
                 if (modifiedHeader != null) {
                     newValues.add(modifiedHeader.toString());
                     flag = true;

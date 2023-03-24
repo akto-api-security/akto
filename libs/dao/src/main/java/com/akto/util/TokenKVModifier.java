@@ -10,12 +10,12 @@ import com.akto.dto.testing.AuthParam;
 
 import okhttp3.Cookie;
 
-public class TokenPayloadModifier {
+public class TokenKVModifier {
     
-    public static Boolean tokenPayloadModifier(OriginalHttpRequest request, String key, String value, AuthParam.Location where) {
+    public static Boolean tokenKVModifier(OriginalHttpRequest request, String key, String value, AuthParam.Location where) {
         if (where.toString().equals(AuthParam.Location.BODY.toString())) {
             try {
-                String resp = JsonStringPayloadModifier.jsonStringPayloadModifier(request.getBody(), key, value);
+                String resp = JsonStringKVModifier.jsonStringKVModifier(request.getBody(), key, value);
                 request.setBody(resp);
             } catch(Exception e) {
                 return false;

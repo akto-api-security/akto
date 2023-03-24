@@ -4,8 +4,8 @@ import com.akto.dto.HttpRequestParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.util.CookieTransformer;
 import com.akto.util.JSONUtils;
-import com.akto.util.JsonStringPayloadModifier;
-import com.akto.util.TokenPayloadModifier;
+import com.akto.util.JsonStringKVModifier;
+import com.akto.util.TokenKVModifier;
 import com.mongodb.BasicDBObject;
 
 import java.util.*;
@@ -29,13 +29,13 @@ public class HardcodedAuthParam extends AuthParam {
     @Override
     public boolean addAuthTokens(OriginalHttpRequest request) {
         if (this.key == null) return false;
-        return TokenPayloadModifier.tokenPayloadModifier(request, this.key, this.value, this.where);
+        return TokenKVModifier.tokenKVModifier(request, this.key, this.value, this.where);
     }
 
     @Override
     public boolean removeAuthTokens(OriginalHttpRequest request) {
         if (this.key == null) return false;
-        return TokenPayloadModifier.tokenPayloadModifier(request, this.key, null, this.where);
+        return TokenKVModifier.tokenKVModifier(request, this.key, null, this.where);
     }
 
     @Override

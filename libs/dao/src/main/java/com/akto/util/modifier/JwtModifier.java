@@ -12,7 +12,7 @@ import java.security.KeyFactory;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.*;
 
-public abstract class JwtModifier extends PayloadModifier {
+public abstract class JwtModifier extends KVModifier {
 
     static ObjectMapper mapper = new ObjectMapper();
     public abstract String jwtModify(String key, String value) throws Exception;

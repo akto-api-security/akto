@@ -2,7 +2,7 @@ package com.akto.util.modifier;
 
 import com.mongodb.BasicDBObject;
 
-public class NestedObjectModifier extends PayloadModifier {
+public class NestedObjectModifier extends KVModifier {
 
     @Override
     public Object modify(String key, Object value) {
