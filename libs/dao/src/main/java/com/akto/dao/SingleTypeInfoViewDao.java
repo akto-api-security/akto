@@ -29,7 +29,7 @@ public class SingleTypeInfoViewDao extends AccountsContextDao<SingleTypeInfoView
 
         Set<String> uniqueAuthTypes = new HashSet<>();
 
-        List<String> authTypes = singleTypeInfoView.getAllAuthTypes();
+        List<String> authTypes = singleTypeInfoView.getAuthTypes();
 
         if (authTypes == null) {
             return new ArrayList<>();

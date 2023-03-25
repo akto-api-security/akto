@@ -25,8 +25,6 @@ public class EndpointDataQueryBuilder {
         ArrayList<String> values;
         String prefix;
         Boolean sensitiveParamInQuery = false;
-        ArrayList<String> reqSensitiveParamsToBeAdded = new ArrayList<>();
-        ArrayList<String> respSensitiveParamsToBeAdded = new ArrayList<>();
 
         List<String> queryOrder = Arrays.asList("apiCollectionId", "method", "authType", "accessType", "sensitiveTags", "url", "discoveredTs", "lastSeenTs");
         
@@ -79,6 +77,8 @@ public class EndpointDataQueryBuilder {
                 }
 
                 if (key.equals("sensitiveTags")) {
+                    ArrayList<String> reqSensitiveParamsToBeAdded = new ArrayList<>();
+                    ArrayList<String> respSensitiveParamsToBeAdded = new ArrayList<>();
                     sensitiveParamInQuery = true;
                     List<String> alwaysSensitiveSubTypes = SingleTypeInfoDao.instance.sensitiveSubTypeNames();
     
@@ -106,7 +106,7 @@ public class EndpointDataQueryBuilder {
                         sensitiveReqSet.add(param.toString());
                     }
     
-                    if (sensitiveParamInQuery && (reqSensitiveParamsToBeAdded.size() + respSensitiveParamsToBeAdded.size()) == 0) {
+                    if (sensitiveParamInQuery && (reqSensitiveParamsToBeAdded.size() + respSensitiveParamsToBeAdded.size()) == 0 && !operator.equals("NOT")) {
                         return null;
                     } else {
                         if (operator.equals("AND")) {
