@@ -33,7 +33,34 @@ public class TestFintechTypes extends MongoBasedTest {
                     assertTrue(cdt.validate("ABCDE9458J", "foo"));
                     assertFalse(cdt.validate("ACDE9458J", "foo"));
                     break;
-                
+                case "US Medicare Health Insurance Claim Number":
+                    assertTrue(cdt.validate("123456789A1", "foo"));
+                    assertFalse(cdt.validate("ACDE9458J", "foo"));
+                    break;
+                case "Indian Unique Health Identification":
+                    assertTrue(cdt.validate("12345678912345", "foo"));
+                    assertFalse(cdt.validate("ACDE9458J", "foo"));
+                    break;
+                case "United Kingdom National Insurance Number":
+                    assertTrue(cdt.validate("AA123456A", "foo"));
+                    assertFalse(cdt.validate("ACDE9458J", "foo"));
+                    break;
+                case "Finnish Personal Identity Number":
+                    assertTrue(cdt.validate("210698-200T", "foo"));
+                    assertFalse(cdt.validate("ACDE9458J", "foo"));
+                    break;
+                case "Canadian Social Insurance Number":
+                    assertTrue(cdt.validate("123456789", "foo"));
+                    assertFalse(cdt.validate("ACDE9458J", "foo"));
+                    break;
+                case "German Insurance Identity Number":
+                    assertTrue(cdt.validate("12250953M123", "foo"));
+                    assertFalse(cdt.validate("ACDE9458J", "foo"));
+                    break;
+                case "Japanese Social Insurance Number":
+                    assertTrue(cdt.validate("012345678912", "foo"));
+                    assertFalse(cdt.validate("ACDE9458J", "foo"));
+                    break;
                 default:
                     break;
             }
