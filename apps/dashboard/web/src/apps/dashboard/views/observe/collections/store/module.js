@@ -20,8 +20,8 @@ const collections = {
             state.fetchTs = 0
             state.apiCollections = []
         },
-        SAVE_API_COLLECTION (state, {apiCollections}) {
-            state.apiCollections = apiCollections
+        SAVE_API_COLLECTION (state, {apiCollectionResponse}) {
+            state.apiCollections = apiCollectionResponse
         },
         CREATE_COLLECTION (state, {apiCollections}) {
             state.apiCollections.push(apiCollections[0])
@@ -56,7 +56,7 @@ const collections = {
             }).catch((err) => {})
         },
         deleteCollection({commit}, apiCollection, options) {
-            return api.deleteCollection(apiCollection.apiCollection.id).then((resp) => {
+            return api.deleteCollection(apiCollection.apiCollection.id, apiCollection.apiCollection.isLogicalGroup).then((resp) => {
                 commit('DELETE_COLLECTION', apiCollection.apiCollection.id, options)
             }).catch((err) => {})
         }

@@ -387,24 +387,26 @@ export default {
         })
     },
 
-    fetchCollectionEndpointCountInfo (apiCollectionId) {
+    fetchCollectionEndpointCountInfo (apiCollectionId, isLogicalGroup) {
         return request({
             url: '/api/fetchCollectionEndpointCountInfo',
             method: 'post',
             data: {
-                apiCollectionId: apiCollectionId
+                apiCollectionId: apiCollectionId,
+                isLogicalGroup: isLogicalGroup
             }
         }).then((resp) => {
             return resp.response.data
         })
     },
 
-    fetchAllEndpointData (apiCollectionId) {
+    fetchAllEndpointData (apiCollectionId, isLogicalGroup) {
         return request({
             url: '/api/fetchAllEndpointData',
             method: 'post',
             data: {
-                apiCollectionId: apiCollectionId
+                apiCollectionId: apiCollectionId,
+                isLogicalGroup: isLogicalGroup
             }
         }).then((resp) => {
             return resp.response.data

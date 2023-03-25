@@ -22,13 +22,10 @@ public class EndpointDataQueryBuilder {
 
         ArrayList<Bson> filterList = new ArrayList<>();
         String key, operator;
-        ArrayList<String> values;
-        String prefix;
-        Boolean sensitiveParamInQuery = false;
-        ArrayList<String> reqSensitiveParamsToBeAdded = new ArrayList<>();
-        ArrayList<String> respSensitiveParamsToBeAdded = new ArrayList<>();
+        ArrayList<String> values;        
+        Bson filters;
 
-        List<String> queryOrder = Arrays.asList("apiCollectionId", "method", "authType", "accessType", "sensitiveTags", "url", "discoveredTs", "lastSeenTs");
+        List<String> queryOrder = Arrays.asList("apiCollectionId", "logicalGroups", "method", "authType", "accessType", "sensitiveTags", "url", "discoveredTs", "lastSeenTs");
         
         for (String queryParam: queryOrder) {
             for (EndpointDataFilterCondition endpointDataFilterCondition: endpointDataQuery.getFilterConditions()) {
@@ -40,108 +37,171 @@ public class EndpointDataQueryBuilder {
                     continue;
                 }
 
-                if (queryParam.equals("apiCollectionId")) {
-                    if (values.size() > 1) {
-                        filterList.add(Filters.in("_id." + key, values));
-                    } else if (values.size() == 1) {
-                        filterList.add(Filters.eq("_id." + key, Integer.parseInt(values.get(0))));
-                    }
+                filters = buildApiCollectionFilter(key, values);
+                if (filters != null) {
+                    filterList.add(filters);
                 }
 
-                if (key.equals("method")) {
-
-                    prefix = "_id." + key;
-
-                    if (operator.equals("AND")) {
-                        filterList.add(Filters.all("_id.method", values));
-                    } else if (operator.equals("NOT")) {
-                        filterList.add(Filters.nin("_id.method", values));
-                    } else if (operator.equals("OR")) {
-                        filterList.add(Filters.in("_id.method", values));
-                    }
+                filters = buildLogicalGroupFilter(key, values);
+                if (filters != null) {
+                    filterList.add(filters);
                 }
 
-                if (key.equals("authType") || key.equals("accessType")) {
-
-                    List<String> valuesWithPrefix = new ArrayList<>();
-                    prefix = key + "_";
-                    for (Object value: values) {
-                        valuesWithPrefix.add(prefix + value.toString());
-                    }
-
-                    if (operator.equals("AND")) {
-                        filterList.add(Filters.all("combinedData", valuesWithPrefix));
-                    } else if (operator.equals("NOT")) {
-                        filterList.add(Filters.nin("combinedData", valuesWithPrefix));
-                    } else if (operator.equals("OR")) {
-                        filterList.add(Filters.in("combinedData", valuesWithPrefix));
-                    }    
+                filters = buildMethodFilter(key, values, operator);
+                if (filters != null) {
+                    filterList.add(filters);
                 }
 
-                if (key.equals("sensitiveTags")) {
-                    sensitiveParamInQuery = true;
-                    List<String> alwaysSensitiveSubTypes = SingleTypeInfoDao.instance.sensitiveSubTypeNames();
-    
-                    List<String> sensitiveInResponse;
-                    List<String> sensitiveInRequest;
-                    sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
-                    sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
-                    //Map<String> sen
-        
-                    Set<String> sensitiveReqSet = new HashSet<>();
-                    for (Object param: values) {
-
-                        if (alwaysSensitiveSubTypes.contains(param)) {
-                            reqSensitiveParamsToBeAdded.add("reqSensitive_" + param);
-                            respSensitiveParamsToBeAdded.add("respSensitive_" + param);
-
-                        } else if (sensitiveInRequest.contains(param)) {
-                            reqSensitiveParamsToBeAdded.add("reqSensitive_" + param);
-                            
-                        } else if (sensitiveInResponse.contains(param)) {
-                            respSensitiveParamsToBeAdded.add("respSensitive_" + param);
-                        }
-                        // SingleTypeInfo.SubType subtype = SingleTypeInfo.subTypeMap.get(param);
-                        // subtype.getSensitivePosition()
-                        sensitiveReqSet.add(param.toString());
-                    }
-    
-                    if (sensitiveParamInQuery && (reqSensitiveParamsToBeAdded.size() + respSensitiveParamsToBeAdded.size()) == 0) {
-                        return null;
-                    } else {
-                        if (operator.equals("AND")) {
-                            filterList.add(Filters.or(Filters.all("combinedData", reqSensitiveParamsToBeAdded), 
-                            Filters.all("combinedData", respSensitiveParamsToBeAdded)));
-                        } else if (operator.equals("NOT")) {
-                            reqSensitiveParamsToBeAdded.addAll(respSensitiveParamsToBeAdded);
-                            filterList.add(Filters.nin("combinedData", reqSensitiveParamsToBeAdded));
-                        } else if (operator.equals("OR")) {
-
-                            filterList.add(Filters.or(Filters.in("combinedData", reqSensitiveParamsToBeAdded), 
-                            Filters.in("combinedData", respSensitiveParamsToBeAdded)));
-                        } 
-                    }
+                filters = buildAuthTypeAndAccessTypeFilter(key, values, operator);
+                if (filters != null) {
+                    filterList.add(filters);
                 }
 
-                if (key.equals("url")) {
-                    filterList.add(Filters.regex("_id." + key, ".*"+values.get(0)+".*"));
-                }
-    
-                if (key.equals( "lastSeenTs") || key.equals("discoveredTs")) {
-    
-                    int ltTs = Integer.parseInt(values.get(0));
-                    int gtTs =  Integer.parseInt(values.get(1));
-                    if (gtTs > ltTs) {
-                        int temp = ltTs;
-                        ltTs = gtTs;
-                        gtTs = temp;   
-                    }
-                    filterList.add(Filters.and(Filters.lt(key, ltTs), Filters.gt(key, gtTs)));
+                filters = buildSensitiveTagFilter(key, values, operator);
+                if (key == "sensitiveTags" && filters == null) {
+                    return null;
+                } 
+                if (filters != null) {
+                    filterList.add(filters);
                 }
 
+                filters = buildUrlFilter(key, values, operator);
+                if (filters != null) {
+                    filterList.add(filters);
+                }
+
+                filters = buildTsFilter(key, values, operator);
+                if (filters != null) {
+                    filterList.add(filters);
+                }
             }
         }
         return filterList;
+    }
+
+    public Bson buildApiCollectionFilter(String key, List<String> values) {
+        Bson filters = null;
+        if (key.equals("apiCollectionId")) {
+            filters = Filters.eq("_id." + key, Integer.parseInt(values.get(0)));
+        }
+        return filters;
+    }
+    
+    public Bson buildLogicalGroupFilter(String key, List<String> values) {
+        Bson filters = null;
+        if (key.equals("logicalGroups")) {
+            filters = Filters.in("combinedData", "logicalGroup_" + Integer.parseInt(values.get(0)));
+        }
+        return filters;
+    }
+
+    public Bson buildMethodFilter(String key, List<String> values, String operator) {
+        Bson filters = null;
+        String actualKey;
+        if (key.equals("method")) {
+            actualKey = "_id." + key;
+            if (operator.equals("AND")) {
+                filters = Filters.all(actualKey, values);
+            } else if (operator.equals("NOT")) {
+                filters = Filters.nin(actualKey, values);
+            } else if (operator.equals("OR")) {
+                filters = Filters.in(actualKey, values);
+            }
+        }
+        return filters;
+    }
+
+    public Bson buildAuthTypeAndAccessTypeFilter(String key, List<String> values, String operator) {
+        Bson filters = null;
+        String prefix;
+        if (key.equals("authType") || key.equals("accessType")) {
+            List<String> valuesWithPrefix = new ArrayList<>();
+            prefix = key + "_";
+            for (Object value: values) {
+                valuesWithPrefix.add(prefix + value.toString());
+            }
+            if (operator.equals("AND")) {
+                filters = Filters.all("combinedData", valuesWithPrefix);
+            } else if (operator.equals("NOT")) {
+                filters = Filters.nin("combinedData", valuesWithPrefix);
+            } else if (operator.equals("OR")) {
+                filters = Filters.in("combinedData", valuesWithPrefix);
+            }    
+        }
+        return filters;
+    }
+
+    public Bson buildSensitiveTagFilter(String key, List<String> values, String operator) {
+        Bson filters = null;
+        ArrayList<String> reqSensitiveParamsToBeAdded = new ArrayList<>();
+        ArrayList<String> respSensitiveParamsToBeAdded = new ArrayList<>();
+        Boolean sensitiveParamInQuery = false;
+        
+        if (key.equals("sensitiveTags")) {
+            sensitiveParamInQuery = true;
+            List<String> alwaysSensitiveSubTypes = SingleTypeInfoDao.instance.sensitiveSubTypeNames();
+
+            List<String> sensitiveInResponse;
+            List<String> sensitiveInRequest;
+            sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
+            sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
+
+            Set<String> sensitiveReqSet = new HashSet<>();
+            for (Object param: values) {
+
+                if (alwaysSensitiveSubTypes.contains(param)) {
+                    reqSensitiveParamsToBeAdded.add("reqSensitive_" + param);
+                    respSensitiveParamsToBeAdded.add("respSensitive_" + param);
+
+                } else if (sensitiveInRequest.contains(param)) {
+                    reqSensitiveParamsToBeAdded.add("reqSensitive_" + param);
+                    
+                } else if (sensitiveInResponse.contains(param)) {
+                    respSensitiveParamsToBeAdded.add("respSensitive_" + param);
+                }
+                sensitiveReqSet.add(param.toString());
+            }
+
+            if (sensitiveParamInQuery && (reqSensitiveParamsToBeAdded.size() + respSensitiveParamsToBeAdded.size()) == 0) {
+                return null;
+            } else {
+                if (operator.equals("AND")) {
+                    filters = Filters.or(Filters.all("combinedData", reqSensitiveParamsToBeAdded), 
+                    Filters.all("combinedData", respSensitiveParamsToBeAdded));
+                } else if (operator.equals("NOT")) {
+                    reqSensitiveParamsToBeAdded.addAll(respSensitiveParamsToBeAdded);
+                    filters = Filters.nin("combinedData", reqSensitiveParamsToBeAdded);
+                } else if (operator.equals("OR")) {
+                    filters = Filters.or(Filters.in("combinedData", reqSensitiveParamsToBeAdded), 
+                    Filters.in("combinedData", respSensitiveParamsToBeAdded));
+                } 
+            }
+        }
+        return filters;
+    }
+
+    public Bson buildUrlFilter(String key, List<String> values, String operator) {
+        Bson filters = null;
+        if (key.equals("url")) {
+            filters = Filters.regex("_id." + key, ".*"+values.get(0)+".*");
+        }
+        return filters;
+    }
+
+    public Bson buildTsFilter(String key, List<String> values, String operator) {
+        Bson filters = null;
+        if (key.equals( "lastSeenTs") || key.equals("discoveredTs")) {
+    
+            int ltTs = Integer.parseInt(values.get(0));
+            int gtTs =  Integer.parseInt(values.get(1));
+            if (gtTs > ltTs) {
+                int temp = ltTs;
+                ltTs = gtTs;
+                gtTs = temp;   
+            }
+            filters = Filters.and(Filters.lt(key, ltTs), Filters.gt(key, gtTs));
+        }
+        return filters;
     }
 
     public Bson buildEndpointInfoSort(EndpointDataQuery endpointDataQuery) {

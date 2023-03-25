@@ -18,7 +18,7 @@
                     <div class="clickable download-csv d-flex">
                         <secondary-button 
                             :disabled=showNewRow 
-                            @click="showNewRow = true"
+                            @click="selectCreateNewCollection"
                             icon="$plusIcon"
                             text="Create new collections" />
 
@@ -75,6 +75,7 @@ import SimpleTextField from '@/apps/dashboard/shared/components/SimpleTextField'
 import BatchOperation from '../changes/components/BatchOperation'
 import ScheduleBox from '@/apps/dashboard/shared/components/ScheduleBox'
 import SecondaryButton from '@/apps/dashboard/shared/components/buttons/SecondaryButton'
+import CreateApiCollection from './CreateApiCollection'
 
 export default {
     name: "ApiCollections",
@@ -84,7 +85,8 @@ export default {
         SimpleTextField,
         BatchOperation,
         ScheduleBox,
-        SecondaryButton
+        SecondaryButton,
+        CreateApiCollection
     },
     
     data() {
@@ -106,6 +108,10 @@ export default {
                 {
                     text: "Discovered",
                     value: "detected"
+                },
+                {
+                    text: "Author",
+                    value: "author"
                 }
             ],
             actions: [ 
@@ -136,7 +142,8 @@ export default {
             ],
             showNewRow: false,
             deletedCollection: null,
-            showScheduleTestBox: false
+            showScheduleTestBox: false,
+            showCreationColletionDialogBox: false
         }
     },
     methods: {
@@ -151,7 +158,11 @@ export default {
             }
         },
         rowClicked(item) {
-            this.$emit("selectedItem", {type: 1, collectionName: item.name, apiCollectionId: item.id})
+            this.$emit("selectedItem", {type: 1, collectionName: item.name, apiCollectionId: item.id, isLogicalGroup: item.isLogicalGroup})
+        },
+        selectCreateNewCollection() {
+            this.showNewRow = true
+            this.showCreationColletionDialogBox = true
         },
         createCollection(name) {
           this.$store.dispatch('collections/createCollection', {name})
@@ -248,7 +259,8 @@ export default {
                     color: "var(--white)",
                     width: '0px',
                     endpoints: c["urlsCount"] || 0,
-                    detected: func.prettifyEpoch(c.startTs)
+                    detected: func.prettifyEpoch(c.startTs),
+                    author: c["createdBy"] || "System"
                 }
             })
         }

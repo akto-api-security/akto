@@ -1,6 +1,7 @@
 package com.akto.dto.testing;
 
 import java.util.List;
+import java.util.Set;
 
 import com.akto.dto.ApiInfo.ApiInfoKey;
 
@@ -14,6 +15,7 @@ public class SingleTypeInfoView {
     private List<String> reqSubTypes;
     private List<String> respSubTypes;
     private List<String> combinedData;
+    private Set<Integer> logicalGroups;
 
     public SingleTypeInfoView() {}
 
@@ -22,7 +24,8 @@ public class SingleTypeInfoView {
     }
     
     public SingleTypeInfoView(ApiInfoKey id, int discoveredTs, int lastSeenTs, String accessType,
-            List<String> authTypes, List<String> reqSubTypes, List<String> respSubTypes, List<String> combinedData) {
+            List<String> authTypes, List<String> reqSubTypes, List<String> respSubTypes, List<String> combinedData, 
+            Set<Integer> logicalGroups) {
         this.id = id;
         this.discoveredTs = discoveredTs;
         this.lastSeenTs = lastSeenTs;
@@ -31,6 +34,7 @@ public class SingleTypeInfoView {
         this.reqSubTypes = reqSubTypes;
         this.respSubTypes = respSubTypes;
         this.combinedData = combinedData;
+        this.logicalGroups = logicalGroups;
     }
 
     public ApiInfoKey getId() {
@@ -107,6 +111,14 @@ public class SingleTypeInfoView {
 
     public void setCombinedData(List<String> combinedData) {
         this.combinedData = combinedData;
+    }
+
+    public Set<Integer> getLogicalGroups() {
+        return logicalGroups;
+    }
+
+    public void setLogicalGroups(Set<Integer> logicalGroups) {
+        this.logicalGroups = logicalGroups;
     }
     
 }

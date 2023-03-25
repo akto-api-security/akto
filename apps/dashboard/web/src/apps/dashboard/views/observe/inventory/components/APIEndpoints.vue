@@ -180,7 +180,8 @@ export default {
         ServerTable
     },
     props: {
-        apiCollectionId: obj.numR
+        apiCollectionId: obj.numR,
+        isLogicalGroup: obj.boolR
     },
     activated(){
         this.refreshPage(true)
@@ -341,7 +342,7 @@ export default {
         async downloadData() {
             
             let allEndpointsData = []
-            await api.fetchAllEndpointData(this.apiCollectionId).then(resp => {
+            await api.fetchAllEndpointData(this.apiCollectionId, this.isLogicalGroup).then(resp => {
                 allEndpointsData = this.buildAllEndpointData(resp.allEndpoints)   
             })
 
@@ -475,7 +476,7 @@ export default {
 
         async fetchAllEndpointsForWorkflow(apiCollectionId) {
             let allEndpointsData = []
-            await api.fetchAllEndpointData(apiCollectionId).then(resp => {
+            await api.fetchAllEndpointData(apiCollectionId, this.isLogicalGroup).then(resp => {
                 allEndpointsData = this.buildAllEndpointData(resp.allEndpoints)   
             })
             return allEndpointsData
@@ -509,8 +510,12 @@ export default {
 
         buildFetchParamQuery(sortKey, sortOrder, skip, limit, filters, filterOperators) {
             let filterConditions = []
-            filterConditions.push({"key" : "apiCollectionId", "operator": "OR", "values": [this.apiCollectionId]})
 
+            if (!this.isLogicalGroup) {
+                filterConditions.push({"key" : "apiCollectionId", "operator": "OR", "values": [this.apiCollectionId]})
+            } else {
+                filterConditions.push({"key" : "logicalGroups", "operator": "OR", "values": [this.apiCollectionId]})
+            }
             for (let key in filters) {
                 let values = Array.from(filters[key])
                 let operator = filterOperators[key]
@@ -593,9 +598,9 @@ export default {
             // if (!this.apiCollection || this.apiCollection.length === 0 || this.$store.state.inventory.apiCollectionId !== this.apiCollectionId) {
             this.showWorkflowTestBuilder = false
 
-            api.fetchCollectionEndpointCountInfo(this.apiCollectionId).then(resp => {
+            api.fetchCollectionEndpointCountInfo(this.apiCollectionId, this.isLogicalGroup).then(resp => {
                 this.totalEndpointCount = resp.totalEndpointCount
-                this.sensitiveEndpointCount = resp.sensitiveEndpointCount                
+                this.sensitiveEndpointCount = resp.sensitiveEndpointCount        
             })
 
             this.workflowTests = (await api.fetchWorkflowTests()).workflowTests.filter(x => x.apiCollectionId === this.apiCollectionId).map(x => {

@@ -21,11 +21,11 @@ export default {
         })
     },
 
-    deleteCollection(apiCollectionId) {
+    deleteCollection(apiCollectionId, isLogicalGroup) {
         return request({
             url: '/api/deleteCollection',
             method: 'post',
-            data: {apiCollectionId}
+            data: {apiCollectionId, isLogicalGroup}
         }).then((resp) => {
             return resp
         })

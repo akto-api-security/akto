@@ -25,10 +25,10 @@ public class EndpointLogicalGroupDao extends AccountsContextDao<EndpointLogicalG
 
     public static final EndpointLogicalGroupDao instance = new EndpointLogicalGroupDao();
 
-    public EndpointLogicalGroup createLogicalGroup(String name, Conditions andConditions, Conditions orConditions, String user) {
+    public EndpointLogicalGroup createLogicalGroup(String name, Conditions andConditions, Conditions orConditions, String user, String groupType) {
         LogicalGroupTestingEndpoint testingEndpoint = new LogicalGroupTestingEndpoint(andConditions, orConditions);
         int createdTs = Context.now();
-        EndpointLogicalGroup endpointLogicalGroup = new EndpointLogicalGroup(new ObjectId(), createdTs, createdTs, user,name, testingEndpoint);
+        EndpointLogicalGroup endpointLogicalGroup = new EndpointLogicalGroup(createdTs, createdTs, user,name, testingEndpoint, groupType, Context.now());
         try {
             this.insertOne(endpointLogicalGroup);
             return endpointLogicalGroup;

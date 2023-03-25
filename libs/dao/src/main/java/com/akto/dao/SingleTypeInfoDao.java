@@ -459,7 +459,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             pipeline2.add(Aggregates.match(filter));
             pipeline2.add(Aggregates.unwind("$allAuthTypesFound"));
 
-            String combinedDataComputedJson = "{'$setUnion':[{'$ifNull': [ { '$map': {'input': '$$req_sens', 'as': 'reqs', 'in': {'$concat': ['reqSensitive_', '$$reqs']}} }, []]}, {'$ifNull': [ { '$map': {'input': '$$resp_sens', 'as': 'resps', 'in': {'$concat': ['respSensitive_', '$$resps']}} }, []]}, {'$ifNull': [ { '$map': {'input': '$allAuthTypesFound', 'as': 'auth', 'in': {'$concat': ['authType_', '$$auth']}} }, []]}, {'$ifNull': [[ {'$concat': ['accessType', '_', {'$first': '$apiAccessTypes'}]}], []]}, {'$ifNull': [[ {'$concat': ['method', '_', '$_id.method']}], []]}]}";
+            String combinedDataComputedJson = "{'$setUnion':[{'$ifNull': [ { '$map': {'input': '$$req_sens', 'as': 'reqs', 'in': {'$concat': ['reqSensitive_', '$$reqs']}} }, []]}, {'$ifNull': [ { '$map': {'input': '$$resp_sens', 'as': 'resps', 'in': {'$concat': ['respSensitive_', '$$resps']}} }, []]}, {'$ifNull': [ { '$map': {'input': '$allAuthTypesFound', 'as': 'auth', 'in': {'$concat': ['authType_', '$$auth']}} }, []]}, {'$ifNull': [[ {'$concat': ['accessType', '_', {'$first': '$apiAccessTypes'}]}], []]}, {'$ifNull': [[ {'$concat': ['method', '_', '$_id.method']}], []]}, {'$ifNull': [ { '$map': {'input': '$$logic_groups', 'as': 'lg', 'in': {'$concat': ['logicalGroup_', {'$toString':'$$lg'}]}} }, []]}]}";
             String accessTypeComputedJson = "{'$first': '$item.apiAccessTypes'}";
 
             pipeline2.add(
@@ -482,6 +482,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             vars.add(new Variable<>("view_id", "$_id"));
             vars.add(new Variable<>("req_sens", "$reqSubTypes"));
             vars.add(new Variable<>("resp_sens", "$respSubTypes"));
+            vars.add(new Variable<>("logic_groups", "$logicalGroups"));
 
             pipeline.add(Aggregates.lookup(ApiInfoDao.instance.getCollName(), vars, pipeline2, "item"));
 
