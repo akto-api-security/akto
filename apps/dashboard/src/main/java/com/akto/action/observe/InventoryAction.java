@@ -3,12 +3,14 @@ package com.akto.action.observe;
 import com.akto.action.UserAction;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.EndpointLogicalGroupDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.EndpointDataFilterCondition;
 import com.akto.dto.testing.EndpointDataQuery;
 import com.akto.dto.testing.EndpointDataResponse;
 import com.akto.dto.testing.EndpointDataSortCondition;
+import com.akto.dto.testing.EndpointLogicalGroup;
 import com.akto.dto.testing.SingleTypeInfoView;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
@@ -37,6 +39,7 @@ public class InventoryAction extends UserAction {
 
     int apiCollectionId = -1;
     int fetchEndpointsLimit = 50;
+    Boolean isLogicalGroup;
 
     BasicDBObject response;
 
@@ -163,13 +166,9 @@ public class InventoryAction extends UserAction {
         return response;
     }
 
-    public BasicDBObject buildEndpointCountInfo(int apiCollectionId) {
+    public BasicDBObject buildEndpointCountInfo(int apiCollectionId, Boolean isLogicalGroup) {
         BasicDBObject resp = new BasicDBObject();
 
-        //int depreCatedEndpoint = 
-        // init sensitiveEndpoint =
-
-        // List<String> allDataTypes = new ArrayList<>();
         Set<String> sensitiveSet = new HashSet<>();
         List<String> sensitiveReqList = new ArrayList<>();
         List<CustomDataType> customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject());
@@ -196,23 +195,37 @@ public class InventoryAction extends UserAction {
             sensitiveReqList.add(param);
         }
 
-        Bson collectionFilter = Filters.eq("_id.apiCollectionId", apiCollectionId);
-        int totalEndpointCount = (int) SingleTypeInfoViewDao.instance.findCount(collectionFilter);
+        int totalEndpointCount = 0;
+        int sensitiveEndpointCount = 0;
 
-        Bson filter = Filters.in("combinedData", sensitiveReqList);
-
-        int sensitiveEndpointCount = (int) SingleTypeInfoViewDao.instance.findCount(Filters.and(filter, collectionFilter));
+        if (!isLogicalGroup) {
+            Bson collectionFilter = Filters.eq("_id.apiCollectionId", apiCollectionId);
+            totalEndpointCount = (int) SingleTypeInfoViewDao.instance.findCount(collectionFilter);
+            Bson filter = Filters.in("combinedData", sensitiveReqList);
+            sensitiveEndpointCount = (int) SingleTypeInfoViewDao.instance.findCount(Filters.and(filter, collectionFilter));
+        } else {
+            Bson collectionFilter = Filters.in("combinedData", "logicalGroup_" + apiCollectionId);
+            totalEndpointCount = (int) SingleTypeInfoViewDao.instance.findCount(collectionFilter);
+            Bson filter = Filters.in("combinedData", sensitiveReqList);
+            sensitiveEndpointCount = (int) SingleTypeInfoViewDao.instance.findCount(Filters.and(filter, collectionFilter));
+        }
 
         resp.put("data", new BasicDBObject("totalEndpointCount", totalEndpointCount).append("sensitiveEndpointCount", sensitiveEndpointCount));
-
         return resp;
 
     }
 
-    public BasicDBObject fetchAllEndpointData(int apiCollectionId) {
+    public BasicDBObject fetchAllEndpointData(int apiCollectionId, Boolean isLogicalGroup) {
         BasicDBObject resp = new BasicDBObject();
 
-        Bson filter = Filters.eq("_id.apiCollectionId", apiCollectionId);
+        Bson filter;
+
+        if (!isLogicalGroup) {
+            filter = Filters.eq("_id.apiCollectionId", apiCollectionId);
+        } else {
+            filter = Filters.in("combinedData", "logicalGroup_" + apiCollectionId);
+        }
+
         List<SingleTypeInfoView> endpoints = SingleTypeInfoViewDao.instance.findAll(filter);
         List<EndpointDataResponse> allEndpoints = new ArrayList<>();
         for (SingleTypeInfoView data: endpoints) {
@@ -558,14 +571,22 @@ public class InventoryAction extends UserAction {
 
     public String fetchCollectionEndpointCountInfo() {
 
-        response = buildEndpointCountInfo(apiCollectionId);
+        if (isLogicalGroup == null) {
+            isLogicalGroup = false;
+        }
+
+        response = buildEndpointCountInfo(apiCollectionId, isLogicalGroup);
 
         return Action.SUCCESS.toUpperCase();
     }
 
     public String fetchAllEndpointData() {
 
-        response = fetchAllEndpointData(apiCollectionId);
+        if (isLogicalGroup == null) {
+            isLogicalGroup = false;
+        }
+
+        response = fetchAllEndpointData(apiCollectionId, isLogicalGroup);
 
         return Action.SUCCESS.toUpperCase();
     }
@@ -1005,12 +1026,12 @@ public class InventoryAction extends UserAction {
         this.endpointDataQuery = endpointDataQuery;
     }
 
-    // public List<SingleTypeInfoView> getEndpointDataResponse() {
-    //     return this.endpointDataResponse;
-    // }
+    public Boolean getIsLogicalGroup() {
+        return this.isLogicalGroup;
+    }
 
-    // public void setEndpointDataResponse(List<SingleTypeInfoView> endpointDataResponse) {
-    //     this.endpointDataResponse = endpointDataResponse;
-    // }
+    public void setIsLogicalGroup(Boolean isLogicalGroup) {
+        this.isLogicalGroup = isLogicalGroup;
+    }
 
 }
