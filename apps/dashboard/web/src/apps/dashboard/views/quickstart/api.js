@@ -1,11 +1,11 @@
 import request from '@/util/request'
 
 export default{
-    addBurpToken() {
+    addApiToken(tokenOrigin) {
         return request({
-            url: '/api/addBurpToken',
+            url: '/api/addApiToken',
             method: 'post',
-            data: {}
+            data: {tokenOrigin}
         }).then((resp) => {
             return resp
         })

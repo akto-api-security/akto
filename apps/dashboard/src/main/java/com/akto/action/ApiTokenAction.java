@@ -27,26 +27,24 @@ import java.util.List;
 public class ApiTokenAction extends UserAction implements ServletRequestAware {
     private static final int keyLength = 40;
     private static final RandomString randomString = new RandomString(keyLength);
+    private String tokenOrigin;
 
-    public String addBurpToken() {
+    public String addApiToken() {
         String username = getSUser().getLogin();
         String apiKey = randomString.nextString();
         if (apiKey == null || apiKey.length() != keyLength) return ERROR.toUpperCase();
 
-        ApiToken apiToken = new ApiToken(Context.now(),Context.accountId.get(),"burp_key",apiKey, Context.now(), username, ApiToken.Utility.BURP);
-        ApiTokensDao.instance.insertOne(apiToken);
-        apiTokenList = new ArrayList<>();
-        apiTokenList.add(apiToken);
-        return SUCCESS.toUpperCase();
-    }
-
-    public String addExternalApiToken() {
-        String username = getSUser().getLogin();
-        String apiKey = randomString.nextString();
-        if (apiKey == null || apiKey.length() != keyLength) return ERROR.toUpperCase();
-
-        ApiToken apiToken = new ApiToken(Context.now(),Context.accountId.get(),"external_key",apiKey, Context.now(),
-                username, ApiToken.Utility.EXTERNAL_API);
+        ApiToken apiToken = new ApiToken();
+        switch (tokenOrigin){
+            case "burp_key": 
+                apiToken = new ApiToken(Context.now(),Context.accountId.get(),"burp_key",apiKey, Context.now(), username, ApiToken.Utility.BURP);
+                break;
+            case "cicd_key":
+                apiToken = new ApiToken(Context.now(),Context.accountId.get(),"cicd_key",apiKey, Context.now(), username, ApiToken.Utility.CICD);
+                break;
+            default:
+            apiToken = new ApiToken(Context.now(),Context.accountId.get(),"external_key",apiKey, Context.now(), username, ApiToken.Utility.EXTERNAL_API);
+        }
         ApiTokensDao.instance.insertOne(apiToken);
         apiTokenList = new ArrayList<>();
         apiTokenList.add(apiToken);
@@ -160,6 +158,14 @@ public class ApiTokenAction extends UserAction implements ServletRequestAware {
 
     public boolean isApiTokenDeleted() {
         return apiTokenDeleted;
+    }
+
+    public String getTokenOrigin() {
+        return tokenOrigin;
+    }
+
+    public void setTokenOrigin(String tokenOrigin) {
+        this.tokenOrigin = tokenOrigin;
     }
 
     @Override

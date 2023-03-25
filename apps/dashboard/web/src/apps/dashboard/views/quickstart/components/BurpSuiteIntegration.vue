@@ -19,7 +19,7 @@ export default {
   },
   methods: {
     addBurpToken() {
-      api.addBurpToken().then((resp) => {
+      api.addApiToken("burp_key").then((resp) => {
         this.burp_tokens.push(...resp.apiTokenList)
         this.burp_tokens = [...this.burp_tokens]
       })

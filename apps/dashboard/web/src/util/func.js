@@ -587,6 +587,9 @@ export default {
             
             case "WEBHOOKS":
                 return {name: '$customwebhooks', color: '#fe7b5b'}
+
+            case "CI/CDINTEGERATION":
+                return {name: '$cicdicon', color: '#fe7b5b' }
         }
     },
 
