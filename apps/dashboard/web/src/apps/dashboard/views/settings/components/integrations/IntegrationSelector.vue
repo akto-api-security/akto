@@ -48,7 +48,6 @@
 <script>
 
 import IntegrationLogo from "@/apps/dashboard/shared/components/integrations/IntegrationLogo";
-import BurpSuiteIntegration from "./BurpSuiteIntegration"
 import SlackIntegration from "./SlackIntegration"
 import Postman from "./Postman"
 import AktoAPIIntegration from "./AktoApiIntegration"
@@ -58,7 +57,6 @@ export default {
   name: "IntegrationSelector",
   components: {
     IntegrationLogo,
-    BurpSuiteIntegration,
     SlackIntegration,
     Postman,
     AktoAPIIntegration,
@@ -70,7 +68,12 @@ export default {
         name:'Traffic Sources',
         connectors: [{
           name: 'BurpSuite',
-          component: BurpSuiteIntegration
+          component: AktoAPIIntegration,
+          props:{
+            title:"Burp",
+            tokenOrigin:"burp_key",
+            avatar_image:"$burpsuite"
+          }
         }],
       },
       {
@@ -84,7 +87,20 @@ export default {
         name: 'Automation',
         connectors: [{
           name: 'Akto API',
-          component: AktoAPIIntegration
+          component: AktoAPIIntegration,
+          props:{
+            title:"External APIs",
+            tokenOrigin:"external_key",
+            avatar_image:"$restapi"
+          }
+        },{
+          name: 'CI/CD Integeration',
+          component: AktoAPIIntegration,
+          props:{
+            title:"CI/CD Integeration",
+            tokenOrigin:"cicd_key",
+            avatar_image:"$cicdicon"
+          }
         }]
       },
       {
@@ -151,7 +167,6 @@ export default {
       setTimeout(() => this.scrolling = false, 500);
     },
     addConnector(type) {
-      console.log(type);
       this.$emit('connectorSelected', type)
     }
   }

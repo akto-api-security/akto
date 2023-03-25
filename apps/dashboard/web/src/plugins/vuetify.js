@@ -22,6 +22,7 @@ import Discord from "../apps/dashboard/shared/icons/Discord"
 import DeleteIcon from "../apps/dashboard/shared/icons/DeleteIcon"
 import DropDown from "../apps/dashboard/shared/icons/DropDown"
 import PlusIcon from "../apps/dashboard/shared/icons/PlusIcon"
+import CICDIcon from "../apps/dashboard/shared/icons/CICDIcon"
 
 Vue.component('font-awesome-icon', FontAwesomeIcon)
 
@@ -256,6 +257,10 @@ faIconsOpts.trashSingleTick = {
 
 faIconsOpts.trashDoubleTick = {
   component: TrashDoubleTick
+}
+
+faIconsOpts.cicdicon = {
+  component: CICDIcon
 }
 
 faIcons.forEach(x => faIconsOpts[x.prefix+"_"+x.iconName] = {
