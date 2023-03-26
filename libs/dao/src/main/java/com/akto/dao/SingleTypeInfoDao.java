@@ -459,8 +459,8 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             pipeline2.add(Aggregates.match(filter));
             pipeline2.add(Aggregates.unwind("$allAuthTypesFound"));
 
-            String combinedDataComputedJson = "{'$setUnion':[{'$ifNull': [ { '$map': {'input': '$$req_sens', 'as': 'reqs', 'in': {'$concat': ['reqSensitive_', '$$reqs']}} }, []]}, {'$ifNull': [ { '$map': {'input': '$$resp_sens', 'as': 'resps', 'in': {'$concat': ['respSensitive_', '$$resps']}} }, []]}, {'$ifNull': [ { '$map': {'input': '$allAuthTypesFound', 'as': 'auth', 'in': {'$concat': ['authType_', '$$auth']}} }, []]}, {'$ifNull': [[ {'$concat': ['accessType', '_', {'$first': '$apiAccessTypes'}]}], []]}, {'$ifNull': [[ {'$concat': ['method', '_', '$_id.method']}], []]}]}";
-            String accessTypeComputedJson = "{'$first': '$item.apiAccessTypes'}";
+            String combinedDataComputedJson = "{'$setUnion':[{'$ifNull': [ { '$map': {'input': '$$req_sens', 'as': 'reqs', 'in': {'$concat': ['reqSensitive_', '$$reqs']}} }, []]}, {'$ifNull': [ { '$map': {'input': '$$resp_sens', 'as': 'resps', 'in': {'$concat': ['respSensitive_', '$$resps']}} }, []]}, {'$ifNull': [ { '$map': {'input': '$allAuthTypesFound', 'as': 'auth', 'in': {'$concat': ['authType_', '$$auth']}} }, []]}, {'$ifNull': [ [  {'$concat': ['accessType_', { '$cond': [{'$gt': [{'$size': '$apiAccessTypes'}, 1]}, 'PUBLIC', {'$first': '$apiAccessTypes'}]}]}],[]]}, {'$ifNull': [[ {'$concat': ['method', '_', '$_id.method']}], []]}]}";
+            String accessTypeComputedJson = "{ '$cond': [{'$gt': [{'$size': {'$ifNull': ['$item.apiAccessTypes', [] ]} }, 1]}, 'PUBLIC', {'$ifNull': [{'$first': '$item.apiAccessTypes'}, '' ]}  ] }";
 
             pipeline2.add(
                 Aggregates.project(
