@@ -150,11 +150,22 @@ export default {
         async deleteMultipleCollections({items}) {
             let noOfItems = Object.keys(items).length
             if (noOfItems > 0) {
-                items.forEach(x => x.id = x.value)
+                items.forEach(this.buildRequestForMultiDelete)
                 let resp = await api.deleteMultipleCollections(items);
                 this.deletedCollection = ""+noOfItems+" collections";
                 this.successfullyDeleted();
                 this.$store.dispatch('collections/loadAllApiCollections')
+            }
+        },
+        buildRequestForMultiDelete(item, index, arr) {
+            arr[index].id = arr[index].value
+            arr[index].isLogicalGroup = false
+            for (let i = 0; i < this.apiCollectionsForTable.length; i++) {
+                if (this.apiCollectionsForTable[i].id == arr[index].id) {
+                    if (this.apiCollectionsForTable[i].isLogicalGroup != null) {
+                        arr[index].isLogicalGroup = this.apiCollectionsForTable[i].isLogicalGroup
+                    }
+                }
             }
         },
         rowClicked(item) {

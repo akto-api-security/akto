@@ -35,7 +35,7 @@ export default {
         return request({
             url: '/api/deleteMultipleCollections',
             method: 'post',
-            data: {apiCollections: items}
+            data: {apiCollectionResponse: items}
         })        
     }
 }

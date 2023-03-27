@@ -5,6 +5,9 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.bson.conversions.Bson;
 
@@ -30,6 +33,9 @@ import com.mongodb.client.model.WriteModel;
 public class SingleTypeInfoViewDao extends AccountsContextDao<SingleTypeInfoView>{
     
     public static final SingleTypeInfoViewDao instance = new SingleTypeInfoViewDao();
+    public static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
+
     @Override
     public String getCollName() {
         return "single_type_info_view";
@@ -234,7 +240,7 @@ public class SingleTypeInfoViewDao extends AccountsContextDao<SingleTypeInfoView
         EndpointLogicalGroupDao.instance.getMCollection().updateOne(
                 Filters.eq("_id", endpointLogicalGroup.getId()),
                 Updates.combine(
-                        Updates.set("endpointsRefreshTs", Context.now())
+                        Updates.set("endpointRefreshTs", Context.now())
                 )
         );
                 
@@ -244,8 +250,13 @@ public class SingleTypeInfoViewDao extends AccountsContextDao<SingleTypeInfoView
         EndpointLogicalGroup endpointLogicalGroup = EndpointLogicalGroupDao.instance.findOne(Filters.eq("_id", logicalGroupId));
 
         if (Context.now() - endpointLogicalGroup.getEndpointRefreshTs() > 300) {
-            // trigger in separate thread
-            buildLogicalGroup(endpointLogicalGroup);
+
+            executorService.schedule( new Runnable() {
+                public void run() {
+                    Context.accountId.set(1_000_000);
+                    buildLogicalGroup(endpointLogicalGroup);
+                }
+            }, 1 , TimeUnit.SECONDS);
         }   
     }
 

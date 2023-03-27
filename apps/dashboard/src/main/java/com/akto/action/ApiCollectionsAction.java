@@ -92,7 +92,7 @@ public class ApiCollectionsAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        Bson logicalGroupFilter = Filters.and(Filters.eq("groupType", "LOGICAL_GROUP"), Filters.eq("groupName", "collectionName"));
+        Bson logicalGroupFilter = Filters.and(Filters.eq("groupType", "LOGICAL_GROUP"), Filters.eq("groupName", collectionName));
         EndpointLogicalGroup logicalGroup = EndpointLogicalGroupDao.instance.findOne(logicalGroupFilter);
 
         if (logicalGroup != null) {
