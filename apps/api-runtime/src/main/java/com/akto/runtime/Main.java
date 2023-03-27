@@ -332,17 +332,17 @@ public class Main {
     public static void createStiCollectionView() {
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-        boolean runCreateStiView = accountSettings == null ? true : accountSettings.getRunCreateStiView();
+        boolean runCreateStiView = accountSettings == null ? false : accountSettings.getRunCreateStiView();
 
-        if (runCreateStiView) {
+        if (!runCreateStiView) {
+            AccountSettingsDao.instance.updateRunCreateStiViewFlag(true);
             logger.info("create view called " + Context.now());
             SingleTypeInfoDao.instance.createStiCollectionView();
-            AccountSettingsDao.instance.updateRunCreateStiViewFlag(true);
+            logger.info("create merge called " + Context.now());
+            SingleTypeInfoDao.instance.mergeStiViewAndApiInfo();
+            logger.info("create index called " + Context.now());
+            SingleTypeInfoDao.instance.createStiViewIndexes();
         }
-        logger.info("create merge called " + Context.now());
-        SingleTypeInfoDao.instance.mergeStiViewAndApiInfo();
-        logger.info("create index called " + Context.now());
-        SingleTypeInfoDao.instance.createStiViewIndexes();
     }
 
     public static void updateStiCollectionView() {
@@ -364,7 +364,7 @@ public class Main {
                 Context.accountId.set(1_000_000);
                 updateStiCollectionView();
             }
-        }, 10, 1, TimeUnit.MINUTES);
+        }, 7, 1, TimeUnit.MINUTES);
 
         try {
             AccountSettingsDao.instance.updateVersion(AccountSettings.API_RUNTIME_VERSION);

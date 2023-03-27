@@ -90,8 +90,8 @@
 
                 <server-table 
                     :headers="allEndpointsTableHeaders" 
-                    name="Sensitive" 
-                    sortKeyDefault="discoveredTs" 
+                    name="Sensitive"
+                    sortKeyDefault="discoveredTs"
                     :sortDescDefault="true"
                     @rowClicked="allEndpointTableRowClicked"
                     :fetchParams="fetchUnauthenticatedTableParams"
