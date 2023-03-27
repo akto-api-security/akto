@@ -26,6 +26,9 @@ import io.swagger.v3.oas.models.OpenAPI;
 import org.json.JSONObject;
 
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class PostmanAction extends UserAction {
 
@@ -221,6 +224,8 @@ public class PostmanAction extends UserAction {
 
     private boolean allowReplay;
 
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
     public String importDataFromPostman() throws Exception {
         if (api_key == null || api_key.length() == 0) {
             addActionError("Invalid postman key");
@@ -235,9 +240,21 @@ public class PostmanAction extends UserAction {
         addOrUpdateApiKey();
         PostmanCredential postmanCredential = fetchPostmanCredential();
 
-        Main main = new Main(postmanCredential.getApiKey());
-        String workspaceId = this.workspace_id;
-        loggerMaker.infoAndAddToDb("Fetching details for workspace_id:" + workspace_id, LogDb.DASHBOARD);
+
+        int accountId = Context.accountId.get();
+        executorService.schedule( new Runnable() {
+            public void run() {
+                Context.accountId.set(accountId);
+                importDataFromPostmanMain(workspace_id, postmanCredential.getApiKey(), skipKafka, allowReplay);
+            }
+        }, 1, TimeUnit.SECONDS);
+
+        return SUCCESS.toUpperCase();
+    }
+
+    private static void importDataFromPostmanMain(String workspaceId, String apiKey, boolean skipKafka, boolean allowReplay) {
+        Main main = new Main(apiKey);
+        loggerMaker.infoAndAddToDb("Fetching details for workspace_id:" + workspaceId, LogDb.DASHBOARD);
         JsonNode workspaceDetails = main.fetchWorkspace(workspaceId);
         JsonNode workspaceObj = workspaceDetails.get("workspace");
         ArrayNode collectionsObj = (ArrayNode) workspaceObj.get("collections");
@@ -250,8 +267,8 @@ public class PostmanAction extends UserAction {
             JsonNode collectionDetailsObj = collectionDetails.get("collection");
 
             String collectionName = collectionDetailsObj.get("info").get("name").asText();
-            
-            List<String> msgs = generateMessages(collectionDetails, aktoCollectionId, collectionName);
+
+            List<String> msgs = generateMessages(collectionDetailsObj, aktoCollectionId, collectionName, allowReplay);
 
             if(msgs.size() > 0) {
                 aktoFormat.put(aktoCollectionId, msgs);
@@ -269,10 +286,14 @@ public class PostmanAction extends UserAction {
             //For each entry, push a message to Kafka
             int aktoCollectionId = entry.getKey();
             List<String> msgs = entry.getValue();
-            Utils.pushDataToKafka(aktoCollectionId, topic, msgs, new ArrayList<>(), skipKafka);
+            try {
+                Utils.pushDataToKafka(aktoCollectionId, topic, msgs, new ArrayList<>(), skipKafka);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error while pushing data to kafka", LogDb.DASHBOARD);
+                return;
+            }
             loggerMaker.infoAndAddToDb(String.format("Pushed data in apicollection id %s", aktoCollectionId), LogDb.DASHBOARD);
         }
-        return SUCCESS.toUpperCase();
     }
 
     String postmanCollectionFile;
@@ -300,22 +321,32 @@ public class PostmanAction extends UserAction {
 
         aktoCollectionId = aktoCollectionId < 0 ? aktoCollectionId * -1: aktoCollectionId;
 
-        List<String> msgs = generateMessages(collectionDetailsObj, aktoCollectionId, collectionName);
+        int accountId = Context.accountId.get();
+        int finalAktoCollectionId = aktoCollectionId;
+        executorService.schedule(new Runnable() {
+            public void run() {
+                Context.accountId.set(accountId);
+                importDataFromPostmanFileMain(collectionDetailsObj, finalAktoCollectionId, collectionName,allowReplay, skipKafka);
+            }
+        }, 1, TimeUnit.SECONDS);
+
+        return SUCCESS.toUpperCase();
+    }
+
+    private static void importDataFromPostmanFileMain(JsonNode collectionDetailsObj, int aktoCollectionId, String collectionName, boolean allowReplay, boolean skipKafka) {
+        List<String> msgs = generateMessages(collectionDetailsObj, aktoCollectionId, collectionName, allowReplay);
 
         String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
         try {
             Utils.pushDataToKafka(aktoCollectionId, topic, msgs, new ArrayList<>(), skipKafka);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error pushing data to kafka", LogDb.DASHBOARD);
-            return ERROR.toUpperCase();
+            return;
         }
         loggerMaker.infoAndAddToDb(String.format("Pushed data in apicollection id %s", aktoCollectionId), LogDb.DASHBOARD);
-
-
-        return SUCCESS.toUpperCase();
     }
 
-    private List<String> generateMessages(JsonNode collectionDetailsObj, int aktoCollectionId, String collectionName) {
+    private static List<String> generateMessages(JsonNode collectionDetailsObj, int aktoCollectionId, String collectionName, boolean allowReplay) {
         List<String> msgs = new ArrayList<>();
         Map<String, String> variablesMap = Utils.getVariableMap((ArrayNode) collectionDetailsObj.get("variable"));
         ArrayList<JsonNode> jsonNodes = new ArrayList<>();
