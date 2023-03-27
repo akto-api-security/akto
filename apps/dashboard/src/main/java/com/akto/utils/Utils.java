@@ -115,10 +115,7 @@ public class Utils {
                     statusCode =  res.getStatusCode()+"";
                     status =  "";
                 } else {
-                    responseHeadersString = "{}";
-                    responsePayload = null;
-                    statusCode =  "0";
-                    status =  "";
+                    return null;
                 }
             } else {
                 Map<String, String> responseHeadersMap = getHeaders((ArrayNode) response.get("header"), variables);
