@@ -128,8 +128,49 @@ public class SingleTypeInfoViewDao extends AccountsContextDao<SingleTypeInfoView
         return false;
     }
 
+    public int getLogicalEndpointMatchingCount(EndpointLogicalGroup endpointLogicalGroup) {
+        List<SingleTypeInfoView> singleTypeInfoViewList = getMatchingStiViewObjects(endpointLogicalGroup);
+        return singleTypeInfoViewList.size();
+    }
+
     public void buildLogicalGroup(EndpointLogicalGroup endpointLogicalGroup) {
 
+        List<SingleTypeInfoView> singleTypeInfoViewList = getMatchingStiViewObjects(endpointLogicalGroup);
+
+        List<WriteModel<SingleTypeInfoView>> stiViewUpdates = new ArrayList<>();
+
+        for (SingleTypeInfoView singleTypeInfoView: singleTypeInfoViewList) {
+            List<Bson> updates = new ArrayList<>();
+            updates.add(Updates.addToSet("logicalGroups", endpointLogicalGroup.getId()));
+            updates.add(Updates.addToSet("combinedData", "logicalGroup_" + endpointLogicalGroup.getId()));
+            stiViewUpdates.add(
+                new UpdateOneModel<>(
+                    Filters.and(
+                        Filters.eq("_id.apiCollectionId", singleTypeInfoView.getId().getApiCollectionId()),
+                        Filters.eq("_id.method", singleTypeInfoView.getId().getMethod()),
+                        Filters.eq("_id.url", singleTypeInfoView.getId().getUrl())
+                    ),
+                Updates.combine(updates),
+                new UpdateOptions().upsert(false)
+            )
+            );
+        }
+
+        if (stiViewUpdates.size() > 0) {
+            BulkWriteResult res = SingleTypeInfoViewDao.instance.getMCollection().bulkWrite(stiViewUpdates);
+            System.out.println(res.getInsertedCount() + " " + res.getUpserts());
+        }
+
+        EndpointLogicalGroupDao.instance.getMCollection().updateOne(
+                Filters.eq("_id", endpointLogicalGroup.getId()),
+                Updates.combine(
+                        Updates.set("endpointRefreshTs", Context.now())
+                )
+        );
+                
+    }
+
+    public List<SingleTypeInfoView> getMatchingStiViewObjects(EndpointLogicalGroup endpointLogicalGroup) {
         LogicalGroupTestingEndpoint logicalGroup = (LogicalGroupTestingEndpoint) endpointLogicalGroup.getTestingEndpoints();
         Conditions andConditions = logicalGroup.getAndConditions();
         Conditions orConditions = logicalGroup.getOrConditions();
@@ -211,39 +252,12 @@ public class SingleTypeInfoViewDao extends AccountsContextDao<SingleTypeInfoView
             filters = Filters.and(orFilters);
         }
 
+        if (filters == null) {
+            return new ArrayList<>();
+        }
         List<SingleTypeInfoView> singleTypeInfoViewList = SingleTypeInfoViewDao.instance.findAll(filters);
 
-        List<WriteModel<SingleTypeInfoView>> stiViewUpdates = new ArrayList<>();
-
-        for (SingleTypeInfoView singleTypeInfoView: singleTypeInfoViewList) {
-            List<Bson> updates = new ArrayList<>();
-            updates.add(Updates.addToSet("logicalGroups", endpointLogicalGroup.getId()));
-            updates.add(Updates.addToSet("combinedData", "logicalGroup_" + endpointLogicalGroup.getId()));
-            stiViewUpdates.add(
-                new UpdateOneModel<>(
-                    Filters.and(
-                        Filters.eq("_id.apiCollectionId", singleTypeInfoView.getId().getApiCollectionId()),
-                        Filters.eq("_id.method", singleTypeInfoView.getId().getMethod()),
-                        Filters.eq("_id.url", singleTypeInfoView.getId().getUrl())
-                    ),
-                Updates.combine(updates),
-                new UpdateOptions().upsert(false)
-            )
-            );
-        }
-
-        if (stiViewUpdates.size() > 0) {
-            BulkWriteResult res = SingleTypeInfoViewDao.instance.getMCollection().bulkWrite(stiViewUpdates);
-            System.out.println(res.getInsertedCount() + " " + res.getUpserts());
-        }
-
-        EndpointLogicalGroupDao.instance.getMCollection().updateOne(
-                Filters.eq("_id", endpointLogicalGroup.getId()),
-                Updates.combine(
-                        Updates.set("endpointRefreshTs", Context.now())
-                )
-        );
-                
+        return singleTypeInfoViewList;
     }
     
     public void triggerLogicalGroupUpdate(int logicalGroupId) {

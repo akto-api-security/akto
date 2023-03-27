@@ -11,11 +11,11 @@ export default {
         })
     },
 
-    createCollection(name) {
+    createCollection(collectionName, andConditions, orConditions) {
         return request({
             url: '/api/createCollection',
             method: 'post',
-            data: {collectionName:name}
+            data: {collectionName, andConditions, orConditions}
         }).then((resp) => {
             return resp
         })
@@ -36,6 +36,14 @@ export default {
             url: '/api/deleteMultipleCollections',
             method: 'post',
             data: {apiCollectionResponse: items}
+        })        
+    },
+
+    getLogicalEndpointMatchingCount(orConditions, andConditions) {
+        return request({
+            url: '/api/getLogicalEndpointMatchingCount',
+            method: 'post',
+            data: {orConditions, andConditions}
         })        
     }
 }

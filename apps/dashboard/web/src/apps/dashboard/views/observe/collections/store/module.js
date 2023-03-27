@@ -45,8 +45,8 @@ const collections = {
                 state.loading = false
             })
         },
-        createCollection({commit}, {name}, options) {
-            return api.createCollection(name).then((resp) => {
+        createCollection({commit}, {name, andConditions, orConditions}, options) {
+            return api.createCollection(name, andConditions, orConditions).then((resp) => {
                 commit('CREATE_COLLECTION', resp, options)
                 window._AKTO.$emit('SHOW_SNACKBAR', {
                     show: true,

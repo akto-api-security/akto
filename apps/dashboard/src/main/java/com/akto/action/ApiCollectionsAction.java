@@ -18,6 +18,7 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.FetchApiCollectionResponse;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.testing.EndpointLogicalGroup;
+import com.akto.dto.testing.LogicalGroupTestingEndpoint;
 import com.akto.util.LogicalGroupUtil;
 import com.mongodb.client.model.Filters;
 import com.mongodb.BasicDBObject;
@@ -30,6 +31,7 @@ public class ApiCollectionsAction extends UserAction {
     RolesConditionUtils andConditions;
     RolesConditionUtils orConditions;
     Boolean isLogicalGroup;
+    int matchingEndpointCount;
 
     int apiCollectionId;
 
@@ -134,6 +136,29 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String getLogicalEndpointMatchingCount() {
+
+        LogicalGroupUtil logicalGroupUtil = new LogicalGroupUtil();
+        Conditions orConditions = null;
+        if (this.orConditions != null) {
+            orConditions = new Conditions();
+            orConditions.setOperator(this.orConditions.getOperator());
+            orConditions.setPredicates(logicalGroupUtil.getPredicatesFromPredicatesObject(this.orConditions.getPredicates()));
+        }
+        Conditions andConditions = null;
+        if (this.andConditions != null) {
+            andConditions = new Conditions();
+            andConditions.setOperator(this.andConditions.getOperator());
+            andConditions.setPredicates(logicalGroupUtil.getPredicatesFromPredicatesObject(this.andConditions.getPredicates()));
+        }
+        
+        LogicalGroupTestingEndpoint testingEndpoint = new LogicalGroupTestingEndpoint(andConditions, orConditions);
+        EndpointLogicalGroup endpointLogicalGroup = new EndpointLogicalGroup(Context.now(), Context.now(), "","", testingEndpoint, "", Context.now());
+
+        this.matchingEndpointCount =  SingleTypeInfoViewDao.instance.getLogicalEndpointMatchingCount(endpointLogicalGroup);
+        return Action.SUCCESS.toUpperCase();
+    } 
+
     public String deleteCollection() {
         
         this.apiCollectionResponse = new ArrayList<>();
@@ -217,6 +242,14 @@ public class ApiCollectionsAction extends UserAction {
   
     public void setOrConditions(RolesConditionUtils orConditions) {
         this.orConditions = orConditions;
+    }
+
+    public int getMatchingEndpointCount() {
+        return this.matchingEndpointCount;
+    }
+  
+    public void setMatchingEndpointCount(int matchingEndpointCount) {
+        this.matchingEndpointCount = matchingEndpointCount;
     }
 
 }
