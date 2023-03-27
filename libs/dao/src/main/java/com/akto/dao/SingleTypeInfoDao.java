@@ -454,8 +454,9 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             List<Bson> pipeline = new ArrayList<>();
             List<Bson> pipeline2 = new ArrayList<>();
             
-            String filterJson = "{'$eq': ['$_id', '$$view_id']}";
+            String filterJson = "{ '$and': [ {'$eq': ['$_id.apiCollectionId', '$$view_apicollectionid']}, {'$eq': ['$_id.method', '$$view_method']}, {'$eq': ['$_id.url', '$$view_url']} ] } ";
             Bson filter = Filters.expr(Document.parse(filterJson));
+            pipeline2.add(Aggregates.unwind("$_id"));
             pipeline2.add(Aggregates.match(filter));
             pipeline2.add(Aggregates.unwind("$allAuthTypesFound"));
 
@@ -479,7 +480,9 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             );
 
             List<Variable<String>> vars = new ArrayList<>();
-            vars.add(new Variable<>("view_id", "$_id"));
+            vars.add(new Variable<>("view_apicollectionid", "$_id.apiCollectionId"));
+            vars.add(new Variable<>("view_method", "$_id.method"));
+            vars.add(new Variable<>("view_url", "$_id.url"));
             vars.add(new Variable<>("req_sens", "$reqSubTypes"));
             vars.add(new Variable<>("resp_sens", "$respSubTypes"));
 
