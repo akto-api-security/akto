@@ -1,6 +1,6 @@
 <template>
     <simple-layout title="Quick start: Takes 2 mins">
-        <v-expansion-panels class="detail-panels">
+        <v-expansion-panels class="detail-panels" :value="0">
             <detail-expansion-panel
                 title="Connect traffic data"
                 detail="Akto is all about automation, which is made possible by connecting to your traffic sources. Real user traffic helps Akto create accurate inventory and run business logic tests on APIs"
