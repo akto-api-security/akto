@@ -11,6 +11,13 @@ export default {
             case "WORKFLOW": 
                 apiCollectionId = testingEndpoints.workflowTest.apiCollectionId
                 break;
+            case "FILTER_BASED":
+                for (let k in testingEndpoints.endpointDataQuery.filterConditions) {
+                    let val = testingEndpoints.endpointDataQuery.filterConditions[k]
+                    if (val.key == "apiCollectionId"){
+                        apiCollectionId = val.values[0]
+                    }
+                }
         }
 
         return mapCollectionIdToName[apiCollectionId]

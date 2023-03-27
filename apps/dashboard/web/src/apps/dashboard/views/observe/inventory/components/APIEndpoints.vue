@@ -43,11 +43,11 @@
                     :rowsPerPageDefault="50"
                 >
                 
-                 <template #add-new-row-btn="{filteredItems}">
+                 <template #add-at-top="{filters, filterOperators, total}">
                         <div style="align-items: center; display: flex;">
                             <v-tooltip>
                                 <template v-slot:activator='{ on, attrs }'>
-                                    <v-btn icon primary dark color="#47466A" @click="showScheduleDialog(filteredItems)">
+                                    <v-btn icon primary dark color="#47466A" @click="showScheduleDialog(filters, filterOperators, total)">
                                         <v-icon>$fas_play</v-icon>
                                     </v-btn>
                                 </template>
@@ -75,6 +75,7 @@
                     :fetchParams="fetchSensitiveTableParams"
                     :processParams="prepareItemForTable"
                     :getColumnValueList="getColumnValueList"
+                    :rowsPerPageDefault="50"
                 >
 
                     <template #item.sensitiveTags="{item}">
@@ -89,13 +90,14 @@
 
                 <server-table 
                     :headers="allEndpointsTableHeaders" 
-                    name="Sensitive" 
-                    sortKeyDefault="discoveredTs" 
+                    name="Sensitive"
+                    sortKeyDefault="discoveredTs"
                     :sortDescDefault="true"
                     @rowClicked="allEndpointTableRowClicked"
                     :fetchParams="fetchUnauthenticatedTableParams"
                     :processParams="prepareItemForTable"
                     :getColumnValueList="getColumnValueList"
+                    :rowsPerPageDefault="50"
                 >
                     <template #item.sensitiveTags="{item}">
                         <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
@@ -457,7 +459,7 @@ export default {
         },
         prepareItemForTable(x) {
             return {
-                color: this.$vuetify.theme.themes.dark.redMetric,
+                color: x.sensitiveParams.length > 0 ? this.$vuetify.theme.themes.dark.redMetric : this.$vuetify.theme.themes.dark.greenMetric,
                 url: x.url,
                 method: x.method,
                 sensitiveTags: new Set(x.sensitiveParams),
@@ -484,7 +486,18 @@ export default {
 
         async fetchUnauthenticatedTableParams(sortKey, sortOrder, skip, limit, filters, filterOperators) {
             let query = this.buildFetchParamQuery(sortKey, sortOrder, skip, limit, filters, filterOperators)
-            query.filterConditions.push({"key" : "authType", "operator": "AND", "values": ["UNAUTHENTICATED"]})
+
+            let unauthenticatedKeyFound = false;
+            for (let k in query.filterConditions) {
+                let val = query.filterConditions[k]
+                if (val.key == "authType"){
+                    unauthenticatedKeyFound = true;
+                }
+            }
+
+            if (!unauthenticatedKeyFound) {
+                query.filterConditions.push({"key" : "authType", "operator": "AND", "values": ["UNAUTHENTICATED"]})
+            }
             return api.fetchEndpointData(query, skip/50)
         },
 
@@ -492,15 +505,23 @@ export default {
             let query = this.buildFetchParamQuery(sortKey, sortOrder, skip, limit, filters, filterOperators)
 
             let sensitiveKeyFound = false;
+            let finalSensitiveParams = this.sensitiveDataKeys
             for (let k in query.filterConditions) {
                 let val = query.filterConditions[k]
                 if (val.key == "sensitiveTags"){
                     sensitiveKeyFound = true;
+                    if (query.filterConditions[k].operator == "NOT") {
+                        finalSensitiveParams = finalSensitiveParams.filter(function(el) {
+                            return val.values.indexOf(el) < 0;
+                        });
+                        query.filterConditions.push({"key" : "sensitiveTags", "operator": "OR", "values": finalSensitiveParams})
+                        // query.filterConditions[k].values = finalSensitiveParams
+                    }
                 }
             }
 
             if (!sensitiveKeyFound) {
-                query.filterConditions.push({"key" : "sensitiveTags", "operator": "OR", "values": this.sensitiveDataKeys})
+                query.filterConditions.push({"key" : "sensitiveTags", "operator": "OR", "values": finalSensitiveParams})
             }
 
             //check if sensitive is present, if not append, else modify value
@@ -615,7 +636,7 @@ export default {
         buildAllEndpointData(allEndpoints) {
             return func.buildAllEndpointData(allEndpoints)
         },
-        showScheduleDialog(filteredItems) {
+        showScheduleDialog(filters, filterOperators, total) {
             this.showTestSelectorDialog = true
             this.filteredItemsForScheduleTest = filteredItems
         },
