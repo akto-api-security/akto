@@ -76,7 +76,7 @@ public class Utils {
         return sb.toString();
     }
     
-    public static Map<String, String> convertApiInAktoFormat(JsonNode apiInfo, Map<String, String> variables, String accountId) {
+    public static Map<String, String> convertApiInAktoFormat(JsonNode apiInfo, Map<String, String> variables, String accountId, boolean allowReplay) {
         try {
             JsonNode request = apiInfo.get("request");
             String apiName = apiInfo.get("name").asText();
@@ -102,17 +102,24 @@ public class Utils {
             String status;
 
             if (response == null) {
-                Map<String, List<String>> reqHeadersListMap = new HashMap<>();
-                for (String key: requestHeadersMap.keySet()) {
-                    reqHeadersListMap.put(key, Collections.singletonList(requestHeadersMap.get(key)));
-                }
+                if (allowReplay) {
+                    Map<String, List<String>> reqHeadersListMap = new HashMap<>();
+                    for (String key: requestHeadersMap.keySet()) {
+                        reqHeadersListMap.put(key, Collections.singletonList(requestHeadersMap.get(key)));
+                    }
 
-                OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest(result.get("path"), "", result.get("method"), requestPayload, reqHeadersListMap , "http");
-                OriginalHttpResponse res = ApiExecutor.sendRequest(originalHttpRequest, true);
-                responseHeadersString = convertHeaders(res.getHeaders());
-                responsePayload =  res.getBody();
-                statusCode =  res.getStatusCode()+"";
-                status =  "";
+                    OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest(result.get("path"), "", result.get("method"), requestPayload, reqHeadersListMap , "http");
+                    OriginalHttpResponse res = ApiExecutor.sendRequest(originalHttpRequest, true);
+                    responseHeadersString = convertHeaders(res.getHeaders());
+                    responsePayload =  res.getBody();
+                    statusCode =  res.getStatusCode()+"";
+                    status =  "";
+                } else {
+                    responseHeadersString = "{}";
+                    responsePayload = null;
+                    statusCode =  "0";
+                    status =  "";
+                }
             } else {
                 Map<String, String> responseHeadersMap = getHeaders((ArrayNode) response.get("header"), variables);
                 responseHeadersString = mapper.writeValueAsString(responseHeadersMap);
