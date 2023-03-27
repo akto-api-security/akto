@@ -43,11 +43,11 @@
                     :rowsPerPageDefault="50"
                 >
                 
-                 <template #add-new-row-btn="{filteredItems}">
+                 <template #add-at-top="{filters, filterOperators, total}">
                         <div style="align-items: center; display: flex;">
                             <v-tooltip>
                                 <template v-slot:activator='{ on, attrs }'>
-                                    <v-btn icon primary dark color="#47466A" @click="showScheduleDialog(filteredItems)">
+                                    <v-btn icon primary dark color="#47466A" @click="showScheduleDialog(filters, filterOperators, total)">
                                         <v-icon>$fas_play</v-icon>
                                     </v-btn>
                                 </template>
@@ -75,6 +75,7 @@
                     :fetchParams="fetchSensitiveTableParams"
                     :processParams="prepareItemForTable"
                     :getColumnValueList="getColumnValueList"
+                    :rowsPerPageDefault="50"
                 >
 
                     <template #item.sensitiveTags="{item}">
@@ -96,6 +97,7 @@
                     :fetchParams="fetchUnauthenticatedTableParams"
                     :processParams="prepareItemForTable"
                     :getColumnValueList="getColumnValueList"
+                    :rowsPerPageDefault="50"
                 >
                     <template #item.sensitiveTags="{item}">
                         <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
@@ -629,7 +631,7 @@ export default {
         buildAllEndpointData(allEndpoints) {
             return func.buildAllEndpointData(allEndpoints)
         },
-        showScheduleDialog(filteredItems) {
+        showScheduleDialog(filters, filterOperators, total) {
             this.showTestSelectorDialog = true
             this.filteredItemsForScheduleTest = filteredItems
         },
