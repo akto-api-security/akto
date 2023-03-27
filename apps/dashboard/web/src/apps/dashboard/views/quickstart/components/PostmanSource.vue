@@ -54,7 +54,7 @@
                     <step-builder :stepNumber="4">
                         <template slot="content">
                             <div>Paste Postman API key: </div>
-                            <div style="width: 520px;">
+                            <div style="width: 520px;" class="inline-text-field">
                                 <v-text-field 
                                     height="13px" 
                                     v-model="postman_api_key" 
@@ -85,7 +85,7 @@
 
                             <v-menu offset-y>
                                 <template v-slot:activator="{ on, attrs }">
-                                    <div style="width: 200px">
+                                    <div style="width: 200px" class="inline-text-field">
                                         <v-text-field 
                                             height="14px" 
                                             :value="workspace ? workspace['name'] : null" 
@@ -201,7 +201,7 @@ export default {
             postman_api_key: "",
             loading: true,
             importing_workspace: false,
-            uploadPostmanFile: 1,
+            uploadPostmanFile: 0,
             showKey: true,
             allowReplay: true,
             file: null
@@ -300,16 +300,11 @@ export default {
     cursor: pointer
     color: var(--quickStartTheme) !important
     text-decoration: underline 
-.v-text-field
-    padding: 0px
-    margin-top: 14px
-
 
 .replay-div
     display: flex
     align-items: center
     height: 40px
-
 
 .radio-button-label
     font-weight: 800 !important
@@ -319,20 +314,19 @@ export default {
 
 </style>
 
-<style>
-
-.v-text-field .v-input__control .v-input__slot {
+<style scoped>
+.inline-text-field >>> .v-text-field .v-input__control .v-input__slot {
     margin: 0px 4px 0px 4px !important;
     color: var(--hexColor19) !important;
 }
 
-.v-text-field input {
+.inline-text-field >>> .v-text-field input {
     color: var(--hexColor19) !important;
     font-weight: 400 !important;
     font-size: 13px !important;
 }
 
-.v-text-field .v-input__append-inner, .v-text-field .v-input__prepend-inner {
+.inline-text-field >>> .v-text-field .v-input__append-inner, .v-text-field .v-input__prepend-inner {
     align-self: auto;
     display: inline-flex;
     margin-top: 0px;
@@ -343,14 +337,10 @@ export default {
     user-select: none;
 }
 
-.v-icon__component, .v-icon__svg {
+div >>> .v-icon__component, .v-icon__svg {
     height: 12px;
     width: 12px;
 }
-
-/* .v-application--is-ltr .v-input--selection-controls__input {
-    margin-right: 8px;
-} */
 
 
 </style>
