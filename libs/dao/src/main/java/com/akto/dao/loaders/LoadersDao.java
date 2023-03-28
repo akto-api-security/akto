@@ -1,8 +1,11 @@
 package com.akto.dao.loaders;
 
 import com.akto.dao.AccountsContextDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.loaders.Loader;
 import com.akto.dto.loaders.NormalLoader;
+import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.UpdateOptions;
@@ -55,6 +58,25 @@ public class LoadersDao extends AccountsContextDao<Loader> {
     public void createNormalLoader(NormalLoader normalLoader) {
         instance.insertOne(normalLoader);
     }
+
+
+    public void createIndicesIfAbsent() {
+        boolean exists = false;
+        String dbName = Context.accountId.get()+"";
+        MongoDatabase db = clients[0].getDatabase(dbName);
+        for (String col: db.listCollectionNames()){
+            if (getCollName().equalsIgnoreCase(col)){
+                exists = true;
+                break;
+            }
+        };
+
+        if (!exists) {
+            db.createCollection(getCollName(), new CreateCollectionOptions().capped(true).maxDocuments(100).sizeInBytes(100_000));
+        }
+    }
+
+
 
     @Override
     public String getCollName() {
