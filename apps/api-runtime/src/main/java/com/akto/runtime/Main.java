@@ -339,6 +339,8 @@ public class Main {
             AccountSettingsDao.instance.updateRunCreateStiViewFlag(true);
             logger.info("create view called " + Context.now());
             SingleTypeInfoDao.instance.createStiCollectionView();
+            logger.info("create sti view id index called " + Context.now());
+            SingleTypeInfoDao.instance.createStiViewIdIndex();
             logger.info("create merge called " + Context.now());
             SingleTypeInfoDao.instance.mergeStiViewAndApiInfo();
             logger.info("create index called " + Context.now());
@@ -349,15 +351,14 @@ public class Main {
     public static void updateStiCollectionView() {
         logger.info("update view called " + Context.now());
         SingleTypeInfoDao.instance.createStiCollectionView();
+        logger.info("update merge called " + Context.now());
         SingleTypeInfoDao.instance.mergeStiViewAndApiInfo();
+        logger.info("update merge finished " + Context.now());
     }
 
     public static void rebuildStiCollectionView() {
-
-        SingleTypeInfoDao.instance.createStiCollectionView();
-        SingleTypeInfoDao.instance.mergeStiViewAndApiInfo();
-
         SingleTypeInfoDao.instance.createStiCollectionViewReplica();
+        SingleTypeInfoDao.instance.createStiViewReplicaIdIndex();
         SingleTypeInfoDao.instance.mergeStiViewReplicaAndApiInfo();
 
         SingleTypeInfoViewDao.instance.dropCollection();
@@ -379,7 +380,7 @@ public class Main {
                 Context.accountId.set(1_000_000);
                 updateStiCollectionView();
             }
-        }, 30, 30, TimeUnit.SECONDS);
+        }, 10, 15, TimeUnit.SECONDS);
 
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {

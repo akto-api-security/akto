@@ -454,8 +454,18 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             List<Bson> pipeline = new ArrayList<>();
             List<Bson> pipeline2 = new ArrayList<>();
             
+            int ts = 0;
+
+            SingleTypeInfoView singleTypeInfoView = SingleTypeInfoViewDao.instance.findLatestOne(new BasicDBObject(), Sorts.descending("lastSeenTs"));
+            if (singleTypeInfoView != null) {
+                ts = singleTypeInfoView.getLastSeenTs();
+            }
+
             String filterJson = "{ '$and': [ {'$eq': ['$_id.apiCollectionId', '$$view_apicollectionid']}, {'$eq': ['$_id.method', '$$view_method']}, {'$eq': ['$_id.url', '$$view_url']} ] } ";
+            String lastSeenJson = "{'$gte': ['$lastSeen', " + ts + "]}";
             Bson filter = Filters.expr(Document.parse(filterJson));
+            Bson lastSeenFilter = Filters.expr(Document.parse(lastSeenJson));
+            pipeline2.add(Aggregates.match(lastSeenFilter));
             pipeline2.add(Aggregates.unwind("$_id"));
             pipeline2.add(Aggregates.match(filter));
             pipeline2.add(Aggregates.unwind("$allAuthTypesFound"));
@@ -658,6 +668,16 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
     }
 
+    public void createStiViewIdIndex() {
+        String[] fieldNames = {"_id.apiCollectionId", "_id.method", "_id.url"};
+        SingleTypeInfoViewDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
+    }
+
+    public void createStiViewReplicaIdIndex() {
+        String[] fieldNames = {"_id.apiCollectionId", "_id.method", "_id.url"};
+        SingleTypeInfoViewReplicaDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
+    }
+
     public void createStiViewIndexes() {
 
         String[] fieldNames = {"_id.apiCollectionId", "discoveredTs"};
@@ -677,7 +697,6 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
         fieldNames = new String []{"_id.apiCollectionId", "_id.method", "_id.url"};
         SingleTypeInfoViewDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
-
     }
 
 }
