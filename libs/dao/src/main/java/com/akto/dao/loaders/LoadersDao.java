@@ -15,7 +15,7 @@ public class LoadersDao extends AccountsContextDao<Loader> {
 
     public static final LoadersDao instance = new LoadersDao();
 
-    public void updateCountNormalLoader(ObjectId id,int count) {
+    public void updateIncrementalCount(ObjectId id,int count) {
         instance.getMCollection().findOneAndUpdate(
                 Filters.eq("_id", id),
                 Updates.inc(NormalLoader.CURRENT_COUNT, count),

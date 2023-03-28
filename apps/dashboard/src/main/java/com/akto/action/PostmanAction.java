@@ -314,7 +314,7 @@ public class PostmanAction extends UserAction {
                 loggerMaker.infoAndAddToDb(String.format("Pushed data in apicollection id %s", aktoCollectionId), LogDb.DASHBOARD);
             }
 
-            LoadersDao.instance.updateCountNormalLoader(loaderId, countMap.get(collectionId));
+            LoadersDao.instance.updateIncrementalCount(loaderId, countMap.get(collectionId));
         }
 
     }
@@ -372,7 +372,7 @@ public class PostmanAction extends UserAction {
             loggerMaker.errorAndAddToDb("Error pushing data to kafka", LogDb.DASHBOARD);
             return;
         }
-        LoadersDao.instance.updateCountNormalLoader(loaderId, count);
+        LoadersDao.instance.updateIncrementalCount(loaderId, count);
         loggerMaker.infoAndAddToDb(String.format("Pushed data in apicollection id %s", aktoCollectionId), LogDb.DASHBOARD);
     }
 
