@@ -3,7 +3,9 @@ package com.akto.action;
 import com.akto.ApiRequest;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dao.loaders.LoadersDao;
 import com.akto.dto.*;
+import com.akto.dto.loaders.PostmanUploadLoader;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
@@ -23,6 +25,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.ReplaceOptions;
 import io.swagger.v3.oas.models.OpenAPI;
+import org.bson.types.ObjectId;
 import org.json.JSONObject;
 
 import java.util.*;
@@ -220,7 +223,7 @@ public class PostmanAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    private boolean skipKafka = DashboardMode.isLocalDeployment();
+    private final boolean skipKafka = DashboardMode.isLocalDeployment();
 
     private boolean allowReplay;
 
@@ -240,60 +243,80 @@ public class PostmanAction extends UserAction {
         addOrUpdateApiKey();
         PostmanCredential postmanCredential = fetchPostmanCredential();
 
-
         int accountId = Context.accountId.get();
+        ObjectId loaderId = createPostmanLoader();
+
         executorService.schedule( new Runnable() {
             public void run() {
                 Context.accountId.set(accountId);
-                importDataFromPostmanMain(workspace_id, postmanCredential.getApiKey(), skipKafka, allowReplay);
+                importDataFromPostmanMain(workspace_id, postmanCredential.getApiKey(), skipKafka, allowReplay, loaderId);
             }
-        }, 1, TimeUnit.SECONDS);
+        }, 0, TimeUnit.SECONDS);
 
         return SUCCESS.toUpperCase();
     }
 
-    private static void importDataFromPostmanMain(String workspaceId, String apiKey, boolean skipKafka, boolean allowReplay) {
+    private ObjectId createPostmanLoader() {
+        int userId = getSUser().getId();
+        PostmanUploadLoader postmanUploadLoader = new PostmanUploadLoader(
+                userId, 0,0, true
+        );
+        LoadersDao.instance.createNormalLoader(postmanUploadLoader);
+        return postmanUploadLoader.getId();
+    }
+
+    private static void importDataFromPostmanMain(String workspaceId, String apiKey, boolean skipKafka, boolean allowReplay, ObjectId loaderId) {
         Main main = new Main(apiKey);
         loggerMaker.infoAndAddToDb("Fetching details for workspace_id:" + workspaceId, LogDb.DASHBOARD);
         JsonNode workspaceDetails = main.fetchWorkspace(workspaceId);
         JsonNode workspaceObj = workspaceDetails.get("workspace");
         ArrayNode collectionsObj = (ArrayNode) workspaceObj.get("collections");
-        Map<Integer, List<String>> aktoFormat = new HashMap<>();
-        for(JsonNode collectionObj: collectionsObj){
+        String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
+
+        int totalApis = 0;
+        Map<String, JsonNode> collectionDetailsToIdMap = new HashMap<>();
+        Map<String, Integer> countMap = new HashMap<>();
+        for(JsonNode collectionObj: collectionsObj) {
+            String collectionId = collectionObj.get("id").asText();
+            JsonNode collectionDetails = main.fetchCollection(collectionId);
+            JsonNode collectionDetailsObj = collectionDetails.get("collection");
+            int count = apiCount(collectionDetailsObj);
+
+            collectionDetailsToIdMap.put(collectionId, collectionDetailsObj);
+            countMap.put(collectionId, count);
+
+            totalApis +=  count;
+        }
+
+        LoadersDao.instance.updateTotalCountNormalLoader(loaderId,totalApis);
+
+        for(JsonNode collectionObj: collectionsObj) {
             String collectionId = collectionObj.get("id").asText();
             int aktoCollectionId = collectionId.hashCode();
             aktoCollectionId = aktoCollectionId < 0 ? aktoCollectionId * -1: aktoCollectionId;
-            JsonNode collectionDetails = main.fetchCollection(collectionId);
-            JsonNode collectionDetailsObj = collectionDetails.get("collection");
+            JsonNode collectionDetailsObj = collectionDetailsToIdMap.get(collectionId);
 
             String collectionName = collectionDetailsObj.get("info").get("name").asText();
 
             List<String> msgs = generateMessages(collectionDetailsObj, aktoCollectionId, collectionName, allowReplay);
 
             if(msgs.size() > 0) {
-                aktoFormat.put(aktoCollectionId, msgs);
                 if(ApiCollectionsDao.instance.findOne(Filters.eq("_id", aktoCollectionId)) == null){
                     ApiCollectionsDao.instance.insertOne(ApiCollection.createManualCollection(aktoCollectionId, "Postman " + collectionName));
                 }
-                loggerMaker.infoAndAddToDb(String.format("Pushed %s apis from collection %s", msgs.size(), collectionName), LogDb.DASHBOARD);
+
+                try {
+                    Utils.pushDataToKafka(aktoCollectionId, topic, msgs, new ArrayList<>(), skipKafka);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Error while pushing data to kafka", LogDb.DASHBOARD);
+                    return;
+                }
+                loggerMaker.infoAndAddToDb(String.format("Pushed data in apicollection id %s", aktoCollectionId), LogDb.DASHBOARD);
             }
 
+            LoadersDao.instance.updateCountNormalLoader(loaderId, countMap.get(collectionId));
         }
-        //Push to Akto
-        loggerMaker.infoAndAddToDb(String.format("Starting to push data to Akto, pushin data in %s collections", aktoFormat.size()), LogDb.DASHBOARD);
-        String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
-        for(Map.Entry<Integer, List<String>> entry: aktoFormat.entrySet()){
-            //For each entry, push a message to Kafka
-            int aktoCollectionId = entry.getKey();
-            List<String> msgs = entry.getValue();
-            try {
-                Utils.pushDataToKafka(aktoCollectionId, topic, msgs, new ArrayList<>(), skipKafka);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while pushing data to kafka", LogDb.DASHBOARD);
-                return;
-            }
-            loggerMaker.infoAndAddToDb(String.format("Pushed data in apicollection id %s", aktoCollectionId), LogDb.DASHBOARD);
-        }
+
     }
 
     String postmanCollectionFile;
@@ -323,17 +346,23 @@ public class PostmanAction extends UserAction {
 
         int accountId = Context.accountId.get();
         int finalAktoCollectionId = aktoCollectionId;
+
+        ObjectId loaderId = createPostmanLoader();
+
         executorService.schedule(new Runnable() {
             public void run() {
                 Context.accountId.set(accountId);
-                importDataFromPostmanFileMain(collectionDetailsObj, finalAktoCollectionId, collectionName,allowReplay, skipKafka);
+                importDataFromPostmanFileMain(collectionDetailsObj, finalAktoCollectionId, collectionName,allowReplay, skipKafka, loaderId);
             }
         }, 1, TimeUnit.SECONDS);
 
         return SUCCESS.toUpperCase();
     }
 
-    private static void importDataFromPostmanFileMain(JsonNode collectionDetailsObj, int aktoCollectionId, String collectionName, boolean allowReplay, boolean skipKafka) {
+    private static void importDataFromPostmanFileMain(JsonNode collectionDetailsObj, int aktoCollectionId, String collectionName, boolean allowReplay, boolean skipKafka, ObjectId loaderId) {
+        int count = apiCount(collectionDetailsObj);
+        LoadersDao.instance.updateTotalCountNormalLoader(loaderId, count);
+
         List<String> msgs = generateMessages(collectionDetailsObj, aktoCollectionId, collectionName, allowReplay);
 
         String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
@@ -343,7 +372,15 @@ public class PostmanAction extends UserAction {
             loggerMaker.errorAndAddToDb("Error pushing data to kafka", LogDb.DASHBOARD);
             return;
         }
+        LoadersDao.instance.updateCountNormalLoader(loaderId, count);
         loggerMaker.infoAndAddToDb(String.format("Pushed data in apicollection id %s", aktoCollectionId), LogDb.DASHBOARD);
+    }
+
+    public static int apiCount(JsonNode collectionDetailsObj) {
+        ArrayList<JsonNode> jsonNodes = new ArrayList<>();
+        Utils.fetchApisRecursively((ArrayNode) collectionDetailsObj.get("item"), jsonNodes);
+
+        return jsonNodes.size();
     }
 
     private static List<String> generateMessages(JsonNode collectionDetailsObj, int aktoCollectionId, String collectionName, boolean allowReplay) {

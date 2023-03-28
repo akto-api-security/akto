@@ -109,6 +109,15 @@
         </div>
       </div>
     </v-main>
+
+    <loading-snack-bar 
+      v-for="(data,index) in this.loadingSnackBars"
+      :title=data.title
+      :subTitle=data.subTitle
+      :percentage=data.percentage
+      :index="index"
+      @close="closeLoadingSnackBar(data)"
+    />
   </v-app>
 </template>
 
@@ -119,6 +128,8 @@ import api from "./appbar/api"
 import OwnerName from "./shared/components/OwnerName";
 import SimpleTextField from "./shared/components/SimpleTextField";
 import SimpleMenu from "./shared/components/SimpleMenu"
+import LoadingSnackBar from './shared/components/LoadingSnackBar';
+import {mapState} from 'vuex'
 
 export default {
   name: 'PageDashboard',
@@ -126,7 +137,8 @@ export default {
     SimpleTextField,
     OwnerName,
     'create-account-dialog': CreateAccountDialog,
-    SimpleMenu
+    SimpleMenu,
+    LoadingSnackBar
   },
   data() {
     const myItems = [
@@ -205,6 +217,9 @@ export default {
   },
   mounted() {
     window.Beamer.init();
+    let i = setInterval(() => {
+        this.$store.dispatch('dashboard/fetchActiveLoaders')
+    }, 3000)
   },
   methods: {
     ...mapGetters('auth', ['getUsername', 'getAvatar', 'getActiveAccount', 'getAccounts']),
@@ -230,7 +245,15 @@ export default {
           this.$router.push('/dashboard/teams/' + resp.id)
         })
       }
+    },
+    closeLoadingSnackBar(data) {
+      console.log(data)
+      this.$store.dispatch('dashboard/closeLoader', data['hexId'])
     }
+  },
+
+  computed: {
+      ...mapState('dashboard', ['loadingSnackBars']),
   }
 }
 </script>
