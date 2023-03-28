@@ -63,16 +63,16 @@
                                     @click:append="showKey = !showKey"
                                 />
                             </div>
-                            <div style="height: 20px; display: flex; align-items: center; padding-left: 4px">
+                            <div class="postman-status">
                                 <div v-if="this.workspace_loading" style="padding-left: 4px">
-                                    <v-progress-circular indeterminate color="grey" :size="12" :width="1.5"></v-progress-circular>
+                                    <v-progress-circular indeterminate color="var(--lightGrey)" :size="12" :width="1.5"></v-progress-circular>
                                 </div>
                                 <div v-else>
                                     <div v-if="this.validApiKey && this.workspaces && this.workspaces.length>0">
-                                        <v-icon color="green">$fas_check-circle</v-icon>
+                                        <v-icon color="var(--hexColor8)">$fas_check-circle</v-icon>
                                     </div>
                                     <div v-else>
-                                        <v-icon color="red">$fas_times</v-icon>
+                                        <v-icon color="var(--errorBtn)">$fas_times</v-icon>
                                     </div>
                                 </div>
                             </div>
@@ -104,10 +104,10 @@
                             </v-menu>
 
                             <span v-if="this.workspace_loading" style="padding-left: 4px">
-                                <v-progress-circular indeterminate color="grey" :size="12" :width="1.5"></v-progress-circular>
+                                <v-progress-circular indeterminate color="var(--lightGrey)" :size="12" :width="1.5"></v-progress-circular>
                             </span>
                             <span v-else>
-                                <v-icon color="green" v-if="this.workspace">$fas_check-circle</v-icon>
+                                <v-icon color="var(--hexColor8)" v-if="this.workspace">$fas_check-circle</v-icon>
                             </span>
                         </template>
                     </step-builder>
@@ -169,7 +169,7 @@
                     color="var(--themeColor)"
                     @click="importPostmanWorkspace"
                     :disabled="!postman_setup_complete"
-                    style="color:white">
+                    style="color:var(--white)">
                     {{ import_button }}
                 </v-btn>
             </div>
@@ -311,6 +311,11 @@ export default {
     font-size: 13px !important
     color: var(--hexColor19)
 
+.postman-status
+    height: 20px
+    display: flex
+    align-items: center
+    padding-left: 4px
 
 </style>
 

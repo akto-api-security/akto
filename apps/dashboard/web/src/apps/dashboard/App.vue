@@ -219,7 +219,7 @@ export default {
     window.Beamer.init();
     let i = setInterval(() => {
         this.$store.dispatch('dashboard/fetchActiveLoaders')
-    }, 3000)
+    }, 1000)
   },
   methods: {
     ...mapGetters('auth', ['getUsername', 'getAvatar', 'getActiveAccount', 'getAccounts']),
@@ -247,7 +247,6 @@ export default {
       }
     },
     closeLoadingSnackBar(data) {
-      console.log(data)
       this.$store.dispatch('dashboard/closeLoader', data['hexId'])
     }
   },
