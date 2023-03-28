@@ -1,5 +1,6 @@
 package com.akto.dao;
 
+import com.mongodb.MongoNamespace;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.*;
 import com.mongodb.client.model.*;
@@ -154,6 +155,14 @@ public abstract class MCollection<T> {
 
     public UpdateResult replaceOne(Bson q, T obj) {
         return this.getMCollection().replaceOne(q, obj, new ReplaceOptions().upsert(true));
+    }
+
+    public void renameCollection(String newColName) {
+        this.getMCollection().renameCollection(new MongoNamespace(getDBName(), newColName), new RenameCollectionOptions());
+    }
+
+    public void dropCollection() {
+        this.getMCollection().drop();
     }
 
     public InsertOneResult insertOne(T elem) {

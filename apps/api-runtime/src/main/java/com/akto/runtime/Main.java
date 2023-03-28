@@ -18,6 +18,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.testing.SingleTypeInfoView;
 import com.akto.runtime.policies.AktoPolicies;
 import com.google.gson.Gson;
 import com.mongodb.ConnectionString;
@@ -351,6 +352,20 @@ public class Main {
         SingleTypeInfoDao.instance.mergeStiViewAndApiInfo();
     }
 
+    public static void rebuildStiCollectionView() {
+
+        SingleTypeInfoDao.instance.createStiCollectionView();
+        SingleTypeInfoDao.instance.mergeStiViewAndApiInfo();
+
+        SingleTypeInfoDao.instance.createStiCollectionViewReplica();
+        SingleTypeInfoDao.instance.mergeStiViewReplicaAndApiInfo();
+
+        SingleTypeInfoViewDao.instance.dropCollection();
+        SingleTypeInfoViewReplicaDao.instance.renameCollection("single_type_info_view");
+
+        SingleTypeInfoDao.instance.createStiViewIndexes();
+    }
+
     public static void initializeRuntime(){
         SingleTypeInfoDao.instance.getMCollection().updateMany(Filters.exists("apiCollectionId", false), Updates.set("apiCollectionId", 0));
         SingleTypeInfo.init();
@@ -365,6 +380,13 @@ public class Main {
                 updateStiCollectionView();
             }
         }, 30, 30, TimeUnit.SECONDS);
+
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                Context.accountId.set(1_000_000);
+                rebuildStiCollectionView();
+            }
+        }, 1, 1, TimeUnit.HOURS);
 
         try {
             AccountSettingsDao.instance.updateVersion(AccountSettings.API_RUNTIME_VERSION);
