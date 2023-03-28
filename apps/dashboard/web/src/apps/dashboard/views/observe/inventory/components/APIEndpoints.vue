@@ -462,10 +462,10 @@ export default {
                 url: x.url,
                 method: x.method,
                 sensitiveTags: new Set(x.sensitiveParams),
-                lastSeenTs: x.lastSeenTs,
+                lastSeenTs: this.prettifyDate(x.lastSeenTs),
                 accessType: x.accessType,
                 authType: x.authTypes.join(', '),
-                discoveredTs: x.discoveredTs
+                discoveredTs: this.prettifyDate(x.discoveredTs)
             }
         },
 
