@@ -364,7 +364,7 @@ public class Main {
                 Context.accountId.set(1_000_000);
                 updateStiCollectionView();
             }
-        }, 7, 1, TimeUnit.MINUTES);
+        }, 30, 30, TimeUnit.SECONDS);
 
         try {
             AccountSettingsDao.instance.updateVersion(AccountSettings.API_RUNTIME_VERSION);

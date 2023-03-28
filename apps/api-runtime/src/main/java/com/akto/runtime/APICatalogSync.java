@@ -689,6 +689,7 @@ public class APICatalogSync {
 
                 bulkUpdatesForSampleData.add(new DeleteManyModel<>(filterQSampleData));
                 bulkUpdatesForApiInfo.add(new DeleteManyModel<>(filterQSampleData));
+                bulkUpdatesForStiView.add(new DeleteManyModel<>(filterQStiView));
                 // SampleDataDao.instance.deleteAll(filterQSampleData);
                 // ApiInfoDao.instance.deleteAll(filterQSampleData);
             }
