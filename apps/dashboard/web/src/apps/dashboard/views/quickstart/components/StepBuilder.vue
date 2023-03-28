@@ -1,9 +1,9 @@
 <template>
-    <div style="display: flex; flex-direction: row; height: 40px; align-items: center">
+    <div class="main">
         <div class="col_1">
             <p> {{ stepNumber }} </p>
         </div>
-        <div style="margin-left: 12px; display: flex; align-items: center; width: 100%">
+        <div class="content">
             <slot name="content"/>
         </div>
     </div>
@@ -40,5 +40,17 @@ export default {
     font-size: 14px
     line-height: 16px
     color: var(--themeColor)
+
+.main
+    display: flex
+    flex-direction: row
+    height: 40px
+    align-items: center
+
+.content
+    margin-left: 12px
+    display: flex
+    align-items: center
+    width: 100%
 
 </style>

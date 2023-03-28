@@ -25,9 +25,9 @@
         data () {
             return {
                 snackbar: {
-                    show: false,
-                    text: '',
-                    color: ''
+                    show: true,
+                    text: 'dd',
+                    color: 'green'
                 }
             }
         },
