@@ -1,7 +1,7 @@
 <template>
     <div class="test-summary-card">
-        <div style="display: flex; justify-content: space-between; width: 100%;">
-            <div style="display: flex;">
+        <div class="test-summary-card-details">
+            <div class="d-flex">
                 <div class="method">
                     {{ method }}
                 </div>
@@ -13,7 +13,7 @@
                 {{ severity }}
             </div>
         </div>
-        <div style="display: flex; justify-content: space-between; width: 100%;">
+        <div class="vulnerability-div">
             <div class="vulnerability">
                 {{ vulnerability }}
                 <hint-icon :value="testName"/>
@@ -67,6 +67,11 @@ export default {
     border: 1px solid #E9E9E9
     border-radius: 12px
 
+.test-summary-card-details
+    display: flex
+    justify-content: space-between
+    width: 100%
+
 .method
     font-weight: 500
     font-size: 16px
@@ -88,6 +93,11 @@ export default {
     width: 44px
     height: 26px
     line-height: 26px
+
+.vulnerability-div
+    display: flex
+    justify-content: space-between
+    width: 100%
 
 .vulnerability
     font-weight: 400

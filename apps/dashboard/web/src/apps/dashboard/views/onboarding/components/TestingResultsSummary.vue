@@ -6,7 +6,7 @@
         </div>
         <div v-else>
             <div class="loading-bar" v-if="loading">
-                <v-progress-linear :indeterminate="true" height="8" color="#6200EA" rounded></v-progress-linear>
+                <v-progress-linear :indeterminate="true" height="8" color="var(--themeColor)" rounded></v-progress-linear>
             </div>
 
             <v-tabs
@@ -26,7 +26,7 @@
                     </div>
                 </v-tab>
                 <v-tabs-items v-model="tab" v-if="this.testResults">
-                    <div style="padding-top: 32px" class="height-class">
+                    <div class="height-class tab-content">
                         <div v-if="this.testResults[tab] && this.testResults[tab].length > 0" class="fd-column" style="gap: 12px">
                             <div v-for="testResult in this.testResults[tab]">
                                 <testing-result-card
@@ -193,12 +193,15 @@ export default {
     font-weight: 500
     font-size: 16px
     text-transform: none !important
-    color: #000000 !important
+    color: var(--black) !important
     border-radius: 8px
     letter-spacing: normal
 
+.tab-content
+    padding-top: 32px
+
 .v-tab.v-tab--active
-    color: #47466A !important
+    color: var(--themeColorDark) !important
 
 .count-chip
     background-color: #ABABAB
@@ -212,7 +215,7 @@ export default {
     height: 22px
 
 .count-chip-selected
-    background-color: #47466A
+    background-color: var(--themeColorDark)
 
 .spinner-div
     display: flex
@@ -238,7 +241,7 @@ export default {
     font-size: 16px
     line-height: 24px
     text-align: center
-    color: #47466A
+    color: var(--themeColorDark)
 
 .zero-div
     display: flex
