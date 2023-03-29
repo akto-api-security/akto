@@ -83,7 +83,7 @@ jobs:
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG . --push
           echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"       
       - name: Deploy and update flash staging
-        if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == true }}
+        if: ${{ github.event.inputs.Environment == 'prod' }} && ${{ github.event.inputs.Deploy == true }}
         env:
           ECR_REGISTRY: aktosecurity
           ECR_REPOSITORY: akto-api-security
@@ -113,6 +113,7 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
       - name: Run CI/CD tests
+        if: ${{ github.event.inputs.Environment == 'prod' }} && ${{ github.event.inputs.Deploy == true }}
         uses: oren-akto/akto-github-action@v1.0
         with:
           AKTO_DASHBOARD_URL: ${{secrets.AKTO_DASHBOARD_URL}}
