@@ -105,7 +105,7 @@ jobs:
       #     key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
       #     restore-keys: ${{ runner.os }}-m2
       - name: Run CI/CD tests
-        if: ${{ github.event.inputs.Environment == 'prod' }} && ${{ github.event.inputs.Deploy == 'true' }}
+        if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
         uses: oren-akto/akto-github-action@v1.0
         with:
           AKTO_DASHBOARD_URL: https://flash.staging.akto.io/
