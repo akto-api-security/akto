@@ -240,14 +240,25 @@ public class PostmanAction extends UserAction {
             return ERROR.toUpperCase();
         }
         
-        addOrUpdateApiKey();
+        try {
+            String result = addOrUpdateApiKey();
+            if ( result == null || !result.equals(SUCCESS.toUpperCase())) throw new Exception("Returned Error");
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while adding/updating postman key+ " + e.getMessage(), LogDb.DASHBOARD);
+            addActionError("Error while adding/updating postman key.");
+            return ERROR.toUpperCase();
+        }
+
         PostmanCredential postmanCredential = fetchPostmanCredential();
+
+        loggerMaker.infoAndAddToDb("Fetched postman creds", LogDb.DASHBOARD);
 
         int accountId = Context.accountId.get();
         ObjectId loaderId = createPostmanLoader();
 
         executorService.schedule( new Runnable() {
             public void run() {
+                loggerMaker.infoAndAddToDb("Starting postman thread", LogDb.DASHBOARD);
                 Context.accountId.set(accountId);
                 importDataFromPostmanMain(workspace_id, postmanCredential.getApiKey(), skipKafka, allowReplay, loaderId);
             }
@@ -278,9 +289,20 @@ public class PostmanAction extends UserAction {
         Map<String, Integer> countMap = new HashMap<>();
         for(JsonNode collectionObj: collectionsObj) {
             String collectionId = collectionObj.get("id").asText();
-            JsonNode collectionDetails = main.fetchCollection(collectionId);
+            JsonNode collectionDetails;
+            try {
+                collectionDetails = main.fetchCollection(collectionId);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error getting data from postman for collection " + collectionId + " : " + e.getMessage(), LogDb.DASHBOARD);
+                continue;
+            }
+
+            loggerMaker.infoAndAddToDb("Successfully fetched postman collection: " + collectionId, LogDb.DASHBOARD);
+
             JsonNode collectionDetailsObj = collectionDetails.get("collection");
             int count = apiCount(collectionDetailsObj);
+
+            loggerMaker.infoAndAddToDb("Api count for collection " + collectionId + ": " + count, LogDb.DASHBOARD);
 
             collectionDetailsToIdMap.put(collectionId, collectionDetailsObj);
             countMap.put(collectionId, count);
@@ -298,7 +320,14 @@ public class PostmanAction extends UserAction {
 
             String collectionName = collectionDetailsObj.get("info").get("name").asText();
 
-            List<String> msgs = generateMessages(collectionDetailsObj, aktoCollectionId, collectionName, allowReplay);
+            List<String> msgs = new ArrayList<>();
+            try {
+                msgs = generateMessages(collectionDetailsObj, aktoCollectionId, collectionName, allowReplay);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error getting data from postman for collection " + collectionId + " : " + e.getMessage(), LogDb.DASHBOARD);
+                LoadersDao.instance.updateIncrementalCount(loaderId, countMap.get(collectionId));
+                continue;
+            }
 
             if(msgs.size() > 0) {
                 if(ApiCollectionsDao.instance.findOne(Filters.eq("_id", aktoCollectionId)) == null){
@@ -308,7 +337,7 @@ public class PostmanAction extends UserAction {
                 try {
                     Utils.pushDataToKafka(aktoCollectionId, topic, msgs, new ArrayList<>(), skipKafka);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("Error while pushing data to kafka", LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb("Error while pushing data to kafka: " + e.getMessage(), LogDb.DASHBOARD);
                     return;
                 }
                 loggerMaker.infoAndAddToDb(String.format("Pushed data in apicollection id %s", aktoCollectionId), LogDb.DASHBOARD);
@@ -351,6 +380,7 @@ public class PostmanAction extends UserAction {
 
         executorService.schedule(new Runnable() {
             public void run() {
+                loggerMaker.infoAndAddToDb("Starting thread to process postman file", LogDb.DASHBOARD);
                 Context.accountId.set(accountId);
                 importDataFromPostmanFileMain(collectionDetailsObj, finalAktoCollectionId, collectionName,allowReplay, skipKafka, loaderId);
             }
@@ -361,9 +391,17 @@ public class PostmanAction extends UserAction {
 
     private static void importDataFromPostmanFileMain(JsonNode collectionDetailsObj, int aktoCollectionId, String collectionName, boolean allowReplay, boolean skipKafka, ObjectId loaderId) {
         int count = apiCount(collectionDetailsObj);
+        loggerMaker.infoAndAddToDb("API count in postman.json: " + count, LogDb.DASHBOARD);
         LoadersDao.instance.updateTotalCountNormalLoader(loaderId, count);
 
-        List<String> msgs = generateMessages(collectionDetailsObj, aktoCollectionId, collectionName, allowReplay);
+        List<String> msgs;
+        try {
+            msgs = generateMessages(collectionDetailsObj, aktoCollectionId, collectionName, allowReplay);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error generating messages: " + e.getMessage(), LogDb.DASHBOARD);
+            LoadersDao.instance.updateIncrementalCount(loaderId, count);
+            return ;
+        }
 
         String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
         try {
@@ -401,7 +439,7 @@ public class PostmanAction extends UserAction {
                 try{
                     apiInAktoFormat.put("akto_vxlan_id", String.valueOf(aktoCollectionId));
                     String s = mapper.writeValueAsString(apiInAktoFormat);
-                    loggerMaker.infoAndAddToDb(String.format("Api name: %s, CollectionName: %s, AktoFormat: %s", apiName, collectionName, s), LogDb.DASHBOARD);
+                    loggerMaker.infoAndAddToDb(String.format("Api name: %s, CollectionName: %s", apiName, collectionName), LogDb.DASHBOARD);
                     msgs.add(s);
                 } catch (JsonProcessingException e){
                     loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
