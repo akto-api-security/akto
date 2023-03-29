@@ -1,5 +1,6 @@
 package com.akto.action.testing;
 
+import com.akto.DaoInit;
 import com.akto.action.UserAction;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
@@ -17,11 +18,14 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.util.enums.GlobalEnums.TestSubCategory;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
@@ -51,6 +55,8 @@ public class StartTestAction extends UserAction {
     private String testName;
     private HashMap<String,String> metadata;
     private boolean fetchCicd;
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
 
     private static List<ObjectId> getCicdTests(){
         Bson projections = Projections.fields(
@@ -111,10 +117,20 @@ public class StartTestAction extends UserAction {
 
         TestingRun localTestingRun = null;
         if(this.testingRunHexId!=null){
-            localTestingRun = TestingRunDao.instance.findOne("_id",new ObjectId(this.testingRunHexId));
+            try{
+                ObjectId testingId = new ObjectId(this.testingRunHexId);
+                localTestingRun = TestingRunDao.instance.findOne("_id",testingId);
+            } catch (Exception e){
+                loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+            }
         }
         if(localTestingRun==null){
-            localTestingRun = createTestingRun(scheduleTimestamp, this.recurringDaily ? 86400 : 0);
+            try {
+                localTestingRun = createTestingRun(scheduleTimestamp, this.recurringDaily ? 86400 : 0);
+            } catch (Exception e){
+                loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+            }
+            
             if (localTestingRun == null) {
                 return ERROR.toUpperCase();
             } else {
