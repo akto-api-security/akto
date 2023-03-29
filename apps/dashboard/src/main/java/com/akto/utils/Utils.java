@@ -84,9 +84,13 @@ public class Utils {
             Map<String, String> result = new HashMap<>();
             result.put("akto_account_id", accountId);
             result.put("path", getPath(request, variables));
-            result.put("method", request.get("method").asText());
 
-            Map<String, String> requestHeadersMap = getHeaders((ArrayNode) request.get("header"), variables);
+            JsonNode methodObj = request.get("method");
+            if (methodObj == null) throw new Exception("No method field exists");
+            result.put("method", methodObj.asText());
+
+            ArrayNode requestHeadersNode = (ArrayNode) request.get("header");
+            Map<String, String> requestHeadersMap = getHeaders(requestHeadersNode, variables);
             String requestHeadersString =  mapper.writeValueAsString(requestHeadersMap);
             result.put("requestHeaders", requestHeadersString);
 
@@ -94,7 +98,8 @@ public class Utils {
             String requestPayload = bodyNode != null ?  bodyNode.asText() : "";
             requestPayload = replaceVariables(requestPayload, variables);
 
-            JsonNode response = apiInfo.has("response") ?  apiInfo.get("response").get(0): null;
+            JsonNode responseNode = apiInfo.get("response");
+            JsonNode response = responseNode != null && responseNode.has(0) ?  responseNode.get(0): null;
 
             String responseHeadersString;
             String responsePayload;
@@ -109,20 +114,31 @@ public class Utils {
                     }
 
                     OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest(result.get("path"), "", result.get("method"), requestPayload, reqHeadersListMap , "http");
-                    OriginalHttpResponse res = ApiExecutor.sendRequest(originalHttpRequest, true);
-                    responseHeadersString = convertHeaders(res.getHeaders());
-                    responsePayload =  res.getBody();
-                    statusCode =  res.getStatusCode()+"";
-                    status =  "";
+                    try {
+                        OriginalHttpResponse res = ApiExecutor.sendRequest(originalHttpRequest, true);
+                        responseHeadersString = convertHeaders(res.getHeaders());
+                        responsePayload =  res.getBody();
+                        statusCode =  res.getStatusCode()+"";
+                        status =  "";
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.toString(), null);
+                        return null;
+                    }
                 } else {
                     return null;
                 }
             } else {
                 Map<String, String> responseHeadersMap = getHeaders((ArrayNode) response.get("header"), variables);
                 responseHeadersString = mapper.writeValueAsString(responseHeadersMap);
-                responsePayload = response.get("body").asText();
-                statusCode = response.get("code").asText();
-                status = response.get("status").asText();
+
+                JsonNode responsePayloadNode = response.get("body");
+                responsePayload = responsePayloadNode != null ? responsePayloadNode.asText() : "";
+
+                JsonNode statusCodeNode = response.get("code");
+                statusCode = statusCodeNode != null ? statusCodeNode.asText() : "0";
+
+                JsonNode statusNode = response.get("status");
+                status = statusNode != null ? statusNode.asText() : "";
             }
 
             result.put("responseHeaders", responseHeadersString);
@@ -161,9 +177,12 @@ public class Utils {
         return response.get("_postman_previewlanguage").asText();
     }
 
-    public static String getPath(JsonNode request, Map<String, String> variables) {
+    public static String getPath(JsonNode request, Map<String, String> variables) throws Exception {
         JsonNode urlObj = request.get("url");
-        String url = urlObj.get("raw").asText();
+        if (urlObj == null) throw new Exception("URL field doesn't exists");
+        JsonNode raw = urlObj.get("raw");
+        if (raw == null) throw new Exception("Raw field doesn't exists");
+        String url = raw.asText();
         return replaceVariables(url, variables);
     }
 
@@ -193,6 +212,7 @@ public class Utils {
 
     private static Map<String, String> getHeaders(ArrayNode headers, Map<String, String> variables){
         Map<String, String> result = new HashMap<>();
+        if (headers == null) return result;
         for(JsonNode node: headers){
             String key = node.get("key").asText().toLowerCase();
             key = replaceVariables(key,variables);
