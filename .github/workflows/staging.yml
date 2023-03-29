@@ -49,61 +49,61 @@ jobs:
           java-version: '8'
           architecture: x64
 
-      - uses: actions/setup-node@v2
-        with:
-          node-version: '17'
-      - name: Prepare Dashboard UI
-        working-directory: ./apps/dashboard/
-        run: npm install && npm run build
-      - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s")
-      - name: DockerHub login
-        if: ${{ github.event.inputs.Environment == 'prod' }}
-        env:
-          DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
-          DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
-        run: |
-          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD 
-      - name: Convert github branch name to be compatible with docker tag name convention
-        id: docker_tag
-        run: echo "TAG_SUFFIX=$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/_/g')" >> $GITHUB_OUTPUT
-      - name: Build, tag, and push the image to DockerHub
-        if: ${{ github.event.inputs.Environment == 'prod' }}
-        id: build-image-dockerhub
-        env:
-          ECR_REGISTRY: aktosecurity
-          ECR_REPOSITORY: akto-api-security
-          IMAGE_TAG: ${{ github.event.inputs.Tag }}_${{ steps.docker_tag.outputs.TAG_SUFFIX }}
-          IMAGE_TAG_DASHBOARD: ${{ github.event.inputs.Deploy && '-t aktosecurity/akto-api-security-dashboard:flash' || '' }}
-          IMAGE_TAG_TESTING: ${{ github.event.inputs.Deploy && '-t aktosecurity/akto-api-testing:flash' || '' }}
-        run: |
-          docker buildx create --use
-          # Build a docker container and push it to DockerHub 
-          cd apps/dashboard
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG $IMAGE_TAG_DASHBOARD . --push
-          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG"   
-          cd ../testing
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG $IMAGE_TAG_TESTING . --push
-          echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"       
-      - name: Update flash staging
-        if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy }}
-        run: |
-          curl https://flash.staging.akto.io/api/takeUpdate -H X-API-KEY:${{secrets.AKTO_API_KEY}}
-      - name: Set up JDK 11
-        uses: actions/setup-java@v1
-        with:
-          java-version: 11
-      - name: Cache SonarCloud packages
-        uses: actions/cache@v1
-        with:
-          path: ~/.sonar/cache
-          key: ${{ runner.os }}-sonar
-          restore-keys: ${{ runner.os }}-sonar
-      - name: Cache Maven packages
-        uses: actions/cache@v1
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
+      # - uses: actions/setup-node@v2
+      #   with:
+      #     node-version: '17'
+      # - name: Prepare Dashboard UI
+      #   working-directory: ./apps/dashboard/
+      #   run: npm install && npm run build
+      # - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s")
+      # - name: DockerHub login
+      #   if: ${{ github.event.inputs.Environment == 'prod' }}
+      #   env:
+      #     DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
+      #     DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
+      #   run: |
+      #     docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD 
+      # - name: Convert github branch name to be compatible with docker tag name convention
+      #   id: docker_tag
+      #   run: echo "TAG_SUFFIX=$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/_/g')" >> $GITHUB_OUTPUT
+      # - name: Build, tag, and push the image to DockerHub
+      #   if: ${{ github.event.inputs.Environment == 'prod' }}
+      #   id: build-image-dockerhub
+      #   env:
+      #     ECR_REGISTRY: aktosecurity
+      #     ECR_REPOSITORY: akto-api-security
+      #     IMAGE_TAG: ${{ github.event.inputs.Tag }}_${{ steps.docker_tag.outputs.TAG_SUFFIX }}
+      #     IMAGE_TAG_DASHBOARD: ${{ github.event.inputs.Deploy && '-t aktosecurity/akto-api-security-dashboard:flash' || '' }}
+      #     IMAGE_TAG_TESTING: ${{ github.event.inputs.Deploy && '-t aktosecurity/akto-api-testing:flash' || '' }}
+      #   run: |
+      #     docker buildx create --use
+      #     # Build a docker container and push it to DockerHub 
+      #     cd apps/dashboard
+      #     docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG $IMAGE_TAG_DASHBOARD . --push
+      #     echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG"   
+      #     cd ../testing
+      #     docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG $IMAGE_TAG_TESTING . --push
+      #     echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"       
+      # - name: Update flash staging
+      #   if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy }}
+      #   run: |
+      #     curl https://flash.staging.akto.io/api/takeUpdate -H X-API-KEY:${{secrets.AKTO_API_KEY}}
+      # - name: Set up JDK 11
+      #   uses: actions/setup-java@v1
+      #   with:
+      #     java-version: 11
+      # - name: Cache SonarCloud packages
+      #   uses: actions/cache@v1
+      #   with:
+      #     path: ~/.sonar/cache
+      #     key: ${{ runner.os }}-sonar
+      #     restore-keys: ${{ runner.os }}-sonar
+      # - name: Cache Maven packages
+      #   uses: actions/cache@v1
+      #   with:
+      #     path: ~/.m2
+      #     key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+      #     restore-keys: ${{ runner.os }}-m2
       - name: Run CI/CD tests
         if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy }}
         uses: oren-akto/akto-github-action@v1.0
