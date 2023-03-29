@@ -1,23 +1,11 @@
 import request from '@/util/request'
 
 export default {
-    fetchActiveTestingDetails() {
+    fetchTestingDetails(data) {
         return request({
             url: '/api/retrieveAllCollectionTests',
             method: 'post',
-            data: {}
-        }).then((resp) => {
-            return resp
-        })
-    },
-    fetchPastTestingDetails({startTimestamp, endTimestamp}) {
-        return request({
-            url: '/api/retrieveAllCollectionTests',
-            method: 'post',
-            data: {
-                startTimestamp, 
-                endTimestamp
-            }
+            data: data
         }).then((resp) => {
             return resp
         })

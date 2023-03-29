@@ -26,6 +26,11 @@ on:
           - prod
           - staging
         default: staging  
+      Deploy:
+        description: 'Deploy to flash staging'
+        required: false
+        type: boolean
+        default: false
       
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -77,6 +82,20 @@ jobs:
           cd ../testing
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG . --push
           echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"       
+      - name: Deploy and update flash staging
+        if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == true }}
+        env:
+          ECR_REGISTRY: aktosecurity
+          ECR_REPOSITORY: akto-api-security
+          IMAGE_TAG: ${{ github.event.inputs.Tag }}_${{ steps.docker_tag.outputs.TAG_SUFFIX }}
+          IMAGE_TAG_2: flash
+          AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
+        run: |
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG_2
+          docker tag $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG_2
+          curl ${{secrets.AKTO_DASHBOARD_URL}}/api/takeUpdate -H X-API-KEY:$AKTO_API_KEY
+          sleep 180
+          echo "flash should have been updated"
       - name: Set up JDK 11
         uses: actions/setup-java@v1
         with:
@@ -93,3 +112,9 @@ jobs:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
+      - name: Run CI/CD tests
+        uses: oren-akto/akto-github-action@v1.0
+        with:
+          AKTO_DASHBOARD_URL: ${{secrets.AKTO_DASHBOARD_URL}}
+          AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
+          AKTO_TEST_ID: ${{secrets.AKTO_TEST_ID}} 

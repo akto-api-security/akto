@@ -9,6 +9,7 @@ const state = {
     loading: false,
     testingRuns: [],
     pastTestingRuns: [],
+    cicdTestingRuns: [],
     authMechanism: null,
     testingRunResults: []
 }
@@ -23,10 +24,14 @@ const testing = {
             state.authMechanism = null
             state.testingRunResults = []
             state.pastTestingRuns = []
+            state.cicdTestingRuns = []
         },
         SAVE_DETAILS (state, {authMechanism, testingRuns}) {
             state.authMechanism = authMechanism
             state.testingRuns = testingRuns
+        },        
+        SAVE_CICD_DETAILS (state, {testingRuns}) {
+            state.cicdTestingRuns = testingRuns
         },
         SAVE_PAST_DETAILS (state, {testingRuns}) {
             state.pastTestingRuns = testingRuns
@@ -48,11 +53,18 @@ const testing = {
         loadTestingDetails({commit}, {startTimestamp, endTimestamp}) {
             commit('EMPTY_STATE')
             state.loading = true
-            return api.fetchActiveTestingDetails().then((resp) => {
+            return api.fetchTestingDetails().then((resp) => {
                 commit('SAVE_DETAILS', resp)
 
-                api.fetchPastTestingDetails({startTimestamp, endTimestamp}).then(resp2 => {
+                api.fetchTestingDetails({startTimestamp, endTimestamp}).then(resp2 => {
                     commit('SAVE_PAST_DETAILS', resp2)
+
+                    api.fetchTestingDetails({fetchCicd:true}).then(resp3 => {
+                        commit('SAVE_CICD_DETAILS',resp3)
+                    }).catch(() => {
+
+                    })
+
                 }).catch(() => {
 
                 })

@@ -24,7 +24,8 @@ import {mapState} from 'vuex'
 export default {
     name: "TestingRunsTable",
     props: {
-        active: obj.boolR
+        active: obj.boolR,
+        cicd: obj.boolN
     },
     data() {
         return {
@@ -95,7 +96,7 @@ export default {
         }
     },
     computed: {
-        ...mapState('testing', ['testingRuns', 'pastTestingRuns']),
+        ...mapState('testing', ['testingRuns', 'pastTestingRuns','cicdTestingRuns']),
         mapCollectionIdToName() {
             return this.$store.state.collections.apiCollections.reduce((m, e) => {
                 m[e.id] = e.displayName
@@ -103,6 +104,9 @@ export default {
             }, {})
         },
         testingRunsItems() {
+            if(this.cicd){
+                return this.cicdTestingRuns.map(run => this.prepareTableItem(run))
+            }
             return ((this.active ? this.testingRuns : this.pastTestingRuns) || []).map(run => this.prepareTableItem(run))     
         }
     }
