@@ -84,8 +84,6 @@
                 let tab = this.tabs.find(x=> x.toLowerCase().replace(" ", "").startsWith(currTab.toLowerCase()))
                 if(tab){
                     this.setTabWithName(tab)
-                }else{
-                    this.tabName = 0
                 }
             }
         },
