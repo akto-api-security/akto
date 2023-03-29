@@ -393,11 +393,11 @@ export default {
             return dayStr + " " + date.slice(11)
         }
     },
-    mounted() {
+    async mounted() {
         this.fetchAuthMechanismData()
         let now = func.timeNow()
         this.$store.dispatch('test_roles/loadTestRoles')
-        this.$store.dispatch('testing/loadTestingDetails', { startTimestamp: now - func.recencyPeriod, endTimestamp: now })
+        await this.$store.dispatch('testing/loadTestingDetails', { startTimestamp: now - func.recencyPeriod, endTimestamp: now })
     },
     watch: {
         authMechanism: {
