@@ -91,4 +91,24 @@ public class TestStartTestAction extends MongoBasedTest {
         assertEquals(10, summariesFromDb.get(summariesFromDb.size()-1).getStartTimestamp());
 
     }
+
+    @Test
+    public void testStartTest() {
+        TestingRunDao.instance.getMCollection().drop();
+
+        CollectionWiseTestingEndpoints collectionWiseTestingEndpoints = new CollectionWiseTestingEndpoints(1000);
+        TestingRun testingRun = new TestingRun(Context.now(), "", collectionWiseTestingEndpoints,0, TestingRun.State.COMPLETED, 0, "test");
+        TestingRunDao.instance.insertOne(testingRun);
+        String testingRunHexId = testingRun.getHexId();
+
+        assertEquals(1,TestingRunDao.instance.findAll(new BasicDBObject()).size());
+
+        StartTestAction startTestAction = new StartTestAction();
+        startTestAction.setSession(new HashMap<>());
+        startTestAction.setTestingRunHexId(testingRunHexId);
+        startTestAction.startTest();
+
+        assertEquals(1,TestingRunDao.instance.findAll(new BasicDBObject()).size());
+    }
+
 }

@@ -50,7 +50,8 @@ public class BurpJarAction extends UserAction implements ServletResponseAware, S
         if (apiToken == null) {
             ApiTokenAction apiTokenAction = new ApiTokenAction();
             apiTokenAction.setSession(this.getSession());
-            apiTokenAction.addBurpToken();
+            apiTokenAction.setTokenOrigin("burp_key");
+            apiTokenAction.addApiToken();
             List<ApiToken> apiTokenList = apiTokenAction.getApiTokenList();
             if (apiTokenList == null || apiTokenList.isEmpty()) {
                 addActionError("Couldn't generate burp token");

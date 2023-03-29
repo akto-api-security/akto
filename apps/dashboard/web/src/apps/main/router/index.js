@@ -110,6 +110,15 @@ const router =  new Router({
                             })
                         },
                         {
+                            path: 'cicd',
+                            name: 'cicdTestResults',
+                            component: TestingRunsTable,
+                            props: route => ({
+                                active: true,
+                                cicd:true
+                            })
+                        },
+                        {
                             path: ':testingRunHexId/results',
                             name: 'testResults',
                             component: TestingRunResults,

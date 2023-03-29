@@ -1,5 +1,6 @@
 package com.akto.dto.testing;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import org.bson.codecs.pojo.annotations.BsonIgnore;
@@ -30,6 +31,7 @@ public class TestingRunResultSummary {
     @BsonIgnore
     private String hexId;
 
+    private HashMap<String,String> metadata;
 
     public TestingRunResultSummary() {
     }
@@ -121,6 +123,15 @@ public class TestingRunResultSummary {
         this.testResultsCount = testResultsCount;
     }
 
+
+    public HashMap<String, String> getMetadata() {
+        return metadata;
+    }
+
+    public void setMetadata(HashMap<String, String> metadata) {
+        this.metadata = metadata;
+    }
+
     @Override
     public String toString() {
         return "{" +
@@ -131,6 +142,7 @@ public class TestingRunResultSummary {
             ", testingRunId='" + getTestingRunId() + "'" +
             ", testingRunHexId='" + getTestingRunHexId() + "'" +
             ", state='" + getState() + "'" +
+            ", metadata='" + getMetadata().toString() + "'" +
             "}";
     }
 }

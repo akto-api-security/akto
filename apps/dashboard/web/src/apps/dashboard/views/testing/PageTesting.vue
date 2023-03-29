@@ -269,7 +269,7 @@ export default {
     },
     computed: {
         ...mapState('test_roles', ['testRoles', 'loading', 'selectedRole']),
-        ...mapState('testing', ['testingRuns', 'authMechanism', 'testingRunResults', 'pastTestingRuns']),
+        ...mapState('testing', ['testingRuns', 'authMechanism', 'testingRunResults', 'pastTestingRuns','cicdTestingRuns']),
         mapCollectionIdToName() {
             return this.$store.state.collections.apiCollections.reduce((m, e) => {
                 m[e.id] = e.displayName
@@ -319,6 +319,30 @@ export default {
                                 title: x.displayName || testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
                                 link: "/dashboard/testing/" + x.hexId + "/results",
                                 active: true
+                            }
+                        })
+                    ]
+                },
+                {
+                    icon: "$fas_search",
+                    active: true,
+                    title: "CI/CD tests",
+                    group: "/dashboard/testing/",
+                    color: "var(--rgbaColor17)",
+                    items: [
+                        {
+                            title: "All CI/CD tests",
+                            link: "/dashboard/testing/cicd",
+                            icon: "$fas_search",
+                            class: "bold",
+                            active: true
+                        },
+                        ...(this.cicdTestingRuns || []).map(x => {
+                            return {
+                                title: x.displayName || testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
+                                link: "/dashboard/testing/" + x.hexId + "/results",
+                                active: true,
+                                cicd: true
                             }
                         })
                     ]
