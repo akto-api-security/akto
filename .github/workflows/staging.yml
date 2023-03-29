@@ -73,29 +73,21 @@ jobs:
           ECR_REGISTRY: aktosecurity
           ECR_REPOSITORY: akto-api-security
           IMAGE_TAG: ${{ github.event.inputs.Tag }}_${{ steps.docker_tag.outputs.TAG_SUFFIX }}
+          IMAGE_TAG_DASHBOARD: ${{ github.event.inputs.Deploy && '-t aktosecurity/akto-api-security-dashboard:flash' || '' }}
+          IMAGE_TAG_TESTING: ${{ github.event.inputs.Deploy && '-t aktosecurity/akto-api-testing:flash' || '' }}
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
           cd apps/dashboard
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG . --push
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG $IMAGE_TAG_DASHBOARD . --push
           echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG"   
           cd ../testing
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG . --push
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG $IMAGE_TAG_TESTING . --push
           echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"       
-      - name: Deploy and update flash staging
-        if: ${{ github.event.inputs.Environment == 'prod' }} && ${{ github.event.inputs.Deploy == true }}
-        env:
-          ECR_REGISTRY: aktosecurity
-          ECR_REPOSITORY: akto-api-security
-          IMAGE_TAG: ${{ github.event.inputs.Tag }}_${{ steps.docker_tag.outputs.TAG_SUFFIX }}
-          IMAGE_TAG_2: flash
-          AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
+      - name: Update flash staging
+        if: ${{ github.event.inputs.Environment == 'prod' }} && ${{ github.event.inputs.Deploy }}
         run: |
-          docker tag $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG_2
-          docker tag $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG_2
-          curl ${{secrets.AKTO_DASHBOARD_URL}}/api/takeUpdate -H X-API-KEY:$AKTO_API_KEY
-          sleep 180
-          echo "flash should have been updated"
+          curl ${{secrets.AKTO_DASHBOARD_URL}}/api/takeUpdate -H X-API-KEY:${{secrets.AKTO_API_KEY}}
       - name: Set up JDK 11
         uses: actions/setup-java@v1
         with:
@@ -113,7 +105,7 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
       - name: Run CI/CD tests
-        if: ${{ github.event.inputs.Environment == 'prod' }} && ${{ github.event.inputs.Deploy == true }}
+        if: ${{ github.event.inputs.Environment == 'prod' }} && ${{ github.event.inputs.Deploy }}
         uses: oren-akto/akto-github-action@v1.0
         with:
           AKTO_DASHBOARD_URL: ${{secrets.AKTO_DASHBOARD_URL}}
