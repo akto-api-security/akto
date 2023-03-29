@@ -1,5 +1,5 @@
 <template>
-    <div style="height:120px ;width: 482px">
+    <div class="select-component-main">
         <div class="ma-4 api-collection-label">
             API COLLECTION
         </div>
@@ -63,10 +63,14 @@ export default {
 </script>
 
 <style lang="sass">
+.select-component-main
+    height:120px
+    width: 482px
+
 .api-collection-label
     font-weight: 600
     font-size: 14px
-    color: #47466A
+    color: var(--themeColorDark)
 .spinner-div
     display: flex
     justify-content: center
