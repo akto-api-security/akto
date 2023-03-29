@@ -85,7 +85,7 @@ jobs:
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG $IMAGE_TAG_TESTING . --push
           echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"       
       - name: Update flash staging
-        if: ${{ github.event.inputs.Environment == 'prod' }} && ${{ github.event.inputs.Deploy }}
+        if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy }}
         run: |
           curl https://flash.staging.akto.io/api/takeUpdate -H X-API-KEY:${{secrets.AKTO_API_KEY}}
       - name: Set up JDK 11
@@ -105,7 +105,7 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
       - name: Run CI/CD tests
-        if: ${{ github.event.inputs.Environment == 'prod' }} && ${{ github.event.inputs.Deploy }}
+        if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy }}
         uses: oren-akto/akto-github-action@v1.0
         with:
           AKTO_DASHBOARD_URL: https://flash.staging.akto.io/
