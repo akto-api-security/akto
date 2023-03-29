@@ -50,29 +50,25 @@ const testing = {
         emptyState({commit}, payload, options) {
             commit('EMPTY_STATE', payload, options)
         },
-        loadTestingDetails({commit}, {startTimestamp, endTimestamp}) {
+        async loadTestingDetails({commit}, {startTimestamp, endTimestamp}) {
             commit('EMPTY_STATE')
             state.loading = true
-            return api.fetchTestingDetails().then((resp) => {
+            await api.fetchTestingDetails().then((resp) => {
                 commit('SAVE_DETAILS', resp)
-
-                api.fetchTestingDetails({startTimestamp, endTimestamp}).then(resp2 => {
-                    commit('SAVE_PAST_DETAILS', resp2)
-
-                    api.fetchTestingDetails({fetchCicd:true}).then(resp3 => {
-                        commit('SAVE_CICD_DETAILS',resp3)
-                    }).catch(() => {
-
-                    })
-
-                }).catch(() => {
-
-                })
-
-                state.loading = false
             }).catch(() => {
                 state.loading = false
             })
+            await api.fetchTestingDetails({startTimestamp, endTimestamp}).then(resp2 => {
+                commit('SAVE_PAST_DETAILS', resp2)
+            }).catch(() => {
+                state.loading = false
+            })
+            await api.fetchTestingDetails({fetchCicd:true}).then(resp3 => {
+                commit('SAVE_CICD_DETAILS',resp3)
+            }).catch(() => {
+                state.loading = false
+            })
+            state.loading = false
         },
         startTestForCollection({commit}, {apiCollectionId, testName}) {
             return api.startTestForCollection(apiCollectionId, testName).then((resp) => {
