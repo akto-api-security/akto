@@ -1215,7 +1215,7 @@ public class APICatalogSync {
         }
     }
 
-    private static void build(SingleTypeInfo param, Map<Integer, APICatalog> ret) {
+    private static void buildHelper(SingleTypeInfo param, Map<Integer, APICatalog> ret) {
         String url = param.getUrl();
         int collId = param.getApiCollectionId();
         APICatalog catalog = ret.get(collId);
@@ -1302,7 +1302,7 @@ public class APICatalogSync {
         
         for (SingleTypeInfo param: allParams) {
             try {
-                build(param, ret);
+                buildHelper(param, ret);
             } catch (Exception e) {
                 e.printStackTrace();
                 loggerMaker.errorAndAddToDb("Error while building from db: " + e.getMessage(), LogDb.RUNTIME);
