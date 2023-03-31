@@ -92,13 +92,17 @@
     </v-navigation-drawer>
 
     <v-main class="akto-background" :style="{ 'padding-left': mini ? '56px' : '200px'}">
+      <help-box @closeDialogBox="(helpDialog = false)" :openDetailsDialog="helpDialog" :contentPath="getHelpContent()"/>
       <div class="page-wrapper">
         <router-view>
           <template slot="universal-ctas">
           </template>
         </router-view>
         <div class="akto-external-links">
-          <v-btn primary dark depressed color="var(--hexColor40)" @click='openDiscordCommunity'>
+          <v-btn primary dark depressed rounded min-width="36px" color="var(--white)" class="pa-0" @click='openHelp' >
+            <v-icon color="var(--black)" size="28">$far_question-circle</v-icon>
+          </v-btn>
+          <v-btn primary dark depressed color="var(--hexColor40)" class="discord-btn" @click='openDiscordCommunity'>
             Ask us on <v-icon size="16">$fab_discord</v-icon>
           </v-btn>
           <v-btn primary dark depressed class="github-btn" @click='openGithubRepoPage'>    
@@ -119,6 +123,7 @@ import api from "./appbar/api"
 import OwnerName from "./shared/components/OwnerName";
 import SimpleTextField from "./shared/components/SimpleTextField";
 import SimpleMenu from "./shared/components/SimpleMenu"
+import HelpBox from './shared/components/HelpBox';
 
 export default {
   name: 'PageDashboard',
@@ -126,7 +131,8 @@ export default {
     SimpleTextField,
     OwnerName,
     'create-account-dialog': CreateAccountDialog,
-    SimpleMenu
+    SimpleMenu,
+    HelpBox
   },
   data() {
     const myItems = [
@@ -183,6 +189,7 @@ export default {
       showField: {},
       showTeamField: false,
       newName: '',
+      helpDialog: false,
       myAccountItems: [
         {
           label: "Settings",
@@ -211,6 +218,9 @@ export default {
     openDiscordCommunity() {
       return window.open("https://discord.gg/Wpc6xVME4s")
     },
+    openHelp(){
+      this.helpDialog = true;
+    },
     openGithubRepoPage() {
       return window.open("https://github.com/akto-api-security/community-edition/")
     },
@@ -230,6 +240,10 @@ export default {
           this.$router.push('/dashboard/teams/' + resp.id)
         })
       }
+    },
+    getHelpContent(){
+      return this.$route.meta.helpDocPath;
+      
     }
   }
 }
@@ -394,9 +408,7 @@ export default {
   margin-left: 8px
 
 .discord-btn
-  background: #ffffff !important
-  color: #24292f !important
-  border: 1px solid rgba(27,31,36,.15)
+  margin-left: 8px
 
 .akto-external-links
   position: absolute

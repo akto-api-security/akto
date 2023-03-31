@@ -38,21 +38,33 @@ const router =  new Router({
         {
             path: '/',
             redirect: 'login',
+            meta: {
+                helpDocPath:'index.html'
+            },
             component: PageLogin
         },
         {
             path: '/login',
             name: 'login',
+            meta: {
+                helpDocPath:'index.html'
+            },
             component: PageLogin
         },
         {
             path: '/signup',
             name: 'signup',
+            meta: {
+                helpDocPath:'index.html'
+            },
             component: PageSignup
         },
         {
             path: '/dashboard/onboarding',
             name: 'onboarding',
+            meta: {
+                helpDocPath:'index.html'
+            },
             component: Onboarding,
             beforeEnter (to, from, next) {
                 store.dispatch('collections/loadAllApiCollections').then(() => next()).catch(() => next())
@@ -61,6 +73,9 @@ const router =  new Router({
         {
             path: '/dashboard',
             name: 'dashboard',
+            meta: {
+                helpDocPath:'testing/run-test.html'
+            },
             component: PageDashboard,
             redirect: '/dashboard/testing',
             beforeEnter (to, from, next) {
@@ -70,11 +85,17 @@ const router =  new Router({
                 {
                     path: 'quick-start',
                     name: 'quick-start',
+                    meta: {
+                        helpDocPath:'getting-started/quick-start-with-akto-cloud.html'
+                    },
                     component: PageQuickStart
                 },        
                 {
                     path: 'testing',
                     name: 'testing',
+                    meta: {
+                        helpDocPath:'testing/run-test.html'
+                    },
                     redirect: 'testing/active',
                     components: {
                         default: PageTesting
@@ -88,6 +109,9 @@ const router =  new Router({
                         {
                             path: 'active',
                             name: 'testResults',
+                            meta: {
+                                helpDocPath:'testing/test-results.html'
+                            },
                             component: TestingRunsTable,
                             props: route => ({
                                 active: true
@@ -96,6 +120,9 @@ const router =  new Router({
                         {
                             path: 'completed',
                             name: 'testResults',
+                            meta: {
+                                helpDocPath:'testing/test-results.html'
+                            },
                             component: TestingRunsTable,
                             props: route => ({
                                 active: false
@@ -104,6 +131,9 @@ const router =  new Router({
                         {
                             path: 'inactive',
                             name: 'inactiveTestResults',
+                            meta: {
+                                helpDocPath:'testing/test-results.html'
+                            },
                             component: TestingRunsTable,
                             props: route => ({
                                 active: false
@@ -112,6 +142,9 @@ const router =  new Router({
                         {
                             path: ':testingRunHexId/results',
                             name: 'testResults',
+                            meta: {
+                                helpDocPath:'testing/test-results.html'
+                            },
                             component: TestingRunResults,
                             props: route => ({
                                 testingRunHexId: route.params.testingRunHexId,
@@ -121,6 +154,9 @@ const router =  new Router({
                         {
                             path: 'create/:apiCollectionId',
                             name: 'createFromApiCollection',
+                            meta: {
+                                helpDocPath:'testing/run-test.html'
+                            },
                             component: CreateTestingRun
 
                             
@@ -130,11 +166,17 @@ const router =  new Router({
                 {
                     path: 'issues',
                     name: 'issues',
+                    meta: {
+                        helpDocPath:'testing/test-results.html'
+                    },
                     component: PageIssues
                 },        
                 {
                     path: 'settings',
                     name: 'settings',
+                    meta: {
+                        helpDocPath:'api-reference/api-reference.html'
+                    },
                     component: PageSettings,
                     props: route => ({
                         defaultStartTimestamp: route.query.start,
@@ -145,21 +187,33 @@ const router =  new Router({
                 {
                     path: 'observe',
                     name: 'observe',
+                    meta: {
+                        helpDocPath:'api-inventory/api-collections.html'
+                    },
                     component: Observe,
                     children:[
                         {
                             path: 'inventory',
                             name: 'inventory',
+                            meta: {
+                                helpDocPath:'api-inventory/api-collections.html'
+                            },
                             component: Inventory,
                             children: [
                                 {
                                     path:'',
                                     name:'default',
+                                    meta: {
+                                        helpDocPath:'api-inventory/api-collections.html'
+                                    },
                                     component: APICollections        
                                 },
                                 {
                                     path:':apiCollectionId',
                                     name:'apiCollection',
+                                    meta: {
+                                        helpDocPath:'api-inventory/api-inventory.html'
+                                    },
                                     component: APIEndpoints,
                                     props: route => ({
                                         apiCollectionId: +route.params.apiCollectionId
@@ -168,6 +222,9 @@ const router =  new Router({
                                 {
                                     path:':apiCollectionId/:urlAndMethod',
                                     name:'apiCollection/urlAndMethod',
+                                    meta: {
+                                        helpDocPath:'api-inventory/api-inventory.html'
+                                    },
                                     component: APIParameters,
                                     props: route => ({
                                         urlAndMethod: atob(route.params.urlAndMethod),
@@ -179,6 +236,9 @@ const router =  new Router({
                         {
                             path: 'changes',
                             name: 'changes',
+                            meta: {
+                                helpDocPath:'api-inventory/detecting-changes-in-apis.html'
+                            },
                             component: ApiChanges,
                             props: route => ({
                                 openTab: route.query.tab === "parameters" ? "parameters" : "endpoints",
@@ -189,6 +249,9 @@ const router =  new Router({
                         {
                             path: 'sensitive',
                             name: 'sensitive',
+                            meta: {
+                                helpDocPath:'api-inventory/sensitive-data.html'
+                            },
                             component: SensitiveData,
                             props: route => ({
                                 subType: route.query.type
@@ -197,6 +260,9 @@ const router =  new Router({
                         {
                             path: 'param_state',
                             name: 'param_state',
+                            meta: {
+                                helpDocPath:'api-inventory/api-collections.html'
+                            },
                             component: ParamState,
                         }
                     ]
@@ -204,6 +270,9 @@ const router =  new Router({
                 {
                     path: 'library',
                     name: 'library',
+                    meta: {
+                        helpDocPath:'testing/test-library.html'
+                    },
                     components: {
                         default: PageMarketplace
                     },
@@ -211,6 +280,9 @@ const router =  new Router({
                         {
                             path: 'custom/:category_id',
                             name: 'customCategory',
+                            meta: {
+                                helpDocPath:'testing/test-library.html'
+                            },
                             component: MPTestCategory,
                             props: route => ({
                                 categoryType: "custom",
@@ -220,6 +292,9 @@ const router =  new Router({
                         {
                             path: 'default/:category_id',
                             name: 'defaultCategory',
+                            meta: {
+                                helpDocPath:'testing/test-library.html'
+                            },
                             component: MPTestCategory,
                             props: route => ({
                                 categoryType: "default",

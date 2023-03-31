@@ -69,6 +69,7 @@
     "cross-env": "^5.0.5",
     "css-loader": "^0.28.7",
     "file-loader": "^1.1.4",
+    "html-loader": "^0.5.5",
     "sass": "^1.25.0",
     "sass-loader": "^7.2.0",
     "sw-precache-webpack-plugin": "^1.0.0",
