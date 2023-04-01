@@ -26,7 +26,7 @@
                         <div v-if="showName" class="table-name">
                         {{name}}
                         </div>
-                        <div class="d-flex hello">
+                        <div class="d-flex headerButtons">
                             <template v-for = "(header,index) in selectedHeaders">
                                 <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.sortKey || header.value]"> 
                                     <template v-slot:activator="{ on, attrs }">
@@ -537,7 +537,7 @@ export default {
 
 .highlight-row
     background-color: var(--themeColorDark14)
-.hello
+.headerButtons
     flex-wrap: wrap
     max-width: 660px
 
