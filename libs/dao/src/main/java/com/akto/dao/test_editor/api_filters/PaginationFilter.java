@@ -1,13 +1,13 @@
-package com.akto.dto.test_editor.api_filters;
+package com.akto.dao.test_editor.api_filters;
 
 import java.util.List;
 
+import com.akto.dao.test_editor.Utils;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.ApiSelectionFilters;
 import com.akto.dto.test_editor.TestConfig;
-import com.akto.dto.test_editor.Utils;
 import com.akto.util.HttpRequestResponseUtils;
 
 public class PaginationFilter extends ApiFilter{
