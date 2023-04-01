@@ -2,6 +2,8 @@ package com.akto.rules;
 
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.test_editor.TestConfig;
+import com.akto.dto.test_editor.TestConfigYamlParser;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.info.TestInfo;
 import com.akto.dto.type.*;
@@ -404,6 +406,14 @@ public abstract class TestPlugin {
         }
 
         return comparisonExcludedKeys;
+    }
+
+    public Boolean validate(String configFileName, RawApi rawApi, ApiInfoKey apiInfoKey) {
+        TestConfigYamlParser parser = new TestConfigYamlParser();
+        TestConfig testConfig = parser.parseTemplate(configFileName);
+        //RawApi rawApi = filteredMessages.get(0).copy();
+
+        return parser.validateAgainstTemplate(testConfig, rawApi, apiInfoKey);
     }
     
     private SampleRequestReplayResponse replaySampleReq(OriginalHttpRequest testRequest, int replayCount, boolean followRedirects, OriginalHttpResponse originalHttpResponse) throws Exception {

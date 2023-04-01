@@ -1,0 +1,23 @@
+id: jwt-invalid-signature
+info:
+  message: >
+            "Since server is not validating the JWT signature the attacker can tamper with the payload of JWT and access protected resources",
+            "The endpoint appears to be vulnerable to broken authentication attack.The original request was replayed by changing the valid signature" +
+            " of JWT to invalid signature. The server responded with 2XX success codes. This indicates that this endpoint can be " +
+            "accessed with an invalid JWT signature as the developer has failed to properly verify the signature with every request.<br><br>" +
+            "<b>Background:</b> The JSON Web Token specification provides several ways for developers to digitally sign payload claims. This ensures data integrity and robust user authentication. However, some servers fail to properly verify the signature, which can result in them accepting tokens with invalid signatures.",
+            "Using this vulnerability an attacker can do a full account takeover. <br><br>" +
+            "They can also exploit this vulnerability by supplying an arbitrary claim in the JWT" +
+            " payload to escalate their privileges or impersonate other users. For example, if the token" +
+            " contains a \"username\": \"joe\" claim, they could change this to \"username\": \"admin\"."
+  category: Broken User Authentication (BUA)
+  subCategory: JWT_INVALID_SIGNATURE
+  severity: HIGH
+  confidence: LOW
+  tags: Business logic, OWASP top 10, HackerOne top 10
+  references:
+    - "https://redhuntlabs.com/a-practical-guide-to-attack-jwt-json-web-token"
+    - "https://portswigger.net/kb/issues/00200900_jwt-signature-not-verified#:~:text=Description%3A%20JWT%20signature%20not%20verified&text=However%2C%20some%20servers%20fail%20to,privileges%20or%20impersonate%20other%20users."
+  author: Akto
+apiSelectionFilters:
+  authenticated: true

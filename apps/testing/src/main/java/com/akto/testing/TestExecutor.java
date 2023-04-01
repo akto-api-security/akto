@@ -314,7 +314,8 @@ public class TestExecutor {
                         String subcategory = origTemplateURL.substring(origTemplateURL.lastIndexOf("/")+1).split("\\.")[0];
 
                         FuzzingTest fuzzingTest = new FuzzingTest(testingRun.getId().toHexString(), summaryId.toHexString(), origTemplateURL, subcategory, testSubCategory, null);
-                        TestingRunResult fuzzResult = runTest(fuzzingTest, apiInfoKey, testingUtil, testingRun.getId(), summaryId);
+                        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
+                        TestingRunResult fuzzResult = runTest(fuzzingTest, apiInfoKey, testingUtil, testingRun.getId(), summaryId, "Fuzzing", messages.get(0));
                         if (fuzzResult != null) {
                             trim(fuzzResult);
                             TestingRunResultDao.instance.insertOne(fuzzResult);
@@ -541,10 +542,14 @@ public class TestExecutor {
         OpenRedirectTest openRedirectTest = new OpenRedirectTest(testRunId.toHexString(), testRunResultSummaryId.toHexString());
         SSRFOnAwsMetadataEndpoint ssrfOnAwsMetadataEndpoint = new SSRFOnAwsMetadataEndpoint(testRunId.toHexString(), testRunResultSummaryId.toHexString());
         CreateAdminUserViaMassAssignment createAdminUserViaMassAssignment = new CreateAdminUserViaMassAssignment(testRunId.toHexString(), testRunResultSummaryId.toHexString());
+        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
+        //if (messages.isEmpty()) return null;
+        List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, testingUtil.getAuthMechanism());
+        //if (filteredMessages.isEmpty()) return null;
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
 
-        TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+        TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "NoAuth", filteredMessages.get(0));
         if (noAuthTestResult != null) {
             testingRunResults.add(noAuthTestResult);
         } else {
@@ -555,86 +560,89 @@ public class TestExecutor {
             TestPlugin.TestRoleMatcher testRoleMatcher = new TestPlugin.TestRoleMatcher(testingUtil.getTestRoles(), apiInfoKey);
             loggerMaker.infoAndAddToDb("Starting auth required tests for " + apiInfoKey, LogDb.TESTING);
             if ((testSubCategories == null || testSubCategories.contains(TestSubCategory.BFLA.name())) && testRoleMatcher.shouldDoBFLA())  {
-                TestingRunResult bflaTestResult = runTest(bflaTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                TestingRunResult bflaTestResult = runTest(bflaTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "BFLA", filteredMessages.get(0));
                 if (bflaTestResult != null) testingRunResults.add(bflaTestResult);
             } else if (testSubCategories == null || testSubCategories.contains(TestSubCategory.REPLACE_AUTH_TOKEN.name())){
-                TestingRunResult bolaTestResult = runTest(bolaTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                TestingRunResult bolaTestResult = runTest(bolaTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "BOLAByChangingAuthToken", filteredMessages.get(0));
                 if (bolaTestResult != null) testingRunResults.add(bolaTestResult);
             }
 
             if (testSubCategories == null || testSubCategories.contains(TestSubCategory.ADD_USER_ID.name())) {
-                TestingRunResult addUserIdTestResult = runTest(addUserIdTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                TestingRunResult addUserIdTestResult = runTest(addUserIdTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "AddUserId", filteredMessages.get(0));
                 if (addUserIdTestResult != null) testingRunResults.add(addUserIdTestResult);
             }
 
             if (testSubCategories == null || testSubCategories.contains(TestSubCategory.PARAMETER_POLLUTION.name())) {
-                TestingRunResult parameterPollutionTestResult = runTest(parameterPollutionTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                TestingRunResult parameterPollutionTestResult = runTest(parameterPollutionTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "ParameterPollution", filteredMessages.get(0));
                 if (parameterPollutionTestResult != null) testingRunResults.add(parameterPollutionTestResult);
             }
 
             if (testSubCategories == null || testSubCategories.contains(TestSubCategory.REPLACE_AUTH_TOKEN_OLD_VERSION.name())) {
-                TestingRunResult oldApiVersionTestResult = runTest(oldApiVersionTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                TestingRunResult oldApiVersionTestResult = runTest(oldApiVersionTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "OldApiVersion", filteredMessages.get(0));
                 if (oldApiVersionTestResult != null) testingRunResults.add(oldApiVersionTestResult);
             }
 
             if (testSubCategories == null || testSubCategories.contains(TestSubCategory.JWT_NONE_ALGO.name())) {
-                TestingRunResult jwtNoneAlgoTestResult = runTest(jwtNoneAlgoTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                TestingRunResult jwtNoneAlgoTestResult = runTest(jwtNoneAlgoTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "JwtNoneAlgo", filteredMessages.get(0));
                 if (jwtNoneAlgoTestResult != null) testingRunResults.add(jwtNoneAlgoTestResult);
             }
 
             if (testSubCategories == null || testSubCategories.contains(TestSubCategory.JWT_INVALID_SIGNATURE.name())) {
-                TestingRunResult jwtInvalidSignatureTestResult = runTest(jwtInvalidSignatureTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                TestingRunResult jwtInvalidSignatureTestResult = runTest(jwtInvalidSignatureTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "JwtInvalidSignature", filteredMessages.get(0));
                 if (jwtInvalidSignatureTestResult != null) testingRunResults.add(jwtInvalidSignatureTestResult);
             }
 
             if (testSubCategories == null || testSubCategories.contains(TestSubCategory.ADD_JKU_TO_JWT.name())) {
-                TestingRunResult addJkuToJwtTestResult = runTest(addJkuToJwtTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+                TestingRunResult addJkuToJwtTestResult = runTest(addJkuToJwtTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "JwtAddJku", filteredMessages.get(0));
                 if (addJkuToJwtTestResult != null) testingRunResults.add(addJkuToJwtTestResult);
             }
         }
 
        if(testSubCategories == null || testSubCategories.contains(TestSubCategory.PAGINATION_MISCONFIGURATION.name())) {
-            TestingRunResult paginationMisconfigurationTestResult = runTest(pageSizeDosTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            TestingRunResult paginationMisconfigurationTestResult = runTest(pageSizeDosTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "PageDos", messages.get(0));
             if (paginationMisconfigurationTestResult != null) testingRunResults.add(paginationMisconfigurationTestResult);
         }
 
         if (testSubCategories == null || testSubCategories.contains(TestSubCategory.ADD_METHOD_IN_PARAMETER.name())) {
-            TestingRunResult addMethodInParameterTestResult = runTest(addMethodInParameterTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            TestingRunResult addMethodInParameterTestResult = runTest(addMethodInParameterTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "AddMethodInParameter", messages.get(0));
             if (addMethodInParameterTestResult != null) testingRunResults.add(addMethodInParameterTestResult);
         }
 
         if (testSubCategories == null || testSubCategories.contains(TestSubCategory.ADD_METHOD_OVERRIDE_HEADERS.name())) {
-            TestingRunResult addMethodOverrideHeadersTestResult = runTest(addMethodOverrideHeadersTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            TestingRunResult addMethodOverrideHeadersTestResult = runTest(addMethodOverrideHeadersTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "AddMethodOVerrideHeader", messages.get(0));
             if (addMethodOverrideHeadersTestResult != null) testingRunResults.add(addMethodOverrideHeadersTestResult);
         }
 
         if (testSubCategories == null || testSubCategories.contains(TestSubCategory.CHANGE_METHOD.name())) {
-            TestingRunResult changeHttpMethodTestResult = runTest(changeHttpMethodTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            TestingRunResult changeHttpMethodTestResult = runTest(changeHttpMethodTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "ChangeMethod", messages.get(0));
             if (changeHttpMethodTestResult != null) testingRunResults.add(changeHttpMethodTestResult);
         }
 
         if (testSubCategories == null || testSubCategories.contains(TestSubCategory.OPEN_REDIRECT.name())) {
-            TestingRunResult openRedirectResult = runTest(openRedirectTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            TestingRunResult openRedirectResult = runTest(openRedirectTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "OpenRedirect", messages.get(0));
             if (openRedirectResult != null) testingRunResults.add(openRedirectResult);
         }
 
         if (testSubCategories == null || testSubCategories.contains(TestSubCategory.SSRF_AWS_METADATA_EXPOSED.name())) {
-            TestingRunResult ssrfAwsMetadataExposedResult = runTest(ssrfOnAwsMetadataEndpoint, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            TestingRunResult ssrfAwsMetadataExposedResult = runTest(ssrfOnAwsMetadataEndpoint, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "SSRFOnAwsMetaEndpoint", messages.get(0));
             if (ssrfAwsMetadataExposedResult != null)
                 testingRunResults.add(ssrfAwsMetadataExposedResult);
         }
 
         if(testSubCategories == null || testSubCategories.contains(TestSubCategory.MASS_ASSIGNMENT_CREATE_ADMIN_ROLE.name())) {
-            TestingRunResult createAdminUserViaMassAssignmentResult = runTest(createAdminUserViaMassAssignment, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+            TestingRunResult createAdminUserViaMassAssignmentResult = runTest(createAdminUserViaMassAssignment, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "MassAssignmentCreateAdminUser", messages.get(0));
             if (createAdminUserViaMassAssignmentResult != null) testingRunResults.add(createAdminUserViaMassAssignmentResult);
         }
 
         return testingRunResults;
     }
 
-    public TestingRunResult runTest(TestPlugin testPlugin, ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil, ObjectId testRunId, ObjectId testRunResultSummaryId) {
+    public TestingRunResult runTest(TestPlugin testPlugin, ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil, ObjectId testRunId, ObjectId testRunResultSummaryId, String configYamlFileName, RawApi rawApi) {
 
         int startTime = Context.now();
+        if (!testPlugin.validate(configYamlFileName, rawApi, apiInfoKey)) {
+            return null;
+        }
         TestPlugin.Result result = testPlugin.start(apiInfoKey, testingUtil);
         if (result == null) return null;
         int endTime = Context.now();
