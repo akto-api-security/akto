@@ -1,9 +1,9 @@
 package com.akto.rules;
 
+import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.test_editor.TestConfig;
-import com.akto.dto.test_editor.TestConfigYamlParser;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.info.TestInfo;
 import com.akto.dto.type.*;

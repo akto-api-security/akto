@@ -1,4 +1,4 @@
-package com.akto.dto.test_editor.api_filters;
+package com.akto.dao.test_editor.api_filters;
 
 import com.akto.dto.ApiInfo;
 import com.akto.dto.RawApi;

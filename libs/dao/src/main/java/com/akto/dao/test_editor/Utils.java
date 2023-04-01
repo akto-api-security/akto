@@ -1,4 +1,4 @@
-package com.akto.dto.test_editor;
+package com.akto.dao.test_editor;
 
 import java.util.HashSet;
 import java.util.List;
@@ -27,15 +27,6 @@ public class Utils {
         return match != null;
     }
 
-    public static Boolean checkIfParamExists(String param, List<String> searchIn, OriginalHttpRequest request, OriginalHttpResponse response) {
-        
-        for (String location : searchIn) {
-                        
-        }
-
-        return true;
-    }
-
     public static Boolean checkInQueryParams(OriginalHttpRequest request) {
         String queryJson = HttpRequestResponseUtils.convertFormUrlEncodedToJson(request.getQueryParams());
         if (queryJson != null) {
@@ -52,29 +43,29 @@ public class Utils {
         return false;
     }
 
-    public static Boolean checkInRequestBody(OriginalHttpRequest request) {
-        String jsonBody = request.getJsonRequestBody();
-        if(jsonBody.length() > 0) {
-            BasicDBObject payload = RequestTemplate.parseRequestPayload(jsonBody, null);
-            Map<String, Set<Object>> flattenedPayload = JSONUtils.flatten(payload);
-            Set<String> payloadKeysToFuzz = new HashSet<>();
-            for (String key : flattenedPayload.keySet()) {
-                Set<Object> values = flattenedPayload.get(key);
-                for (Object v : values) {
-                    if (v != null && isUrlPresent(v)) {
-                        return true;
-                    }
-                }
-            }
+    // public static Boolean checkInRequestBody(OriginalHttpRequest request) {
+    //     String jsonBody = request.getJsonRequestBody();
+    //     if(jsonBody.length() > 0) {
+    //         BasicDBObject payload = RequestTemplate.parseRequestPayload(jsonBody, null);
+    //         Map<String, Set<Object>> flattenedPayload = JSONUtils.flatten(payload);
+    //         Set<String> payloadKeysToFuzz = new HashSet<>();
+    //         for (String key : flattenedPayload.keySet()) {
+    //             Set<Object> values = flattenedPayload.get(key);
+    //             for (Object v : values) {
+    //                 if (v != null && isUrlPresent(v)) {
+    //                     return true;
+    //                 }
+    //             }
+    //         }
 
-            Map<String, Object> store = new HashMap<>();
-            for (String k : payloadKeysToFuzz) store.put(k, URL);
+    //         Map<String, Object> store = new HashMap<>();
+    //         for (String k : payloadKeysToFuzz) store.put(k, URL);
 
-            String modifiedPayload = JSONUtils.modify(jsonBody, payloadKeysToFuzz, new SetValueModifier(store));
-            req.setBody(modifiedPayload);
-        }
-        return false;
-    }
+    //         String modifiedPayload = JSONUtils.modify(jsonBody, payloadKeysToFuzz, new SetValueModifier(store));
+    //         req.setBody(modifiedPayload);
+    //     }
+    //     return false;
+    // }
 
     private static boolean isUrlPresent(String value) {
         if (value.contains("http://") || value.contains("https://")) {
