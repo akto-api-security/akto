@@ -1,0 +1,24 @@
+id: open-redirect
+info:
+  message: > 
+            "An attacker can construct a URL within the application that causes a redirection to an arbitrary external domain.",
+            "Open redirection vulnerabilities arise when an application incorporates user-controllable data into the target of a redirection in an unsafe way." +
+            "The ability to use an authentic application URL, targeting the correct domain and with a valid SSL certificate (if SSL is used), lends credibility to the phishing attack because many users, even if they verify these features, will not notice the subsequent redirection to a different domain",
+            "This behavior can be leveraged to facilitate phishing attacks against users of the application."
+  category: Security Misconfiguration (SM)
+  subCategory: OPEN_REDIRECT
+  severity: HIGH
+  confidence: LOW
+  tags: Business logic, OWASP top 10, HackerOne top 10
+  references:
+    - "https://portswigger.net/kb/issues/00500100_open-redirection-reflected"
+  author: Akto
+apiSelectionFilters:
+  mustContainKeys:
+    - location: 
+      - "request-header"
+      - "queryParam"
+      - "request-body"
+      keyRegex: 
+        - location
+

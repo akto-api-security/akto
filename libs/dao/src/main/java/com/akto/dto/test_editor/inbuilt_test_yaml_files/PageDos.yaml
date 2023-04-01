@@ -1,0 +1,16 @@
+id: page-dos
+info:
+  message: "Quite often, APIs do not impose any restrictions on the size or number of resources that can be requested by the user."
+  category: Lack of Resources & Rate Limiting (RL)
+  subCategory: PAGINATION_MISCONFIGURATION
+  severity: HIGH
+  confidence: LOW
+  tags: Business logic, OWASP top 10, HackerOne top 10
+  references:
+    - "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa4-lack-of-resources-and-rate-limiting.md#scenario-2"
+  author: Akto
+apiSelectionFilters:
+  paginationKeyWords:
+    - limit
+    - size
+    - page
