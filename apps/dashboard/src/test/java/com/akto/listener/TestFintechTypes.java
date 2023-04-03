@@ -32,6 +32,10 @@ public class TestFintechTypes extends MongoBasedTest {
                 case "PAN CARD":
                     assertTrue(cdt.validate("ABCDE9458J", "foo"));
                     assertFalse(cdt.validate("ACDE9458J", "foo"));
+                case "Google Ad Cookie":
+                    assertTrue(cdt.validate("__gads", "foo"));
+                    assertTrue(cdt.validate("_gcl_gb", "foo"));
+                    assertTrue(cdt.validate("__gpi", "foo"));
                     break;
                 
                 default:
