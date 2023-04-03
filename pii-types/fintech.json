@@ -1,5 +1,6 @@
 {
     "types": [
-        {"name": "PAN CARD", "regexPattern" : "[A-Z]{5}[0-9]{4}[A-Z]{1}", "sensitive":false, "onKey": false, "active" : false}
+        {"name": "PAN CARD", "regexPattern" : "[A-Z]{5}[0-9]{4}[A-Z]{1}", "sensitive":false, "onKey": false, "active" : false},
+        {"name": "Google Ad Cookie", "regexPattern": "^_{1,}g[a-z]{2,}_{0,2}[a-z]{0,2}", "sensitive":false, "onKey": false, "active": false},        
     ]
 }
