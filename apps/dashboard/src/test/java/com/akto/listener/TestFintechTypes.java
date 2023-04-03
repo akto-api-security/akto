@@ -33,6 +33,10 @@ public class TestFintechTypes extends MongoBasedTest {
                     assertTrue(cdt.validate("ABCDE9458J", "foo"));
                     assertFalse(cdt.validate("ACDE9458J", "foo"));
                     break;
+                case "IBAN EUROPE":
+                    assertTrue(cdt.validate("AB 12 3456 7890 1234 5678", "foo"));
+                    assertFalse(cdt.validate("AB 12 3456 7890 1234 56789", "foo"));
+                    break;
                 
                 default:
                     break;
