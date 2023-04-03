@@ -184,7 +184,8 @@ export default {
                 ["API Security matters!!!"]
             ],
             refreshSummariesInterval: null,
-            refreshTestResultsInterval : null
+            refreshTestResultsInterval : null,
+            firstTime: true
         }
     },
     methods: {
@@ -372,9 +373,15 @@ export default {
         },
         dateRange: {
             get () {
+                if(this.currentTest && this.firstTime){
+                    if(this.startTimestamp > this.currentTest.startTimestamp){
+                        this.startTimestamp = this.currentTest.startTimestamp
+                    }
+                }
                 return [this.toHyphenatedDate(this.startTimestamp * 1000), this.toHyphenatedDate(this.endTimestamp * 1000)]
             },
             set(newDateRange) {
+                this.firstTime = false;
                 let start = Math.min(func.toEpochInMs(newDateRange[0]), func.toEpochInMs(newDateRange[1]));
                 let end = Math.max(func.toEpochInMs(newDateRange[0]), func.toEpochInMs(newDateRange[1]));
 
