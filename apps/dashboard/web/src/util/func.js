@@ -675,5 +675,22 @@ export default {
         }
 
         return result
+    },
+
+    getListOfHosts(apiCollections) {
+        console.log(apiCollections);
+        let result = []
+        apiCollections.forEach((x) => {
+            let hostName = x['hostName']
+            if (!hostName) return
+            result.push(
+                {
+                    "title": hostName,
+                    "value": hostName
+                }
+            )
+        })
+
+        return result
     }
 }

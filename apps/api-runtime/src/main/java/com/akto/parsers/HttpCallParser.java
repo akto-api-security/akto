@@ -3,6 +3,7 @@ package com.akto.parsers;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
+import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -30,6 +31,7 @@ public class HttpCallParser {
     private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class);
     public APICatalogSync apiCatalogSync;
     private Map<String, Integer> hostNameToIdMap = new HashMap<>();
+    private Map<TrafficMetrics.Key, TrafficMetrics> trafficMetricsMap = new HashMap<>();
 
     public HttpCallParser(String userIdentifier, int thresh, int sync_threshold_count, int sync_threshold_time, boolean fetchAllSTI) {
         last_synced = 0;
@@ -184,10 +186,42 @@ public class HttpCallParser {
         return whiteListSource.contains(source) &&  hostNameCondition && ApiCollection.useHost;
     }
 
+    public static int getBucketStartEpoch() {
+        return 0;
+    }
+
+    public static int getBucketEndEpoch() {
+        return 0;
+    }
+
+    public static TrafficMetrics.Key getTrafficMetricsKey(HttpResponseParams httpResponseParam, TrafficMetrics.Name name) {
+        int bucketStartEpoch = getBucketStartEpoch();
+        int bucketEndEpoch = getBucketEndEpoch();
+        return new TrafficMetrics.Key(
+                httpResponseParam.getSourceIP(), "", httpResponseParam.requestParams.getApiCollectionId(),
+                name, bucketStartEpoch, bucketEndEpoch
+        );
+    }
+
+    public void incTrafficMetrics(TrafficMetrics.Key key, int value)  {
+        TrafficMetrics trafficMetrics = trafficMetricsMap.get(key);
+        if (trafficMetrics == null) {
+            trafficMetrics = new TrafficMetrics(key, new HashMap<>());
+            trafficMetricsMap.put(key, trafficMetrics);
+        }
+
+        trafficMetrics.inc(1);
+    }
 
     public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
         for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
+
+            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
+                TrafficMetrics.Key totalRequestsKey = getTrafficMetricsKey(httpResponseParam, TrafficMetrics.Name.TOTAL_REQUESTS_RUNTIME);
+                incTrafficMetrics(totalRequestsKey,1);
+            }
+
             boolean cond = HttpResponseParams.validHttpResponseCode(httpResponseParam.getStatusCode());
             if (!cond) continue;
             
@@ -242,6 +276,12 @@ public class HttpCallParser {
             } else {
                 filteredResponseParams.addAll(responseParamsList);
             }
+
+            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
+                TrafficMetrics.Key processedRequestsKey = getTrafficMetricsKey(httpResponseParam, TrafficMetrics.Name.FILTERED_REQUESTS_RUNTIME);
+                incTrafficMetrics(processedRequestsKey,1);
+            }
+
         }
 
         return filteredResponseParams;
