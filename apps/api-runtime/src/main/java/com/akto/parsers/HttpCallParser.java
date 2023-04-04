@@ -127,12 +127,12 @@ public class HttpCallParser {
             id += i;
             try {
                 Bson updates = Updates.combine(
-                    Updates.setOnInsert(ApiCollection.HOST_NAME, host),
+                    Updates.setOnInsert("_id", id),
                     Updates.setOnInsert("startTs", Context.now()),
                     Updates.setOnInsert("urls", new HashSet<>())
                 );
 
-                ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq("_id", id), updates, updateOptions);
+                ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
 
                 flag = true;
                 break;
