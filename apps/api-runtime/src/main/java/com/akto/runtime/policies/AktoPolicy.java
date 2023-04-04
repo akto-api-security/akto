@@ -308,6 +308,7 @@ public class AktoPolicy {
 
     public static void main(String[] args) {
         DaoInit.init(new ConnectionString("mongodb://172.18.0.2:27017/admini"));
+        //todo: shivam change to saas
         Context.accountId.set(1_000_000);
         RuntimeFilterDao.instance.initialiseFilters();
 //        RuntimeFilterDao.instance.initialiseFilters();
