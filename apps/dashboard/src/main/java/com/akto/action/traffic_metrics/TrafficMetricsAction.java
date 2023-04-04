@@ -1,21 +1,15 @@
 package com.akto.action.traffic_metrics;
 
-import com.akto.DaoInit;
 import com.akto.action.UserAction;
-import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
-import com.akto.dto.traffic_metrics.TrafficMetrics.Name;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import org.bson.Document;
 import org.bson.conversions.Bson;
-import org.checkerframework.checker.units.qual.K;
 
 import java.util.*;
 
@@ -25,34 +19,12 @@ public class TrafficMetricsAction extends UserAction {
 
     private List<TrafficMetrics.Name> names;
     private String groupBy;
+    private String host;
+    private int vxlanID;
 
     public static final String ID = "_id.";
 
     private Map<TrafficMetrics.Name, Map<String, Map<String, Long> >> trafficMetricsMap = new HashMap<>();
-
-    public static void main(String[] args) {
-        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
-        Context.accountId.set(1_000_000);
-
-        // TrafficMetricsAction trafficMetricsAction = new TrafficMetricsAction();
-        // trafficMetricsAction.setStartTimestamp(0);
-        // trafficMetricsAction.setEndTimestamp(Context.now());
-        // trafficMetricsAction.setHost("host1");
-//        trafficMetricsAction.setVxlanID(1);
-        // trafficMetricsAction.setNames(Collections.singletonList(TrafficMetrics.Name.INCOMING_PACKETS_MIRRORING));
-
-        // trafficMetricsAction.execute();
-
-        TrafficMetrics.Key key = new TrafficMetrics.Key("ip1", "host2", 1, TrafficMetrics.Name.INCOMING_PACKETS_MIRRORING, 19447, 19448);
-        Map<String, Long> countMap = new HashMap<>();
-        for (int h = 466641; h<466741; h++ ) {
-            Random random = new Random();
-            int randomNumber = random.nextInt(1001) + 1000;
-            countMap.put(""+h, new Long(randomNumber));
-        }
-        TrafficMetrics trafficMetrics = new TrafficMetrics(key, countMap);
-        TrafficMetricsDao.instance.insertOne(trafficMetrics);
-    }
 
     @Override
     public String execute() {
@@ -68,6 +40,14 @@ public class TrafficMetricsAction extends UserAction {
         Document idExpression = new Document("ts", "$countMap.k").append("name", "$_id.name");
         List<String> keys = new ArrayList<>();
 
+        if (host != null) {
+            filters.add(Filters.in(ID + TrafficMetrics.Key.HOST, this.host));
+        }
+        
+        if (vxlanID != 0) {
+            filters.add(Filters.in(ID + TrafficMetrics.Key.VXLAN_ID, this.vxlanID));
+        }
+
         if (this.groupBy == null || this.groupBy.equals("ALL")) {
             keys.add("host");
             keys.add("vxlanID");
@@ -79,6 +59,11 @@ public class TrafficMetricsAction extends UserAction {
             idExpression.append("vxlanID", "$_id.vxlanID");
             keys.add("vxlanID");
         } else if (this.groupBy.equals("IP")) {
+            if (host == null && vxlanID == 0) {
+                addActionError("Group by IP needs additional filtering");
+                return ERROR.toUpperCase();
+            }
+
             idExpression.append("ip", "$_id.ip");
             keys.add("ip");
         } else {
@@ -143,5 +128,12 @@ public class TrafficMetricsAction extends UserAction {
         return trafficMetricsMap;
     }
 
-    
+
+    public void setHost(String host) {
+        this.host = host;
+    }
+
+    public void setVxlanID(int vxlanID) {
+        this.vxlanID = vxlanID;
+    }
 }
