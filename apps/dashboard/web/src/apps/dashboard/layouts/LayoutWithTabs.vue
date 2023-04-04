@@ -1,5 +1,5 @@
 <template>
-    <div>
+    <div style="height: 100%;">
         <div class="brdb pl-8">
             <div v-if="title" class="pt-6">
                 <div>

@@ -659,4 +659,21 @@ export default {
     toEpochInMs(hyphenatedDate) {
         return +this.toDate(hyphenatedDate.replace(/\-/g, ''))
     },
+    convertTrafficMetricsToTrend(trafficMetricsMap) {
+        let result = []
+        for (const [key, countMap] of Object.entries(trafficMetricsMap)) {
+            let trafficArr = []
+            for (const [key, value] of Object.entries(countMap)) {
+                const epochHours = parseInt(key);
+                const epochMilliseconds = epochHours * 3600000;
+                trafficArr.push([epochMilliseconds, value]);
+            }
+
+            result.push(
+                {"data": trafficArr, "color": null, "name": key},
+            )
+        }
+
+        return result
+    }
 }

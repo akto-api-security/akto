@@ -1,5 +1,9 @@
 <template>
     <layout-with-tabs title="Settings" :tabs="getTabs()">
+        <template slot="Metrics">
+            <traffic-metrics/>
+        </template>
+
         <template slot="Data types">
             <data-types title="Data types" :data_types="data_types" :toggleActivateFieldFunc='toggleActivateDataTypes'
                 :createNewDataType="createNewDataType" @selectedEntry="selectedDataType">
@@ -80,6 +84,7 @@ import TagConfigDetails from './components/tag_configs/TagConfigDetails.vue'
 import ACard from '@/apps/dashboard/shared/components/ACard'
 import IntegrationCenter from './components/integrations/IntegrationCenter'
 import AuthTypeDetails from './components/auth_types/AuthTypeDetails.vue'
+import TrafficMetrics from './components/traffic_metrics/TrafficMetrics.vue'
 import obj from "@/util/obj"
 
 import { mapState } from 'vuex'
@@ -96,7 +101,8 @@ export default {
         TagConfigDetails,
         DataTypeDetails,
         AuthTypeDetails,
-        ACard
+        ACard,
+        TrafficMetrics
     },
     props:{
         defaultStartTimestamp: obj.strN,
@@ -151,10 +157,10 @@ export default {
         },
         getTabs() {
           if(this.tab && this.tab=="health"){
-            return ['Health', 'Data types','Auth types', 'Tags', 'Account', 'Users', 'Integrations'];
+            return ['Health', 'Data types','Auth types', 'Tags', 'Account', 'Users', 'Integrations', 'Metrics'];
           }
           else if(window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'){
-            return ['Data types','Auth types', 'Tags', 'Users', 'Health' ,'Integrations'];
+            return ['Metrics', 'Data types','Auth types', 'Tags', 'Users', 'Health' ,'Integrations'];
           }
           return ['Data types','Auth types', 'Tags', 'Account', 'Users', 'Health', 'Integrations'];
         }
