@@ -39,10 +39,7 @@ import obj from '@/util/obj'
 export default {
   name: "ApiToken",
   props: {
-    title: {
-      type: obj.strR,
-      required: false
-    },
+    title: obj.strN,
     burp_tokens: obj.arrR,
     avatar_image: obj.str,
     addTokenTitle: obj.strN
@@ -54,6 +51,14 @@ export default {
     return {
       openPasswordMap: {},
       actions: [
+        {
+          isValid: item => true,
+          icon: item => '$fas_copy',
+          text: item => 'Copy token',
+          func: item => this.copyToClipboard(item),
+          success: (resp, item) => () => this.successfullyCopied(resp,item),
+          failure: (err, item) => () => { console.log(item) }
+        },
         {
           isValid: item => true,
           icon: item => this.openPasswordMap[item.id] ? '$fas_eye' : '$fas_eye-slash',
@@ -88,6 +93,19 @@ export default {
         this.openPasswordMap[item.id] = !this.openPasswordMap[item.id]
       })
     },
+    copyToClipboard(item){
+      return new Promise((resolve, reject) => {
+        func.copyToClipboard(item.key, this.$el);
+      })
+    },
+    successfullyCopied(resp,item){
+      console.log(item);
+      window._AKTO.$emit('SHOW_SNACKBAR', {
+              show: true,
+              text: "Key copied",
+              color: 'green'
+            });
+    }
   },
   computed: {
     burpTokensForTable() {
