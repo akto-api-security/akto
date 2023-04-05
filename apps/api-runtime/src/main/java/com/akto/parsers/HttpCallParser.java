@@ -377,4 +377,10 @@ public class HttpCallParser {
     public void setHostNameToIdMap(Map<String, Integer> hostNameToIdMap) {
         this.hostNameToIdMap = hostNameToIdMap;
     }
+
+    public void setTrafficMetricsMap(Map<TrafficMetrics.Key, TrafficMetrics> trafficMetricsMap) {
+        this.trafficMetricsMap = trafficMetricsMap;
+    }
+
+    
 }
