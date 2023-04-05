@@ -28,6 +28,17 @@ public class TrafficMetricsDao extends AccountsContextDao<TrafficMetrics> {
         return filters;
     }
 
+    public static Bson filtersForUpdate(TrafficMetrics.Key key) {
+        return Filters.and(
+                Filters.eq(ID + TrafficMetrics.Key.NAME, key.getName()),
+                Filters.eq(ID + TrafficMetrics.Key.BUCKET_START_EPOCH, key.getBucketStartEpoch()),
+                Filters.eq(ID + TrafficMetrics.Key.BUCKET_END_EPOCH, key.getBucketEndEpoch()),
+                Filters.eq(ID + TrafficMetrics.Key.IP, key.getIp()),
+                Filters.eq(ID + TrafficMetrics.Key.HOST,  key.getHost()),
+                Filters.eq(ID + TrafficMetrics.Key.VXLAN_ID,  key.getVxlanID())
+        );
+    }
+
     public void createIndicesIfAbsent() {
         boolean exists = false;
         for (String col: clients[0].getDatabase(Context.accountId.get()+"").listCollectionNames()){
@@ -50,7 +61,14 @@ public class TrafficMetricsDao extends AccountsContextDao<TrafficMetrics> {
 
 
         if (counter == 1) {
-            String[] fieldNames = {ID+ TrafficMetrics.Key.NAME, ID+ TrafficMetrics.Key.BUCKET_START_EPOCH, ID+ TrafficMetrics.Key.BUCKET_END_EPOCH,};
+            String[] fieldNames = {
+                    ID+ TrafficMetrics.Key.NAME,
+                    ID+ TrafficMetrics.Key.BUCKET_START_EPOCH,
+                    ID+ TrafficMetrics.Key.BUCKET_END_EPOCH,
+                    ID+ TrafficMetrics.Key.IP,
+                    ID+ TrafficMetrics.Key.HOST,
+                    ID+ TrafficMetrics.Key.VXLAN_ID,
+            };
             instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
         }
 

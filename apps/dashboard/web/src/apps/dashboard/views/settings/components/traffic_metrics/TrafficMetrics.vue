@@ -60,7 +60,8 @@ export default {
             loading: false,
             hosts: [],
             names: [
-                'OUTGOING_PACKETS_MIRRORING', 'INCOMING_PACKETS_MIRRORING'
+              'OUTGOING_PACKETS_MIRRORING', 'OUTGOING_REQUESTS_MIRRORING', 'INCOMING_PACKETS_MIRRORING', 'TOTAL_REQUESTS_RUNTIME',
+              'FILTERED_REQUESTS_RUNTIME'
             ],
             groupBy: { title: "All", value: "ALL" },
             startTimestamp: Math.floor(Date.now() / 1000) - (7 * 24 * 60 * 60),
