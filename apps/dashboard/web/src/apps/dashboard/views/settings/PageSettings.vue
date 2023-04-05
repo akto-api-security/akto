@@ -1,9 +1,5 @@
 <template>
     <layout-with-tabs title="Settings" :tabs="getTabs()">
-        <template slot="Metrics">
-            <traffic-metrics/>
-        </template>
-
         <template slot="Data types">
             <data-types title="Data types" :data_types="data_types" :toggleActivateFieldFunc='toggleActivateDataTypes'
                 :createNewDataType="createNewDataType" @selectedEntry="selectedDataType">
@@ -67,6 +63,9 @@
         </template>
         <template slot="Health">
             <health :defaultStartTimestamp="defaultStartTimestamp" :defaultEndTimestamp="defaultEndTimestamp"/>
+        </template>
+        <template slot="Metrics">
+            <traffic-metrics/>
         </template>
     </layout-with-tabs>
 </template>
@@ -157,12 +156,12 @@ export default {
         },
         getTabs() {
           if(this.tab && this.tab=="health"){
-            return ['Health', 'Data types','Auth types', 'Tags', 'Account', 'Users', 'Integrations', 'Metrics'];
+            return ['Health', 'Data types','Auth types', 'Tags', 'Account', 'Users', 'Integrations'];
           }
           else if(window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'){
-            return ['Metrics', 'Data types','Auth types', 'Tags', 'Users', 'Health' ,'Integrations'];
+            return ['Data types','Auth types', 'Tags', 'Users', 'Health' ,'Integrations'];
           }
-          return ['Data types','Auth types', 'Tags', 'Account', 'Users', 'Health', 'Integrations'];
+          return ['Data types','Auth types', 'Tags', 'Account', 'Users', 'Health', 'Integrations', 'Metrics'];
         }
     },
     computed: {

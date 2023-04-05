@@ -74,6 +74,7 @@ export default {
     },
     methods: {
         clickedGroupByFilter(item) {
+            this.menu = false
             this.groupBy = item['parent']
             let filter = {}
             if (item['nestedValue']) {

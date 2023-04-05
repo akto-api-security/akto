@@ -678,8 +678,8 @@ export default {
     },
 
     getListOfHosts(apiCollections) {
-        console.log(apiCollections);
         let result = []
+        if (!apiCollections || apiCollections.length == 0) return []
         apiCollections.forEach((x) => {
             let hostName = x['hostName']
             if (!hostName) return

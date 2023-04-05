@@ -251,7 +251,7 @@ export default {
                 ret.push([func.toDate(func.toYMD(currDate)), dateToCount[func.toYMD(currDate)] || 0])
                 currDate = func.incrDays(currDate, 1)
             }
-            return ret
+            return [{"data": ret, "color": "#6200EA", "name": "Traffic"}]
         },
         sensitiveParamsForChart() {
             if (this.parameters.length == 0) {
