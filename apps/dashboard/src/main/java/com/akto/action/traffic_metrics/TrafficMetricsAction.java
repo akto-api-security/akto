@@ -33,6 +33,11 @@ public class TrafficMetricsAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        // this is done so that ui shows graph instead of empty screen
+        for (TrafficMetrics.Name name: names) {
+            trafficMetricsMap.put(name, new HashMap<>());
+        }
+
         int startTimestampDays = startTimestamp/(3600*24);
         int endTimestampDays = endTimestamp/(3600*24) + 1;
         List<Bson> filters = TrafficMetricsDao.instance.basicFilters(names,startTimestampDays,endTimestampDays);
