@@ -1,10 +1,8 @@
 package com.akto.action;
 
-import com.akto.dao.AccountsDao;
-import com.akto.dao.UsersDao;
+import com.akto.dao.*;
 import com.akto.dao.context.Context;
-import com.akto.dto.Account;
-import com.akto.dto.UserAccountEntry;
+import com.akto.dto.*;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.cloud.serverless.aws.Lambda;
@@ -14,6 +12,8 @@ import com.akto.utils.platform.DashboardStackDetails;
 import com.akto.utils.platform.MirroringStackDetails;
 import com.amazonaws.services.lambda.model.*;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 import com.amazonaws.services.autoscaling.AmazonAutoScaling;
 import com.amazonaws.services.autoscaling.AmazonAutoScalingClientBuilder;
@@ -25,8 +25,10 @@ import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
 import java.util.List;
 
+import static com.akto.dao.MCollection.ID;
 import static com.mongodb.client.model.Filters.eq;
 
 public class AccountAction extends UserAction {
@@ -155,23 +157,84 @@ public class AccountAction extends UserAction {
 
     private boolean checkIfStairwayInstallation() {
         StackState stackStatus = AwsStack.getInstance().fetchStackStatus(MirroringStackDetails.getStackName());
-        return "CREATE_COMPLETE".equalsIgnoreCase(stackStatus.getStatus().toString());
+        return "CREATE_COMPLETE".equalsIgnoreCase(stackStatus.getStatus());
+    }
+
+    public static int createAccountRecord(String accountName) {
+
+        if (accountName == null || accountName.isEmpty()) {
+            throw new IllegalArgumentException("Account name can't be empty");
+        }
+
+        int triesAllowed = 10;
+        int now = Context.now();
+        while(triesAllowed >=0) {
+            try {
+                now = now - 40000;
+                triesAllowed --;
+                AccountsDao.instance.insertOne(new Account(now, accountName));
+                return now;
+            } catch (Exception e) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e1) {
+                    // eat it
+                }
+            }
+        }
+
+        throw new IllegalStateException("Couldn't find a suitable account id. Please try after some time.");
     }
 
     public String createNewAccount() {
-        newAccountId = Context.getId();
-        AccountsDao.instance.insertOne(new Account(newAccountId, newAccountName));
-
-        UserAccountEntry uae = new UserAccountEntry();
-        uae.setAccountId(newAccountId);
-        BasicDBObject set = new BasicDBObject("$set", new BasicDBObject("accounts."+newAccountId, uae));
-
-        UsersDao.instance.getMCollection().updateOne(eq("login", getSUser().getLogin()), set);
-
+        String email = getSUser().getLogin();
+        int newAccountId = createAccountRecord(newAccountName);
+        User user = initializeAccount(email, newAccountId, newAccountName,true);
+        getSession().put("user", user);
         getSession().put("accountId", newAccountId);
-        Context.accountId.set(newAccountId);
-
         return Action.SUCCESS.toUpperCase();
+    }
+
+    public static User initializeAccount(String email, int newAccountId,String newAccountName,  boolean isNew) {
+        UsersDao.addAccount(email, newAccountId, newAccountName);
+        User user = UsersDao.instance.findOne(eq(User.LOGIN, email));
+        RBAC.Role role = isNew ? RBAC.Role.ADMIN : RBAC.Role.MEMBER;
+        RBACDao.instance.insertOne(new RBAC(user.getId(), role, newAccountId));
+        Context.accountId.set(newAccountId);
+        if (isNew) intializeCollectionsForTheAccount();
+        return user;
+    }
+
+    private static void intializeCollectionsForTheAccount() {
+        ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), new HashSet<>(), null, 0));
+
+        BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
+        if (backwardCompatibility == null) {
+            backwardCompatibility = new BackwardCompatibility();
+            BackwardCompatibilityDao.instance.insertOne(backwardCompatibility);
+        }
+
+        // backward compatibility
+        if (backwardCompatibility.getDropFilterSampleData() == 0) {
+            FilterSampleDataDao.instance.getMCollection().drop();
+        }
+        BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq(ID, backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.DROP_FILTER_SAMPLE_DATA, Context.now())
+        );
+
+        if (backwardCompatibility.getResetSingleTypeInfoCount() == 0) {
+            SingleTypeInfoDao.instance.resetCount();
+        }
+
+        BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.RESET_SINGLE_TYPE_INFO_COUNT, Context.now())
+        );
+
+        SingleTypeInfoDao.instance.createIndicesIfAbsent();
+        SensitiveSampleDataDao.instance.createIndicesIfAbsent();
+        RuntimeFilterDao.instance.initialiseFilters();
     }
 
     public String goToAccount() {

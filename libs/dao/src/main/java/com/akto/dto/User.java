@@ -11,12 +11,14 @@ import java.util.Map;
 public class User {
     private String name;
     private String login;
+    public static final String LOGIN = "login";
     private int id;
     private List<String> refreshTokens;
     public static final String LAST_LOGIN_TS = "lastLoginTs";
     private int lastLoginTs;
 
     private Map<String, UserAccountEntry> accounts;
+    public static final String ACCOUNTS = "accounts";
 
     private Map<String, SignupInfo> signupInfoMap;
 
