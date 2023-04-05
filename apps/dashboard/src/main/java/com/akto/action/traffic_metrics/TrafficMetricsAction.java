@@ -24,7 +24,7 @@ public class TrafficMetricsAction extends UserAction {
 
     public static final String ID = "_id.";
 
-    private Map<TrafficMetrics.Name, Map<String, Map<String, Long> >> trafficMetricsMap = new HashMap<>();
+    private final Map<TrafficMetrics.Name, Map<String, Map<String, Long> >> trafficMetricsMap = new HashMap<>();
 
     @Override
     public String execute() {
