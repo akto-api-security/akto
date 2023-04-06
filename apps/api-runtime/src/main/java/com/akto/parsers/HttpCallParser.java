@@ -141,6 +141,7 @@ public class HttpCallParser {
             }
         }
         if (flag) { // flag tells if we were successfully able to insert collection
+            loggerMaker.infoAndAddToDb("Using collectionId=" + id + " for " + host, LogDb.RUNTIME);
             return id;
         } else {
             throw new Exception("Not able to insert");
