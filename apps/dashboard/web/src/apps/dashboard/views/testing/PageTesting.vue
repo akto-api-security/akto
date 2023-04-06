@@ -1,5 +1,5 @@
 <template>
-    <layout-with-tabs title="API Testing" class="page-testing" :tabs='["Test results", "User config", "Roles"]' :tab="tab">
+    <layout-with-tabs title="API Testing" class="page-testing" :tabs='["Run Tests","Test results", "User config", "Roles"]' :tab="tab">
         <template slot="Test results">
             <div class="py-8">
                 <div>
@@ -129,6 +129,9 @@
                 <log-fetch />
             </div>
         </template>
+        <template slot="Run Tests">
+            <one-click-test />
+        </template>
     </layout-with-tabs>
 </template>
 
@@ -142,6 +145,7 @@ import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import TestRoles from './components/test_roles/TestRoles'
 import TestRolesConfigDetails from './components/test_roles/components/TestRolesConfigDetails'
 import LogFetch from './LogFetch'
+import OneClickTest from './components/OneClickTest.vue'
 
 
 import func from '@/util/func'
@@ -170,7 +174,8 @@ export default {
         TestRolesConfigDetails,
         TokenAutomation,
         HelpTooltip,
-        LogFetch
+        LogFetch,
+        OneClickTest
     },
     props: {
         tab: obj.strN

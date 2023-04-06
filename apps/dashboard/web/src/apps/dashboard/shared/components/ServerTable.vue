@@ -21,74 +21,76 @@
             :ref="tableId"
         >
             <template v-slot:top="{ pagination, options, updateOptions }">
-                <div class="d-flex jc-sb mt-4">
-                    
-                        <div v-if="showName" class="table-name">
-                        {{name}}
-                        </div>
-                        <div class="d-flex headerButtons">
-                            <template v-for = "(header,index) in selectedHeaders">
-                                <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.sortKey || header.value]"> 
+                <slot name="custom-header">
+                    <div class="d-flex jc-sb mt-4">
+                        
+                            <div v-if="showName" class="table-name">
+                            {{name}}
+                            </div>
+                            <div class="d-flex headerButtons">
+                                <template v-for = "(header,index) in selectedHeaders">
+                                    <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.sortKey || header.value]"> 
+                                        <template v-slot:activator="{ on, attrs }">
+                                            <secondary-button 
+                                                :text="header.text" 
+                                                v-bind="attrs"
+                                                v-on="on"
+                                                :color="filters[header.sortKey || header.value].size > 0 ? 'var(--themeColor) !important' : null"
+                                            />
+                                        </template>
+                                        <filter-column 
+                                            :title="header.text"
+                                            :typeAndItems="getColumnValueList(header.sortKey || header.value)" 
+                                            @clickedItem="appliedFilter(header.sortKey || header.value, $event)" 
+                                            @operatorChanged="operatorChanged(header.sortKey || header.value, $event)"
+                                            @selectedAll="selectedAll(header.sortKey || header.value, $event)"
+                                        />
+                                    </v-menu>
+                                </template>
+                                <v-menu offset-y :close-on-content-click="false" v-if="convertHeadersList().length > 0">
                                     <template v-slot:activator="{ on, attrs }">
                                         <secondary-button 
-                                            :text="header.text" 
+                                            text="More Filters" 
                                             v-bind="attrs"
                                             v-on="on"
-                                            :color="filters[header.sortKey || header.value].size > 0 ? 'var(--themeColor) !important' : null"
                                         />
                                     </template>
-                                    <filter-column 
-                                        :title="header.text"
-                                        :typeAndItems="getColumnValueList(header.sortKey || header.value)" 
-                                        @clickedItem="appliedFilter(header.sortKey || header.value, $event)" 
-                                        @operatorChanged="operatorChanged(header.sortKey || header.value, $event)"
-                                        @selectedAll="selectedAll(header.sortKey || header.value, $event)"
+
+                                    <filter-list
+                                        :title="headers[1].text"
+                                        hideOperators
+                                        hideListTitle
+                                        :items="convertHeadersList()"
+                                        @clickedItem = "pushIntoNew($event)"
                                     />
+
                                 </v-menu>
-                            </template>
-                            <v-menu offset-y :close-on-content-click="false" v-if="convertHeadersList().length > 0">
-                                <template v-slot:activator="{ on, attrs }">
-                                    <secondary-button 
-                                        text="More Filters" 
-                                        v-bind="attrs"
-                                        v-on="on"
-                                    />
-                                </template>
 
-                                <filter-list
-                                    :title="headers[1].text"
-                                    hideOperators
-                                    hideListTitle
-                                    :items="convertHeadersList()"
-                                    @clickedItem = "pushIntoNew($event)"
-                                />
-
-                            </v-menu>
-
-                        </div>
-                        <div>
-                            <slot name="massActions"/>
-                        </div>
-                        <div class="d-flex jc-end">
-                            <div class="d-flex board-table-cards jc-end">
-                                <v-data-footer 
-                                    v-if="filteredItems.length > 0"
-                                    :pagination="pagination" 
-                                    :options="options"
-                                    @update:options="updateOptions"
-                                    prevIcon= '$fas_angle-left'
-                                    nextIcon= '$fas_angle-right'
-                                />
-                                <slot name="add-at-top" 
-                                    v-bind:filters="filters"  
-                                    v-bind:filterOperators="filterOperators"
-                                    v-bind:sortKey="sortKey"
-                                    v-bind:sortDesc="sortDesc"
-                                    v-bind:total="total"
-                                />
                             </div>
-                        </div>
-                </div>
+                            <div>
+                                <slot name="massActions"/>
+                            </div>
+                            <div class="d-flex jc-end">
+                                <div class="d-flex board-table-cards jc-end">
+                                    <v-data-footer 
+                                        v-if="filteredItems.length > 0"
+                                        :pagination="pagination" 
+                                        :options="options"
+                                        @update:options="updateOptions"
+                                        prevIcon= '$fas_angle-left'
+                                        nextIcon= '$fas_angle-right'
+                                    />
+                                    <slot name="add-at-top" 
+                                        v-bind:filters="filters"  
+                                        v-bind:filterOperators="filterOperators"
+                                        v-bind:sortKey="sortKey"
+                                        v-bind:sortDesc="sortDesc"
+                                        v-bind:total="total"
+                                    />
+                                </div>
+                            </div>
+                    </div>
+                </slot>
             </template>
             <template v-slot:footer.prepend="{}">
                 <v-spacer/>

@@ -2,12 +2,15 @@
     <simple-table
         :headers="headers" 
         :items="items" 
-        name="" 
-        sortKeyDefault="vulnerable" 
-        :pageSize="10"
-        :sortDescDefault="true"
-        class="grid-table"
+        :class="['grid-table' , leftView ? 'left-view' : '']"
+        @rowClicked="rowClicked"
     >
+        <template v-for="(index, name) in $slots" v-slot:[name]>
+            <slot :name="name" />
+        </template>
+        <template v-for="(index, name) in $scopedSlots" v-slot:[name]="data">
+            <slot :name="name" v-bind="data"></slot>
+        </template>
         <template v-slot:row-view="content">
             <server-table-block
                 :item="content.rowData" 
@@ -15,7 +18,14 @@
                 :currRowIndex="content.current" 
                 :headers="headers" 
                 @clickRow="rowClicked"
+                :leftView="leftView"
             >
+                <template v-for="(index, name) in $slots" v-slot:[name]>
+                    <slot :name="name" />
+                </template>
+                <template v-for="(index, name) in $scopedSlots" v-slot:[name]="data">
+                    <slot :name="name" v-bind="data"></slot>
+                </template>
             </server-table-block>
         </template>
     </simple-table>
@@ -32,7 +42,8 @@ export default {
     name: "GridTable",
     props:{
         headers: obj.arrR,
-        items: obj.arrR,      
+        items: obj.arrR,
+        leftView:obj.boolN,      
     },
     components:{
         SimpleTable,
@@ -40,7 +51,7 @@ export default {
         ServerTableBlock
     },
     methods: {
-        rowClicked(item){
+        rowClicked(item,index){
             this.$emit('clickRow',item)
         }
     },
@@ -59,5 +70,13 @@ export default {
     .grid-table >>> th{
         display: none;
     }
+    .left-view >>> .v-data-table{
+        padding: 0px !important;
+    }
+    .left-view >>> tbody{
+        gap: 4px !important;
+        margin: 0px !important;
+    }
+
 </style>
 
