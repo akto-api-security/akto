@@ -27,6 +27,19 @@ public class TestGraphQLUtils{
     @Test
     public void testGraphQLParser() throws Exception {
         HAR har = new HAR();
+        List<String> requests = har.getMessages(harString2, 0);
+        //Even with 2 har entries, we get 10 endpoints
+
+        for (String request : requests) {
+            HttpResponseParams responseParams = parseKafkaMessage(request);
+            List<HttpResponseParams> list = GraphQLUtils.getUtils().parseGraphqlResponseParam(responseParams);
+            Assert.assertTrue(responseParams.getRequestParams().url.contains("graphql") != list.isEmpty());
+        }
+    }
+
+    @Test
+    public void testGraphQLParserOnSimpleQuery() throws Exception {
+        HAR har = new HAR();
         List<String> requests = har.getMessages(harString, 0);
         //Even with 2 har entries, we get 10 endpoints
 
@@ -378,6 +391,145 @@ public class TestGraphQLUtils{
             "          \"wait\": 742.6230000086912,\n" +
             "          \"receive\": 0.4409999819472432,\n" +
             "          \"_blocked_queueing\": 2.4720000219531357\n" +
+            "        }\n" +
+            "      }\n" +
+            "    ]\n" +
+            "  }\n" +
+            "}";
+
+        public static final String harString2 = "{\n" +
+            "  \"log\": {\n" +
+            "    \"entries\": [\n" +
+            "      {\n" +
+            "        \"request\": {\n" +
+            "          \"method\": \"POST\",\n" +
+            "          \"url\": \"http://localhost:8081/graphql\",\n" +
+            "          \"httpVersion\": \"HTTP/1.1\",\n" +
+            "          \"headers\": [\n" +
+            "            {\n" +
+            "              \"name\": \"Accept-Encoding\",\n" +
+            "              \"value\": \"gzip, deflate, br\"\n" +
+            "            },\n" +
+            "            {\n" +
+            "              \"name\": \"Accept-Language\",\n" +
+            "              \"value\": \"en-GB,en-US;q=0.9,en;q=0.8\"\n" +
+            "            },\n" +
+            "            {\n" +
+            "              \"name\": \"Connection\",\n" +
+            "              \"value\": \"keep-alive\"\n" +
+            "            },\n" +
+            "            {\n" +
+            "              \"name\": \"Content-Length\",\n" +
+            "              \"value\": \"472\"\n" +
+            "            },\n" +
+            "            {\n" +
+            "              \"name\": \"Host\",\n" +
+            "              \"value\": \"localhost:8081\"\n" +
+            "            },\n" +
+            "            {\n" +
+            "              \"name\": \"Origin\",\n" +
+            "              \"value\": \"http://localhost:8081\"\n" +
+            "            },\n" +
+            "            {\n" +
+            "              \"name\": \"Referer\",\n" +
+            "              \"value\": \"http://localhost:8081/graphiql?path=/graphql\"\n" +
+            "            },\n" +
+            "            {\n" +
+            "              \"name\": \"Sec-Fetch-Dest\",\n" +
+            "              \"value\": \"empty\"\n" +
+            "            },\n" +
+            "            {\n" +
+            "              \"name\": \"Sec-Fetch-Mode\",\n" +
+            "              \"value\": \"cors\"\n" +
+            "            },\n" +
+            "            {\n" +
+            "              \"name\": \"Sec-Fetch-Site\",\n" +
+            "              \"value\": \"same-origin\"\n" +
+            "            },\n" +
+            "            {\n" +
+            "              \"name\": \"User-Agent\",\n" +
+            "              \"value\": \"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36\"\n" +
+            "            },\n" +
+            "            {\n" +
+            "              \"name\": \"accept\",\n" +
+            "              \"value\": \"application/json, multipart/mixed\"\n" +
+            "            },\n" +
+            "            {\n" +
+            "              \"name\": \"content-type\",\n" +
+            "              \"value\": \"application/json\"\n" +
+            "            },\n" +
+            "            {\n" +
+            "              \"name\": \"sec-ch-ua\",\n" +
+            "              \"value\": \"\\\"Not_A Brand\\\";v=\\\"99\\\", \\\"Google Chrome\\\";v=\\\"109\\\", \\\"Chromium\\\";v=\\\"109\\\"\"\n" +
+            "            },\n" +
+            "            {\n" +
+            "              \"name\": \"sec-ch-ua-mobile\",\n" +
+            "              \"value\": \"?0\"\n" +
+            "            },\n" +
+            "            {\n" +
+            "              \"name\": \"sec-ch-ua-platform\",\n" +
+            "              \"value\": \"\\\"macOS\\\"\"\n" +
+            "            }\n" +
+            "          ],\n" +
+            "          \"queryString\": [],\n" +
+            "          \"headersSize\": 1650,\n" +
+            "          \"bodySize\": 472,\n" +
+            "          \"postData\": {\n" +
+            "            \"mimeType\": \"application/json\",\n" +
+            "            \"text\": \"[{\\\"operationName\\\":\\\"GetSuggestedWorkspaceBanner\\\",\\\"variables\\\":{},\\\"query\\\":\\\"query GetSuggestedWorkspaceBanner {\\\\n  result: getSuggestedWorkspaceForCurrentUser {\\\\n    __typename\\\\n    ... on JoinableWorkspace {\\\\n      ...SuggestedWorkspaceFragment\\\\n      __typename\\\\n    }\\\\n  }\\\\n}\\\\n\\\\nfragment SuggestedWorkspaceFragment on JoinableWorkspace {\\\\n  id\\\\n  workspace {\\\\n    id\\\\n    counts {\\\\n      users\\\\n      __typename\\\\n    }\\\\n    name\\\\n    workspaceLogoPath\\\\n    members: membersConnection(first: 4) {\\\\n      nodes {\\\\n        id\\\\n        member_role\\\\n        user {\\\\n          id\\\\n          first_name\\\\n          display_name\\\\n          last_name\\\\n          avatars {\\\\n            thumb\\\\n            __typename\\\\n          }\\\\n          __typename\\\\n        }\\\\n        __typename\\\\n      }\\\\n      __typename\\\\n    }\\\\n    __typename\\\\n  }\\\\n  autoJoin\\\\n  isCurrentUserMember\\\\n  requestStatus\\\\n  hasPendingInvitation\\\\n  __typename\\\\n}\\\\n         query GGGGGGGetSuggestedWorkspaceBanner {\\\\n  result: getSuggestedWorkspaceForCurrentUser {\\\\n    __typename\\\\n    ... on JoinableWorkspace {\\\\n      ...SuggestedWorkspaceFragment\\\\n      __typename\\\\n    }\\\\n  }\\\\n}\\\\n\\\\nfragment SuggestedWorkspaceFragment on JoinableWorkspace {\\\\n  id\\\\n  workspace {\\\\n    id\\\\n    counts {\\\\n      users\\\\n      __typename\\\\n    }\\\\n    name\\\\n    workspaceLogoPath\\\\n    members: membersConnection(first: 4) {\\\\n      nodes {\\\\n        id\\\\n        member_role\\\\n        user {\\\\n          id\\\\n          first_name\\\\n          display_name\\\\n          last_name\\\\n          avatars {\\\\n            thumb\\\\n            __typename\\\\n          }\\\\n          __typename\\\\n        }\\\\n        __typename\\\\n      }\\\\n      __typename\\\\n    }\\\\n    __typename\\\\n  }\\\\n  autoJoin\\\\n  isCurrentUserMember\\\\n  requestStatus\\\\n  hasPendingInvitation\\\\n  __typename\\\\n}\\\\n    \\\"}]\"\r\n" +
+            "          }\n" +
+            "        },\n" +
+            "        \"response\": {\n" +
+            "          \"status\": 200,\n" +
+            "          \"statusText\": \"\",\n" +
+            "          \"httpVersion\": \"HTTP/1.1\",\n" +
+            "          \"headers\": [\n" +
+            "            {\n" +
+            "              \"name\": \"Connection\",\n" +
+            "              \"value\": \"keep-alive\"\n" +
+            "            },\n" +
+            "            {\n" +
+            "              \"name\": \"Content-Type\",\n" +
+            "              \"value\": \"application/json\"\n" +
+            "            },\n" +
+            "            {\n" +
+            "              \"name\": \"Date\",\n" +
+            "              \"value\": \"Tue, 07 Feb 2023 12:56:33 GMT\"\n" +
+            "            },\n" +
+            "            {\n" +
+            "              \"name\": \"Keep-Alive\",\n" +
+            "              \"value\": \"timeout=60\"\n" +
+            "            },\n" +
+            "            {\n" +
+            "              \"name\": \"Transfer-Encoding\",\n" +
+            "              \"value\": \"chunked\"\n" +
+            "            }\n" +
+            "          ],\n" +
+            "          \"cookies\": [],\n" +
+            "          \"content\": {\n" +
+            "            \"size\": 1224,\n" +
+            "            \"mimeType\": \"application/json\",\n" +
+            "            \"compression\": -13,\n" +
+            "            \"text\": \"{\\\"data\\\":{\\\"__schema\\\":{\\\"types\\\":[{\\\"name\\\":\\\"Author\\\"},{\\\"name\\\":\\\"Book\\\"},{\\\"name\\\":\\\"Boolean\\\"},{\\\"name\\\":\\\"ID\\\"},{\\\"name\\\":\\\"Int\\\"},{\\\"name\\\":\\\"Mutation\\\"},{\\\"name\\\":\\\"Query\\\"},{\\\"name\\\":\\\"String\\\"},{\\\"name\\\":\\\"__Directive\\\"},{\\\"name\\\":\\\"__DirectiveLocation\\\"},{\\\"name\\\":\\\"__EnumValue\\\"},{\\\"name\\\":\\\"__Field\\\"},{\\\"name\\\":\\\"__InputValue\\\"},{\\\"name\\\":\\\"__Schema\\\"},{\\\"name\\\":\\\"__Type\\\"},{\\\"name\\\":\\\"__TypeKind\\\"}]},\\\"shivamBook\\\":{\\\"id\\\":\\\"book-1\\\",\\\"name\\\":\\\"Harry Potter and the Philosopher's Stone\\\"},\\\"allBooks\\\":[{\\\"name\\\":\\\"Harry Potter and the Philosopher's Stone\\\",\\\"author\\\":{\\\"firstName\\\":\\\"Joanne\\\"}},{\\\"name\\\":\\\"Moby Dick\\\",\\\"author\\\":{\\\"firstName\\\":\\\"Herman\\\"}},{\\\"name\\\":\\\"To Kill a Mockingbird\\\",\\\"author\\\":{\\\"firstName\\\":\\\"Harper\\\"}},{\\\"name\\\":\\\"Interview with the vampire\\\",\\\"author\\\":{\\\"firstName\\\":\\\"Anne\\\"}}],\\\"bookById\\\":{\\\"id\\\":\\\"book-2\\\",\\\"name\\\":\\\"Moby Dick\\\"},\\\"allAuthors\\\":[{\\\"id\\\":\\\"author-1\\\",\\\"firstName\\\":\\\"Joanne\\\",\\\"lastName\\\":\\\"Rowling\\\"},{\\\"id\\\":\\\"author-2\\\",\\\"firstName\\\":\\\"Herman\\\",\\\"lastName\\\":\\\"Melville\\\"},{\\\"id\\\":\\\"author-4\\\",\\\"firstName\\\":\\\"Harper\\\",\\\"lastName\\\":\\\"Lee\\\"},{\\\"id\\\":\\\"author-3\\\",\\\"firstName\\\":\\\"Anne\\\",\\\"lastName\\\":\\\"Rice\\\"},{\\\"id\\\":\\\"author-15\\\",\\\"firstName\\\":\\\"Shivam\\\",\\\"lastName\\\":\\\"Rawat\\\"},{\\\"id\\\":\\\"author-15\\\",\\\"firstName\\\":\\\"Shivam\\\",\\\"lastName\\\":\\\"Rawat\\\"}],\\\"authorById\\\":{\\\"lastName\\\":\\\"Rowling\\\",\\\"bookList\\\":[{\\\"name\\\":\\\"Harry Potter and the Philosopher's Stone\\\"}]}}}\"\n" +
+            "          },\n" +
+            "          \"redirectURL\": \"\",\n" +
+            "          \"headersSize\": 161,\n" +
+            "          \"bodySize\": 1237,\n" +
+            "          \"_transferSize\": 1398,\n" +
+            "          \"_error\": null\n" +
+            "        },\n" +
+            "        \"serverIPAddress\": \"[::1]\",\n" +
+            "        \"startedDateTime\": \"2023-02-07T12:56:33.908Z\",\n" +
+            "        \"time\": 13.571000017691404,\n" +
+            "        \"timings\": {\n" +
+            "          \"blocked\": 0.5270000217072666,\n" +
+            "          \"dns\": -1,\n" +
+            "          \"ssl\": -1,\n" +
+            "          \"connect\": -1,\n" +
+            "          \"send\": 0.089,\n" +
+            "          \"wait\": 12.821000023379922,\n" +
+            "          \"receive\": 0.13399997260421515,\n" +
+            "          \"_blocked_queueing\": 0.40800002170726657\n" +
             "        }\n" +
             "      }\n" +
             "    ]\n" +
