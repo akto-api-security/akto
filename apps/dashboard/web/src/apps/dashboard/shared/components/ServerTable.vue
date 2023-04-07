@@ -120,37 +120,24 @@
 
             </template>
             <template v-slot:item="{item, index}">
-                <v-hover
-                    v-slot="{ hover }"
-                >
-                    <tr
-                        :class="['table-row', index == currRowIndex ? 'highlight-row' : '']"
+                <slot name="row-view" :rowData="item" :index="index" :current="currRowIndex">
+                    <server-table-rows
+                        :actions="actions" 
+                        :item="item" 
+                        :index="index" 
+                        :currRowIndex="currRowIndex" 
+                        :headers="headers" 
+                        @clickRow="clickRow"
+                        :dense="dense"
                     >
-                        <td
-                            class="table-column"
-                            :style="{'background-color':item.color, 'padding' : '0px !important', 'width': item.width, 'height': dense ? '24px !important' : '48px'}"
-                        />
-                        <td 
-                            v-for="(header, ii) in headers.slice(1)"
-                            :key="ii"
-                            class="table-column clickable"
-                            @click="clickRow(item, index)"
-                            :style="{'height': dense ? '24px !important' : '48px'}"
-                        >
-                            <slot :name="[`item.${header.value}`]" :item="item">
-                                <div class="table-entry">{{item[header.value]}}</div>
-                            </slot>
-                        </td>
-
-                        <div v-if="actions && actions.length > 0" class="table-row-actions">
-                            <simple-menu :items="actionsFunction(item)">
-                                <template v-slot:activator2>
-                                    <v-icon>$dropdown</v-icon>
-                                </template>
-                            </simple-menu>
-                        </div>
-                    </tr>
-                </v-hover>
+                        <template v-for="(index, name) in $slots" v-slot:[name]>
+                            <slot :name="name" />
+                        </template>
+                        <template v-for="(index, name) in $scopedSlots" v-slot:[name]="data">
+                            <slot :name="name" v-bind="data"></slot>
+                        </template>
+                    </server-table-rows>
+                </slot>
             </template>
         </v-data-table>
     </div>
@@ -167,6 +154,8 @@ import FilterList from './FilterList'
 import SimpleTextField from '@/apps/dashboard/shared/components/SimpleTextField.vue'
 import SecondaryButton from './buttons/SecondaryButton'
 import SimpleMenu from './SimpleMenu.vue'
+import ServerTableRows from "./rows/ServerTableRows.vue"
+import ServerTableBlock from "./rows/ServerTableBlock.vue"
 
 export default {
     name: "ServerTable",
@@ -176,7 +165,9 @@ export default {
         SimpleTextField,
         FilterList,
         SecondaryButton,
-        SimpleMenu
+        SimpleMenu,
+        ServerTableRows,
+        ServerTableBlock,
     },
     props: {
         headers: obj.arrR,
@@ -217,15 +208,6 @@ export default {
     methods: {
         showHideFilterIcon(hValue) {
             return (this.filterOperators[hValue] === "OR" && this.filters[hValue].size == 0)
-        },
-        actionsFunction(item){
-            let arrayActions = []
-            this.actions.forEach(action => {
-                if(action.isValid(item)){
-                    arrayActions.push({label:action.text(item) ,icon:action.icon(item), click:action.func})
-                }
-            })
-            return arrayActions
         },
         selectedAll (hValue, {items, checked}) {
             for(var index in items) {
@@ -415,7 +397,7 @@ export default {
             let item = this.filteredItems[this.currRowIndex]
             this.$emit('rowClicked', item)
         },
-        clickRow(item, index) {
+        clickRow(index) {
             this.currRowIndex = index
             this.pressEnter()
         }
@@ -471,31 +453,6 @@ export default {
         text-align: left
         padding: 12px 8px !important
         border: 1px solid var(--white) !important
-
-    .table-column
-        padding: 4px 8px !important
-        border-top: 1px solid var(--white) !important
-        border-bottom: 1px solid var(--white) !important
-        background: var(--themeColorDark18)
-        color: var(--themeColorDark)
-        max-width: 250px
-        text-overflow: ellipsis
-        overflow : hidden
-        white-space: nowrap
-
-        &:hover
-            text-overflow: clip
-            white-space: normal
-            word-break: break-all
-
-
-    .table-row
-        border: 0px solid var(--white) !important
-        position: relative
-
-        &:hover
-            background-color: var(--colTableBackground) !important
-            
     .form-field-text
         padding-top: 8px !important
         margin-top: 0px !important
@@ -517,11 +474,6 @@ export default {
         color: var(--v-themeColor-base)
         font-weight: bold
         display: flex
-
-    .table-row-actions
-        position: absolute
-        right: 30px
-        padding: 8px 16px !important
     
     &:focus    
         outline: none !important
@@ -535,8 +487,6 @@ export default {
 .table-sub-header
     position: relative
 
-.highlight-row
-    background-color: var(--themeColorDark14)
 .headerButtons
     flex-wrap: wrap
     max-width: 660px
