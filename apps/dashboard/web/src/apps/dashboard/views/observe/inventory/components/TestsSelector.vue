@@ -61,7 +61,7 @@
                 </div>
             </div>
 
-            <schedule-box @schedule="emitTestSelection" class="mt-2"/>
+            <schedule-box @schedule="emitTestSelection" class="mt-2" v-if="!hideTestScheduler"/>
             </div>
         </div>
     </a-card>
@@ -82,7 +82,9 @@ import NameInput from '@/apps/dashboard/shared/components/inputs/NameInput'
 export default {
     name: "TestsSelector",
     props: {
-        collectionName: obj.strR
+        collectionName: obj.strR,
+        hideTestScheduler:obj.boolN,
+        newTests:obj,
     },
     components: {
         ScheduleBox,
@@ -189,12 +191,18 @@ export default {
                 ret[x.superCategory.name].selected.push(obj)
             })
             this.selectedCategory = Object.keys(ret)[0]
+            if(this.newTests['BOLA']){ return this.newTests} 
             return ret
         }
     },
     computed: {
         nameSuffixes() {
             return Object.entries(this.mapCategoryToSubcategory).filter(x => x[1].selected.length > 0).map(x => x[0])
+        }
+    },
+    watch:{
+        mapCategoryToSubcategory(newVal){
+            this.$emit('test-updated',newVal,this.categories)
         }
     }
 }

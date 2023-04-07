@@ -32,9 +32,12 @@
                 </v-stepper-content>
 
                 <v-stepper-content step="2">
-                    <div>
-                        Hello 2
-                    </div>
+                    <tests-selector 
+                        :hide-test-scheduler="true" 
+                        collection-name="Tests-Selector" 
+                        @test-updated="getTestsSelected" 
+                        :newTests="testsSelected"
+                    />
                 </v-stepper-content>
 
                 <v-stepper-content step="3">
@@ -46,7 +49,7 @@
                 <v-stepper-content step="4">
                     <div>Summary</div>
                 </v-stepper-content>
-                
+
             </v-stepper>
         </div>
 
@@ -68,6 +71,7 @@
 <script>
 import obj from '@/util/obj'
 import SecondaryButton from '../../../shared/components/buttons/SecondaryButton.vue'
+import TestsSelector from '../../observe/inventory/components/TestsSelector.vue'
 
 export default{
     name: "TestingRunScreens",
@@ -77,6 +81,7 @@ export default{
     },
     components:{
         SecondaryButton,
+        TestsSelector
     },
     data(){
         return{
@@ -84,7 +89,9 @@ export default{
             summaryActive:false,
             stepperData:[
                 'COLLECTION','TEST SUITES','USER CONFIG'
-            ]
+            ],
+            testsSelected:{},
+            testCategories:[],
         }
     },
     methods:{
@@ -110,6 +117,10 @@ export default{
         },
         runTest(){
             console.log("RunTest")
+        },
+        getTestsSelected(tests,categories){
+            this.testsSelected = tests
+            this.testCategories = categories    
         },
     },
     computed:{
