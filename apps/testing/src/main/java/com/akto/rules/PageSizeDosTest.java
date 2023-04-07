@@ -31,7 +31,7 @@ import java.util.*;
      private final static String REDIRECT_KEYWORD = "{{redirect}}";
      private final static String REDIRECT_KEYWORD_TEMP = "AKTOREDIRECT";
      private static final String[] PAGINATED_KEYWORDS = {"limit", "size", "per_page", "perpage", "per-page",
-     "page_size", "pagesize", "page-size", "page_limit", "pagelimit", "page-limit"};
+     "page_size", "pagesize", "page-size", "page_limit", "pagelimit", "page-limit", "perPage", "pageSize", "pageLimit"};
 
      public PageSizeDosTest(String testRunId, String testRunResultSummaryId) {
          this.testRunId = testRunId;
