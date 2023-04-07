@@ -12,7 +12,6 @@
                 @rowClicked=rowClicked
                 hide-default-footer ="true"
                 :hideDownloadCSVIcon="true"
-                :hideMoreActions="true"
             >
                 <template v-slot:add-new-row-btn="{}">
                     <div class="clickable download-csv d-flex">
