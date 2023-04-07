@@ -20,6 +20,7 @@
 
                 <upload-file fileFormat=".har" @fileChanged="handleFileChange" tooltipText="Upload traffic (.har)" label="" type="uploadTraffic"/>
                 <icon-menu icon="$fas_download" :items="downloadFileItems"/>
+                <icon-menu icon="$fas_paper-plane" :items="prompts"></icon-menu>
             </div>
         </div>
         <div class="d-flex">
@@ -296,7 +297,43 @@ export default {
                 {
                     label: "Download CSV file",
                     click: this.downloadData
+                },
+                {
+                    label: "Ask AI",
+                    click: this.askAi
                 }
+            ],
+            prompts: [
+                {
+                    label: "Tell me all the Payment APIs",
+                    click: this.fetchPaymentApis
+                },
+                {
+                    label: "Tell me all the User APIs",
+                    click: this.fetchUserApis
+                },
+                {
+                    label: "Tell me all the Order APIs",
+                    click: this.fetchOrderApis
+                },
+                {
+                    label: "Tell me all the Product APIs",
+                    click: this.fetchProductApis
+                },
+                {
+                    label: "Tell me all the Authentication APIs",
+                    click: this.fetchAuthApis
+                },
+                {
+                    label: "Tell me all the Login APIs",
+                    click: this.fetchLoginApis
+                },
+                {
+                    label: "Tell me all the Search APIs",
+                    click: this.fetchSearchApis
+                }
+                
+
             ],
             showTestSelectorDialog: false,
             filteredItemsForScheduleTest: [],
@@ -320,6 +357,39 @@ export default {
         }
     },
     methods: {
+        fetchLoginApis(){
+            this.askAi("list_apis_by_type", "login")
+        },
+        fetchPaymentApis(){
+            this.askAi("list_apis_by_type", "payment")
+        },
+        fetchUserApis(){
+            this.askAi("list_apis_by_type", "user")
+        },
+        fetchProductApis(){
+            this.askAi("list_apis_by_type", "product")
+        },
+        fetchOrderApis(){
+            this.askAi("list_apis_by_type", "order")
+        },
+        fetchAuthApis(){
+            this.askAi("list_apis_by_type", "authentication")
+        },
+        fetchSearchApis(){
+            this.askAi("list_apis_by_type", "search")
+        },
+        askAi(query_type, keyword){
+            let data = {
+                "type": query_type,
+                "meta": {
+                    "apiCollectionId": this.apiCollectionId,
+                    "type_of_apis": keyword
+                }
+            }
+            api.askAi(data).then(resp => {
+                console.log(resp)
+            })
+        },
         rowClicked(row) {
             this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.endpoint + " " + row.method, type: 2})
         },

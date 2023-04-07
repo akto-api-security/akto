@@ -114,6 +114,7 @@ import {
   faBook,
   faGripLines,
   faAlignJustify,
+  faPaperPlane
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -151,7 +152,7 @@ const faIcons = [
   farComments,farCalendar, farHandPointRight, farBuilding, farStar,farSquare, farCheckSquare,farFolder,farFolderOpen,farClock,
   farQuestionCircle, faBook,
 
-  fabSalesforce,fabHubspot,fabDiscord
+  fabSalesforce,fabHubspot,fabDiscord,faPaperPlane
 ]
 
 library.add(faIcons)
