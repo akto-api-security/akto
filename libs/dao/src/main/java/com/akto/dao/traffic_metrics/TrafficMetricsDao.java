@@ -5,6 +5,7 @@ import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
 
@@ -49,7 +50,7 @@ public class TrafficMetricsDao extends AccountsContextDao<TrafficMetrics> {
         };
 
         if (!exists) {
-            clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
+            clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName(), new CreateCollectionOptions().capped(true).maxDocuments(30_000).sizeInBytes(100_000_000));
         }
         
         MongoCursor<Document> cursor = instance.getMCollection().listIndexes().cursor();
