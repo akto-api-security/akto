@@ -1,10 +1,12 @@
 <template>
-    <v-btn class="show-buttons mr-2" :disabled="disabled" @click="(e) => {$emit('click', e)}">
-        <span class="filter-header-span" :style="{color: color}">
-            <v-icon v-if="icon" :size="16">{{icon}}</v-icon>
-            {{text}}
-        </span>
-    </v-btn>
+    <div>
+        <v-btn class="show-buttons mr-2" :disabled="disabled" @click="(e) => {$emit('click', e)}">
+            <span class="filter-header-span" :style="{color: color}">
+                <v-icon v-if="icon" :size="16">{{icon}}</v-icon>
+                {{text}}
+            </span>
+        </v-btn>
+    </div>
 </template>
 
 <script>
@@ -42,5 +44,6 @@ export default {
         font-weight: 500;
         font-size: 12px;
         color:var(--themeColorDark);
+        text-transform: uppercase;
     }
 </style>

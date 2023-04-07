@@ -31,7 +31,6 @@ export default {
     },
     methods:{
         clickRow(item){
-            console.log(item)
             this.$emit('clickRow',item)
         }
     }

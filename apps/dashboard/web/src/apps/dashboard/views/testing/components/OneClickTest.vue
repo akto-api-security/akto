@@ -1,7 +1,7 @@
 <template>
     <div v-if="!leftView">
         <div v-for="(table,index) in tables" :key="index">
-            <grid-table :headers="table.headers" :items="table.items" @clickRow="test">
+            <grid-table :headers="table.headers" :items="table.items" @clickRow="rowClicked">
                 <template v-slot:custom-header>
                     <div class="table-name">{{ table.name }}</div>
                 </template>
@@ -19,6 +19,7 @@
                             <v-btn class="test-buttons" @click="toggle()" v-else>
                                 <span :style="{'color': 'var(--themeColor)'}">COLLAPSE</span>
                             </v-btn>
+                            <v-icon class="icon-on-hover" size="20">$deleteIcon</v-icon>
                         </div>
                     </div>
                 </template>
@@ -26,7 +27,7 @@
         </div>
     </div>
     <div v-else>
-        <layout-with-left-pane title="Run test">
+        <layout-with-left-pane title="Run test" class="left-table-view">
             <template #leftPane>
                 <div class="left-pane">
                     <div class="custom-test">
@@ -36,7 +37,7 @@
                         </span>
                     </div>
                     <div v-for="(table,index) in tables" :key="index" class="table-container">
-                        <grid-table :headers="table.headers" :items="table.items" @clickRow="test" :left-view="true">
+                        <grid-table :headers="table.headers" :items="table.items" @clickRow="rowClicked" :left-view="true">
                             <template v-slot:custom-header>
                                 <div class="left-table-name">
                                     <span>{{ table.name }}</span>
@@ -47,7 +48,7 @@
                     </div>
                 </div>
             </template>
-            <testing-run-screens :item="currObj" />
+            <testing-run-screens :item="currObj"  :show-test-screen="showTestScreen"/>
         </layout-with-left-pane>
     </div>
 </template>
@@ -63,7 +64,6 @@ export default {
     components: {
         GridTable,
         LayoutWithLeftPane,
-        TestingRunScreens,
         TestingRunScreens,
     },
     props: {
@@ -154,10 +154,11 @@ export default {
             showAll: false,
             leftView: false,
             currObj: {},
+            showTestScreen:true,
         }
     },
     methods: {
-        test(item){
+        rowClicked(item){
             this.currObj = item
             this.leftView = true
         },
@@ -176,6 +177,12 @@ export default {
     }
 }
 </script>
+<style scoped>
+    .left-table-view >>> .akto-left-pane{
+        padding: 0px !important
+    }
+</style>
+
 <style lang ="scss" scoped>
     .table-name{
         margin: 32px 0 0 8px;
@@ -204,6 +211,9 @@ export default {
             color: var(--themeColorDark);
             font-weight: 500;
         }
+    }
+    .icon-on-hover{
+        display: none;
     }
     .left-pane{
         width: 280px;
