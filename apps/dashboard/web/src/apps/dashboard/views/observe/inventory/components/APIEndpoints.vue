@@ -167,6 +167,21 @@
         <v-dialog v-model="showTestSelectorDialog" width="800px"> 
             <tests-selector :collectionName="apiCollectionName" @testsSelected=startTest v-if="showTestSelectorDialog"/>
         </v-dialog>
+
+        <div class="fix-at-top">
+            <v-btn depressed @click="showGPTScreen()">
+                Ask AktoGPT 
+                <v-icon size="16">$chatGPT</v-icon>
+            </v-btn>
+        </div>
+        <v-dialog v-model="showGPTPrompts" width="800px">
+            <v-card height="400px" v-if="showGPTPrompts">
+                <v-card-title>Akto GPT is here to help</v-card-title>
+                <v-card-text>
+                    <div>Hello Everyone</div>
+                </v-card-text>
+            </v-card>
+        </v-dialog>
     </div>
 </template>
 
@@ -353,10 +368,14 @@ export default {
             ],
             showWorkflowTestBuilder: false,
             originalStateFromDb: null,
-            workflowTests: []
+            workflowTests: [],
+            showGPTPrompts:false,
         }
     },
     methods: {
+        showGPTScreen(){
+            this.showGPTPrompts = true
+        },
         fetchLoginApis(){
             this.askAi("list_apis_by_type", "login")
         },
@@ -587,6 +606,12 @@ export default {
 </script>
 
 <style lang="sass">
+
+.fix-at-top
+    position: absolute
+    right: 260px
+    top: 18px
+    
 .api-endpoints
     & .table-column
         &:nth-child(1)    
