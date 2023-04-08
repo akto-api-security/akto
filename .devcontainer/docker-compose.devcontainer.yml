@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  akto:
+    image: mcr.microsoft.com/devcontainers/java:8-bullseye
+    volumes:
+      - ..:/workspace:cached
+    command: sleep infinity
+    network_mode: service:akto-db
+    user: vscode
+
+  akto-db:
+    image: mongo:latest
+    restart: unless-stopped
+    volumes:
+      - akto-mongo-data:/data/db
+
+volumes:
+  akto-mongo-data:

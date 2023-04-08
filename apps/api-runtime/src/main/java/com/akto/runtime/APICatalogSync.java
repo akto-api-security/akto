@@ -1206,89 +1206,98 @@ public class APICatalogSync {
         }
     }
 
+    private static void buildHelper(SingleTypeInfo param, Map<Integer, APICatalog> ret) {
+        String url = param.getUrl();
+        int collId = param.getApiCollectionId();
+        APICatalog catalog = ret.get(collId);
+
+        if (catalog == null) {
+            catalog = new APICatalog(collId, new HashMap<>(), new HashMap<>());
+            ret.put(collId, catalog);
+        }
+        RequestTemplate reqTemplate;
+        if (APICatalog.isTemplateUrl(url)) {
+            URLTemplate urlTemplate = createUrlTemplate(url, Method.fromString(param.getMethod()));
+            reqTemplate = catalog.getTemplateURLToMethods().get(urlTemplate);
+
+            if (reqTemplate == null) {
+                reqTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>()));
+                catalog.getTemplateURLToMethods().put(urlTemplate, reqTemplate);
+            }
+
+        } else {
+            URLStatic urlStatic = new URLStatic(url, Method.fromString(param.getMethod()));
+            reqTemplate = catalog.getStrictURLToMethods().get(urlStatic);
+            if (reqTemplate == null) {
+                reqTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>()));
+                catalog.getStrictURLToMethods().put(urlStatic, reqTemplate);
+            }
+        }
+
+        if (param.getIsUrlParam()) {
+            Map<Integer, KeyTypes> urlParams = reqTemplate.getUrlParams();
+            if (urlParams == null) {
+                urlParams = new HashMap<>();
+                reqTemplate.setUrlParams(urlParams);
+            }
+
+            String p = param.getParam();
+            try {
+                int position = Integer.parseInt(p);
+                KeyTypes keyTypes = urlParams.get(position);
+                if (keyTypes == null) {
+                    keyTypes = new KeyTypes(new HashMap<>(), false);
+                    urlParams.put(position, keyTypes);
+                }
+                keyTypes.getOccurrences().put(param.getSubType(), param);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("ERROR while parsing url param position: " + p, LogDb.RUNTIME);
+            }
+            return;
+        }
+
+        if (param.getResponseCode() > 0) {
+            RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(param.getResponseCode());
+            if (respTemplate == null) {
+                respTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>()));
+                reqTemplate.getResponseTemplates().put(param.getResponseCode(), respTemplate);
+            }
+
+            reqTemplate = respTemplate;
+        }
+
+        Map<String, KeyTypes> keyTypesMap = param.getIsHeader() ? reqTemplate.getHeaders() : reqTemplate.getParameters();
+        KeyTypes keyTypes = keyTypesMap.get(param.getParam());
+
+        if (keyTypes == null) {
+            keyTypes = new KeyTypes(new HashMap<>(), false);
+
+            if (param.getParam() == null) {
+                logger.info("null value - " + param.composeKey());
+            }
+
+            keyTypesMap.put(param.getParam(), keyTypes);
+        }
+
+        SingleTypeInfo info = keyTypes.getOccurrences().get(param.getSubType());
+        if (info != null && info.getTimestamp() > param.getTimestamp()) {
+            param = info;
+        }
+
+        keyTypes.getOccurrences().put(param.getSubType(), param);
+    }
+
 
     private static Map<Integer, APICatalog> build(List<SingleTypeInfo> allParams) {
         Map<Integer, APICatalog> ret = new HashMap<>();
         
         for (SingleTypeInfo param: allParams) {
-            String url = param.getUrl();
-            int collId = param.getApiCollectionId();
-            APICatalog catalog = ret.get(collId);
-
-            if (catalog == null) {
-                catalog = new APICatalog(collId, new HashMap<>(), new HashMap<>());
-                ret.put(collId, catalog);
+            try {
+                buildHelper(param, ret);
+            } catch (Exception e) {
+                e.printStackTrace();
+                loggerMaker.errorAndAddToDb("Error while building from db: " + e.getMessage(), LogDb.RUNTIME);
             }
-            RequestTemplate reqTemplate;
-            if (APICatalog.isTemplateUrl(url)) {
-                URLTemplate urlTemplate = createUrlTemplate(url, Method.valueOf(param.getMethod()));
-                reqTemplate = catalog.getTemplateURLToMethods().get(urlTemplate);
-
-                if (reqTemplate == null) {
-                    reqTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>()));
-                    catalog.getTemplateURLToMethods().put(urlTemplate, reqTemplate);
-                }
-
-            } else {
-                URLStatic urlStatic = new URLStatic(url, Method.fromString(param.getMethod()));
-                reqTemplate = catalog.getStrictURLToMethods().get(urlStatic);
-                if (reqTemplate == null) {
-                    reqTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>()));
-                    catalog.getStrictURLToMethods().put(urlStatic, reqTemplate);
-                }
-            }
-
-            if (param.getIsUrlParam()) {
-                Map<Integer, KeyTypes> urlParams = reqTemplate.getUrlParams();
-                if (urlParams == null) {
-                    urlParams = new HashMap<>();
-                    reqTemplate.setUrlParams(urlParams);
-                }
-
-                String p = param.getParam();
-                try {
-                    int position = Integer.parseInt(p);
-                    KeyTypes keyTypes = urlParams.get(position);
-                    if (keyTypes == null) {
-                        keyTypes = new KeyTypes(new HashMap<>(), false);
-                        urlParams.put(position, keyTypes);
-                    }
-                    keyTypes.getOccurrences().put(param.getSubType(), param);
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("ERROR while parsing url param position: " + p, LogDb.RUNTIME);
-                }
-                continue;
-            }
-
-            if (param.getResponseCode() > 0) {
-                RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(param.getResponseCode());
-                if (respTemplate == null) {
-                    respTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>()));
-                    reqTemplate.getResponseTemplates().put(param.getResponseCode(), respTemplate);
-                }
-
-                reqTemplate = respTemplate;
-            }
-
-            Map<String, KeyTypes> keyTypesMap = param.getIsHeader() ? reqTemplate.getHeaders() : reqTemplate.getParameters();
-            KeyTypes keyTypes = keyTypesMap.get(param.getParam());
-
-            if (keyTypes == null) {
-                keyTypes = new KeyTypes(new HashMap<>(), false);
-
-                if (param.getParam() == null) {
-                    logger.info("null value - " + param.composeKey());
-                }
-
-                keyTypesMap.put(param.getParam(), keyTypes);
-            }
-
-            SingleTypeInfo info = keyTypes.getOccurrences().get(param.getSubType());
-            if (info != null && info.getTimestamp() > param.getTimestamp()) {
-                param = info;
-            }
-
-            keyTypes.getOccurrences().put(param.getSubType(), param);
         }
 
         return ret;
