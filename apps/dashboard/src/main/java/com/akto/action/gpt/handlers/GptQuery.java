@@ -1,7 +1,8 @@
 package com.akto.action.gpt.handlers;
 
 public enum GptQuery {
-    LIST_APIS_BY_TYPE("list_apis_by_type");
+    LIST_APIS_BY_TYPE("list_apis_by_type"),
+    GROUP_APIS_BY_FUNCTIONALITY("group_apis_by_functionality");
 
     private final String name;
 
