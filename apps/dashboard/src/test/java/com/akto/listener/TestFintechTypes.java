@@ -21,7 +21,7 @@ public class TestFintechTypes extends MongoBasedTest {
 
     @Test
     public void testTypes() {
-        String fileUrl = "https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/fintech.json";
+        String fileUrl = "https://raw.githubusercontent.com/akto-api-security/akto/develop/pii-types/fintech.json";
         PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
         piiSource.setId("Fin");
         PIISourceDao.instance.insertOne(piiSource);
@@ -35,7 +35,7 @@ public class TestFintechTypes extends MongoBasedTest {
                     break;
                 case "IBAN EUROPE":
                     assertTrue(cdt.validate("AB 12 3456 7890 1234 5678", "foo"));
-                    assertFalse(cdt.validate("AB 12 3456 7890 1234 56789", "foo"));
+                    assertFalse(cdt.validate("AB 12 3456 7890 1234 5678 912", "foo"));
                     break;
                 
                 case "US ADDRESS":

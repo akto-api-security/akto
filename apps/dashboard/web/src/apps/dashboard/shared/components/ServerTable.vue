@@ -7,17 +7,10 @@
             :server-items-length="total"
             :options.sync="options"
             :sort-by="sortKey"
-            :sort-desc="sortDesc"
-            :items-per-page="rowsPerPage"           
-            :hide-default-footer="!(filteredItems && filteredItems.length > 0)"
-            :footer-props="{
-                showFirstLastPage: false,
-                prevIcon: '$fas_angle-left',
-                nextIcon: '$fas_angle-right',
-                'items-per-page-options': itemsPerPage                
-            }"
-
+            :sort-desc="sortDesc"        
+            hide-default-footer
             hide-default-header
+            :items-per-page="rowsPerPage"
             :loading="loading"
             tabindex="0"
             @keydown.native.37="moveLeft"
@@ -33,7 +26,7 @@
                         <div v-if="showName" class="table-name">
                         {{name}}
                         </div>
-                        <div class="d-flex jc-sb">
+                        <div class="d-flex headerButtons">
                             <template v-for = "(header,index) in selectedHeaders">
                                 <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.sortKey || header.value]"> 
                                     <template v-slot:activator="{ on, attrs }">
@@ -41,7 +34,7 @@
                                             :text="header.text" 
                                             v-bind="attrs"
                                             v-on="on"
-                                            :color="filters[header.sortKey || header.value].size > 0 ? '#6200EA !important' : null"
+                                            :color="filters[header.sortKey || header.value].size > 0 ? 'var(--themeColor) !important' : null"
                                         />
                                     </template>
                                     <filter-column 
@@ -78,6 +71,14 @@
                         </div>
                         <div class="d-flex jc-end">
                             <div class="d-flex board-table-cards jc-end">
+                                <v-data-footer 
+                                    v-if="filteredItems.length > 0"
+                                    :pagination="pagination" 
+                                    :options="options"
+                                    @update:options="updateOptions"
+                                    prevIcon= '$fas_angle-left'
+                                    nextIcon= '$fas_angle-right'
+                                />
                                 <slot name="add-at-top" 
                                     v-bind:filters="filters"  
                                     v-bind:filterOperators="filterOperators"
@@ -87,7 +88,6 @@
                                 />
                             </div>
                         </div>
-                    
                 </div>
             </template>
             <template v-slot:footer.prepend="{}">
@@ -120,33 +120,24 @@
 
             </template>
             <template v-slot:item="{item, index}">
-                <v-hover
-                    v-slot="{ hover }"
-                >
-                    <tr
-                        :class="['table-row', index == currRowIndex ? 'highlight-row' : '']"
+                <slot name="row-view" :rowData="item" :index="index" :current="currRowIndex">
+                    <server-table-rows
+                        :actions="actions" 
+                        :item="item" 
+                        :index="index" 
+                        :currRowIndex="currRowIndex" 
+                        :headers="headers" 
+                        @clickRow="clickRow"
+                        :dense="dense"
                     >
-                        <td
-                            class="table-column"
-                            :style="{'background-color':item.color, 'padding' : '0px !important', 'width': item.width, 'height': dense ? '24px !important' : '48px'}"
-                        />
-                        <td 
-                            v-for="(header, ii) in headers.slice(1)"
-                            :key="ii"
-                            class="table-column clickable"
-                            @click="clickRow(item, index)"
-                            :style="{'height': dense ? '24px !important' : '48px'}"
-                        >
-                            <slot :name="[`item.${header.value}`]" :item="item">
-                                <div class="table-entry">{{item[header.value]}}</div>
-                            </slot>
-                        </td>
-
-                        <div v-if="actions && hover && actions.length > 0" class="table-row-actions">
-                            <actions-tray :actions="actions || []" :subject=item></actions-tray>
-                        </div>
-                    </tr>
-                </v-hover>
+                        <template v-for="(index, name) in $slots" v-slot:[name]>
+                            <slot :name="name" />
+                        </template>
+                        <template v-for="(index, name) in $scopedSlots" v-slot:[name]="data">
+                            <slot :name="name" v-bind="data"></slot>
+                        </template>
+                    </server-table-rows>
+                </slot>
             </template>
         </v-data-table>
     </div>
@@ -162,6 +153,9 @@ import FilterColumn from './FilterColumn'
 import FilterList from './FilterList'
 import SimpleTextField from '@/apps/dashboard/shared/components/SimpleTextField.vue'
 import SecondaryButton from './buttons/SecondaryButton'
+import SimpleMenu from './SimpleMenu.vue'
+import ServerTableRows from "./rows/ServerTableRows.vue"
+import ServerTableBlock from "./rows/ServerTableBlock.vue"
 
 export default {
     name: "ServerTable",
@@ -170,7 +164,10 @@ export default {
         FilterColumn,
         SimpleTextField,
         FilterList,
-        SecondaryButton
+        SecondaryButton,
+        SimpleMenu,
+        ServerTableRows,
+        ServerTableBlock,
     },
     props: {
         headers: obj.arrR,
@@ -400,7 +397,7 @@ export default {
             let item = this.filteredItems[this.currRowIndex]
             this.$emit('rowClicked', item)
         },
-        clickRow(item, index) {
+        clickRow(index) {
             this.currRowIndex = index
             this.pressEnter()
         }
@@ -456,31 +453,6 @@ export default {
         text-align: left
         padding: 12px 8px !important
         border: 1px solid var(--white) !important
-
-    .table-column
-        padding: 4px 8px !important
-        border-top: 1px solid var(--white) !important
-        border-bottom: 1px solid var(--white) !important
-        background: var(--themeColorDark18)
-        color: var(--themeColorDark)
-        max-width: 250px
-        text-overflow: ellipsis
-        overflow : hidden
-        white-space: nowrap
-
-        &:hover
-            text-overflow: clip
-            white-space: normal
-            word-break: break-all
-
-
-    .table-row
-        border: 0px solid var(--white) !important
-        position: relative
-
-        &:hover
-            background-color: var(--colTableBackground) !important
-            
     .form-field-text
         padding-top: 8px !important
         margin-top: 0px !important
@@ -502,20 +474,22 @@ export default {
         color: var(--v-themeColor-base)
         font-weight: bold
         display: flex
-
-    .table-row-actions
-        position: absolute
-        right: 30px
-        padding: 8px 16px !important
     
     &:focus    
         outline: none !important
-
+    
+    .v-data-footer
+        border: 1px solid var(--hexColor22)  
+        height: 30px !important
+        padding:0px !important
+        background: var(--white)
+        border-radius: 4px
 .table-sub-header
     position: relative
 
-.highlight-row
-    background-color: var(--themeColorDark14)        
+.headerButtons
+    flex-wrap: wrap
+    max-width: 660px
 
 .filter-icon
     color: var(--themeColor) !important
@@ -550,5 +524,30 @@ export default {
 .board-table-cards >>> .v-data-footer__select {
     display: none;
 }
+.board-table-cards >>> .v-data-footer__pagination {
+    display: flex;
+    order: 1;
+    margin: 0 5px 0 5px;
+    font-size: 0.8rem;
+    color: var(--themeColorDark);
+}
 
+.board-table-cards >>> .v-data-footer__icons-before {
+    width: 30px;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+}
+.board-table-cards >>> .v-data-footer__icons-after {
+    order: 2;
+    width: 30px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.board-table-cards >>> .v-btn--icon.v-size--default {
+    height: 30px;
+    width: 36px;
+}
 </style>
