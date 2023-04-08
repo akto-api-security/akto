@@ -47,6 +47,7 @@ import {
   faComments,
   faEye,
   faEllipsisV,
+  faEllipsisH,
   faStar,
   faCalendar,
   faCog,
@@ -150,7 +151,7 @@ const faIcons = [
   faHome,faBullseye,faBullhorn,faCheckDouble,faSquare,faBolt,faDatabase,faAngleDoubleRight, faAngleDoubleLeft,faClipboardList,
   faUnlockAlt,faStethoscope,faLongArrowAltDown,faLongArrowAltUp,faSyncAlt, faExchangeAlt, faUserLock, faExclamation,faPhoneAlt,
   faCreditCard,faAddressCard,faChalkboard,faFilter,faKey,faAngleDoubleDown,faAngleDoubleUp,faUpload,faRedo,faGlobe,faAngleDown,
-  faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faCaretSquareUp,
+  faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faCaretSquareUp,faEllipsisH,
   faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faThumbsUp,faCaretUp,faShareAlt,faUserPlus,faCaretDown,
   faLaptopHouse,faAnchor,fabGithub,faArrowRight,faGift,faGripLines,faAlignJustify,faBook,faMagic,faLayerGroup,faPaperPlane,
   

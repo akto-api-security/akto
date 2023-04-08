@@ -1,5 +1,5 @@
 <template>
-    <v-menu bottom offset-y min-width="150" max-height="300px" v-model="showMenu">
+    <v-menu offset-y min-width="150" max-height="300px" v-model="showMenu" content-class="no-shadow">
         <template v-slot:activator="{on, attrs}">
             <div v-on="on" v-bind="attrs">
                 <slot name="activator2"/>
@@ -7,7 +7,7 @@
         </template>
 
         <div>
-          <div :class='["arrow-"+tooltipTriangle]' v-if="tooltipTriangle"></div>
+          <div :class='arrowClasses' v-if="tooltipTriangle"></div>
           <v-list class="gray-menu" v-if="items && items.length > 0">
               <v-list-item 
                   v-for="(item, index) in items"
@@ -38,11 +38,21 @@ export default {
     props: {
         items: obj.arrR,
         tooltipTriangle: obj.strN,
-        showMenuOnDraw: obj.boolN
+        showMenuOnDraw: obj.boolN,
+        extraArrowClasses: obj.arrN
     },
     data() {
       return {
         showMenu: !!this.showMenuOnDraw
+      }
+    },
+    computed: {
+      arrowClasses() {
+        let ret = ["arrow-"+this.tooltipTriangle]
+        if (this.extraArrowClasses) {
+          ret = [...this.extraArrowClasses, ...ret]
+        }
+        return ret
       }
     }
 }

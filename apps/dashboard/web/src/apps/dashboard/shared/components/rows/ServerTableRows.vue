@@ -18,10 +18,12 @@
             </slot>
         </td>
 
-        <div v-if="actions && actions.length > 0" class="table-row-actions">
-            <simple-menu :items="actionsFunction(item)">
+        <div v-if="actions && actions.length > 0 && actionsFunction(item).length > 0" class="table-row-actions">
+            <simple-menu :items="actionsFunction(item)" tooltipTriangle="up" :extraArrowClasses="['mlp-74']">
                 <template v-slot:activator2>
-                    <v-icon>$dropdown</v-icon>
+                    <v-btn icon :ripple="false" @click="showRowFunctions">
+                        <v-icon size="12">$fas_ellipsis-h</v-icon>
+                    </v-btn>                    
                 </template>
             </simple-menu>
         </div>
@@ -57,6 +59,9 @@ export default {
         },
         clickRow(index){
             this.$emit('clickRow',index)
+        },
+        showRowFunctions(index) {
+            this.$emit('highlightRow', index)
         }
     }
 }
@@ -68,8 +73,9 @@ export default {
     }
     .table-row-actions{
         position: absolute;
-        right: 30px;
-        padding: 8px 16px !important;
+        right: 5px;
+        top: 10%;
+        opacity: 1;
     }
     .table-column{
         padding: 4px 8px !important ;

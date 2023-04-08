@@ -255,7 +255,7 @@ export default {
                     callback: (data) => console.log("callback Tell me all the apis", data)
                 }
             ],
-            showDialog: true,
+            showDialog: false,
             file: null,
             rules: [
                 value => !value || value.size < 50e6 || 'HAR file size should be less than 50 MB!',
