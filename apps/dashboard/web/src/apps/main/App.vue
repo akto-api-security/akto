@@ -234,6 +234,43 @@
 .z-80
     zoom: 0.8
         
+.no-shadow
+    box-shadow: 0 !important
+
+
+.arrow-up
+    width: 0
+    height: 0 
+    border-left: 5px solid transparent
+    border-right: 5px solid transparent
+    border-bottom: 5px solid var(--hexColor15)
+    margin-left: 20%
+
+.arrow-down
+    width: 0
+    height: 0 
+    border-left: 5px solid transparent
+    border-right: 5px solid transparent
+    border-top: 5px solid var(--hexColor15)
+    margin-left: 20%
+
+.arrow-left
+    width: 0
+    height: 0 
+    border-top: 5px solid transparent
+    border-bottom: 5px solid transparent
+    border-right: 5px solid var(--hexColor15)
+    margin-top: 20%
+
+.arrow-right
+    width: 0
+    height: 0 
+    border-top: 5px solid transparent
+    border-bottom: 5px solid transparent
+    border-left: 5px solid var(--hexColor15)
+    margin-top: 20%
+
+    
 </style>
 
 <style lang="css">
