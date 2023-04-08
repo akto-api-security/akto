@@ -40,7 +40,6 @@
                     name="All" 
                     sortKeyDefault="sensitiveTags" 
                     :sortDescDefault="true"
-                    :slotActions="true"
                 >
                     <template #add-new-row-btn="{filteredItems}">
                         <div>
