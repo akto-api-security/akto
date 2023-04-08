@@ -53,20 +53,15 @@ Step 2: Run tests
 
 ## How to get Started?
 
-Local deploy:
-
-### Linux/Unix based machines
-Run this script to create Akto at ~/akto and run the docker containers. You'll need to have Docker installed in order to run the container. 
-
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/akto-api-security/infra/feature/self_hosting/cf-deploy-akto)"
-
-### Directly using docker-compose (best option for Windows - works for any machine which has Docker installed)
+### Using docker-compose (works for any machine which has Docker installed)
 Run the following commands to install Akto. You'll need to have curl and Docker installed in order to run the container..
 1. Clone the Akto repo by using this command `git clone https://github.com/akto-api-security/akto.git`
 2. Go to the cloned directory `cd akto` 
 3. Run `docker-compose up -d`
+<details>
+  <summary><h4>If you are setting this up in your own Cloud (AWS/GCP/Heroku), read this section</h4></summary>
 
-#### Note - if you are setting this up on an instance in your own Cloud (AWS/GCP/Heroku etc.), please ensure the following for good security practices - 
+Please ensure the following for good security practices
 1. Open inbound security rule for port 9090 only. And restrict the source CIDR to VPC CIDR or your IP only. 
 2. Use an EC2 from a private subnet - 
     
@@ -80,8 +75,10 @@ Run the following commands to install Akto. You'll need to have curl and Docker 
 
 3. Use an EC2 from a public subnet - please don't! If you still want to do this, you can skip 2.b and 2.c. Simply access your instance via `http://ip:9090`
 
-Akto is really powerful in Cloud deployment if you can provide your application's mirrored traffic (0 performance impact). For that, you should install Akto Enterprise edition available [here](https://stairway.akto.io). Read more about it [here](https://www.akto.io/pricing)
+Akto is really powerful in Cloud deployment if you can provide your application's mirrored traffic (0 performance impact). You would also be able to schedule tests in CI/CD and invite more team members on the dashboard. For that, you should install Akto Enterprise edition available [here](https://stairway.akto.io). Read more about it [here](https://www.akto.io/pricing)
 
+</details>  
+  
 ## Contributors
 <a href="https://github.com/akto-api-security/akto/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=akto-api-security/akto" />
@@ -91,7 +88,8 @@ Akto is really powerful in Cloud deployment if you can provide your application'
 
 # Develop and contribute
 
-## Quicksetup using [VSCode Devcontainers](https://code.visualstudio.com/docs/devcontainers/containers)
+<details>
+  <summary><h3>Quicksetup using VSCode Devcontainers</h3></summary>
 
 ### Prerequisites:
 
@@ -101,8 +99,8 @@ Akto is really powerful in Cloud deployment if you can provide your application'
 4. **macOS**: [Docker Desktop](https://www.docker.com/products/docker-desktop) 2.0+.
 5. **Linux**: [Docker CE/EE](https://docs.docker.com/install/#supported-platforms) 18.06+ and [Docker Compose](https://docs.docker.com/compose/install) 1.21+.
 
-**Note**: If using Docker Desktop, consider changing the memory allocation to 8 GB for better performance
-
+**Note**: If using Docker Desktop, consider changing the memory allocation to 8 GB for better performance  
+  
 ### Steps:
 
 #### Clone repo and open in vscode
@@ -120,7 +118,11 @@ Akto is really powerful in Cloud deployment if you can provide your application'
 2. Wait for the Dev Container to set up.
 3. Open **localhost:9090** in your web browser to see the Akto dashboard
 
-## Manual Setup Instructions
+</details>
+
+
+<details>
+  <summary><h3> Manual Setup Instructions</h3> </summary>
 
 ### Prerequisites
 OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), npm(v8.15.0+), maven (v3.6.3 [link](https://dlcdn.apache.org/maven/maven-3/3.6.3/binaries/)), MongoDB (v5.0.3+ [link](https://www.mongodb.com/docs/manual/administration/install-community/))
@@ -164,27 +166,29 @@ OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), 
 5. [OPTIONAL] To setup nuclei testing: Compile the nuclei executable from https://github.com/akto-api-security/nuclei-wrapper. Once executable is built add the path of executable to env variable "NUCLEI_EXECUTABLE_PATH".
 6. `mvn compile; mvn exec:java -Dexec.mainClass="com.akto.testing.Main"`
 
-
+  </details>  
+  
 ### Play around
 
 1. Open `localhost:9090` in your favourite browser
 2. You will need to signup when logging in for the first time, next time onwards you can login
 
-### Debug
+<details>  
+  <summary><h3>Debug</h3></summary>
 1. To debug front end, install Vue.js Chrome extension from [here](https://devtools.vuejs.org/guide/installation.html).
 2. To debug backend, run the following before running web server - 
-    a. Set MAVEN_OPTS variable to enable debugging on your Java process
+  a. Set MAVEN_OPTS variable to enable debugging on your Java process
         
         export MAVEN_OPTS="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8081, -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
         
-    b. In Visual Studio code, click on any line number to set a breakpoint.
+  b. In Visual Studio code, click on any line number to set a breakpoint.
     
-    c.  Attach the Java debugger from Run and Debug mode. If you are doing this for the first time, click on “Create launch.json file” and then “Add configuration”. Choose “Java: Attach process by ID” and save the file. 
-    
-     <img width="426" alt="img1" src="https://user-images.githubusercontent.com/91221068/217048839-dbb00c48-00df-419b-8f32-cdb2d47a2218.png">
+  c.  Attach the Java debugger from Run and Debug mode. If you are doing this for the first time, click on “Create launch.json file” and then “Add configuration”. Choose “Java: Attach process by ID” and save the file. <br/>
+     <img width="426" alt="img1" src="https://user-images.githubusercontent.com/91221068/217048839-dbb00c48-00df-419b-8f32-cdb2d47a2218.png"><br/>
+  d. A list of running Java processes with show up. Select the web server process to attach the debugger
 
-    d. A list of running Java processes with show up. Select the web server process to attach the debugger
-
+</details>  
+  
 ## Contributing
 
 We welcome contributions to this project. Please read our [CONTRIBUTING.md](CONTRIBUTING.md) for more information on how to get involved.

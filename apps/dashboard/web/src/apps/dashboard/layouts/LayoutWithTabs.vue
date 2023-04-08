@@ -75,10 +75,18 @@
         },
         watch: {
             defaultTabName: function (newVal) {
-                console.log(newVal, this.tabs.indexOf(newVal))
                 this.tabName = this.tabs.indexOf(newVal)
             }
-        }
+        },
+        mounted() {
+            let currTab = this.$router.history.current.query['tab']
+            if(currTab){
+                let tab = this.tabs.find(x=> x.toLowerCase().replace(" ", "").startsWith(currTab.toLowerCase()))
+                if(tab){
+                    this.setTabWithName(tab)
+                }
+            }
+        },
     }
 
 </script>

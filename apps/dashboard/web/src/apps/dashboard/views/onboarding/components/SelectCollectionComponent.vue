@@ -66,7 +66,7 @@ export default {
 .api-collection-label
     font-weight: 600
     font-size: 14px
-    color: #47466A
+    color: var(--themeColorDark)
 
 .spinner-div
     display: flex
