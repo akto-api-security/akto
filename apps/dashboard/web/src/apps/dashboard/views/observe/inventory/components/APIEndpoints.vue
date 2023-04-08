@@ -2,13 +2,13 @@
     <spinner v-if="endpointsLoading" />
     <div class="pr-4 api-endpoints" v-else>
         <v-dialog
-            v-model="showDialog"
+            v-model="showGptDialog"
             max-width="50%" 
             content-class="dialog-no-shadow"
         >
             <div class="white-background pa-8 ma-0">
                 <chat-gpt-input
-                    v-if="showDialog"
+                    v-if="showGptDialog"
                     :items="chatGptPrompts"
                 />
             </div>
@@ -185,16 +185,6 @@
                 <v-icon size="16">$chatGPT</v-icon>
             </v-btn>
         </div>
-        <v-dialog v-model="showGPTPrompts" width="800px">
-            <akto-ai
-                :responseArr="responseArr"
-                :getResponse="getResponse"
-                :prompts="prompts"
-                :promptText="promptText"
-                @closeDialog="closeDialog"
-                @callFunc="callFunc"
-            />
-        </v-dialog>
     </div>
 </template>
 
@@ -216,10 +206,8 @@ import JsonViewer from "@/apps/dashboard/shared/components/JSONViewer"
 import IconMenu from '@/apps/dashboard/shared/components/IconMenu'
 import WorkflowTestBuilder from './WorkflowTestBuilder'
 import TestsSelector from './TestsSelector'
-import AktoAi from '@/apps/dashboard/shared/components/AktoAi.vue'
-import ACard from '@/apps/dashboard/shared/components/ACard.vue'
 import SecondaryButton from '@/apps/dashboard/shared/components/buttons/SecondaryButton'
-import ChatGptInput from '../../../../shared/components/inputs/ChatGptInput.vue'
+import ChatGptInput from '@/apps/dashboard/shared/components/inputs/ChatGptInput'
 
 export default {
     name: "ApiEndpoints",
@@ -236,8 +224,6 @@ export default {
         WorkflowTestBuilder,
         TestsSelector,
         SecondaryButton,
-        AktoAi,
-        ACard,
         ChatGptInput
     },
     props: {
@@ -252,15 +238,28 @@ export default {
                 {
                     icon: "$fas_magic",
                     label: "Create API groups",
+                    prepareQuery: () => { return {
+                        type: "group_apis_by_functionality",
+                        meta: {
+                            "apiCollectionId": this.apiCollectionId
+                        }                        
+                    }},
                     callback: (data) => console.log("callback create api groups", data)
                 },
                 {
                     icon: "$fas_layer-group",
                     label: "Tell me APIs related to ${input}",
+                    prepareQuery: (filterApi) => { return {
+                        type: "list_apis_by_type",
+                        meta: {
+                            "apiCollectionId": this.apiCollectionId,
+                            "type_of_apis": filterApi
+                        }                        
+                    }},
                     callback: (data) => console.log("callback Tell me all the apis", data)
                 }
             ],
-            showDialog: false,
+            showGptDialog: false,
             file: null,
             rules: [
                 value => !value || value.size < 50e6 || 'HAR file size should be less than 50 MB!',
@@ -395,37 +394,8 @@ export default {
         }
     },
     methods: {
-        reset(){
-            this.getResponse=false
-            this.promptText=""
-            this.responseArr=[]
-        },
-        callFunc(keyword){
-            this.responseArr = []
-            let str = "Please tell me all the " + keyword + " APIs"
-            this.promptText = str
-            this.askAi("list_apis_by_type" , keyword)
-        },
-        closeDialog(){
-            this.showGPTPrompts = false
-        },
         showGPTScreen(){
-            this.showGPTPrompts = true
-            this.reset()
-        },
-        askAi(query_type, keyword){
-            this.getResponse=false
-            let data = {
-                "type": query_type,
-                "meta": {
-                    "apiCollectionId": this.apiCollectionId,
-                    "type_of_apis": keyword
-                }
-            }
-            api.askAi(data).then(resp => {
-                this.getResponse=true
-                this.responseArr = resp.response.responses || []
-            })
+            this.showGptDialog = true
         },
         rowClicked(row) {
             this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.endpoint + " " + row.method, type: 2})
