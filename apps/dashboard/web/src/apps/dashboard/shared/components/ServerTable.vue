@@ -75,7 +75,7 @@
                             <slot name="massActions"/>
                         </div>
                         <div class="d-flex jc-end">
-                            <div class="d-flex board-table-cards jc-end">
+                            <div class="d-flex jc-end">
                                 <slot name="add-at-top" 
                                     v-bind:filters="filters"  
                                     v-bind:filterOperators="filterOperators"
