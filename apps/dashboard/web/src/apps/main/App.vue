@@ -341,6 +341,8 @@
         --teamColor: #304ffe;
         --teamColor2: #2D243480;
         --transparent: rgba(0,0,0,0.0);
+        --gptColor: rgb(16, 163, 127);
+        --gptBackground: rgb(247, 247, 248);
 
         --rgbaColor1: rgba(246, 190, 79);
         --rgbaColor2: rgba(33, 150, 243);
