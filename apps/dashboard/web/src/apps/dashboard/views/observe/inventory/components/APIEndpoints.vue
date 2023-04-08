@@ -216,7 +216,6 @@ import JsonViewer from "@/apps/dashboard/shared/components/JSONViewer"
 import IconMenu from '@/apps/dashboard/shared/components/IconMenu'
 import WorkflowTestBuilder from './WorkflowTestBuilder'
 import TestsSelector from './TestsSelector'
-import SecondaryButton from '@/apps/dashboard/shared/components/buttons/SecondaryButton.vue'
 import AktoAi from '@/apps/dashboard/shared/components/AktoAi.vue'
 import ACard from '@/apps/dashboard/shared/components/ACard.vue'
 import SecondaryButton from '@/apps/dashboard/shared/components/buttons/SecondaryButton'
