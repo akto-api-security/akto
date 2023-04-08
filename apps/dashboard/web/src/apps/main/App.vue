@@ -234,8 +234,11 @@
 .z-80
     zoom: 0.8
         
+.mlp-74
+    margin-left: 74% !important
+            
 .no-shadow
-    box-shadow: 0 !important
+    box-shadow: none !important
 
 
 .arrow-up
