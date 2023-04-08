@@ -1,5 +1,5 @@
 <template>
-    <div style="height: 200px">
+    <div style="min-height: 200px">
         <div class="chat-gpt-container">
             <simple-menu :items="menuItems" tooltipTriangle="up" :showMenuOnDraw="showMenuOnDraw">
                 <template v-slot:activator2>
@@ -13,10 +13,10 @@
                         v-model="textSearch"
                         @keydown.native.13="sendToGPT"
                     >
-                        <template slot="prepend-inner" v-if="selectedItem">{{first}}</template>
+                        <template slot="prepend-inner" v-if="selectedLabel">{{first}}</template>
                         <template slot="append">
                             <span>
-                                <span  v-if="selectedItem">{{second}}</span>
+                                <span  v-if="selectedLabel">{{second}}</span>
                             </span>
                         </template>
                     </v-text-field>
@@ -26,6 +26,23 @@
                 <v-icon size="14">$far_paper-plane</v-icon>
             </v-btn>
         </div>    
+        <div class="prompt-body" v-if="responses">
+            <div class="prompt-loader" v-if="loading">
+                <span class="mr-1">AktoGPT is performing magic</span>
+                <spinner />
+            </div>
+            <div class="api-no-response" v-else-if="responses.length == 0">
+                Sorry couldn't find any response with your prompt.
+                Try again.
+            </div>
+
+            <div class="response-body">
+                <v-list-item v-for="item in responses" :key="item" class="listItem">
+                    {{ item }}
+                </v-list-item>
+            </div>
+        </div>
+
     </div>
 </template>
 
@@ -33,11 +50,14 @@
 
 import obj from '@/util/obj';
 import SimpleMenu from '../SimpleMenu'
+import Spinner from '../Spinner'
+import request from '@/util/request'
 
 export default {
     name: "ChatGptInput",
     components: {
-        SimpleMenu
+        SimpleMenu,
+        Spinner
     },
     props: {
         items: obj.arrR,
@@ -46,15 +66,18 @@ export default {
     data () {
         let _this = this;
         return {
+            loading: false,
             showMenuOnDraw: false,
-            selectedItem: null,
+            selectedObject: null,
             searchKey: null,
+            responses: null,
             menuItems: this.items.map(x => {
                 return {
                     icon: x.icon,
                     label: x.label.replaceAll("${input}", "_________"),
                     click: () => {
-                        _this.selectedItem = x.label
+                        _this.responses = null
+                        _this.selectedObject = x
                     }
                 }
             })
@@ -62,8 +85,24 @@ export default {
     },
     methods: {
         sendToGPT() {
-            if (this.disabledQuery) return
-            console.log("sendToGPT")
+            if (this.disabledQuery || !this.selectedObject) return
+            let _this = this;
+            let queryPayload = this.selectedObject.prepareQuery(this.searchKey)
+            this.loading = true;
+            this.askGPT(queryPayload).then(resp => {
+                _this.responses = resp.response.responses || []
+                _this.loading = false
+            }).catch(() => {
+                _this.responses = []
+                _this.loading = false
+            })   
+        },
+        askGPT(data) {
+            return request({
+                url: '/api/ask_ai',
+                method: 'post',
+                data
+            })
         }
     },
     mounted () {
@@ -75,26 +114,33 @@ export default {
         
     },
     computed: {
+        selectedLabel() {
+            if (this.selectedObject) {
+                return this.selectedObject.label
+            } else {
+                return null
+            }
+        },
         placeholder() {
-            return this.selectedItem ? '' : "What do you want to ask AktoGPT?"
+            return this.selectedLabel ? '' : "What do you want to ask AktoGPT?"
         },
         first () {
-            return this.selectedItem ? this.selectedItem.split("${input}")[0] : null
+            return this.selectedLabel ? this.selectedLabel.split("${input}")[0] : null
         },
         second () {
-            return this.selectedItem ? (this.selectedItem.split("${input}").length > 1 ? this.selectedItem.split("${input}")[1] : '') : null
+            return this.selectedLabel ? (this.selectedLabel.split("${input}").length > 1 ? this.selectedLabel.split("${input}")[1] : '') : null
         },
         disabled() {
-            return !this.selectedItem || this.selectedItem.indexOf("${input}") == -1
+            return !this.selectedLabel || this.selectedLabel.indexOf("${input}") == -1
         },
         disabledQuery() {
-            let ret = !!this.selectedItem && (this.selectedItem.indexOf("${input}") == -1 || (this.searchKey || '').length > 0)
+            let ret = !!this.selectedLabel && (this.selectedLabel.indexOf("${input}") == -1 || (this.searchKey || '').length > 0)
             return !ret
         },
         textSearch: {
             get () {
                 let _this = this
-                if (this.selectedItem) {
+                if (this.selectedLabel) {
                     if (this.disabled) return null
                     if (!this.searchKey)  {
                         this.searchKey = ''
@@ -129,6 +175,33 @@ export default {
     min-width: 346px !important
     max-width: 346px !important
     width: 346px !important
+
+.prompt-body
+    background: var(--gptBackground)
+    border-top: 1px solid var(--borderColor)
+    border-bottom: 1px solid var(--borderColor)
+    min-height: 200px
+    .prompt-loader,.api-no-response
+        display: flex
+        justify-content: center
+        margin-top: 70px !important
+        height: 50px
+        align-items: center
+        font-size: 18px
+    
+    .api-no-response
+        border: 1px solid var(--redMetric)
+        background-color: var(--white)
+        width: 650px
+        margin: auto
+        border-radius: 6px
+    
+    .response-body
+        padding: 24px
+        .listItem
+            padding: 6px 9px
+            min-height: 24px !important
+            font-size: 14px !important
 </style>
 
 <style scoped>
