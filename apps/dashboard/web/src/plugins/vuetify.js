@@ -115,6 +115,8 @@ import {
   faBook,
   faGripLines,
   faAlignJustify,
+  faMagic,
+  faLayerGroup,
   faPaperPlane
 } from '@fortawesome/free-solid-svg-icons'
 
@@ -130,6 +132,8 @@ import {
   faFolderOpen as farFolderOpen,
   faClock as farClock,
   faQuestionCircle as farQuestionCircle,
+  faPaperPlane as farPaperPlane
+  
 } from '@fortawesome/free-regular-svg-icons'
 
 import {
@@ -148,12 +152,12 @@ const faIcons = [
   faCreditCard,faAddressCard,faChalkboard,faFilter,faKey,faAngleDoubleDown,faAngleDoubleUp,faUpload,faRedo,faGlobe,faAngleDown,
   faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faCaretSquareUp,
   faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faThumbsUp,faCaretUp,faShareAlt,faUserPlus,faCaretDown,
-  faLaptopHouse,faAnchor,fabGithub,faArrowRight,faGift,faGripLines,faAlignJustify,
+  faLaptopHouse,faAnchor,fabGithub,faArrowRight,faGift,faGripLines,faAlignJustify,faBook,faMagic,faLayerGroup,faPaperPlane,
   
   farComments,farCalendar, farHandPointRight, farBuilding, farStar,farSquare, farCheckSquare,farFolder,farFolderOpen,farClock,
-  farQuestionCircle, faBook,
+  farQuestionCircle, farPaperPlane, 
 
-  fabSalesforce,fabHubspot,fabDiscord,faPaperPlane
+  fabSalesforce,fabHubspot,fabDiscord
 ]
 
 library.add(faIcons)
