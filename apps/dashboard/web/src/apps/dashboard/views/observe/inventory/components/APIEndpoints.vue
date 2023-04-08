@@ -1,6 +1,19 @@
 <template>
     <spinner v-if="endpointsLoading" />
     <div class="pr-4 api-endpoints" v-else>
+        <v-dialog
+            v-model="showDialog"
+            max-width="50%" 
+            content-class="dialog-no-shadow"
+        >
+            <div class="white-background pa-8 ma-0">
+                <chat-gpt-input
+                    v-if="showDialog"
+                    :items="chatGptPrompts"
+                />
+            </div>
+
+        </v-dialog>
         <div>
             <div class="d-flex jc-end pb-3 pt-3">
                     <v-tooltip bottom>
@@ -188,6 +201,7 @@ import IconMenu from '@/apps/dashboard/shared/components/IconMenu'
 import WorkflowTestBuilder from './WorkflowTestBuilder'
 import TestsSelector from './TestsSelector'
 import SecondaryButton from '@/apps/dashboard/shared/components/buttons/SecondaryButton'
+import ChatGptInput from '../../../../shared/components/inputs/ChatGptInput.vue'
 
 export default {
     name: "ApiEndpoints",
@@ -203,7 +217,8 @@ export default {
         IconMenu,
         WorkflowTestBuilder,
         TestsSelector,
-        SecondaryButton
+        SecondaryButton,
+        ChatGptInput
     },
     props: {
         apiCollectionId: obj.numR
@@ -213,6 +228,19 @@ export default {
     },
     data() {
         return {
+            chatGptPrompts: [
+                {
+                    icon: "$fas_magic",
+                    label: "Create API groups",
+                    callback: (data) => console.log("callback create api groups", data)
+                },
+                {
+                    icon: "$fas_layer-group",
+                    label: "Tell me APIs related to ${input}",
+                    callback: (data) => console.log("callback Tell me all the apis", data)
+                }
+            ],
+            showDialog: true,
             file: null,
             rules: [
                 value => !value || value.size < 50e6 || 'HAR file size should be less than 50 MB!',

@@ -1,28 +1,30 @@
 <template>
-    <v-menu bottom offset-x offset-y min-width="150" max-height="300px">
+    <v-menu bottom offset-y min-width="150" max-height="300px" v-model="showMenu">
         <template v-slot:activator="{on, attrs}">
             <div v-on="on" v-bind="attrs">
                 <slot name="activator2"/>
             </div>
         </template>
 
-        <v-list class="gray-menu" v-if="items && items.length > 0">
-            <v-list-item 
-                v-for="(item, index) in items"
-                :key=index
-                class='row-nav-drawer' 
-                active-class="active-item" 
-                @click="item.click"
-            >
-                <v-list-item-content class="content-nav-drawer">
-          
-                    <v-list-item-title class="title-nav-drawer">
-                      <v-icon v-if="item.icon" size="12" color="#fff">{{ item.icon }}</v-icon>
-                      {{item.label}}
-                    </v-list-item-title>
-                </v-list-item-content>
-            </v-list-item>
-        </v-list>
+        <div>
+          <div :class='["arrow-"+tooltipTriangle]' v-if="tooltipTriangle"></div>
+          <v-list class="gray-menu" v-if="items && items.length > 0">
+              <v-list-item 
+                  v-for="(item, index) in items"
+                  :key=index
+                  class='row-nav-drawer' 
+                  active-class="active-item" 
+                  @click="item.click"
+              >
+                  <v-list-item-content class="content-nav-drawer">
+                      <v-list-item-title class="title-nav-drawer">
+                        <v-icon v-if="item.icon" size="12" color="#fff">{{ item.icon }}</v-icon>{{item.label}}
+                      </v-list-item-title>
+                  </v-list-item-content>
+              </v-list-item>
+          </v-list>
+
+        </div>
     </v-menu>
     
 </template>
@@ -34,8 +36,15 @@ import obj from "@/util/obj"
 export default {
     name: "SimpleMenu",
     props: {
-        items: obj.arrR
+        items: obj.arrR,
+        tooltipTriangle: obj.strN,
+        showMenuOnDraw: obj.boolN
     },
+    data() {
+      return {
+        showMenu: !!this.showMenuOnDraw
+      }
+    }
 }
 </script>
 
@@ -63,6 +72,7 @@ export default {
     max-width: 16px
 .gray-menu
   background-color: var(--hexColor15)
+  border-radius: 4px
 
 .active-item
   &:before
