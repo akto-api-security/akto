@@ -38,22 +38,6 @@
                     sortKeyDefault="sensitive" 
                     :sortDescDefault="true" 
                 >
-                    <template #item.domain="{item}">
-                        <v-tooltip bottom max-width="300px">
-                            <template v-slot:activator='{ on, attrs }'>
-                                <div
-                                    v-bind="attrs"
-                                    v-on="on"
-                                    class="table-entry"
-                                >
-                                  {{item.domain}}
-                                </div>
-                            </template class="table-entry">
-                            <div>
-                                {{item.valuesString}}
-                            </div>
-                        </v-tooltip>
-                    </template>
                 </simple-table>
             </template>
             <template slot="Response">
@@ -65,22 +49,6 @@
                     sortKeyDefault="sensitive" 
                     :sortDescDefault="true"
                 >
-                    <template #item.domain="{item}">
-                        <v-tooltip bottom max-width="300px">
-                            <template v-slot:activator='{ on, attrs }'>
-                                <div
-                                    v-bind="attrs"
-                                    v-on="on"
-                                    class="table-entry"
-                                >
-                                  {{item.domain}}
-                                </div>
-                            </template>
-                            <div class="fs-12">
-                                {{item.valuesString}}
-                            </div>
-                        </v-tooltip>
-                    </template>
                 </simple-table>
             </template>
             <template slot="Values">

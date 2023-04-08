@@ -20,7 +20,7 @@
         >
             <template v-slot:add-at-top="{filters, filterOperators, sortKey, sortDesc}">
                 <div class="d-flex jc-end">
-                    <div class="d-flex board-table-cards jc-end">
+                    <div class="d-flex jc-end">
                         <div class="clickable download-csv">
                             <v-tooltip bottom>
                                 <template v-slot:activator="{on, attrs}">
