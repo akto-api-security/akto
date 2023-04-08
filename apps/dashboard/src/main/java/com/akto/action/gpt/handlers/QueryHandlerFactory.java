@@ -15,6 +15,9 @@ public class QueryHandlerFactory {
         if (query.equals(GptQuery.GROUP_APIS_BY_FUNCTIONALITY)) {
             return new GroupApisByFunctionality(new ListApisEndpointNames(Collections.singletonList(new FilterJunkEndpoints())), new SimpleResultFetcherStrategy());
         }
+        if(query.equals(GptQuery.LIST_SENSITIVE_PARAMS)){
+            return new ListSensitiveParameters(new SimpleResultFetcherStrategy());
+        }
         throw new IllegalArgumentException("No such query handler");
     }
 }
