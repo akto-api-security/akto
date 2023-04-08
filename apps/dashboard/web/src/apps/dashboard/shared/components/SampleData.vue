@@ -188,7 +188,7 @@ export default {
             let data = {
                 "type": "list_sensitive_params",
                 "meta": {
-                    "sampleData": this.json["message"]
+                    "sampleData": JSON.stringify(this.json["message"])
                 }
             }
             console.log(data)
