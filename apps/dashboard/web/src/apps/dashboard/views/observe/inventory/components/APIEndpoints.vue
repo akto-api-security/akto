@@ -33,7 +33,6 @@
 
                 <upload-file fileFormat=".har" @fileChanged="handleFileChange" tooltipText="Upload traffic (.har)" label="" type="uploadTraffic"/>
                 <icon-menu icon="$fas_download" :items="downloadFileItems"/>
-                <icon-menu icon="$fas_paper-plane" :items="prompts"></icon-menu>
             </div>
         </div>
         <div class="d-flex">
@@ -181,18 +180,20 @@
         </v-dialog>
 
         <div class="fix-at-top">
-            <v-btn depressed @click="showGPTScreen()">
+            <v-btn dark depressed color="var(--gptColor)" @click="showGPTScreen()">
                 Ask AktoGPT 
                 <v-icon size="16">$chatGPT</v-icon>
             </v-btn>
         </div>
         <v-dialog v-model="showGPTPrompts" width="800px">
-            <v-card height="400px" v-if="showGPTPrompts">
-                <v-card-title>Akto GPT is here to help</v-card-title>
-                <v-card-text>
-                    <div>Hello Everyone</div>
-                </v-card-text>
-            </v-card>
+            <akto-ai
+                :responseArr="responseArr"
+                :getResponse="getResponse"
+                :prompts="prompts"
+                :promptText="promptText"
+                @closeDialog="closeDialog"
+                @callFunc="callFunc"
+            />
         </v-dialog>
     </div>
 </template>
@@ -215,6 +216,9 @@ import JsonViewer from "@/apps/dashboard/shared/components/JSONViewer"
 import IconMenu from '@/apps/dashboard/shared/components/IconMenu'
 import WorkflowTestBuilder from './WorkflowTestBuilder'
 import TestsSelector from './TestsSelector'
+import SecondaryButton from '@/apps/dashboard/shared/components/buttons/SecondaryButton.vue'
+import AktoAi from '@/apps/dashboard/shared/components/AktoAi.vue'
+import ACard from '@/apps/dashboard/shared/components/ACard.vue'
 import SecondaryButton from '@/apps/dashboard/shared/components/buttons/SecondaryButton'
 import ChatGptInput from '../../../../shared/components/inputs/ChatGptInput.vue'
 
@@ -233,6 +237,8 @@ export default {
         WorkflowTestBuilder,
         TestsSelector,
         SecondaryButton,
+        AktoAi,
+        ACard,
         ChatGptInput
     },
     props: {
@@ -339,43 +345,30 @@ export default {
                 {
                     label: "Download CSV file",
                     click: this.downloadData
-                },
-                {
-                    label: "Ask AI",
-                    click: this.askAi
                 }
             ],
             prompts: [
                 {
-                    label: "Tell me all the Payment APIs",
-                    click: this.fetchPaymentApis
+                    keyword: "Payment",
                 },
                 {
-                    label: "Tell me all the User APIs",
-                    click: this.fetchUserApis
+                    keyword: "User",
                 },
                 {
-                    label: "Tell me all the Order APIs",
-                    click: this.fetchOrderApis
+                    keyword: "Order",
                 },
                 {
-                    label: "Tell me all the Product APIs",
-                    click: this.fetchProductApis
+                    keyword: "Product",
                 },
                 {
-                    label: "Tell me all the Authentication APIs",
-                    click: this.fetchAuthApis
+                    keyword: "Authentication",
                 },
                 {
-                    label: "Tell me all the Login APIs",
-                    click: this.fetchLoginApis
+                    keyword: "Login",           
                 },
                 {
-                    label: "Tell me all the Search APIs",
-                    click: this.fetchSearchApis
-                }
-                
-
+                    keyword: "Search",                
+                }   
             ],
             showTestSelectorDialog: false,
             filteredItemsForScheduleTest: [],
@@ -397,34 +390,32 @@ export default {
             originalStateFromDb: null,
             workflowTests: [],
             showGPTPrompts:false,
+            getResponse:false,
+            promptText: "",
+            responseArr:[],
         }
     },
     methods: {
+        reset(){
+            this.getResponse=false
+            this.promptText=""
+            this.responseArr=[]
+        },
+        callFunc(keyword){
+            this.responseArr = []
+            let str = "Please tell me all the " + keyword + " APIs"
+            this.promptText = str
+            this.askAi("list_apis_by_type" , keyword)
+        },
+        closeDialog(){
+            this.showGPTPrompts = false
+        },
         showGPTScreen(){
             this.showGPTPrompts = true
-        },
-        fetchLoginApis(){
-            this.askAi("list_apis_by_type", "login")
-        },
-        fetchPaymentApis(){
-            this.askAi("list_apis_by_type", "payment")
-        },
-        fetchUserApis(){
-            this.askAi("list_apis_by_type", "user")
-        },
-        fetchProductApis(){
-            this.askAi("list_apis_by_type", "product")
-        },
-        fetchOrderApis(){
-            this.askAi("list_apis_by_type", "order")
-        },
-        fetchAuthApis(){
-            this.askAi("list_apis_by_type", "authentication")
-        },
-        fetchSearchApis(){
-            this.askAi("list_apis_by_type", "search")
+            this.reset()
         },
         askAi(query_type, keyword){
+            this.getResponse=false
             let data = {
                 "type": query_type,
                 "meta": {
@@ -433,7 +424,8 @@ export default {
                 }
             }
             api.askAi(data).then(resp => {
-                console.log(resp)
+                this.getResponse=true
+                this.responseArr = resp.response.responses || []
             })
         },
         rowClicked(row) {
@@ -632,13 +624,11 @@ export default {
 }
 </script>
 
-<style lang="sass">
-
+<style lang="sass" scoped>  
 .fix-at-top
     position: absolute
     right: 260px
     top: 18px
-    
 .api-endpoints
     & .table-column
         &:nth-child(1)    
