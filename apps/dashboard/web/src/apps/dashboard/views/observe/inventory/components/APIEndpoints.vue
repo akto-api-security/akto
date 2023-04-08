@@ -33,6 +33,7 @@
 
                 <upload-file fileFormat=".har" @fileChanged="handleFileChange" tooltipText="Upload traffic (.har)" label="" type="uploadTraffic"/>
                 <icon-menu icon="$fas_download" :items="downloadFileItems"/>
+                <icon-menu icon="$fas_paper-plane" :items="prompts"></icon-menu>
             </div>
         </div>
         <div class="d-flex">
@@ -179,6 +180,21 @@
         <v-dialog v-model="showTestSelectorDialog" width="800px"> 
             <tests-selector :collectionName="apiCollectionName" @testsSelected=startTest v-if="showTestSelectorDialog"/>
         </v-dialog>
+
+        <div class="fix-at-top">
+            <v-btn depressed @click="showGPTScreen()">
+                Ask AktoGPT 
+                <v-icon size="16">$chatGPT</v-icon>
+            </v-btn>
+        </div>
+        <v-dialog v-model="showGPTPrompts" width="800px">
+            <v-card height="400px" v-if="showGPTPrompts">
+                <v-card-title>Akto GPT is here to help</v-card-title>
+                <v-card-text>
+                    <div>Hello Everyone</div>
+                </v-card-text>
+            </v-card>
+        </v-dialog>
     </div>
 </template>
 
@@ -324,7 +340,43 @@ export default {
                 {
                     label: "Download CSV file",
                     click: this.downloadData
+                },
+                {
+                    label: "Ask AI",
+                    click: this.askAi
                 }
+            ],
+            prompts: [
+                {
+                    label: "Tell me all the Payment APIs",
+                    click: this.fetchPaymentApis
+                },
+                {
+                    label: "Tell me all the User APIs",
+                    click: this.fetchUserApis
+                },
+                {
+                    label: "Tell me all the Order APIs",
+                    click: this.fetchOrderApis
+                },
+                {
+                    label: "Tell me all the Product APIs",
+                    click: this.fetchProductApis
+                },
+                {
+                    label: "Tell me all the Authentication APIs",
+                    click: this.fetchAuthApis
+                },
+                {
+                    label: "Tell me all the Login APIs",
+                    click: this.fetchLoginApis
+                },
+                {
+                    label: "Tell me all the Search APIs",
+                    click: this.fetchSearchApis
+                }
+                
+
             ],
             showTestSelectorDialog: false,
             filteredItemsForScheduleTest: [],
@@ -344,10 +396,47 @@ export default {
             ],
             showWorkflowTestBuilder: false,
             originalStateFromDb: null,
-            workflowTests: []
+            workflowTests: [],
+            showGPTPrompts:false,
         }
     },
     methods: {
+        showGPTScreen(){
+            this.showGPTPrompts = true
+        },
+        fetchLoginApis(){
+            this.askAi("list_apis_by_type", "login")
+        },
+        fetchPaymentApis(){
+            this.askAi("list_apis_by_type", "payment")
+        },
+        fetchUserApis(){
+            this.askAi("list_apis_by_type", "user")
+        },
+        fetchProductApis(){
+            this.askAi("list_apis_by_type", "product")
+        },
+        fetchOrderApis(){
+            this.askAi("list_apis_by_type", "order")
+        },
+        fetchAuthApis(){
+            this.askAi("list_apis_by_type", "authentication")
+        },
+        fetchSearchApis(){
+            this.askAi("list_apis_by_type", "search")
+        },
+        askAi(query_type, keyword){
+            let data = {
+                "type": query_type,
+                "meta": {
+                    "apiCollectionId": this.apiCollectionId,
+                    "type_of_apis": keyword
+                }
+            }
+            api.askAi(data).then(resp => {
+                console.log(resp)
+            })
+        },
         rowClicked(row) {
             this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.endpoint + " " + row.method, type: 2})
         },
@@ -545,6 +634,12 @@ export default {
 </script>
 
 <style lang="sass">
+
+.fix-at-top
+    position: absolute
+    right: 260px
+    top: 18px
+    
 .api-endpoints
     & .table-column
         &:nth-child(1)    
