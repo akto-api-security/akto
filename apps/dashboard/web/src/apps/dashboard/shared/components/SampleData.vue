@@ -188,8 +188,7 @@ export default {
             let data = {
                 "type": "list_sensitive_params",
                 "meta": {
-                    "url": this.json["message"]["path"],
-                    "apiCollectionId": this.json["message"]["akto_vxlan_id"]
+                    "sampleData": this.json["message"]
                 }
             }
             console.log(data)
