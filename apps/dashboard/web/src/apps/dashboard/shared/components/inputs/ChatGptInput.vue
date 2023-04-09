@@ -22,9 +22,28 @@
                     </v-text-field>
                 </template>
             </simple-menu>
-            <v-btn icon :ripple="false" color="var(--themeColor)" @click="sendToGPT" :disabled="disabledQuery" style="margin: auto 0" class="gpt-button">
+            <v-btn icon :ripple="false" color="var(--themeColor)" @click="sendToGPT" :disabled="disabledQuery" class="gpt-button">
                 <v-icon size="14">$far_paper-plane</v-icon>
             </v-btn>
+            
+                <v-tooltip bottom>
+                    <template v-slot:activator='{ on, attrs }'>
+                        <v-btn 
+                            icon 
+                            :ripple="false" 
+                            color="var(--themeColorDark)" 
+                            @click="openDocsOnAktoGPT" 
+                            class="gpt-button"
+                            v-on="on"
+                            v-bind="attrs"                            
+                        >
+                            <v-icon size="14">$far_question-circle</v-icon>
+                        </v-btn>
+                    </template>
+                    <span>Learn what data is sent and how we use it</span>
+                </v-tooltip>
+
+
         </div>    
         <div class="prompt-body" v-if="responses || loading">
             <div class="gpt-prompt">
@@ -98,6 +117,9 @@ export default {
         }
     },
     methods: {
+        openDocsOnAktoGPT() {
+            return window.open("https://docs.akto.io/api-inventory/akto-gpt")
+        },
         sendToGPT() {
             if (this.disabledQuery || !this.selectedObject) return
             let _this = this;
@@ -191,7 +213,8 @@ export default {
 </script>
 
 <style lang="sass" scoped>
-
+.gpt-button
+    margin: auto 0
 .gpt-main-div
     display: flex
     flex-direction: column
