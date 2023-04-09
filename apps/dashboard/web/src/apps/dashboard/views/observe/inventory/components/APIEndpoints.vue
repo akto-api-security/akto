@@ -51,6 +51,7 @@
                     :headers=tableHeaders 
                     :items=allEndpoints 
                     @rowClicked=rowClicked 
+                    @filterApplied="filterApplied"
                     name="All" 
                     sortKeyDefault="sensitiveTags" 
                     :sortDescDefault="true"
@@ -77,7 +78,8 @@
                 <simple-table 
                     :headers=tableHeaders 
                     :items=sensitiveEndpoints 
-                    @rowClicked=rowClicked name="Sensitive"
+                    @rowClicked=rowClicked 
+                    name="Sensitive"
                 >
                     <template #item.sensitiveTags="{item}">
                         <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
@@ -235,6 +237,7 @@ export default {
     },
     data() {
         return {
+            filteredItems: [],
             chatGptPrompts: [
                 {
                     icon: "$fas_magic",
@@ -242,7 +245,7 @@ export default {
                     prepareQuery: () => { return {
                         type: "group_apis_by_functionality",
                         meta: {
-                            "apiCollectionId": this.apiCollectionId
+                            "urls": this.filteredItems.map(x => x.endpoint)
                         }                        
                     }},
                     callback: (data) => console.log("callback create api groups", data)
@@ -253,7 +256,7 @@ export default {
                     prepareQuery: (filterApi) => { return {
                         type: "list_apis_by_type",
                         meta: {
-                            "apiCollectionId": this.apiCollectionId,
+                            "urls": this.filteredItems.map(x => x.endpoint),
                             "type_of_apis": filterApi
                         }                        
                     }},
@@ -395,6 +398,9 @@ export default {
         }
     },
     methods: {
+        filterApplied(data) {
+            this.filteredItems = data
+        },
         showGPTScreen(){
             this.showGptDialog = true
         },
