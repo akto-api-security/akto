@@ -1,5 +1,6 @@
 package com.akto.action.gpt.handlers;
 
+import com.akto.action.gpt.GptAction;
 import com.akto.action.gpt.data_extractors.DataExtractor;
 import com.akto.action.gpt.result_fetchers.ResultFetcherStrategy;
 import com.mongodb.BasicDBObject;
@@ -24,6 +25,7 @@ public class ListApisByType implements QueryHandler {
         logger.info("Found " + urls.size() + " endpoints");
         BasicDBObject data = new BasicDBObject();
         data.put("query_type", GptQuery.LIST_APIS_BY_TYPE.getName());
+        data.put(GptAction.USER_EMAIL, meta.getString(GptAction.USER_EMAIL));
         data.put("type_of_apis", meta.getString("type_of_apis"));
         data.put("apis", urls);
         return this.resultFetcherStrategy.fetchResult(data);
