@@ -183,7 +183,7 @@ export default {
         pageSize: obj.numN
     },
     data () {
-        let rowsPerPage = this.pageSize || 10
+        let rowsPerPage = this.pageSize || 100
         return {
             tableId: "table_"+parseInt(Math.random() * 10000000),
             options:{},
