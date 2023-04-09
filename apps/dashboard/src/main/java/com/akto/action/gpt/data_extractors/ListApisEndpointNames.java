@@ -24,16 +24,28 @@ public class ListApisEndpointNames implements DataExtractor<String>{
     }
     @Override
     public List<String> extractData(BasicDBObject meta) {
-        int apiCollectionId = meta.getInt("apiCollectionId");
-        List<BasicDBObject> list =  Utils.fetchEndpointsInCollection(apiCollectionId, 0);
+        int apiCollectionId = meta.getInt("apiCollectionId", -1);
 
         List<String> result = new ArrayList<>();
-        for (BasicDBObject obj : list) {
-            String url = ((BasicDBObject)obj.get("_id")).getString("url", "");
-            if(!url.isEmpty()){
-                result.add(url);
+
+        if (apiCollectionId == -1) {
+
+            ArrayList<Object> urlsObj = (ArrayList) (meta.get("urls"));
+            for(Object o: urlsObj) {
+                result.add(o.toString());
+            }
+
+        } else {
+            List<BasicDBObject> list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, 0);
+            
+            for (BasicDBObject obj : list) {
+                String url = ((BasicDBObject)obj.get("_id")).getString("url", "");
+                if(!url.isEmpty()){
+                    result.add(url);
+                }
             }
         }
+
         if(!filters.isEmpty()){
             for(Filter<String> filter: filters) {
                 int originalSize = result.size();
