@@ -17,6 +17,7 @@
             :key="reRenderKey"
             :dense="dense"
             @rowClicked="rowClicked"
+            @filterApplied="filterApplied"
         >
             <template v-slot:add-at-top="{filters, filterOperators, sortKey, sortDesc}">
                 <div class="d-flex jc-end">
@@ -94,6 +95,9 @@ export default {
         }
     },
     methods: {
+        filterApplied(data) {
+            this.$emit("filterApplied", data)
+        },
         rowClicked(row) {
             this.$emit('rowClicked', row)
         },

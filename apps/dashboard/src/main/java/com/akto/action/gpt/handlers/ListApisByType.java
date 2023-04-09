@@ -21,6 +21,13 @@ public class ListApisByType implements QueryHandler {
         this.resultFetcherStrategy = strategy;
     }
     public BasicDBObject handleQuery(BasicDBObject meta) {
+
+        String filterPhrase = meta.getString("type_of_apis");
+
+        if (filterPhrase != null && filterPhrase.length() > 20) {
+            throw new IllegalArgumentException("Filter phrase must be less than 20 chars");
+        }
+
         List<String> urls =  dataExtractor.extractData(meta);
         logger.info("Found " + urls.size() + " endpoints");
         BasicDBObject data = new BasicDBObject();
