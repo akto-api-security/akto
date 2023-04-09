@@ -12,8 +12,9 @@
 
         <v-dialog
             v-model="showGptDialog"
-            max-width="50%" 
+            width="fit-content" 
             content-class="dialog-no-shadow"
+            overlay-opacity="0.7"
         >
             <div class="gpt-dialog-container ma-0">
                 <chat-gpt-input
@@ -350,18 +351,18 @@ export default {
 </script>
 
 <style lang="sass" scoped>
-    .fix-at-top
-        position: absolute
-        right: 260px
-        top: 18px
-    .gpt-dialog-container
-        min-height:300px
-        background-color: var(--gptBackground)
-    .table-title
-        font-size: 16px    
-        color: var(--themeColorDark)
-        font-weight: 500
-        padding-top: 16px
-    .v-tooltip__content
-        font-size: 15px !important
+.fix-at-top
+    position: absolute
+    right: 260px
+    top: 18px
+.gpt-dialog-container
+    min-height: 300px
+    background-color: var(--gptBackground)
+.table-title
+    font-size: 16px    
+    color: var(--themeColorDark)
+    font-weight: 500
+    padding-top: 16px
+.v-tooltip__content
+    font-size: 15px !important
 </style>

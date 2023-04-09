@@ -1,5 +1,5 @@
 <template>
-    <div>
+    <div class="gpt-main-div">
         <div class="chat-gpt-container">
             <simple-menu :items="menuItems" tooltipTriangle="up" :showMenuOnDraw="showMenuOnDraw">
                 <template v-slot:activator2>
@@ -22,21 +22,30 @@
                     </v-text-field>
                 </template>
             </simple-menu>
-            <v-btn icon :ripple="false" color="var(--themeColor)" @click="sendToGPT" :disabled="disabledQuery" style="margin: auto 0">
+            <v-btn icon :ripple="false" color="var(--themeColor)" @click="sendToGPT" :disabled="disabledQuery" style="margin: auto 0" class="gpt-button">
                 <v-icon size="14">$far_paper-plane</v-icon>
             </v-btn>
         </div>    
         <div class="prompt-body" v-if="responses || loading">
-            <div class="prompt-loader" v-if="loading">
-                <span class="mr-1">AktoGPT is performing magic</span>
-                <spinner />
+            <div class="gpt-prompt">
+                <span class="gpt-prompt-text">
+                    <v-icon :size=14 :color='("var(--hexColor"+Math.floor(Math.random() * 13 + 1)+")")'>$fas_user-graduate</v-icon>
+                    {{ computedLabel }}
+                </span>
             </div>
-            <div class="api-no-response" v-else-if="responses.length == 0">
-                Sorry couldn't find any response with your prompt.
-                Try again.
+            <div class="prompt-loader" v-if="loading">
+                <spinner :size=28 />
+            </div>
+            <div class="response-body" v-else-if="responses.length == 0">
+                <v-icon class="gpt-icon" :size="14">$aktoWhite</v-icon>
+                <span class="listItem">
+                    Sorry couldn't find any response with your prompt.
+                    Try again.
+                </span>
             </div>
 
-            <div class="response-body">
+            <div class="response-body" v-else>
+                <v-icon class="gpt-icon" :size="16">$aktoWhite</v-icon>
                 <v-list-item v-for="item in responses" :key="item" class="listItem">
                     {{ item }}
                 </v-list-item>
@@ -80,7 +89,7 @@ export default {
                         _this.selectedObject = x
                     }
                 }
-            })
+            }),
         }
     },
     methods: {
@@ -115,6 +124,18 @@ export default {
         
     },
     computed: {
+        computedLabel(){
+            if(this.selectedObject){
+                let arr = this.selectedObject.label.split("$")
+                if(arr.length > 1){
+                    let str = arr[0] + " " + this.searchKey
+                    return str
+                }
+                else{
+                    return arr[0]
+                }
+            }
+        },
         selectedLabel() {
             if (this.selectedObject) {
                 return this.selectedObject.label
@@ -165,9 +186,24 @@ export default {
 </script>
 
 <style lang="sass" scoped>
+
+.gpt-main-div
+    display: flex
+    flex-direction: column
 .chat-gpt-container
     display: flex
     margin: auto
+    justify-content: center
+    order: 99
+.gpt-icon
+    color: var(--themeColor)
+.gpt-prompt
+    display: flex
+    align-items: center
+    padding: 0 20px
+    .gpt-prompt-text
+        font-size: 12px
+
 
 .chat-gpt-text-field
     min-width: 346px !important
@@ -177,7 +213,6 @@ export default {
 .prompt-body
     min-height: 200px
     margin-top:20px
-    border: 1px solid var(--black)
     border-radius:4px
     .prompt-loader,.api-no-response
         display: flex
@@ -195,11 +230,10 @@ export default {
         border-radius: 6px
     
     .response-body
-        padding: 24px
+        padding: 20px
         .listItem
-            padding: 6px 9px
-            min-height: 24px !important
-            font-size: 14px !important
+            min-height: 16px !important
+            font-size: 12px !important
 </style>
 
 <style scoped>
@@ -221,7 +255,6 @@ export default {
 
     .chat-gpt-text-field >>> input {
         color: var(--themeColor) !important;
-        padding-top: 11px !important;
     }
 
     .chat-gpt-container >>> .v-text-field--outlined {
@@ -229,6 +262,12 @@ export default {
         border-color: rgba(0,0,0,.1) !important;
     }
 
+    .chat-gpt-text-field >>> .v-input__prepend-inner {
+        margin: auto;
+        width: 380px;
+        display: flex;
+        justify-content: center; 
+    }
     .chat-gpt-text-field >>> .v-input__append-inner {
         margin: auto;
     }
