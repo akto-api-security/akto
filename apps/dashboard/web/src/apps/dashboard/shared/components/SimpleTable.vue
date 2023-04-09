@@ -17,10 +17,11 @@
             :key="reRenderKey"
             :dense="dense"
             @rowClicked="rowClicked"
+            @filterApplied="filterApplied"
         >
             <template v-slot:add-at-top="{filters, filterOperators, sortKey, sortDesc}">
                 <div class="d-flex jc-end">
-                    <div class="d-flex board-table-cards jc-end">
+                    <div class="d-flex jc-end">
                         <div class="clickable download-csv">
                             <v-tooltip bottom>
                                 <template v-slot:activator="{on, attrs}">
@@ -94,6 +95,9 @@ export default {
         }
     },
     methods: {
+        filterApplied(data) {
+            this.$emit("filterApplied", data)
+        },
         rowClicked(row) {
             this.$emit('rowClicked', row)
         },

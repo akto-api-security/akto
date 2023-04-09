@@ -7,10 +7,15 @@
             :server-items-length="total"
             :options.sync="options"
             :sort-by="sortKey"
-            :sort-desc="sortDesc"        
-            hide-default-footer
-            hide-default-header
-            :items-per-page="rowsPerPage"
+            :sort-desc="sortDesc"
+            :items-per-page="rowsPerPage"           
+            :hide-default-footer="!(filteredItems && filteredItems.length > 0)"
+            :footer-props="{
+                showFirstLastPage: false,
+                prevIcon: '$fas_angle-left',
+                nextIcon: '$fas_angle-right',
+                'items-per-page-options': itemsPerPage                
+            }"            hide-default-header
             :loading="loading"
             tabindex="0"
             @keydown.native.37="moveLeft"
@@ -70,15 +75,7 @@
                             <slot name="massActions"/>
                         </div>
                         <div class="d-flex jc-end">
-                            <div class="d-flex board-table-cards jc-end">
-                                <v-data-footer 
-                                    v-if="filteredItems.length > 0"
-                                    :pagination="pagination" 
-                                    :options="options"
-                                    @update:options="updateOptions"
-                                    prevIcon= '$fas_angle-left'
-                                    nextIcon= '$fas_angle-right'
-                                />
+                            <div class="d-flex jc-end">
                                 <slot name="add-at-top" 
                                     v-bind:filters="filters"  
                                     v-bind:filterOperators="filterOperators"
@@ -128,6 +125,7 @@
                         :currRowIndex="currRowIndex" 
                         :headers="headers" 
                         @clickRow="clickRow"
+                        @highlightRow="() => {currRowIndex = index}"
                         :dense="dense"
                     >
                         <template v-for="(index, name) in $slots" v-slot:[name]>
@@ -284,6 +282,7 @@ export default {
             this.currPage = page
             this.rowsPerPage = itemsPerPage
             let skip = (this.currPage-1)*this.rowsPerPage
+            let _this = this
             
             this.fetchParams(sortBy[0], sortDesc[0] ? -1: 1, skip, this.rowsPerPage, this.filters, this.filterOperators).then(resp => {
                 this.loading = false
@@ -293,6 +292,7 @@ export default {
                 let listParams = params.map(this.processParams)
                 let sortedParams = listParams
                 this.filteredItems = sortedParams
+                _this.$emit("filterApplied", sortedParams)
             }).catch(e => {
                 this.loading = false
             })
@@ -478,12 +478,6 @@ export default {
     &:focus    
         outline: none !important
     
-    .v-data-footer
-        border: 1px solid var(--hexColor22)  
-        height: 30px !important
-        padding:0px !important
-        background: var(--white)
-        border-radius: 4px
 .table-sub-header
     position: relative
 
@@ -523,31 +517,5 @@ export default {
 
 .board-table-cards >>> .v-data-footer__select {
     display: none;
-}
-.board-table-cards >>> .v-data-footer__pagination {
-    display: flex;
-    order: 1;
-    margin: 0 5px 0 5px;
-    font-size: 0.8rem;
-    color: var(--themeColorDark);
-}
-
-.board-table-cards >>> .v-data-footer__icons-before {
-    width: 30px;
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-}
-.board-table-cards >>> .v-data-footer__icons-after {
-    order: 2;
-    width: 30px;
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-}
-
-.board-table-cards >>> .v-btn--icon.v-size--default {
-    height: 30px;
-    width: 36px;
 }
 </style>

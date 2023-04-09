@@ -43,23 +43,6 @@
                     <template #item.type="{item}">
                         <sensitive-chip-group :sensitiveTags="[item.type]" />
                     </template>
-
-                    <template #item.domain="{item}">
-                        <v-tooltip bottom max-width="300px">
-                            <template v-slot:activator='{ on, attrs }'>
-                                <div
-                                    v-bind="attrs"
-                                    v-on="on"
-                                    class="fs-12"
-                                >
-                                  {{item.domain}}
-                                </div>
-                            </template>
-                            <div>
-                                {{item.valuesString}}
-                            </div>
-                        </v-tooltip>
-                    </template>
                 </server-table>
             </template>
             <template slot="Response">
@@ -76,23 +59,6 @@
                 >
                     <template #item.type="{item}">
                         <sensitive-chip-group :sensitiveTags="[item.type]" />
-                    </template>
-
-                    <template #item.domain="{item}">
-                        <v-tooltip bottom max-width="300px">
-                            <template v-slot:activator='{ on, attrs }'>
-                                <div
-                                    v-bind="attrs"
-                                    v-on="on"
-                                    class="fs-12"
-                                >
-                                  {{item.domain}}
-                                </div>
-                            </template>
-                            <div>
-                                {{item.valuesString}}
-                            </div>
-                        </v-tooltip>
                     </template>
                 </server-table>
             </template>
