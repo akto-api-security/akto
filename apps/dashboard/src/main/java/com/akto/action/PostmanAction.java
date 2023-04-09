@@ -3,7 +3,9 @@ package com.akto.action;
 import com.akto.ApiRequest;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dao.loaders.LoadersDao;
 import com.akto.dto.*;
+import com.akto.dto.loaders.PostmanUploadLoader;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
@@ -23,9 +25,13 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.ReplaceOptions;
 import io.swagger.v3.oas.models.OpenAPI;
+import org.bson.types.ObjectId;
 import org.json.JSONObject;
 
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class PostmanAction extends UserAction {
 
@@ -217,72 +223,231 @@ public class PostmanAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    private boolean skipKafka = DashboardMode.isLocalDeployment();
+    private final boolean skipKafka = DashboardMode.isLocalDeployment();
+
+    private boolean allowReplay;
+
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     public String importDataFromPostman() throws Exception {
-        PostmanCredential postmanCredential = fetchPostmanCredential();
-        if (postmanCredential == null) {
-            addActionError("Please add postman credentials in settings");
+        if (api_key == null || api_key.length() == 0) {
+            addActionError("Invalid postman key");
             return ERROR.toUpperCase();
         }
-        Main main = new Main(postmanCredential.getApiKey());
-        String workspaceId = this.workspace_id;
-        loggerMaker.infoAndAddToDb("Fetching details for workspace_id:" + workspace_id, LogDb.DASHBOARD);
+
+        if (workspace_id == null || workspace_id.length() == 0) {
+            addActionError("Invalid workspace id");
+            return ERROR.toUpperCase();
+        }
+        
+        try {
+            String result = addOrUpdateApiKey();
+            if ( result == null || !result.equals(SUCCESS.toUpperCase())) throw new Exception("Returned Error");
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while adding/updating postman key+ " + e.getMessage(), LogDb.DASHBOARD);
+            addActionError("Error while adding/updating postman key.");
+            return ERROR.toUpperCase();
+        }
+
+        PostmanCredential postmanCredential = fetchPostmanCredential();
+
+        loggerMaker.infoAndAddToDb("Fetched postman creds", LogDb.DASHBOARD);
+
+        int accountId = Context.accountId.get();
+        ObjectId loaderId = createPostmanLoader();
+
+        executorService.schedule( new Runnable() {
+            public void run() {
+                loggerMaker.infoAndAddToDb("Starting postman thread", LogDb.DASHBOARD);
+                Context.accountId.set(accountId);
+                importDataFromPostmanMain(workspace_id, postmanCredential.getApiKey(), skipKafka, allowReplay, loaderId);
+            }
+        }, 0, TimeUnit.SECONDS);
+
+        return SUCCESS.toUpperCase();
+    }
+
+    private ObjectId createPostmanLoader() {
+        int userId = getSUser().getId();
+        PostmanUploadLoader postmanUploadLoader = new PostmanUploadLoader(
+                userId, 0,0, true
+        );
+        LoadersDao.instance.createNormalLoader(postmanUploadLoader);
+        return postmanUploadLoader.getId();
+    }
+
+    private static void importDataFromPostmanMain(String workspaceId, String apiKey, boolean skipKafka, boolean allowReplay, ObjectId loaderId) {
+        Main main = new Main(apiKey);
+        loggerMaker.infoAndAddToDb("Fetching details for workspace_id:" + workspaceId, LogDb.DASHBOARD);
         JsonNode workspaceDetails = main.fetchWorkspace(workspaceId);
         JsonNode workspaceObj = workspaceDetails.get("workspace");
         ArrayNode collectionsObj = (ArrayNode) workspaceObj.get("collections");
-        Map<Integer, List<String>> aktoFormat = new HashMap<>();
-        for(JsonNode collectionObj: collectionsObj){
-            List<String> msgs = new ArrayList<>();
+        String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
+
+        int totalApis = 0;
+        Map<String, JsonNode> collectionDetailsToIdMap = new HashMap<>();
+        Map<String, Integer> countMap = new HashMap<>();
+        for(JsonNode collectionObj: collectionsObj) {
+            String collectionId = collectionObj.get("id").asText();
+            JsonNode collectionDetails;
+            try {
+                collectionDetails = main.fetchCollection(collectionId);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error getting data from postman for collection " + collectionId + " : " + e.getMessage(), LogDb.DASHBOARD);
+                continue;
+            }
+
+            loggerMaker.infoAndAddToDb("Successfully fetched postman collection: " + collectionId, LogDb.DASHBOARD);
+
+            JsonNode collectionDetailsObj = collectionDetails.get("collection");
+            int count = apiCount(collectionDetailsObj);
+
+            loggerMaker.infoAndAddToDb("Api count for collection " + collectionId + ": " + count, LogDb.DASHBOARD);
+
+            collectionDetailsToIdMap.put(collectionId, collectionDetailsObj);
+            countMap.put(collectionId, count);
+
+            totalApis +=  count;
+        }
+
+        LoadersDao.instance.updateTotalCountNormalLoader(loaderId,totalApis);
+
+        for(JsonNode collectionObj: collectionsObj) {
             String collectionId = collectionObj.get("id").asText();
             int aktoCollectionId = collectionId.hashCode();
             aktoCollectionId = aktoCollectionId < 0 ? aktoCollectionId * -1: aktoCollectionId;
-            JsonNode collectionDetails = main.fetchCollection(collectionId);
-            JsonNode collectionDetailsObj = collectionDetails.get("collection");
-            Map<String, String> variablesMap = Utils.getVariableMap((ArrayNode) collectionDetailsObj.get("variable"));
-            ArrayList<JsonNode> jsonNodes = new ArrayList<>();
-            Utils.fetchApisRecursively((ArrayNode) collectionDetailsObj.get("item"), jsonNodes);
+            JsonNode collectionDetailsObj = collectionDetailsToIdMap.get(collectionId);
+
             String collectionName = collectionDetailsObj.get("info").get("name").asText();
-            if(jsonNodes.size() == 0) {
-                loggerMaker.infoAndAddToDb("Collection "+ collectionName + " has no requests, skipping it", LogDb.DASHBOARD);
+
+            List<String> msgs = new ArrayList<>();
+            try {
+                msgs = generateMessages(collectionDetailsObj, aktoCollectionId, collectionName, allowReplay);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error getting data from postman for collection " + collectionId + " : " + e.getMessage(), LogDb.DASHBOARD);
+                LoadersDao.instance.updateIncrementalCount(loaderId, countMap.get(collectionId));
                 continue;
             }
-            loggerMaker.infoAndAddToDb(String.format("Found %s apis in collection %s", jsonNodes.size(), collectionName), LogDb.DASHBOARD);
-            for(JsonNode item: jsonNodes){
-                String apiName = item.get("name").asText();
-                loggerMaker.infoAndAddToDb(String.format("Processing api %s if collection %s", apiName, collectionName), LogDb.DASHBOARD);
-                Map<String, String> apiInAktoFormat = Utils.convertApiInAktoFormat(item, variablesMap, String.valueOf(1_000_000));
-                if(apiInAktoFormat != null){
-                    try{
-                        apiInAktoFormat.put("akto_vxlan_id", String.valueOf(aktoCollectionId));
-                        String s = mapper.writeValueAsString(apiInAktoFormat);
-                        loggerMaker.infoAndAddToDb(String.format("Api name: %s, CollectionName: %s, AktoFormat: %s", apiName, collectionName, s), LogDb.DASHBOARD);
-                        msgs.add(s);
-                    } catch (JsonProcessingException e){
-                        loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
-                    }
-                }
-            }
+
             if(msgs.size() > 0) {
-                aktoFormat.put(aktoCollectionId, msgs);
                 if(ApiCollectionsDao.instance.findOne(Filters.eq("_id", aktoCollectionId)) == null){
                     ApiCollectionsDao.instance.insertOne(ApiCollection.createManualCollection(aktoCollectionId, "Postman " + collectionName));
                 }
-                loggerMaker.infoAndAddToDb(String.format("Pushed %s apis from collection %s", msgs.size(), collectionName), LogDb.DASHBOARD);
+
+                try {
+                    Utils.pushDataToKafka(aktoCollectionId, topic, msgs, new ArrayList<>(), skipKafka);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Error while pushing data to kafka: " + e.getMessage(), LogDb.DASHBOARD);
+                    return;
+                }
+                loggerMaker.infoAndAddToDb(String.format("Pushed data in apicollection id %s", aktoCollectionId), LogDb.DASHBOARD);
             }
 
+            LoadersDao.instance.updateIncrementalCount(loaderId, countMap.get(collectionId));
         }
-        //Push to Akto
-        loggerMaker.infoAndAddToDb(String.format("Starting to push data to Akto, pushin data in %s collections", aktoFormat.size()), LogDb.DASHBOARD);
-        String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
-        for(Map.Entry<Integer, List<String>> entry: aktoFormat.entrySet()){
-            //For each entry, push a message to Kafka
-            int aktoCollectionId = entry.getKey();
-            List<String> msgs = entry.getValue();
-            Utils.pushDataToKafka(aktoCollectionId, topic, msgs, new ArrayList<>(), skipKafka);
-            loggerMaker.infoAndAddToDb(String.format("Pushed data in apicollection id %s", aktoCollectionId), LogDb.DASHBOARD);
+
+    }
+
+    String postmanCollectionFile;
+    public String importDataFromPostmanFile() {
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode collectionDetailsObj;
+        try {
+            collectionDetailsObj = mapper.readTree(postmanCollectionFile);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error parsing postman collection file: " + e.getMessage(), LogDb.DASHBOARD);
+            addActionError("Error while parsing the file");
+            return ERROR.toLowerCase();
         }
+
+        JsonNode infoNode = collectionDetailsObj.get("info");
+        String collectionId = infoNode.get("_postman_id").asText();
+        int aktoCollectionId = collectionId.hashCode();
+
+        String collectionName = infoNode.get("name").asText();
+
+
+        if(ApiCollectionsDao.instance.findOne(Filters.eq("_id", aktoCollectionId)) == null){
+            ApiCollectionsDao.instance.insertOne(ApiCollection.createManualCollection(aktoCollectionId, "Postman " + collectionName));
+        }
+
+        aktoCollectionId = aktoCollectionId < 0 ? aktoCollectionId * -1: aktoCollectionId;
+
+        int accountId = Context.accountId.get();
+        int finalAktoCollectionId = aktoCollectionId;
+
+        ObjectId loaderId = createPostmanLoader();
+
+        executorService.schedule(new Runnable() {
+            public void run() {
+                loggerMaker.infoAndAddToDb("Starting thread to process postman file", LogDb.DASHBOARD);
+                Context.accountId.set(accountId);
+                importDataFromPostmanFileMain(collectionDetailsObj, finalAktoCollectionId, collectionName,allowReplay, skipKafka, loaderId);
+            }
+        }, 1, TimeUnit.SECONDS);
+
         return SUCCESS.toUpperCase();
+    }
+
+    private static void importDataFromPostmanFileMain(JsonNode collectionDetailsObj, int aktoCollectionId, String collectionName, boolean allowReplay, boolean skipKafka, ObjectId loaderId) {
+        int count = apiCount(collectionDetailsObj);
+        loggerMaker.infoAndAddToDb("API count in postman.json: " + count, LogDb.DASHBOARD);
+        LoadersDao.instance.updateTotalCountNormalLoader(loaderId, count);
+
+        List<String> msgs;
+        try {
+            msgs = generateMessages(collectionDetailsObj, aktoCollectionId, collectionName, allowReplay);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error generating messages: " + e.getMessage(), LogDb.DASHBOARD);
+            LoadersDao.instance.updateIncrementalCount(loaderId, count);
+            return ;
+        }
+
+        String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
+        try {
+            Utils.pushDataToKafka(aktoCollectionId, topic, msgs, new ArrayList<>(), skipKafka);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error pushing data to kafka", LogDb.DASHBOARD);
+            return;
+        }
+        LoadersDao.instance.updateIncrementalCount(loaderId, count);
+        loggerMaker.infoAndAddToDb(String.format("Pushed data in apicollection id %s", aktoCollectionId), LogDb.DASHBOARD);
+    }
+
+    public static int apiCount(JsonNode collectionDetailsObj) {
+        ArrayList<JsonNode> jsonNodes = new ArrayList<>();
+        Utils.fetchApisRecursively((ArrayNode) collectionDetailsObj.get("item"), jsonNodes);
+
+        return jsonNodes.size();
+    }
+
+    private static List<String> generateMessages(JsonNode collectionDetailsObj, int aktoCollectionId, String collectionName, boolean allowReplay) {
+        List<String> msgs = new ArrayList<>();
+        Map<String, String> variablesMap = Utils.getVariableMap((ArrayNode) collectionDetailsObj.get("variable"));
+        ArrayList<JsonNode> jsonNodes = new ArrayList<>();
+        Utils.fetchApisRecursively((ArrayNode) collectionDetailsObj.get("item"), jsonNodes);
+        if(jsonNodes.size() == 0) {
+            loggerMaker.infoAndAddToDb("Collection "+ collectionName + " has no requests, skipping it", LogDb.DASHBOARD);
+            return msgs;
+        }
+        loggerMaker.infoAndAddToDb(String.format("Found %s apis in collection %s", jsonNodes.size(), collectionName), LogDb.DASHBOARD);
+        for(JsonNode item: jsonNodes){
+            String apiName = item.get("name").asText();
+            loggerMaker.infoAndAddToDb(String.format("Processing api %s if collection %s", apiName, collectionName), LogDb.DASHBOARD);
+            Map<String, String> apiInAktoFormat = Utils.convertApiInAktoFormat(item, variablesMap, String.valueOf(1_000_000), allowReplay);
+            if(apiInAktoFormat != null){
+                try{
+                    apiInAktoFormat.put("akto_vxlan_id", String.valueOf(aktoCollectionId));
+                    String s = mapper.writeValueAsString(apiInAktoFormat);
+                    loggerMaker.infoAndAddToDb(String.format("Api name: %s, CollectionName: %s", apiName, collectionName), LogDb.DASHBOARD);
+                    msgs.add(s);
+                } catch (JsonProcessingException e){
+                    loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+                }
+            }
+        }
+        
+        return msgs;
     }
 
 
@@ -301,4 +466,17 @@ public class PostmanAction extends UserAction {
     public BasicDBObject getPostmanCred() {
         return postmanCred;
     }
+
+
+    public void setAllowReplay(boolean allowReplay) {
+        this.allowReplay = allowReplay;
+    }
+
+
+    public void setPostmanCollectionFile(String postmanCollectionFile) {
+        this.postmanCollectionFile = postmanCollectionFile;
+    }
+
+    
+    
 }

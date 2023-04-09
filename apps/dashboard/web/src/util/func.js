@@ -659,4 +659,33 @@ export default {
     toEpochInMs(hyphenatedDate) {
         return +this.toDate(hyphenatedDate.replace(/\-/g, ''))
     },
+    convertToRelativePath(url) {
+        if (!url) return url
+        if (!url.startsWith("http")) return url
+        try {
+            var url = new URL(url)
+            return url.pathname
+        }catch(e) {
+            console.log(e);
+        }
+        return url
+    },
+
+    getRunResultSubCategory (runResult, subCategoryFromSourceConfigMap, subCatogoryMap, fieldName) {
+        if (subCatogoryMap[runResult.testSubType] === undefined) {
+            let a = subCategoryFromSourceConfigMap[runResult.testSubType]
+            return a ? a.subcategory : null
+        } else {
+            return subCatogoryMap[runResult.testSubType][fieldName]
+        }
+    },
+
+    getRunResultCategory (runResult, subCatogoryMap, subCategoryFromSourceConfigMap, fieldName) {
+        if (subCatogoryMap[runResult.testSubType] === undefined) {
+            let a = subCategoryFromSourceConfigMap[runResult.testSubType]
+            return a ? a.category.shortName : null
+        } else {
+            return subCatogoryMap[runResult.testSubType].superCategory[fieldName]
+        }
+    },
 }

@@ -22,11 +22,11 @@
                     </v-text-field>
                 </template>
             </simple-menu>
-            <v-btn icon :ripple="false" color="#6200EA" @click="sendToGPT" :disabled="disabledQuery" style="margin: auto 0">
+            <v-btn icon :ripple="false" color="var(--themeColor)" @click="sendToGPT" :disabled="disabledQuery" style="margin: auto 0">
                 <v-icon size="14">$far_paper-plane</v-icon>
             </v-btn>
         </div>    
-        <div class="prompt-body" v-if="responses">
+        <div class="prompt-body" v-if="responses || loading">
             <div class="prompt-loader" v-if="loading">
                 <span class="mr-1">AktoGPT is performing magic</span>
                 <spinner />
@@ -87,6 +87,7 @@ export default {
         sendToGPT() {
             if (this.disabledQuery || !this.selectedObject) return
             let _this = this;
+            _this.responses = null
             let queryPayload = this.selectedObject.prepareQuery(this.searchKey)
             this.loading = true;
             this.askGPT(queryPayload).then(resp => {
@@ -177,17 +178,17 @@ export default {
     width: 346px !important
 
 .prompt-body
-    background: var(--gptBackground)
-    border-top: 1px solid var(--borderColor)
-    border-bottom: 1px solid var(--borderColor)
     min-height: 200px
+    margin-top:20px
+    border: 1px solid var(--black)
+    border-radius:4px
     .prompt-loader,.api-no-response
         display: flex
         justify-content: center
         margin-top: 70px !important
         height: 50px
         align-items: center
-        font-size: 18px
+        font-size: 16px
     
     .api-no-response
         border: 1px solid var(--redMetric)
@@ -213,16 +214,16 @@ export default {
         margin-bottom: 0px;
         font-size: 14px;
         min-height: 45px !important;
-        color: #000000 !important;
+        color: var(--black) !important;
 
     }
 
     .chat-gpt-text-field >>> input::placeholder {
-        color: #000000 !important;
+        color: var(--black) !important;
     }
 
     .chat-gpt-text-field >>> input {
-        color: #6200EA !important;
+        color: var(--themeColor) !important;
         padding-top: 11px !important;
     }
 
@@ -234,6 +235,8 @@ export default {
     .chat-gpt-text-field >>> .v-input__append-inner {
         margin: auto;
     }
-
+    .chat-gpt-text-field >>> .v-input__prepend-inner {
+        width: 280px !important;
+    }
 
 </style>
