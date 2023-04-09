@@ -1,6 +1,5 @@
 <template>
     <div>
-    <v-btn @click="fetchSensitiveParamsUsingGpt">Fetch Sensitive params using AI</v-btn>
     <div class="d-flex">
         <div class="flex-equal" >
             <sample-single-side
@@ -182,18 +181,6 @@ export default {
             return result
         },
 
-    },
-    methods: {
-        fetchSensitiveParamsUsingGpt(){
-            let data = {
-                "type": "list_sensitive_params",
-                "meta": {
-                    "sampleData": JSON.stringify(this.json["message"])
-                }
-            }
-            console.log(data)
-            api.askAi(data).then(resp => console.log(resp))
-        }
     }
 }
 </script>

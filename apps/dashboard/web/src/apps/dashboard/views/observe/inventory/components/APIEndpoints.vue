@@ -6,7 +6,7 @@
             max-width="50%" 
             content-class="dialog-no-shadow"
         >
-            <div class="white-background pa-8 ma-0">
+            <div class="gpt-dialog-container ma-0">
                 <chat-gpt-input
                     v-if="showGptDialog"
                     :items="chatGptPrompts"
@@ -598,6 +598,9 @@ export default {
     position: absolute
     right: 260px
     top: 18px
+.gpt-dialog-container
+    min-height:300px
+    background-color: var(--gptBackground)
 .api-endpoints
     & .table-column
         &:nth-child(1)    
