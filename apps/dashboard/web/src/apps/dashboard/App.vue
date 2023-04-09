@@ -112,6 +112,7 @@
 
     <loading-snack-bar 
       v-for="(data,index) in this.loadingSnackBars"
+      :key="'snackBar_' + index"
       :title=data.title
       :subTitle=data.subTitle
       :percentage=data.percentage

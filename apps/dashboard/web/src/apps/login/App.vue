@@ -155,6 +155,10 @@
   min-width: 0px !important
   background: linear-gradient(100deg,var(--backgroundColor1) -17.13%,var(--themeColor) 99.86%)
 
+  &.v-btn--disabled
+    background: var(--themeColorDark)
+  
+
 .logo-container  
   background: var(--white)
   height: 44px
