@@ -46,9 +46,14 @@
 
             <div class="response-body" v-else>
                 <v-icon class="gpt-icon" :size="16">$aktoWhite</v-icon>
-                <v-list-item v-for="item in responses" :key="item" class="listItem">
-                    {{ item }}
-                </v-list-item>
+                    <v-list-item v-for="(item, index) in responses" :key="index" class="listItem">
+                        <div v-if="item.functionality">
+                            <div class="fw-500" style="text-transform: uppercase">{{item.functionality}}</div>
+                            <div v-for="(api, ii) in item.apis" :key="'api_'+ii">- {{api}}</div>
+                        </div>
+                        <span v-else>{{ item }}</span>
+                        
+                    </v-list-item>
             </div>
         </div>
 

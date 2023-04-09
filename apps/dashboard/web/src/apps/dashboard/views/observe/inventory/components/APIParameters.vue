@@ -130,7 +130,7 @@ export default {
                     prepareQuery: () => { return {
                         type: "list_sensitive_params",
                         meta: {
-                            "sampleData": this.allSamples[0].message
+                            "sampleData": this.parseMsg(this.allSamples[0].message)
                         }                        
                     }},
                     callback: (data) => console.log("callback create api groups", data)
@@ -183,6 +183,13 @@ export default {
         }  
     },
     methods: {
+        parseMsg(jsonStr) {
+            let json = JSON.parse(jsonStr)
+            return {
+                request: JSON.parse(json.requestPayload),
+                response: JSON.parse(json.responsePayload)
+            }
+        },
         showGPTScreen(){
             this.showGptDialog=true
             console.log(this.sampleData)
