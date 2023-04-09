@@ -1,5 +1,5 @@
 <template>
-    <div style="min-height: 200px">
+    <div>
         <div class="chat-gpt-container">
             <simple-menu :items="menuItems" tooltipTriangle="up" :showMenuOnDraw="showMenuOnDraw">
                 <template v-slot:activator2>
@@ -166,9 +166,6 @@ export default {
 
 <style lang="sass" scoped>
 .chat-gpt-container
-    min-width: 400px !important
-    max-width: 400px !important
-    width: 400px !important
     display: flex
     margin: auto
 
@@ -235,8 +232,9 @@ export default {
     .chat-gpt-text-field >>> .v-input__append-inner {
         margin: auto;
     }
-    .chat-gpt-text-field >>> .v-input__prepend-inner {
-        width: 280px !important;
+
+    .chat-gpt-text-field >>> fieldset {
+        border: 0px
     }
 
 </style>
