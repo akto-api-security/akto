@@ -1,6 +1,7 @@
 package com.akto.rules;
 
 import com.akto.dao.test_editor.TestConfigYamlParser;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.test_editor.TestConfig;
@@ -24,7 +25,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 
+import org.bson.conversions.Bson;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -218,12 +221,16 @@ public abstract class TestPlugin {
                                          ApiInfo.ApiInfoKey apiInfoKey, boolean isHeader, int responseCode,
                                          Map<String, SingleTypeInfo> singleTypeInfoMap) {
 
-        String key = SingleTypeInfo.composeKey(
-                apiInfoKey.url, apiInfoKey.method.name(), responseCode, isHeader,
-                param,SingleTypeInfo.GENERIC, apiInfoKey.getApiCollectionId(), isUrlParam
+        Bson filter = Filters.and(
+            Filters.eq("apiCollectionId", apiInfoKey.getApiCollectionId()),
+            Filters.eq("url", apiInfoKey.url),
+            Filters.eq("method", apiInfoKey.method.name()),
+            Filters.eq("responseCode", responseCode),
+            Filters.eq("isHeader", isHeader),
+            Filters.eq("param", param),
+            Filters.eq("isUrlParam", isUrlParam)
         );
-
-        SingleTypeInfo singleTypeInfo = singleTypeInfoMap.get(key);
+        SingleTypeInfo singleTypeInfo = SingleTypeInfoDao.instance.findOne(filter);
 
         if (singleTypeInfo == null) return null;
 
