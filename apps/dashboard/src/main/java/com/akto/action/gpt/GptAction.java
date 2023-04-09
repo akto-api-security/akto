@@ -29,6 +29,7 @@ public class GptAction extends UserAction {
             return SUCCESS.toUpperCase();
         }catch (Exception e){
             logger.error("Error while asking AI", e);
+            addActionError(e.getMessage());
             return ERROR.toUpperCase();
         }
     }

@@ -282,6 +282,7 @@ export default {
             this.currPage = page
             this.rowsPerPage = itemsPerPage
             let skip = (this.currPage-1)*this.rowsPerPage
+            let _this = this
             
             this.fetchParams(sortBy[0], sortDesc[0] ? -1: 1, skip, this.rowsPerPage, this.filters, this.filterOperators).then(resp => {
                 this.loading = false
@@ -291,6 +292,7 @@ export default {
                 let listParams = params.map(this.processParams)
                 let sortedParams = listParams
                 this.filteredItems = sortedParams
+                _this.$emit("filterApplied", sortedParams)
             }).catch(e => {
                 this.loading = false
             })
