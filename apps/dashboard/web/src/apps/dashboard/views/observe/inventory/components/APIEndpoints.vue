@@ -3,8 +3,9 @@
     <div class="pr-4 api-endpoints" v-else>
         <v-dialog
             v-model="showGptDialog"
-            max-width="50%" 
+            width="fit-content" 
             content-class="dialog-no-shadow"
+            overlay-opacity="0.7"
         >
             <div class="gpt-dialog-container ma-0">
                 <chat-gpt-input
@@ -599,7 +600,6 @@ export default {
     right: 260px
     top: 18px
 .gpt-dialog-container
-    min-height:300px
     background-color: var(--gptBackground)
 .api-endpoints
     & .table-column
