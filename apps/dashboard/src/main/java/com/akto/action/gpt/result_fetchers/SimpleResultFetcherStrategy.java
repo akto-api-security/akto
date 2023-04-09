@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.UUID;
 
 public class SimpleResultFetcherStrategy implements ResultFetcherStrategy<BasicDBObject> {
 
@@ -24,8 +25,13 @@ public class SimpleResultFetcherStrategy implements ResultFetcherStrategy<BasicD
     }
 
     private String fetchDataFromLambda(BasicDBObject data) {
+        String requestId = UUID.randomUUID().toString();
+        data.put("request_id", requestId);
         logger.info("Request body:" + data.toJson() );
         OkHttpClient client = new OkHttpClient().newBuilder()
+                .writeTimeout(45, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(45, java.util.concurrent.TimeUnit.SECONDS)
+                .callTimeout(45, java.util.concurrent.TimeUnit.SECONDS)
                 .build();
         MediaType mediaType = MediaType.parse("application/json");
         RequestBody body = RequestBody.create(mediaType, new BasicDBObject("data", data).toJson());
