@@ -159,9 +159,7 @@ export default {
         deleteCollection(item) {
             this.deletedCollection = item.name
             if(confirm("Are you sure you want to delete this collection?")) {
-                const summ = this.$store.dispatch('collections/deleteCollection', {apiCollection: item})
-                console.log(summ)
-                return summ
+                return this.$store.dispatch('collections/deleteCollection', {apiCollection: item})
             }
         },
         successfullyDeleted(resp,item) {

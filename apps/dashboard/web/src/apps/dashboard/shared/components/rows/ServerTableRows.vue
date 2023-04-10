@@ -52,7 +52,7 @@ export default {
             let arrayActions = []
             this.actions.forEach(action => {
                 if(action.isValid(item)){
-                    arrayActions.push({label:action.text(item) ,icon:action.icon(item), click:action.func})
+                    arrayActions.push({label:action.text(item) ,icon:action.icon(item), click: () => action.func(item)})
                 }
             })
             return arrayActions
