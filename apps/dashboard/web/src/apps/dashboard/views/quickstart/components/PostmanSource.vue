@@ -247,7 +247,7 @@ export default {
                 let resp = await api.importPostmanWorkspace(this.workspace['id'], this.allowReplay, this.postman_api_key);
             } else {
                 console.log(this.file);
-                let resp = await api.importDataFromPostmanFile(this.file['content']);
+                let resp = await api.importDataFromPostmanFile(this.file['content'], this.allowReplay);
             }
             this.importing_workspace = false;
         },
