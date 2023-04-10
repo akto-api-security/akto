@@ -36,13 +36,13 @@ public class Utils {
 
     public static void rebootInstance(String instanceId){
         final AmazonEC2 ec2 = AmazonEC2ClientBuilder.defaultClient();
-
+        loggerMaker.infoAndAddToDb("Initiating request to reboot instance", LogDb.TESTING);
         RebootInstancesRequest request = new RebootInstancesRequest()
                 .withInstanceIds(instanceId);
         String requestString = request.toString();
-        loggerMaker.infoAndAddToDb("Request for rebooting instance fired: " + requestString,LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("Request for rebooting instance fired: " + ( requestString!=null ? requestString : "no request" ), LogDb.TESTING);
         RebootInstancesResult response = ec2.rebootInstances(request);
         String responseString = response.toString();
-        loggerMaker.infoAndAddToDb("Response for instance reboot: " + responseString,LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("Response for instance reboot: " + ( responseString!=null ? responseString : "no response" ), LogDb.TESTING);
     }
 }
