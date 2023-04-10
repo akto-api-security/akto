@@ -22,6 +22,7 @@ import Discord from "../apps/dashboard/shared/icons/Discord"
 import DeleteIcon from "../apps/dashboard/shared/icons/DeleteIcon"
 import DropDown from "../apps/dashboard/shared/icons/DropDown"
 import PlusIcon from "../apps/dashboard/shared/icons/PlusIcon"
+import ChatGPT from "../apps/dashboard/shared/icons/ChatGPT"
 
 Vue.component('font-awesome-icon', FontAwesomeIcon)
 
@@ -46,6 +47,7 @@ import {
   faComments,
   faEye,
   faEllipsisV,
+  faEllipsisH,
   faStar,
   faCalendar,
   faCog,
@@ -114,6 +116,10 @@ import {
   faBook,
   faGripLines,
   faAlignJustify,
+  faMagic,
+  faLayerGroup,
+  faPaperPlane,
+  faUserGraduate,
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -128,6 +134,9 @@ import {
   faFolderOpen as farFolderOpen,
   faClock as farClock,
   faQuestionCircle as farQuestionCircle,
+  faPaperPlane as farPaperPlane,
+  faCircle as farCircle,
+  faDotCircle as farDotCircle
 } from '@fortawesome/free-regular-svg-icons'
 
 import {
@@ -144,12 +153,12 @@ const faIcons = [
   faHome,faBullseye,faBullhorn,faCheckDouble,faSquare,faBolt,faDatabase,faAngleDoubleRight, faAngleDoubleLeft,faClipboardList,
   faUnlockAlt,faStethoscope,faLongArrowAltDown,faLongArrowAltUp,faSyncAlt, faExchangeAlt, faUserLock, faExclamation,faPhoneAlt,
   faCreditCard,faAddressCard,faChalkboard,faFilter,faKey,faAngleDoubleDown,faAngleDoubleUp,faUpload,faRedo,faGlobe,faAngleDown,
-  faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faCaretSquareUp,
+  faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faCaretSquareUp,faEllipsisH,
   faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faThumbsUp,faCaretUp,faShareAlt,faUserPlus,faCaretDown,
-  faLaptopHouse,faAnchor,fabGithub,faArrowRight,faGift,faGripLines,faAlignJustify,
+  faLaptopHouse,faAnchor,fabGithub,faArrowRight,faGift,faGripLines,faAlignJustify,faBook,faMagic,faLayerGroup,faPaperPlane,faUserGraduate,
   
   farComments,farCalendar, farHandPointRight, farBuilding, farStar,farSquare, farCheckSquare,farFolder,farFolderOpen,farClock,
-  farQuestionCircle, faBook,
+  farQuestionCircle, faBook, farCircle, farDotCircle, farPaperPlane,
 
   fabSalesforce,fabHubspot,fabDiscord
 ]
@@ -256,6 +265,10 @@ faIconsOpts.trashSingleTick = {
 
 faIconsOpts.trashDoubleTick = {
   component: TrashDoubleTick
+}
+
+faIconsOpts.chatGPT = {
+  component: ChatGPT
 }
 
 faIcons.forEach(x => faIconsOpts[x.prefix+"_"+x.iconName] = {

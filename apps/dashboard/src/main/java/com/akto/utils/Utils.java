@@ -1,7 +1,10 @@
 package com.akto.utils;
 
 import com.akto.dao.ThirdPartyAccessDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
@@ -13,6 +16,8 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.policies.AktoPolicy;
+import com.akto.testing.ApiExecutor;
+import com.akto.testing.TestExecutor;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -21,8 +26,12 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 
 import java.sql.Timestamp;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.mongodb.client.model.Filters;
+
+import static com.akto.utils.RedactSampleData.convertHeaders;
 
 
 public class Utils {
@@ -39,63 +48,107 @@ public class Utils {
         }
         return result;
     }
+
+    public static String replaceVariables(String payload, Map<String, String> variableMap) {
+        String regex = "\\{\\{(.*?)\\}\\}";
+        Pattern p = Pattern.compile(regex);
+
+        // replace with values
+        Matcher matcher = p.matcher(payload);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            String key = matcher.group(1);
+            if (key == null) continue;
+            if (!variableMap.containsKey(key)) {
+                loggerMaker.infoAndAddToDb("Missed: " + key, LogDb.DASHBOARD);
+                continue;
+            }
+            String value = variableMap.get(key);
+            if (value == null) value = "null";
+
+            String val = value.toString();
+            matcher.appendReplacement(sb, "");
+            sb.append(val);
+        }
+
+        matcher.appendTail(sb);
+
+        return sb.toString();
+    }
     
-    public static Map<String, String> convertApiInAktoFormat(JsonNode apiInfo, Map<String, String> variables, String accountId) {
+    public static Map<String, String> convertApiInAktoFormat(JsonNode apiInfo, Map<String, String> variables, String accountId, boolean allowReplay) {
         try {
             JsonNode request = apiInfo.get("request");
-            JsonNode response = apiInfo.has("response") ?  apiInfo.get("response").get(0): null;
             String apiName = apiInfo.get("name").asText();
-            if(response == null){
-                loggerMaker.infoAndAddToDb(String.format("There are no responses for this api %s, skipping this", apiName), LogDb.DASHBOARD);
-                return null;
-            }
-            Timestamp timestamp = new Timestamp(System.currentTimeMillis());
 
             Map<String, String> result = new HashMap<>();
             result.put("akto_account_id", accountId);
             result.put("path", getPath(request, variables));
-            Map<String, String> requestHeadersMap = getHeaders((ArrayNode) request.get("header"));
-            Map<String, String> responseHeadersMap = getHeaders((ArrayNode) response.get("header"));
-            try {
-                result.put("requestHeaders", mapper.writeValueAsString(requestHeadersMap));
-                result.put("responseHeaders", mapper.writeValueAsString(responseHeadersMap));
-            } catch (JsonProcessingException e) {
-                loggerMaker.errorAndAddToDb(String.format("Error while processing request/response headers : %s", e.toString()), LogDb.DASHBOARD);
-            }
 
-            String contentType = getContentType(request, response, requestHeadersMap);
-            String requestPayload;
-            if(contentType.contains("json")){
-                String body = response.get("body").asText();
-                if(body == null){
-                    body = "{}";
-                }
-                if(body.startsWith("[")){
-                    requestPayload = body;
+            JsonNode methodObj = request.get("method");
+            if (methodObj == null) throw new Exception("No method field exists");
+            result.put("method", methodObj.asText());
+
+            ArrayNode requestHeadersNode = (ArrayNode) request.get("header");
+            Map<String, String> requestHeadersMap = getHeaders(requestHeadersNode, variables);
+            String requestHeadersString =  mapper.writeValueAsString(requestHeadersMap);
+            result.put("requestHeaders", requestHeadersString);
+
+            JsonNode bodyNode = request.get("body");
+            String requestPayload = bodyNode != null ?  bodyNode.asText() : "";
+            requestPayload = replaceVariables(requestPayload, variables);
+
+            JsonNode responseNode = apiInfo.get("response");
+            JsonNode response = responseNode != null && responseNode.has(0) ?  responseNode.get(0): null;
+
+            String responseHeadersString;
+            String responsePayload;
+            String statusCode;
+            String status;
+
+            if (response == null) {
+                if (allowReplay) {
+                    Map<String, List<String>> reqHeadersListMap = new HashMap<>();
+                    for (String key: requestHeadersMap.keySet()) {
+                        reqHeadersListMap.put(key, Collections.singletonList(requestHeadersMap.get(key)));
+                    }
+
+                    OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest(result.get("path"), "", result.get("method"), requestPayload, reqHeadersListMap , "http");
+                    try {
+                        OriginalHttpResponse res = ApiExecutor.sendRequest(originalHttpRequest, true);
+                        responseHeadersString = convertHeaders(res.getHeaders());
+                        responsePayload =  res.getBody();
+                        statusCode =  res.getStatusCode()+"";
+                        status =  "";
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.toString(), null);
+                        return null;
+                    }
                 } else {
-                    Map<String,Object> bodyMap = mapper.readValue(body, new TypeReference<HashMap<String,Object>>() {});
-                    requestPayload = mapper.writeValueAsString(bodyMap);
+                    return null;
                 }
-            } else if(contentType.contains("x-www-form-urlencoded")){
-                String postText = response.get("body").asText();
-                if (postText == null) {
-                    postText = "";
-                }
-                requestPayload = postText;
             } else {
-                loggerMaker.infoAndAddToDb(String.format("Unsupported content type %s for api %s",contentType, apiName), LogDb.DASHBOARD);
-                return null;
+                Map<String, String> responseHeadersMap = getHeaders((ArrayNode) response.get("header"), variables);
+                responseHeadersString = mapper.writeValueAsString(responseHeadersMap);
+
+                JsonNode responsePayloadNode = response.get("body");
+                responsePayload = responsePayloadNode != null ? responsePayloadNode.asText() : "";
+
+                JsonNode statusCodeNode = response.get("code");
+                statusCode = statusCodeNode != null ? statusCodeNode.asText() : "0";
+
+                JsonNode statusNode = response.get("status");
+                status = statusNode != null ? statusNode.asText() : "";
             }
 
-            result.put("method", request.get("method").asText());
+            result.put("responseHeaders", responseHeadersString);
+            result.put("responsePayload", responsePayload);
+            result.put("statusCode", statusCode);
+            result.put("status", status);
             result.put("requestPayload", requestPayload);
-            result.put("responsePayload", response.get("body").asText());
             result.put("ip", "null");
-            result.put("time", Long.toString(timestamp.getTime() / 1000L));
-            result.put("statusCode", response.get("code").asText());
+            result.put("time", Context.now()+"");
             result.put("type", "http");
-            result.put("status", response.get("status").asText());
-            result.put("contentType", contentType);
             result.put("source", "POSTMAN");
 
             return result;
@@ -124,32 +177,13 @@ public class Utils {
         return response.get("_postman_previewlanguage").asText();
     }
 
-    public static String getPath(JsonNode request, Map<String, String> variables){
+    public static String getPath(JsonNode request, Map<String, String> variables) throws Exception {
         JsonNode urlObj = request.get("url");
-        String url = urlObj.get("raw").asText();
-        if((url.contains("{{") && url.contains("}}")) && !variables.isEmpty()){
-            String host = process((ArrayNode) urlObj.get("host"), ".", variables);
-            String path = process((ArrayNode) urlObj.get("path"), "/", variables);
-            url = "";
-            if(urlObj.has("protocol") && urlObj.get("protocol").asText().length() > 0){
-                url += urlObj.get("protocol").asText();
-                url += "://";
-            }
-            if(host.endsWith("/")){
-                url += host.substring(0, host.length()-1);
-            }
-            else{
-                url += host;
-            }
-            if(urlObj.has("port") &&  urlObj.get("port").asText().length() > 0){
-                url += ":" + urlObj.get("port").asText();
-            }
-            if(!(path.startsWith("/") || path.startsWith("."))){
-                url += "/";
-            }
-            url += path;
-        }
-        return url;
+        if (urlObj == null) throw new Exception("URL field doesn't exists");
+        JsonNode raw = urlObj.get("raw");
+        if (raw == null) throw new Exception("Raw field doesn't exists");
+        String url = raw.asText();
+        return replaceVariables(url, variables);
     }
 
     public static String process(ArrayNode arrayNode, String delimiter, Map<String, String> variables){
@@ -176,11 +210,19 @@ public class Utils {
     }
 
 
-    private static Map<String, String> getHeaders(ArrayNode headers){
+    private static Map<String, String> getHeaders(ArrayNode headers, Map<String, String> variables){
         Map<String, String> result = new HashMap<>();
+        if (headers == null) return result;
         for(JsonNode node: headers){
-            result.put(node.get("key").asText().toLowerCase(), node.get("value").asText());
+            String key = node.get("key").asText().toLowerCase();
+            key = replaceVariables(key,variables);
+
+            String value = node.get("value").asText();
+            value = replaceVariables(value, variables);
+
+            result.put(key, value);
         }
+
         return  result;
     }
 

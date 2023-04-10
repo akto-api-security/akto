@@ -1,21 +1,23 @@
 <template>
     <div class="page-text">
-        <div class="page-heading">
+        <div class="page-heading" :style="[this.centerAlignText? {'text-align': 'center'} : {}]">
             {{ title }}
         </div>
 
-        <div class="page-description">
+        <div class="page-description" :style="[this.centerAlignText? {'text-align': 'center'} : {}]">
             {{ subtitle }}
         </div>
 
-        <div class="page-steps">
-            Step {{ currentStep }} of {{ totalSteps }}
-        </div>
-        <div class="step-builder">
-            <div 
-                class="step" v-for="idx in this.totalSteps" :key="idx" :class="idx <= currentStep ? 'step-selected':'step-not-selected'"
-                @click="goToStep(idx)"
-            >
+        <div v-if="this.showStepBuilder">
+            <div class="page-steps">
+                Step {{ currentStep }} of {{ totalSteps }}
+            </div>
+            <div class="step-builder">
+                <div 
+                    class="step" v-for="idx in this.totalSteps" :key="idx" :class="idx <= currentStep ? 'step-selected':'step-not-selected'"
+                    @click="goToStep(idx)"
+                >
+                </div>
             </div>
         </div>
     </div>
@@ -33,12 +35,17 @@ export default {
         title: obj.strR,
         subtitle: obj.strR,
         totalSteps: obj.numR,
-        currentStep: obj.numR
+        currentStep: obj.numR,
+        showStepBuilder: obj.boolR,
+        centerAlignText: obj.boolR,
     },
     methods: {
         goToStep(index) {
             this.$emit("goToStep", index)
         }
+    },
+    mounted() {
+        
     }
 }
 </script>
@@ -69,7 +76,6 @@ export default {
     width: 420px
     flex: none
     order: 1
-    flex: none
     margin-bottom: 24px
 
 .page-heading
@@ -81,7 +87,7 @@ export default {
     font-weight: 500
     font-size: 16px
     color: var(--themeColorDark)
-    padding: 0px 0px 12px 0px
+    padding: 8px 0px 12px 0px
 
 .page-steps
     color: #AAAAAA
