@@ -20,7 +20,6 @@ import AktoWhite from "../apps/dashboard/shared/icons/AktoWhite"
 import BookBookmark from "../apps/dashboard/shared/icons/BookBookmark"
 import Discord from "../apps/dashboard/shared/icons/Discord"
 import DeleteIcon from "../apps/dashboard/shared/icons/DeleteIcon"
-import DropDown from "../apps/dashboard/shared/icons/DropDown"
 import PlusIcon from "../apps/dashboard/shared/icons/PlusIcon"
 import ChatGPT from "../apps/dashboard/shared/icons/ChatGPT"
 
@@ -193,10 +192,6 @@ const faIconsOpts = {}
 
 faIconsOpts.deleteIcon = {
   component: DeleteIcon
-}
-
-faIconsOpts.dropdown = {
-  component: DropDown
 }
 
 faIconsOpts.plusIcon = {
