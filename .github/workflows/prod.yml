@@ -33,7 +33,7 @@ jobs:
       - name: Prepare Dashboard UI
         working-directory: ./apps/dashboard/
         run: npm install && npm run build
-      - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s")
+      - run: mvn package -Dakto-image-tag=${{ github.event.inputs.release_version }} -Dakto-build-time=$(eval "date +%s")
       - name: Configure AWS credentials
         if: ${{ github.event.inputs.Environment == 'staging' }}
         uses: aws-actions/configure-aws-credentials@v1
@@ -96,7 +96,7 @@ jobs:
         env:
           ECR_REGISTRY: aktosecurity
           ECR_REPOSITORY: akto-api-security
-          IMAGE_TAG_1: latest
+          IMAGE_TAG: latest
           IMAGE_TAG_2: ${{ github.event.inputs.release_version }}_latest
         run: |
           docker buildx create --use
@@ -112,7 +112,7 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY-runtime:$IMAGE_TAG
           echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-runtime:$IMAGE_TAG"       
           cd ../testing
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG_2 . --push
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG . --push
           echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"       
           cd ../api-analyser
           docker build -t $ECR_REGISTRY/akto-api-context-analyzer:$IMAGE_TAG .

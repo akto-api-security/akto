@@ -42,7 +42,7 @@
                     <div style="margin-left: 4px">
                         Start Burp proxy and browse any website. You will see traffic in 
                         <span v-if="!burpCollectionURL"> Burp collection </span>
-                        <a :href="burpCollectionURL" v-else> <span style="text-decoratoin: underline; color: #6200EA">Burp collection</span> </a>
+                        <a :href="burpCollectionURL" v-else> <span style="text-decoratoin: underline; color: var(--themeColor)">Burp collection</span> </a>
                     </div>
                     <span v-if="this.sendDataLoading === 1" style="padding-left: 4px">
                         <v-progress-circular indeterminate color="grey" :size="12" :width="1.5"></v-progress-circular>
@@ -131,18 +131,18 @@ export default {
     height: 20px
     left: 0px
     top: 0px
-    border: 2px solid #6200EA
+    border: 2px solid var(--themeColor)
     border-radius: 50%
     text-align: center
     font-style: normal
     font-weight: 600
     font-size: 14px
     line-height: 16px
-    color: #6200EA
+    color: var(--themeColor)
 
 .clickable-docs
     cursor: pointer
-    color: #6200B0 !important
+    color: var(--quickStartTheme) !important
     text-decoration: underline
 
 .container

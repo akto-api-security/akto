@@ -17,6 +17,8 @@ on:
         required: true
         type: choice
         options:
+          - debug
+          - staging
           - mono_staging1
           - mono_staging2
           - mono_staging3

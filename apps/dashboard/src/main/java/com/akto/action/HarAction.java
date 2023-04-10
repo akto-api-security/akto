@@ -45,6 +45,12 @@ public class HarAction extends UserAction {
     private byte[] tcpContent;
     private static final Logger logger = LoggerFactory.getLogger(HarAction.class);
 
+    public String executeWithSkipKafka(boolean skipKafka) throws IOException {
+        this.skipKafka = skipKafka;
+        execute();
+        return SUCCESS.toUpperCase();
+    }
+
     @Override
     public String execute() throws IOException {
         ApiCollection apiCollection = null;
@@ -89,7 +95,7 @@ public class HarAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        if (KafkaListener.kafka == null) {
+        if (!skipKafka && KafkaListener.kafka == null) {
             addActionError("Dashboard kafka not running");
             return ERROR.toUpperCase();
         }
