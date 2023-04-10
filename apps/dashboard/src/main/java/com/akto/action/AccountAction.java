@@ -4,12 +4,9 @@ import com.akto.dao.AccountsDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
-import com.akto.dto.OriginalHttpRequest;
-import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.UserAccountEntry;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.testing.ApiExecutor;
 import com.akto.utils.cloud.Utils;
 import com.akto.utils.cloud.serverless.aws.Lambda;
 import com.akto.utils.cloud.stack.aws.AwsStack;
@@ -17,6 +14,7 @@ import com.akto.utils.cloud.stack.dto.StackState;
 import com.akto.utils.platform.DashboardStackDetails;
 import com.akto.utils.platform.MirroringStackDetails;
 import com.amazonaws.services.lambda.model.*;
+import com.amazonaws.util.EC2MetadataUtils;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 import com.amazonaws.services.autoscaling.AmazonAutoScaling;
@@ -29,9 +27,6 @@ import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 
 import static com.mongodb.client.model.Filters.eq;
@@ -139,19 +134,8 @@ public class AccountAction extends UserAction {
 
     public void dashboardReboot(){
         try{
-            // IMDSv2
-            HashMap<String,List<String>> headers = new HashMap<>();
-            headers.put("X-aws-ec2-metadata-token-ttl-seconds",new ArrayList<>(Collections.singleton("21600")));
-            OriginalHttpRequest requestToken = new OriginalHttpRequest("http://169.254.169.254/latest/api/token", "", "PUT", "", headers, "");
-            OriginalHttpResponse responseToken = null;
-            responseToken = ApiExecutor.sendRequest(requestToken,true);
-            headers = new HashMap<>();
-            headers.put("X-aws-ec2-metadata-token",new ArrayList<>(Collections.singleton(responseToken.getBody())));
-            OriginalHttpRequest request = new OriginalHttpRequest("http://169.254.169.254/latest/meta-data/instance-id", "", "GET", "", headers, "");
-            OriginalHttpResponse response = null;
-            response = ApiExecutor.sendRequest(request,true);
-            if(response!=null && response.getStatusCode()<300){
-                String instanceId = response.getBody();
+            String instanceId = EC2MetadataUtils.getInstanceId();
+            if(instanceId!=null){
                 Utils.rebootInstance(instanceId);
                 loggerMaker.infoAndAddToDb("Dashboard instance rebooted", LogDb.DASHBOARD);
             }

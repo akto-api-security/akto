@@ -1,5 +1,7 @@
 package com.akto.utils.cloud;
 
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.amazonaws.services.cloudformation.AmazonCloudFormation;
 import com.amazonaws.services.cloudformation.AmazonCloudFormationClientBuilder;
 import com.amazonaws.services.cloudformation.model.DescribeStacksRequest;
@@ -10,14 +12,11 @@ import com.amazonaws.services.ec2.AmazonEC2ClientBuilder;
 import com.amazonaws.services.ec2.model.RebootInstancesRequest;
 import com.amazonaws.services.ec2.model.RebootInstancesResult;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.List;
 
 public class Utils {
 
-    private static final Logger logger = LoggerFactory.getLogger(Utils.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class);
     public static CloudType getCloudType() {
         if (System.getenv("AWS_REGION") != null) {
             return CloudType.AWS;
@@ -40,9 +39,10 @@ public class Utils {
 
         RebootInstancesRequest request = new RebootInstancesRequest()
                 .withInstanceIds(instanceId);
-
+        String requestString = request.toString();
+        loggerMaker.infoAndAddToDb("Request for rebooting instance fired: " + requestString,LogDb.TESTING);
         RebootInstancesResult response = ec2.rebootInstances(request);
         String responseString = response.toString();
-        logger.info(responseString);
+        loggerMaker.infoAndAddToDb("Response for instance reboot: " + responseString,LogDb.TESTING);
     }
 }
