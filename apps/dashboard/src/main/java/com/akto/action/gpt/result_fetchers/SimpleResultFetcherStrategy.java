@@ -36,7 +36,7 @@ public class SimpleResultFetcherStrategy implements ResultFetcherStrategy<BasicD
         MediaType mediaType = MediaType.parse("application/json");
         RequestBody body = RequestBody.create(mediaType, new BasicDBObject("data", data).toJson());
         Request request = new Request.Builder()
-                .url("https://mzt87ut27e.execute-api.ap-south-1.amazonaws.com/test/ask_gpt")
+                .url("https://18qazon803.execute-api.ap-south-1.amazonaws.com/ask_gpt")
                 .method("POST", body)
                 .addHeader("Content-Type", "application/json")
                 .build();
