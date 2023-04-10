@@ -5,7 +5,7 @@ import com.akto.dto.testing.AccessMatrixUrlToRole;
 
 public class AccessMatrixUrlToRolesDao extends AccountsContextDao<AccessMatrixUrlToRole> {
 
-    public final static AccessMatrixUrlToRolesDao instance = new AccessMatrixUrlToRolesDao();
+    public static final AccessMatrixUrlToRolesDao instance = new AccessMatrixUrlToRolesDao();
 
     private AccessMatrixUrlToRolesDao() {}
 

@@ -4,11 +4,14 @@ import com.akto.MongoBasedTest;
 import com.akto.dto.User;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Predicate;
+import com.akto.dto.testing.AuthParamData;
 import com.akto.dto.testing.TestRoles;
+import com.akto.dto.testing.AuthParam.Location;
 import com.mongodb.BasicDBObject;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,9 +53,11 @@ public class TestRolesActionTest extends MongoBasedTest {
 
         action.setOrConditions(orConditionUtils);
         action.setAndConditions(andConditionUtils);
+        action.setAuthParamData(Arrays.asList(new AuthParamData(Location.HEADER, "Authorization", "value1", null)));
 
         if (TestRolesAction.SUCCESS.toUpperCase().equals(action.createTestRole())) {
             assertEquals("admin", action.getSelectedRole().getName());
+            assertEquals(1, action.getSelectedRole().getAuthMechanism().getAuthParams().size());
         } else {
             fail();
         }
@@ -61,6 +66,8 @@ public class TestRolesActionTest extends MongoBasedTest {
         TestRoles role = action.getTestRoles().get(0);
         assertEquals("admin", role.getName());
 
+        action.setAuthParamData(Arrays.asList(new AuthParamData(Location.HEADER, "Authorization", "value2", null)));
+        action.addAuthMechanism(role);
         list.clear();
         list.add(new BasicDBObject()
                 .append(Predicate.TYPE, Predicate.Type.CONTAINS.name())
@@ -68,6 +75,7 @@ public class TestRolesActionTest extends MongoBasedTest {
         andConditionUtils.setPredicates(list);
 
         assertEquals(TestRolesAction.SUCCESS.toUpperCase(), action.updateTestRoles());
+        assertEquals(1, action.getSelectedRole().getAuthMechanism().getAuthParams().size());
 
 
     }

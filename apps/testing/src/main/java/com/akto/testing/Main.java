@@ -23,6 +23,7 @@ import org.bson.types.ObjectId;
 import java.util.HashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class Main {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
@@ -68,6 +69,16 @@ public class Main {
         loggerMaker.infoAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"), LogDb.TESTING);
+
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                String mongoURI = System.getenv("AKTO_MONGO_CONN");
+                DaoInit.init(new ConnectionString(mongoURI));
+                Context.accountId.set(1_000_000);
+                AccessMatrixAnalyzer matrixAnalyzer = new AccessMatrixAnalyzer();
+                matrixAnalyzer.run();
+            }
+        }, 0, 48, TimeUnit.HOURS);
 
         TestExecutor testExecutor = new TestExecutor();
 

@@ -70,6 +70,17 @@ public class TestRolesAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public void addAuthMechanism(TestRoles role){
+        if (authParamData != null) {
+            AuthParam param = new HardcodedAuthParam(authParamData.get(0).getWhere(), authParamData.get(0).getKey(), authParamData.get(0).getValue(), true);
+            List<AuthParam> authParams = new ArrayList<>();
+            authParams.add(param);
+            AuthMechanism authM = new AuthMechanism(authParams, null, LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString());
+            TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, role.getId()), Updates.set("authMechanism", authM));
+            role.setAuthMechanism(authM);
+        }
+    }
+
     public String updateTestRoles() {
         if (roleName == null) {
             addActionError("Test role id is empty");
@@ -101,15 +112,9 @@ public class TestRolesAction extends UserAction {
             EndpointLogicalGroupDao.instance.updateLogicalGroup(logicalGroup, andConditions, orConditions);
         }
         role.setLastUpdatedTs(Context.now());
-
-        if (authParamData != null) {
-            AuthParam param = new HardcodedAuthParam(authParamData.get(0).getWhere(), authParamData.get(0).getKey(), authParamData.get(0).getValue(), true);
-            List<AuthParam> authParams = new ArrayList<>();
-            authParams.add(param);
-            AuthMechanism authM = new AuthMechanism(authParams, null, LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString());
-            TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, role.getId()), Updates.set("authMechanism", authM));
-        }
-
+        addAuthMechanism(role);
+        this.selectedRole = role;
+        this.selectedRole.setEndpointLogicalGroup(logicalGroup);
         TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, role.getId()), Updates.set(TestRoles.LAST_UPDATED_TS, Context.now()));
         return SUCCESS.toUpperCase();
     }
@@ -143,6 +148,7 @@ public class TestRolesAction extends UserAction {
                 createLogicalGroup(logicalGroupName, andConditions,orConditions,this.getSUser().getLogin());
         selectedRole = TestRolesDao.instance.createTestRole(roleName, logicalGroup.getId(), this.getSUser().getLogin());
         selectedRole.setEndpointLogicalGroup(logicalGroup);
+        addAuthMechanism(selectedRole);
         return SUCCESS.toUpperCase();
     }
 

@@ -113,15 +113,7 @@ public class TestExecutor {
         );
     }
 
-    public void apiWiseInit(TestingRun testingRun, ObjectId summaryId) {
-        int accountId = Context.accountId.get();
-        int now = Context.now();
-        int maxConcurrentRequests = testingRun.getMaxConcurrentRequests() > 0 ? testingRun.getMaxConcurrentRequests() : 100;
-        TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
-
-        Map<String, SingleTypeInfo> singleTypeInfoMap = SampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
-        Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = SampleMessageStore.fetchSampleMessages();
-        List<TestRoles> testRoles = SampleMessageStore.fetchTestRoles();
+    public static AuthMechanism createAuthMechanism(){
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
 
         List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
@@ -152,8 +144,26 @@ public class TestExecutor {
         }
 
         authMechanism.setAuthParams(authParams);
+        return authMechanism;
+    }
 
-        TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessages, singleTypeInfoMap, testRoles);
+    public static TestingUtil createTestingUtil(TestingEndpoints testingEndpoints, AuthMechanism authMechanism){
+
+        Map<String, SingleTypeInfo> singleTypeInfoMap = SampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
+        Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = SampleMessageStore.fetchSampleMessages();
+        List<TestRoles> testRoles = SampleMessageStore.fetchTestRoles();
+
+        return new TestingUtil(authMechanism, sampleMessages, singleTypeInfoMap, testRoles);
+    }
+
+    public void apiWiseInit(TestingRun testingRun, ObjectId summaryId) {
+        int accountId = Context.accountId.get();
+        int now = Context.now();
+        int maxConcurrentRequests = testingRun.getMaxConcurrentRequests() > 0 ? testingRun.getMaxConcurrentRequests() : 100;
+        AuthMechanism authMechanism = createAuthMechanism();
+        TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
+
+        TestingUtil testingUtil = createTestingUtil(testingEndpoints, authMechanism);
 
         try {
             LoginFlowResponse loginFlowResponse = triggerLoginFlow(authMechanism, 3);

@@ -1,8 +1,6 @@
 package com.akto.dto.testing;
 
 import java.util.List;
-import java.util.Map;
-
 import com.akto.dto.ApiInfo.ApiInfoKey;
 
 import org.bson.codecs.pojo.annotations.BsonId;
@@ -12,7 +10,7 @@ public class AccessMatrixUrlToRole {
     @BsonId
     private ApiInfoKey id;
 
-    List<String> roles;
+    private List<String> roles;
 
     public AccessMatrixUrlToRole() {
     }
@@ -45,7 +43,4 @@ public class AccessMatrixUrlToRole {
             ", roles='" + getRoles() + "'" +
             "}";
     }
-
-
-
 }

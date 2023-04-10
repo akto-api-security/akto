@@ -2,16 +2,24 @@ package com.akto.dto.testing;
 
 import java.util.List;
 
+import org.bson.codecs.pojo.annotations.BsonIgnore;
+import org.bson.types.ObjectId;
+
 import com.akto.dto.ApiInfo.ApiInfoKey;
 
 public class AccessMatrixTaskInfo {
  
+    private ObjectId id;
     private List<ApiInfoKey> apiInfoKeys;
     private int apiCollectionId;
     private int frequencyInSeconds;
     private int lastCompletedTimestamp;
 
     private int nextScheduledTimestamp;
+
+    @BsonIgnore
+    private String hexId;
+
     public final static String NEXT_SCHEDULED_TIMESTAMP = "nextScheduledTimestamp";
 
     public AccessMatrixTaskInfo() {
@@ -63,6 +71,18 @@ public class AccessMatrixTaskInfo {
 
     public void setNextScheduledTimestamp(int nextScheduledTimestamp) {
         this.nextScheduledTimestamp = nextScheduledTimestamp;
+    }
+
+    public ObjectId getId() {
+        return id;
+    }
+
+    public void setId(ObjectId id) {
+        this.id = id;
+    }
+
+    public String getHexId() {
+        return this.id.toHexString();
     }
 
     @Override

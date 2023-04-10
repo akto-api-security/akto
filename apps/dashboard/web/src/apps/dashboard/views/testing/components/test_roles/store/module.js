@@ -32,6 +32,14 @@ const test_roles = {
         updateTestRoleWithNewRole(state, {selectedRole}) {
             state.testRoles.push(selectedRole)
         },
+        UPDATE_TESTROLES(state, {selectedRole}){
+            state.testRoles.forEach((testRole,i) => {
+                if(JSON.stringify(testRole.id)===JSON.stringify(selectedRole.id)){
+                    state.testRoles[i]=selectedRole;
+                }
+            })
+            state.testRoles = [...state.testRoles]
+        },
         SAVE_CREATE_NEW(state, {createNew}) {
             state.createNew = createNew;
         },
@@ -55,9 +63,9 @@ const test_roles = {
                 state.loading = false
             })
         },
-        addTestRoles ({commit}, {roleName, andConditions, orConditions}) {
+        addTestRoles ({commit}, {roleName, andConditions, orConditions, authParamData}) {
             state.loading = true
-            api.addTestRoles(roleName, andConditions, orConditions).then((resp) => {
+            api.addTestRoles(roleName, andConditions, orConditions, authParamData).then((resp) => {
                 commit('SAVE_SELECTED_ROLE', resp)
                 commit('updateTestRoleWithNewRole', resp)
                 commit('SAVE_CREATE_NEW', {createNew: false})
@@ -70,6 +78,8 @@ const test_roles = {
         updateTestRoles ({commit}, {roleName, andConditions, orConditions, authParamData}) {
             state.loading = true
             api.updateTestRoles(roleName, andConditions, orConditions, authParamData).then((resp) => {
+                commit('SAVE_SELECTED_ROLE', resp);
+                commit('UPDATE_TESTROLES', resp);
                 state.loading = false
 
             }).catch(() => {

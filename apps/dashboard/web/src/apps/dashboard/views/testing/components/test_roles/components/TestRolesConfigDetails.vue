@@ -197,12 +197,21 @@ export default {
         async save() {
             let andConditions = this.filterContainsConditions('AND')
             let orConditions = this.filterContainsConditions('OR')
+            let roleName = '';
+            let dispatchUrl = '';
+            let successText = '';
             if (this.selectedRole && !this.isSelectedRoleEmpty) {// Update case
-                let roleName = this.selectedRole.name
-
-                if (andConditions || orConditions) {
+                roleName = this.selectedRole.name
+                dispatchUrl = 'test_roles/updateTestRoles';
+                successText = 'Role updated successfully!';
+            } else {//Create new case
+                roleName = this.roleName
+                dispatchUrl = 'test_roles/addTestRoles';
+                successText = 'Role saved successfully!';
+            }
+            if (andConditions || orConditions) {
                     this.saveLoading = true
-                    await this.$store.dispatch('test_roles/updateTestRoles', {
+                    await this.$store.dispatch(dispatchUrl, {
                         roleName,
                         andConditions,
                         orConditions,
@@ -217,7 +226,7 @@ export default {
 
                             window._AKTO.$emit('SHOW_SNACKBAR', {
                                 show: true,
-                                text: `Role updated successfully!`,
+                                text: successText,
                                 color: 'green'
                             })
                         }).catch((err) => {
@@ -230,34 +239,6 @@ export default {
                         color: 'red'
                     })
                 }
-            } else {//Create new case
-                let roleName = this.roleName
-                if (andConditions || orConditions) {
-                    this.saveLoading = true
-                    await this.$store.dispatch('test_roles/addTestRoles', {
-                        roleName,
-                        andConditions,
-                        orConditions
-                    })
-                        .then((resp) => {
-                            this.saveLoading = false
-
-                            window._AKTO.$emit('SHOW_SNACKBAR', {
-                                show: true,
-                                text: `Role saved successfully!`,
-                                color: 'green'
-                            })
-                        }).catch((err) => {
-                            this.saveLoading = false
-                        })
-                } else {
-                    window._AKTO.$emit('SHOW_SNACKBAR', {
-                        show: true,
-                        text: `All values are empty`,
-                        color: 'red'
-                    })
-                }
-            }
         }
     },
     mounted() {
@@ -275,6 +256,13 @@ export default {
         }
     },
     watch: {
+        selectedRole(newVal, oldVal){
+            if(newVal!=oldVal){
+                this.roleName = this.selectedRole.name;
+                this.newKey = this.selectedRole.authMechanism?.authParams?.[0]?.key || ''
+                this.newVal = this.selectedRole.authMechanism?.authParams?.[0]?.value || ''
+            }
+        }
     }
 }
 

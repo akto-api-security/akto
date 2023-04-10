@@ -3,19 +3,15 @@ package com.akto.rules;
 import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
-import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
-import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.info.BFLATestInfo;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.TestingUtil;
-import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
-
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
@@ -33,8 +29,6 @@ public class BFLATest extends AuthRequiredRunAllTestPlugin {
         try {
             apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApiDuplicate);
 
-            System.out.println("orig: " + apiInfoKey.url + " "+ apiExecutionDetails.statusCode);
-
             if (!isStatusGood(apiExecutionDetails.statusCode)) {
                 return ret;
             }
@@ -48,19 +42,13 @@ public class BFLATest extends AuthRequiredRunAllTestPlugin {
             try {
                 apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApiDuplicate);
             } catch (Exception e) {
-
+                loggerMaker.errorAndAddToDb("BFLA Matrix update error" + e.toString(), LogDb.TESTING);
             }
-            System.out.println("role: " + testRoles.getName() + " " + apiInfoKey.url + " " + testRequest.getBody() + " " + testRequest.getHeaders());
-            for (String hh: testRequest.getHeaders().keySet()) {
-                System.out.println(hh+ ": " + testRequest.getHeaders().get(hh));
-            }
-            System.out.println(apiExecutionDetails.statusCode + " " + (apiExecutionDetails.statusCode == 200 ? apiExecutionDetails.testResponse.getBody(): ""));
 
             if(isStatusGood(apiExecutionDetails.statusCode)) {
                 ret.add(testRoles.getName());
             }
         }
-
 
         Bson q = Filters.eq("_id", apiInfoKey);
         Bson update = Updates.addEachToSet("roles", ret);

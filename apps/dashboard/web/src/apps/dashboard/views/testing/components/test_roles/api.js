@@ -10,11 +10,11 @@ export default {
             return resp
         })
     },
-    addTestRoles (roleName, andConditions, orConditions) {
+    addTestRoles (roleName, andConditions, orConditions, authParamData) {
         return request({
             url: '/api/addTestRoles',
             method: 'post',
-            data: {roleName, andConditions, orConditions}
+            data: {roleName, andConditions, orConditions, authParamData}
         }).then((resp) => {
             return resp
         })        
