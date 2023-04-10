@@ -363,6 +363,7 @@ public class PostmanAction extends UserAction {
         JsonNode infoNode = collectionDetailsObj.get("info");
         String collectionId = infoNode.get("_postman_id").asText();
         int aktoCollectionId = collectionId.hashCode();
+        aktoCollectionId = aktoCollectionId < 0 ? aktoCollectionId * -1: aktoCollectionId;
 
         String collectionName = infoNode.get("name").asText();
 
@@ -371,7 +372,6 @@ public class PostmanAction extends UserAction {
             ApiCollectionsDao.instance.insertOne(ApiCollection.createManualCollection(aktoCollectionId, "Postman " + collectionName));
         }
 
-        aktoCollectionId = aktoCollectionId < 0 ? aktoCollectionId * -1: aktoCollectionId;
 
         int accountId = Context.accountId.get();
         int finalAktoCollectionId = aktoCollectionId;

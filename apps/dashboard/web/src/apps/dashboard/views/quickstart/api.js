@@ -85,11 +85,11 @@ export default{
             return resp
         })
     },
-    importDataFromPostmanFile(postmanCollectionFile) {
+    importDataFromPostmanFile(postmanCollectionFile, allowReplay) {
         return request({
             url: '/api/importDataFromPostmanFile',
             method: 'post',
-            data: {postmanCollectionFile}
+            data: {postmanCollectionFile, allowReplay}
         }).then((resp) => {
             return resp
         })
