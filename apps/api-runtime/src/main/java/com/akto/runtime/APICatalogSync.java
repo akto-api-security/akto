@@ -68,7 +68,7 @@ public class APICatalogSync {
         
     }
 
-    public static final int STRING_MERGING_THRESHOLD = 20;
+    public static final int STRING_MERGING_THRESHOLD = 2;
 
     public void processResponse(RequestTemplate requestTemplate, Collection<HttpResponseParams> responses, List<SingleTypeInfo> deletedInfo) {
         Iterator<HttpResponseParams> iter = responses.iterator();
