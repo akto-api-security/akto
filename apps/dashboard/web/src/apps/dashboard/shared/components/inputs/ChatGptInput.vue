@@ -118,7 +118,7 @@ export default {
     },
     methods: {
         openDocsOnAktoGPT() {
-            return window.open("https://docs.akto.io/api-inventory/akto-gpt")
+            return window.open("https://docs.akto.io/aktogpt")
         },
         sendToGPT() {
             if (this.disabledQuery || !this.selectedObject) return
