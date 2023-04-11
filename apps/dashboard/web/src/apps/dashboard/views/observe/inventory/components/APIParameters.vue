@@ -3,7 +3,7 @@
         <spinner/>
     </div>
     <div v-else>
-        <div class="fix-at-top" v-if="allSamples && allSamples.length > 0">
+        <div class="fix-at-top" v-if="allSamples && allSamples.length > 0" style="display: none">
             <v-btn dark depressed color="var(--gptColor)" @click="showGPTScreen()">
                 Ask AktoGPT 
                 <v-icon size="16">$chatGPT</v-icon>
