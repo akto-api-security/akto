@@ -17,7 +17,7 @@ export default {
     props:{
       title: obj.strR,
       avatar_image: obj.strR,
-      tokenOrigin: obj.strR
+      tokenUtility: obj.strR
     },
     components: {
       ApiToken
@@ -29,7 +29,7 @@ export default {
     },
     methods: {
       addApiToken() {
-        api.addApiToken(this.tokenOrigin).then((resp) => {
+        api.addApiToken(this.tokenUtility).then((resp) => {
           this.external_api_tokens.push(...resp.apiTokenList)
           this.external_api_tokens = [...this.external_api_tokens]
         })
@@ -44,17 +44,9 @@ export default {
     },
     async mounted() {
       let resp = await api.fetchApiTokens()
-      let type = "";
-      switch(this.tokenOrigin){
-        case "external_key": type = "EXTERNAL_API" 
-          break;
-        case "burp_key": type = "BURP"
-          break;
-        case "cicd_key": type = "CICD"
-      }
       resp.apiTokenList.forEach(x => {
         switch (x.utility) {
-          case type:
+          case this.tokenUtility:
             this.external_api_tokens.push(x)
             break;
         }

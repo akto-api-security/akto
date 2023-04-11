@@ -69,11 +69,11 @@ export default {
             return resp
         })
     },
-    addApiToken(tokenOrigin) {
+    addApiToken(tokenUtility) {
         return request({
             url: '/api/addApiToken',
             method: 'post',
-            data: {tokenOrigin}
+            data: {tokenUtility}
         }).then((resp) => {
             return resp
         })

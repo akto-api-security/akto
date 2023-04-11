@@ -53,17 +53,17 @@ const testing = {
         async loadTestingDetails({commit}, {startTimestamp, endTimestamp}) {
             commit('EMPTY_STATE')
             state.loading = true
-            await api.fetchTestingDetails().then((resp) => {
+            await api.fetchTestingDetails({startTimeStamp:0, endTimeStamp:0, fetchCicd:false}).then((resp) => {
                 commit('SAVE_DETAILS', resp)
             }).catch(() => {
                 state.loading = false
             })
-            await api.fetchTestingDetails({startTimestamp, endTimestamp}).then(resp2 => {
+            await api.fetchTestingDetails({startTimestamp, endTimestamp, fetchCicd:false}).then(resp2 => {
                 commit('SAVE_PAST_DETAILS', resp2)
             }).catch(() => {
                 state.loading = false
             })
-            await api.fetchTestingDetails({fetchCicd:true}).then(resp3 => {
+            await api.fetchTestingDetails({startTimeStamp:0, endTimeStamp:0, fetchCicd:true}).then(resp3 => {
                 commit('SAVE_CICD_DETAILS',resp3)
             }).catch(() => {
                 state.loading = false

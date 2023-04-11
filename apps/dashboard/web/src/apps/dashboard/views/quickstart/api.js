@@ -1,11 +1,11 @@
 import request from '@/util/request'
 
 export default{
-    addApiToken(tokenOrigin) {
+    addApiToken(tokenUtility) {
         return request({
             url: '/api/addApiToken',
             method: 'post',
-            data: {tokenOrigin}
+            data: {tokenUtility}
         }).then((resp) => {
             return resp
         })
