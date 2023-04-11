@@ -1612,7 +1612,7 @@
             </result>
         </action>
 
-        <action name="api/ask_ai" class="com.akto.action.gpt.GptAction" method="askAi">
+        <action name="api/fetchTrafficMetrics" class="com.akto.action.traffic_metrics.TrafficMetricsAction">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
@@ -1622,7 +1622,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
-        
+                
         <action name="api/importDataFromPostmanFile" class="com.akto.action.PostmanAction" method="importDataFromPostmanFile">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
