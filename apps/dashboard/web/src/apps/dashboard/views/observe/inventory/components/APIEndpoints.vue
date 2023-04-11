@@ -182,7 +182,7 @@
             <tests-selector :collectionName="apiCollectionName" @testsSelected=startTest v-if="showTestSelectorDialog"/>
         </v-dialog>
 
-        <div class="fix-at-top">
+        <div class="fix-at-top" style="display: none">
             <v-btn dark depressed color="var(--gptColor)" @click="showGPTScreen()">
                 Ask AktoGPT 
                 <v-icon size="16">$chatGPT</v-icon>
