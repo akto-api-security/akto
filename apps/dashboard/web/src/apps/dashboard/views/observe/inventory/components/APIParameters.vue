@@ -3,7 +3,7 @@
         <spinner/>
     </div>
     <div v-else>
-        <div class="fix-at-top" v-if="allSamples && allSamples.length > 0">
+        <div class="fix-at-top" v-if="allSamples && allSamples.length > 0" style="display: none">
             <v-btn dark depressed color="var(--gptColor)" @click="showGPTScreen()">
                 Ask AktoGPT 
                 <v-icon size="16">$chatGPT</v-icon>
@@ -272,7 +272,7 @@ export default {
                 ret.push([func.toDate(func.toYMD(currDate)), dateToCount[func.toYMD(currDate)] || 0])
                 currDate = func.incrDays(currDate, 1)
             }
-            return ret
+            return [{"data": ret, "color": "#6200EA", "name": "Traffic"}]
         },
         sensitiveParamsForChart() {
             if (this.parameters.length == 0) {

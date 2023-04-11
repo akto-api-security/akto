@@ -498,7 +498,11 @@ export default {
             return func.mergeApiInfoAndApiCollection(this.apiCollection, this.apiInfoList, this.mapCollectionIdToName)
         },
         newEndpointsTrend() {
-            return this.changesTrend(this.newEndpoints)
+            return [{
+                "data": this.changesTrend(this.newEndpoints),
+                "color" : "6200EA",
+                "name": "New Endpoints"
+            }]
         },
         newSensitiveEndpoints() {
             return this.newEndpoints.filter(x => x.sensitive && x.sensitive.size > 0)
