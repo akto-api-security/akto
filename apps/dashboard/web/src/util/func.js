@@ -572,24 +572,26 @@ export default {
     },
 
     icon(name) {
+        let ele = document.querySelector(':root');
+        let cs = getComputedStyle(ele);
         switch (name) {
             case "BURPSUITE":
-                return {name: '$burpsuite', color: '#fe7b5b'}
+                return {name: '$burpsuite', color: cs.getPropertyValue('--hexColor42')}
 
             case "POSTMAN":
-                return {name: '$postman', color: '#ffffff'}
+                return {name: '$postman', color: cs.getPropertyValue('--white')}
 
             case "AKTOAPI":
-                return {name: '$restapi', color: '#fe7b5b'}
+                return {name: '$restapi', color: cs.getPropertyValue('--hexColor42')}
 
             case "SLACK":
-                return {name: '$slack', color: '#fe7b5b'}
+                return {name: '$slack', color: cs.getPropertyValue('--hexColor42')}
             
             case "WEBHOOKS":
-                return {name: '$customwebhooks', color: '#fe7b5b'}
+                return {name: '$customwebhooks', color: cs.getPropertyValue('--hexColor42')}
 
             case "CI/CDINTEGERATION":
-                return {name: '$cicdicon', color: '#fe7b5b' }
+                return {name: '$cicdicon', color: cs.getPropertyValue('--hexColor42') }
         }
     },
 
@@ -662,4 +664,20 @@ export default {
     toEpochInMs(hyphenatedDate) {
         return +this.toDate(hyphenatedDate.replace(/\-/g, ''))
     },
+
+    testingResultType(){
+        return {
+            BURP:"BURP",
+            CICD:"CICD",
+            EXTERNAL_API:"EXTERNAL_API"
+        }
+    },
+
+    testingType () {
+        return {
+            active:"active",
+            inactive:"inactive",
+            cicd:"cicd"
+        }
+    }
 }

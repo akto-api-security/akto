@@ -29,6 +29,29 @@ public class Main {
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
+    private static ObjectId createTRRSummaryIfAbsent(TestingRun testingRun, int start){
+        ObjectId summaryId = null;
+        try {
+            ObjectId testingRunId = new ObjectId(testingRun.getHexId());
+            TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.findOne(
+                Filters.and(
+                    Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRunId),
+                    Filters.eq(TestingRunResultSummary.STATE,TestingRun.State.SCHEDULED)
+                )
+            );
+            summaryId = testingRunResultSummary.getId();
+            TestingRunResultSummariesDao.instance.updateOne(
+                    Filters.eq(TestingRunResultSummary.ID, summaryId),
+                    Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING));
+        } catch (Exception e){
+            TestingRunResultSummary summary = new TestingRunResultSummary(start, 0, new HashMap<>(),
+            0, testingRun.getId(), testingRun.getId().toHexString(), 0);
+
+            summaryId = TestingRunResultSummariesDao.instance.insertOne(summary).getInsertedId().asObjectId().getValue();
+        }
+        return summaryId;
+    }
+
     public static void main(String[] args) throws InterruptedException {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         DaoInit.init(new ConnectionString(mongoURI));
@@ -114,27 +137,7 @@ public class Main {
                 }
             }
 
-            // The assumption here is that only one test would have been scheduled with the given TestingRun
-            TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.findOne(
-                Filters.and(
-                    Filters.eq("testingRunId",new ObjectId(testingRun.getHexId())),
-                    Filters.eq("state",TestingRun.State.SCHEDULED)
-                )
-            );
-            ObjectId summaryId = null;
-            if(testingRunResultSummary!=null){
-                summaryId = testingRunResultSummary.getId();
-            }
-            if(summaryId==null){
-            TestingRunResultSummary summary = new TestingRunResultSummary(start, 0, new HashMap<>(),
-                    0, testingRun.getId(), testingRun.getId().toHexString(), 0);
-
-            summaryId = TestingRunResultSummariesDao.instance.insertOne(summary).getInsertedId().asObjectId().getValue();
-            } else {
-                TestingRunResultSummariesDao.instance.updateOne(
-                    Filters.eq("_id",summaryId), 
-                    Updates.set("state", TestingRun.State.RUNNING));
-            }
+            ObjectId summaryId = createTRRSummaryIfAbsent(testingRun, start);
             loggerMaker.infoAndAddToDb("Using testing run summary: " + summaryId, LogDb.TESTING);
 
             try {

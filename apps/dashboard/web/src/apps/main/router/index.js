@@ -1,5 +1,6 @@
 import Vue from 'vue'
 import Router from 'vue-router'
+import func from "@/util/func";
 const PageLogin  = () => import( '@/apps/login/App')
 const PageDashboard  = () => import( '@/apps/dashboard/App')
 const PageToday  = () => import( "@/apps/dashboard/views/today/Today")
@@ -90,7 +91,7 @@ const router =  new Router({
                             name: 'testResults',
                             component: TestingRunsTable,
                             props: route => ({
-                                active: true
+                                type: func.testingType().active
                             })
                         },
                         {
@@ -98,7 +99,7 @@ const router =  new Router({
                             name: 'testResults',
                             component: TestingRunsTable,
                             props: route => ({
-                                active: false
+                                type: func.testingType().inactive
                             })
                         },
                         {
@@ -106,7 +107,7 @@ const router =  new Router({
                             name: 'inactiveTestResults',
                             component: TestingRunsTable,
                             props: route => ({
-                                active: false
+                                type: func.testingType().inactive
                             })
                         },
                         {
@@ -114,8 +115,7 @@ const router =  new Router({
                             name: 'cicdTestResults',
                             component: TestingRunsTable,
                             props: route => ({
-                                active: true,
-                                cicd:true
+                                type: func.testingType().cicd
                             })
                         },
                         {

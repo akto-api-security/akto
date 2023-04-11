@@ -24,8 +24,7 @@ import {mapState} from 'vuex'
 export default {
     name: "TestingRunsTable",
     props: {
-        active: obj.boolR,
-        cicd: obj.boolN
+        type: obj.strR
     },
     data() {
         return {
@@ -104,10 +103,11 @@ export default {
             }, {})
         },
         testingRunsItems() {
-            if(this.cicd){
-                return this.cicdTestingRuns.map(run => this.prepareTableItem(run))
+            switch(this.type){
+                case func.testingType().cicd: return this.cicdTestingRuns.map(run => this.prepareTableItem(run));
+                case func.testingType().active: return (this.testingRuns || []).map(run => this.prepareTableItem(run));
+                case func.testingType().inactive: return (this.pastTestingRuns || []).map(run => this.prepareTableItem(run));
             }
-            return ((this.active ? this.testingRuns : this.pastTestingRuns) || []).map(run => this.prepareTableItem(run))     
         }
     }
 }

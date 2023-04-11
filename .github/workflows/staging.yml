@@ -108,7 +108,7 @@ jobs:
         if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
         uses: oren-akto/akto-github-action@v1.0
         with:
-          AKTO_DASHBOARD_URL: https://flash.staging.akto.io/
-          AKTO_API_KEY: ${{secrets.AKTO_API_KEY}}
-          AKTO_TEST_ID: 6422ab9dc6f3c725b360c403
+          AKTO_DASHBOARD_URL: ${{vars.AKTO_DASHBOARD_URL}}
+          AKTO_API_KEY: ${{vars.AKTO_API_KEY}}
+          AKTO_TEST_ID: ${{vars.AKTO_TEST_ID}}
           START_TIME_DELAY: 180

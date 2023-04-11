@@ -53,7 +53,7 @@ public class StartTestAction extends UserAction {
     private AuthMechanism authMechanism;
     private int endTimestamp;
     private String testName;
-    private HashMap<String,String> metadata;
+    private Map<String,String> metadata;
     private boolean fetchCicd;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
@@ -431,11 +431,11 @@ public class StartTestAction extends UserAction {
         this.maxConcurrentRequests = maxConcurrentRequests;
     }
 
-    public HashMap<String, String> getMetadata() {
+    public Map<String, String> getMetadata() {
         return metadata;
     }
 
-    public void setMetadata(HashMap<String, String> metadata) {
+    public void setMetadata(Map<String, String> metadata) {
         this.metadata = metadata;
     }
 

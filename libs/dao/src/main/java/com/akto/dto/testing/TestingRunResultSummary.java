@@ -8,6 +8,7 @@ import org.bson.types.ObjectId;
 
 public class TestingRunResultSummary {
     
+    public static final String ID = "_id";
     public static final String START_TIMESTAMP = "startTimestamp";    
     public static final String END_TIMESTAMP = "endTimestamp";    
     public static final String COUNT_ISSUES = "countIssues";    
@@ -31,7 +32,7 @@ public class TestingRunResultSummary {
     @BsonIgnore
     private String hexId;
 
-    private HashMap<String,String> metadata;
+    private Map<String,String> metadata;
 
     public TestingRunResultSummary() {
     }
@@ -124,11 +125,11 @@ public class TestingRunResultSummary {
     }
 
 
-    public HashMap<String, String> getMetadata() {
+    public Map<String, String> getMetadata() {
         return metadata;
     }
 
-    public void setMetadata(HashMap<String, String> metadata) {
+    public void setMetadata(Map<String, String> metadata) {
         this.metadata = metadata;
     }
 

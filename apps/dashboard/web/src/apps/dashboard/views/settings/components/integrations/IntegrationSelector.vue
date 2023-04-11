@@ -71,7 +71,7 @@ export default {
           component: AktoAPIIntegration,
           props:{
             title:"Burp",
-            tokenOrigin:"burp_key",
+            tokenUtility:"BURP",
             avatar_image:"$burpsuite"
           }
         }],
@@ -90,7 +90,7 @@ export default {
           component: AktoAPIIntegration,
           props:{
             title:"External APIs",
-            tokenOrigin:"external_key",
+            tokenUtility:"EXTERNAL_API",
             avatar_image:"$restapi"
           }
         },{
@@ -98,7 +98,7 @@ export default {
           component: AktoAPIIntegration,
           props:{
             title:"CI/CD Integeration",
-            tokenOrigin:"cicd_key",
+            tokenUtility:"CICD",
             avatar_image:"$cicdicon"
           }
         }]
