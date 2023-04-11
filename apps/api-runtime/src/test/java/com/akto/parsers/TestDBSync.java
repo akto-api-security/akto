@@ -446,6 +446,7 @@ public class TestDBSync extends MongoBasedTest {
 
     @Test
     public void testCollisionHostNameCollection() {
+        ApiCollectionsDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "domain", 0, new HashSet<>(), null, 0));
         HttpResponseParams h1 = new HttpResponseParams();
         h1.requestParams = new HttpRequestParams();
