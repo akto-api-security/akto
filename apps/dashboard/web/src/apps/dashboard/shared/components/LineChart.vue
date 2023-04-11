@@ -53,6 +53,20 @@ export default {
           ]
         }
 
+        var dataForChart = []
+        this.data.forEach((x,idx) => {
+          let b = {
+            data: x['data'],
+            color: x['color'],
+            name: x['name'],
+            fillColor: this.areaFillHex ? fillColor : {},
+            marker: { enabled: x['data'].length <= 2},
+            yAxis: 0
+          }
+
+          dataForChart.push(b)
+        })
+
         var basicOpts = {
           chart: {
             type: this.type,
@@ -70,16 +84,7 @@ export default {
             shared: true
           },
           series: [
-            {
-              data: this.data,
-              color: this.color,
-              name: this.title,
-              fillColor: this.areaFillHex ? fillColor : {},
-              marker: {
-                enabled: this.data.length <= 2
-              },
-              yAxis: 0
-            },
+            ...dataForChart,
             ...this.inputMetrics.map((x, i) => {
               return {
                 data: x.data,
