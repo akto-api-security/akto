@@ -1,13 +1,12 @@
 package com.akto.dao.test_editor;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import org.springframework.security.access.method.P;
 
 import com.akto.dao.test_editor.data_operands_impl.ContainsAllFilter;
 import com.akto.dao.test_editor.data_operands_impl.ContainsEitherFilter;
@@ -23,7 +22,6 @@ import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.DataOperandFilterRequest;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.FilterActionRequest;
-import com.akto.dto.test_editor.Pred.V;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.util.JSONUtils;
 import com.mongodb.BasicDBList;
@@ -74,7 +72,7 @@ public final class FilterAction {
                 return applyFilterOnRequestHeaders(filterActionRequest);
             case "response_headers":
                 return applyFilterOnResponseHeaders(filterActionRequest);
-            case "queryparams":
+            case "query_param":
                 return applyFilterOnQueryParams(filterActionRequest);
             case "response_code":
                 return applyFilterOnResponseCode(filterActionRequest);
@@ -128,26 +126,7 @@ public final class FilterAction {
             return new DataOperandsFilterResponse(false, null);
         }
         String reqBody = rawApi.getRequest().getBody();
-        BasicDBObject reqObj =  BasicDBObject.parse(reqBody);
-
-        Set<String> matchingKeySet = new HashSet<>();
-        List<String> matchingKeys = new ArrayList<>();
-        Boolean res = false;
-
-        if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("key")) {
-
-            getMatchingKeysForPayload(reqObj, null, filterActionRequest.getQuerySet(), filterActionRequest.getOperand(), matchingKeySet);
-            for (String s: matchingKeySet) {
-                matchingKeys.add(s);
-            }
-            return new DataOperandsFilterResponse(matchingKeys.size() > 0, matchingKeys);
-
-        } else if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("value")) {
-            res = valueExists(reqObj, null, filterActionRequest.getQuerySet(), reqBody, matchingKeys);
-            return new DataOperandsFilterResponse(res, null);
-        }
-
-        return new DataOperandsFilterResponse(false, null);
+        return applyFilterOnPayload(filterActionRequest, reqBody);
     }
 
     public DataOperandsFilterResponse applyFilterOnResponsePayload(FilterActionRequest filterActionRequest) {
@@ -156,13 +135,33 @@ public final class FilterAction {
         if (rawApi == null) {
             return new DataOperandsFilterResponse(false, null);
         }
-        String respBody = rawApi.getResponse().getBody();
-        BasicDBObject basicDBObject =  BasicDBObject.parse(respBody);
-        BasicDBObject respObj = JSONUtils.flattenWithDots(basicDBObject);
-        Object data = respObj;
-        DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(data, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
-        Boolean res = invokeFilter(dataOperandFilterRequest);
-        return new DataOperandsFilterResponse(res, null);
+        String reqBody = rawApi.getResponse().getBody();
+        return applyFilterOnPayload(filterActionRequest, reqBody);
+    }
+
+    public DataOperandsFilterResponse applyFilterOnPayload(FilterActionRequest filterActionRequest, String payload) {
+
+        BasicDBObject payloadObj =  BasicDBObject.parse(payload);
+
+        Set<String> matchingKeySet = new HashSet<>();
+        List<String> matchingKeys = new ArrayList<>();
+        Boolean res = false;
+
+        if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("key")) {
+
+            getMatchingKeysForPayload(payloadObj, null, filterActionRequest.getQuerySet(), filterActionRequest.getOperand(), matchingKeySet);
+            for (String s: matchingKeySet) {
+                matchingKeys.add(s);
+            }
+            return new DataOperandsFilterResponse(matchingKeys.size() > 0, matchingKeys);
+
+        } else if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("value")) {
+            matchingKeys = filterActionRequest.getMatchingKeySet();
+            res = valueExists(payloadObj, null, filterActionRequest.getQuerySet(), filterActionRequest.getOperand(), matchingKeys);
+            return new DataOperandsFilterResponse(res, null);
+        }
+
+        return new DataOperandsFilterResponse(false, null);
     }
 
     public DataOperandsFilterResponse applyFilterOnRequestHeaders(FilterActionRequest filterActionRequest) {
@@ -235,7 +234,7 @@ public final class FilterAction {
         String url = filterActionRequest.getApiInfoKey().getUrl();
         BasicDBObject queryParamObj = RequestTemplate.getQueryJSON(url + "?" + queryParams);
 
-        ArrayList<String> matchingKeys = new ArrayList<>();
+        List<String> matchingKeys = new ArrayList<>();
         Boolean res = false;
 
         for (String key: queryParamObj.keySet()) {
@@ -248,6 +247,7 @@ public final class FilterAction {
                 }
                 return new DataOperandsFilterResponse(res, matchingKeys);
             } else if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("value")) {
+                matchingKeys = filterActionRequest.getMatchingKeySet();
                 if (matchingKeys != null && !matchingKeys.contains(key)) {
                     continue;
                 }
@@ -260,7 +260,7 @@ public final class FilterAction {
             }
         }
 
-        return new DataOperandsFilterResponse(false, null);
+        return new DataOperandsFilterResponse(res, null);
     }
 
     public Boolean invokeFilter(DataOperandFilterRequest dataOperandFilterRequest) {
@@ -275,29 +275,35 @@ public final class FilterAction {
 
     public Object resolveQuerySetValues(FilterActionRequest filterActionRequest, Object querySet) {
         Object obj = null;
+        List<Object> listVal = new ArrayList<>();
         try {
-            List<Object> listVal = (List) querySet;
-            for (Object val: listVal) {
-                if (!(val instanceof String)) {
+            listVal = (List) querySet;
+            int index = 0;
+            for (Object objVal: listVal) {
+                if (!(objVal instanceof String)) {
                     continue;
                 }
-                Boolean matches = Utils.checkIfContainsMatch(val, "\\${[^}]*}");
+                String val = (String) objVal;
+                Boolean matches = Utils.checkIfContainsMatch(val, "\\$\\{[^}]*\\}");
                 if (matches) {
                     val = val.substring(2, val.length());
-                    val = val.substring(2, val.length() - 1);
-                    String[] params = val.split(".");
+                    val = val.substring(0, val.length() - 1);
+
+                    String[] params = val.split("\\.");
                     String firstParam = params[0];
                     String secondParam = null;
                     if (params.length > 1) {
                         secondParam = params[1];
                     }
-                    resolveDynamicValue(filterActionRequest, firstParam, secondParam);
+                    obj = resolveDynamicValue(filterActionRequest, firstParam, secondParam);
+                    listVal.set(index, obj);
+                    index++;
                 }
             }
         } catch (Exception e) {
-            return obj;
+            return null;
         }
-        return obj;
+        return listVal;
     }
 
     public void getMatchingKeysForPayload(Object obj, String parentKey, Object querySet, String operand, Set<String> matchingKeys) {
@@ -341,6 +347,9 @@ public final class FilterAction {
                 }
                 Object value = basicDBObject.get(key);
                 res = valueExists(value, key, querySet, operand, matchingKeys);
+                if (res) {
+                    break;
+                }
             }
         } else if (obj instanceof BasicDBList) {
             for(Object elem: (BasicDBList) obj) {
@@ -373,6 +382,9 @@ public final class FilterAction {
                 }
                 Object value = basicDBObject.get(key);
                 val = getValue(value, key, queryKey);
+                if (val != null) {
+                    break;
+                }
             }
         } else if (obj instanceof BasicDBList) {
             for(Object elem: (BasicDBList) obj) {
@@ -394,8 +406,7 @@ public final class FilterAction {
     
     public Object resolveDynamicValue(FilterActionRequest filterActionRequest, String firstParam, String secondParam) {
 
-        String concernedProperty = filterActionRequest.getConcernedProperty();
-        switch (concernedProperty.toLowerCase()) {
+        switch (firstParam) {
             case "sample_request_payload":
                 return resolveRequestPayload(filterActionRequest, true, secondParam);
             case "sample_response_payload":

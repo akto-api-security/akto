@@ -23,7 +23,7 @@ public class TestEditorEnums {
         URL,
         METHOD,
         API_COLLECTION_ID,
-        QUERY,
+        QUERY_PARAM,
         REQUEST_HEADERS,
         REQUEST_PAYLOAD,
         RESPONSE_HEADERS,

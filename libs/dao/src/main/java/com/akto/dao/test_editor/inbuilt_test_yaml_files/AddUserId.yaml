@@ -15,6 +15,4 @@ info:
     - "https://cwe.mitre.org/data/definitions/285.html"
     - "https://cwe.mitre.org/data/definitions/639.html"
 apiSelectionFilters:
-  userIdParamRegex: 
-    - "user"
-    - "customer"
+

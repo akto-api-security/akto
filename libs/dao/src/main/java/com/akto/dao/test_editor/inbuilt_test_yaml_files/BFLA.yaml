@@ -9,4 +9,4 @@ info:
   references:
   author: Akto
 apiSelectionFilters:
-  isPrivate: true
+  #isPrivate: true

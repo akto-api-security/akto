@@ -20,23 +20,23 @@ info:
     - "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa6-mass-assignment.md"
   author: Akto
 apiSelectionFilters:
-  respStatus: 2xx
-  excludeMethods:
-    - GET
-    - OPTIONS
-    - DELETE
-    - HEAD
-  urlContains:
-    - user
-  mustContainKeys:
-    - location: 
-      - "request-body"
-      keyRegex: 
-        - "email"
-        - "login"
-    - location: 
-      - "response-body"
-      keyRegex:
-        - "role"
-        - "user_role"
-        - "user_type"
+  response_code:
+    gte: 200
+    lt: 300
+  methods:
+    containsOne:
+			- 'PUT'
+			- 'POST'
+			- 'PATCH'
+  url:
+    regex:
+			- user
+  request_payload:
+    - key:
+			  regex:
+				  - "email"
+          - "login"
+  response_payload:
+		- key:
+			  regex:
+				  - "role"
