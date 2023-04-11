@@ -126,7 +126,7 @@ public class TestConfigParser {
     }
 
 
-    public DataOperandsFilterResponse isEndpointValid(FilterNode node, RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, List<String> matchingKeySet) {
+    public DataOperandsFilterResponse isEndpointValid(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfo.ApiInfoKey apiInfoKey, List<String> matchingKeySet, String context) {
 
         List<FilterNode> childNodes = node.getChildNodes();
         if (childNodes.size() == 0) {
@@ -134,7 +134,10 @@ public class TestConfigParser {
                 return new DataOperandsFilterResponse(false, null);
             }
             String operand = node.getOperand();
-            return filterAction.apply(new FilterActionRequest(node.getValues(), rawApi, apiInfoKey, node.getConcernedProperty(), node.getSubConcernedProperty(), matchingKeySet, operand));
+            FilterActionRequest filterActionRequest = new FilterActionRequest(node.getValues(), rawApi, testRawApi, apiInfoKey, node.getConcernedProperty(), node.getSubConcernedProperty(), matchingKeySet, operand, context);
+            Object updatedQuerySet = filterAction.resolveQuerySetValues(filterActionRequest, node.getValues());
+            filterActionRequest.setQuerySet(updatedQuerySet);
+            return filterAction.apply(filterActionRequest);
         }
 
         Boolean result = true;
@@ -142,6 +145,7 @@ public class TestConfigParser {
         String operator = "and";
         if (node.getOperand().toLowerCase().equals("or")) {
             operator = "or";
+            result = false;
         }
         Boolean hasKeyOperand = false;
 
@@ -149,7 +153,7 @@ public class TestConfigParser {
         for (int i = 0; i < childNodes.size(); i++) {
             if (childNodes.get(i).getOperand().toLowerCase().equals("key")) {
                 hasKeyOperand = true;
-                dataOperandsFilterResponse = isEndpointValid(childNodes.get(i), rawApi, apiInfoKey, null);
+                dataOperandsFilterResponse = isEndpointValid(childNodes.get(i), rawApi, testRawApi, apiInfoKey, null, context);
                 matchingKeySet = dataOperandsFilterResponse.getMatchedEntities();
                 result = operator.equals("and") ? result && dataOperandsFilterResponse.getResult() : result || dataOperandsFilterResponse.getResult();
                 if (matchingKeySet.size() == 0) {
@@ -163,7 +167,7 @@ public class TestConfigParser {
             if (hasKeyOperand && childNode.getOperand().toLowerCase().equals("key")) {
                 continue;
             }
-            dataOperandsFilterResponse = isEndpointValid(childNode, rawApi, apiInfoKey, matchingKeySet);
+            dataOperandsFilterResponse = isEndpointValid(childNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, context);
             result = operator.equals("and") ? result && dataOperandsFilterResponse.getResult() : result || dataOperandsFilterResponse.getResult();
             if (childNode.getSubConcernedProperty() != null && childNode.getSubConcernedProperty().toLowerCase().equals("key")) {
                 matchingKeySet =  evaluateMatchingKeySet(matchingKeySet, dataOperandsFilterResponse.getMatchedEntities(), operator);

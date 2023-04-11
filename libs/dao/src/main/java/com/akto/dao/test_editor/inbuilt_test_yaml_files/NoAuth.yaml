@@ -1,6 +1,7 @@
 id: no-auth
 info:
-  message: "API doesn't validate the authenticity of token. Attacker can remove the auth token and access the endpoint.",
+  message: >
+            "API doesn't validate the authenticity of token. Attacker can remove the auth token and access the endpoint.",
             "The endpoint appears to be vulnerable to broken authentication attack. The original request was replayed by removing victim's <b>auth</b> token. The server responded with 2XX success codes.<br><br>" +
             "<b>Background:</b> Authentication is the process of attempting to verify the digital identity of the sender of a communication. Testing the authentication schema means understanding how the authentication process works and using that information to " +
             "circumvent the authentication mechanism. While most applications require authentication to gain access to private information or to execute tasks, not every authentication method is able to provide adequate security. Negligence, ignorance, or simple " +

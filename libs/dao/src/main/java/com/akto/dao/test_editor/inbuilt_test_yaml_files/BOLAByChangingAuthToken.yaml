@@ -1,6 +1,7 @@
 id: bola-by-changing-auth-token
 info:
-  message: Attacker can access resources of any user by changing the auth token in request.",
+  message: >
+            Attacker can access resources of any user by changing the auth token in request.",
             "The endpoint appears to be vulnerable to broken object level authorization attack. The original request " +
             "was replayed with attacker's auth token. The server responded with 2XX success codes and greater" +
             " than <b>{{percentageMatch}}%</b> of the response body matched with original response body. Also, the endpoint had atleast one private " +
@@ -21,4 +22,4 @@ info:
     - "https://cwe.mitre.org/data/definitions/639.html"
   author: Akto
 apiSelectionFilters:
-  isPrivate: true
+  #isPrivate: true

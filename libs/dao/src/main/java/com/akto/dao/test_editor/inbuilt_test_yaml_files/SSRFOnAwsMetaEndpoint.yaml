@@ -18,12 +18,23 @@ info:
     - "https://www.akto.io/blog/how-to-prevent-server-side-request-forgery-ssrf-as-a-developer"
   author: Akto
 apiSelectionFilters:
-  containsParams: 
-    - param: url
-      paramRegex:
-        - "https://"
-        - "http://"
-      searchIn: 
-        - request-header
-        - request-body
-        - queryParam
+  response_code:
+    and:
+      gte: 200
+      lt: 205
+  or:
+    request_header:
+      for_one:
+        value:
+          - regex: "https://"
+          - regex: "http://"
+    request_payload:
+      for_one:
+        value:
+          - regex: "https://"
+          - regex: "http://"
+    queryparams:
+      for_one:
+        value:
+          - regex: "https://"
+          - regex: "http://"

@@ -14,11 +14,12 @@ info:
     - "https://portswigger.net/kb/issues/00500100_open-redirection-reflected"
   author: Akto
 apiSelectionFilters:
-  mustContainKeys:
-    - location: 
-      - "request-header"
-      - "queryParam"
-      - "request-body"
-      keyRegex: 
-        - location
+  or:
+    - request_header:
+        for_one:
+          - value: "${response_header.location}"
+    - request_body:
+        - value: "${response_header.z.b.*.location}"
+    - querparams:
+        - value: "${response_header.location}"
 

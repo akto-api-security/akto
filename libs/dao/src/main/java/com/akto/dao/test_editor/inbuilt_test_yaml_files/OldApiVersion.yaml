@@ -25,4 +25,5 @@ info:
     - "https://cwe.mitre.org/data/definitions/639.html"
   author: Akto
 apiSelectionFilters:
-  versionMatchRegex: /v(\d+)/
+  url:
+    regex: /v(\d+)/
