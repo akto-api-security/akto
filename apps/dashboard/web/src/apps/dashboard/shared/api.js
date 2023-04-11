@@ -20,5 +20,13 @@ export default {
                 code: code
             }
         })
-    }
+    },
+    askAi(data){
+        return request({
+            url: '/api/ask_ai',
+            method: 'post',
+            data: data
+        })
+    },
+
 }

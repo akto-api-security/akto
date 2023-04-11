@@ -1,6 +1,13 @@
 import request from '@/util/request'
 
 export default {
+    askAi(data){
+        return request({
+            url: '/api/ask_ai',
+            method: 'post',
+            data: data
+        })
+    },
     saveContent(apiSpec) {
         return request({
             url: '/api/saveContent',
