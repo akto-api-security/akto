@@ -5,6 +5,7 @@ import com.akto.action.HarAction;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.AuthParam;
@@ -13,6 +14,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.Main;
 import com.akto.runtime.policies.AktoPolicy;
+import com.akto.util.AccountTask;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Updates;
@@ -20,6 +22,7 @@ import com.mongodb.client.model.Updates;
 import java.io.IOException;
 import java.net.URL;
 import java.util.*;
+import java.util.function.Consumer;
 
 public class RuntimeListener extends AfterMongoConnectListener {
 
@@ -30,17 +33,20 @@ public class RuntimeListener extends AfterMongoConnectListener {
 
     @Override
     public void runMainFunction() {
-        //todo: shivam change to saas
-        Context.accountId.set(1_000_000);
-        Main.initializeRuntime();
-        httpCallParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
-        aktoPolicy = new AktoPolicy(RuntimeListener.httpCallParser.apiCatalogSync, false);
+        AccountTask.instance.executeTask(new Consumer<Account>() {
+            @Override
+            public void accept(Account account) {
+                Main.initializeRuntime();
+                httpCallParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
+                aktoPolicy = new AktoPolicy(RuntimeListener.httpCallParser.apiCatalogSync, false);
 
-        try {
-            initialiseDemoCollections();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while initialising demo collections: " + e, LoggerMaker.LogDb.DASHBOARD);
-        }
+                try {
+                    initialiseDemoCollections();
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Error while initialising demo collections: " + e, LoggerMaker.LogDb.DASHBOARD);
+                }
+            }
+        }, "runtime-listner-task");
     }
 
     public void initialiseDemoCollections() {

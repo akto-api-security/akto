@@ -31,6 +31,7 @@ import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
+import com.akto.util.AccountTask;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
@@ -48,6 +49,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
+import org.checkerframework.checker.units.qual.C;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,6 +63,7 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
@@ -71,11 +74,13 @@ public class InitializerListener implements ServletContextListener {
     private static final Logger logger = LoggerFactory.getLogger(InitializerListener.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(InitializerListener.class);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    public static final boolean isSaas = "true".equals(System.getenv("IS_SAAS"));
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     public static boolean connectedToMongo = false;
 
     private static String domain = null;
+    public static String subdomain = "https://app.akto.io";
 
     public static String getDomain() {
         if (domain == null) {
@@ -94,19 +99,20 @@ public class InitializerListener implements ServletContextListener {
             public void run() {
                 String mongoURI = System.getenv("AKTO_MONGO_CONN");
                 DaoInit.init(new ConnectionString(mongoURI));
-                //todo: shivam change to saas
-                Context.accountId.set(1_000_000);
-                try {
-                    executeTestSourcesFetch();
-                } catch (Exception e) {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        try {
+                            executeTestSourcesFetch();
+                        } catch (Exception e) {
+                        }
 
-                }
-
-                try {
-                    executePIISourceFetch();
-                } catch (Exception e) {
-
-                }
+                        try {
+                            executePIISourceFetch();
+                        } catch (Exception e) {
+                        }
+                    }
+                }, "pii-scheduler");
             }
         }, 0, 4, TimeUnit.HOURS);
     }
@@ -243,10 +249,8 @@ public class InitializerListener implements ServletContextListener {
 
             } catch (IOException e) {
                 loggerMaker.errorAndAddToDb(String.format("failed to read file %s", e.toString()), LogDb.DASHBOARD);
-                continue;
             }
         }
-        SingleTypeInfo.fetchCustomDataTypes();
     }
 
     private static CustomDataType getCustomDataTypeFromPiiType(PIISource piiSource, PIIType piiType, Boolean active) {
@@ -275,62 +279,68 @@ public class InitializerListener implements ServletContextListener {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 try {
-                    //todo: shivam change to saas
-                    Context.accountId.set(1_000_000);
-                    List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
-                    if (listWebhooks == null || listWebhooks.isEmpty()) {
-                        return;
-                    }
+                    AccountTask.instance.executeTask(new Consumer<Account>() {
+                        @Override
+                        public void accept(Account t) {
+                            List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
+                            if (listWebhooks == null || listWebhooks.isEmpty()) {
+                                return;
+                            }
 
-                    Slack slack = Slack.getInstance();
-        
-                    for(SlackWebhook slackWebhook: listWebhooks) {
-                        int now =Context.now();
+                            Slack slack = Slack.getInstance();
 
-                        if (slackWebhook.getFrequencyInSeconds() == 0) {
-                            slackWebhook.setFrequencyInSeconds(24 * 60 * 60);
+                            for(SlackWebhook slackWebhook: listWebhooks) {
+                                int now =Context.now();
+
+                                if(slackWebhook.getFrequencyInSeconds()==0) {
+                                    slackWebhook.setFrequencyInSeconds(24*60*60);
+                                }
+
+                                boolean shouldSend = ( slackWebhook.getLastSentTimestamp() + slackWebhook.getFrequencyInSeconds() ) <= now ;
+
+                                if(!shouldSend){
+                                    continue;
+                                }
+
+                                loggerMaker.infoAndAddToDb(slackWebhook.toString(), LogDb.DASHBOARD);
+
+                                ChangesInfo ci = getChangesInfo(now - slackWebhook.getLastSentTimestamp(), now - slackWebhook.getLastSentTimestamp());
+                                if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0) {
+                                    return;
+                                }
+
+                                DailyUpdate dailyUpdate = new DailyUpdate(
+                                        0, 0,
+                                        ci.newSensitiveParams.size(), ci.newEndpointsLast7Days.size(),
+                                        ci.recentSentiiveParams, ci.newParamsInExistingEndpoints,
+                                        slackWebhook.getLastSentTimestamp(), now ,
+                                        ci.newSensitiveParams, slackWebhook.getDashboardUrl());
+
+                                slackWebhook.setLastSentTimestamp(now);
+                                SlackWebhooksDao.instance.updateOne(eq("webhook",slackWebhook.getWebhook()), Updates.set("lastSentTimestamp", now));
+
+                                loggerMaker.infoAndAddToDb("******************DAILY INVENTORY SLACK******************", LogDb.DASHBOARD);
+                                String webhookUrl = slackWebhook.getWebhook();
+                                String payload = dailyUpdate.toJSON();
+                                loggerMaker.infoAndAddToDb(payload, LogDb.DASHBOARD);
+                                try {
+                                    WebhookResponse response = slack.send(webhookUrl, payload);
+                                    loggerMaker.infoAndAddToDb("*********************************************************", LogDb.DASHBOARD);
+
+                                    // slack testing notification
+                                    loggerMaker.infoAndAddToDb("******************TESTING SUMMARY SLACK******************", LogDb.DASHBOARD);
+                                    TestSummaryGenerator testSummaryGenerator = new TestSummaryGenerator(Context.accountId.get());
+                                    payload = testSummaryGenerator.toJson(slackWebhook.getDashboardUrl());
+                                    loggerMaker.infoAndAddToDb(payload, LogDb.DASHBOARD);
+                                    response = slack.send(webhookUrl, payload);
+                                    loggerMaker.infoAndAddToDb("*********************************************************", LogDb.DASHBOARD);
+
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
+                            }
                         }
-
-                        boolean shouldSend = (slackWebhook.getLastSentTimestamp() + slackWebhook.getFrequencyInSeconds()) <= now;
-
-                        if (!shouldSend) {
-                            continue;
-                        }
-
-                        loggerMaker.infoAndAddToDb(slackWebhook.toString(), LogDb.DASHBOARD);
-
-                        ChangesInfo ci = getChangesInfo(now - slackWebhook.getLastSentTimestamp(), now - slackWebhook.getLastSentTimestamp());
-                        if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0) {
-                            return;
-                        }
-
-                        DailyUpdate dailyUpdate = new DailyUpdate(
-                                0, 0,
-                                ci.newSensitiveParams.size(), ci.newEndpointsLast7Days.size(),
-                                ci.recentSentiiveParams, ci.newParamsInExistingEndpoints,
-                                slackWebhook.getLastSentTimestamp(), now,
-                                ci.newSensitiveParams, slackWebhook.getDashboardUrl());
-
-                        slackWebhook.setLastSentTimestamp(now);
-                        SlackWebhooksDao.instance.updateOne(eq("webhook", slackWebhook.getWebhook()), Updates.set("lastSentTimestamp", now));
-
-                        loggerMaker.infoAndAddToDb("******************DAILY INVENTORY SLACK******************", LogDb.DASHBOARD);
-                        String webhookUrl = slackWebhook.getWebhook();
-                        String payload = dailyUpdate.toJSON();
-                        loggerMaker.infoAndAddToDb(payload, LogDb.DASHBOARD);
-                        WebhookResponse response = slack.send(webhookUrl, payload);
-                        loggerMaker.infoAndAddToDb("*********************************************************", LogDb.DASHBOARD);
-
-                        // slack testing notification
-                        loggerMaker.infoAndAddToDb("******************TESTING SUMMARY SLACK******************", LogDb.DASHBOARD);
-                        TestSummaryGenerator testSummaryGenerator = new TestSummaryGenerator(1_000_000);
-                        payload = testSummaryGenerator.toJson(slackWebhook.getDashboardUrl());
-                        loggerMaker.infoAndAddToDb(payload, LogDb.DASHBOARD);
-                        response = slack.send(webhookUrl, payload);
-                        loggerMaker.infoAndAddToDb("*********************************************************", LogDb.DASHBOARD);
-
-                    }
-
+                    }, "setUpDailyScheduler");
                 } catch (Exception ex) {
                 }
             }
@@ -419,10 +429,12 @@ public class InitializerListener implements ServletContextListener {
             public void run() {
                 String mongoURI = System.getenv("AKTO_MONGO_CONN");
                 DaoInit.init(new ConnectionString(mongoURI));
-                //todo: shivam change to saas
-                Context.accountId.set(1_000_000);
-
-                webhookSender();
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        webhookSender();
+                    }
+                }, "webhook-sener");
             }
         }, 0, 15, TimeUnit.MINUTES);
     }
@@ -682,6 +694,8 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+
+
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
         sce.getServletContext().getSessionCookieConfig().setSecure(HttpUtils.isHttpsEnabled());
@@ -698,15 +712,22 @@ public class InitializerListener implements ServletContextListener {
                 boolean calledOnce = false;
                 do {
                     try {
+
                         if (!calledOnce) {
                             DaoInit.init(new ConnectionString(mongoURI));
-                            //todo: shivam change to saas
-                            Context.accountId.set(1_000_000);
                             calledOnce = true;
                         }
-                        AccountSettingsDao.instance.getStats();
-                        connectedToMongo = true;
-                        runInitializerFunctions();
+                        AccountTask.instance.executeTask(new Consumer<Account>() {
+                            @Override
+                            public void accept(Account account) {
+                                AccountSettingsDao.instance.getStats();
+                                connectedToMongo = true;
+                                runInitializerFunctions();
+                            }
+                        }, "context-initializer");
+                        setUpDailyScheduler();
+                        setUpWebhookScheduler();
+                        setUpPiiAndTestSourcesScheduler();
                     } catch (Exception e) {
 //                        e.printStackTrace();
                     } finally {
@@ -750,8 +771,6 @@ public class InitializerListener implements ServletContextListener {
 
             SingleTypeInfo.init();
 
-            Context.accountId.set(1000000);
-
             if (PIISourceDao.instance.findOne("_id", "A") == null) {
                 String fileUrl = "https://raw.githubusercontent.com/akto-api-security/pii-types/master/general.json";
                 PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
@@ -766,11 +785,6 @@ public class InitializerListener implements ServletContextListener {
                 piiSource.setId("Fin");
                 PIISourceDao.instance.insertOne(piiSource);
             }
-
-
-            setUpDailyScheduler();
-            setUpWebhookScheduler();
-            setUpPiiAndTestSourcesScheduler();
 
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             dropSampleDataIfEarlierNotDroped(accountSettings);

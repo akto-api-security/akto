@@ -142,7 +142,10 @@ public class AktoPolicyNew {
     }
 
     public void process(HttpResponseParams httpResponseParams) throws Exception {
-        List<CustomAuthType> customAuthTypes = SingleTypeInfo.activeCustomAuthTypes;
+        List<CustomAuthType> customAuthTypes = SingleTypeInfo.activeCustomAuthTypes.get(httpResponseParams.getAccountId());
+        if (customAuthTypes == null) {
+            customAuthTypes = new ArrayList<>();
+        }
         ApiInfo.ApiInfoKey apiInfoKey = ApiInfo.ApiInfoKey.generateFromHttpResponseParams(httpResponseParams);
         PolicyCatalog policyCatalog = getApiInfoFromMap(apiInfoKey);
         ApiInfo apiInfo = policyCatalog.getApiInfo();

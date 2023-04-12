@@ -134,7 +134,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     }
 
                     code = "";
-                    createUserAndRedirect(userEmail, userName, info);
+                    createUserAndRedirect(userEmail, userName, info, 0);
                 } else {
                     code = usersIdentityResponse.getError();
                 }
@@ -164,7 +164,16 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
         Config.GoogleConfig aktoGoogleConfig = (Config.GoogleConfig) ConfigsDao.instance.findOne("_id", "GOOGLE-ankush");
         if (aktoGoogleConfig == null) {
-
+            Config.GoogleConfig newConfig = new Config.GoogleConfig();
+            newConfig.setClientId("779574722609-j4scecjhuiiu8u8g9hegjs27ihhpa3c2.apps.googleusercontent.com");
+            newConfig.setProjectId("ankitas-playground");
+            newConfig.setAuthURI("https://accounts.google.com/o/oauth2/auth");
+            newConfig.setCertURL("https://www.googleapis.com/oauth2/v1/certs");
+            newConfig.setJsOrigins(InitializerListener.getDomain());
+            newConfig.setClientSecret("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");
+            newConfig.setTokenURI("https://oauth2.googleapis.com/token");
+            ConfigsDao.instance.insertOne(newConfig);
+            aktoGoogleConfig = (Config.GoogleConfig) ConfigsDao.instance.findOne("_id", "GOOGLE-ankush");
         }
 
 
@@ -186,7 +195,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     clientSecrets.getDetails().getClientId(),
                     clientSecrets.getDetails().getClientSecret(),
                     codeFromGoogle,
-                    InitializerListener.getDomain()+"/signup-google")
+                    InitializerListener.subdomain)
                     .execute();
 
             String accessToken = tokenResponse.getAccessToken();
@@ -197,7 +206,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             String userEmail = payload.getEmail();
 
             SignupInfo.GoogleSignupInfo signupInfo = new SignupInfo.GoogleSignupInfo(aktoGoogleConfig.getId(), accessToken, refreshToken, tokenResponse.getExpiresInSeconds());
-            createUserAndRedirect(userEmail, username, signupInfo);
+            createUserAndRedirect(userEmail, username, signupInfo, 0);
             code = "";
         } catch (IOException e) {
             code = e.getMessage();
@@ -221,9 +230,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             code = "Password can't be empty";
             return ERROR.toUpperCase();
         }
-        long count = UsersDao.instance.getMCollection().countDocuments();
-        // only 1st user is allowed to signup without invitationCode
-        if (count != 0) {
+        int invitedToAccountId = 0;
+        if (!invitationCode.isEmpty()) {
             Jws<Claims> jws;
             try {
                 jws = JWT.parseJwt(invitationCode, "");
@@ -248,19 +256,38 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
             // deleting the invitation code
             PendingInviteCodesDao.instance.getMCollection().deleteOne(filter);
-
-            if (UsersDao.instance.findOne("login", email) != null) {
-                code = "This ";
-                return ERROR.toUpperCase();
+            invitedToAccountId = pendingInviteCode.getAccountId();
+        } else {
+            if (!InitializerListener.isSaas) {
+                long countUsers = UsersDao.instance.getMCollection().countDocuments();
+                if (countUsers > 0) {
+                    code = "Ask admin to invite you";
+                }
             }
         }
+        User userExists = UsersDao.instance.findOne("login", email);
+        SignupInfo.PasswordHashInfo signupInfo;
+        if (userExists != null) {
+            if (invitationCode.isEmpty()) {
+                code = "This user already exists.";
+                return ERROR.toUpperCase();
+            } else {
+                signupInfo = (SignupInfo.PasswordHashInfo) userExists.getSignupInfoMap().get(Config.ConfigType.PASSWORD + "-ankush");
+                String salt = signupInfo.getSalt();
+                String passHash = Integer.toString((salt + password).hashCode());
+                if (!passHash.equals(signupInfo.getPasshash())) {
+                    return Action.ERROR.toUpperCase();
+                }
 
-        String salt = "39yu";
-        String passHash = Integer.toString((salt + password).hashCode());
+            }
+        } else {
+            String salt = "39yu";
+            String passHash = Integer.toString((salt + password).hashCode());
+            signupInfo = new SignupInfo.PasswordHashInfo(passHash, salt);
+        }
 
-        SignupInfo.PasswordHashInfo signupInfo = new SignupInfo.PasswordHashInfo(passHash, salt);
         try {
-            createUserAndRedirect(email, email, signupInfo);
+            createUserAndRedirect(email, email, signupInfo, invitedToAccountId);
         } catch (IOException e) {
             ;
             return ERROR.toUpperCase();
@@ -307,42 +334,81 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     List<String> allEmails;
     String shouldLogin="false";
 
-    private void createUserAndRedirect(String userEmail, String username, SignupInfo signupInfo) throws IOException {
-            String accountName = System.getenv("AKTO_ACCOUNT_NAME");
-            if (accountName == null) accountName = "Helios";
-            Account account = AccountsDao.instance.findOne("name", accountName);
-            if(!SIGN_IN.equals(state)) {
-                if (account == null) {
-                    account = new Account(1000000, accountName);
-                    AccountsDao.instance.insertOne(account);
+//    public String addSignupInfo() throws IOException {
+//        String email = ((BasicDBObject) servletRequest.getAttribute("signupInfo")).getString("email");
+//        Bson updates =
+//                combine(
+//                        set("companyName", companyName),
+//                        set("teamName", teamName),
+//                        set("emailInvitations", allEmails)
+//                );
+//
+//        Bson findQ = eq("user.login", email);
+//        SignupDao.instance.updateOne(findQ, updates);
+//
+//        SignupUserInfo updatedUserInfo = SignupDao.instance.findOne(findQ);
+//
+//        if (StringUtils.isEmpty(updatedUserInfo.getTeamName())) {
+//            shouldLogin = "false";
+//        } else {
+//            shouldLogin = "true";
+//            int invitationToAccountId = updatedUserInfo.getInvitationToAccount();
+//            createUserAndRedirect(email, email, updatedUserInfo.getUser().getSignupInfoMap().entrySet().iterator().next().getValue(), invitationToAccountId);
+//            Mail welcomeEmail = WelcomeEmail.buildWelcomeEmail("there", email);
+//            try {
+//                WelcomeEmail.send(welcomeEmail);
+//            } catch (IOException e) {
+//                // TODO Auto-generated catch block
+//                e.printStackTrace();
+//                return ERROR.toUpperCase();
+//            }
+//
+//        }
+//
+//        return "SUCCESS";
+//    }
+
+    private void createUserAndRedirect(String userEmail, String username, SignupInfo signupInfo,
+                                       int invitationToAccount) throws IOException {
+        User user = UsersDao.instance.findOne(eq("login", userEmail));
+        if (user == null && "false".equalsIgnoreCase(shouldLogin)) {
+            SignupUserInfo signupUserInfo = SignupDao.instance.insertSignUp(userEmail, username, signupInfo, invitationToAccount);
+            LoginAction.loginUser(signupUserInfo.getUser(), servletResponse, false, servletRequest);
+            servletResponse.sendRedirect("/dashboard/setup");
+        } else {
+
+            int accountId = 0;
+            if (invitationToAccount > 0) {
+                Account account = AccountsDao.instance.findOne("_id", invitationToAccount);
+                if (account != null) {
+                    accountId = account.getId();
                 }
             }
 
-            int accountId = account.getId();
-            User user = UsersDao.instance.insertSignUp(userEmail, username, signupInfo, accountId);
-            long count = UsersDao.instance.getMCollection().countDocuments();
-            // if first user then automatic admin
-            // else check if rbac is 0 or not. If 0 then make the user that was created first as admin.
-            // done for customers who were there before rbac feature
-            if (count == 1) {
-                RBACDao.instance.insertOne(new RBAC(user.getId(), RBAC.Role.ADMIN));
+            if (user == null) {
+
+                if (accountId == 0 || invitationToAccount == 0) {
+                    accountId = AccountAction.createAccountRecord("My account");
+                }
+                user = UsersDao.instance.insertSignUp(userEmail, username, signupInfo, accountId);
+
+            } else if (StringUtils.isEmpty(code)) {
+                if (accountId == 0) {
+                    throw new IllegalStateException("The account doesn't exist.");
+                }
             } else {
-                long rbacCount = RBACDao.instance.getMCollection().countDocuments();
-                if (rbacCount == 0) {
-                    MongoCursor<User> cursor = UsersDao.instance.getMCollection().find().sort(Sorts.ascending("_id")).limit(1).cursor();
-                    if (cursor.hasNext()) {
-                        User firstUser = cursor.next();
-                        RBACDao.instance.insertOne(new RBAC(firstUser.getId(), RBAC.Role.ADMIN));
-                    }
-                }
+                LoginAction.loginUser(user, servletResponse, true, servletRequest);
+                servletResponse.sendRedirect("/dashboard/observe/inventory");
+                return;
             }
 
-            Context.accountId.set(accountId);
-            AccountSettingsDao.instance.updateOnboardingFlag(true);
-            servletRequest.getSession().setAttribute("user", user);
-            new LoginAction().loginUser(user, servletResponse, true, servletRequest);
-            servletResponse.sendRedirect("/dashboard/onboarding");
+            user = AccountAction.initializeAccount(userEmail, accountId, "My account",invitationToAccount == 0);
 
+            servletRequest.getSession().setAttribute("user", user);
+            servletRequest.getSession().setAttribute("accountId", accountId);
+            new LoginAction().loginUser(user, servletResponse, true, servletRequest);
+            servletResponse.sendRedirect("/dashboard/observe/inventory");
+        }
     }
 
     protected HttpServletResponse servletResponse;

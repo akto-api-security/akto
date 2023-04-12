@@ -75,7 +75,9 @@ public class ApiTokenAction extends UserAction implements ServletRequestAware {
         String username = getSUser().getLogin();
         apiTokenList = ApiTokensDao.instance.findAll(
                 Filters.and(
-                        Filters.eq(ApiToken.USER_NAME, username)
+                        Filters.eq(ApiToken.USER_NAME, username),
+                        Filters.eq(ApiToken.ACCOUNT_ID, Context.accountId.get())
+
                 )
         );
 

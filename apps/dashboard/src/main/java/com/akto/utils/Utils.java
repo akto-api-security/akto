@@ -1,6 +1,7 @@
 package com.akto.utils;
 
 import com.akto.dao.ThirdPartyAccessDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.PostmanCredential;
@@ -23,6 +24,7 @@ import java.sql.Timestamp;
 import java.util.*;
 
 import com.mongodb.client.model.Filters;
+import org.apache.commons.lang3.StringUtils;
 
 
 public class Utils {
@@ -215,7 +217,15 @@ public class Utils {
         }
 
         if(skipKafka) {
-            SingleTypeInfo.fetchCustomDataTypes(); //todo:
+            String accountIdStr = responses.get(0).accountId;
+            if (!StringUtils.isNumeric(accountIdStr)) {
+                return;
+            }
+
+            int accountId = Integer.parseInt(accountIdStr);
+            Context.accountId.set(accountId);
+
+            SingleTypeInfo.fetchCustomDataTypes(accountId);
             APICatalogSync apiCatalogSync = RuntimeListener.httpCallParser.syncFunction(responses, true, false);
             RuntimeListener.aktoPolicy.main(responses, apiCatalogSync, false);
         }

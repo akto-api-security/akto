@@ -220,6 +220,7 @@ public class PostmanAction extends UserAction {
     private boolean skipKafka = DashboardMode.isLocalDeployment();
 
     public String importDataFromPostman() throws Exception {
+        int accountId = Context.accountId.get();
         PostmanCredential postmanCredential = fetchPostmanCredential();
         if (postmanCredential == null) {
             addActionError("Please add postman credentials in settings");
@@ -251,7 +252,7 @@ public class PostmanAction extends UserAction {
             for(JsonNode item: jsonNodes){
                 String apiName = item.get("name").asText();
                 loggerMaker.infoAndAddToDb(String.format("Processing api %s if collection %s", apiName, collectionName), LogDb.DASHBOARD);
-                Map<String, String> apiInAktoFormat = Utils.convertApiInAktoFormat(item, variablesMap, String.valueOf(1_000_000));
+                Map<String, String> apiInAktoFormat = Utils.convertApiInAktoFormat(item, variablesMap, String.valueOf(accountId));
                 if(apiInAktoFormat != null){
                     try{
                         apiInAktoFormat.put("akto_vxlan_id", String.valueOf(aktoCollectionId));
