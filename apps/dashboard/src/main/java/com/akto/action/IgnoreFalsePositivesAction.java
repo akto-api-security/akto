@@ -36,9 +36,10 @@ public class IgnoreFalsePositivesAction extends UserAction{
         if(falsePositives==null){
             return Action.ERROR.toUpperCase();
         }
+        int accountId = Context.accountId.get();
         for (String keyType : falsePositives.keySet()) {
-            if (SingleTypeInfo.customDataTypeMap.containsKey(keyType)) {
-                IgnoreData ignoreData = SingleTypeInfo.customDataTypeMap.get(keyType).getIgnoreData();
+            if (SingleTypeInfo.getCustomDataTypeMap(accountId).containsKey(keyType)) {
+                IgnoreData ignoreData = SingleTypeInfo.getCustomDataTypeMap(accountId).get(keyType).getIgnoreData();
                 if (ignoreData == null) {
                     ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
                 }
@@ -62,7 +63,6 @@ public class IgnoreFalsePositivesAction extends UserAction{
             }
         }
 
-        int accountId = Context.accountId.get();
         executorService.schedule( new Runnable() {
             public void run() {
                 Context.accountId.set(accountId);

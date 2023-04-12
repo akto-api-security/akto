@@ -39,6 +39,16 @@ public class User {
         return new User(name, login, accountEntryMap, infoMap);
     }
 
+    public String findAnyAccountId() {
+        if (this.accounts == null || this.accounts.isEmpty()) return null;
+
+        for (String acc: accounts.keySet()) {
+            return acc;
+        }
+
+        return null;
+    }
+
     public static BasicDBObject convertUserToUserDetails(User user) {
         BasicDBObject userDetails = new BasicDBObject();
         userDetails.put("id",user.getId());

@@ -2,6 +2,7 @@ package com.akto.action;
 
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.BurpPluginInfoDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.har.HAR;
@@ -96,7 +97,7 @@ public class HarAction extends UserAction {
         try {
             HAR har = new HAR();
             logger.info("Har file upload processing for collectionId : {}", apiCollectionId);
-            List<String> messages = har.getMessages(harString, apiCollectionId);
+            List<String> messages = har.getMessages(harString, apiCollectionId, Context.accountId.get());
             harErrors = har.getErrors();
             Utils.pushDataToKafka(apiCollectionId, topic, messages, harErrors, skipKafka);
         } catch (Exception e) {

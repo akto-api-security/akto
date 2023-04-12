@@ -3,6 +3,7 @@ package com.akto.filter;
 import javax.servlet.*;
 import javax.servlet.http.HttpServletResponse;
 
+import com.akto.dao.context.Context;
 import com.akto.utils.HttpUtils;
 
 import java.io.IOException;
@@ -16,6 +17,7 @@ public class SecurityHeadersFilter implements Filter {
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+        Context.accountId.remove();
         HttpServletResponse httpServletResponse = (HttpServletResponse) response;
 
         httpServletResponse.addHeader("X-Frame-Options", "deny");
