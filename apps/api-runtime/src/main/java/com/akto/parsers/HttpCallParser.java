@@ -236,7 +236,7 @@ public class HttpCallParser {
 
         String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
 
-        if (hostName.toLowerCase().equals(hostName.toUpperCase()) ) {
+        if (hostName != null &&  hostName.toLowerCase().equals(hostName.toUpperCase()) ) {
             hostName = "ip-host";
         }
 
