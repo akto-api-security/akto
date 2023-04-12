@@ -23,7 +23,7 @@
                     :height="230"
                     title="Traffic"
                     :data="trafficTrend"
-                    :defaultChartOptions="{legend:{enabled: false}}"
+                    :defaultChartOptions="defaultChartOptions"
                     background-color="var(--transparent)"
                     :text="true"
                     :input-metrics="[]"
@@ -68,8 +68,31 @@ export default {
             endTimestamp: Math.floor(Date.now() / 1000) ,
             trafficMetricsMapString: '',
             trafficMetricsMap: {},
-            menu: false
+            menu: false,
+            defaultChartOptions: {
+                "legend": {
+                    layout: 'vertical', align: 'right', verticalAlign: 'middle'
+                },
+                "plotOptions": {
+                    series: {
+                        events: {
+                            // Add legend item click event
+                            legendItemClick: function() {
+                                var seriesIndex = this.index;
+                                var chart = this.chart;
+                                var series = chart.series[seriesIndex]; // Get the selected series
 
+                                chart.series.forEach(function(s) {
+                                    s.hide(); // Hide all series
+                                });
+                                series.show(); // Show the selected series
+
+                                return false; // Prevent default legend click behavior
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     methods: {
