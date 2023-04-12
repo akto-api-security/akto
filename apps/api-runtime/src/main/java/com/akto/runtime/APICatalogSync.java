@@ -210,7 +210,7 @@ public class APICatalogSync {
     }
 
 
-    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId) {
+    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, Boolean urlRegexMatchingEnabled) {
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
 
         Bson filterQ = null;
@@ -280,7 +280,7 @@ public class APICatalogSync {
 
 
             for(int size: sizeToUrlToSti.keySet()) {
-                ApiMergerResult result = tryMergingWithKnownStrictURLs(sizeToUrlToSti.get(size));    
+                ApiMergerResult result = tryMergingWithKnownStrictURLs(sizeToUrlToSti.get(size), urlRegexMatchingEnabled);    
                 finalResult.templateToStaticURLs.putAll(result.templateToStaticURLs);
             }
 
@@ -333,7 +333,7 @@ public class APICatalogSync {
     }
 
     private static ApiMergerResult tryMergingWithKnownStrictURLs(
-        Map<String, Set<String>> pendingRequests
+        Map<String, Set<String>> pendingRequests, Boolean urlRegexMatchingEnabled
     ) {
         Map<URLTemplate, Set<String>> templateToStaticURLs = new HashMap<>();
 
@@ -373,7 +373,7 @@ public class APICatalogSync {
                     continue;
                 }
 
-                if (APICatalogSync.areBothMatchingUrls(newStatic,aStatic,mergedTemplate) || APICatalogSync.areBothUuidUrls(newStatic,aStatic,mergedTemplate) || RequestTemplate.compareKeys(aTemplate, newTemplate, mergedTemplate)) {
+                if (APICatalogSync.areBothMatchingUrls(newStatic,aStatic,mergedTemplate, urlRegexMatchingEnabled) || APICatalogSync.areBothUuidUrls(newStatic,aStatic,mergedTemplate) || RequestTemplate.compareKeys(aTemplate, newTemplate, mergedTemplate)) {
                     Map<String, Set<String>> similarTemplates = potentialMerges.get(mergedTemplate);
                     if (similarTemplates == null) {
                         similarTemplates = new HashMap<>();
@@ -461,7 +461,7 @@ public class APICatalogSync {
                         continue;
                     }
 
-                    if (areBothMatchingUrls(newUrl, dbUrl, mergedTemplate) || areBothUuidUrls(newUrl,dbUrl,mergedTemplate) || dbTemplate.compare(newTemplate, mergedTemplate)) {
+                    if (areBothUuidUrls(newUrl,dbUrl,mergedTemplate) || dbTemplate.compare(newTemplate, mergedTemplate)) {
                         Set<RequestTemplate> similarTemplates = potentialMerges.get(mergedTemplate);
                         if (similarTemplates == null) {
                             similarTemplates = new HashSet<>();
@@ -507,7 +507,7 @@ public class APICatalogSync {
             for (URLStatic deltaUrl: deltaCatalog.getStrictURLToMethods().keySet()) {
                 RequestTemplate deltaTemplate = deltaTemplates.get(deltaUrl);
                 URLTemplate mergedTemplate = tryMergeUrls(deltaUrl, newUrl);
-                if (mergedTemplate == null || (RequestTemplate.isMergedOnStr(mergedTemplate) && !(areBothUuidUrls(newUrl,deltaUrl,mergedTemplate) || areBothMatchingUrls(newUrl, deltaUrl, mergedTemplate)))) {
+                if (mergedTemplate == null || (RequestTemplate.isMergedOnStr(mergedTemplate) && areBothUuidUrls(newUrl,deltaUrl,mergedTemplate))) {
                     continue;
                 }
 
@@ -561,7 +561,12 @@ public class APICatalogSync {
         return true;
     }
 
-    public static boolean areBothMatchingUrls(URLStatic newUrl, URLStatic deltaUrl, URLTemplate mergedTemplate) {
+    public static boolean areBothMatchingUrls(URLStatic newUrl, URLStatic deltaUrl, URLTemplate mergedTemplate, Boolean urlRegexMatchingEnabled) {
+
+        if (!urlRegexMatchingEnabled) {
+            System.out.println("merging not allowed");
+            return false;
+        }
 
         String[] n = tokenize(newUrl.getUrl());
         String[] o = tokenize(deltaUrl.getUrl());
@@ -572,6 +577,8 @@ public class APICatalogSync {
                 String val = n[idx];
                 if(!isAlphanumericString(val) || !isAlphanumericString(o[idx])) {
                     return false;
+                } else {
+                    System.out.println(val);
                 }
             }
         }
@@ -583,9 +590,12 @@ public class APICatalogSync {
 
         int intCount = 0;
         int charCount = 0;
+        if (s.length() < 6) {
+            return false;
+        }
         for (int i = 0; i < s.length(); i++) {
 
-            Character c = s.charAt(i);
+            char c = s.charAt(i);
             if (Character.isDigit(c)) {
                 intCount++;
             } else if (Character.isLetter(c)) {
@@ -641,8 +651,8 @@ public class APICatalogSync {
     }
 
 
-    public static void mergeUrlsAndSave(int apiCollectionId) {
-        ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId);
+    public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled) {
+        ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, urlRegexMatchingEnabled);
         ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSti = new ArrayList<>();
         ArrayList<WriteModel<SampleData>> bulkUpdatesForSampleData = new ArrayList<>();
         ArrayList<WriteModel<ApiInfo>> bulkUpdatesForApiInfo = new ArrayList<>();
@@ -1164,10 +1174,11 @@ public class APICatalogSync {
 
                     try {
                         List<ApiCollection> allCollections = ApiCollectionsDao.instance.getMetaAll();
+                        Boolean urlRegexMatchingEnabled = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()).getUrlRegexMatchingEnabled();
                         for(ApiCollection apiCollection: allCollections) {
                             int start = Context.now();
                             loggerMaker.infoAndAddToDb("Started merging API collection " + apiCollection.getId(), LogDb.RUNTIME);
-                            mergeUrlsAndSave(apiCollection.getId());
+                            mergeUrlsAndSave(apiCollection.getId(), urlRegexMatchingEnabled);
                             loggerMaker.infoAndAddToDb("Finished merging API collection " + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
                         }
                     } catch (Exception e) {
