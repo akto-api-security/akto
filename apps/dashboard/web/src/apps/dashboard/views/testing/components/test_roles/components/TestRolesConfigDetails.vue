@@ -1,90 +1,111 @@
 <template>
-    <div style="padding: 24px; height: 100%" v-if="(!isSelectedRoleEmpty || createNew)">
-        <v-container>
-            <div style=" display: flex">
-                <div class="form-text">
-                    Role Name
-                </div>
-                <div style="padding-top: 0px">
-                    <v-text-field :placeholder="(selectedRole.name ? selectedRole.name : 'Define role name')" flat solo
-                        class="form-value" v-model="roleName" :rules="name_rules" hide-details
-                        :readonly="!(createNew)" />
-                </div>
-            </div>
-            <div v-if="!isSelectedRoleEmpty">
-                <div style=" display: flex">
-                    <div class="form-text">
-                        Creator
+    <layout-with-tabs title="" :tabs='["Settings", "Access"]'>
+        <template slot="Settings">
+            <div style="height: 100%" v-if="(!isSelectedRoleEmpty || createNew)">
+                <v-container style="padding: 12px 12px 12px 0px">
+                    <div style=" display: flex">
+                        <div class="form-text">
+                            Role Name
+                        </div>
+                        <div style="padding-top: 0px">
+                            <v-text-field :placeholder="(selectedRole.name ? selectedRole.name : 'Define role name')" flat solo
+                                class="form-value" v-model="roleName" :rules="name_rules" hide-details
+                                :readonly="!(createNew)" />
+                        </div>
                     </div>
-                    <div style="padding-top: 0px">
-                        <v-text-field flat solo class="form-value" readonly hide-details
-                            :value="selectedRole.createdBy" />
-                    </div>
-                </div>
-                <div style="display: flex">
-                    <div class="form-text">
-                        Last Updated
-                    </div>
-                    <div style="padding-top: 0px">
-                        <v-text-field flat solo class="ma-0 pa-0" readonly hide-details
-                            :value='computeLastUpdated(selectedRole.lastUpdatedTs)' />
-                    </div>
-                </div>
-            </div>
-            <div>
-                <v-row style="padding: 36px 12px 12px 12px">
-                    <test-role-conditions-table initial_string="Endpoint" :selectedRole="selectedRole"
-                        table_header="Role endpoint conditions" :operators="operators"
-                        :requireTextInputForTypeArray="requireTextInputForTypeArray"
-                        :requireMapInputForTypeArray="requireMapInputForTypeArray" :operation_types="operation_types" />
-                </v-row>
-            </div>
-
-            <div class="d-flex pt-4">
-                <div class="form-text">
-                    Auth token
-                </div>
-
-                <div class="input-value">
-                    <v-text-field v-model="newKey" style="width: 200px">
-                        <template slot="label">
-                            <div class="d-flex">
-                                Auth header key
+                    <div v-if="!isSelectedRoleEmpty">
+                        <div style=" display: flex">
+                            <div class="form-text">
+                                Creator
                             </div>
-                        </template>
-                    </v-text-field>
-
-                </div>
-                <div class="input-value">
-                    <v-text-field v-model="newVal" style="width: 500px">
-                        <template slot="label">
-                            <div class="d-flex">
-                                Auth header value
+                            <div style="padding-top: 0px">
+                                <v-text-field flat solo class="form-value" readonly hide-details
+                                    :value="selectedRole.createdBy" />
                             </div>
-                        </template>
+                        </div>
+                        <div style="display: flex">
+                            <div class="form-text">
+                                Last Updated
+                            </div>
+                            <div style="padding-top: 0px">
+                                <v-text-field flat solo class="ma-0 pa-0" readonly hide-details
+                                    :value='computeLastUpdated(selectedRole.lastUpdatedTs)' />
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <v-row style="padding: 36px 12px 12px 12px">
+                            <test-role-conditions-table initial_string="Endpoint" :selectedRole="selectedRole"
+                                table_header="Role endpoint conditions" :operators="operators"
+                                :requireTextInputForTypeArray="requireTextInputForTypeArray"
+                                :requireMapInputForTypeArray="requireMapInputForTypeArray" :operation_types="operation_types" />
+                        </v-row>
+                    </div>
 
-                    </v-text-field>
-                </div>
+                    <div class="d-flex pt-4">
+                        <div class="form-text">
+                            Auth token
+                        </div>
+
+                        <div class="input-value">
+                            <v-text-field v-model="newKey" style="width: 200px">
+                                <template slot="label">
+                                    <div class="d-flex">
+                                        Auth header key
+                                    </div>
+                                </template>
+                            </v-text-field>
+
+                        </div>
+                        <div class="input-value">
+                            <v-text-field v-model="newVal" style="width: 500px">
+                                <template slot="label">
+                                    <div class="d-flex">
+                                        Auth header value
+                                    </div>
+                                </template>
+
+                            </v-text-field>
+                        </div>
+                    </div>
+
+
+                    <v-row style="padding-top: 30px">
+                        <div style="padding: 12px">
+                            <v-btn @click="save" color="var(--themeColor)" class="save-btn" height="40px" width="100px"
+                                :loading="saveLoading">
+                                Save
+                            </v-btn>
+                        </div>
+                    </v-row>
+                    <!-- <review-table v-if="reviewData" :review-data="reviewData" /> -->
+                </v-container>
             </div>
+        </template>
 
-
-            <v-row style="padding-top: 30px">
-                <div style="padding: 12px">
-                    <v-btn @click="save" color="var(--themeColor)" class="save-btn" height="40px" width="100px"
-                        :loading="saveLoading">
-                        Save
+        <template slot="Access">
+            <div v-if="!isSelectedRoleEmpty && !createNew">
+                <div style="padding: 12px 0px">
+                    <v-btn @click="createAccessMatrix" color="var(--themeColor)" class="save-btn" height="40px" width="200px" style="margin: 0px">
+                        Create Access Matrix
                     </v-btn>
                 </div>
-            </v-row>
-            <!-- <review-table v-if="reviewData" :review-data="reviewData" /> -->
-        </v-container>
-    </div>
+                <simple-table 
+                :headers="headers" 
+                :items="roleToUrls" 
+                />
+            </div>
+        </template>
+    </layout-with-tabs>
 </template>
 
 
 <script>
 import ReviewTable from "@/apps/dashboard/views/settings/components/data_types/components/ReviewTable";
 import TestRoleConditionsTable from "./TestRoleConditionsTable.vue"
+import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
+import ACard from '@/apps/dashboard/shared/components/ACard'
+import LayoutWithTabs from "@/apps/dashboard/layouts/LayoutWithTabs"
 import { mapState } from "vuex";
 import func from "@/util/func";
 import api from "../api"
@@ -95,7 +116,10 @@ export default {
     },
     components: {
         ReviewTable,
-        TestRoleConditionsTable
+        SimpleTable,
+        TestRoleConditionsTable,
+        ACard,
+        LayoutWithTabs
     },
     data() {
         var operators = [
@@ -132,6 +156,20 @@ export default {
                     return true
                 },
             ],
+            rolesToUrls: [],
+            headers: [
+                {
+                    text: '',
+                    value: 'color'
+                },
+                {
+                    text: 'method',
+                    value: 'method'
+                }, {
+                    text: 'url',
+                    value: 'url'
+                }],
+            conditionCollections: []
         }
     },
     methods: {
@@ -239,10 +277,16 @@ export default {
                         color: 'red'
                     })
                 }
+        },
+        async createAccessMatrix(){
+            let apiCollectionIds = this.conditionCollections.map((collectionId) => parseInt(collectionId));
+            await api.createMultipleAccessMatrixTasks(apiCollectionIds)
         }
     },
     mounted() {
-        api.fetchAccessMatrixUrlToRoles();
+        api.fetchAccessMatrixUrlToRoles().then((resp) => {
+            this.rolesToUrls = resp.accessMatrixRoleToUrls;
+        })
     },
     computed: {
         ...mapState('test_roles', ['testRoles', 'loading', 'selectedRole', 'listOfEndpointsInCollection', 'createNew', 'conditions']),
@@ -254,11 +298,23 @@ export default {
         },
         isSelectedRoleEmpty() {
             return Object.keys(this.selectedRole).length === 0
+        },
+        roleToUrls() {
+            this.conditions.map((condition) => { 
+                    if(condition.value){
+                        let key = Object.keys(condition.value)[0]
+                        if(key!=0 && !this.conditionCollections.includes(key)){
+                            this.conditionCollections.push(key);
+                        }
+                    }
+            });
+            return this.rolesToUrls[this.roleName];
         }
     },
     watch: {
         selectedRole(newVal, oldVal){
             if(newVal!=oldVal){
+                this.conditionCollections = []
                 this.roleName = this.selectedRole.name;
                 this.newKey = this.selectedRole.authMechanism?.authParams?.[0]?.key || ''
                 this.newVal = this.selectedRole.authMechanism?.authParams?.[0]?.value || ''

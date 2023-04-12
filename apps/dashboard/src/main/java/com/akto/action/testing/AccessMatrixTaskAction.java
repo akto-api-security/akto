@@ -1,7 +1,10 @@
 package com.akto.action.testing;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -17,15 +20,19 @@ import com.akto.dto.testing.AccessMatrixUrlToRole;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.WriteModel;
 
 public class AccessMatrixTaskAction extends UserAction{
     
     private List<AccessMatrixTaskInfo> accessMatrixTaskInfos;
     private List<AccessMatrixUrlToRole> accessMatrixUrlToRoles;
+    private Map<String,List<ApiInfoKey>> accessMatrixRoleToUrls = new HashMap<>();
     private List<ApiInfoKey> apiInfoKeys;
     private int apiCollectionId;
+    private List<Integer> apiCollectionIds;
     private int frequencyInSeconds;
     private String hexId;
 
@@ -36,6 +43,15 @@ public class AccessMatrixTaskAction extends UserAction{
 
     public String fetchAccessMatrixUrlToRoles(){
         accessMatrixUrlToRoles = AccessMatrixUrlToRolesDao.instance.findAll(new BasicDBObject());
+        for(AccessMatrixUrlToRole urlToRole: accessMatrixUrlToRoles){
+            for(String role:urlToRole.getRoles()){
+                if(accessMatrixRoleToUrls.containsKey(role)){
+                    accessMatrixRoleToUrls.get(role).add(urlToRole.getId());
+                } else {
+                    accessMatrixRoleToUrls.put(role, new ArrayList<>(Collections.singletonList(urlToRole.getId())));
+                }
+            }
+        }
         return SUCCESS.toUpperCase();
     }
 
@@ -49,6 +65,25 @@ public class AccessMatrixTaskAction extends UserAction{
             frequencyInSeconds = 86400;
         }
         return true;
+    }
+
+    public String createMultipleAccessMatrixTasks(){
+        if(apiCollectionIds==null || apiCollectionIds.isEmpty()){
+            addActionError("No endpoints found to create access matrix");
+            return ERROR.toUpperCase();
+        }
+        List<WriteModel<AccessMatrixTaskInfo>> writes = new ArrayList<>();
+        for(int collectionId: apiCollectionIds){
+            Bson filter = Filters.eq(AccessMatrixTaskInfo.API_COLLECTION_ID, collectionId);
+            Bson update = Updates.combine(
+                    Updates.set(AccessMatrixTaskInfo.API_COLLECTION_ID, collectionId),
+                    Updates.set(AccessMatrixTaskInfo.FREQUENCY_IN_SECONDS, 86400),
+                    Updates.set(AccessMatrixTaskInfo.NEXT_SCHEDULED_TIMESTAMP, Context.now()));
+                    UpdateOptions opts = new UpdateOptions().upsert(true);
+                    writes.add(new UpdateOneModel<>(filter, update,opts));
+        }
+        AccessMatrixTaskInfosDao.instance.getMCollection().bulkWrite(writes);
+        return SUCCESS.toUpperCase();
     }
 
     public String createAccessMatrixTask(){
@@ -106,6 +141,18 @@ public class AccessMatrixTaskAction extends UserAction{
     }
     public void setAccessMatrixUrlToRoles(List<AccessMatrixUrlToRole> accessMatrixUrlToRoles) {
         this.accessMatrixUrlToRoles = accessMatrixUrlToRoles;
+    }
+    public Map<String, List<ApiInfoKey>> getAccessMatrixRoleToUrls() {
+        return accessMatrixRoleToUrls;
+    }
+    public void setAccessMatrixRoleToUrls(Map<String, List<ApiInfoKey>> accessMatrixRoleToUrls) {
+        this.accessMatrixRoleToUrls = accessMatrixRoleToUrls;
+    }
+    public List<Integer> getApiCollectionIds() {
+        return apiCollectionIds;
+    }
+    public void setApiCollectionIds(List<Integer> apiCollectionIds) {
+        this.apiCollectionIds = apiCollectionIds;
     }
     public List<ApiInfoKey> getApiInfoKeys() {
         return apiInfoKeys;

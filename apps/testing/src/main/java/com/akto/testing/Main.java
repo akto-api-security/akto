@@ -78,7 +78,7 @@ public class Main {
                 AccessMatrixAnalyzer matrixAnalyzer = new AccessMatrixAnalyzer();
                 matrixAnalyzer.run();
             }
-        }, 0, 48, TimeUnit.HOURS);
+        }, 0, 12, TimeUnit.HOURS);
 
         TestExecutor testExecutor = new TestExecutor();
 

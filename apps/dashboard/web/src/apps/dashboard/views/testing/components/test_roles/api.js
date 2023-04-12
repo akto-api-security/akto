@@ -37,6 +37,15 @@ export default {
             return resp
         })
     },
+    createMultipleAccessMatrixTasks(apiCollectionIds){
+        return request({
+            url: '/api/createMultipleAccessMatrixTasks',
+            method: 'post',
+            data: {apiCollectionIds}
+        }).then((resp) => {
+            return resp
+        })
+    },
     fetchCollectionWiseApiEndpoints (apiCollectionId) {
         return request({
             url: '/api/fetchCollectionWiseApiEndpoints',

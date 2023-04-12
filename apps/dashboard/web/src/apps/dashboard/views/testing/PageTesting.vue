@@ -118,9 +118,7 @@
         <template slot="Roles">
             <test-roles title="Roles" :testRoles="testRoles">
                 <template #details-container="{}">
-                    <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
-                        <test-roles-config-details></test-roles-config-details>
-                    </a-card>
+                    <test-roles-config-details/>
                 </template>
             </test-roles>
         </template>
@@ -136,7 +134,6 @@
 
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import SensitiveChipGroup from '@/apps/dashboard/shared/components/SensitiveChipGroup'
-import ACard from '@/apps/dashboard/shared/components/ACard'
 import SampleData from '@/apps/dashboard/shared/components/SampleData'
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import TestRoles from './components/test_roles/TestRoles'
@@ -160,7 +157,6 @@ export default {
     components: {
         SimpleTable,
         SensitiveChipGroup,
-        ACard,
         SampleData,
         LayoutWithTabs,
         LayoutWithLeftPane,
