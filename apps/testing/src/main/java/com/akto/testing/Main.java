@@ -30,7 +30,7 @@ public class Main {
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
     private static ObjectId createTRRSummaryIfAbsent(TestingRun testingRun, int start){
-        ObjectId summaryId = null;
+        ObjectId summaryId = new ObjectId();
         try {
             ObjectId testingRunId = new ObjectId(testingRun.getHexId());
             TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.findOne(

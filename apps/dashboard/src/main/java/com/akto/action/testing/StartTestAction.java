@@ -13,6 +13,7 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.testing.*;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
+import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
@@ -119,7 +120,7 @@ public class StartTestAction extends UserAction {
         if(this.testingRunHexId!=null){
             try{
                 ObjectId testingId = new ObjectId(this.testingRunHexId);
-                localTestingRun = TestingRunDao.instance.findOne("_id",testingId);
+                localTestingRun = TestingRunDao.instance.findOne(Constants.ID,testingId);
             } catch (Exception e){
                 loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
             }
@@ -139,17 +140,17 @@ public class StartTestAction extends UserAction {
             }
         } else {
             TestingRunDao.instance.updateOne(
-                Filters.eq("_id",localTestingRun.getId()), 
+                Filters.eq(Constants.ID,localTestingRun.getId()), 
                 Updates.combine(
-                    Updates.set("state",TestingRun.State.SCHEDULED),
-                    Updates.set("scheduleTimestamp",scheduleTimestamp)
+                    Updates.set(TestingRun.STATE,TestingRun.State.SCHEDULED),
+                    Updates.set(TestingRun.SCHEDULE_TIMESTAMP,scheduleTimestamp)
                 ));
         }
 
         Map<String, Object> session = getSession();
         String utility = (String) session.get("utility");
         
-        if(utility!=null && ( "CICD".equals(utility) || "EXTERNAL_API".equals(utility))){
+        if(utility!=null && ( Utility.CICD.toString().equals(utility) || Utility.EXTERNAL_API.toString().equals(utility))){
             TestingRunResultSummary summary = new TestingRunResultSummary(scheduleTimestamp, 0, new HashMap<>(),
             0, localTestingRun.getId(), localTestingRun.getId().toHexString(), 0);
             summary.setState(TestingRun.State.SCHEDULED);
@@ -177,12 +178,12 @@ public class StartTestAction extends UserAction {
         this.authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
 
         if(fetchCicd){
-            testingRuns = TestingRunDao.instance.findAll(Filters.in("_id", getCicdTests()));
+            testingRuns = TestingRunDao.instance.findAll(Filters.in(Constants.ID, getCicdTests()));
         } else {
             Bson filterQ = Filters.and(
                 Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, this.endTimestamp),
                 Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, this.startTimestamp),
-                Filters.nin("_id",getCicdTests())
+                Filters.nin(Constants.ID,getCicdTests())
             );
             testingRuns = TestingRunDao.instance.findAll(filterQ);
         }
