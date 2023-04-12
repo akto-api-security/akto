@@ -52,7 +52,7 @@
                     </div>
                 </div>                  
 
-                <div class="testing-results-header" v-if="this.currentTest.metadata">
+                <div class="testing-results-header" v-if="this.currentTest && this.currentTest.metadata">
                     CI/CD Run Details: {{ this.currentTest.metadata }}
                 </div>
 

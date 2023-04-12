@@ -52,6 +52,7 @@ import SlackIntegration from "./SlackIntegration"
 import Postman from "./Postman"
 import AktoAPIIntegration from "./AktoApiIntegration"
 import WebhookIntegration from "./webhook/WebhookIntegration";
+import func from "@/util/func";
 
 export default {
   name: "IntegrationSelector",
@@ -71,7 +72,7 @@ export default {
           component: AktoAPIIntegration,
           props:{
             title:"Burp",
-            tokenUtility:"BURP",
+            tokenUtility:func.testingResultType().BURP,
             avatar_image:"$burpsuite"
           }
         }],
@@ -90,7 +91,7 @@ export default {
           component: AktoAPIIntegration,
           props:{
             title:"External APIs",
-            tokenUtility:"EXTERNAL_API",
+            tokenUtility:func.testingResultType().EXTERNAL_API,
             avatar_image:"$restapi"
           }
         },{
@@ -98,7 +99,7 @@ export default {
           component: AktoAPIIntegration,
           props:{
             title:"CI/CD Integeration",
-            tokenUtility:"CICD",
+            tokenUtility:func.testingResultType().CICD,
             avatar_image:"$cicdicon"
           }
         }]
