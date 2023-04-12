@@ -507,7 +507,7 @@ public class APICatalogSync {
             for (URLStatic deltaUrl: deltaCatalog.getStrictURLToMethods().keySet()) {
                 RequestTemplate deltaTemplate = deltaTemplates.get(deltaUrl);
                 URLTemplate mergedTemplate = tryMergeUrls(deltaUrl, newUrl);
-                if (mergedTemplate == null || (RequestTemplate.isMergedOnStr(mergedTemplate) && areBothUuidUrls(newUrl,deltaUrl,mergedTemplate))) {
+                if (mergedTemplate == null || (RequestTemplate.isMergedOnStr(mergedTemplate) && !areBothUuidUrls(newUrl,deltaUrl,mergedTemplate))) {
                     continue;
                 }
 
