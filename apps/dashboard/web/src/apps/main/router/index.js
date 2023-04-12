@@ -162,7 +162,8 @@ const router =  new Router({
                                     name:'apiCollection',
                                     component: APIEndpoints,
                                     props: route => ({
-                                        apiCollectionId: +route.params.apiCollectionId
+                                        apiCollectionId: +route.params.apiCollectionId,
+                                        isLogicalGroup:(+route.params.isLogicalGroup == true)
                                     })
                                 },
                                 {

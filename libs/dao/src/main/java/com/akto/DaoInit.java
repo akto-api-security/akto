@@ -116,6 +116,14 @@ public class DaoInit {
                 .builder(CollectionWiseTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<WorkflowTestingEndpoints> workflowTestingEndpointsClassModel = ClassModel
                 .builder(WorkflowTestingEndpoints.class).enableDiscriminator(true).build();
+        ClassModel<FilterBasedTestingEndpoints> filterBasedTestingEndpointsClassModel = ClassModel
+                .builder(FilterBasedTestingEndpoints.class).enableDiscriminator(true).build();
+        ClassModel<EndpointDataQuery> endpointDataQuery = ClassModel.builder(EndpointDataQuery.class)
+                .enableDiscriminator(true).build();
+        ClassModel<EndpointDataFilterCondition> endpointDataFilterCondition = ClassModel.builder(EndpointDataFilterCondition.class)
+                .enableDiscriminator(true).build();
+        ClassModel<EndpointDataSortCondition> endpointDataSortCondition = ClassModel.builder(EndpointDataSortCondition.class)
+                .enableDiscriminator(true).build();
         ClassModel<WorkflowTestResult> workflowTestResultClassModel = ClassModel.builder(WorkflowTestResult.class)
                 .enableDiscriminator(true).build();
         ClassModel<CappedSet> cappedSetClassModel = ClassModel.builder(CappedSet.class).enableDiscriminator(true)
@@ -171,9 +179,9 @@ public class DaoInit {
                 cappedListClassModel,
                 equalsToPredicateClassModel, isNumberPredicateClassModel, testingRunClassModel,
                 testingRunResultClassModel, testResultClassModel,
-                authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel, loginReqAuthParamClassModel,
-                testingEndpointsClassModel, customTestingEndpointsClassModel, collectionWiseTestingEndpointsClassModel,
-                workflowTestingEndpointsClassModel, workflowTestResultClassModel,
+                authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel, endpointDataQuery, endpointDataFilterCondition, endpointDataSortCondition,
+                loginReqAuthParamClassModel, testingEndpointsClassModel, customTestingEndpointsClassModel, collectionWiseTestingEndpointsClassModel,
+                workflowTestingEndpointsClassModel, filterBasedTestingEndpointsClassModel, workflowTestResultClassModel,
                 cappedSetClassModel, CustomWebhookClassModel, CustomWebhookResultClassModel,
                 nodeResultClassModel, awsResourcesModel, AktoDataTypeClassModel, testingRunIssuesClassModel,
                 testingIssuesIdClassModel, testSourceConfigClassModel, endpointLogicalGroupClassModel, testRolesClassModel,

@@ -8,6 +8,7 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomDataType;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.SensitiveParamInfo;
+import com.akto.dto.testing.SingleTypeInfoView;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -192,7 +193,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return sensitiveInResponse;
     }
 
-    public Bson filterForSensitiveParamsExcludingUserMarkedSensitive(Integer apiCollectionId, String url, String method, String subType) {
+    public Bson filterForSensitiveParamsExcludingUserMarkedSensitive(Integer apiCollectionId, String url, String method, String subType, List<String> urls) {
         // apiCollectionId null then no filter for apiCollectionId
         List<String> sensitiveSubTypes = sensitiveSubTypeNames();
 
@@ -230,6 +231,10 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             filters.add(Filters.eq("apiCollectionId", apiCollectionId) );
         }
 
+        if (urls != null && urls.size() > 0) {
+            filters.add(Filters.in("url", urls));
+        }
+
         if (url != null) {
             filters.add(Filters.eq("url", url));
         }
@@ -265,7 +270,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             urls.add(sensitiveParamInfo.getUrl());
         }
 
-        Bson filter = filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId, url, method, null);
+        Bson filter = filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId, url, method, null, null);
 
         urls.addAll(instance.findDistinctFields("url", String.class, filter));
 
@@ -393,4 +398,157 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
         return countMap;
     }
+
+    public void createStiCollectionView() {
+
+        int ts = 0;
+        int iterations = 0;
+
+        while(iterations < 100) {
+
+            SingleTypeInfoView singleTypeInfoView = SingleTypeInfoViewDao.instance.findLatestOne(new BasicDBObject(), Sorts.descending("discoveredTs"));
+            if (singleTypeInfoView == null) {
+                ts = -1;
+            } else {
+                ts = singleTypeInfoView.getDiscoveredTs();
+            }
+
+            Bson filters = Filters.gt("timestamp", ts);
+
+            int count = (int) SingleTypeInfoDao.instance.findCount(filters);
+            if (count == 0) {
+                break;
+            }
+
+            String reqSensitiveComputedJson = "{'$cond': [{'$eq': ['$responseCode', 200]}, '$subType', '$REMOVE']}";
+            String respSensitiveComputedJson = "{'$cond': [{'$eq': ['$responseCode', -1]}, '$subType', '$REMOVE']}";
+            String sensitiveComputedJson = "{'$cond': [{'$eq': ['$responseCode', 200]}, {'$concat': ['reqSensitive', '_', '$subType']}, {'$concat': ['respSensitive', '_', '$subType']}]}";
+
+            List<Bson> pipeline = new ArrayList<>();
+            BasicDBObject groupedId = 
+                    new BasicDBObject("apiCollectionId", "$apiCollectionId")
+                    .append("method", "$method")
+                    .append("url", "$url");
+            
+            pipeline.add(Aggregates.match(Filters.gte("timestamp", ts)));
+            pipeline.add(Aggregates.sort(Sorts.ascending("timestamp")));
+            pipeline.add(Aggregates.limit(1000000));
+
+            pipeline.add(Aggregates.group(
+                groupedId, Accumulators.min("discoveredTs", "$timestamp"),
+                Accumulators.addToSet("reqSubTypes", Document.parse(reqSensitiveComputedJson)),
+                Accumulators.addToSet("respSubTypes", Document.parse(respSensitiveComputedJson)),
+                Accumulators.addToSet("combinedData", Document.parse(sensitiveComputedJson))
+            ));
+
+            pipeline.add(Aggregates.merge(SingleTypeInfoViewDao.instance.getCollName()));
+            instance.createOnDemandView(pipeline);
+            
+            iterations++;
+        }
+    }
+
+    public void mergeStiViewAndApiInfo() {
+
+        try {
+            List<Bson> pipeline = new ArrayList<>();
+            List<Bson> pipeline2 = new ArrayList<>();
+            
+            String filterJson = "{'$eq': ['$_id', '$$view_id']}";
+            Bson filter = Filters.expr(Document.parse(filterJson));
+            pipeline2.add(Aggregates.match(filter));
+            pipeline2.add(Aggregates.unwind("$allAuthTypesFound"));
+
+            String combinedDataComputedJson = "{'$setUnion':[{'$ifNull': [ { '$map': {'input': '$$req_sens', 'as': 'reqs', 'in': {'$concat': ['reqSensitive_', '$$reqs']}} }, []]}, {'$ifNull': [ { '$map': {'input': '$$resp_sens', 'as': 'resps', 'in': {'$concat': ['respSensitive_', '$$resps']}} }, []]}, {'$ifNull': [ { '$map': {'input': '$allAuthTypesFound', 'as': 'auth', 'in': {'$concat': ['authType_', '$$auth']}} }, []]}, {'$ifNull': [ [  {'$concat': ['accessType_', { '$cond': [{'$gt': [{'$size': '$apiAccessTypes'}, 1]}, 'PUBLIC', {'$first': '$apiAccessTypes'}]}]}],[]]}, {'$ifNull': [[ {'$concat': ['method', '_', '$_id.method']}], []]}, {'$ifNull': [ { '$map': {'input': '$$logic_groups', 'as': 'lg', 'in': {'$concat': ['logicalGroup_', {'$toString':'$$lg'}]}} }, []]}]}";
+            String accessTypeComputedJson = "{ '$cond': [{'$gt': [{'$size': {'$ifNull': ['$item.apiAccessTypes', [] ]} }, 1]}, 'PUBLIC', {'$ifNull': [{'$first': '$item.apiAccessTypes'}, '' ]}  ] }";
+
+            pipeline2.add(
+                Aggregates.project(
+                    Projections.fields(
+                        Projections.include("_id", "allAuthTypesFound", "apiAccessTypes", "lastSeen"),
+                        Projections.computed(
+                            "combinedData",
+                            Document.parse(combinedDataComputedJson)
+                        ),
+                        Projections.computed(
+                            "lastSeenTs",
+                            "$lastSeen"
+                        )
+                    )
+                )
+            );
+
+            List<Variable<String>> vars = new ArrayList<>();
+            vars.add(new Variable<>("view_id", "$_id"));
+            vars.add(new Variable<>("req_sens", "$reqSubTypes"));
+            vars.add(new Variable<>("resp_sens", "$respSubTypes"));
+            vars.add(new Variable<>("logic_groups", "$logicalGroups"));
+
+            pipeline.add(Aggregates.lookup(ApiInfoDao.instance.getCollName(), vars, pipeline2, "item"));
+
+            pipeline.add(Aggregates.unwind("$item"));
+
+            pipeline.add(
+                Aggregates.project(
+                    Projections.fields(
+                        Projections.include("_id"),
+                        Projections.computed(
+                            "authTypes",
+                            "$item.allAuthTypesFound"
+                        ),
+                        Projections.computed(
+                            "accessType",
+                            Document.parse(accessTypeComputedJson)
+                        ),
+                        Projections.computed(
+                            "combinedData",
+                            "$item.combinedData"
+                        ),
+                        Projections.computed(
+                            "lastSeenTs", 
+                            "$item.lastSeenTs"
+                        )
+                    )
+                )
+            );
+
+            pipeline.add(Aggregates.merge(SingleTypeInfoViewDao.instance.getCollName()));
+
+            System.out.println(pipeline.toString());
+            
+            SingleTypeInfoViewDao.instance.mergeCollections(pipeline);
+
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+        }
+
+    }
+
+    public void createSingleTypeInfoTimeStampIndex() {
+        String[] fieldNames = {"timestamp"};
+        SingleTypeInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
+    }
+
+    public void createStiViewIndexes() {
+
+        String[] fieldNames = {"_id.apiCollectionId", "discoveredTs"};
+        SingleTypeInfoViewDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
+
+        fieldNames = new String []{"_id.apiCollectionId", "lastSeenTs"};
+        SingleTypeInfoViewDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
+
+        fieldNames = new String []{"_id.apiCollectionId", "combinedData", "discoveredTs", "lastSeenTs"};
+        SingleTypeInfoViewDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
+
+        fieldNames = new String []{"_id.apiCollectionId", "combinedData", "lastSeenTs", "discoveredTs"};
+        SingleTypeInfoViewDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
+
+        fieldNames = new String []{"_id.apiCollectionId", "_id.method", "combinedData", "lastSeenTs", "discoveredTs"};
+        SingleTypeInfoViewDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
+
+        fieldNames = new String []{"_id.apiCollectionId", "_id.method", "_id.url"};
+        SingleTypeInfoViewDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));
+
+    }
+
 }

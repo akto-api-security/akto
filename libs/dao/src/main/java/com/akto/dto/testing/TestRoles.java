@@ -11,7 +11,7 @@ public class TestRoles {
     private ObjectId id;
     public static final String NAME = "name";
     private String name;
-    private ObjectId endpointLogicalGroupId;
+    private int endpointLogicalGroupId;
     private AuthMechanism authMechanism;
     @BsonIgnore
     private EndpointLogicalGroup endpointLogicalGroup;
@@ -20,7 +20,7 @@ public class TestRoles {
     public static final String LAST_UPDATED_TS = "lastUpdatedTs";
     private int lastUpdatedTs;
     public TestRoles(){}
-    public TestRoles(ObjectId id, String name, ObjectId endpointLogicalGroupId, AuthMechanism authMechanism, String createdBy, int createdTs, int lastUpdatedTs) {
+    public TestRoles(ObjectId id, String name, int endpointLogicalGroupId, AuthMechanism authMechanism, String createdBy, int createdTs, int lastUpdatedTs) {
         this.id = id;
         this.name = name;
         this.endpointLogicalGroupId = endpointLogicalGroupId;
@@ -51,11 +51,11 @@ public class TestRoles {
         this.name = name;
     }
 
-    public ObjectId getEndpointLogicalGroupId() {
+    public int getEndpointLogicalGroupId() {
         return endpointLogicalGroupId;
     }
 
-    public void setEndpointLogicalGroupId(ObjectId endpointLogicalGroupId) {
+    public void setEndpointLogicalGroupId(int endpointLogicalGroupId) {
         this.endpointLogicalGroupId = endpointLogicalGroupId;
     }
 

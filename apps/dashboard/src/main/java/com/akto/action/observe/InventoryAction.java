@@ -3,13 +3,21 @@ package com.akto.action.observe;
 import com.akto.action.UserAction;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.EndpointLogicalGroupDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.testing.EndpointDataFilterCondition;
+import com.akto.dto.testing.EndpointDataQuery;
+import com.akto.dto.testing.EndpointDataResponse;
+import com.akto.dto.testing.EndpointDataSortCondition;
+import com.akto.dto.testing.EndpointLogicalGroup;
+import com.akto.dto.testing.SingleTypeInfoView;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
+import com.akto.util.EndpointDataQueryBuilder;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -30,6 +38,8 @@ import java.util.*;
 public class InventoryAction extends UserAction {
 
     int apiCollectionId = -1;
+    int fetchEndpointsLimit = 50;
+    Boolean isLogicalGroup;
 
     BasicDBObject response;
 
@@ -46,9 +56,35 @@ public class InventoryAction extends UserAction {
 
     private String subType;
     public List<SingleTypeInfo> fetchSensitiveParams() {
-        Bson filterStandardSensitiveParams = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId, url, method, subType);
+        Bson filterStandardSensitiveParams = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId, url, method, subType, null);
 
         List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(filterStandardSensitiveParams, 0, 1_000, null, Projections.exclude("values"));
+        return list;        
+    }
+    
+    public List<SingleTypeInfo> fetchSensitiveParamsForUrls(List<ApiInfoKey> apiInfoList) {
+
+        List<String> urls = new ArrayList<>();
+        Set<ApiInfoKey> apiInfoKeySet = new HashSet<ApiInfoKey>();
+
+        for (ApiInfoKey apiInfoKey: apiInfoList) {
+            urls.add(apiInfoKey.getUrl());
+            apiInfoKeySet.add(new ApiInfoKey(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod()));
+        }
+
+        Bson filterStandardSensitiveParams = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId, url, method, subType, urls);
+
+        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(filterStandardSensitiveParams, 0, 1_000, null, Projections.exclude("values"));
+
+        List<SingleTypeInfo> filteredList = new ArrayList<>();
+
+        for (SingleTypeInfo singleTypeInfo: list) {
+            ApiInfoKey apiInfoKey = new ApiInfoKey(singleTypeInfo.getApiCollectionId(), singleTypeInfo.getUrl(), Method.fromString(singleTypeInfo.getMethod()));
+            if (apiInfoKeySet.contains(apiInfoKey)) {
+                filteredList.add(singleTypeInfo);
+            }
+        }
+
         return list;        
     }
 
@@ -92,6 +128,122 @@ public class InventoryAction extends UserAction {
         }
 
         return endpoints;
+    }
+
+    public BasicDBObject executeEndpointDataQuery(EndpointDataQuery endpointDataQuery) {
+
+        response = new BasicDBObject();
+
+        EndpointDataQueryBuilder endpointQueryBuilder = new EndpointDataQueryBuilder();
+        ArrayList<Bson> filterList = endpointQueryBuilder.buildEndpointDataFilterList(endpointDataQuery);
+
+        if (filterList == null) {
+            response.put("data", new BasicDBObject("endpoints", new ArrayList<EndpointDataResponse>()).append("total", 0));
+            return response;
+        }
+
+        Bson sort = endpointQueryBuilder.buildEndpointInfoSort(endpointDataQuery);
+        List<SingleTypeInfoView> endpoints = SingleTypeInfoViewDao.instance.findAll(Filters.and(filterList), collectionPage * fetchEndpointsLimit, fetchEndpointsLimit, sort);
+
+        List<EndpointDataResponse> resp = new ArrayList<>();
+        for (SingleTypeInfoView data: endpoints) {
+
+            List<String> authTypes = SingleTypeInfoViewDao.instance.calculateAuthTypes(data);
+            List<String> sensitiveTypes = SingleTypeInfoViewDao.instance.calculateSensitiveTypes(data);
+
+            EndpointDataResponse endpointDataResp = new EndpointDataResponse(data.getId().getUrl(), data.getId().getMethod().toString(), 
+            data.getId().getApiCollectionId(), data.getDiscoveredTs(), data.getLastSeenTs(), 
+            data.getAccessType(), authTypes, sensitiveTypes);
+
+            resp.add(endpointDataResp);
+
+        }
+
+        int docCount = (int) SingleTypeInfoViewDao.instance.findCount(Filters.and(filterList));
+
+        response.put("data", new BasicDBObject("endpoints", resp).append("total", docCount));
+
+        return response;
+    }
+
+    public BasicDBObject buildEndpointCountInfo(int apiCollectionId, Boolean isLogicalGroup) {
+        BasicDBObject resp = new BasicDBObject();
+
+        Set<String> sensitiveSet = new HashSet<>();
+        List<String> sensitiveReqList = new ArrayList<>();
+        List<CustomDataType> customDataTypes = CustomDataTypeDao.instance.findAll(new BasicDBObject());
+        for (CustomDataType cdt: customDataTypes) {
+            if (SingleTypeInfoViewDao.instance.isSensitive(cdt.getName(), true)) {
+                sensitiveSet.add("reqSensitive_" + cdt.getName());
+            }
+
+            if (SingleTypeInfoViewDao.instance.isSensitive(cdt.getName(), false)) {
+                sensitiveSet.add("respSensitive_" + cdt.getName());
+            }
+        }
+        for (SingleTypeInfo.SubType subType: SingleTypeInfo.subTypeMap.values()) {
+            if (SingleTypeInfoViewDao.instance.isSensitive(subType.getName(), true)) {
+                sensitiveSet.add("reqSensitive_" + subType.getName());
+            }
+
+            if (SingleTypeInfoViewDao.instance.isSensitive(subType.getName(), false)) {
+                sensitiveSet.add("respSensitive_" + subType.getName());
+            }
+        }
+
+        for (String param: sensitiveSet) {
+            sensitiveReqList.add(param);
+        }
+
+        int totalEndpointCount = 0;
+        int sensitiveEndpointCount = 0;
+
+        if (!isLogicalGroup) {
+            Bson collectionFilter = Filters.eq("_id.apiCollectionId", apiCollectionId);
+            totalEndpointCount = (int) SingleTypeInfoViewDao.instance.findCount(collectionFilter);
+            Bson filter = Filters.in("combinedData", sensitiveReqList);
+            sensitiveEndpointCount = (int) SingleTypeInfoViewDao.instance.findCount(Filters.and(filter, collectionFilter));
+        } else {
+            Bson collectionFilter = Filters.in("combinedData", "logicalGroup_" + apiCollectionId);
+            totalEndpointCount = (int) SingleTypeInfoViewDao.instance.findCount(collectionFilter);
+            Bson filter = Filters.in("combinedData", sensitiveReqList);
+            sensitiveEndpointCount = (int) SingleTypeInfoViewDao.instance.findCount(Filters.and(filter, collectionFilter));
+        }
+
+        resp.put("data", new BasicDBObject("totalEndpointCount", totalEndpointCount).append("sensitiveEndpointCount", sensitiveEndpointCount));
+        return resp;
+
+    }
+
+    public BasicDBObject fetchAllEndpointData(int apiCollectionId, Boolean isLogicalGroup) {
+        BasicDBObject resp = new BasicDBObject();
+
+        Bson filter;
+
+        if (!isLogicalGroup) {
+            filter = Filters.eq("_id.apiCollectionId", apiCollectionId);
+        } else {
+            filter = Filters.in("combinedData", "logicalGroup_" + apiCollectionId);
+        }
+
+        List<SingleTypeInfoView> endpoints = SingleTypeInfoViewDao.instance.findAll(filter);
+        List<EndpointDataResponse> allEndpoints = new ArrayList<>();
+        for (SingleTypeInfoView data: endpoints) {
+
+            List<String> authTypes = SingleTypeInfoViewDao.instance.calculateAuthTypes(data);
+            List<String> sensitiveTypes = SingleTypeInfoViewDao.instance.calculateSensitiveTypes(data);
+
+            EndpointDataResponse endpointDataResp = new EndpointDataResponse(data.getId().getUrl(), data.getId().getMethod().toString(), 
+            data.getId().getApiCollectionId(), data.getDiscoveredTs(), data.getLastSeenTs(), 
+            data.getAccessType(), authTypes, sensitiveTypes);
+
+            allEndpoints.add(endpointDataResp);
+
+        }
+
+        resp.put("data", new BasicDBObject("allEndpoints", allEndpoints));
+        return resp;
+
     }
 
     public static final int LIMIT = 2000;
@@ -147,6 +299,22 @@ public class InventoryAction extends UserAction {
     
             return endpoints;
         }
+    }
+
+    public List<BasicDBObject> fetchEndpoints(int apiCollectionId, int page) {
+        Bson filters = Filters.eq("_id.apiCollectionId", apiCollectionId);
+        List<SingleTypeInfoView> singleTypeInfos = SingleTypeInfoViewDao.instance.findAll(filters, page * fetchEndpointsLimit, fetchEndpointsLimit, null);
+
+        List<BasicDBObject> endpoints = new ArrayList<>();
+        
+        for(SingleTypeInfoView singleTypeInfo: singleTypeInfos) {
+            BasicDBObject groupId = new BasicDBObject("apiCollectionId", apiCollectionId)
+                .append("url", singleTypeInfo.getApiInfoKey().getUrl())
+                .append("method", singleTypeInfo.getApiInfoKey().getMethod());
+            endpoints.add(new BasicDBObject("startTs", singleTypeInfo.getDiscoveredTs()).append("_id", groupId));
+
+        }
+        return endpoints;
     }
 
     private String hostName;
@@ -369,7 +537,7 @@ public class InventoryAction extends UserAction {
     }
 
     public String fetchAPICollection() {
-        List<BasicDBObject> list = fetchEndpointsInCollectionUsingHost(apiCollectionId);
+        List<BasicDBObject> list = fetchEndpoints(apiCollectionId, collectionPage);
 
         APISpec apiSpec = APISpecDao.instance.findById(apiCollectionId);
         Set<String> unused = null;
@@ -394,6 +562,35 @@ public class InventoryAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchEndpointData() {
+
+        response = executeEndpointDataQuery(endpointDataQuery);
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchCollectionEndpointCountInfo() {
+
+        if (isLogicalGroup == null) {
+            isLogicalGroup = false;
+        }
+
+        response = buildEndpointCountInfo(apiCollectionId, isLogicalGroup);
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchAllEndpointData() {
+
+        if (isLogicalGroup == null) {
+            isLogicalGroup = false;
+        }
+
+        response = fetchAllEndpointData(apiCollectionId, isLogicalGroup);
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
     private List<String> urls;
     public String fetchSensitiveParamsForEndpoints() {
 
@@ -401,7 +598,7 @@ public class InventoryAction extends UserAction {
         List<SingleTypeInfo> list = new ArrayList<>();
         for (int i = 0; i < urls.size(); i += batchSize) {
             List<String> slice = urls.subList(i, Math.min(i+batchSize, urls.size()));
-            Bson sensitiveFilters = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(null, null, null, null);
+            Bson sensitiveFilters = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(null, null, null, null, null);
             Bson sensitiveFiltersWithUrls = 
                 Filters.and(Filters.in("url", slice), sensitiveFilters);
             List<SingleTypeInfo> sensitiveSTIs = SingleTypeInfoDao.instance.findAll(sensitiveFiltersWithUrls, 0, 2000, null, Projections.exclude("values"));
@@ -424,6 +621,39 @@ public class InventoryAction extends UserAction {
     public String loadSensitiveParameters() {
 
         List list = fetchSensitiveParams();
+        List<Bson> filterCustomSensitiveParams = new ArrayList<>();
+
+        if (subType == null) {
+            filterCustomSensitiveParams.add(Filters.eq("sensitive", true));
+            
+            if (apiCollectionId != -1) {
+                Bson apiCollectionIdFilter = Filters.eq("apiCollectionId", apiCollectionId);
+                filterCustomSensitiveParams.add(apiCollectionIdFilter);
+            }
+
+            if (url != null) {
+                Bson urlFilter = Filters.eq("url", url);
+                filterCustomSensitiveParams.add(urlFilter);
+            }
+
+            if (method != null) {
+                Bson methodFilter = Filters.eq("method", method);
+                filterCustomSensitiveParams.add(methodFilter);
+            }
+
+            List<SensitiveParamInfo> customSensitiveList = SensitiveParamInfoDao.instance.findAll(Filters.and(filterCustomSensitiveParams));
+            list.addAll(customSensitiveList);
+        }
+
+        response = new BasicDBObject();
+        response.put("data", new BasicDBObject("endpoints", list));
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchSensitiveParameters() {
+
+        List list = fetchSensitiveParamsForUrls(apiInfoList);
         List<Bson> filterCustomSensitiveParams = new ArrayList<>();
 
         if (subType == null) {
@@ -512,6 +742,10 @@ public class InventoryAction extends UserAction {
     private Map<String, String> filterOperators;
     private boolean sensitive;
     private boolean request;
+    private int collectionPage;
+    private List<ApiInfoKey> apiInfoList;
+    private EndpointDataQuery endpointDataQuery;
+    //private List<SingleTypeInfoView> endpointDataResponse;
 
     private Bson prepareFilters() {
         ArrayList<Bson> filterList = new ArrayList<>();
@@ -767,4 +1001,37 @@ public class InventoryAction extends UserAction {
     public void setSubType(String subType) {
         this.subType = subType;
     }
+
+    public int getCollectionPage() {
+        return this.collectionPage;
+    }
+
+    public void setCollectionPage(int collectionPage) {
+        this.collectionPage = collectionPage;
+    }
+
+    public List<ApiInfoKey> getApiInfoList() {
+        return this.apiInfoList;
+    }
+
+    public void setApiInfoList(List<ApiInfoKey> apiInfoList) {
+        this.apiInfoList = apiInfoList;
+    }
+
+    public EndpointDataQuery getEndpointDataQuery() {
+        return this.endpointDataQuery;
+    }
+
+    public void setEndpointDataQuery(EndpointDataQuery endpointDataQuery) {
+        this.endpointDataQuery = endpointDataQuery;
+    }
+
+    public Boolean getIsLogicalGroup() {
+        return this.isLogicalGroup;
+    }
+
+    public void setIsLogicalGroup(Boolean isLogicalGroup) {
+        this.isLogicalGroup = isLogicalGroup;
+    }
+
 }

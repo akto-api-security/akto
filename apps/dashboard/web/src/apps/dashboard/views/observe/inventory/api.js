@@ -130,6 +130,17 @@ export default {
             return resp
         })
     },
+    fetchSensitiveParameters (apiInfoList) {
+        return request({
+            url: '/api/fetchSensitiveParameters',
+            method: 'post',
+            data: {
+                apiInfoList
+            }
+        }).then((resp) => {
+            return resp
+        })
+    },
     loadParamsOfEndpoint (apiCollectionId, url, method) {
         return request({
             url: '/api/loadParamsOfEndpoint',
@@ -361,6 +372,45 @@ export default {
         }).then((resp) => {
             return resp
         })
-    }
+    },
+
+    fetchEndpointData (endpointDataQuery, pageNo) {
+        return request({
+            url: '/api/fetchEndpointData',
+            method: 'post',
+            data: {
+                endpointDataQuery: endpointDataQuery,
+                collectionPage: pageNo
+            }
+        }).then((resp) => {
+            return resp.response.data
+        })
+    },
+
+    fetchCollectionEndpointCountInfo (apiCollectionId, isLogicalGroup) {
+        return request({
+            url: '/api/fetchCollectionEndpointCountInfo',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId,
+                isLogicalGroup: isLogicalGroup
+            }
+        }).then((resp) => {
+            return resp.response.data
+        })
+    },
+
+    fetchAllEndpointData (apiCollectionId, isLogicalGroup) {
+        return request({
+            url: '/api/fetchAllEndpointData',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId,
+                isLogicalGroup: isLogicalGroup
+            }
+        }).then((resp) => {
+            return resp.response.data
+        })
+    },
 
 }

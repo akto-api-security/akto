@@ -45,6 +45,7 @@ public class StartTestAction extends UserAction {
     private AuthMechanism authMechanism;
     private int endTimestamp;
     private String testName;
+    private EndpointDataQuery endpointDataQuery;
 
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds) {
         User user = getSUser();
@@ -75,6 +76,9 @@ public class StartTestAction extends UserAction {
                 }
                 testingEndpoints = new WorkflowTestingEndpoints(workflowTest);
                 testIdConfig = 1;
+                break;
+            case FILTER_BASED:
+                testingEndpoints = new FilterBasedTestingEndpoints(endpointDataQuery);
                 break;
             default:
                 addActionError("Invalid APIs type");
@@ -369,5 +373,13 @@ public class StartTestAction extends UserAction {
 
     public void setMaxConcurrentRequests(int maxConcurrentRequests) {
         this.maxConcurrentRequests = maxConcurrentRequests;
+    }
+
+    public EndpointDataQuery getEndpointDataQuery() {
+        return this.endpointDataQuery;
+    }
+
+    public void setEndpointDataQuery(EndpointDataQuery endpointDataQuery) {
+        this.endpointDataQuery = endpointDataQuery;
     }
 }

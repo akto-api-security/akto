@@ -31,6 +31,9 @@ public class AccountSettings {
     private boolean showOnboarding;
     public static final String SHOW_ONBOARDING = "showOnboarding";
 
+    private boolean runCreateStiView;
+    public static final String RUN_CREATE_STI_VIEW = "runCreateStiView";
+
     public AccountSettings() {
     }
 
@@ -142,6 +145,14 @@ public class AccountSettings {
 
     public void setShowOnboarding(boolean showOnboarding) {
         this.showOnboarding = showOnboarding;
+    }
+
+    public boolean getRunCreateStiView() {
+        return runCreateStiView;
+    }
+
+    public void setRunCreateStiView(boolean runCreateStiView) {
+        this.runCreateStiView = runCreateStiView;
     }
 
     

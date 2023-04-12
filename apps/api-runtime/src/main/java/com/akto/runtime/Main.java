@@ -87,6 +87,8 @@ public class Main {
 
 
     public static void createIndices() {
+        logger.info("create ts index called " + Context.now());
+        SingleTypeInfoDao.instance.createSingleTypeInfoTimeStampIndex();
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
         SensitiveSampleDataDao.instance.createIndicesIfAbsent();
         SampleDataDao.instance.createIndicesIfAbsent();
@@ -327,12 +329,43 @@ public class Main {
         }
     }
 
+    public static void createStiCollectionView() {
+
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        boolean runCreateStiView = accountSettings == null ? false : accountSettings.getRunCreateStiView();
+
+        if (!runCreateStiView) {
+            AccountSettingsDao.instance.updateRunCreateStiViewFlag(true);
+            logger.info("create view called " + Context.now());
+            SingleTypeInfoDao.instance.createStiCollectionView();
+            logger.info("create merge called " + Context.now());
+            SingleTypeInfoDao.instance.mergeStiViewAndApiInfo();
+            logger.info("create index called " + Context.now());
+            SingleTypeInfoDao.instance.createStiViewIndexes();
+        }
+    }
+
+    public static void updateStiCollectionView() {
+        logger.info("update view called " + Context.now());
+        SingleTypeInfoDao.instance.createStiCollectionView();
+        SingleTypeInfoDao.instance.mergeStiViewAndApiInfo();
+    }
+
     public static void initializeRuntime(){
         SingleTypeInfoDao.instance.getMCollection().updateMany(Filters.exists("apiCollectionId", false), Updates.set("apiCollectionId", 0));
         SingleTypeInfo.init();
 
         createIndices();
         insertRuntimeFilters();
+        createStiCollectionView();
+
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                Context.accountId.set(1_000_000);
+                updateStiCollectionView();
+            }
+        }, 7, 1, TimeUnit.MINUTES);
+
         try {
             AccountSettingsDao.instance.updateVersion(AccountSettings.API_RUNTIME_VERSION);
         } catch (Exception e) {

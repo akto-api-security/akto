@@ -59,6 +59,10 @@ public abstract class MCollection<T> {
         return findAll(q, null);
     }
 
+    public long findCount(Bson q) {
+        return this.getMCollection().countDocuments(q);
+    }
+
     public List<T> findAll(Bson q, Bson projection) {
         return findAll(q, 0, 1_000_000, null, projection);
     }
@@ -161,7 +165,16 @@ public abstract class MCollection<T> {
         return getMCollection().insertMany(elems);
     }
 
+    public T findLatestOne(Bson q, Bson sort) {
+        MongoCursor<T> cursor = this.getMCollection().find(q).limit(1).sort(sort).cursor();
 
+        while(cursor.hasNext()) {
+            T elem = cursor.next();
+            return elem;
+        }
+
+        return null;
+    }
     
     public DeleteResult deleteAll(Bson q) {
         return this.getMCollection().deleteMany(q);
@@ -181,4 +194,22 @@ public abstract class MCollection<T> {
     public Logger getLogger() {
         return logger;
     }
+
+    public void createView(String viewName, List<Bson> pipeline) {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+        mongoDatabase.createView(viewName, getCollName(), pipeline);
+    }
+
+    public void createOnDemandView(List<Bson> pipeline) {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+        AggregateIterable<Document> res = mongoDatabase.getCollection(getCollName()).aggregate(pipeline);
+        Document doc = res.first();
+    }
+
+    public void mergeCollections(List<Bson> pipeline) {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+        AggregateIterable<Document> res = mongoDatabase.getCollection(getCollName()).aggregate(pipeline);
+        Document doc = res.first();
+    }
+
 }

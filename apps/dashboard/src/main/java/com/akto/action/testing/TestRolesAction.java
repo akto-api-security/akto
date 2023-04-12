@@ -11,6 +11,7 @@ import com.akto.dto.data_types.Predicate.Type;
 import com.akto.dto.testing.EndpointLogicalGroup;
 import com.akto.dto.testing.TestRoles;
 import com.akto.util.Constants;
+import com.akto.util.LogicalGroupUtil;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -55,7 +56,7 @@ public class TestRolesAction extends UserAction {
 
         testRoles.forEach((item) -> {
             for (int index = 0; index < endpointLogicalGroups.size(); index++) {
-                if (endpointLogicalGroups.get(index).getId().equals(item.getEndpointLogicalGroupId())) {
+                if (endpointLogicalGroups.get(index).getId() == item.getEndpointLogicalGroupId()) {
                     item.setEndpointLogicalGroup(endpointLogicalGroups.get(index));
                     break;
                 }
@@ -76,17 +77,19 @@ public class TestRolesAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        LogicalGroupUtil logicalGroupUtil = new LogicalGroupUtil();
+
         Conditions orConditions = null;
         if (this.orConditions != null) {
             orConditions = new Conditions();
             orConditions.setOperator(this.orConditions.getOperator());
-            orConditions.setPredicates(getPredicatesFromPredicatesObject(this.orConditions.getPredicates()));
+            orConditions.setPredicates(logicalGroupUtil.getPredicatesFromPredicatesObject(this.orConditions.getPredicates()));
         }
         Conditions andConditions = null;
         if (this.andConditions != null) {
             andConditions = new Conditions();
             andConditions.setOperator(this.andConditions.getOperator());
-            andConditions.setPredicates(getPredicatesFromPredicatesObject(this.andConditions.getPredicates()));
+            andConditions.setPredicates(logicalGroupUtil.getPredicatesFromPredicatesObject(this.andConditions.getPredicates()));
         }
         //Valid role name and regex
         EndpointLogicalGroup logicalGroup = EndpointLogicalGroupDao.instance.findOne(Filters.eq(Constants.ID, role.getEndpointLogicalGroupId()));
@@ -109,35 +112,27 @@ public class TestRolesAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        LogicalGroupUtil logicalGroupUtil = new LogicalGroupUtil();
+
         Conditions orConditions = null;
         if (this.orConditions != null) {
             orConditions = new Conditions();
             orConditions.setOperator(this.orConditions.getOperator());
-            orConditions.setPredicates(getPredicatesFromPredicatesObject(this.orConditions.getPredicates()));
+            orConditions.setPredicates(logicalGroupUtil.getPredicatesFromPredicatesObject(this.orConditions.getPredicates()));
         }
         Conditions andConditions = null;
         if (this.andConditions != null) {
             andConditions = new Conditions();
             andConditions.setOperator(this.andConditions.getOperator());
-            andConditions.setPredicates(getPredicatesFromPredicatesObject(this.andConditions.getPredicates()));
+            andConditions.setPredicates(logicalGroupUtil.getPredicatesFromPredicatesObject(this.andConditions.getPredicates()));
         }
         //Valid role name and regex
         String logicalGroupName = roleName + EndpointLogicalGroup.GROUP_NAME_SUFFIX;
         EndpointLogicalGroup logicalGroup = EndpointLogicalGroupDao.instance.
-                createLogicalGroup(logicalGroupName, andConditions,orConditions,this.getSUser().getLogin());
+                createLogicalGroup(logicalGroupName, andConditions,orConditions,this.getSUser().getLogin(), "ROLE");
         selectedRole = TestRolesDao.instance.createTestRole(roleName, logicalGroup.getId(), this.getSUser().getLogin());
         selectedRole.setEndpointLogicalGroup(logicalGroup);
         return SUCCESS.toUpperCase();
-    }
-
-    private List<Predicate> getPredicatesFromPredicatesObject(List<BasicDBObject> predicates) {
-        List<Predicate> arrayList = new ArrayList<>();
-        for (int index = 0; index < predicates.size(); index++) {
-            Type type = Type.valueOf(predicates.get(index).getString(Predicate.TYPE));
-            Predicate predicate = Predicate.generatePredicate(type, predicates.get(index));
-            arrayList.add(predicate);
-        }
-        return arrayList;
     }
 
     public List<TestRoles> getTestRoles() {
