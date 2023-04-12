@@ -68,7 +68,7 @@ public class APICatalogSync {
         
     }
 
-    public static final int STRING_MERGING_THRESHOLD = 2;
+    public static final int STRING_MERGING_THRESHOLD = 10;
 
     public void processResponse(RequestTemplate requestTemplate, Collection<HttpResponseParams> responses, List<SingleTypeInfo> deletedInfo) {
         Iterator<HttpResponseParams> iter = responses.iterator();
@@ -373,7 +373,7 @@ public class APICatalogSync {
                     continue;
                 }
 
-                if (APICatalogSync.areBothUuidUrls(newStatic,aStatic,mergedTemplate) || RequestTemplate.compareKeys(aTemplate, newTemplate, mergedTemplate)) {
+                if (APICatalogSync.areBothMatchingUrls(newStatic,aStatic,mergedTemplate) || APICatalogSync.areBothUuidUrls(newStatic,aStatic,mergedTemplate) || RequestTemplate.compareKeys(aTemplate, newTemplate, mergedTemplate)) {
                     Map<String, Set<String>> similarTemplates = potentialMerges.get(mergedTemplate);
                     if (similarTemplates == null) {
                         similarTemplates = new HashMap<>();
@@ -461,7 +461,7 @@ public class APICatalogSync {
                         continue;
                     }
 
-                    if (areBothUuidUrls(newUrl,dbUrl,mergedTemplate) || dbTemplate.compare(newTemplate, mergedTemplate)) {
+                    if (areBothMatchingUrls(newUrl, dbUrl, mergedTemplate) || areBothUuidUrls(newUrl,dbUrl,mergedTemplate) || dbTemplate.compare(newTemplate, mergedTemplate)) {
                         Set<RequestTemplate> similarTemplates = potentialMerges.get(mergedTemplate);
                         if (similarTemplates == null) {
                             similarTemplates = new HashSet<>();
@@ -507,7 +507,7 @@ public class APICatalogSync {
             for (URLStatic deltaUrl: deltaCatalog.getStrictURLToMethods().keySet()) {
                 RequestTemplate deltaTemplate = deltaTemplates.get(deltaUrl);
                 URLTemplate mergedTemplate = tryMergeUrls(deltaUrl, newUrl);
-                if (mergedTemplate == null || (RequestTemplate.isMergedOnStr(mergedTemplate) && !areBothUuidUrls(newUrl,deltaUrl,mergedTemplate))) {
+                if (mergedTemplate == null || (RequestTemplate.isMergedOnStr(mergedTemplate) && !(areBothUuidUrls(newUrl,deltaUrl,mergedTemplate) || areBothMatchingUrls(newUrl, deltaUrl, mergedTemplate)))) {
                     continue;
                 }
 
@@ -559,6 +559,40 @@ public class APICatalogSync {
         }
 
         return true;
+    }
+
+    public static boolean areBothMatchingUrls(URLStatic newUrl, URLStatic deltaUrl, URLTemplate mergedTemplate) {
+
+        String[] n = tokenize(newUrl.getUrl());
+        String[] o = tokenize(deltaUrl.getUrl());
+        SuperType[] b = mergedTemplate.getTypes();
+        for (int idx =0 ; idx < b.length; idx++) {
+            SuperType c = b[idx];
+            if (Objects.equals(c, SuperType.STRING) && o.length > idx) {
+                String val = n[idx];
+                if(!isAlphanumericString(val) || !isAlphanumericString(o[idx])) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    public static boolean isAlphanumericString(String s) {
+
+        int intCount = 0;
+        int charCount = 0;
+        for (int i = 0; i < s.length(); i++) {
+
+            Character c = s.charAt(i);
+            if (Character.isDigit(c)) {
+                intCount++;
+            } else if (Character.isLetter(c)) {
+                charCount++;
+            }
+        }
+        return (intCount >= 3 && charCount >= 1);
     }
 
 
