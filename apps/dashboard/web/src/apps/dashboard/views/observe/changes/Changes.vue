@@ -79,24 +79,6 @@
                     <template #item.type="{item}">
                         <sensitive-chip-group :sensitiveTags="[item.type]" />
                     </template>
-
-                    <template #item.domain="{item}">
-                        <v-tooltip bottom max-width="300px">
-                            <template v-slot:activator='{ on, attrs }'>
-                                <div
-                                    v-bind="attrs"
-                                    v-on="on"
-                                    class="fs-12"
-                                >
-                                  {{item.domain}}
-                                </div>
-                            </template>
-                            <div>
-                                {{item.valuesString}}
-                            </div>
-                        </v-tooltip>
-                    </template>
-                    
                     <!-- <template #add-new-row-btn="{filters, filterOperators, sortKey, sortDesc, total}">
                         <div class="ma-1 d-flex">
                             <v-dialog
@@ -516,7 +498,11 @@ export default {
             return func.mergeApiInfoAndApiCollection(this.apiCollection, this.apiInfoList, this.mapCollectionIdToName)
         },
         newEndpointsTrend() {
-            return this.changesTrend(this.newEndpoints)
+            return [{
+                "data": this.changesTrend(this.newEndpoints),
+                "color" : "6200EA",
+                "name": "New Endpoints"
+            }]
         },
         newSensitiveEndpoints() {
             return this.newEndpoints.filter(x => x.sensitive && x.sensitive.size > 0)

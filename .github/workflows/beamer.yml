@@ -1,0 +1,28 @@
+name: Push Release Notes to Beamer
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  push-release-notes:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Push Release Notes to Beamer
+      run: |
+        # Set up variables
+        BEAMER_API_TOKEN="${{ secrets.BEAMER_API_KEY }}"
+        RELEASE_TAG="${{ github.event.release.tag_name }}"
+        RELEASE_NOTES="${{github.event.release.body}}"
+
+        # Push release notes to Beamer
+        curl --request POST \
+          --url https://api.getbeamer.com/v0/posts \
+          --header "Content-Type: application/json" \
+          --header "Beamer-Api-Key: $BEAMER_API_TOKEN" \
+          --data "{
+            \"title\": [ \"New Release: $RELEASE_TAG\" ],
+            \"content\": [ \"$RELEASE_NOTES\" ],
+            \"category\": \"new\",
+            \"publish\": true
+          }"

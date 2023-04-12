@@ -17,25 +17,22 @@
             :key="reRenderKey"
             :dense="dense"
             @rowClicked="rowClicked"
+            @filterApplied="filterApplied"
         >
             <template v-slot:add-at-top="{filters, filterOperators, sortKey, sortDesc}">
                 <div class="d-flex jc-end">
-                    <div class="d-flex board-table-cards jc-end">
-                        <div class="clickable download-csv ma-1">
+                    <div class="d-flex jc-end">
+                        <div class="clickable download-csv">
                             <v-tooltip bottom>
                                 <template v-slot:activator="{on, attrs}">
-                                    <v-btn 
-                                        v-on="on"
-                                        v-bind="attrs" 
-                                        icon 
-                                        :ripple="false"
-                                        color="var(--themeColorDark)" 
-                                        @click="downloadData(fetchParamsSync(sortKey, sortDesc, 0, 10000, filters, filterOperators))" 
-                                        class="download-csv-btn"
-                                        v-if="!hideDownloadCSVIcon"
-                                    >
-                                            <v-icon>$fas_file-csv</v-icon>
-                                    </v-btn>
+                                    <div v-on="on" v-bind="attrs">
+                                        <secondary-button 
+                                            color="var(--themeColorDark)" 
+                                            text="Export"
+                                            @click="downloadData(fetchParamsSync(sortKey, sortDesc, 0, 10000, filters, filterOperators))" 
+                                            v-if="!hideDownloadCSVIcon"
+                                        />
+                                    </div>
                                 </template>
                                 Download as CSV
                             </v-tooltip>
@@ -65,6 +62,7 @@ import { saveAs } from 'file-saver'
 import FilterList from './FilterList'
 import SimpleTextField from '@/apps/dashboard/shared/components/SimpleTextField'
 import ServerTable from './ServerTable'
+import SecondaryButton from "./buttons/SecondaryButton.vue"
 
 
 export default {
@@ -72,7 +70,8 @@ export default {
     components: {
         FilterList,
         SimpleTextField,
-        ServerTable
+        ServerTable,
+        SecondaryButton
     },
     props: {
         headers: obj.arrR,
@@ -86,8 +85,6 @@ export default {
         showName: obj.boolN,
         showGridView:obj.boolN,
         leftView:obj.boolN,
-        hideMoreActions:obj.boolN,
-        slotActions:obj.boolN,
         defaultRowHeight: obj.numN,
         dense: obj.boolN,
         pageSize: obj.numN
@@ -98,6 +95,9 @@ export default {
         }
     },
     methods: {
+        filterApplied(data) {
+            this.$emit("filterApplied", data)
+        },
         rowClicked(row) {
             this.$emit('rowClicked', row)
         },
@@ -248,7 +248,6 @@ export default {
 </script>
 
 <style scoped lang="sass">
-.download-csv-btn
-    height: 20px !important
-    width: 20px !important
+.download-csv
+    margin-left: 8px !important
 </style>
