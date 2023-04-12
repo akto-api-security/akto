@@ -12,6 +12,7 @@ public class TestRoles {
     public static final String NAME = "name";
     private String name;
     private ObjectId endpointLogicalGroupId;
+    public static final String AUTH_MECHANISM = "authMechanism";
     private AuthMechanism authMechanism;
     @BsonIgnore
     private EndpointLogicalGroup endpointLogicalGroup;

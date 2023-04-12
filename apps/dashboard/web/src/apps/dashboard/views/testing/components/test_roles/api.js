@@ -28,6 +28,15 @@ export default {
             return resp
         })        
     },
+    fetchAccessMatrixUrlToRoles(){
+        return request({
+            url: '/api/fetchAccessMatrixUrlToRoles',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
+    },
     fetchCollectionWiseApiEndpoints (apiCollectionId) {
         return request({
             url: '/api/fetchCollectionWiseApiEndpoints',

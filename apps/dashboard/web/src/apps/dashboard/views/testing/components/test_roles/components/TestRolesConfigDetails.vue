@@ -242,6 +242,7 @@ export default {
         }
     },
     mounted() {
+        api.fetchAccessMatrixUrlToRoles();
     },
     computed: {
         ...mapState('test_roles', ['testRoles', 'loading', 'selectedRole', 'listOfEndpointsInCollection', 'createNew', 'conditions']),
@@ -271,7 +272,7 @@ export default {
 <style lang="sass" scoped>
     .input-value
         padding-right: 8px
-        color: #47466A
+        color: var(--themeColorDark)
 
     .condition-row
         width: 100%

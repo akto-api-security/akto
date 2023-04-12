@@ -4,11 +4,13 @@ import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
+import com.akto.dto.testing.AccessMatrixUrlToRole;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.info.BFLATestInfo;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.TestingUtil;
+import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
@@ -50,8 +52,8 @@ public class BFLATest extends AuthRequiredRunAllTestPlugin {
             }
         }
 
-        Bson q = Filters.eq("_id", apiInfoKey);
-        Bson update = Updates.addEachToSet("roles", ret);
+        Bson q = Filters.eq(Constants.ID, apiInfoKey);
+        Bson update = Updates.addEachToSet(AccessMatrixUrlToRole.ROLES, ret);
         UpdateOptions opts = new UpdateOptions().upsert(true);
         AccessMatrixUrlToRolesDao.instance.getMCollection().updateOne(q, update, opts);
 

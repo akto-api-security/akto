@@ -76,7 +76,7 @@ public class TestRolesAction extends UserAction {
             List<AuthParam> authParams = new ArrayList<>();
             authParams.add(param);
             AuthMechanism authM = new AuthMechanism(authParams, null, LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString());
-            TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, role.getId()), Updates.set("authMechanism", authM));
+            TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, role.getId()), Updates.set(TestRoles.AUTH_MECHANISM, authM));
             role.setAuthMechanism(authM);
         }
     }

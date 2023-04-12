@@ -10,17 +10,19 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 public class AccessMatrixTaskInfo {
  
     private ObjectId id;
+    public static final String API_INFO_KEYS = "apiInfoKeys";
     private List<ApiInfoKey> apiInfoKeys;
+    public static final String API_COLLECTION_ID = "apiCollectionId";
     private int apiCollectionId;
+    public static final String FREQUENCY_IN_SECONDS = "frequencyInSeconds";
     private int frequencyInSeconds;
+    public static final String LAST_COMPLETED_TIMESTAMP = "lastCompletedTimestamp";
     private int lastCompletedTimestamp;
-
+    public static final String NEXT_SCHEDULED_TIMESTAMP = "nextScheduledTimestamp";
     private int nextScheduledTimestamp;
 
     @BsonIgnore
     private String hexId;
-
-    public final static String NEXT_SCHEDULED_TIMESTAMP = "nextScheduledTimestamp";
 
     public AccessMatrixTaskInfo() {
     }

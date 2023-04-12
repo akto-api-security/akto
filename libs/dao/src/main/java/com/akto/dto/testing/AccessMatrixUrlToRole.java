@@ -9,7 +9,7 @@ public class AccessMatrixUrlToRole {
     
     @BsonId
     private ApiInfoKey id;
-
+    public static final String ROLES = "roles";
     private List<String> roles;
 
     public AccessMatrixUrlToRole() {

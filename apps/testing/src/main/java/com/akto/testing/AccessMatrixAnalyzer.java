@@ -21,6 +21,8 @@ import com.akto.store.TestingUtil;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+
 import org.bson.conversions.Bson;
 
 public class AccessMatrixAnalyzer {
@@ -44,11 +46,9 @@ public class AccessMatrixAnalyzer {
                     endpoints.add(apiInfoKey);
                 });
             }
-
         } else {
             endpoints.addAll(task.getApiInfoKeys());
         }
-
         return endpoints;
     }
 
@@ -81,6 +81,12 @@ public class AccessMatrixAnalyzer {
                     }
                 }
             }
+            Bson q = Filters.eq(Constants.ID, task.getId());
+            Bson update = Updates.combine(
+                Updates.set(AccessMatrixTaskInfo.LAST_COMPLETED_TIMESTAMP,Context.now()),
+                Updates.set(AccessMatrixTaskInfo.NEXT_SCHEDULED_TIMESTAMP, Context.now() + task.getFrequencyInSeconds())
+            );
+            AccessMatrixTaskInfosDao.instance.updateOne(q, update);
         }
     }
 }
