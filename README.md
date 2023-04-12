@@ -25,6 +25,12 @@
 
 # Akto.io API Security
 
+## Contributors
+<a href="https://github.com/akto-api-security/akto/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=akto-api-security/akto" />
+</a>
+
+
 # What is Akto?
 
 [How it works](https://docs.akto.io/#how-it-works) • [Getting-Started](https://docs.akto.io/#how-to-get-started) • [API Inventory](https://docs.akto.io/api-inventory/api-collections) • [API testing](https://docs.akto.io/testing/run-test) • [Add Test](https://docs.akto.io/testing/test-library) • [Join Discord community](https://discord.com/invite/Wpc6xVME4s) •
@@ -79,11 +85,6 @@ Akto is really powerful in Cloud deployment if you can provide your application'
 
 </details>  
   
-## Contributors
-<a href="https://github.com/akto-api-security/akto/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=akto-api-security/akto" />
-</a>
-
 
 
 # Develop and contribute
