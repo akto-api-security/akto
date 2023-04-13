@@ -171,7 +171,6 @@ export default {
 
                 this.startTimestamp = +func.dayStart(start) / 1000
                 this.endTimestamp = +func.dayEnd(end) / 1000
-                this.selectedDate = this.endTimestamp
                 this.fetchTrafficMetrics(this.startTimestamp, this.endTimestamp, {})
             }
         }
