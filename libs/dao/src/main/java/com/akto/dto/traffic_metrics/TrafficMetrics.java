@@ -17,8 +17,27 @@ public class TrafficMetrics {
     }
 
     public enum Name {
-        OUTGOING_PACKETS_MIRRORING, OUTGOING_REQUESTS_MIRRORING, INCOMING_PACKETS_MIRRORING, TOTAL_REQUESTS_RUNTIME,
-        FILTERED_REQUESTS_RUNTIME
+        OUTGOING_PACKETS_MIRRORING("outgoing packets", "Data sent by mirroring logging"),
+        OUTGOING_REQUESTS_MIRRORING("outgoing requests", "Data processed by mirroring logging"),
+        INCOMING_PACKETS_MIRRORING("incoming packets", "Data coming to mirroring logging"),
+        TOTAL_REQUESTS_RUNTIME("total requests", "Total requests sent to runtime"),
+        FILTERED_REQUESTS_RUNTIME("filtered requests", "Requests processed by runtime");
+
+        private final String description;
+        private final String descriptionName;
+
+        Name(String descriptionName, String description){
+            this.descriptionName = descriptionName;
+            this.description = description;
+        }
+
+        public String getDescription(){
+            return this.description;
+        }
+
+        public String getDescriptionName(){
+            return this.descriptionName;
+        }
     }
 
     public static class Key {

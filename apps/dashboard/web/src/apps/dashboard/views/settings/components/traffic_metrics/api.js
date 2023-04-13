@@ -10,4 +10,13 @@ export default {
             return resp
         })
     },
+    fetchTrafficMetricsDesciptions() {
+        return request({
+            url: '/api/fetchTrafficMetricsDesciptions',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
+    },
 }
