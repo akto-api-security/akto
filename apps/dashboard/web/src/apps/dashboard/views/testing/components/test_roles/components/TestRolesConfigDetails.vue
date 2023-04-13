@@ -93,7 +93,8 @@
                     <div class="clickable download-csv d-flex">
                         <secondary-button 
                             @click="createAccessMatrix"
-                            text="Create Access Matrix" />
+                            text="Create Access Matrix"
+                            color="var(--themeColor)" />
                     </div>            
                 </template>
                 </simple-table>
