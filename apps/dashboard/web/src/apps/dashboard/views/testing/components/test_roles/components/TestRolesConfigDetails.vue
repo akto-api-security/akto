@@ -47,7 +47,6 @@
                     </v-btn>
                 </div>
             </v-row>
-            <!-- <review-table v-if="reviewData" :review-data="reviewData" /> -->
         </v-container>
     </div>
 </template>
@@ -58,7 +57,6 @@ import ReviewTable from "@/apps/dashboard/views/settings/components/data_types/c
 import TestRoleConditionsTable from "./TestRoleConditionsTable.vue"
 import { mapState } from "vuex";
 import func from "@/util/func";
-import api from "../api"
 
 export default {
     name: "TestRolesConfigDetails",
@@ -123,10 +121,9 @@ export default {
                     if (element.type === 'CONTAINS') {
                         filteredCondition['predicates'].push({ type: element.type, value: element.value })
                         found = true
-                    } else if (element.type === 'BELONGS_TO') {
+                    } else if (element.type === 'BELONGS_TO' || element.type === 'NOT_BELONGS_TO') {
                         let collectionMap = element.value
                         let collectionId = Object.keys(collectionMap)[0]
-
                         if (collectionMap[collectionId]) {
                             let apiKeyInfoList = []
                             collectionMap[collectionId].forEach(apiKeyInfo => {
@@ -139,88 +136,58 @@ export default {
                                 filteredCondition['predicates'].push({ type: element.type, value: apiKeyInfoList })
                             }
                         }
-                    } else if (element.type === 'NOT_BELONGS_TO') { //Not belongs condition
-                        let collectionMap = element.value
-                        let collectionId = Object.keys(collectionMap)[0]
-
-                        if (collectionMap[collectionId]) {
-                            let apiKeyInfoList = []
-                            collectionMap[collectionId].forEach(apiKeyInfo => {
-                                if (apiKeyInfo['checked']) {
-                                    apiKeyInfoList.push({ 'url': apiKeyInfo['url'], 'method': apiKeyInfo['method'], 'apiCollectionId': apiKeyInfo['apiCollectionId'] })
-                                    found = true
-                                }
-                            })
-                            if (apiKeyInfoList.length > 0) {
-                                filteredCondition['predicates'].push({ type: element.type, value: apiKeyInfoList })
-                            }
-                        }
-                    }
+                    } 
                 }
             });
             if (found) {
                 return filteredCondition;
             }
         },
+        async saveUtilMethod(roleName, andConditions, orConditions, type){
+            let url = 'test_roles/updateTestRoles'
+            let text = 'Role updated successfully!'
 
-        async save() {
+            if(type == "createNew"){
+                url = 'test_roles/addTestRoles'
+                text = 'Role saved successfully'
+            }
+            if (andConditions || orConditions) {
+                    this.saveLoading = true
+                    await this.$store.dispatch(url, {
+                        roleName,
+                        andConditions,
+                        orConditions
+                    })
+                        .then((resp) => {
+                            this.saveLoading = false
+
+                            window._AKTO.$emit('SHOW_SNACKBAR', {
+                                show: true,
+                                text: text,
+                                color: 'green'
+                            })
+                        }).catch((err) => {
+                            this.saveLoading = false
+                        })
+                } else {
+                    window._AKTO.$emit('SHOW_SNACKBAR', {
+                        show: true,
+                        text: `All values are empty`,
+                        color: 'red'
+                    })
+                }
+        },
+        save() {
             let andConditions = this.filterContainsConditions('AND')
             let orConditions = this.filterContainsConditions('OR')
-            if (this.selectedRole && !this.isSelectedRoleEmpty) {// Update case
+
+            if ((this.selectedRole && !this.isSelectedRoleEmpty)) {// Update case
                 let roleName = this.selectedRole.name
-
-                if (andConditions || orConditions) {
-                    this.saveLoading = true
-                    await this.$store.dispatch('test_roles/updateTestRoles', {
-                        roleName,
-                        andConditions,
-                        orConditions
-                    })
-                        .then((resp) => {
-                            this.saveLoading = false
-
-                            window._AKTO.$emit('SHOW_SNACKBAR', {
-                                show: true,
-                                text: `Role updated successfully!`,
-                                color: 'green'
-                            })
-                        }).catch((err) => {
-                            this.saveLoading = false
-                        })
-                } else {
-                    window._AKTO.$emit('SHOW_SNACKBAR', {
-                        show: true,
-                        text: `All values are empty`,
-                        color: 'red'
-                    })
-                }
+                this.saveUtilMethod(roleName, andConditions , orConditions , "Update")
+                
             } else {//Create new case
-                let roleName = this.roleName
-                if (andConditions || orConditions) {
-                    this.saveLoading = true
-                    await this.$store.dispatch('test_roles/addTestRoles', {
-                        roleName,
-                        andConditions,
-                        orConditions
-                    })
-                        .then((resp) => {
-                            this.saveLoading = false
-
-                            window._AKTO.$emit('SHOW_SNACKBAR', {
-                                show: true,
-                                text: `Role saved successfully!`,
-                                color: 'green'
-                            })
-                        }).catch((err) => {
-                            this.saveLoading = false
-                        })
-                } else {
-                    window._AKTO.$emit('SHOW_SNACKBAR', {
-                        show: true,
-                        text: `All values are empty`,
-                        color: 'red'
-                    })
-                }
+                this.saveUtilMethod(this.roleName, andConditions , orConditions, "createNew")
+                this.roleName = ""
             }
         }
     },
@@ -236,7 +203,7 @@ export default {
         },
         isSelectedRoleEmpty() {
             return Object.keys(this.selectedRole).length === 0
-        }
+        },
     },
     watch: {
     }

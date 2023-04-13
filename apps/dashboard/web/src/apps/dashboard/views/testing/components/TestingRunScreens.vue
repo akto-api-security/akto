@@ -27,7 +27,6 @@
 
                 <v-stepper-content step="1">
                     <div>
-                        Hello 1
                     </div>
                 </v-stepper-content>
 
@@ -35,19 +34,71 @@
                     <tests-selector 
                         :hide-test-scheduler="true" 
                         collection-name="Tests-Selector" 
-                        @test-updated="getTestsSelected" 
-                        :newTests="testsSelected"
+                        @test-updated="getTestsSelected"
                     />
                 </v-stepper-content>
 
                 <v-stepper-content step="3">
-                    <div>
-                        Hello 3
-                    </div>
+                    <user-config/>
                 </v-stepper-content>
 
                 <v-stepper-content step="4">
-                    <div>Summary</div>
+                    <span class="summary-text">Summary</span>
+                    <div class="summary-container">
+                        <div class="summary-boxes">
+                            <v-icon size="30" class="selected-icon">$aktoWhite</v-icon>
+                            <div class="summary-body">
+                                <div class="summary-header">
+                                    <span class="header-title">{{ totalTestsSelected }} tests selected</span>
+                                    <v-btn icon plain>
+                                        <v-icon size="20">$fas_angle-down</v-icon>
+                                    </v-btn>
+                                </div>
+                                <div class="button-containers">
+                                    <template v-for="(item) in selectedTestCategories">
+                                        <div class="test-categories" :key="item.name">
+                                            <span>{{ item.name }}</span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="summary-list">
+                            <v-list dense nav class="test-list-container">
+                                <v-list-group
+                                    v-for="item in selectedTestCategories"
+                                    :key="item.displayName"
+                                    class="tests-category-container"
+                                    active-class="tests-category-container-active"
+                                >
+                                    <template v-slot:appendIcon>
+                                        <v-icon >$fas_angle-down</v-icon>
+                                    </template>
+
+                                    <template v-slot:prependIcon>
+                                        <v-icon >$fas_cog</v-icon>
+                                    </template>
+                                    <template v-slot:activator>
+                                        <v-list-item-content>
+                                            <v-list-item-title :style="{'font-size' : '16px'}" v-text="item.displayName"></v-list-item-title>
+                                        </v-list-item-content>
+                                    </template>
+
+                                    <v-list-item
+                                        v-for="(test,index) in testsSelected[item.name].selected"
+                                        :key="index"
+                                        class="test-container"
+                                    >
+                                    
+                                        <v-list-item-content>
+                                            <v-list-item-title v-text="test.label" class="test-name"></v-list-item-title>
+                                        </v-list-item-content>
+                                    </v-list-item>
+                                </v-list-group>
+                            </v-list>
+                        </div>
+                    </div>
                 </v-stepper-content>
 
             </v-stepper>
@@ -72,6 +123,7 @@
 import obj from '@/util/obj'
 import SecondaryButton from '../../../shared/components/buttons/SecondaryButton.vue'
 import TestsSelector from '../../observe/inventory/components/TestsSelector.vue'
+import UserConfig from './token/UserConfig.vue'
 
 export default{
     name: "TestingRunScreens",
@@ -81,7 +133,8 @@ export default{
     },
     components:{
         SecondaryButton,
-        TestsSelector
+        TestsSelector,
+        UserConfig,
     },
     data(){
         return{
@@ -90,8 +143,12 @@ export default{
             stepperData:[
                 'COLLECTION','TEST SUITES','USER CONFIG'
             ],
+            andConditions:[],
+            orConditions:[],
+            total_collections:0,
+            totalTestsSelected:0,
+            selectedTestCategories:[],
             testsSelected:{},
-            testCategories:[],
         }
     },
     methods:{
@@ -119,9 +176,27 @@ export default{
             console.log("RunTest")
         },
         getTestsSelected(tests,categories){
-            this.testsSelected = tests
-            this.testCategories = categories    
+            console.log(tests)
+            let _this = this
+            _this.totalTestsSelected = 0
+            _this.testsSelected = tests
+            _this.selectedTestCategories=[]
+            categories.forEach((x) => {
+                if(tests[x.name] && tests[x.name].selected.length > 0){
+                    _this.selectedTestCategories.push(x)
+                    _this.totalTestsSelected += (_this.testsSelected[x.name].selected.length)
+                }
+            })   
         },
+        getCollections(andConditions,orConditions){
+            if(andConditions){
+                this.andConditions = andConditions.predicates
+            }
+            if(orConditions){
+                this.orConditions = orConditions.predicates
+            }
+            this.total_collections = this.andConditions.length + this.orConditions.length
+        }
     },
     computed:{
         color(){
@@ -134,6 +209,9 @@ export default{
         },
         runIcon(){
             if(this.currIndex > 3){return "$fas_play"}      
+        },
+        openTests(){
+            return this.selectedTestCategories
         }
     }
 }
@@ -157,8 +235,25 @@ export default{
     .stepper-title >>> .primary{
         border-color: var(--themeColor) !important;
     }
+    .tests-category-container>>>.v-list-group__header{
+        height: 48px !important;
+    }
+
+    .tests-category-container>>>.v-list-group__header__prepend-icon{
+        margin: auto !important;
+    }
+    .tests-category-container >>>.tests-category-container-active{
+        background: var(--lighten2) !important;
+        border: 1px solid !important;   
+    }
+    .tests-category-container >>>.v-list-group__items{
+        padding: 4px 24px !important;
+    }
 </style>
 <style lang="scss" scoped>
+    ::-webkit-scrollbar {
+        display: none !important;
+    }
     .no-display{
         display: none !important;
     }
@@ -200,6 +295,92 @@ export default{
             width: 100%;
             border-top: 1px solid var(--borderColor);
             padding: 16px 32px 8px 32px;
+        }
+    }
+    .summary-text{
+        font-size: 20px;
+        font-weight: 600;
+        color: var(--themeColorDark);
+        width: 102px;
+        height: 26px;
+        display: flex;
+        margin-bottom: 8px;
+    }
+    .summary-container{
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        padding: 8px 0px;
+        .summary-boxes{
+            height: 110px;
+            width: 100%;
+            border: 2px solid var(--borderColor);
+            border-radius: 12px;
+            padding: 24px 24px 4px 24px;
+            display: flex;
+            gap:12px;
+            .summary-body{
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                width: 100%;
+                .summary-header{
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    .header-title{
+                        font-size: 20px;
+                        color: var(--themeColorDark);
+                        font-weight: 600;
+                    }
+                }
+                .button-containers{
+                    gap:8px;
+                    display: flex;
+                    .test-categories{
+                        height: 28px;
+                        min-width: 50px;
+                        background: var(--hexColor39);
+                        padding: 2px 8px;
+                        border-radius: 4px;
+                        display: flex;
+                        justify-content: center;
+                        
+                        span{
+                            font-size: 16px;
+                            color: var(--black);
+                            font-weight: 500;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    .summary-list{
+        max-height: 250px;
+        border-width: 0px 1px 1px 1px;
+        border-style: solid;
+        border-color: var(--borderColor);
+        border-radius: 0px 0px 12px 12px;
+        padding: 6px;
+
+        .test-list-container{
+            max-height: 235px;
+            overflow-y: scroll;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            align-items: center;
+            padding: 8px 12px ;
+            .tests-category-container{
+                width: 1150px;
+                .test-container{
+                    color:var(--themeColorDark) !important;
+                }
+                .test-name{
+                    font-size: 12px !important;
+                }
+            }
         }
     }
 </style>

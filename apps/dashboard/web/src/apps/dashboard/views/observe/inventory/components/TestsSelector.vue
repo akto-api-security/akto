@@ -40,7 +40,7 @@
                     </v-list-item>
                     <v-list dense class="test-list pa-0" v-if="selectedCategory">
                         <v-list-item v-for="(item, index) in mapCategoryToSubcategory[selectedCategory].selected" :key="'selected_'+index" class="brdb test-item">
-                            <v-btn icon plain size="12" color="var(--themeColorDark)" @click="mapCategoryToSubcategory[selectedCategory].selected.splice(index, 1);" :ripple="false">
+                            <v-btn icon plain size="12" color="var(--themeColorDark)" @click="mapCategoryToSubcategory[selectedCategory].selected.splice(index, 1),test" :ripple="false">
                                 <v-icon>$far_check-square</v-icon>
                             </v-btn> 
                             <v-icon color="var(--themeColorDark)" size="12">{{item.icon}}</v-icon>
@@ -51,7 +51,7 @@
                             :key="'all_'+index" 
                             class="brdb test-item"
                         >
-                                <v-btn icon plain size="12" color="var(--themeColorDark)" @click="mapCategoryToSubcategory[selectedCategory].selected.push(item)" :ripple="false">
+                                <v-btn icon plain size="12" color="var(--themeColorDark)" @click="test(item)" :ripple="false">
                                     <v-icon>$far_square</v-icon>
                                 </v-btn> 
                                 <v-icon color="var(--themeColorDark)" size="12">{{item.icon}}</v-icon>
@@ -83,8 +83,7 @@ export default {
     name: "TestsSelector",
     props: {
         collectionName: obj.strR,
-        hideTestScheduler:obj.boolN,
-        newTests:obj,
+        hideTestScheduler:obj.boolN
     },
     components: {
         ScheduleBox,
@@ -126,9 +125,12 @@ export default {
                 this.disableLinkClass = ''
             }
         })
-        
     },
     methods: {
+        test(item){
+            this.mapCategoryToSubcategory[this.selectedCategory].selected.push(item)
+            this.$emit('test-updated',this.mapCategoryToSubcategory,this.categories)
+        },
         getCategoryName(category) {
             return this.categories.find(x => x.name === category).displayName
         },
@@ -191,18 +193,13 @@ export default {
                 ret[x.superCategory.name].selected.push(obj)
             })
             this.selectedCategory = Object.keys(ret)[0]
-            if(this.newTests['BOLA']){ return this.newTests} 
+            this.$emit('test-updated',ret,this.categories)
             return ret
         }
     },
     computed: {
         nameSuffixes() {
             return Object.entries(this.mapCategoryToSubcategory).filter(x => x[1].selected.length > 0).map(x => x[0])
-        }
-    },
-    watch:{
-        mapCategoryToSubcategory(newVal){
-            this.$emit('test-updated',newVal,this.categories)
         }
     }
 }
