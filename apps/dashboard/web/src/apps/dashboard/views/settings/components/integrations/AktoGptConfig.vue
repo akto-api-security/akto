@@ -8,12 +8,14 @@
 				:headers="headers" 
 				:items="aktoGptConfig" 
 				name="Akto Gpt Configuration" 
+				:hideDownloadCSVIcon="true"
 				:showName="true"
 			>
 				<template #item.state="{item}">
                     <v-switch 
 					v-model="item.state" 
 					@change="updateConfig(item.index)"
+					class="switch-state"
 					/>
                 </template>
 			</simple-table>
@@ -86,4 +88,9 @@ export default {
 </script>
 
 <style scoped>
+.switch-state {
+    height: 24px !important;
+    display: flex;
+    align-items: center;
+}
 </style>
