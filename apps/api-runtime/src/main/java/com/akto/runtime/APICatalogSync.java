@@ -233,11 +233,12 @@ public class APICatalogSync {
 
 
             Map<String, Set<String>> staticUrlToSti = new HashMap<>();
+            Set<String> templateUrlSet = new HashSet<>();
             List<String> templateUrls = new ArrayList<>();
             for(SingleTypeInfo sti: singleTypeInfos) {
                 String key = sti.getMethod() + " " + sti.getUrl();
                 if (key.contains("INTEGER") || key.contains("STRING") || key.contains("UUID")) {
-                    templateUrls.add(key);
+                    templateUrlSet.add(key);
                     continue;
                 };
 
@@ -255,6 +256,10 @@ public class APICatalogSync {
                 }
 
                 set.add(sti.getResponseCode() + " " + sti.getParam());
+            }
+
+            for (String s: templateUrlSet) {
+                templateUrls.add(s);
             }
 
             for(String staticURL: staticUrlToSti.keySet()) {
