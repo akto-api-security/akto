@@ -1,6 +1,7 @@
 <template>
     <div class="pa-4">
         <div class="filter-div">
+            <date-range v-model="dateRange"/>
             <v-menu offset-y v-model="menu" :close-on-content-click="false"> 
                 <template v-slot:activator="{ on, attrs }">
                     <secondary-button 
@@ -45,6 +46,7 @@ import FilterList from '@/apps/dashboard/shared/components/FilterList'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
 import api from '@/apps/dashboard/views/settings/components/traffic_metrics/api.js';
 import NestedFilterList from '@/apps/dashboard/shared/components/NestedFilterList'
+import DateRange from '@/apps/dashboard/shared/components/DateRange'
 
 export default {
     name: "TrafficMetrics",
@@ -53,7 +55,8 @@ export default {
         SecondaryButton,
         FilterList,
         Spinner,
-        NestedFilterList
+        NestedFilterList,
+        DateRange
     },
     data() {
         return {
@@ -112,7 +115,10 @@ export default {
             let resp = await api.fetchTrafficMetrics(this.groupBy.value, startTimestamp, endTimestamp, this.names, host)
             this.trafficMetricsMap = resp['trafficMetricsMap']
             this.loading = false
-        }
+        },
+        toHyphenatedDate(epochInMs) {
+            return func.toDateStrShort(new Date(epochInMs))
+        },
 
     },
     async mounted() {
@@ -126,11 +132,18 @@ export default {
                 let val = func.convertTrafficMetricsToTrend(countMap)
                 result[key] =val
             }
-            return result
+            let orderedResult = {}
+            if(Object.keys(result).length>0){
+                orderedResult['INCOMING_PACKETS_MIRRORING'] = result['INCOMING_PACKETS_MIRRORING'];
+                orderedResult['OUTGOING_PACKETS_MIRRORING'] = result['OUTGOING_PACKETS_MIRRORING'];
+                orderedResult['OUTGOING_REQUESTS_MIRRORING'] = result['OUTGOING_REQUESTS_MIRRORING'];
+                orderedResult['TOTAL_REQUESTS_RUNTIME'] = result['TOTAL_REQUESTS_RUNTIME'];
+                orderedResult['FILTERED_REQUESTS_RUNTIME'] = result['FILTERED_REQUESTS_RUNTIME'];
+            }
+            return orderedResult;
         },
         groupByBtnText() {
             let title = this.groupBy.title
-            console.log(title);
             return title === "All" ? title : "Group by " + title 
         },
         ipSelected() {
@@ -147,6 +160,19 @@ export default {
                     "values": this.hosts
                 } }
             ]
+        },
+        dateRange: {
+            get () {
+                return [this.toHyphenatedDate(this.startTimestamp * 1000), this.toHyphenatedDate(this.endTimestamp * 1000)]
+            },
+            set(newDateRange) {
+                let start = Math.min(func.toEpochInMs(newDateRange[0]), func.toEpochInMs(newDateRange[1]));
+                let end = Math.max(func.toEpochInMs(newDateRange[0]), func.toEpochInMs(newDateRange[1]));
+
+                this.startTimestamp = +func.dayStart(start) / 1000
+                this.endTimestamp = +func.dayEnd(end) / 1000
+                this.fetchTrafficMetrics(this.startTimestamp, this.endTimestamp, {})
+            }
         }
     }
 }
