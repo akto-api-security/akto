@@ -1623,6 +1623,28 @@
             </result>
         </action>
 
+        <action name="api/fetchAktoGptConfig" class="com.akto.action.gpt.GptConfigAction" method="fetchAktoGptConfig">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/saveAktoGptConfig" class="com.akto.action.gpt.GptConfigAction" method="saveAktoGptConfig">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchTrafficMetrics" class="com.akto.action.traffic_metrics.TrafficMetricsAction">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
