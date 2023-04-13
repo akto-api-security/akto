@@ -33,7 +33,7 @@ export default {
         display: flex !important;
         flex-direction: row !important;
         padding: 4px 8px !important;
-        border:1px solid #D0D5DD !important;
+        border:1px solid var(--hexColor22) !important;
         border-radius: 4px !important;
         box-shadow: none !important;
     }
@@ -41,6 +41,6 @@ export default {
     .filter-header-span{
         font-weight: 500;
         font-size: 12px;
-        color:#47466A;
+        color:var(--themeColorDark);
     }
 </style>

@@ -1,5 +1,5 @@
 <template>
-    <div style="height:120px ;width: 482px">
+    <div class="select-component-main">
         <div class="ma-4 api-collection-label">
             API COLLECTION
         </div>
@@ -63,12 +63,38 @@ export default {
 </script>
 
 <style lang="sass">
+.select-component-main
+    height:120px
+    width: 482px
+
 .api-collection-label
     font-weight: 600
     font-size: 14px
-    color: #47466A
-
+    color: var(--themeColorDark)
 .spinner-div
     display: flex
     justify-content: center
+.page-login__card
+    max-width: 482px
+    margin: 0 auto
+    border-radius: 12px !important
+    border: 0px
+    position: relative
+    box-shadow: unset
+    height: 240px
+.collection-prompt
+    height: 72px
+    border: 1px solid #DADAE1
+    font-weight: 600
+    font-size: 14px
+    color: #344054
+    border: 2px
+    border-radius: 12px !important
+.collection-name
+    font-weight: 500
+    color: #344054
+    font-size: 16px
+    height: 72px
+    line-height: 44px
+    padding-left: 16px
 </style>

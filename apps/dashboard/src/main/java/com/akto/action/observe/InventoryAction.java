@@ -41,7 +41,7 @@ public class InventoryAction extends UserAction {
     //     return Action.SUCCESS.toUpperCase();
     // }
 
-    public final static int DELTA_PERIOD_VALUE = 60 * 24 * 60 * 60;
+
     private static final LoggerMaker loggerMaker = new LoggerMaker(InventoryAction.class);
 
     private String subType;
@@ -94,14 +94,10 @@ public class InventoryAction extends UserAction {
         return endpoints;
     }
 
-    public static final int LIMIT = 2000;
-    public List<BasicDBObject> fetchEndpointsInCollection(int apiCollectionId) {
-        return ApiCollectionsDao.fetchEndpointsInCollection(apiCollectionId, skip, LIMIT, DELTA_PERIOD_VALUE);
-    }
 
-    public List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId) {
-        return ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip, LIMIT, DELTA_PERIOD_VALUE);
-    }
+
+
+
 
     private String hostName;
     private List<BasicDBObject> endpoints;
@@ -119,7 +115,7 @@ public class InventoryAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        List<SingleTypeInfo> singleTypeInfos = ApiCollectionsDao.fetchHostSTI(apiCollection.getId(), skip);
+        List<SingleTypeInfo> singleTypeInfos = Utils.fetchHostSTI(apiCollection.getId(), skip);
         for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
             BasicDBObject value = new BasicDBObject();
             value.put("url", singleTypeInfo.getUrl());
@@ -136,7 +132,7 @@ public class InventoryAction extends UserAction {
         listOfEndpointsInCollection = new HashSet<>();
         List<BasicDBObject> list = null;
         if (apiCollectionId > -1) {
-            list = fetchEndpointsInCollectionUsingHost(apiCollectionId);
+            list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip);
         }
         if (list != null && !list.isEmpty()) {
             list.forEach(element -> {
@@ -153,6 +149,10 @@ public class InventoryAction extends UserAction {
         }
         return SUCCESS.toUpperCase();
     }
+
+
+
+
 
     private void attachTagsInAPIList(List<BasicDBObject> list) {
         List<TagConfig> tagConfigs = TagConfigsDao.instance.findAll(new BasicDBObject("active", true));
@@ -316,8 +316,7 @@ public class InventoryAction extends UserAction {
     }
 
     public String fetchAPICollection() {
-        List<BasicDBObject> list = fetchEndpointsInCollectionUsingHost(apiCollectionId);
-
+        List<BasicDBObject> list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip);
         APISpec apiSpec = APISpecDao.instance.findById(apiCollectionId);
         Set<String> unused = null;
         try {
