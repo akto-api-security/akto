@@ -28,9 +28,9 @@ export default {
     },
     props: {
         apiCollectionId: obj.numR,
-        endpointsList: obj.arrR,
         originalStateFromDb: obj.objN,
-        defaultOpenResult: obj.ObjN
+        defaultOpenResult: obj.ObjN,
+        fetchAllEndpointsForWorkflow: Function
     },
     data() {
         let defNodes = [
@@ -66,8 +66,26 @@ export default {
             editWorkflowNodeDetails: api.editWorkflowNodeDetails,
             originalState: this.originalStateFromDb || defaultState,
             runWorkflowTest: api.runWorkflowTest,
-            fetchWorkflowResult: api.fetchWorkflowResult
+            fetchWorkflowResult: api.fetchWorkflowResult,
+            endpointsList: []
         }
+    },
+    methods: {
+        async calculateEndpoints() {
+            let data = []
+            data = await this.fetchAllEndpointsForWorkflow(this.apiCollectionId)
+            console.log("calculateEndpoints data")
+            console.log(data)
+            this.endpointsList = data
+            return this.endpointsList
+        }
+    },
+    async mounted() {
+        let data = []
+        data = await this.fetchAllEndpointsForWorkflow(this.apiCollectionId)
+        console.log("data")
+        console.log(data)
+        this.endpointsList = data
     }
 }
 </script>

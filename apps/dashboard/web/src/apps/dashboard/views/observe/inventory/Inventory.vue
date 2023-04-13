@@ -72,7 +72,7 @@ export default {
             if (event.type >= 1) {
                 let coll = this.apiCollections.find(x => x.id === event.apiCollectionId)                    
                 if (coll) {
-                    let newRouteObject = this.getRouteObject({collectionName: coll.displayName, apiCollectionId: coll.id, type: 1})
+                    let newRouteObject = this.getRouteObject({collectionName: coll.displayName, apiCollectionId: coll.id, type: 1, isLogicalGroup: coll.isLogicalGroup})
                     this.breadcrumbs.push(newRouteObject)
                 } else {
                     return
@@ -97,7 +97,8 @@ export default {
                         to: {
                             name: 'apiCollection',
                             params: {
-                                apiCollectionId: event.apiCollectionId
+                                apiCollectionId: event.apiCollectionId,
+                                isLogicalGroup: event.isLogicalGroup || false
                             }
                         }
                     }

@@ -11,21 +11,21 @@ export default {
         })
     },
 
-    createCollection(name) {
+    createCollection(collectionName, andConditions, orConditions) {
         return request({
             url: '/api/createCollection',
             method: 'post',
-            data: {collectionName:name}
+            data: {collectionName, andConditions, orConditions}
         }).then((resp) => {
             return resp
         })
     },
 
-    deleteCollection(apiCollectionId) {
+    deleteCollection(apiCollectionId, isLogicalGroup) {
         return request({
             url: '/api/deleteCollection',
             method: 'post',
-            data: {apiCollectionId}
+            data: {apiCollectionId, isLogicalGroup}
         }).then((resp) => {
             return resp
         })
@@ -35,7 +35,15 @@ export default {
         return request({
             url: '/api/deleteMultipleCollections',
             method: 'post',
-            data: {apiCollections: items}
+            data: {apiCollectionResponse: items}
+        })        
+    },
+
+    getLogicalEndpointMatchingCount(orConditions, andConditions) {
+        return request({
+            url: '/api/getLogicalEndpointMatchingCount',
+            method: 'post',
+            data: {orConditions, andConditions}
         })        
     }
 }

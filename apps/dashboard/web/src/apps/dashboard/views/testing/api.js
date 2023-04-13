@@ -64,11 +64,11 @@ export default {
         })        
     },
 
-    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests) {
+    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, endpointDataQuery) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests}
+            data: {apiCollectionId, type: "FILTER_BASED", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, endpointDataQuery}
         }).then((resp) => {
             return resp
         })        

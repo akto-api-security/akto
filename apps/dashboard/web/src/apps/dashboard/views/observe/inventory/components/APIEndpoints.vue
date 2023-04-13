@@ -1,6 +1,5 @@
 <template>
-    <spinner v-if="endpointsLoading" />
-    <div class="pr-4 api-endpoints" v-else>
+    <div class="pr-4 api-endpoints">
         <div>
             <div class="d-flex jc-end pb-3 pt-3">
                     <v-tooltip bottom>
@@ -23,114 +22,91 @@
             </div>
         </div>
         <div class="d-flex">
-            <count-box title="Sensitive Endpoints" :count="sensitiveEndpoints.length" colorTitle="Overdue"/>
-            <count-box title="Undocumented Endpoints" :count="shadowEndpoints.length" colorTitle="Pending"/>
-            <count-box title="Deprecated Endpoints" :count="unusedEndpoints.length" colorTitle="This week"/>
-            <count-box title="All Endpoints" :count="allEndpoints.length" colorTitle="Total"/>
+            <count-box title="Sensitive Endpoints" :count="this.sensitiveEndpointCount" colorTitle="Overdue"/>
+            <count-box title="All Endpoints" :count="this.totalEndpointCount" colorTitle="Total"/>
         </div> 
         
-        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Unauthenticated', 'Undocumented', 'Deprecated', 'Documented', 'Tests']">
+        <layout-with-tabs title="" :tabs="['All', 'Sensitive', 'Unauthenticated', 'Workflows']">
             <template slot="actions-tray">
             </template>
             <template slot="All">
-                <simple-table 
-                    :headers=tableHeaders 
-                    :items=allEndpoints 
-                    @rowClicked=rowClicked 
+
+                <server-table 
+                    :headers="allEndpointsTableHeaders" 
                     name="All" 
-                    sortKeyDefault="sensitiveTags" 
+                    sortKeyDefault="discoveredTs" 
                     :sortDescDefault="true"
+                    @rowClicked="allEndpointTableRowClicked"
+                    :fetchParams="fetchAllTableParams"
+                    :processParams="prepareItemForTable"
+                    :getColumnValueList="getColumnValueList"
+                    :rowsPerPageDefault="50"
                 >
-                    <template #add-new-row-btn="{filteredItems}">
-                        <div>
-                            <secondary-button 
-                                @click="showScheduleDialog(filteredItems)"
-                                icon="$fas_play"
-                                text="Run Test" 
-                            />                            
+                
+                 <template #add-at-top="{filters, filterOperators, total}">
+                        <div style="align-items: center; display: flex;">
+                            <v-tooltip>
+                                <template v-slot:activator='{ on, attrs }'>
+                                    <v-btn icon primary dark color="#47466A" @click="showScheduleDialog(filters, filterOperators, total)">
+                                        <v-icon>$fas_play</v-icon>
+                                    </v-btn>
+                                </template>
+                                "Run test"
+                            </v-tooltip>
+                            
                         </div>
                         
                     </template>
-                    <template #item.sensitiveTags="{item}">
-                        <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
-                    </template>
-                    <template #item.tags="{item}">
-                        <tag-chip-group :tags="Array.from(item.tags || [])" />
-                    </template>
-                </simple-table>
+                <template #item.sensitiveTags="{item}">
+                    <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
+                </template>
+
+                </server-table>
+
             </template>
             <template slot="Sensitive">
-                <simple-table 
-                    :headers=tableHeaders 
-                    :items=sensitiveEndpoints 
-                    @rowClicked=rowClicked name="Sensitive"
-                >
-                    <template #item.sensitiveTags="{item}">
-                        <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
-                    </template>
-                    <template #item.tags="{item}">
-                        <tag-chip-group :tags="Array.from(item.tags || [])" />
-                    </template>
-                </simple-table>
-            </template>
-            <template slot="Undocumented">
-                <simple-table 
-                    :headers=tableHeaders 
-                    :items=shadowEndpoints 
-                    @rowClicked=rowClicked 
-                    name="Undocumented"  
-                    sortKeyDefault="sensitiveTags" 
+
+                <server-table 
+                    :headers="allEndpointsTableHeaders" 
+                    name="Sensitive" 
+                    sortKeyDefault="discoveredTs" 
                     :sortDescDefault="true"
+                    @rowClicked="allEndpointTableRowClicked"
+                    :fetchParams="fetchSensitiveTableParams"
+                    :processParams="prepareItemForTable"
+                    :getColumnValueList="getColumnValueList"
+                    :rowsPerPageDefault="50"
                 >
+
                     <template #item.sensitiveTags="{item}">
                         <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
                     </template>
-                    <template #item.tags="{item}">
-                        <tag-chip-group :tags="Array.from(item.tags || [])" />
-                    </template>
-                </simple-table>
+                    
+                </server-table>
+                
             </template>
-            <template slot="Deprecated">
-                <simple-table 
-                    :headers=unusedHeaders 
-                    :items=deprecatedEndpoints
-                    name="Deprecated"
-                />
-            </template>
-            <template slot="Documented">
-                <v-file-input
-                    :rules=swaggerUploadRules
-                    show-size
-                    label="Upload JSON file"
-                    prepend-icon="$curlyBraces"
-                    accept=".json"
-                    @change="handleSwaggerFileUpload"
-                    v-model=swaggerFile
-                ></v-file-input>
-                <json-viewer
-                    v-if="swaggerContent"
-                    :contentJSON="swaggerContent"
-                    :errors="{}"
-                />
-            </template>
+
             <template slot="Unauthenticated">
-                <simple-table 
-                    :headers=tableHeaders 
-                    :items=openEndpoints
-                    @rowClicked=rowClicked 
-                    name="Unauthenticated" 
-                    sortKeyDefault="sensitiveTags" 
+
+                <server-table 
+                    :headers="allEndpointsTableHeaders" 
+                    name="Sensitive"
+                    sortKeyDefault="discoveredTs"
                     :sortDescDefault="true"
+                    @rowClicked="allEndpointTableRowClicked"
+                    :fetchParams="fetchUnauthenticatedTableParams"
+                    :processParams="prepareItemForTable"
+                    :getColumnValueList="getColumnValueList"
+                    :rowsPerPageDefault="50"
                 >
                     <template #item.sensitiveTags="{item}">
                         <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
                     </template>
-                    <template #item.tags="{item}">
-                        <tag-chip-group :tags="Array.from(item.tags || [])" />
-                    </template>
-                </simple-table>
+
+                </server-table>
+
             </template>
-            <template slot="Tests">
+            <template slot="Workflows">
                 <div>
                     <div class="d-flex jc-end ma-2">
                         <v-btn v-if="!showWorkflowTestBuilder" primary dark color="var(--themeColor)" @click="() => {originalStateFromDb = null; showWorkflowTestBuilder = true}">
@@ -154,14 +130,13 @@
                         <v-btn icon primary dark color="var(--themeColor)" class="float-right" @click="() => {originalStateFromDb = null; showWorkflowTestBuilder = false}">
                             <v-icon>$fas_times</v-icon>
                         </v-btn>
-                        <workflow-test-builder :endpointsList=allEndpoints :apiCollectionId="apiCollectionId" :originalStateFromDb="originalStateFromDb" :defaultOpenResult="false" class="white-background"/>
+                        <workflow-test-builder :fetchAllEndpointsForWorkflow="this.fetchAllEndpointsForWorkflow" :apiCollectionId="apiCollectionId" :originalStateFromDb="originalStateFromDb" :defaultOpenResult="false" class="white-background"/>
                     </div>
                     
                 
                 </div>
             </template>
         </layout-with-tabs>
-        
         <v-dialog v-model="showTestSelectorDialog" width="800px"> 
             <tests-selector :collectionName="apiCollectionName" @testsSelected=startTest v-if="showTestSelectorDialog"/>
         </v-dialog>
@@ -187,6 +162,7 @@ import IconMenu from '@/apps/dashboard/shared/components/IconMenu'
 import WorkflowTestBuilder from './WorkflowTestBuilder'
 import TestsSelector from './TestsSelector'
 import SecondaryButton from '@/apps/dashboard/shared/components/buttons/SecondaryButton'
+import ServerTable from '@/apps/dashboard/shared/components/ServerTable'
 
 export default {
     name: "ApiEndpoints",
@@ -202,10 +178,12 @@ export default {
         IconMenu,
         WorkflowTestBuilder,
         TestsSelector,
-        SecondaryButton
+        SecondaryButton,
+        ServerTable
     },
     props: {
-        apiCollectionId: obj.numR
+        apiCollectionId: obj.numR,
+        isLogicalGroup: obj.boolR
     },
     activated(){
         this.refreshPage(true)
@@ -221,6 +199,43 @@ export default {
                 ],
             swaggerFile: null,
             showMenu: false,
+            allEndpointsTableHeaders: [
+                {
+                    text: '',
+                    value: 'color',
+                    hideFilter: true
+                },
+                {
+                    text: 'Endpoint',
+                    value: 'url',
+                },
+                {
+                    text: 'Method',
+                    value: 'method'
+                },
+                {
+                    text: 'Sensitive Params',
+                    value: 'sensitiveTags'
+                },
+                {
+                  text: 'Last Seen',
+                  value: 'lastSeenTs',
+                  sortKey: 'lastSeenTs'
+                },
+                {
+                  text: 'Access Type',
+                  value: 'accessType'
+                },
+                {
+                  text: 'Auth Type',
+                  value: 'authType'
+                },
+                {
+                    text: constants.DISCOVERED,
+                    value: 'discoveredTs',
+                    sortKey: 'discoveredTs'
+                }
+            ],
             tableHeaders: [
                 {
                     text: '',
@@ -234,10 +249,6 @@ export default {
                 {
                     text: 'Method',
                     value: 'method'
-                },
-                {
-                    text: 'Tags',
-                    value: 'tags'
                 },
                 {
                     text: 'Sensitive Params',
@@ -315,18 +326,32 @@ export default {
             ],
             showWorkflowTestBuilder: false,
             originalStateFromDb: null,
-            workflowTests: []
+            workflowTests: [],
+            sensitiveDataKeys: [],
+            totalEndpointCount: 0,
+            sensitiveEndpointCount: 0,
+            allEndpointsData: [],
+            endpointDataQuery: {},
         }
     },
     methods: {
+        allEndpointTableRowClicked(row) {
+            this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.url + " " + row.method, type: 2})
+        },
         rowClicked(row) {
             this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.endpoint + " " + row.method, type: 2})
         },
-        downloadData() {
+        async downloadData() {
+            
+            let allEndpointsData = []
+            await api.fetchAllEndpointData(this.apiCollectionId, this.isLogicalGroup).then(resp => {
+                allEndpointsData = this.buildAllEndpointData(resp.allEndpoints)   
+            })
+
             let headerTextToValueMap = Object.fromEntries(this.tableHeaders.map(x => [x.text, x.value]).filter(x => x[0].length > 0));
 
             let csv = Object.keys(headerTextToValueMap).join(",")+"\r\n"
-            this.allEndpoints.forEach(i => {
+            allEndpointsData.forEach(i => {
                 csv += Object.values(headerTextToValueMap).map(h => (i[h] || "-")).join(",") + "\r\n"
             })
             let blob = new Blob([csv], {
@@ -359,8 +384,9 @@ export default {
                 }
                 reader.onload = async () => {
                     let skipKafka = false;//window.location.href.indexOf("http://localhost") != -1
+                    let apiCollectionId = this.apiCollectionId
                     if (isHar) {
-                        await this.$store.dispatch('inventory/uploadHarFile', { content: JSON.parse(reader.result), filename: file.name, skipKafka})
+                        await this.$store.dispatch('inventory/uploadHarFile', { content: JSON.parse(reader.result), filename: file.name, skipKafka, apiCollectionId})
                     } else if (isPcap) {
                         var arrayBuffer = reader.result
                         var bytes = new Uint8Array(arrayBuffer);
@@ -375,11 +401,180 @@ export default {
                 }
             }
         },
+        getColumnValueList(headerValue) {
+            switch (headerValue) {
+                case "method": 
+                    return {
+                        type: "STRING",
+                        values: ["GET", "POST", "PUT", "HEAD", "OPTIONS"].map(x => {return {
+                            title: x, 
+                            subtitle: '',
+                            value: x
+                        }})
+                    }
+                
+                case "sensitiveTags": 
+                    return {
+                        type: "STRING",
+                        values: this.sensitiveDataKeys.map(x => {return {
+                            title: x, 
+                            subtitle: '',
+                            value: x
+                        }})
+                    }
+                
+                case "accessType": 
+                    return {
+                        type: "STRING",
+                        values: ["PUBLIC", "PRIVATE"].map(x => {return {
+                            title: x, 
+                            subtitle: '',
+                            value: x
+                        }})
+                    }
+                
+                case "authType": 
+                    return {
+                        type: "STRING",
+                        values: ["JWT", "CUSTOM", "AUTHENTICATED", "UNAUTHENTICATED", "BEARER", "BASIC"].map(x => {return {
+                            title: x, 
+                            subtitle: '',
+                            value: x
+                        }})
+                    }
+
+                case "discoveredTs":
+                case "lastSeenTs": 
+                    return {
+                        type: "INTEGER",
+                        values: {
+                            min: 0,
+                            max: 600
+                        }
+                    }
+                 
+                default: 
+                    return  {type: "SEARCH", values: []}
+            }
+        },
+        prepareItemForTable(x) {
+            return {
+                color: x.sensitiveParams.length > 0 ? this.$vuetify.theme.themes.dark.redMetric : this.$vuetify.theme.themes.dark.greenMetric,
+                url: x.url,
+                method: x.method,
+                sensitiveTags: new Set(x.sensitiveParams),
+                lastSeenTs: x.lastSeenTs,
+                accessType: x.accessType,
+                authType: x.authTypes.join(', '),
+                discoveredTs: x.discoveredTs
+            }
+        },
+
+        async fetchAllTableParams(sortKey, sortOrder, skip, limit, filters, filterOperators) {
+            let query = this.buildFetchParamQuery(sortKey, sortOrder, skip, limit, filters, filterOperators)
+            this.endpointDataQuery = query
+            return api.fetchEndpointData(query, skip/50)
+        },
+
+        async fetchAllEndpointsForWorkflow(apiCollectionId) {
+            let allEndpointsData = []
+            await api.fetchAllEndpointData(apiCollectionId, this.isLogicalGroup).then(resp => {
+                allEndpointsData = this.buildAllEndpointData(resp.allEndpoints)   
+            })
+            return allEndpointsData
+        },
+
+        async fetchUnauthenticatedTableParams(sortKey, sortOrder, skip, limit, filters, filterOperators) {
+            let query = this.buildFetchParamQuery(sortKey, sortOrder, skip, limit, filters, filterOperators)
+
+            let unauthenticatedKeyFound = false;
+            for (let k in query.filterConditions) {
+                let val = query.filterConditions[k]
+                if (val.key == "authType"){
+                    unauthenticatedKeyFound = true;
+                }
+            }
+
+            if (!unauthenticatedKeyFound) {
+                query.filterConditions.push({"key" : "authType", "operator": "AND", "values": ["UNAUTHENTICATED"]})
+            }
+            return api.fetchEndpointData(query, skip/50)
+        },
+
+        async fetchSensitiveTableParams(sortKey, sortOrder, skip, limit, filters, filterOperators) {
+            let query = this.buildFetchParamQuery(sortKey, sortOrder, skip, limit, filters, filterOperators)
+
+            let sensitiveKeyFound = false;
+            let finalSensitiveParams = this.sensitiveDataKeys
+            for (let k in query.filterConditions) {
+                let val = query.filterConditions[k]
+                if (val.key == "sensitiveTags"){
+                    sensitiveKeyFound = true;
+                    if (query.filterConditions[k].operator == "NOT") {
+                        finalSensitiveParams = finalSensitiveParams.filter(function(el) {
+                            return val.values.indexOf(el) < 0;
+                        });
+                        query.filterConditions.push({"key" : "sensitiveTags", "operator": "OR", "values": finalSensitiveParams})
+                        // query.filterConditions[k].values = finalSensitiveParams
+                    }
+                }
+            }
+
+            if (!sensitiveKeyFound) {
+                query.filterConditions.push({"key" : "sensitiveTags", "operator": "OR", "values": finalSensitiveParams})
+            }
+
+            //check if sensitive is present, if not append, else modify value
+
+            return api.fetchEndpointData(query, skip/50)
+        },
+
+        buildFetchParamQuery(sortKey, sortOrder, skip, limit, filters, filterOperators) {
+            let filterConditions = []
+
+            if (!this.isLogicalGroup) {
+                filterConditions.push({"key" : "apiCollectionId", "operator": "OR", "values": [this.apiCollectionId]})
+            } else {
+                filterConditions.push({"key" : "logicalGroups", "operator": "OR", "values": [this.apiCollectionId]})
+            }
+            for (let key in filters) {
+                let values = Array.from(filters[key])
+                let operator = filterOperators[key]
+                
+                if (operator == "AND" && (key == "method" || key == "accessType")) {
+                    operator = "OR"
+                }
+
+                if (operator == "OR" && (key == "sensitiveTags" || key == "authType")) {
+                    operator = "AND"
+                }
+
+                if ((key == "lastSeenTs" || key == "discoveredTs") && values.length > 0 ) {
+                    values[0] = func.timeNow() - values[0] * 24 * 60 * 60
+                    values[1] = func.timeNow() - values[1] * 24 * 60 * 60
+                }
+
+                if (values.length > 0) {
+                    filterConditions.push({"key": key, "operator": operator, "values": values})
+                }
+            }
+            let endpointQuery = {
+                "filterConditions": filterConditions,
+                "sortConditions": [
+                    {
+                        "key": sortKey,
+                        "sortOrder": sortOrder
+                    }
+                ]
+            }
+            return endpointQuery
+        },
         async downloadOpenApiFile() {
           let lastFetchedUrl = null;
           let lastFetchedMethod = null;
+          let apiCollectionId = this.apiCollectionId
           for (let index =0; index < 10; index++) {
-                var result = await this.$store.dispatch('inventory/downloadOpenApiFile', {lastFetchedUrl, lastFetchedMethod})
+                var result = await this.$store.dispatch('inventory/downloadOpenApiFile', {apiCollectionId, lastFetchedUrl, lastFetchedMethod})
                 let openApiString = result["openAPIString"]
                 var blob = new Blob([openApiString], {
                     type: "application/json",
@@ -402,7 +597,8 @@ export default {
         },
 
         async exportToPostman() {
-          var result = await this.$store.dispatch('inventory/exportToPostman')
+          let apiCollectionId = this.apiCollectionId
+          var result = await this.$store.dispatch('inventory/exportToPostman', {apiCollectionId})
           window._AKTO.$emit('SHOW_SNACKBAR', {
             show: true,
             text: "Exported to Postman!",
@@ -422,10 +618,11 @@ export default {
         async refreshPage(shouldLoad) {
             // if (!this.apiCollection || this.apiCollection.length === 0 || this.$store.state.inventory.apiCollectionId !== this.apiCollectionId) {
             this.showWorkflowTestBuilder = false
-            let collectionIdChanged = this.$store.state.inventory.apiCollectionId !== this.apiCollectionId
-            if (collectionIdChanged || !shouldLoad || ((new Date() / 1000) - this.lastFetched > 60*5)) {
-                this.$store.dispatch('inventory/loadAPICollection', { apiCollectionId: this.apiCollectionId, shouldLoad: shouldLoad})
-            }
+
+            api.fetchCollectionEndpointCountInfo(this.apiCollectionId, this.isLogicalGroup).then(resp => {
+                this.totalEndpointCount = resp.totalEndpointCount
+                this.sensitiveEndpointCount = resp.sensitiveEndpointCount        
+            })
 
             this.workflowTests = (await api.fetchWorkflowTests()).workflowTests.filter(x => x.apiCollectionId === this.apiCollectionId).map(x => {
                 return {
@@ -436,7 +633,10 @@ export default {
 
             this.$emit('mountedView', {type: 1, apiCollectionId: this.apiCollectionId})
         },
-        showScheduleDialog(filteredItems) {
+        buildAllEndpointData(allEndpoints) {
+            return func.buildAllEndpointData(allEndpoints)
+        },
+        showScheduleDialog(filters, filterOperators, total) {
             this.showTestSelectorDialog = true
             this.filteredItemsForScheduleTest = filteredItems
         },
@@ -450,68 +650,31 @@ export default {
             })
         },
         async startTest({recurringDaily, startTimestamp, selectedTests, testName, testRunTime, maxConcurrentRequests}) {
-            let apiInfoKeyList = this.toApiInfoKeyList(this.filteredItemsForScheduleTest)
-            let filtersSelected = this.filteredItemsForScheduleTest.length === this.allEndpoints.length
             let store = this.$store
             let apiCollectionId = this.apiCollectionId
+            let endpointDataQuery = this.endpointDataQuery
             
-            if (filtersSelected) {
-                await store.dispatch('testing/scheduleTestForCollection', {apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests})
-            } else {
-                await store.dispatch('testing/scheduleTestForCustomEndpoints', {apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests})
-            }
+            await store.dispatch('testing/scheduleTestForCollection', {apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, endpointDataQuery})
             
             this.showTestSelectorDialog = false            
-        }      
+        }  
     },
     computed: {
-        ...mapState('inventory', ['apiCollection', 'endpointsLoading', 'swaggerContent', 'apiInfoList', 'filters', 'lastFetched', 'unusedEndpoints']),
         apiCollectionName() {
-            return this.$store.state.collections.apiCollections.find(x => x.id === this.apiCollectionId).displayName
-        },
-        openEndpoints() {
-          return this.allEndpoints.filter(x => x.open)
-        },
-        allEndpoints () {
-            return func.mergeApiInfoAndApiCollection(this.apiCollection, this.apiInfoList)
-        },
-        sensitiveEndpoints() {
-            return this.allEndpoints.filter(x => x.sensitive && x.sensitive.size > 0)
-        },
-        shadowEndpoints () {
-            return this.allEndpoints.filter(x => x.shadow)
-        },
-        deprecatedEndpoints() {
-            let ret = []
-            this.apiInfoList.forEach(apiInfo => {
-                if (apiInfo.lastSeen < (func.timeNow() - func.recencyPeriod)) {
-                    ret.push({
-                        endpoint: apiInfo.id.url, 
-                        method: apiInfo.id.method,
-                        lastSeen: func.prettifyEpoch(apiInfo.lastSeen),
-                        color: func.actionItemColors()["This week"]
-                    })
+            let collectionName = ""
+            for (const [key, value] of this.$store.state.collections.apiCollections.entries()) {
+                if (value.id == this.apiCollectionId) {
+                    collectionName = value.displayName
                 }
-            })
-
-            try {
-                this.unusedEndpoints.forEach((x) => {
-                    if (!x) return;
-                    let arr = x.split(" ");
-                    if (arr.length < 2) return;
-                    ret.push({
-                      endpoint : arr[0],
-                      method : arr[1],
-                      color: func.actionItemColors()["This week"],
-                      lastSeen: 'in API spec file'
-                    })
-                })
-            } catch (e) {
             }
-            return ret
-        }
+            return collectionName
+        },
     },
-    async mounted() {}
+    async mounted() {
+        api.fetchDataTypeNames().then((resp) => {
+            this.sensitiveDataKeys = resp.allDataTypes
+        })
+    }
 }
 </script>
 

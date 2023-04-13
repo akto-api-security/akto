@@ -124,7 +124,15 @@ const inventory = {
             }
             return api.fetchAPICollection(apiCollectionId).then((resp) => {
                 commit('SAVE_API_COLLECTION', {data: resp.data, apiCollectionId: apiCollectionId, unusedEndpoints: resp.unusedEndpoints}, options)
-                api.loadSensitiveParameters(apiCollectionId).then(allSensitiveFields => {
+
+                let apiInfoList = []
+                if (resp.data.endpoints != null) {
+                    resp.data.endpoints.forEach(data => {
+                        apiInfoList.push({"apiCollectionId": data._id.apiCollectionId, "url": data._id.url, "method": data._id.method})
+                    })
+                }
+
+                api.fetchSensitiveParameters(apiInfoList).then(allSensitiveFields => {
                     commit('SAVE_SENSITIVE', allSensitiveFields.data.endpoints)
                 })
                 api.loadContent(apiCollectionId).then(resp => {
@@ -176,18 +184,18 @@ const inventory = {
                 return resp
             })
         },
-        uploadHarFile({commit,state},{content,filename, skipKafka}) {
-            return api.uploadHarFile(content,state.apiCollectionId,skipKafka).then(resp => {
+        uploadHarFile({commit,state},{content, filename, skipKafka, apiCollectionId}) {
+            return api.uploadHarFile(content, apiCollectionId, skipKafka).then(resp => {
                 return resp
             })
         },
-        downloadOpenApiFile({commit,state}, {lastFetchedUrl, lastFetchedMethod}) {
-            return api.downloadOpenApiFile(state.apiCollectionId, lastFetchedUrl, lastFetchedMethod).then(resp => {
+        downloadOpenApiFile({commit,state}, {apiCollectionId, lastFetchedUrl, lastFetchedMethod}) {
+            return api.downloadOpenApiFile(apiCollectionId, lastFetchedUrl, lastFetchedMethod).then(resp => {
                 return resp
             })
         },
-        exportToPostman({commit,state}) {
-            return api.exportToPostman(state.apiCollectionId).then(resp => {
+        exportToPostman({commit,state}, {apiCollectionId}) {
+            return api.exportToPostman(apiCollectionId).then(resp => {
                 return resp
             })
         },
