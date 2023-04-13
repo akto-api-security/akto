@@ -144,7 +144,6 @@ export default {
         },
         groupByBtnText() {
             let title = this.groupBy.title
-            console.log(title);
             return title === "All" ? title : "Group by " + title 
         },
         ipSelected() {
