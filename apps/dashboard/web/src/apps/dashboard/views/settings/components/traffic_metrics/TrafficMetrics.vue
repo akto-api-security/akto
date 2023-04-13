@@ -16,8 +16,8 @@
         </div>
         <div v-if="!loading">
             <div v-for="(trafficTrend, name) in trafficTrendArr">
-                <div>{{ name }}</div>
-                <div class="description">{{ descriptions[name]['descriptionName'] }} : {{ descriptions[name]['description'] }}</div>
+                <div>{{ descriptions[name]['descriptionName'] }}</div>
+                <div class="description">{{ descriptions[name]['description'] }}</div>
                 <line-chart
                     type='spline'
                     color='var(--themeColor)'
