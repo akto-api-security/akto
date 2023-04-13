@@ -16,7 +16,8 @@
         </div>
         <div v-if="!loading">
             <div v-for="(trafficTrend, name) in trafficTrendArr">
-                <div>{{ name }}</div>
+                <div>{{ descriptions[name]['descriptionName'] }}</div>
+                <div class="description">{{ descriptions[name]['description'] }}</div>
                 <line-chart
                     type='spline'
                     color='var(--themeColor)'
@@ -95,7 +96,8 @@ export default {
                         }
                     }
                 }
-            }
+            },
+            descriptions: {}
         }
     },
     methods: {
@@ -122,6 +124,13 @@ export default {
 
     },
     async mounted() {
+        let resp = await api.fetchTrafficMetricsDesciptions();
+        resp['names'].forEach((val) => {
+            this.descriptions[val["_name"]] = {
+                "description": val["description"],
+                "descriptionName": val["descriptionName"]
+            }
+        })
         this.fetchTrafficMetrics(this.startTimestamp, this.endTimestamp, {})
         this.hosts = func.getListOfHosts(this.$store.state.collections.apiCollections)
     },
@@ -191,5 +200,9 @@ export default {
     justify-content: center
     height: calc(100vh - 220px)
     align-items: center
+
+.description
+    font-size: 13px
+    opacity: 0.5
 
 </style>
