@@ -2,7 +2,9 @@ package com.akto.dao;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
@@ -117,16 +119,16 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
     public static List<BasicDBObject> fetchEndpointsInCollection(int apiCollectionId, int skip, int limit, int deltaPeriodValue) {
         List<Bson> pipeline = new ArrayList<>();
         BasicDBObject groupedId = 
-            new BasicDBObject("apiCollectionId", "$apiCollectionId")
-            .append("url", "$url")
-            .append("method", "$method");
+            new BasicDBObject(ApiInfoKey.API_COLLECTION_ID, "$apiCollectionId")
+            .append(ApiInfoKey.URL, "$url")
+            .append(ApiInfoKey.METHOD, "$method");
             
-        pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
+        pipeline.add(Aggregates.match(Filters.eq(ApiInfoKey.API_COLLECTION_ID, apiCollectionId)));
 
         int recentEpoch = Context.now() - deltaPeriodValue;
 
         Bson projections = Projections.fields(
-            Projections.include("timestamp", "apiCollectionId", "url", "method"),
+            Projections.include(Constants.TIMESTAMP, ApiInfoKey.API_COLLECTION_ID, ApiInfoKey.URL, ApiInfoKey.METHOD),
             Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$timestamp", recentEpoch})),
             Projections.computed("dayOfYear", new BasicDBObject("$trunc", new Object[]{"$dayOfYearFloat", 0}))
         );
@@ -163,10 +165,10 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
 
             List<BasicDBObject> endpoints = new ArrayList<>();
             for(SingleTypeInfo singleTypeInfo: allUrlsInCollection) {
-                BasicDBObject groupId = new BasicDBObject("apiCollectionId", singleTypeInfo.getApiCollectionId())
-                    .append("url", singleTypeInfo.getUrl())
-                    .append("method", singleTypeInfo.getMethod());
-                endpoints.add(new BasicDBObject("startTs", singleTypeInfo.getTimestamp()).append("_id", groupId));
+                BasicDBObject groupId = new BasicDBObject(ApiInfoKey.API_COLLECTION_ID, singleTypeInfo.getApiCollectionId())
+                    .append(ApiInfoKey.URL, singleTypeInfo.getUrl())
+                    .append(ApiInfoKey.METHOD, singleTypeInfo.getMethod());
+                endpoints.add(new BasicDBObject("startTs", singleTypeInfo.getTimestamp()).append(Constants.ID, groupId));
             }
     
             return endpoints;
