@@ -23,10 +23,22 @@ public class AdminSettingsAction extends UserAction {
     }
 
     public AccountSettings.SetupType setupType;
+    public Boolean newMergingEnabled;
+
     public String updateSetupType() {
         AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(),
                 Updates.set(AccountSettings.SETUP_TYPE, this.setupType),
+                new UpdateOptions().upsert(true)
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String toggleNewMergingEnabled() {
+        AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.URL_REGEX_MATCHING_ENABLED, this.newMergingEnabled),
                 new UpdateOptions().upsert(true)
         );
 
@@ -106,4 +118,13 @@ public class AdminSettingsAction extends UserAction {
     public void setSetupType(AccountSettings.SetupType setupType) {
         this.setupType = setupType;
     }
+
+    public Boolean getNewMergingEnabled() {
+        return newMergingEnabled;
+    }
+
+    public void setNewMergingEnabled(Boolean newMergingEnabled) {
+        this.newMergingEnabled = newMergingEnabled;
+    }
+
 }
