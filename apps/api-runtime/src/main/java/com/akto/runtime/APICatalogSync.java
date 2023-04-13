@@ -210,7 +210,7 @@ public class APICatalogSync {
     }
 
 
-    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, Boolean urlRegexMatchingEnabled) {
+    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, boolean urlRegexMatchingEnabled) {
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
 
         Bson filterQ = null;
@@ -338,7 +338,7 @@ public class APICatalogSync {
     }
 
     private static ApiMergerResult tryMergingWithKnownStrictURLs(
-        Map<String, Set<String>> pendingRequests, Boolean urlRegexMatchingEnabled
+        Map<String, Set<String>> pendingRequests, boolean urlRegexMatchingEnabled
     ) {
         Map<URLTemplate, Set<String>> templateToStaticURLs = new HashMap<>();
 
@@ -566,7 +566,7 @@ public class APICatalogSync {
         return true;
     }
 
-    public static boolean areBothMatchingUrls(URLStatic newUrl, URLStatic deltaUrl, URLTemplate mergedTemplate, Boolean urlRegexMatchingEnabled) {
+    public static boolean areBothMatchingUrls(URLStatic newUrl, URLStatic deltaUrl, URLTemplate mergedTemplate, boolean urlRegexMatchingEnabled) {
 
         if (!urlRegexMatchingEnabled) {
             return false;
@@ -653,7 +653,7 @@ public class APICatalogSync {
     }
 
 
-    public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled) {
+    public static void mergeUrlsAndSave(int apiCollectionId, boolean urlRegexMatchingEnabled) {
         ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, urlRegexMatchingEnabled);
         ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSti = new ArrayList<>();
         ArrayList<WriteModel<SampleData>> bulkUpdatesForSampleData = new ArrayList<>();
@@ -1176,7 +1176,7 @@ public class APICatalogSync {
 
                     try {
                         List<ApiCollection> allCollections = ApiCollectionsDao.instance.getMetaAll();
-                        Boolean urlRegexMatchingEnabled = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()).getUrlRegexMatchingEnabled();
+                        boolean urlRegexMatchingEnabled = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()).getUrlRegexMatchingEnabled();
                         loggerMaker.infoAndAddToDb("url regex matching enabled status is " + urlRegexMatchingEnabled, LogDb.RUNTIME);
                         for(ApiCollection apiCollection: allCollections) {
                             int start = Context.now();
