@@ -85,15 +85,18 @@
 
         <template slot="Access">
             <div v-if="!isSelectedRoleEmpty && !createNew">
-                <div style="padding: 12px 0px">
-                    <v-btn @click="createAccessMatrix" color="var(--themeColor)" class="save-btn" height="40px" width="200px" style="margin: 0px">
-                        Create Access Matrix
-                    </v-btn>
-                </div>
                 <simple-table 
                 :headers="headers" 
                 :items="roleToUrls" 
-                />
+                >
+                <template v-slot:add-new-row-btn="{}">
+                    <div class="clickable download-csv d-flex">
+                        <secondary-button 
+                            @click="createAccessMatrix"
+                            text="Create Access Matrix" />
+                    </div>            
+                </template>
+                </simple-table>
             </div>
         </template>
     </layout-with-tabs>
@@ -102,6 +105,7 @@
 
 <script>
 import ReviewTable from "@/apps/dashboard/views/settings/components/data_types/components/ReviewTable";
+import SecondaryButton from '@/apps/dashboard/shared/components/buttons/SecondaryButton'
 import TestRoleConditionsTable from "./TestRoleConditionsTable.vue"
 import SimpleTable from '@/apps/dashboard/shared/components/SimpleTable'
 import ACard from '@/apps/dashboard/shared/components/ACard'
@@ -119,7 +123,8 @@ export default {
         SimpleTable,
         TestRoleConditionsTable,
         ACard,
-        LayoutWithTabs
+        LayoutWithTabs,
+        SecondaryButton
     },
     data() {
         var operators = [
@@ -308,7 +313,7 @@ export default {
                         }
                     }
             });
-            return this.rolesToUrls[this.roleName];
+            return this.rolesToUrls[this.roleName] ? this.rolesToUrls[this.roleName] : [] ;
         }
     },
     watch: {
