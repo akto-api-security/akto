@@ -569,7 +569,6 @@ public class APICatalogSync {
     public static boolean areBothMatchingUrls(URLStatic newUrl, URLStatic deltaUrl, URLTemplate mergedTemplate, Boolean urlRegexMatchingEnabled) {
 
         if (!urlRegexMatchingEnabled) {
-            System.out.println("merging not allowed");
             return false;
         }
 
@@ -582,8 +581,6 @@ public class APICatalogSync {
                 String val = n[idx];
                 if(!isAlphanumericString(val) || !isAlphanumericString(o[idx])) {
                     return false;
-                } else {
-                    System.out.println(val);
                 }
             }
         }
@@ -1180,6 +1177,7 @@ public class APICatalogSync {
                     try {
                         List<ApiCollection> allCollections = ApiCollectionsDao.instance.getMetaAll();
                         Boolean urlRegexMatchingEnabled = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()).getUrlRegexMatchingEnabled();
+                        loggerMaker.infoAndAddToDb("url regex matching enabled status is " + urlRegexMatchingEnabled, LogDb.RUNTIME);
                         for(ApiCollection apiCollection: allCollections) {
                             int start = Context.now();
                             loggerMaker.infoAndAddToDb("Started merging API collection " + apiCollection.getId(), LogDb.RUNTIME);
