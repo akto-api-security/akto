@@ -112,13 +112,14 @@ public class KeyTypes {
 
     public static SubType findSubType(Object o,String key, ParamId paramId) {
 
+        int accountId = Context.accountId.get();
         boolean checkForSubtypes = true ;
-        for (String keyType : SingleTypeInfo.customDataTypeMap.keySet()) {
-            IgnoreData ignoreData = SingleTypeInfo.customDataTypeMap.get(keyType).getIgnoreData();
+        for (String keyType : SingleTypeInfo.getCustomDataTypeMap(accountId).keySet()) {
+            IgnoreData ignoreData = SingleTypeInfo.getCustomDataTypeMap(accountId).get(keyType).getIgnoreData();
             checkForSubtypes = checkForSubtypesTest(paramId, ignoreData);
         }
-        for (String keyType : SingleTypeInfo.aktoDataTypeMap.keySet()) {
-            IgnoreData ignoreData = SingleTypeInfo.aktoDataTypeMap.get(keyType).getIgnoreData();
+        for (String keyType : SingleTypeInfo.getAktoDataTypeMap(accountId).keySet()) {
+            IgnoreData ignoreData = SingleTypeInfo.getAktoDataTypeMap(accountId).get(keyType).getIgnoreData();
             checkForSubtypes = checkForSubtypesTest(paramId, ignoreData);
         }
 
@@ -132,7 +133,7 @@ public class KeyTypes {
         }
 
         if(checkForSubtypes){
-            for (CustomDataType customDataType: SingleTypeInfo.customDataTypesSortedBySensitivity) {
+            for (CustomDataType customDataType: SingleTypeInfo.getCustomDataTypesSortedBySensitivity(Context.accountId.get())) {
                 if (!customDataType.isActive()) continue;
                 boolean result = customDataType.validate(o,key);
                 if (result) return customDataType.toSubType();

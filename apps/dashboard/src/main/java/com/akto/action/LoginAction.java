@@ -58,7 +58,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             return Action.ERROR.toUpperCase();
         }
 
-        User user = UsersDao.instance.findOne(Filters.eq("login", username));
+        User user = UsersDao.instance.findOne(Filters.eq(User.LOGIN, username));
 
         if (user != null) {
             SignupInfo.PasswordHashInfo signupInfo = (SignupInfo.PasswordHashInfo) user.getSignupInfoMap().get(Config.ConfigType.PASSWORD + "-ankush");

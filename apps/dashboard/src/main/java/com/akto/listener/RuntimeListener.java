@@ -15,6 +15,7 @@ import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.Main;
 import com.akto.runtime.policies.AktoPolicy;
 import com.akto.util.AccountTask;
+import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Updates;
@@ -22,6 +23,7 @@ import com.mongodb.client.model.Updates;
 import java.io.IOException;
 import java.net.URL;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public class RuntimeListener extends AfterMongoConnectListener {
@@ -29,16 +31,22 @@ public class RuntimeListener extends AfterMongoConnectListener {
     public static HttpCallParser httpCallParser = null;
     public static AktoPolicy aktoPolicy = null;
 
-    private final LoggerMaker loggerMaker= new LoggerMaker(RuntimeListener.class);
+    public static Map<Integer, AccountHTTPCallParserAktoPolicyInfo> accountHTTPParserMap = new ConcurrentHashMap<>();
 
+    private final LoggerMaker loggerMaker= new LoggerMaker(RuntimeListener.class);
     @Override
     public void runMainFunction() {
+        //todo create map and fill
+
         AccountTask.instance.executeTask(new Consumer<Account>() {
             @Override
             public void accept(Account account) {
                 Main.initializeRuntime();
-                httpCallParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
-                aktoPolicy = new AktoPolicy(RuntimeListener.httpCallParser.apiCatalogSync, false);
+                AccountHTTPCallParserAktoPolicyInfo info = new AccountHTTPCallParserAktoPolicyInfo();
+                HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
+                info.setHttpCallParser(callParser);
+                info.setPolicy(new AktoPolicy(callParser.apiCatalogSync, false));
+                accountHTTPParserMap.put(account.getId(), info);
 
                 try {
                     initialiseDemoCollections();

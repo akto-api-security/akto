@@ -49,8 +49,8 @@ public class IgnoreFalsePositivesAction extends UserAction{
                     Updates.combine(
                             Updates.set(CustomDataType.IGNORE_DATA, ignoreData),
                             Updates.set(CustomDataType.TIMESTAMP, Context.now())));
-            } else if (SingleTypeInfo.aktoDataTypeMap.containsKey(keyType)) {
-                IgnoreData ignoreData = SingleTypeInfo.aktoDataTypeMap.get(keyType).getIgnoreData();
+            } else if (SingleTypeInfo.getAktoDataTypeMap(accountId).containsKey(keyType)) {
+                IgnoreData ignoreData = SingleTypeInfo.getAktoDataTypeMap(accountId).get(keyType).getIgnoreData();
                 if (ignoreData == null) {
                     ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
                 }
