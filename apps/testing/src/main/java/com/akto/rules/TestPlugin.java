@@ -416,7 +416,10 @@ public abstract class TestPlugin {
     }
 
     public Boolean validate(FilterNode filterNode, RawApi rawApi, ApiInfoKey apiInfoKey, String context) {
-        if (filterNode == null || rawApi == null) {
+        if (filterNode == null) {
+            return true;
+        }
+        if (rawApi == null) {
             return null;
         }
         TestConfigParser parser = new TestConfigParser();

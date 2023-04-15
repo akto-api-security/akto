@@ -9,6 +9,8 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
+import com.akto.dto.test_editor.ApiSelectionFilters;
+import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.*;
@@ -555,7 +557,12 @@ public class TestExecutor {
         RawApi authenticatedMessage = filteredMessages.size() == 0? null: filteredMessages.get(0);
 
         TestConfig testConfig = TestEditorConfigMap.testConfigMap.get("REMOVE_TOKENS");
-        TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, testConfig.getApiSelectionFilters().getNode(), authenticatedMessage);
+        ConfigParserResult apiSelectionFilters = testConfig.getApiSelectionFilters();
+        FilterNode filterNode = null;
+        if (apiSelectionFilters != null) {
+            filterNode = apiSelectionFilters.getNode();
+        }
+        TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, filterNode, authenticatedMessage);
         if (noAuthTestResult != null) {
             testingRunResults.add(noAuthTestResult);
         } else {
@@ -573,51 +580,55 @@ public class TestExecutor {
             testConfig = TestEditorConfigMap.testConfigMap.get(subCategory);
             TestPlugin test = null;
             RawApi rawApi = null;
-            FilterNode filterNode = testConfig.getApiSelectionFilters().getNode();
+            filterNode = null;
+            apiSelectionFilters = testConfig.getApiSelectionFilters();
+            if (apiSelectionFilters != null) {
+                filterNode = apiSelectionFilters.getNode();
+            }
 
-            if (testConfig.getInfo().getName().equals("BFLA") && shouldRunAuthTests && testRoleMatcher.shouldDoBFLA()) {
+            if (testConfig.getInfo().getSubCategory().equals("BFLA") && shouldRunAuthTests && testRoleMatcher.shouldDoBFLA()) {
                 test = bflaTest;
                 rawApi = authenticatedMessage;
-            } else if (testConfig.getInfo().getName().equals("REPLACE_AUTH_TOKEN") && shouldRunAuthTests) {
+            } else if (testConfig.getInfo().getSubCategory().equals("REPLACE_AUTH_TOKEN") && shouldRunAuthTests) {
                 test = bolaTest;
                 rawApi = authenticatedMessage;
-            } else if (testConfig.getInfo().getName().equals("ADD_USER_ID") && shouldRunAuthTests) {
+            } else if (testConfig.getInfo().getSubCategory().equals("ADD_USER_ID") && shouldRunAuthTests) {
                 test = addUserIdTest;
                 rawApi = authenticatedMessage;
-            } else if (testConfig.getInfo().getName().equals("PARAMETER_POLLUTION") && shouldRunAuthTests) {
+            } else if (testConfig.getInfo().getSubCategory().equals("PARAMETER_POLLUTION") && shouldRunAuthTests) {
                 test = parameterPollutionTest;
                 rawApi = authenticatedMessage;
-            } else if (testConfig.getInfo().getName().equals("REPLACE_AUTH_TOKEN_OLD_VERSION") && shouldRunAuthTests) {
+            } else if (testConfig.getInfo().getSubCategory().equals("REPLACE_AUTH_TOKEN_OLD_VERSION") && shouldRunAuthTests) {
                 test = oldApiVersionTest;
                 rawApi = authenticatedMessage;
-            } else if (testConfig.getInfo().getName().equals("JWT_NONE_ALGO") && shouldRunAuthTests) {
+            } else if (testConfig.getInfo().getSubCategory().equals("JWT_NONE_ALGO") && shouldRunAuthTests) {
                 test = jwtNoneAlgoTest;
                 rawApi = authenticatedMessage;
-            } else if (testConfig.getInfo().getName().equals("JWT_INVALID_SIGNATURE") && shouldRunAuthTests) {
+            } else if (testConfig.getInfo().getSubCategory().equals("JWT_INVALID_SIGNATURE") && shouldRunAuthTests) {
                 test = jwtInvalidSignatureTest;
                 rawApi = authenticatedMessage;
-            } else if (testConfig.getInfo().getName().equals("ADD_JKU_TO_JWT") && shouldRunAuthTests) {
+            } else if (testConfig.getInfo().getSubCategory().equals("ADD_JKU_TO_JWT") && shouldRunAuthTests) {
                 test = addJkuToJwtTest;
                 rawApi = authenticatedMessage;
-            } else if (testConfig.getInfo().getName().equals("PAGINATION_MISCONFIGURATION")) {
+            } else if (testConfig.getInfo().getSubCategory().equals("PAGINATION_MISCONFIGURATION")) {
                 test = pageSizeDosTest;
                 rawApi = message;
-            } else if (testConfig.getInfo().getName().equals("ADD_METHOD_IN_PARAMETER")) {
+            } else if (testConfig.getInfo().getSubCategory().equals("ADD_METHOD_IN_PARAMETER")) {
                 test = addMethodInParameterTest;
                 rawApi = message;
-            } else if (testConfig.getInfo().getName().equals("ADD_METHOD_OVERRIDE_HEADERS")) {
+            } else if (testConfig.getInfo().getSubCategory().equals("ADD_METHOD_OVERRIDE_HEADERS")) {
                 test = addMethodOverrideHeadersTest;
                 rawApi = message;
-            } else if (testConfig.getInfo().getName().equals("CHANGE_METHOD")) {
+            } else if (testConfig.getInfo().getSubCategory().equals("CHANGE_METHOD")) {
                 test = changeHttpMethodTest;
                 rawApi = message;
-            } else if (testConfig.getInfo().getName().equals( "OPEN_REDIRECT")) {
+            } else if (testConfig.getInfo().getSubCategory().equals( "OPEN_REDIRECT")) {
                 test = openRedirectTest;
                 rawApi = message;
-            } else if (testConfig.getInfo().getName().equals( "SSRF_AWS_METADATA_EXPOSED")) {
+            } else if (testConfig.getInfo().getSubCategory().equals( "SSRF_AWS_METADATA_EXPOSED")) {
                 test = ssrfOnAwsMetadataEndpoint;
                 rawApi = message;
-            } else if (testConfig.getInfo().getName().equals("MASS_ASSIGNMENT_CREATE_ADMIN_ROLE")) {
+            } else if (testConfig.getInfo().getSubCategory().equals("MASS_ASSIGNMENT_CREATE_ADMIN_ROLE")) {
                 test = createAdminUserViaMassAssignment;
                 rawApi = message;
             }
@@ -635,6 +646,9 @@ public class TestExecutor {
     public TestingRunResult runTest(TestPlugin testPlugin, ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil, ObjectId testRunId, ObjectId testRunResultSummaryId, FilterNode filterNode, RawApi rawApi) {
 
         int startTime = Context.now();
+        if (testPlugin == null) {
+            return null;
+        }
         if (!testPlugin.validate(filterNode, rawApi, apiInfoKey, "filter")) {
             return null;
         }

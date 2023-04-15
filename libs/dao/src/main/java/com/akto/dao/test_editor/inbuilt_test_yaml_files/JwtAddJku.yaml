@@ -3,17 +3,17 @@ info:
   name: "JWT authentication bypass via jku header injection"
   description: "Since Host server is using the JKU field of the JWT without validating, attacker can tamper with the payload of JWT and access protected resources."
   details: >
-            "The endpoint appears to be vulnerable to broken authentication attack.The original request was replayed by adding the JKU parameter value to the header of" +
-            " JWT and signing with Akto's key. The server responded with 2XX success codes. This indicates that this endpoint can be accessed with a tampered JWT.<br><br>" +
-            "<b>Background:</b> The JSON Web Signature specification defines the optional \"jku\" header, which contains a URL pointing to a set of keys used by the server to digitally sign " +
-            "the JWT. This parameter is particularly useful for servers that are configured to use multiple different keys because it can help to determine which key to use when verifying the" +
-            " signature. If the target application implicitly trusts this header, it may verify the signature using an arbitrary public key obtained from the provided URL, essentially relying " +
-            "on data that can be tampered with client-side. A malicious user could insert or modify a \"jku\" header so that it points to an external server containing a JSON Web Key Set that " +
-            "they've generated themselves. They could then re-sign the token using the matching private key and check whether the server still accepts it."
+            "The endpoint appears to be vulnerable to broken authentication attack.The original request was replayed by adding the JKU parameter value to the header of
+            JWT and signing with Akto's key. The server responded with 2XX success codes. This indicates that this endpoint can be accessed with a tampered JWT.<br>"
+            "<b>Background:</b> The JSON Web Signature specification defines the optional \"jku\" header, which contains a URL pointing to a set of keys used by the server to digitally sign
+            the JWT. This parameter is particularly useful for servers that are configured to use multiple different keys because it can help to determine which key to use when verifying the
+            signature. If the target application implicitly trusts this header, it may verify the signature using an arbitrary public key obtained from the provided URL, essentially relying
+            on data that can be tampered with client-side. A malicious user could insert or modify a \"jku\" header so that it points to an external server containing a JSON Web Key Set that
+            they've generated themselves. They could then re-sign the token using the matching private key and check whether the server still accepts it."
   impact: > 
-            "Using this vulnerability an attacker can do a full account takeover. <br><br>" +
-            "They can also exploit this vulnerability by supplying an arbitrary claim in the JWT payload to escalate their privileges or impersonate other users. For example, " +
-            "if the token contains a \"username\": \"joe\" claim, they could change this to \"username\": \"admin\"."
+            "Using this vulnerability an attacker can do a full account takeover. <br><br>"
+            "They can also exploit this vulnerability by supplying an arbitrary claim in the JWT payload to escalate their privileges or impersonate other users. For example,
+            if the token contains a \"username\": \"joe\" claim, they could change this to \"username\": \"admin\"."
   category:
     name: NO_AUTH
     shortName: Broken Authentication

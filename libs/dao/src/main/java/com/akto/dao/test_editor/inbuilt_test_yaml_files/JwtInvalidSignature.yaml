@@ -3,15 +3,15 @@ info:
   name: "JWT Failed to verify Signature"
   description: "Since server is not validating the JWT signature the attacker can tamper with the payload of JWT and access protected resources"
   details: >
-            "The endpoint appears to be vulnerable to broken authentication attack.The original request was replayed by changing the valid signature" +
-            " of JWT to invalid signature. The server responded with 2XX success codes. This indicates that this endpoint can be " +
-            "accessed with an invalid JWT signature as the developer has failed to properly verify the signature with every request.<br><br>" +
+            "The endpoint appears to be vulnerable to broken authentication attack.The original request was replayed by changing the valid signature
+            of JWT to invalid signature. The server responded with 2XX success codes. This indicates that this endpoint can be 
+            accessed with an invalid JWT signature as the developer has failed to properly verify the signature with every request.<br><br>"
             "<b>Background:</b> The JSON Web Token specification provides several ways for developers to digitally sign payload claims. This ensures data integrity and robust user authentication. However, some servers fail to properly verify the signature, which can result in them accepting tokens with invalid signatures."
   impact: > 
-            "Using this vulnerability an attacker can do a full account takeover. <br><br>" +
-            "They can also exploit this vulnerability by supplying an arbitrary claim in the JWT" +
-            " payload to escalate their privileges or impersonate other users. For example, if the token" +
-            " contains a \"username\": \"joe\" claim, they could change this to \"username\": \"admin\"."
+            "Using this vulnerability an attacker can do a full account takeover. <br><br>"
+            "They can also exploit this vulnerability by supplying an arbitrary claim in the JWT
+            payload to escalate their privileges or impersonate other users. For example, if the token
+            contains a \"username\": \"joe\" claim, they could change this to \"username\": \"admin\"."
   category:
     name: NO_AUTH
     shortName: Broken Authentication
