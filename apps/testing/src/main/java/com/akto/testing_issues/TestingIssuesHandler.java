@@ -60,13 +60,16 @@ public class TestingIssuesHandler {
                 updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED);
             }
 
-            TestSubCategory subCategory = TestSubCategory.getTestCategory(runResult.getTestSubType());
-            if (subCategory.equals(GlobalEnums.TestSubCategory.CUSTOM_IAM)) {//TestSourceConfig case
+            // name = cateogry
+            String subCategory = runResult.getTestSubType();
+            // string comparison (nuclei test)
+
+            if (subCategory.startsWith("http")) {//TestSourceConfig case
                 TestSourceConfig config = TestSourceConfigsDao.instance.getTestSourceConfig(runResult.getTestSubType());
                 updateSeverityField = Updates.set(TestingRunIssues.KEY_SEVERITY, config.getSeverity());
             } else {//TestSubCategory case
                 updateSeverityField = Updates.set(TestingRunIssues.KEY_SEVERITY,
-                        subCategory.getSuperCategory().getSeverity());
+                        "HIGH"); // todo: take value from yaml
             }
 
             Bson updateFields = Updates.combine(
@@ -106,16 +109,18 @@ public class TestingIssuesHandler {
                 }
             }
             if (!doesExists && runResult.isVulnerable()) {
-                TestSubCategory subCategory = TestSubCategory.getTestCategory(runResult.getTestSubType());
-                if (subCategory.equals(GlobalEnums.TestSubCategory.CUSTOM_IAM)) {
+                // name = category
+                String subCategory = runResult.getTestSubType();
+                // string comparison (nuclei test)
+                if (subCategory.startsWith("http")) {
                     TestSourceConfig config = TestSourceConfigsDao.instance.getTestSourceConfig(runResult.getTestSubType());
                     writeModelList.add(new InsertOneModel<>(new TestingRunIssues(testingIssuesId,
                             config.getSeverity(),
                             TestRunIssueStatus.OPEN, lastSeen, lastSeen, runResult.getTestRunResultSummaryId())));
                 }else {
                     writeModelList.add(new InsertOneModel<>(new TestingRunIssues(testingIssuesId,
-                            subCategory.getSuperCategory().getSeverity(),
-                            TestRunIssueStatus.OPEN, lastSeen, lastSeen, runResult.getTestRunResultSummaryId())));
+                            GlobalEnums.Severity.HIGH,
+                            TestRunIssueStatus.OPEN, lastSeen, lastSeen, runResult.getTestRunResultSummaryId()))); // todo: take value from yaml
                 }
                 loggerMaker.infoAndAddToDb(String.format("Inserting the id %s , with summary Id as %s", testingIssuesId, runResult.getTestRunResultSummaryId()), LogDb.TESTING);
             }

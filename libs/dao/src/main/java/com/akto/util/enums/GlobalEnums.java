@@ -448,15 +448,16 @@ public class GlobalEnums {
             return valuesArray;
         }
 
-        public static TestSubCategory getTestCategory(String category) {
-            if (category.startsWith("http")) return CUSTOM_IAM;
-            for (TestSubCategory testSubCategory : valuesArray) {
-                if (testSubCategory.name.equalsIgnoreCase(category)) {
-                    return testSubCategory;
-                }
-            }
-            return null;
-        }
+        // public static TestSubCategory getTestCategory(String category) {
+        //     // ?? subcategory - http
+        //     if (category.startsWith("http")) return CUSTOM_IAM;
+        //     for (TestSubCategory testSubCategory : valuesArray) {
+        //         if (testSubCategory.name.equalsIgnoreCase(category)) {
+        //             return testSubCategory;
+        //         }
+        //     }
+        //     return null;
+        // }
 
         public String getName() {
             return name;

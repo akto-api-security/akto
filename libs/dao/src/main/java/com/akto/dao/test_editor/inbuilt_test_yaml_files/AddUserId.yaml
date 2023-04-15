@@ -1,11 +1,23 @@
-id: add-user-id
+id: ADD_USER_ID
 info:
-  message: "Attacker can access resources of any user by adding user_id in URL."
-  category: Broken Object Level Authorization (BOLA)
+  name: "IDOR by adding user id in query params"
+  description: "Attacker can access resources of any user by adding user_id in URL."
+  details: >
+    "The endpoint appears to be vulnerable to broken object level authorization attack. The original request was replayed by adding other user's user id in query params. " +
+    "The server responded with 2XX success codes and less than <b>{{percentageMatch}}%</b> of the response body matched with original response body. <br><br>" +
+    "<b>Background:</b> Object level authorization is an access control mechanism that is usually implemented at the code level to validate that one user can only access objects that they should have access to."
+  impact: "Unauthorized access can result in data disclosure to unauthorized parties, data loss, or data manipulation. Unauthorized access to objects can also lead to full account takeover."
+  category:
+    name: BOLA
+    shortName: BOLA
+    displayName: Broken Object Level Authorization (BOLA)
   subCategory: ADD_USER_ID
   severity: HIGH
-  confidence: LOW
-  tags: Business logic, OWASP top 10, HackerOne top 10
+  confidence: HIGH
+  tags: 
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
   author: Akto
   references:
     - "https://www.akto.io/blog/bola-exploitation-using-unauthorized-uuid-on-api-endpoint"
@@ -14,5 +26,5 @@ info:
     - "https://cwe.mitre.org/data/definitions/284.html"
     - "https://cwe.mitre.org/data/definitions/285.html"
     - "https://cwe.mitre.org/data/definitions/639.html"
-apiSelectionFilters:
+api_selection_filters:
 

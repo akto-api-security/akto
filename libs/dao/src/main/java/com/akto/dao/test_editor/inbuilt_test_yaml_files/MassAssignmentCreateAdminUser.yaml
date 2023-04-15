@@ -1,7 +1,8 @@
-id: mass-assignment-create-admin-user
+id: MASS_ASSIGNMENT_CREATE_ADMIN_ROLE
 info:
-  message: >
-            "The endpoint appears to be vulnerable to Mass Assignment attack. The original request was replayed by adding role with admin permissions in request body. The application responded with 2XX success code in response.",
+  name: "Mass assignment leading to creation of admin role"
+  description: "The endpoint appears to be vulnerable to Mass Assignment attack. The original request was replayed by adding role with admin permissions in request body. The application responded with 2XX success code in response."
+  details: >  
             "The endpoint appears to be vulnerable to Mass Assignment attack. The original request was replayed by adding role with admin permissions in request body. The application responded with 2XX success code in response." +
             "<b>Background:</b>" +
             "Objects in modern applications might contain many properties. Some of these properties should be updated directly by the client (e.g., user.first_name or user.address) and some of them should not (e.g., user.is_vip flag).\n" +
@@ -9,34 +10,43 @@ info:
             "Examples for sensitive properties:" +
             "Permission-related properties: user.is_admin, user.is_vip should only be set by admins." +
             "Process-dependent properties: user.cash should only be set internally after payment verification." +
-            "Internal properties: article.created_time should only be set internally by the application.",
-            "Exploitation can lead to privilege escalation.",
-  category: Mass Assignment (MA)
+            "Internal properties: article.created_time should only be set internally by the application."
+  impact: "Exploitation can lead to privilege escalation."
+  category:
+    name: MA
+    shortName: Mass Assignment
+    displayName: Mass Assignment (MA) 
   subCategory: MASS_ASSIGNMENT_CREATE_ADMIN_ROLE
   severity: HIGH
-  confidence: LOW
-  tags: Business logic, OWASP top 10, HackerOne top 10
+  confidence: HIGH
+  tags: 
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
   references:
     - "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa6-mass-assignment.md"
   author: Akto
-apiSelectionFilters:
+api_selection_filters:
   response_code:
     gte: 200
     lt: 300
-  methods:
-    containsOne:
-			- 'PUT'
-			- 'POST'
-			- 'PATCH'
+  method:
+    contains_either:
+      - "PUT"
+      - "POST"
+      - "PATCH"
   url:
-    regex:
-			- user
+    contains_all:
+      - user
   request_payload:
-    - key:
-			  regex:
-				  - "email"
-          - "login"
+    for_one:
+      key:
+        contains_either:
+          - email
+          - login
   response_payload:
-		- key:
-			  regex:
-				  - "role"
+    for_one:
+      key:
+        contains_either:
+          - user
+          - role
