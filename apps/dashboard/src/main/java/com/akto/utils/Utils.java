@@ -267,8 +267,17 @@ public class Utils {
             Context.accountId.set(accountId);
 
             SingleTypeInfo.fetchCustomDataTypes(accountId);
-            APICatalogSync apiCatalogSync = RuntimeListener.httpCallParser.syncFunction(responses, true, false);
-            RuntimeListener.aktoPolicy.main(responses, apiCatalogSync, false);
+            AccountHTTPCallParserAktoPolicyInfo info = RuntimeListener.accountHTTPParserMap.get(accountId);
+            if (info == null) { // account created after docker run
+                info = new AccountHTTPCallParserAktoPolicyInfo();
+                HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
+                info.setHttpCallParser(callParser);
+                info.setPolicy(new AktoPolicy(callParser.apiCatalogSync, false));
+                RuntimeListener.accountHTTPParserMap.put(accountId, info);
+            }
+
+            APICatalogSync apiCatalogSync = info.getHttpCallParser().syncFunction(responses, true, false);
+            info.getPolicy().main(responses, apiCatalogSync, false);
         }
     }
 

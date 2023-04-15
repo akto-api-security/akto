@@ -5,16 +5,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.akto.dto.AktoDataType;
 import com.akto.dto.CustomDataType;
 
 public class AccountDataTypesInfo {
 
-    private Map<String, CustomDataType> customDataTypeMap = new HashMap<>();
-    private List<CustomDataType> customDataTypesSortedBySensitivity = new ArrayList<>();
+    private Map<String, CustomDataType> customDataTypeMap;
+    private List<CustomDataType> customDataTypesSortedBySensitivity;
 
+    private Map<String, AktoDataType> aktoDataTypeMap = new HashMap<>();
     public AccountDataTypesInfo() {
         this.customDataTypeMap = new HashMap<>();
         this.customDataTypesSortedBySensitivity = new ArrayList<>();
+        this.aktoDataTypeMap = new HashMap<>();
     }
 
     public AccountDataTypesInfo(Map<String,CustomDataType> customDataTypeMap, List<CustomDataType> customDataTypesSortedBySensitivity) {
@@ -44,5 +47,13 @@ public class AccountDataTypesInfo {
                 " customDataTypeMap='" + getCustomDataTypeMap() + "'" +
                 ", customDataTypesSortedBySensitivity='" + getCustomDataTypesSortedBySensitivity() + "'" +
                 "}";
+    }
+
+    public Map<String, AktoDataType> getAktoDataTypeMap() {
+        return aktoDataTypeMap;
+    }
+
+    public void setAktoDataTypeMap(Map<String, AktoDataType> aktoDataTypeMap) {
+        this.aktoDataTypeMap = aktoDataTypeMap;
     }
 }

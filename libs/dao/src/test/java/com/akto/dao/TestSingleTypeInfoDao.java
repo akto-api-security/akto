@@ -74,7 +74,7 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         CustomDataTypeDao.instance.insertOne(customDataType);
         SingleTypeInfo.fetchCustomDataTypes(Context.accountId.get());
 
-        assertEquals(SingleTypeInfo.customDataTypeMap.keySet().size(), 1);
+        assertEquals(SingleTypeInfo.getCustomDataTypeMap(Context.accountId.get()).keySet().size(), 1);
 
         SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(
                 "url", "GET",200, false, "param#key", customDataType.toSubType(), 0, false
