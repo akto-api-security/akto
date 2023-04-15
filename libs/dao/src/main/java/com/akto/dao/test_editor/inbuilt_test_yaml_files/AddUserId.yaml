@@ -3,8 +3,8 @@ info:
   name: "IDOR by adding user id in query params"
   description: "Attacker can access resources of any user by adding user_id in URL."
   details: >
-    "The endpoint appears to be vulnerable to broken object level authorization attack. The original request was replayed by adding other user's user id in query params. " +
-    "The server responded with 2XX success codes and less than <b>{{percentageMatch}}%</b> of the response body matched with original response body. <br><br>" +
+    "The endpoint appears to be vulnerable to broken object level authorization attack. The original request was replayed by adding other user's user id in query params.
+    The server responded with 2XX success codes and less than <b>{{percentageMatch}}%</b> of the response body matched with original response body. <br>"
     "<b>Background:</b> Object level authorization is an access control mechanism that is usually implemented at the code level to validate that one user can only access objects that they should have access to."
   impact: "Unauthorized access can result in data disclosure to unauthorized parties, data loss, or data manipulation. Unauthorized access to objects can also lead to full account takeover."
   category:

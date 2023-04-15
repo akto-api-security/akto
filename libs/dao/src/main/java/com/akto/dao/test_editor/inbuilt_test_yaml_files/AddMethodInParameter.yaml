@@ -3,12 +3,12 @@ info:
   name: "BFLA by HTTP verb tunneling by adding method param"
   description: "Attacker can access resources of any user by replacing method of the endpoint (eg: changemethod from get to post). This way attacker can get access to unauthorized endpoints."
   details: >
-            "The endpoint appears to be vulnerable to broken object level authorization attack. The original request " +
-            "was replayed with attacker's auth token. The server responded with 2XX success codes and greater" +
-            " than <b>{{percentageMatch}}%</b> of the response body matched with original response body. Also, the endpoint had atleast one private " +
-            "resources in request payload.<br><br>" +
-            "<b>Background:</b> Object level authorization is an access control mechanism that is usually implemented at the code level to" +
-            " validate that one user can only access objects that they should have access to."
+            "The endpoint appears to be vulnerable to broken object level authorization attack. The original request
+            was replayed with attacker's auth token. The server responded with 2XX success codes and greater
+            than <b>{{percentageMatch}}%</b> of the response body matched with original response body. Also, the endpoint had atleast one private
+            resources in request payload.<br>"
+            "<b>Background:</b> Object level authorization is an access control mechanism that is usually implemented at the code level to
+            validate that one user can only access objects that they should have access to."
   impact: "An attacker can perform sensitive actions (e.g., creation, modification, or erasure) that they should not have access to by simply overriding the HTTP method by adding parameter method in query params."
   category:
     name: BFLA

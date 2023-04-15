@@ -3,8 +3,9 @@ info:
   name: "Open redirect"
   description: "An attacker can construct a URL within the application that causes a redirection to an arbitrary external domain."
   details: > 
-            "Open redirection vulnerabilities arise when an application incorporates user-controllable data into the target of a redirection in an unsafe way." +
-            "The ability to use an authentic application URL, targeting the correct domain and with a valid SSL certificate (if SSL is used), lends credibility to the phishing attack because many users, even if they verify these features, will not notice the subsequent redirection to a different domain"
+            "Open redirection vulnerabilities arise when an application incorporates user-controllable data into the target of a redirection in an unsafe way.
+            The ability to use an authentic application URL, targeting the correct domain and with a valid SSL certificate (if SSL is used), lends credibility 
+            to the phishing attack because many users, even if they verify these features, will not notice the subsequent redirection to a different domain"
   impact: "This behavior can be leveraged to facilitate phishing attacks against users of the application."
   category:
     name: SM
@@ -22,7 +23,7 @@ info:
   author: Akto
 api_selection_filters:
   response_code:
-    neq: 302
+    eq: 302
   or:
     - request_payload:
         for_one:
