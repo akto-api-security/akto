@@ -1,3 +1,9 @@
-id: fuzzing
+id: FUZZING
 info:
-apiSelectionFilters:
+  name: FUZZING
+  description: ""
+  details: ""
+  impact: ""
+  subCategory: FUZZING
+  confidence: ""
+api_selection_filters:

@@ -9,6 +9,8 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
+import com.akto.dto.test_editor.FilterNode;
+import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.type.RequestTemplate;
@@ -23,7 +25,7 @@ import com.akto.store.TestingUtil;
 import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
-import com.akto.util.enums.GlobalEnums.TestSubCategory;
+import com.akto.util.TestEditorConfigMap;
 import com.akto.util.enums.LoginFlowEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
@@ -45,9 +47,7 @@ public class TestExecutor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class);
     public static long acceptableSizeInBytes = 5_000_000;
-
-
-
+    
     public void init(TestingRun testingRun, ObjectId summaryId) {
         if (testingRun.getTestIdConfig() != 1) {
             apiWiseInit(testingRun, summaryId);
@@ -57,6 +57,7 @@ public class TestExecutor {
     }
 
     public static void main(String[] args) {
+        
         DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
         Context.accountId.set(1_000_000);
 
@@ -305,6 +306,8 @@ public class TestExecutor {
     public List<TestingRunResult> runNucleiTests(ApiInfo.ApiInfoKey apiInfoKey, TestingRun testingRun, TestingUtil testingUtil, ObjectId summaryId) {
         List<TestingRunResult> testingRunResults = new ArrayList<>();
         List<String> testSubCategories = testingRun.getTestingRunConfig().getTestSubCategoryList();
+        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
+        RawApi message = messages.size() == 0? null: messages.get(0);
         if (testSubCategories != null) {
             for (String testSubCategory: testSubCategories) {
                 if (testSubCategory.startsWith("http://") || testSubCategory.startsWith("https://")) {
@@ -313,9 +316,9 @@ public class TestExecutor {
                         origTemplateURL = origTemplateURL.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/");
                         String subcategory = origTemplateURL.substring(origTemplateURL.lastIndexOf("/")+1).split("\\.")[0];
 
-                        FuzzingTest fuzzingTest = new FuzzingTest(testingRun.getId().toHexString(), summaryId.toHexString(), origTemplateURL, subcategory, testSubCategory, null);
-                        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
-                        TestingRunResult fuzzResult = runTest(fuzzingTest, apiInfoKey, testingUtil, testingRun.getId(), summaryId, "Fuzzing", messages.get(0));
+                        TestPlugin fuzzingTest = new FuzzingTest(testingRun.getId().toHexString(), summaryId.toHexString(), origTemplateURL, subcategory, testSubCategory, null);
+                        TestConfig testConfig = TestEditorConfigMap.testConfigMap.get("FUZZING");
+                        TestingRunResult fuzzResult = runTest(fuzzingTest, apiInfoKey, testingUtil, testingRun.getId(), summaryId, testConfig.getApiSelectionFilters().getNode(), message);
                         if (fuzzResult != null) {
                             trim(fuzzResult);
                             TestingRunResultDao.instance.insertOne(fuzzResult);
@@ -548,100 +551,91 @@ public class TestExecutor {
         //if (filteredMessages.isEmpty()) return null;
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
+        RawApi message = messages.size() == 0? null: messages.get(0);
         RawApi authenticatedMessage = filteredMessages.size() == 0? null: filteredMessages.get(0);
 
-        TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "NoAuth", authenticatedMessage);
+        TestConfig testConfig = TestEditorConfigMap.testConfigMap.get("REMOVE_TOKENS");
+        TestingRunResult noAuthTestResult = runTest(noAuthTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, testConfig.getApiSelectionFilters().getNode(), authenticatedMessage);
         if (noAuthTestResult != null) {
             testingRunResults.add(noAuthTestResult);
         } else {
             loggerMaker.infoAndAddToDb("No auth result is null for " + apiInfoKey, LogDb.TESTING);
         }
-        if (noAuthTestResult != null && !noAuthTestResult.isVulnerable()) {
+        Boolean shouldRunAuthTests = noAuthTestResult != null && !noAuthTestResult.isVulnerable();
 
-            TestPlugin.TestRoleMatcher testRoleMatcher = new TestPlugin.TestRoleMatcher(testingUtil.getTestRoles(), apiInfoKey);
-            loggerMaker.infoAndAddToDb("Starting auth required tests for " + apiInfoKey, LogDb.TESTING);
-            if ((testSubCategories == null || testSubCategories.contains(TestSubCategory.BFLA.name())) && testRoleMatcher.shouldDoBFLA())  {
-                TestingRunResult bflaTestResult = runTest(bflaTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "BFLA", authenticatedMessage);
-                if (bflaTestResult != null) testingRunResults.add(bflaTestResult);
-            } else if (testSubCategories == null || testSubCategories.contains(TestSubCategory.REPLACE_AUTH_TOKEN.name())){
-                TestingRunResult bolaTestResult = runTest(bolaTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "BOLAByChangingAuthToken", authenticatedMessage);
-                if (bolaTestResult != null) testingRunResults.add(bolaTestResult);
+        TestPlugin.TestRoleMatcher testRoleMatcher = new TestPlugin.TestRoleMatcher(testingUtil.getTestRoles(), apiInfoKey);
+        
+        for (String subCategory: testSubCategories) {
+            if (!TestEditorConfigMap.testConfigMap.containsKey(subCategory)) {
+                loggerMaker.infoAndAddToDb("invalid test subcateogry specified " + subCategory, LogDb.TESTING);
+                continue;
+            }
+            testConfig = TestEditorConfigMap.testConfigMap.get(subCategory);
+            TestPlugin test = null;
+            RawApi rawApi = null;
+            FilterNode filterNode = testConfig.getApiSelectionFilters().getNode();
+
+            if (testConfig.getInfo().getName().equals("BFLA") && shouldRunAuthTests && testRoleMatcher.shouldDoBFLA()) {
+                test = bflaTest;
+                rawApi = authenticatedMessage;
+            } else if (testConfig.getInfo().getName().equals("REPLACE_AUTH_TOKEN") && shouldRunAuthTests) {
+                test = bolaTest;
+                rawApi = authenticatedMessage;
+            } else if (testConfig.getInfo().getName().equals("ADD_USER_ID") && shouldRunAuthTests) {
+                test = addUserIdTest;
+                rawApi = authenticatedMessage;
+            } else if (testConfig.getInfo().getName().equals("PARAMETER_POLLUTION") && shouldRunAuthTests) {
+                test = parameterPollutionTest;
+                rawApi = authenticatedMessage;
+            } else if (testConfig.getInfo().getName().equals("REPLACE_AUTH_TOKEN_OLD_VERSION") && shouldRunAuthTests) {
+                test = oldApiVersionTest;
+                rawApi = authenticatedMessage;
+            } else if (testConfig.getInfo().getName().equals("JWT_NONE_ALGO") && shouldRunAuthTests) {
+                test = jwtNoneAlgoTest;
+                rawApi = authenticatedMessage;
+            } else if (testConfig.getInfo().getName().equals("JWT_INVALID_SIGNATURE") && shouldRunAuthTests) {
+                test = jwtInvalidSignatureTest;
+                rawApi = authenticatedMessage;
+            } else if (testConfig.getInfo().getName().equals("ADD_JKU_TO_JWT") && shouldRunAuthTests) {
+                test = addJkuToJwtTest;
+                rawApi = authenticatedMessage;
+            } else if (testConfig.getInfo().getName().equals("PAGINATION_MISCONFIGURATION")) {
+                test = pageSizeDosTest;
+                rawApi = message;
+            } else if (testConfig.getInfo().getName().equals("ADD_METHOD_IN_PARAMETER")) {
+                test = addMethodInParameterTest;
+                rawApi = message;
+            } else if (testConfig.getInfo().getName().equals("ADD_METHOD_OVERRIDE_HEADERS")) {
+                test = addMethodOverrideHeadersTest;
+                rawApi = message;
+            } else if (testConfig.getInfo().getName().equals("CHANGE_METHOD")) {
+                test = changeHttpMethodTest;
+                rawApi = message;
+            } else if (testConfig.getInfo().getName().equals( "OPEN_REDIRECT")) {
+                test = openRedirectTest;
+                rawApi = message;
+            } else if (testConfig.getInfo().getName().equals( "SSRF_AWS_METADATA_EXPOSED")) {
+                test = ssrfOnAwsMetadataEndpoint;
+                rawApi = message;
+            } else if (testConfig.getInfo().getName().equals("MASS_ASSIGNMENT_CREATE_ADMIN_ROLE")) {
+                test = createAdminUserViaMassAssignment;
+                rawApi = message;
             }
 
-            if (testSubCategories == null || testSubCategories.contains(TestSubCategory.ADD_USER_ID.name())) {
-                TestingRunResult addUserIdTestResult = runTest(addUserIdTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "AddUserId", authenticatedMessage);
-                if (addUserIdTestResult != null) testingRunResults.add(addUserIdTestResult);
+            TestingRunResult result = runTest(test, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, filterNode, rawApi);
+            if (result != null) {
+                testingRunResults.add(result);
             }
 
-            if (testSubCategories == null || testSubCategories.contains(TestSubCategory.PARAMETER_POLLUTION.name())) {
-                TestingRunResult parameterPollutionTestResult = runTest(parameterPollutionTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "ParameterPollution", authenticatedMessage);
-                if (parameterPollutionTestResult != null) testingRunResults.add(parameterPollutionTestResult);
-            }
-
-            if (testSubCategories == null || testSubCategories.contains(TestSubCategory.REPLACE_AUTH_TOKEN_OLD_VERSION.name())) {
-                TestingRunResult oldApiVersionTestResult = runTest(oldApiVersionTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "OldApiVersion", authenticatedMessage);
-                if (oldApiVersionTestResult != null) testingRunResults.add(oldApiVersionTestResult);
-            }
-
-            if (testSubCategories == null || testSubCategories.contains(TestSubCategory.JWT_NONE_ALGO.name())) {
-                TestingRunResult jwtNoneAlgoTestResult = runTest(jwtNoneAlgoTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "JwtNoneAlgo", authenticatedMessage);
-                if (jwtNoneAlgoTestResult != null) testingRunResults.add(jwtNoneAlgoTestResult);
-            }
-
-            if (testSubCategories == null || testSubCategories.contains(TestSubCategory.JWT_INVALID_SIGNATURE.name())) {
-                TestingRunResult jwtInvalidSignatureTestResult = runTest(jwtInvalidSignatureTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "JwtInvalidSignature", authenticatedMessage);
-                if (jwtInvalidSignatureTestResult != null) testingRunResults.add(jwtInvalidSignatureTestResult);
-            }
-
-            if (testSubCategories == null || testSubCategories.contains(TestSubCategory.ADD_JKU_TO_JWT.name())) {
-                TestingRunResult addJkuToJwtTestResult = runTest(addJkuToJwtTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "JwtAddJku", authenticatedMessage);
-                if (addJkuToJwtTestResult != null) testingRunResults.add(addJkuToJwtTestResult);
-            }
-        }
-
-       if(testSubCategories == null || testSubCategories.contains(TestSubCategory.PAGINATION_MISCONFIGURATION.name())) {
-            TestingRunResult paginationMisconfigurationTestResult = runTest(pageSizeDosTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "PageDos", messages.get(0));
-            if (paginationMisconfigurationTestResult != null) testingRunResults.add(paginationMisconfigurationTestResult);
-        }
-
-        if (testSubCategories == null || testSubCategories.contains(TestSubCategory.ADD_METHOD_IN_PARAMETER.name())) {
-            TestingRunResult addMethodInParameterTestResult = runTest(addMethodInParameterTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "AddMethodInParameter", messages.get(0));
-            if (addMethodInParameterTestResult != null) testingRunResults.add(addMethodInParameterTestResult);
-        }
-
-        if (testSubCategories == null || testSubCategories.contains(TestSubCategory.ADD_METHOD_OVERRIDE_HEADERS.name())) {
-            TestingRunResult addMethodOverrideHeadersTestResult = runTest(addMethodOverrideHeadersTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "AddMethodOverrideHeader", messages.get(0));
-            if (addMethodOverrideHeadersTestResult != null) testingRunResults.add(addMethodOverrideHeadersTestResult);
-        }
-
-        if (testSubCategories == null || testSubCategories.contains(TestSubCategory.CHANGE_METHOD.name())) {
-            TestingRunResult changeHttpMethodTestResult = runTest(changeHttpMethodTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "ChangeMethod", messages.get(0));
-            if (changeHttpMethodTestResult != null) testingRunResults.add(changeHttpMethodTestResult);
-        }
-
-        if (testSubCategories == null || testSubCategories.contains(TestSubCategory.OPEN_REDIRECT.name())) {
-            TestingRunResult openRedirectResult = runTest(openRedirectTest, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "OpenRedirect", messages.get(0));
-            if (openRedirectResult != null) testingRunResults.add(openRedirectResult);
-        }
-
-        if (testSubCategories == null || testSubCategories.contains(TestSubCategory.SSRF_AWS_METADATA_EXPOSED.name())) {
-            TestingRunResult ssrfAwsMetadataExposedResult = runTest(ssrfOnAwsMetadataEndpoint, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "SSRFOnAwsMetaEndpoint", messages.get(0));
-            if (ssrfAwsMetadataExposedResult != null)
-                testingRunResults.add(ssrfAwsMetadataExposedResult);
-        }
-
-        if(testSubCategories == null || testSubCategories.contains(TestSubCategory.MASS_ASSIGNMENT_CREATE_ADMIN_ROLE.name())) {
-            TestingRunResult createAdminUserViaMassAssignmentResult = runTest(createAdminUserViaMassAssignment, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId, "MassAssignmentCreateAdminUser", messages.get(0));
-            if (createAdminUserViaMassAssignmentResult != null) testingRunResults.add(createAdminUserViaMassAssignmentResult);
         }
 
         return testingRunResults;
     }
 
-    public TestingRunResult runTest(TestPlugin testPlugin, ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil, ObjectId testRunId, ObjectId testRunResultSummaryId, String configYamlFileName, RawApi rawApi) {
+    public TestingRunResult runTest(TestPlugin testPlugin, ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil, ObjectId testRunId, ObjectId testRunResultSummaryId, FilterNode filterNode, RawApi rawApi) {
 
         int startTime = Context.now();
-        if (!testPlugin.validate(configYamlFileName, rawApi, apiInfoKey)) {
+        if (!testPlugin.validate(filterNode, rawApi, apiInfoKey, "filter")) {
             return null;
         }
         TestPlugin.Result result = testPlugin.start(apiInfoKey, testingUtil);

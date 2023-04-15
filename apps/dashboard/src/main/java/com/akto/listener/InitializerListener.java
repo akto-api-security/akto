@@ -631,6 +631,7 @@ public class InitializerListener implements ServletContextListener {
             TestingRunIssuesDao.instance.deleteAll(
                     Filters.or(
                             Filters.exists("_id.testSubCategory", false),
+                            // ?? enum saved in db
                             Filters.eq("_id.testSubCategory", null)
                     )
             );

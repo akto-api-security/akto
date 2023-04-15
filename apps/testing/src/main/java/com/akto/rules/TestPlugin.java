@@ -1,10 +1,11 @@
 package com.akto.rules;
 
-import com.akto.dao.test_editor.TestConfigYamlParser;
+import com.akto.dao.test_editor.TestConfigParser;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.test_editor.TestConfig;
+import com.akto.dto.test_editor.DataOperandsFilterResponse;
+import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.info.TestInfo;
 import com.akto.dto.type.*;
@@ -15,7 +16,6 @@ import com.akto.runtime.RelationshipSync;
 import com.akto.store.TestingUtil;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.StatusCodeAnalyser;
-import com.akto.testing.TestExecutor;
 import com.akto.types.CappedSet;
 import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
@@ -415,12 +415,13 @@ public abstract class TestPlugin {
         return comparisonExcludedKeys;
     }
 
-    public Boolean validate(String configFileName, RawApi rawApi, ApiInfoKey apiInfoKey) {
-        TestConfigYamlParser parser = new TestConfigYamlParser();
-        TestConfig testConfig = parser.parseTemplate(configFileName);
-        //RawApi rawApi = filteredMessages.get(0).copy();
-
-        return parser.validateAgainstTemplate(testConfig, rawApi, apiInfoKey);
+    public Boolean validate(FilterNode filterNode, RawApi rawApi, ApiInfoKey apiInfoKey, String context) {
+        if (filterNode == null || rawApi == null) {
+            return null;
+        }
+        TestConfigParser parser = new TestConfigParser();
+        DataOperandsFilterResponse dataOperandsFilterResponse = parser.isEndpointValid(filterNode, rawApi, null, apiInfoKey, new ArrayList<>(), context);
+        return dataOperandsFilterResponse.getResult();
     }
     
     private SampleRequestReplayResponse replaySampleReq(OriginalHttpRequest testRequest, int replayCount, boolean followRedirects, OriginalHttpResponse originalHttpResponse) throws Exception {

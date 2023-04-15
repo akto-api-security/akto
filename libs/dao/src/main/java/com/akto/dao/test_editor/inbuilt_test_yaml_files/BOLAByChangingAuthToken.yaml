@@ -1,7 +1,8 @@
-id: bola-by-changing-auth-token
+id: REPLACE_AUTH_TOKEN
 info:
-  message: >
-            Attacker can access resources of any user by changing the auth token in request.",
+  name: REPLACE_AUTH_TOKEN
+  description: "Attacker can access resources of any user by changing the auth token in request."
+  details: >
             "The endpoint appears to be vulnerable to broken object level authorization attack. The original request " +
             "was replayed with attacker's auth token. The server responded with 2XX success codes and greater" +
             " than <b>{{percentageMatch}}%</b> of the response body matched with original response body. Also, the endpoint had atleast one private " +
@@ -9,10 +10,18 @@ info:
             "<b>Background:</b> Object level authorization is an access control mechanism that is usually implemented at the code level to" +
             " validate that one user can only access objects that they should have access to.",
             "Unauthorized access can result in data disclosure to unauthorized parties, data loss, or data manipulation. Unauthorized access to objects can also lead to full account takeover."
-  category: Broken Object Level Authorization (BOLA)
+  impact: "Unauthorized access can result in data disclosure to unauthorized parties, data loss, or data manipulation. Unauthorized access to objects can also lead to full account takeover."
+  category:
+    name: BOLA
+    shortName: BOLA
+    displayName: Broken Object Level Authorization (BOLA)
   subCategory: REPLACE_AUTH_TOKEN
+  confidence: HIGH
   severity: HIGH
-  tags: Business logic, OWASP top 10, HackerOne top 10
+  tags: 
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
   references:
     - "https://www.akto.io/blog/bola-exploitation-using-unauthorized-uuid-on-api-endpoint"
     - "https://www.akto.io/blog/what-is-broken-object-level-authorization-bola"
@@ -21,5 +30,5 @@ info:
     - "https://cwe.mitre.org/data/definitions/285.html"
     - "https://cwe.mitre.org/data/definitions/639.html"
   author: Akto
-apiSelectionFilters:
+api_selection_filters:
   #isPrivate: true

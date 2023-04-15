@@ -1,29 +1,26 @@
 package com.akto.dto.test_editor;
 
-import java.util.List;
-
 public class TestConfig {
     
     private String id;
     
     private Info info;
 
-    private ApiSelectionFilters apiSelectionFilters;
+    private ConfigParserResult apiSelectionFilters;
 
-    private List<Roles> environment;
+    // private List<Roles> environment;
 
-    private Request request;
+    // private Request request;
 
-    private Validation validation;
+    // private Validation validation;
 
-    public TestConfig(String id, Info info, ApiSelectionFilters apiSelectionFilters, List<Roles> environment, Request request,
-            Validation validation) {
+    public TestConfig(String id, Info info, ConfigParserResult apiSelectionFilters) {
         this.id = id;
         this.info = info;
         this.apiSelectionFilters = apiSelectionFilters;
-        this.environment = environment;
-        this.request = request;
-        this.validation = validation;
+        // this.environment = environment;
+        // this.request = request;
+        // this.validation = validation;
     }
 
     public TestConfig() { }
@@ -44,36 +41,36 @@ public class TestConfig {
         this.info = info;
     }
 
-    public ApiSelectionFilters getApiSelectionFilters() {
+    public ConfigParserResult getApiSelectionFilters() {
         return apiSelectionFilters;
     }
 
-    public void setApiSelectionFilters(ApiSelectionFilters apiSelectionFilters) {
+    public void setApiSelectionFilters(ConfigParserResult apiSelectionFilters) {
         this.apiSelectionFilters = apiSelectionFilters;
     }
 
-    public List<Roles> getEnvironment() {
-        return environment;
-    }
+    // public List<Roles> getEnvironment() {
+    //     return environment;
+    // }
 
-    public void setEnvironment(List<Roles> environment) {
-        this.environment = environment;
-    }
+    // public void setEnvironment(List<Roles> environment) {
+    //     this.environment = environment;
+    // }
 
-    public Request getRequest() {
-        return request;
-    }
+    // public Request getRequest() {
+    //     return request;
+    // }
 
-    public void setRequest(Request request) {
-        this.request = request;
-    }
+    // public void setRequest(Request request) {
+    //     this.request = request;
+    // }
 
-    public Validation getValidatione() {
-        return validation;
-    }
+    // public Validation getValidatione() {
+    //     return validation;
+    // }
 
-    public void setValidation(Validation validation) {
-        this.validation = validation;
-    }
+    // public void setValidation(Validation validation) {
+    //     this.validation = validation;
+    // }
 
 }

@@ -152,19 +152,30 @@
 #           value:
 #             regex: "sa"
 
-
+id: "TEST_FILTER"
 info:
-  message: "Quite often, APIs do not impose any restrictions on the size or number of resources that can be requested by the user."
+  description: "Quite often, APIs do not impose any restrictions on the size or number of resources that can be requested by the user."
   category: Lack of Resources & Rate Limiting (RL)
 api_selection_filters:
   query_param:
     or:
       - for_one:
           key:
-            regex: par
-      - for_one:
-          value:
-            contains_either: "asd"
+            or:
+              - regex: limit
+              - regex: size          
+              - regex: page
+
+
+# api_selection_filters:
+#   query_param:
+#     or:
+#       - for_one:
+#           key:
+#             regex: par
+#       - for_one:
+#           value:
+#             contains_either: "asd"
 
       # - value:
       #     contains_either:

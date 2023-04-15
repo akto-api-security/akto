@@ -1,20 +1,27 @@
-id: old-api-version
+id: REPLACE_AUTH_TOKEN_OLD_VERSION
 info:
-  message: >
-            "Attacker can access resources of any user by changing the auth token in request and using older version of an API"
-            "Unpatched old api versions were found for this endpoint. The original request was replayed by changing the version of the endpoint "
-            "(For example: the request url was changed from <b>www.example.com/dfsh/v5/fd</b> to <b>www.example.com/dfsh/v1/fd</b>). The server responded with 2XX success codes.<br><br>"
-            "The old API versions found appears to be vulnerable to broken object level authorization attack. The original "
-            "request was replayed with attacker's auth token. The server responded with 2XX success codes and greater than <b>{{percentageMatch}}%</b> of the response body matched with original"
-            " response body. Also, the endpoint had atleast one private resources in request payload.<br><br>"
-            "<b>Background:</b> Old API versions are usually unpatched and are vulnerable to attacks such as BOLA. Object level authorization is an access control mechanism that is usually"
+  name: BOLA in old api versions
+  description: "Attacker can access resources of any user by changing the auth token in request and using older version of an API"
+  details: >   
+            "Unpatched old api versions were found for this endpoint. The original request was replayed by changing the version of the endpoint " +
+            "(For example: the request url was changed from <b>www.example.com/dfsh/v5/fd</b> to <b>www.example.com/dfsh/v1/fd</b>). The server responded with 2XX success codes.<br><br>" +
+            "The old API versions found appears to be vulnerable to broken object level authorization attack. The original " +
+            "request was replayed with attacker's auth token. The server responded with 2XX success codes and greater than <b>{{percentageMatch}}%</b> of the response body matched with original" +
+            " response body. Also, the endpoint had atleast one private resources in request payload.<br><br>" +
+            "<b>Background:</b> Old API versions are usually unpatched and are vulnerable to attacks such as BOLA. Object level authorization is an access control mechanism that is usually" +
             " implemented at the code level to validate that one user can only access objects that they should have access to."
-            "Unauthorized access can result in data disclosure to unauthorized parties, data loss, or data manipulation. Unauthorized access to objects can also lead to full account takeover."
-  category: Broken Object Level Authorization (BOLA)
+  impact: "Unauthorized access can result in data disclosure to unauthorized parties, data loss, or data manipulation. Unauthorized access to objects can also lead to full account takeover."
+  category:
+    name: BOLA
+    shortName: BOLA
+    displayName: Broken Object Level Authorization (BOLA)
   subCategory: REPLACE_AUTH_TOKEN_OLD_VERSION
   severity: HIGH
-  confidence: LOW
-  tags: Business logic, OWASP top 10, HackerOne top 10
+  confidence: HIGH
+  tags: 
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
   references:
     - "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa9-improper-assets-management.md"
     - "https://www.akto.io/blog/bola-exploitation-using-unauthorized-uuid-on-api-endpoint"
@@ -24,6 +31,6 @@ info:
     - "https://cwe.mitre.org/data/definitions/285.html"
     - "https://cwe.mitre.org/data/definitions/639.html"
   author: Akto
-apiSelectionFilters:
+api_selection_filters:
   url:
     regex: /v(\d+)/

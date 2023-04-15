@@ -4,61 +4,82 @@ import java.util.List;
 
 public class Info {
     
-    private String message;
-    private String category;
+    private String name;
+
+    private String description;
+
+    private String details;
+
+    private String impact;
+
+    private Category category;
 
     private String subCategory;
 
-    private String severity;
-
     private String confidence;
 
-    private String tags;
+    private String severity;
 
-    private List<String> cwe;
-
-    private List<String> owasp;
-
-    private String testUrl;
+    private List<String> tags;
 
     private List<String> references;
 
     private String author;
 
-    private String howToFix;
-
-    public Info(String message, String category, String subCategory, String severity, String confidence, String tags,
-            List<String> cwe, List<String> owasp, String testUrl, List<String> references, String author,
-            String howToFix) {
-        this.message = message;
+    public Info(String name, String description, String details, String impact, Category category, String subCategory, String confidence,
+            String severity, List<String> tags, List<String> references, String author) {
+        this.name = name;
+        this.description = description;
+        this.details = details;
+        this.impact = impact;
         this.category = category;
         this.subCategory = subCategory;
-        this.severity = severity;
         this.confidence = confidence;
+        this.severity = severity;
         this.tags = tags;
-        this.cwe = cwe;
-        this.owasp = owasp;
-        this.testUrl = testUrl;
         this.references = references;
         this.author = author;
-        this.howToFix = howToFix;
     }
 
     public Info() { }
 
-    public String getMessage() {
-        return message;
+    public String getName() {
+        return name;
     }
 
-    public void setMessage(String message) {
-        this.message = message;
+    public void setName(String name) {
+        this.name = name;
     }
 
-    public String getCategory() {
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public String getDetails() {
+        return details;
+    }
+
+    public void setDetails(String details) {
+        this.details = details;
+    }
+
+    public String getImpact() {
+        return impact;
+    }
+
+    public void setImpact(String impact) {
+        this.impact = impact;
+    }
+
+    public Category getCategory() {
         return category;
     }
 
-    public void setCategory(String category) {
+    public void setCategory(Category category) {
         this.category = category;
     }
 
@@ -70,14 +91,6 @@ public class Info {
         this.subCategory = subCategory;
     }
 
-    public String getSeverity() {
-        return severity;
-    }
-
-    public void setSeverity(String severity) {
-        this.severity = severity;
-    }
-
     public String getConfidence() {
         return confidence;
     }
@@ -86,36 +99,20 @@ public class Info {
         this.confidence = confidence;
     }
 
-    public String getTags() {
+    public String getSeverity() {
+        return severity;
+    }
+
+    public void setSeverity(String severity) {
+        this.severity = severity;
+    }
+
+    public List<String> getTags() {
         return tags;
     }
 
-    public void setTags(String tags) {
+    public void setTags(List<String> tags) {
         this.tags = tags;
-    }
-
-    public List<String> getCwe() {
-        return cwe;
-    }
-
-    public void setCwe(List<String> cwe) {
-        this.cwe = cwe;
-    }
-
-    public List<String> getOwasp() {
-        return owasp;
-    }
-
-    public void setOwasp(List<String> owasp) {
-        this.owasp = owasp;
-    }
-
-    public String getTestUrl() {
-        return testUrl;
-    }
-
-    public void setTestUrl(String testUrl) {
-        this.testUrl = testUrl;
     }
 
     public List<String> getReferences() {
@@ -133,13 +130,5 @@ public class Info {
     public void setAuthor(String author) {
         this.author = author;
     }
-
-    public String getHowToFix() {
-        return howToFix;
-    }
-
-    public void setHowToFix(String howToFix) {
-        this.howToFix = howToFix;
-    }
-
+    
 }

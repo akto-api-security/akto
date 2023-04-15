@@ -18,6 +18,8 @@ import com.akto.dto.test_editor.ConfigParserValidationResult;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.FilterActionRequest;
 import com.akto.dto.test_editor.FilterNode;
+import com.akto.dto.test_editor.Info;
+import com.akto.dto.test_editor.TestConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class TestConfigParser {
@@ -31,15 +33,58 @@ public class TestConfigParser {
     public TestConfigParser() {
         this.filterAction = new FilterAction();
     }
-    
-    public ConfigParserResult parse(Map<String, Object> filters) {
 
+    public TestConfig parseConfig(Map<String, Object> config) {
+
+        TestConfig testConfig = null;
+
+        String id = (String) config.get("id");
+        if (id == null) {
+            return testConfig;
+        }
+
+        Object infoMap = config.get("info");
+        if (infoMap == null) {
+            return testConfig;
+        }
+        Info info = parseInfo(infoMap);
+        if (info == null) {
+            return testConfig;
+        }
+
+        Object filterMap = config.get("api_selection_filters");
+        if (filterMap == null) {
+            // todo: should not be null, throw error
+            return new TestConfig(id, info, null);
+        }
+        
+        ConfigParserResult filters = parse(filterMap);
         if (filters == null) {
-            // throw exception
+            // todo: throw error
+            new TestConfig(id, info, null);
+        }
+
+        testConfig = new TestConfig(id, info, filters);
+        return testConfig;
+    }
+
+    public Info parseInfo(Object infoObj) {
+        Map<String, Object> infoMap = (Map) infoObj;
+        ObjectMapper objectMapper = new ObjectMapper();
+        Info info = objectMapper.convertValue(infoMap, Info.class);
+        return info;
+    }
+    
+    public ConfigParserResult parse(Object filters) {
+
+        Map<String, Object> filterMap = (Map) filters;
+
+        if (filterMap == null) {
+            return null;
         }
         
         FilterNode node = new FilterNode("and", false, null, filters, "_ETHER_", new ArrayList<>(), null);
-        ConfigParserResult configParserResult = validateAndTransform(filters, node, node, false, false, null, null);
+        ConfigParserResult configParserResult = validateAndTransform(filterMap, node, node, false, false, null, null);
 
         return configParserResult;
     }

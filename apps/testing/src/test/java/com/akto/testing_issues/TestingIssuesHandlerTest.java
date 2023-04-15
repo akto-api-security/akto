@@ -75,6 +75,7 @@ public class TestingIssuesHandlerTest extends MongoBasedTest {
         for (int i = 0; i < 100; i++) {
             int COLLECTION_ID = 123;
             String testSubType = GlobalEnums.TestSubCategory.getValuesArray()[getIndex(GlobalEnums.TestSubCategory.getValuesArray().length, random)].getName();
+            // string comparison (nuclei test)
             if (testSubType.equals(GlobalEnums.TestSubCategory.CUSTOM_IAM.name())) {
                 testSubType = testSourceString;
             }

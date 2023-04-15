@@ -1,21 +1,30 @@
-id: add-method-override-header
+id: ADD_METHOD_OVERRIDE_HEADERS
 info:
-  message: >
-            "Attacker can access resources of any user by replacing method of the endpoint (eg: changemethod from get to post). This way attacker can get access to unauthorized endpoints.",
+  name: "BFLA by HTTP method overriding"
+  description: "Attacker can access resources of any user by replacing method of the endpoint (eg: changemethod from get to post). This way attacker can get access to unauthorized endpoints."
+  details: >
             "The endpoint appears to be vulnerable to broken function level authorization attack.The original request was replayed with addition of alternative headers" +
             " for HTTP method overriding namely X-HTTP-Method, X-HTTP-Method-Override, X-Method-Override. The application responded with 2XX success codes and less than " +
             "<b>{{percentageMatch}}%</b> of the response body matched with original response body.<br><br>" +
+
             "<b>Background:</b> Some web frameworks provide a way to override the actual HTTP method in the request by emulating the missing HTTP verbs passing some custom header in the requests. " +
             "The main purpose of this is to circumvent some middleware (e.g. proxy, firewall) limitation where methods allowed usually do not encompass verbs such as PUT or DELETE. The following alternative" +
-            " headers could be used to do such verb tunneling: X-HTTP-Method, X-HTTP-Method-Override, X-Method-Override",
-            "An attacker can perform sensitive actions (e.g., creation, modification, or erasure) that they should not have access to by simply overriding the HTTP method."
-  category: Broken Function Level Authorization (BFLA)
+            " headers could be used to do such verb tunneling: X-HTTP-Method, X-HTTP-Method-Override, X-Method-Override"
+  impact: "An attacker can perform sensitive actions (e.g., creation, modification, or erasure) that they should not have access to by simply overriding the HTTP method."
+  category:
+    name: BFLA
+    shortName: Broken Function Level Authorization
+    displayName: Broken Function Level Authorization (BFLA)
   subCategory: ADD_METHOD_OVERRIDE_HEADERS
   severity: HIGH
-  tags: Business logic, OWASP top 10, HackerOne top 10
+  tags: 
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  confidence: HIGH
   references:
     - "https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management_Testing/06-Test_HTTP_Methods"
     - "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa5-broken-function-level-authorization.md"
     - "https://cwe.mitre.org/data/definitions/285.html"
   author: Akto
-apiSelectionFilters:
+api_selection_filters:

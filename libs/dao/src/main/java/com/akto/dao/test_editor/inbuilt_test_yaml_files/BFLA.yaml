@@ -1,12 +1,21 @@
-id: bfla
+id: BFLA
 info:
-  message: Less privileged attacker can access admin resources
-  category: Broken Function Level Authorization (BFLA)
+  name: "BFLA"
+  description: Less privileged attacker can access admin resources
+  details: ""
+  impact: ""
+  category:
+    name: BFLA
+    shortName: Broken Function Level Authorization
+    displayName: Broken Function Level Authorization (BFLA)
   subCategory: BFLA
   severity: HIGH
-  confidence: LOW
-  tags: Business logic, OWASP top 10, HackerOne top 10
+  confidence: HIGH
+  tags: 
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
   references:
   author: Akto
-apiSelectionFilters:
+api_selection_filters:
   #isPrivate: true
