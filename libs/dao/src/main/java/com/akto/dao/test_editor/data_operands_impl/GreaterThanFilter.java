@@ -3,7 +3,6 @@ package com.akto.dao.test_editor.data_operands_impl;
 import java.util.List;
 
 import com.akto.dto.test_editor.DataOperandFilterRequest;
-import com.akto.dto.test_editor.DataOperandsFilterResponse;
 
 public class GreaterThanFilter extends DataOperandsImpl {
     
@@ -22,7 +21,7 @@ public class GreaterThanFilter extends DataOperandsImpl {
                     return false;
                 }
                 Integer dataInt = (Integer) data;
-                result = (dataInt == queryList.get(0));                
+                result = ((int) dataInt == (int) queryList.get(0));                
             }
             
         } catch (Exception e) {

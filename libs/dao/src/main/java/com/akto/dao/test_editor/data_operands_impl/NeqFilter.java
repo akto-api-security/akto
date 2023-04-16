@@ -28,7 +28,7 @@ public class NeqFilter extends DataOperandsImpl {
                     return false;
                 }
                 Integer dataInt = (Integer) data;
-                result = (dataInt != queryList.get(0));                
+                result = ((int) dataInt != (int) queryList.get(0));              
             }
             
             if (data instanceof Boolean && querySet instanceof Boolean) {
@@ -37,7 +37,7 @@ public class NeqFilter extends DataOperandsImpl {
                     return false;
                 }
                 Boolean dataBool = (Boolean) data;
-                result = (dataBool != queryList.get(0));
+                result = ((boolean) dataBool == (boolean) queryList.get(0));
             }
             
         } catch (Exception e) {

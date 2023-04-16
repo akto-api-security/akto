@@ -157,7 +157,7 @@ public final class FilterAction {
 
         } else if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("value")) {
             matchingKeys = filterActionRequest.getMatchingKeySet();
-            res = valueExists(payloadObj, null, filterActionRequest.getQuerySet(), filterActionRequest.getOperand(), matchingKeys);
+            res = valueExists(payloadObj, null, filterActionRequest.getQuerySet(), filterActionRequest.getOperand(), matchingKeys, filterActionRequest.getKeyOperandSeen());
             return new DataOperandsFilterResponse(res, null);
         }
 
@@ -207,7 +207,7 @@ public final class FilterAction {
         } else if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("value")) {
             
             for (String key: headers.keySet()) {
-                if (oldMatchingKeys != null && !oldMatchingKeys.contains(key)) {
+                if (filterActionRequest.getKeyOperandSeen() && oldMatchingKeys != null && !oldMatchingKeys.contains(key)) {
                     continue;
                 }
                 for (String val: headers.get(key)) {
@@ -248,7 +248,7 @@ public final class FilterAction {
                 return new DataOperandsFilterResponse(res, matchingKeys);
             } else if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("value")) {
                 matchingKeys = filterActionRequest.getMatchingKeySet();
-                if (matchingKeys != null && !matchingKeys.contains(key)) {
+                if (filterActionRequest.getKeyOperandSeen() && matchingKeys != null && !matchingKeys.contains(key)) {
                     continue;
                 }
                 DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(queryParamObj.getString(key), filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
@@ -334,7 +334,7 @@ public final class FilterAction {
         }
     }
 
-    public Boolean valueExists(Object obj, String parentKey, Object querySet, String operand, List<String> matchingKeys) {
+    public Boolean valueExists(Object obj, String parentKey, Object querySet, String operand, List<String> matchingKeys, Boolean keyOperandSeen) {
         Boolean res = false;
         if (obj instanceof BasicDBObject) {
             BasicDBObject basicDBObject = (BasicDBObject) obj;
@@ -346,20 +346,20 @@ public final class FilterAction {
                     continue;
                 }
                 Object value = basicDBObject.get(key);
-                res = valueExists(value, key, querySet, operand, matchingKeys);
+                res = valueExists(value, key, querySet, operand, matchingKeys, keyOperandSeen);
                 if (res) {
                     break;
                 }
             }
         } else if (obj instanceof BasicDBList) {
             for(Object elem: (BasicDBList) obj) {
-                res = valueExists(elem, parentKey, querySet, operand, matchingKeys);
+                res = valueExists(elem, parentKey, querySet, operand, matchingKeys, keyOperandSeen);
                 if (res) {
                     break;
                 }
             }
         } else {
-            if (matchingKeys != null && !matchingKeys.contains(parentKey)) {
+            if (keyOperandSeen && matchingKeys != null && !matchingKeys.contains(parentKey)) {
                 return false;
             }
             DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(obj, querySet, operand);
@@ -418,7 +418,7 @@ public final class FilterAction {
             case "sample_request_headers":
                 return resolveRequestHeader(filterActionRequest, true, secondParam);
             case "sample_response_headers":
-                return resolveRequestHeader(filterActionRequest, true, secondParam);
+                return resolveResponseHeader(filterActionRequest, true, secondParam);
             case "test_request_headers":
                 return resolveResponseHeader(filterActionRequest, false, secondParam);
             case "test_response_headers":
@@ -471,7 +471,7 @@ public final class FilterAction {
         Map<String, List<String>> headers = rawApi.getRequest().getHeaders();
 
         if (headers.containsKey(key)) {
-            return headers.get(key);
+            return headers.get(key).get(0);
         } else {
             return null;
         }
@@ -487,7 +487,7 @@ public final class FilterAction {
         Map<String, List<String>> headers = rawApi.getResponse().getHeaders();
 
         if (headers.containsKey(key)) {
-            return headers.get(key);
+            return headers.get(key).get(0);
         } else {
             return null;
         }

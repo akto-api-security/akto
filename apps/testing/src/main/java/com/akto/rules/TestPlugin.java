@@ -423,7 +423,7 @@ public abstract class TestPlugin {
             return null;
         }
         TestConfigParser parser = new TestConfigParser();
-        DataOperandsFilterResponse dataOperandsFilterResponse = parser.isEndpointValid(filterNode, rawApi, null, apiInfoKey, new ArrayList<>(), context);
+        DataOperandsFilterResponse dataOperandsFilterResponse = parser.isEndpointValid(filterNode, rawApi, null, apiInfoKey, new ArrayList<>(), false, context);
         return dataOperandsFilterResponse.getResult();
     }
     

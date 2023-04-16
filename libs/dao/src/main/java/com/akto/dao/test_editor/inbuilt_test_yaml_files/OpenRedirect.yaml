@@ -28,13 +28,13 @@ api_selection_filters:
     - request_payload:
         for_one:
           value:
-            eq: ${response_headers.location}
+            eq: ${sample_response_headers.location}
     - query_param:
         for_one:
           value:
-            eq: ${response_headers.location}
+            eq: ${sample_response_headers.location}
     - request_headers:
         for_one:
           value:
-            eq: ${response_headers.location}
+            eq: ${sample_response_headers.location}
 
