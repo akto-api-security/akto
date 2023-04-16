@@ -33,4 +33,4 @@ info:
   author: Akto
 api_selection_filters:
   url:
-    regex: /v(\d+)/
+    regex: v(\d+)/

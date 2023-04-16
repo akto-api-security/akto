@@ -22,7 +22,7 @@ public class GreaterThanEqFilter extends DataOperandsImpl {
                     return false;
                 }
                 Integer dataInt = (Integer) data;
-                result = (dataInt >= queryList.get(0));                
+                result = ((int) dataInt >= (int) queryList.get(0));                
             }
             
         } catch (Exception e) {

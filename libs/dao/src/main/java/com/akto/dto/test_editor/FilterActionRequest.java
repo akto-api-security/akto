@@ -16,9 +16,10 @@ public class FilterActionRequest {
     private List<String> matchingKeySet;
     private String operand;
     private String context;
+    private Boolean keyOperandSeen;
 
     public FilterActionRequest(Object querySet, RawApi rawApi, RawApi testRunRawApi, ApiInfo.ApiInfoKey apiInfoKey,
-            String concernedProperty, String concernedSubProperty, List<String> matchingKeySet, String operand, String context) {
+            String concernedProperty, String concernedSubProperty, List<String> matchingKeySet, String operand, String context, Boolean keyOperandSeen) {
         this.querySet = querySet;
         this.rawApi = rawApi;
         this.testRunRawApi = testRunRawApi;
@@ -28,6 +29,7 @@ public class FilterActionRequest {
         this.matchingKeySet = matchingKeySet;
         this.operand = operand;
         this.context = context;
+        this.keyOperandSeen = keyOperandSeen;
     }
 
     public FilterActionRequest() { }
@@ -118,6 +120,14 @@ public class FilterActionRequest {
         } else {
             return this.getTestRunRawApi();
         }
+    }
+
+    public Boolean getKeyOperandSeen() {
+        return keyOperandSeen;
+    }
+
+    public void setKeyOperandSeen(Boolean keyOperandSeen) {
+        this.keyOperandSeen = keyOperandSeen;
     }
 
 }
