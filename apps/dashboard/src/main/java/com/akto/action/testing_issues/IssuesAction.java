@@ -13,7 +13,6 @@ import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.util.TestEditorConfigMap;
 import com.akto.util.enums.GlobalEnums;
-import com.akto.util.enums.GlobalEnums.TestSubCategory;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
@@ -41,7 +40,7 @@ public class IssuesAction extends UserAction {
     private List<TestRunIssueStatus> filterStatus;
     private List<Integer> filterCollectionsId;
     private List<Severity> filterSeverity;
-    private List<TestSubCategory> filterSubCategory;
+    private List<String> filterSubCategory;
     private List<TestingRunIssues> similarlyAffectedIssues;
     private int startEpoch;
     private Bson createFilters () {
@@ -71,23 +70,7 @@ public class IssuesAction extends UserAction {
         Bson sort = Sorts.orderBy(Sorts.descending(TestingRunIssues.TEST_RUN_ISSUES_STATUS),
                 Sorts.descending(TestingRunIssues.CREATION_TIME));
         
-        // ?? where is this called
         String subCategory = issueId.getTestSubCategory();
-        //TestCategory superCategory;
-        // string comparison (nuclei test)
-        // if (subCategory.startsWith("http")) {
-        //     superCategory = TestSourceConfigsDao.instance.getTestSourceConfig(issueId.getTestCategoryFromSourceConfig()).getCategory();
-        // } else {
-        //     superCategory = issueId.getTestSubCategory().getSuperCategory();
-        // }
-
-        //List<TestSubCategory> subCategoryList = new ArrayList<>();
-        // read yaml
-        // for (TestSubCategory sctg : TestSubCategory.getValuesArray()) {
-        //     if (sctg.getSuperCategory() == superCategory) {
-        //         subCategoryList.add(sctg);
-        //     }
-        // }
         List<TestSourceConfig> sourceConfigs = TestSourceConfigsDao.instance.findAll(Filters.empty());
         List<String> sourceConfigIds = new ArrayList<>();
         for (TestSourceConfig sourceConfig : sourceConfigs) {
@@ -296,11 +279,11 @@ public class IssuesAction extends UserAction {
         this.filterSeverity = filterSeverity;
     }
 
-    public List<TestSubCategory> getFilterSubCategory() {
+    public List<String> getFilterSubCategory() {
         return filterSubCategory;
     }
 
-    public void setFilterSubCategory(List<TestSubCategory> filterSubCategory) {
+    public void setFilterSubCategory(List<String> filterSubCategory) {
         this.filterSubCategory = filterSubCategory;
     }
 
