@@ -63,6 +63,41 @@
                                 <span class="summary-collection-text">{{ totalEndpoints }} Endpoints</span>
                             </div>
                         </div>
+
+                        <div class="summary-list" v-if="showCollectionSummary">
+                            <v-list dense nav class="test-list-container">
+                                <v-list-group
+                                    v-for="item in selectedCollection"
+                                    :key="item"
+                                    class="tests-category-container"
+                                    active-class="tests-category-container-active"
+                                >
+                                    <template v-slot:appendIcon>
+                                        <v-icon >$fas_angle-down</v-icon>
+                                    </template>
+
+                                    <template v-slot:prependIcon>
+                                        <v-icon >$far_folder</v-icon>
+                                    </template>
+                                    <template v-slot:activator>
+                                        <v-list-item-content>
+                                            <v-list-item-title :style="{'font-size' : '16px'}" v-text="item"></v-list-item-title>
+                                        </v-list-item-content>
+                                    </template>
+
+                                    <v-list-item
+                                        v-for="(coll,index) in endPointsTaken[item]"
+                                        :key="index"
+                                        class="test-container"
+                                    >
+                                    
+                                        <v-list-item-content>
+                                            <v-list-item-title v-text="coll.url" class="test-name"></v-list-item-title>
+                                        </v-list-item-content>
+                                    </v-list-item>
+                                </v-list-group>
+                            </v-list>
+                        </div>
     
                         <div class="summary-boxes">
                             <v-icon size="30">$aktoWhite</v-icon>
@@ -174,6 +209,8 @@ export default{
             showTestScreen:true,
             showTestSummary:false,
             showCollectionSummary:false,
+            selectedCollection:[],
+            endPointsTaken:{},
         }
     },
     methods:{
@@ -191,6 +228,8 @@ export default{
             this.summaryActive = false
             this.andConditions = []
             this.orConditions = []
+            this.selectedCollection = []
+            this.endPointsTaken = {}
         },
         next(){
             this.currIndex++
@@ -229,12 +268,23 @@ export default{
             }
 
             this.orConditions.forEach((item)=>{
-                if(item.value){this.totalEndpoints += (item.value.length)}
+                if(item.value){
+                    this.totalEndpoints += (item.value.length)
+                    let key = this.mapCollectionIdToName[item.value[0].apiCollectionId]
+                    let value = item.value
+                    this.selectedCollection.push(key)
+                    Object.assign(this.endPointsTaken, {[key]: value});
+                }
             })
             this.andConditions.forEach((item)=>{
-                if(item.value){this.totalEndpoints += (item.value.length)}
+                if(item.value){
+                    this.totalEndpoints += (item.value.length)
+                    let key = this.mapCollectionIdToName[item.value[0].apiCollectionId]
+                    let value = item.value
+                    this.selectedCollection.push(key)
+                    Object.assign(this.endPointsTaken, {[key]: value});
+                }
             })
-
             this.total_collections = this.andConditions.length + this.orConditions.length
         }
     },
@@ -252,6 +302,12 @@ export default{
         },
         openTests(){
             return this.selectedTestCategories
+        },
+        mapCollectionIdToName() {
+            return this.$store.state.collections.apiCollections.reduce((m, e) => {
+                m[e.id] = e.displayName
+                return m
+            }, {})
         }
     },
     watch:{
