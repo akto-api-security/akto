@@ -2,7 +2,6 @@ package com.akto.dto.test_run_findings;
 
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.sources.TestSourceConfig;
-import com.akto.util.enums.GlobalEnums.TestSubCategory;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 
 import java.util.Objects;
