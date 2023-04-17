@@ -40,7 +40,7 @@
                     </v-list-item>
                     <v-list dense class="test-list pa-0" v-if="selectedCategory">
                         <v-list-item v-for="(item, index) in mapCategoryToSubcategory[selectedCategory].selected" :key="'selected_'+index" class="brdb test-item">
-                            <v-btn icon plain size="12" color="var(--themeColorDark)" @click="mapCategoryToSubcategory[selectedCategory].selected.splice(index, 1),test" :ripple="false">
+                            <v-btn icon plain size="12" color="var(--themeColorDark)" @click="emitFunc(index)" :ripple="false">
                                 <v-icon>$far_check-square</v-icon>
                             </v-btn> 
                             <v-icon color="var(--themeColorDark)" size="12">{{item.icon}}</v-icon>
@@ -51,7 +51,7 @@
                             :key="'all_'+index" 
                             class="brdb test-item"
                         >
-                                <v-btn icon plain size="12" color="var(--themeColorDark)" @click="test(item)" :ripple="false">
+                                <v-btn icon plain size="12" color="var(--themeColorDark)" @click="pushFunc(item)" :ripple="false">
                                     <v-icon>$far_square</v-icon>
                                 </v-btn> 
                                 <v-icon color="var(--themeColorDark)" size="12">{{item.icon}}</v-icon>
@@ -127,7 +127,11 @@ export default {
         })
     },
     methods: {
-        test(item){
+        emitFunc(index){
+            this.mapCategoryToSubcategory[this.selectedCategory].selected.splice(index, 1)
+            this.$emit('test-updated',this.mapCategoryToSubcategory,this.categories)
+        },
+        pushFunc(item){
             this.mapCategoryToSubcategory[this.selectedCategory].selected.push(item)
             this.$emit('test-updated',this.mapCategoryToSubcategory,this.categories)
         },

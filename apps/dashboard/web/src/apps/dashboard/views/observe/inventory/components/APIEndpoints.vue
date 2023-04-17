@@ -55,6 +55,10 @@
                             </v-tooltip>
                             
                         </div>
+
+                        <!-- <div style="align-items: center; display: flex; margin-left: 8px;">
+                            <secondary-button @click="showScheduleDialog(filters, filterOperators, total)" icon="$fas_play" text="Run Test" />        
+                        </div> -->
                         
                     </template>
                 <template #item.sensitiveTags="{item}">

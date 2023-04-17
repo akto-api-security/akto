@@ -41,7 +41,7 @@
                                     </v-btn>
                                 </template>
 
-                                <div class="pa-4" style="height: 500px">
+                                <div class="pa-4" style="min-height: 500px">
                                     
                                     <div class="d-flex" style="gap: 10px; justify-content: flex-start">
                                         <div class="heading">Collection name:</div>
@@ -68,37 +68,10 @@
                                     <div>
                                         <div style="padding: 24px; height: 100%">
                                             <v-container>
-
-                                                <div>
-                                                    <v-row style="padding: 36px 12px 12px 12px">
-                                                        <test-role-conditions-table initial_string="Endpoint" :selectedRole="selectedRole"
-                                                            table_header="Conditions" :operators="operators"
-                                                            :requireTextInputForTypeArray="requireTextInputForTypeArray"
-                                                            :requireMapInputForTypeArray="requireMapInputForTypeArray" :operation_types="operation_types" />
-                                                    </v-row>
-                                                </div>
-
-                                                <v-row style="padding-top: 30px">
-                                                    <div style="padding: 12px">
-                                                        <v-btn @click="calculateMatchingEndpoints" color="var(--themeColor)" class="save-btn" height="40px" width="100px">
-                                                            Test
-                                                        </v-btn>
-                                                    </div>
-                                                </v-row>
-
-                                                <v-row style="padding-top: 30px">
-                                                    <div style="padding: 12px">
-                                                        <v-btn @click="createCollection" color="var(--themeColor)" class="save-btn" height="40px" width="100px">
-                                                            Save
-                                                        </v-btn>
-                                                    </div>
-                                                </v-row>
+                                                <test-roles-condition :collection-name="newCollectionName" @matchedEndpoints="getMatchedEndpoints" />
                                             </v-container>
                                         </div>
                                     </div>
-
-                                    <div></div>
-
                                 </div>
                             </a-card>
                         </v-dialog>
@@ -159,7 +132,7 @@ import SecondaryButton from '@/apps/dashboard/shared/components/buttons/Secondar
 import CreateApiCollection from './CreateApiCollection'
 import NameInput from '@/apps/dashboard/shared/components/inputs/NameInput'
 import ACard from '@/apps/dashboard/shared/components/ACard'
-import TestRoleConditionsTable from "../../testing/components/test_roles/components/TestRoleConditionsTable"
+import TestRolesCondition from '../../testing/components/test_roles/components/TestRolesCondition.vue'
 
 export default {
     name: "ApiCollections",
@@ -173,37 +146,16 @@ export default {
         CreateApiCollection,
         NameInput,
         ACard,
-        TestRoleConditionsTable
+        TestRolesCondition
     },
     
     data() {
-        var operators = [
-            'OR',
-            'AND'
-        ]
-        var requireTextInputForTypeArray = [
-            'CONTAINS'
-        ]
-        var requireMapInputForTypeArray = [
-            'BELONGS_TO',
-            'NOT_BELONGS_TO'
-        ]
-        var operation_types = [
-            { value: 'CONTAINS', text: 'contains', operators: ['OR', 'AND'] },
-            { value: 'BELONGS_TO', text: 'belongs to', operators: ['OR'] },
-            { value: 'NOT_BELONGS_TO', text: 'does not belongs to', operators: ['AND'] }
-        ]
         return {
-            operators,
-            operation_types,
-            requireTextInputForTypeArray,
-            requireMapInputForTypeArray,
             showDeleteDialog: false,
             showCreateDialog: false,
             newCollectionName: "",
             matchedEndpoints: 0,
             loadingMatchedEndpoints: false,
-            selectedRole: {},
             headers: [
                 {
                     text: "",
@@ -264,13 +216,8 @@ export default {
         setNewCollectionName(name) {
             this.newCollectionName = name
         },
-        async calculateMatchingEndpoints() {
-            this.loadingMatchedEndpoints = true
-            let andConditions = this.filterContainsConditions('AND') || null
-            let orConditions = this.filterContainsConditions('OR') || null
-            let resp = await api.getLogicalEndpointMatchingCount(orConditions, andConditions);
-            this.matchedEndpoints = resp.matchingEndpointCount
-            this.loadingMatchedEndpoints = false
+        getMatchedEndpoints(value){
+            this.matchedEndpoints = value
         },
         async deleteMultipleCollections({items}) {
             let noOfItems = Object.keys(items).length
@@ -285,10 +232,10 @@ export default {
         buildRequestForMultiDelete(item, index, arr) {
             arr[index].id = arr[index].value
             arr[index].isLogicalGroup = false
-            for (let i = 0; i < this.apiCollectionsForTable.length; i++) {
-                if (this.apiCollectionsForTable[i].id == arr[index].id) {
-                    if (this.apiCollectionsForTable[i].isLogicalGroup != null) {
-                        arr[index].isLogicalGroup = this.apiCollectionsForTable[i].isLogicalGroup
+            for (const element of this.apiCollectionsForTable) {
+                if (element.id == arr[index].id) {
+                    if (element.isLogicalGroup != null) {
+                        arr[index].isLogicalGroup = element.isLogicalGroup
                     }
                 }
             }
@@ -296,86 +243,10 @@ export default {
         rowClicked(item) {
             this.$emit("selectedItem", {type: 1, collectionName: item.name, apiCollectionId: item.id, isLogicalGroup: item.isLogicalGroup})
         },
-        async createCollection() {
-
-            let andConditions = this.filterContainsConditions('AND') || null
-            let orConditions = this.filterContainsConditions('OR') || null
-            let name = this.newCollectionName
-            
-            await this.$store.dispatch('collections/createCollection', {
-                name, andConditions, orConditions
-            }).then((resp) => {
-                window._AKTO.$emit('SHOW_SNACKBAR', {
-                    show: true,
-                    text: `Collection created successfully!`,
-                    color: 'green'
-                })
-                this.closeDialogBox()
-            }).catch((err) => {
-                window._AKTO.$emit('SHOW_SNACKBAR', {
-                    show: true,
-                    text: `Error creating collection!` + err,
-                    color: 'red'
-                })
-            })
-
-          //this.$store.dispatch('collections/createCollection', {name})
-          this.showNewRow = false
-        },
-        filterContainsConditions(operator) {//operator is string as 'OR' or 'AND'
-            let filteredCondition = {}
-            let found = false
-            filteredCondition['operator'] = operator
-            filteredCondition['predicates'] = []
-            this.conditions.forEach(element => {
-                if (element.value && element.operator === operator) {
-                    if (element.type === 'CONTAINS') {
-                        filteredCondition['predicates'].push({ type: element.type, value: element.value })
-                        found = true
-                    } else if (element.type === 'BELONGS_TO') {
-                        let collectionMap = element.value
-                        let collectionId = Object.keys(collectionMap)[0]
-
-                        if (collectionMap[collectionId]) {
-                            let apiKeyInfoList = []
-                            collectionMap[collectionId].forEach(apiKeyInfo => {
-                                if (apiKeyInfo['checked']) {
-                                    apiKeyInfoList.push({ 'url': apiKeyInfo['url'], 'method': apiKeyInfo['method'], 'apiCollectionId': apiKeyInfo['apiCollectionId'] })
-                                    found = true
-                                }
-                            })
-                            if (apiKeyInfoList.length > 0) {
-                                filteredCondition['predicates'].push({ type: element.type, value: apiKeyInfoList })
-                            }
-                        }
-                    } else if (element.type === 'NOT_BELONGS_TO') { //Not belongs condition
-                        let collectionMap = element.value
-                        let collectionId = Object.keys(collectionMap)[0]
-
-                        if (collectionMap[collectionId]) {
-                            let apiKeyInfoList = []
-                            collectionMap[collectionId].forEach(apiKeyInfo => {
-                                if (apiKeyInfo['checked']) {
-                                    apiKeyInfoList.push({ 'url': apiKeyInfo['url'], 'method': apiKeyInfo['method'], 'apiCollectionId': apiKeyInfo['apiCollectionId'] })
-                                    found = true
-                                }
-                            })
-                            if (apiKeyInfoList.length > 0) {
-                                filteredCondition['predicates'].push({ type: element.type, value: apiKeyInfoList })
-                            }
-                        }
-                    }
-                }
-            });
-            if (found) {
-                return filteredCondition;
-            }
-        },
         deleteCollection(item) {
             this.deletedCollection = item.name
             if(confirm("Are you sure you want to delete this collection?")) {
                 const summ = this.$store.dispatch('collections/deleteCollection', {apiCollection: item})
-                console.log(summ)
                 return summ
             }
         },
@@ -454,7 +325,6 @@ export default {
     },
     computed: {
         ...mapState('collections', ['apiCollections', 'loading', 'testingRuns']),
-        ...mapState('test_roles', ['testRoles', 'loading', 'selectedRole', 'listOfEndpointsInCollection', 'createNew', 'conditions']),
         ...mapState('testing', ['testingRuns', 'authMechanism']),
         apiCollectionsForTable() {
             return this.apiCollections.map(c => {

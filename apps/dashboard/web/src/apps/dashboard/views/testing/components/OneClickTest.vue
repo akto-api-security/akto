@@ -48,7 +48,7 @@
                     </div>
                 </div>
             </template>
-            <testing-run-screens :item="currObj"  :show-test-screen="showTestScreen"/>
+            <testing-run-screens :item="currObj"/>
         </layout-with-left-pane>
     </div>
 </template>
@@ -154,7 +154,6 @@ export default {
             showAll: false,
             leftView: false,
             currObj: {},
-            showTestScreen:true,
         }
     },
     methods: {

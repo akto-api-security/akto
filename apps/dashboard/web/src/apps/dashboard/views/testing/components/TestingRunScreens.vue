@@ -27,7 +27,13 @@
 
                 <v-stepper-content step="1">
                     <div>
+                        <span class="collection-text">Select Collections</span>
+                        <div v-if="total_collections > 0" class="selected-text">
+                            <span class="bold-text">{{ total_collections }} Collections with {{ totalEndpoints }} Endpoints </span>
+                            <span>match these conditions</span>
+                        </div>
                     </div>
+                    <test-roles-condition :collection-name="collectionName" @collections-selected="getCollections"/>
                 </v-stepper-content>
 
                 <v-stepper-content step="2">
@@ -46,12 +52,25 @@
                     <span class="summary-text">Summary</span>
                     <div class="summary-container">
                         <div class="summary-boxes">
-                            <v-icon size="30" class="selected-icon">$aktoWhite</v-icon>
+                            <v-icon size="30">$aktoWhite</v-icon>
+                            <div class="summary-body">
+                                <div class="summary-header">
+                                    <span class="header-title">{{ total_collections }} collections selected</span>
+                                    <v-btn icon plain @click="showCollectionSummary = !showCollectionSummary">
+                                        <v-icon size="20" :style="{transform: showCollectionSummary ? 'rotate(180deg)' : '', transition: 'all 0.2s linear'}">$fas_angle-down</v-icon>
+                                    </v-btn>
+                                </div>
+                                <span class="summary-collection-text">{{ totalEndpoints }} Endpoints</span>
+                            </div>
+                        </div>
+    
+                        <div class="summary-boxes">
+                            <v-icon size="30">$aktoWhite</v-icon>
                             <div class="summary-body">
                                 <div class="summary-header">
                                     <span class="header-title">{{ totalTestsSelected }} tests selected</span>
-                                    <v-btn icon plain>
-                                        <v-icon size="20">$fas_angle-down</v-icon>
+                                    <v-btn icon plain @click="showTestSummary = !showTestSummary">
+                                        <v-icon size="20" :style="{transform: showTestSummary ? 'rotate(180deg)' : '', transition: 'all 0.2s linear'}">$fas_angle-down</v-icon>
                                     </v-btn>
                                 </div>
                                 <div class="button-containers">
@@ -64,7 +83,7 @@
                             </div>
                         </div>
 
-                        <div class="summary-list">
+                        <div class="summary-list" v-if="showTestSummary">
                             <v-list dense nav class="test-list-container">
                                 <v-list-group
                                     v-for="item in selectedTestCategories"
@@ -124,17 +143,18 @@ import obj from '@/util/obj'
 import SecondaryButton from '../../../shared/components/buttons/SecondaryButton.vue'
 import TestsSelector from '../../observe/inventory/components/TestsSelector.vue'
 import UserConfig from './token/UserConfig.vue'
+import TestRolesCondition from './test_roles/components/TestRolesCondition.vue'
 
 export default{
     name: "TestingRunScreens",
     props:{
         item:obj.objR,
-        showTestScreen:obj.boolR,
     },
     components:{
         SecondaryButton,
         TestsSelector,
         UserConfig,
+        TestRolesCondition
     },
     data(){
         return{
@@ -149,16 +169,28 @@ export default{
             totalTestsSelected:0,
             selectedTestCategories:[],
             testsSelected:{},
+            totalEndpoints:0,
+            collectionName: "one_click_test",
+            showTestScreen:true,
+            showTestSummary:false,
+            showCollectionSummary:false,
         }
     },
     methods:{
         toggle(){
             this.showTestScreen = false
+            this.reset()
         },
         back(){
             if(this.currIndex > 1){
                 this.currIndex--
             }
+        },
+        reset(){
+            this.currIndex = 1
+            this.summaryActive = false
+            this.andConditions = []
+            this.orConditions = []
         },
         next(){
             this.currIndex++
@@ -176,7 +208,6 @@ export default{
             console.log("RunTest")
         },
         getTestsSelected(tests,categories){
-            console.log(tests)
             let _this = this
             _this.totalTestsSelected = 0
             _this.testsSelected = tests
@@ -189,12 +220,21 @@ export default{
             })   
         },
         getCollections(andConditions,orConditions){
+            this.totalEndpoints = 0
             if(andConditions){
                 this.andConditions = andConditions.predicates
             }
             if(orConditions){
                 this.orConditions = orConditions.predicates
             }
+
+            this.orConditions.forEach((item)=>{
+                if(item.value){this.totalEndpoints += (item.value.length)}
+            })
+            this.andConditions.forEach((item)=>{
+                if(item.value){this.totalEndpoints += (item.value.length)}
+            })
+
             this.total_collections = this.andConditions.length + this.orConditions.length
         }
     },
@@ -213,6 +253,12 @@ export default{
         openTests(){
             return this.selectedTestCategories
         }
+    },
+    watch:{
+        item(newVal){
+            this.showTestScreen=true
+            this.reset()
+        }
     }
 }
 </script>
@@ -227,7 +273,7 @@ export default{
     .stepper-title >>> .v-stepper__step__step{
         border: 4px solid var(--borderColor) !important;
         background-color: var(--white) !important;
-
+        order:2;
     }
     .v-stepper__step--complete >>> .v-stepper__step__step{
         background-color: var(--themeColor) !important;
@@ -287,6 +333,7 @@ export default{
             }
             .divider{
                 border: 2px solid var(--borderColor) !important;
+                margin-top:27px;
             }
         }
         .screen-footer{
@@ -296,6 +343,31 @@ export default{
             border-top: 1px solid var(--borderColor);
             padding: 16px 32px 8px 32px;
         }
+    }
+    .collection-text{
+        font-size: 18px;
+        font-weight: 500;
+        display: flex;
+        color: var(--themeColorDark);
+    }
+    .selected-text{
+        height: 48px;
+        padding: 12px 16px;
+        background: var(--hexColor31);
+        border-radius: 8px;
+        border: 1px solid var(--borderColor);
+        span{
+            font-size: 14px;
+            color:var(--themeColorDark);
+        }
+        .bold-text{
+            font-weight: 500 !important;
+        }
+    }
+    .stepper-title{
+        display: flex;
+        flex-direction: column;
+        gap: 12px
     }
     .summary-text{
         font-size: 20px;
@@ -352,6 +424,11 @@ export default{
                             font-weight: 500;
                         }
                     }
+                }
+                .summary-collection-text {
+                    font-size: 16px;
+                    font-weight: 500;
+                    color: var(--themeColorDark);
                 }
             }
         }
