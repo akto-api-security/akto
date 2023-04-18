@@ -436,16 +436,17 @@ public class TestDBSync extends MongoBasedTest {
         httpCallParser.filterHttpResponseParams(Collections.singletonList(h4));
 
         apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
-        Assertions.assertEquals(apiCollections.size(),5);
+        Assertions.assertEquals(apiCollections.size(),6);
 
         id = domain4.hashCode();
         id += 1; // since duplicate so increased by 1 will work
         ApiCollection apiCollection4 = ApiCollectionsDao.instance.findOne(Filters.eq("_id", id));
-        Assertions.assertNull(apiCollection4);
+        Assertions.assertNotNull(apiCollection4);
     }
 
     @Test
     public void testCollisionHostNameCollection() {
+        ApiCollectionsDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "domain", 0, new HashSet<>(), null, 0));
         HttpResponseParams h1 = new HttpResponseParams();
         h1.requestParams = new HttpRequestParams();

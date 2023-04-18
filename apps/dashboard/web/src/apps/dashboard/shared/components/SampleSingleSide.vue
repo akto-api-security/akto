@@ -113,7 +113,9 @@ export default {
               textarea.textContent = text;
               textarea.style.position = "fixed";  // Prevent scrolling to bottom of page in Microsoft Edge.
               domElement.appendChild(textarea);
+              textarea.focus();
               textarea.select();
+              textarea.setSelectionRange(0, 99999);
               try {
                   return document.execCommand("copy");  // Security exception may be thrown by some browsers.
               }

@@ -45,6 +45,7 @@ public class CreateAdminUserViaMassAssignment extends TestPlugin{
             Optional<String> validationResult = checkIfApiIsEligibleForTest(request, response);
             if(validationResult.isPresent()){
                 logger.info("Skipping api: {} due to: {}", request.getUrl(), validationResult.get());
+                rawApi = null;
                 continue;
             }
             extraParams = checkForExtraParams(request, response);
