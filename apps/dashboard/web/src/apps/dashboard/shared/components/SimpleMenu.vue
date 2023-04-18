@@ -12,7 +12,7 @@
               <v-list-item 
                   v-for="(item, index) in items"
                   :key=index
-                  class='row-nav-drawer' 
+                  :class='[item.label ? "row-nav-drawer" : "separator", "e2e-accounts"]'
                   active-class="active-item" 
                   @click="item.click"
               >
@@ -68,6 +68,13 @@ export default {
     text-decoration-color: var(--white)      
 .content-nav-drawer
   padding: 4px 0
+
+.separator
+  height: 0px !important
+  min-height: 0px !important
+  max-height: 0px !important
+  border-bottom: 1px solid #8F8F8F !important
+  
 .icon-nav-drawer
   justify-content: center
   align-self: center

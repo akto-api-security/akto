@@ -116,6 +116,8 @@
 </style>
 
 <style lang="sass">
+.underline
+    text-decoration: underline 
 .v-application a
     color: unset !important
     text-decoration: auto
