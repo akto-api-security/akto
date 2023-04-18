@@ -62,7 +62,7 @@ const router =  new Router({
             path: '/dashboard',
             name: 'dashboard',
             component: PageDashboard,
-            redirect: '/dashboard/testing',
+            redirect: '/dashboard/observe/inventory',
             beforeEnter (to, from, next) {
                 store.dispatch('collections/loadAllApiCollections').then(() => next()).catch(() => next())
             },

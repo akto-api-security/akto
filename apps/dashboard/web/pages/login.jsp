@@ -47,7 +47,7 @@
                     window.SIGNUP_INFO = JSON.parse('${requestScope.signupInfo}' || '{}');
                     window.AVATAR = '${requestScope.avatar}';
                     window.USER_NAME = '${requestScope.username}';
-                    window.USERS = JSON.parse('${requestScope.users}' || '{}');
+                    window.USERS = '{}';
                     window.DASHBOARDS = JSON.parse(atob('${requestScope.dashboards}') || '[]');
                     window.ACCOUNTS = JSON.parse('${requestScope.accounts}' || '{}');
                     window.ACTIVE_ACCOUNT = +'${requestScope.activeAccount}';

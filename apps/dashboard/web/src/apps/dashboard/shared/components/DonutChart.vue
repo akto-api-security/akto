@@ -30,11 +30,13 @@ export default {
         },
         title: {
           text: (this.data || []).reduce((z, e) => z + e.y, 0),
-          y: 100
+          y: this.size * 0.4,
+          style: { "font-size": ""+(this.size > 200 ? 18 : 12)+"px"} 
         },
         subtitle: {
           text: this.name,
-          y: 120
+          y: this.size * 0.55,
+          style: { "font-size": ""+(this.size > 200 ? 16 : 10)+"px"} 
         },
         tooltip: {
           enabled: false
