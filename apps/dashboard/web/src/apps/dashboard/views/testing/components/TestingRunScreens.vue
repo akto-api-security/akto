@@ -21,7 +21,7 @@
                         >
                             {{ item }}
                         </v-stepper-step>
-                        <v-divider v-if="index < (stepperData.length - 1)" :key="index + 1" class="divider"/>
+                        <v-divider v-if="index < (stepperData.length - 1)" :key="index + 1" class="divider" ref="divide_bar"/>
                     </template>
                 </v-stepper-header>
 
@@ -222,6 +222,10 @@ export default{
             if(this.currIndex > 1){
                 this.currIndex--
             }
+            if(this.currIndex < 3){
+                let $ref = this.$refs.divide_bar[this.currIndex - 1]
+                $ref.$el.style.borderColor = "var(--borderColor)"
+            }
         },
         reset(){
             this.currIndex = 1
@@ -230,6 +234,9 @@ export default{
             this.orConditions = []
             this.selectedCollection = []
             this.endPointsTaken = {}
+            this.$refs.divide_bar.forEach((item)=>{
+                item.$el.style.borderColor="var(--borderColor)"
+            })
         },
         next(){
             this.currIndex++
@@ -241,6 +248,10 @@ export default{
             }
             else{
                 this.summaryActive = false
+            }
+            if(this.currIndex < 4){
+                let $ref = this.$refs.divide_bar[this.currIndex - 2]
+                $ref.$el.style.borderColor = "var(--themeColor)"
             }
         },
         runTest(){
@@ -311,8 +322,9 @@ export default{
         }
     },
     watch:{
-        item(newVal){
+        item(){
             this.showTestScreen=true
+            console.log("hey")
             this.reset()
         }
     }
@@ -388,7 +400,7 @@ export default{
                 box-shadow: none !important;
             }
             .divider{
-                border: 2px solid var(--borderColor) !important;
+                border: 2px solid var(--borderColor) ;
                 margin-top:27px;
             }
         }

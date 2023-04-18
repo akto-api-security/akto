@@ -59,6 +59,9 @@ export default {
 </script>
 
 <style scoped>
+    ::-webkit-scrollbar {
+        display: none !important;
+    }
     .grid-table >>> tbody{
         display: flex !important;
         flex-wrap: wrap;
@@ -76,6 +79,11 @@ export default {
     .left-view >>> tbody{
         gap: 4px !important;
         margin: 0px !important;
+        padding: 4px 0px !important;
+    }
+    .left-view{
+        max-height: 450px !important;
+        overflow-y: scroll;
     }
 
 </style>

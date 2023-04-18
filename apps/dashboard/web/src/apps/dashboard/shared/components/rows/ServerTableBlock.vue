@@ -6,7 +6,7 @@
             v-for="(header, ii) in headers"
             :key="ii"
             class="table-column clickable"
-            @click="clickRow(item,index)"
+            @click="clickRow(item)"
         >
             <slot :name="[`item.${header.value}`]" :item="item">
                 <div class="table-entry">{{item[header.value]}}</div>

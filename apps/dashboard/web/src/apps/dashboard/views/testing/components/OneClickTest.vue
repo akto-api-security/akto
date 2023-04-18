@@ -9,9 +9,9 @@
                     <div class="test-categories">
                         <div class="button-container">
                             <div v-for="(test,index) in testShown" :key="index">
-                                <v-btn class="test-buttons">
+                                <div class="test-buttons">
                                     <span>{{ test.name }}</span>
-                                </v-btn>
+                                </div>
                             </div>
                             <v-btn class="test-buttons" @click="toggle()" v-if="!showAll">
                                 <span>+ {{ testCategories.length - 3 }}</span>
@@ -37,12 +37,15 @@
                         </span>
                     </div>
                     <div v-for="(table,index) in tables" :key="index" class="table-container">
-                        <grid-table :headers="table.headers" :items="table.items" @clickRow="rowClicked" :left-view="true">
+                        <div class="left-table-name">
+                            <span>{{ table.name }}</span>
+                            <v-btn icon plain @click="toggleFunc(index)">
+                                <v-icon size="16">$fas_angle-down</v-icon>
+                            </v-btn>
+                        </div>
+                        <grid-table :headers="table.headers" :items="table.items" @clickRow="rowClicked" :left-view="true" ref="table">
                             <template v-slot:custom-header>
-                                <div class="left-table-name">
-                                    <span>{{ table.name }}</span>
-                                    <v-icon size="16">$fas_angle-down</v-icon>
-                                </div>
+                                <v-spacer/>
                             </template>
                         </grid-table>
                     </div>
@@ -54,7 +57,6 @@
 </template>
 
 <script>
-import obj from '@/util/obj'
 import GridTable from '../../../shared/components/GridTable.vue'
 import LayoutWithLeftPane  from '../../../layouts/LayoutWithLeftPane.vue'
 import TestingRunScreens from './TestingRunScreens.vue'
@@ -163,6 +165,14 @@ export default {
         },
         toggle(){
             this.showAll = !this.showAll
+        },
+        toggleFunc(index){
+            let $ref = this.$refs.table[index]
+            if($ref.$el.style.display !== "none"){
+                $ref.$el.style.display = "none"
+            }else{
+                $ref.$el.style.display= "block"
+            }
         }
     },
     computed:{
