@@ -394,7 +394,7 @@ public class APICatalogSync {
                     } 
                     similarTemplates.put(aUrl, aTemplate);
 
-                    if (!RequestTemplate.isMergedOnStr(mergedTemplate) || APICatalogSync.areBothUuidUrls(newStatic,aStatic,mergedTemplate)) {
+                    if (!RequestTemplate.isMergedOnStr(mergedTemplate) || APICatalogSync.areBothUuidUrls(newStatic,aStatic,mergedTemplate) || APICatalogSync.areBothMatchingUrls(newStatic,aStatic,mergedTemplate, urlRegexMatchingEnabled)) {
                         countSimilarURLs = APICatalogSync.STRING_MERGING_THRESHOLD;
                     }
 
