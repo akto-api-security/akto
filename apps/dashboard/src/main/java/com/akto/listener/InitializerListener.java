@@ -37,6 +37,7 @@ import com.akto.util.AccountTask;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
+import com.akto.utils.DashboardMode;
 import com.akto.utils.HttpUtils;
 import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBList;
@@ -659,6 +660,23 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
+    public void enableNewMerging(BackwardCompatibility backwardCompatibility) {
+        if (!DashboardMode.isLocalDeployment()) {
+            return;
+        }
+        if (backwardCompatibility.getEnableNewMerging() == 0) {
+
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(), 
+                Updates.set(AccountSettings.URL_REGEX_MATCHING_ENABLED, true));
+        }
+
+        BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.ENABLE_NEW_MERGING, Context.now())
+        );
+    }
+
     public void readyForNewTestingFramework(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getReadyForNewTestingFramework() == 0) {
             TestingRunDao.instance.getMCollection().drop();
@@ -772,6 +790,7 @@ public class InitializerListener implements ServletContextListener {
             dropAuthMechanismData(backwardCompatibility);
             deleteAccessListFromApiToken(backwardCompatibility);
             deleteNullSubCategoryIssues(backwardCompatibility);
+            enableNewMerging(backwardCompatibility);
 
             SingleTypeInfo.init();
 

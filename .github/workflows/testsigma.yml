@@ -1,0 +1,20 @@
+name: Testsigma
+
+on:
+  workflow_dispatch:
+    inputs:
+        executionId:
+          default: "208"
+        environmentId:
+          default: "8" 
+      
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Testsigma Test
+        run: |
+          curl -X POST -H "Content-type: application/json" -H "Accept:application/json" -H "Authorization: Bearer ${{ secrets.TESTSIGMA_API_KEY }}" \
+                https://app.testsigma.com/api/v1/execution_results -d "{\"executionId\": \"${{ github.event.inputs.executionId }}\", \
+                \"environmentId\": \"${{ github.event.inputs.environmentId }}\"}"
