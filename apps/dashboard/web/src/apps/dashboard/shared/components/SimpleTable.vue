@@ -98,8 +98,8 @@ export default {
         filterApplied(data) {
             this.$emit("filterApplied", data)
         },
-        rowClicked(row) {
-            this.$emit('rowClicked', row)
+        rowClicked(row, $event) {
+            this.$emit('rowClicked', row, $event)
         },
         processParams (x) {
             return {...x}

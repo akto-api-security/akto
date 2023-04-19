@@ -393,13 +393,13 @@ export default {
                 this.currRowIndex++
             }
         },
-        pressEnter() {
+        pressEnter($event) {
             let item = this.filteredItems[this.currRowIndex]
-            this.$emit('rowClicked', item)
+            this.$emit('rowClicked', item, $event)
         },
-        clickRow(index) {
+        clickRow(index, $event) {
             this.currRowIndex = index
-            this.pressEnter()
+            this.pressEnter($event)
         }
     },
     watch: {
