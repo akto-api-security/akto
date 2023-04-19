@@ -25,6 +25,16 @@ public class AccountSettings {
     public static final String MERGE_ASYNC_OUTSIDE = "mergeAsyncOutside";
     private boolean mergeAsyncOutside;
 
+    private int demoCollectionCreateTime = 0;
+    public static final String DEMO_COLLECTION_CREATE_TIME = "demoCollectionCreateTime";
+
+    private boolean showOnboarding;
+    public static final String SHOW_ONBOARDING = "showOnboarding";
+
+    private boolean urlRegexMatchingEnabled;
+
+    public static final String URL_REGEX_MATCHING_ENABLED = "urlRegexMatchingEnabled";
+
     public AccountSettings() {
     }
 
@@ -122,4 +132,28 @@ public class AccountSettings {
     public static final int DEFAULT_CENTRAL_KAFKA_MAX_POLL_RECORDS_CONFIG = 1_000;
     public static final String DEFAULT_CENTRAL_KAFKA_TOPIC_NAME = "akto.central";
 
+    public int getDemoCollectionCreateTime() {
+        return demoCollectionCreateTime;
+    }
+
+    public void setDemoCollectionCreateTime(int demoCollectionCreateTime) {
+        this.demoCollectionCreateTime = demoCollectionCreateTime;
+    }
+
+    public boolean isShowOnboarding() {
+        return showOnboarding;
+    }
+
+    public void setShowOnboarding(boolean showOnboarding) {
+        this.showOnboarding = showOnboarding;
+    }
+
+    public boolean getUrlRegexMatchingEnabled() {
+        return urlRegexMatchingEnabled;
+    }
+
+    public void setUrlRegexMatchingEnabled(boolean urlRegexMatchingEnabled) {
+        this.urlRegexMatchingEnabled = urlRegexMatchingEnabled;
+    }
+    
 }

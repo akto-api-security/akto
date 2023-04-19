@@ -35,10 +35,13 @@ public class BackwardCompatibility {
     public static final String DELETE_NULL_SUB_CATEGORY_ISSUES = "deleteNullSubCategoryIssues";
     private int deleteNullSubCategoryIssues;
 
+    public static final String ENABLE_NEW_MERGING = "enableNewMerging";
+    private int enableNewMerging;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
-                                 int deleteNullSubCategoryIssues) {
+                                 int deleteNullSubCategoryIssues, int enableNewMerging) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -50,6 +53,7 @@ public class BackwardCompatibility {
         this.authMechanismData = authMechanismData;
         this.deleteAccessListFromApiToken = deleteAccessListFromApiToken;
         this.deleteNullSubCategoryIssues = deleteNullSubCategoryIssues;
+        this.enableNewMerging = enableNewMerging;
     }
 
     public BackwardCompatibility() {
@@ -150,4 +154,13 @@ public class BackwardCompatibility {
     public void setDeleteNullSubCategoryIssues(int deleteNullSubCategoryIssues) {
         this.deleteNullSubCategoryIssues = deleteNullSubCategoryIssues;
     }
+
+    public int getEnableNewMerging() {
+        return enableNewMerging;
+    }
+
+    public void setEnableNewMerging(int enableNewMerging) {
+        this.enableNewMerging = enableNewMerging;
+    }
+
 }

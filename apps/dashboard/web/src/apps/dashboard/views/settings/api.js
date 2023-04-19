@@ -141,6 +141,16 @@ export default {
         });
     },
 
+    toggleNewMergingEnabled(newMergingEnabled) {
+        return request({
+            url: '/api/toggleNewMergingEnabled',
+            method: 'post',
+            data: {
+                newMergingEnabled
+            }
+        });
+    },
+
     updateSetupType(setupType) {
         return request({
             url: '/api/updateSetupType',
