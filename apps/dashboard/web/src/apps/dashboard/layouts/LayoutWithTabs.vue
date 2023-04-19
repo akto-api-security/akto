@@ -70,12 +70,20 @@
                 this.tabName = 0
             },
             setTabWithName(tabName) {
-                this.tabName = this.tabs.indexOf(tabName)
+                let tabRealName = tabName.replace("-"," ")
+                this.tabName = this.tabs.indexOf(tabRealName)
             }
         },
         watch: {
             defaultTabName: function (newVal) {
                 this.tabName = this.tabs.indexOf(newVal)
+            },
+            tabName: function (newVal) {
+                let tabName = this.tabs[newVal]
+                if(tabName){
+                    tabName = this.tabs[newVal].replace(" ", "-")
+                }
+                window.location.hash = "#" + tabName
             }
         },
         mounted() {
@@ -85,6 +93,8 @@
                 if(tab){
                     this.setTabWithName(tab)
                 }
+            } else {
+                this.setTabWithName(window.location.hash.substring(1))
             }
         },
     }
