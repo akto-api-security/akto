@@ -18,6 +18,7 @@ import TrashSingleTick from "../apps/dashboard/shared/icons/TrashSingleTick"
 import TrashDoubleTick from "../apps/dashboard/shared/icons/TrashDoubleTick"
 import AktoWhite from "../apps/dashboard/shared/icons/AktoWhite"
 import BookBookmark from "../apps/dashboard/shared/icons/BookBookmark"
+import NGINX from "../apps/dashboard/shared/icons/NGINX"
 import Discord from "../apps/dashboard/shared/icons/Discord"
 import DeleteIcon from "../apps/dashboard/shared/icons/DeleteIcon"
 import PlusIcon from "../apps/dashboard/shared/icons/PlusIcon"
@@ -260,6 +261,10 @@ faIconsOpts.trashSingleTick = {
 
 faIconsOpts.trashDoubleTick = {
   component: TrashDoubleTick
+}
+
+faIconsOpts.nginx = {
+  component: NGINX
 }
 
 faIconsOpts.chatGPT = {
