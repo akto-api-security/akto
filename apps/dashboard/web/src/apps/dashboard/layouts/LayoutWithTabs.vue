@@ -76,6 +76,9 @@
         watch: {
             defaultTabName: function (newVal) {
                 this.tabName = this.tabs.indexOf(newVal)
+            },
+            tabName: function (newVal) {
+                window.location.hash = "#"+this.tabs[newVal]
             }
         },
         mounted() {
@@ -85,6 +88,8 @@
                 if(tab){
                     this.setTabWithName(tab)
                 }
+            } else {
+                this.setTabWithName(window.location.hash.substring(1))
             }
         },
     }
