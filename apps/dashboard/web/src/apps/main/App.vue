@@ -230,6 +230,50 @@
 
 .fw-500   
     font-weight: 500
+
+.z-80
+    zoom: 0.8
+        
+.mlp-74
+    margin-left: 74% !important
+            
+.no-shadow
+    box-shadow: none !important
+
+
+.arrow-up
+    width: 0
+    height: 0 
+    border-left: 5px solid transparent
+    border-right: 5px solid transparent
+    border-bottom: 5px solid var(--hexColor15)
+    margin-left: 20%
+
+.arrow-down
+    width: 0
+    height: 0 
+    border-left: 5px solid transparent
+    border-right: 5px solid transparent
+    border-top: 5px solid var(--hexColor15)
+    margin-left: 20%
+
+.arrow-left
+    width: 0
+    height: 0 
+    border-top: 5px solid transparent
+    border-bottom: 5px solid transparent
+    border-right: 5px solid var(--hexColor15)
+    margin-top: 20%
+
+.arrow-right
+    width: 0
+    height: 0 
+    border-top: 5px solid transparent
+    border-bottom: 5px solid transparent
+    border-left: 5px solid var(--hexColor15)
+    margin-top: 20%
+
+    
 </style>
 
 <style lang="css">
@@ -264,6 +308,7 @@
         --themeColorDark16: #47466A19 ;
         --themeColorDark17: #47466A0D ;
         --themeColorDark18: #47466A08;
+        --themeColorDark19: #474667;
          
         --hexColor1: #1790FF;
         --hexColor2: #FF8717;
@@ -305,6 +350,7 @@
         --hexColor38: #00f;
         --hexColor39: #f2f2f2;
         --hexColor40: #5865F2;
+        --hexColor41: #F7F7F7;
 
         --primary: #126BFF;
         --quickStartTheme:#6200B0;
@@ -335,6 +381,8 @@
         --teamColor: #304ffe;
         --teamColor2: #2D243480;
         --transparent: rgba(0,0,0,0.0);
+        --gptColor: rgb(16, 163, 127);
+        --gptBackground: rgb(247, 247, 248);
 
         --rgbaColor1: rgba(246, 190, 79);
         --rgbaColor2: rgba(33, 150, 243);

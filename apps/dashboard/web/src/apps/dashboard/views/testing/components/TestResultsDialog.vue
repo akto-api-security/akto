@@ -3,13 +3,13 @@
         <div>
             <div>
                 <layout-with-tabs :tabsContent="getTabsContent()" title=""
-                    :tabs="['Description', 'Original', 'Attempt']" ref="layoutWithTabs">
+                    :tabs="['Description', 'Original', 'Attempt']" ref="layoutWithTabs" class="details-container">
                     <template slot="Description">
                         <div class="description-title mt-4" :style="{ 'height': '500px' }"
                             v-if="issuesDetails === undefined || issuesDetails === null || Object.keys(issuesDetails).length === 0">
                             No vulnerabilities exists
                         </div>
-                        <div v-else class="d-flex flex-column">
+                        <div v-else class="d-flex flex-column description-details">
                             <div class="d-flex flex-column">
                                 <span class="description-title mt-4">Issue summary</span>
                                 <div class="mt-3 issue-summary-border">
@@ -64,7 +64,7 @@
                             </div>
                             <div v-if="similarlyAffectedIssues || similarlyAffectedIssues.length === 0" class="mt-4">
                                 <span class="description-title">Api endpoints affected</span>
-                                <table :style="{ 'width': '100%' }" class="mt-3 mb-3">
+                                <table class="mt-3 mb-3">
                                     <tr class="table-row" v-for="(item, index) in similarlyAffectedIssues" :key="index">
                                         <td class="table-column clickable">
                                             <span class="description-content mr-1 ml-3">{{
@@ -296,6 +296,9 @@ export default {
 
   &:hover
       background-color: var(--colTableBackground) !important
+
+.details-container
+    overflow: scroll
 </style>
 
 <style scoped>

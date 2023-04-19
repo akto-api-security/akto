@@ -1,6 +1,20 @@
 <template>
     <spinner v-if="endpointsLoading" />
     <div class="pr-4 api-endpoints" v-else>
+        <v-dialog
+            v-model="showGptDialog"
+            width="fit-content" 
+            content-class="dialog-no-shadow"
+            overlay-opacity="0.7"
+        >
+            <div class="gpt-dialog-container ma-0">
+                <chat-gpt-input
+                    v-if="showGptDialog"
+                    :items="chatGptPrompts"
+                />
+            </div>
+
+        </v-dialog>
         <div>
             <div class="d-flex jc-end pb-3 pt-3">
                     <v-tooltip bottom>
@@ -37,21 +51,18 @@
                     :headers=tableHeaders 
                     :items=allEndpoints 
                     @rowClicked=rowClicked 
+                    @filterApplied="filterApplied"
                     name="All" 
                     sortKeyDefault="sensitiveTags" 
                     :sortDescDefault="true"
                 >
                     <template #add-new-row-btn="{filteredItems}">
-                        <div style="align-items: center; display: flex;">
-                            <v-tooltip>
-                                <template v-slot:activator='{ on, attrs }'>
-                                    <v-btn icon primary dark color="var(--themeColorDark)" @click="showScheduleDialog(filteredItems)">
-                                        <v-icon>$fas_play</v-icon>
-                                    </v-btn>
-                                </template>
-                                "Run test"
-                            </v-tooltip>
-                            
+                        <div>
+                            <secondary-button 
+                                @click="showScheduleDialog(filteredItems)"
+                                icon="$fas_play"
+                                text="Run Test" 
+                            />                            
                         </div>
                         
                     </template>
@@ -67,7 +78,8 @@
                 <simple-table 
                     :headers=tableHeaders 
                     :items=sensitiveEndpoints 
-                    @rowClicked=rowClicked name="Sensitive"
+                    @rowClicked=rowClicked 
+                    name="Sensitive"
                 >
                     <template #item.sensitiveTags="{item}">
                         <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
@@ -169,6 +181,13 @@
         <v-dialog v-model="showTestSelectorDialog" width="800px"> 
             <tests-selector :collectionName="apiCollectionName" @testsSelected=startTest v-if="showTestSelectorDialog"/>
         </v-dialog>
+
+        <div class="fix-at-top">
+            <v-btn dark depressed color="var(--gptColor)" @click="showGPTScreen()">
+                Ask AktoGPT 
+                <v-icon size="16">$chatGPT</v-icon>
+            </v-btn>
+        </div>
     </div>
 </template>
 
@@ -190,6 +209,8 @@ import JsonViewer from "@/apps/dashboard/shared/components/JSONViewer"
 import IconMenu from '@/apps/dashboard/shared/components/IconMenu'
 import WorkflowTestBuilder from './WorkflowTestBuilder'
 import TestsSelector from './TestsSelector'
+import SecondaryButton from '@/apps/dashboard/shared/components/buttons/SecondaryButton'
+import ChatGptInput from '@/apps/dashboard/shared/components/inputs/ChatGptInput'
 
 export default {
     name: "ApiEndpoints",
@@ -204,7 +225,9 @@ export default {
         JsonViewer,
         IconMenu,
         WorkflowTestBuilder,
-        TestsSelector
+        TestsSelector,
+        SecondaryButton,
+        ChatGptInput
     },
     props: {
         apiCollectionId: obj.numR
@@ -214,6 +237,33 @@ export default {
     },
     data() {
         return {
+            filteredItems: [],
+            chatGptPrompts: [
+                {
+                    icon: "$fas_magic",
+                    label: "Create API groups",
+                    prepareQuery: () => { return {
+                        type: "group_apis_by_functionality",
+                        meta: {
+                            "urls": this.filteredItems.map(x => x.endpoint)
+                        }                        
+                    }},
+                    callback: (data) => console.log("callback create api groups", data)
+                },
+                {
+                    icon: "$fas_layer-group",
+                    label: "Tell me APIs related to ${input}",
+                    prepareQuery: (filterApi) => { return {
+                        type: "list_apis_by_type",
+                        meta: {
+                            "urls": this.filteredItems.map(x => x.endpoint),
+                            "type_of_apis": filterApi
+                        }                        
+                    }},
+                    callback: (data) => console.log("callback Tell me all the apis", data)
+                }
+            ],
+            showGptDialog: false,
             file: null,
             rules: [
                 value => !value || value.size < 50e6 || 'HAR file size should be less than 50 MB!',
@@ -247,28 +297,23 @@ export default {
                 },
                 {
                   text: 'Last Seen',
-                  value: 'last_seen',
-                  sortKey: 'last_seen'
+                  value: 'last_seen'
                 },
                 {
                   text: 'Access Type',
-                  value: 'access_type',
-                  sortKey: 'access_type'
+                  value: 'access_type'
                 },
                 {
                   text: 'Auth Type',
-                  value: 'auth_type',
-                  sortKey: 'auth_type'
+                  value: 'auth_type'
                 },
                 {
                     text: constants.DISCOVERED,
-                    value: 'added',
-                    sortKey: 'detectedTs'
+                    value: 'added'
                 },
                 {
                     text: 'Changes',
                     value: 'changes',
-                    sortKey: 'changesCount',
                     hideFilter: true
                 }
             ],
@@ -304,6 +349,29 @@ export default {
                     click: this.downloadData
                 }
             ],
+            prompts: [
+                {
+                    keyword: "Payment",
+                },
+                {
+                    keyword: "User",
+                },
+                {
+                    keyword: "Order",
+                },
+                {
+                    keyword: "Product",
+                },
+                {
+                    keyword: "Authentication",
+                },
+                {
+                    keyword: "Login",           
+                },
+                {
+                    keyword: "Search",                
+                }   
+            ],
             showTestSelectorDialog: false,
             filteredItemsForScheduleTest: [],
             workflowTestHeaders: [
@@ -322,10 +390,20 @@ export default {
             ],
             showWorkflowTestBuilder: false,
             originalStateFromDb: null,
-            workflowTests: []
+            workflowTests: [],
+            showGPTPrompts:false,
+            getResponse:false,
+            promptText: "",
+            responseArr:[],
         }
     },
     methods: {
+        filterApplied(data) {
+            this.filteredItems = data
+        },
+        showGPTScreen(){
+            this.showGptDialog = true
+        },
         rowClicked(row) {
             this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.endpoint + " " + row.method, type: 2})
         },
@@ -522,7 +600,13 @@ export default {
 }
 </script>
 
-<style lang="sass">
+<style lang="sass" scoped>  
+.fix-at-top
+    position: absolute
+    right: 260px
+    top: 18px
+.gpt-dialog-container
+    background-color: var(--gptBackground)
 .api-endpoints
     & .table-column
         &:nth-child(1)    
@@ -551,5 +635,4 @@ export default {
 .menu
     display: flex
     justify-content: right
-
 </style>
