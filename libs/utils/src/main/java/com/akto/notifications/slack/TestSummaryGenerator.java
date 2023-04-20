@@ -13,6 +13,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
+import com.akto.util.enums.GlobalEnums;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
@@ -201,7 +202,9 @@ public class TestSummaryGenerator {
             workflowTestsMap.put(workflowTest.getId(), workflowTest);
         }
 
-        List<TestingRunIssues> testingRunIssues = TestingRunIssuesDao.instance.findAll(Filters.gte(TestingRunIssues.LAST_SEEN, startTs));
+        List<TestingRunIssues> testingRunIssues = TestingRunIssuesDao.instance.findAll(Filters.and(
+                Filters.gte(TestingRunIssues.LAST_SEEN, startTs),
+                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN)));
 
         return new GenerateResult(workflowTestResults, automatedTestingResultSummary, testingRunMap,
                 testingRunResultSummaryMap, testingRunIssues, workflowTestsMap);
