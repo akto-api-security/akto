@@ -377,7 +377,6 @@ export default {
     right: 260px
     top: 18px
 .gpt-dialog-container
-    min-height: 300px
     background-color: var(--gptBackground)
 .table-title
     font-size: 16px    
