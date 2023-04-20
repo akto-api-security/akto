@@ -17,11 +17,11 @@ public class TrafficMetrics {
     }
 
     public enum Name {
-        OUTGOING_PACKETS_MIRRORING("outgoing packets", "Data sent by mirroring logging"),
-        OUTGOING_REQUESTS_MIRRORING("outgoing requests", "Data processed by mirroring logging"),
-        INCOMING_PACKETS_MIRRORING("incoming packets", "Data coming to mirroring logging"),
-        TOTAL_REQUESTS_RUNTIME("total requests", "Total requests sent to runtime"),
-        FILTERED_REQUESTS_RUNTIME("filtered requests", "Requests processed by runtime");
+        OUTGOING_PACKETS_MIRRORING("Bytes processed for HTTP data", "Bytes of data processed by traffic mirroring module"),
+        OUTGOING_REQUESTS_MIRRORING("API calls extracted", "Count of API req-resp processed by traffic mirroring module"),
+        INCOMING_PACKETS_MIRRORING("Bytes received", "Bytes of data received from traffic mirroring"),
+        TOTAL_REQUESTS_RUNTIME("API calls received", "Count of API req-resp recevied by runtime module"),
+        FILTERED_REQUESTS_RUNTIME("API calls processed", "Count of API req-resp processed successfully by runtime module");
 
         private final String description;
         private final String descriptionName;
