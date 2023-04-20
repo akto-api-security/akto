@@ -8,19 +8,18 @@ public class TestConfig {
 
     private ConfigParserResult apiSelectionFilters;
 
-    // private List<Roles> environment;
+    private ExecutorConfigParserResult execute;
 
-    // private Request request;
+    private ConfigParserResult validation;
 
-    // private Validation validation;
-
-    public TestConfig(String id, Info info, ConfigParserResult apiSelectionFilters) {
+    public TestConfig(String id, Info info, ConfigParserResult apiSelectionFilters, ExecutorConfigParserResult execute, 
+        ConfigParserResult validation) {
+        
         this.id = id;
         this.info = info;
         this.apiSelectionFilters = apiSelectionFilters;
-        // this.environment = environment;
-        // this.request = request;
-        // this.validation = validation;
+        this.execute = execute;
+        this.validation = validation;
     }
 
     public TestConfig() { }
@@ -49,28 +48,20 @@ public class TestConfig {
         this.apiSelectionFilters = apiSelectionFilters;
     }
 
-    // public List<Roles> getEnvironment() {
-    //     return environment;
-    // }
+    public ExecutorConfigParserResult getExecute() {
+        return execute;
+    }
 
-    // public void setEnvironment(List<Roles> environment) {
-    //     this.environment = environment;
-    // }
+    public void setExecute(ExecutorConfigParserResult execute) {
+        this.execute = execute;
+    }
 
-    // public Request getRequest() {
-    //     return request;
-    // }
+    public ConfigParserResult getValidation() {
+        return validation;
+    }
 
-    // public void setRequest(Request request) {
-    //     this.request = request;
-    // }
-
-    // public Validation getValidatione() {
-    //     return validation;
-    // }
-
-    // public void setValidation(Validation validation) {
-    //     this.validation = validation;
-    // }
+    public void setValidation(ConfigParserResult validation) {
+        this.validation = validation;
+    }
 
 }
