@@ -587,6 +587,9 @@ export default {
             
             case "WEBHOOKS":
                 return {name: '$customwebhooks', color: '#fe7b5b'}
+
+            case "AKTOGPT":
+                return {name: '$chatGPT', color: 'rgb(16, 163, 127)'}
         }
     },
 
