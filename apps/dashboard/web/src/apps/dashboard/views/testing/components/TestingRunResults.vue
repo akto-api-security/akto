@@ -311,6 +311,11 @@ export default {
             }
         }, 5000)
 
+        if(this.currentTest){
+            if(this.startTimestamp > this.currentTest.startTimestamp){
+                this.startTimestamp = this.currentTest.startTimestamp
+            }
+        }
     },
 
     destroyed() {
