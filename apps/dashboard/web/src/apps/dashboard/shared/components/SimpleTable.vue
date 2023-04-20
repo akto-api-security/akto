@@ -58,6 +58,7 @@
 <script>
 
 import obj from "@/util/obj"
+import func from "@/util/func"
 import { saveAs } from 'file-saver'
 import FilterList from './FilterList'
 import SimpleTextField from '@/apps/dashboard/shared/components/SimpleTextField'
@@ -159,13 +160,29 @@ export default {
                 columnToSort = sortKey.value
             }
 
-
             let ret = items.sort((a, b) => {
                 if (a[columnToSort] === b[columnToSort]) {                    
                     return 0
                 }
 
-                let ret = a[columnToSort] > b[columnToSort] ? -1 : 1
+                let ret
+                if(columnToSort == "detected" || columnToSort == "last_seen" || columnToSort == "added"){
+                    let entry1 = func.getDateFromPrettyData(a[columnToSort])
+                    let entry2 = func.getDateFromPrettyData(b[columnToSort])
+
+                    if(entry1 == a[columnToSort]){
+                        entry1 = Date.parse(entry1)
+                    }
+
+                    if(entry2 == b[columnToSort]){
+                        entry2 = Date.parse(entry1)
+                    }
+
+                    ret = entry1 > entry2 ? -1 : 1
+                }else{
+                    ret = a[columnToSort] > b[columnToSort] ? -1 : 1
+                }
+
                 if (isDesc[0]) {
                     ret = -ret
                 }

@@ -205,6 +205,36 @@ export default {
 
         return count + ' ' + unit + plural + ' ago'
     },
+    getDateFromPrettyData(timeAgo){
+        const now = new Date();
+        const regex = /^(\d+) (minute|hour|day|week|month)s? ago$/;
+        const match = timeAgo.match(regex);
+        if (match) {
+            const quantity = parseInt(match[1]);
+            const unit = match[2];
+            let date;
+            switch (unit) {
+            case 'minute':
+                date = new Date(now.getTime() - quantity * 60000);
+                break;
+            case 'hour':
+                date = new Date(now.getTime() - quantity * 3600000);
+                break;
+            case 'day':
+                date = new Date(now.getTime() - quantity * 86400000);
+                break;
+            case 'week':
+                date = new Date(now.getTime() - quantity * 604800000);
+                break;
+            case 'month':
+                date = new Date(now.getFullYear(), now.getMonth() - quantity, now.getDate());
+                break;
+            }
+            return date.getTime();
+        }else{
+            return timeAgo
+        }
+    },
     getCreationTime(creationTime) {
         let epoch = Date.now();
         let difference = epoch / 1000 - creationTime;
