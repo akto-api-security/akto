@@ -120,4 +120,91 @@ public class TestEditorEnums {
         return null;
     }
 
+
+    public enum ExecutorParentOperands {
+        TYPE,
+        REQUESTS
+    }
+
+    public enum RequestParentOperand {
+        REQ
+    }
+
+    public enum TerminalExecutorDataOperands {
+        DELETE_HEADER,
+        DELETE_BODY_PARAM,
+        DELETE_QUERYPARAM,
+        MODIFY_URL,
+        MODIFY_METHOD
+    }
+
+    public enum NonTerminalExecutorDataOperands {
+        ADD_HEADER,
+        ADD_BODY_PARAM,
+        ADD_QUERYPARAM,
+        MODIFY_HEADER,
+        MODIFY_BODY_PARAM,
+        MODIFY_QUERYPARAM
+    }
+
+    public enum ExecutorOperandTypes {
+        Parent,
+        Req,
+        Terminal,
+        NonTerminal,
+        Data
+    }
+
+    public String getExecutorOperandValue(String key) {
+
+        for (ExecutorParentOperands operand: ExecutorParentOperands.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return operand.toString();
+            }
+        }
+
+        for (TerminalExecutorDataOperands operand: TerminalExecutorDataOperands.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return operand.toString();
+            }
+        }
+
+        for (NonTerminalExecutorDataOperands operand: NonTerminalExecutorDataOperands.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return operand.toString();
+            }
+        }
+
+        return key;
+    }
+
+    public String getExecutorOperandType(String key) {
+
+        for (ExecutorParentOperands operand: ExecutorParentOperands.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return "parent";
+            }
+        }
+
+        for (RequestParentOperand operand: RequestParentOperand.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return "req";
+            }
+        }
+
+        for (TerminalExecutorDataOperands operand: TerminalExecutorDataOperands.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return "terminal";
+            }
+        }
+
+        for (NonTerminalExecutorDataOperands operand: NonTerminalExecutorDataOperands.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return "nonterminal";
+            }
+        }
+
+        return "data";
+    }
+
 }
