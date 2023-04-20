@@ -46,6 +46,7 @@ public class MergeOnHostOnly {
     public MergeOnHostOnly() {} 
 
     public void updateAllCollections(int oldId, int newId) {
+        loggerMaker.infoAndAddToDb("starting updateAllCollections " + oldId + " - " + newId, LoggerMaker.LogDb.RUNTIME);
 
         InsertManyOptions options = new InsertManyOptions();
         options.ordered(false);
@@ -61,6 +62,7 @@ public class MergeOnHostOnly {
             }
             ApiInfoDao.instance.getMCollection().deleteMany(Filters.eq("_id.apiCollectionId", oldId));
         }
+        loggerMaker.infoAndAddToDb("Updated api info", LoggerMaker.LogDb.RUNTIME);
 
         List<SampleData> sampleDatas =  SampleDataDao.instance.findAll("_id.apiCollectionId", oldId);
         if(sampleDatas!=null && sampleDatas.size()>0){
@@ -72,6 +74,8 @@ public class MergeOnHostOnly {
             }
             SampleDataDao.instance.getMCollection().deleteMany(Filters.eq("_id.apiCollectionId", oldId));
         }
+        loggerMaker.infoAndAddToDb("Updated sample data", LoggerMaker.LogDb.RUNTIME);
+
 
         List<SensitiveSampleData> sensitiveSampleDatas =  SensitiveSampleDataDao.instance.findAll("_id.apiCollectionId", oldId);
         if(sensitiveSampleDatas!=null && sensitiveSampleDatas.size()>0){
@@ -83,6 +87,8 @@ public class MergeOnHostOnly {
             }
             SensitiveSampleDataDao.instance.getMCollection().deleteMany(Filters.eq("_id.apiCollectionId", oldId));
         }
+        loggerMaker.infoAndAddToDb("Updated sensitive sample data", LoggerMaker.LogDb.RUNTIME);
+
 
         List<TrafficInfo> trafficInfos =  TrafficInfoDao.instance.findAll("_id.apiCollectionId", oldId);
         if(trafficInfos!=null && trafficInfos.size()>0){
@@ -95,14 +101,23 @@ public class MergeOnHostOnly {
             TrafficInfoDao.instance.getMCollection().deleteMany(Filters.eq("_id.apiCollectionId", oldId));
         }
 
+        loggerMaker.infoAndAddToDb("Updated traffic info", LoggerMaker.LogDb.RUNTIME);
+
         SensitiveParamInfoDao.instance.getMCollection().deleteMany(Filters.eq("apiCollectionId", oldId));
+
+        loggerMaker.infoAndAddToDb("Deleted sensitive param", LoggerMaker.LogDb.RUNTIME);
+
         FilterSampleDataDao.instance.getMCollection().deleteMany(Filters.eq("_id.apiInfoKey.apiCollectionId", oldId));
+
+        loggerMaker.infoAndAddToDb("Deleted filter sample data", LoggerMaker.LogDb.RUNTIME);
     }
 
     public void updateSTI(int oldId, int newId){
         SingleTypeInfoDao.instance.getMCollection().updateMany(
             Filters.eq("apiCollectionId",oldId), 
             Updates.set("apiCollectionId",newId));
+
+        loggerMaker.infoAndAddToDb("Updated STI", LoggerMaker.LogDb.RUNTIME);
     }
 
     public void deleteFromAllCollections(int apiCollectionId, List<String> urls ) {
