@@ -53,6 +53,7 @@ import SlackIntegration from "./SlackIntegration"
 import Postman from "./Postman"
 import AktoAPIIntegration from "./AktoApiIntegration"
 import WebhookIntegration from "./webhook/WebhookIntegration";
+import AktoGptConfig from "./AktoGptConfig";
 
 export default {
   name: "IntegrationSelector",
@@ -62,7 +63,8 @@ export default {
     SlackIntegration,
     Postman,
     AktoAPIIntegration,
-    WebhookIntegration
+    WebhookIntegration,
+    AktoGptConfig
   },
   data () {
     let integrationsList = [
@@ -85,6 +87,13 @@ export default {
         connectors: [{
           name: 'Akto API',
           component: AktoAPIIntegration
+        }]
+      },
+      {
+        name: 'Akto GPT',
+        connectors: [{
+          name: 'Akto GPT',
+          component: AktoGptConfig
         }]
       },
       {
