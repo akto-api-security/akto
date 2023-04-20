@@ -1,4 +1,4 @@
-package com.akto.dao.test_editor;
+package com.akto.dao.test_editor.filter;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -9,6 +9,8 @@ import java.util.Set;
 
 import org.springframework.security.access.method.P;
 
+import com.akto.dao.test_editor.FilterAction;
+import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.OperandTypes;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.RawApi;
@@ -16,13 +18,14 @@ import com.akto.dto.api_workflow.Node;
 import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.ConfigParserValidationResult;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
+import com.akto.dto.test_editor.ExecutorConfigParserResult;
 import com.akto.dto.test_editor.FilterActionRequest;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-public class TestConfigParser {
+public class ConfigParser {
 
     private List<String> allowedDataParentNodes = Arrays.asList("pred", "payload", "term");
     private List<String> allowedPredParentNodes = Arrays.asList("pred", "collection", "payload", "term");
@@ -30,7 +33,7 @@ public class TestConfigParser {
     private List<String> allowedCollectionParentNodes = Arrays.asList("pred", "term");
     private FilterAction filterAction;
 
-    public TestConfigParser() {
+    public ConfigParser() {
         this.filterAction = new FilterAction();
     }
 
@@ -55,16 +58,30 @@ public class TestConfigParser {
         Object filterMap = config.get("api_selection_filters");
         if (filterMap == null) {
             // todo: should not be null, throw error
-            return new TestConfig(id, info, null);
+            return new TestConfig(id, info, null, null, null);
         }
         
         ConfigParserResult filters = parse(filterMap);
         if (filters == null) {
             // todo: throw error
-            new TestConfig(id, info, null);
+            new TestConfig(id, info, null, null, null);
         }
 
-        testConfig = new TestConfig(id, info, filters);
+        Object executionMap = config.get("execute");
+        if (executionMap == null) {
+            // todo: should not be null, throw error
+            return new TestConfig(id, info, null, null, null);
+        }
+        
+        // ExecutorConfigParserResult executeOperations = parse(filterMap);
+        // if (filters == null) {
+        //     // todo: throw error
+        //     new TestConfig(id, info, null, null, null);
+        // }
+
+
+
+        // testConfig = new TestConfig(id, info, filters);
         return testConfig;
     }
 
@@ -168,58 +185,6 @@ public class TestConfigParser {
         ConfigParserResult configParserResult = new ConfigParserResult(curNode, true, "");
         return configParserResult;
 
-    }
-
-
-    public DataOperandsFilterResponse isEndpointValid(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfo.ApiInfoKey apiInfoKey, List<String> matchingKeySet, Boolean keyOperandSeen, String context) {
-
-        List<FilterNode> childNodes = node.getChildNodes();
-        if (childNodes.size() == 0) {
-            if (!node.getNodeType().toLowerCase().equals(OperandTypes.Data.toString().toLowerCase())) {
-                return new DataOperandsFilterResponse(false, null);
-            }
-            String operand = node.getOperand();
-            FilterActionRequest filterActionRequest = new FilterActionRequest(node.getValues(), rawApi, testRawApi, apiInfoKey, node.getConcernedProperty(), node.getSubConcernedProperty(), matchingKeySet, operand, context, keyOperandSeen);
-            Object updatedQuerySet = filterAction.resolveQuerySetValues(filterActionRequest, node.getValues());
-            filterActionRequest.setQuerySet(updatedQuerySet);
-            return filterAction.apply(filterActionRequest);
-        }
-
-        Boolean result = true;
-        DataOperandsFilterResponse dataOperandsFilterResponse;
-        String operator = "and";
-        if (node.getOperand().toLowerCase().equals("or")) {
-            operator = "or";
-            result = false;
-        }
-        Boolean hasKeyOperand = false;
-
-        // todo: introduce priority for each operand
-        for (int i = 0; i < childNodes.size(); i++) {
-            if (childNodes.get(i).getOperand().toLowerCase().equals("key")) {
-                hasKeyOperand = true;
-                dataOperandsFilterResponse = isEndpointValid(childNodes.get(i), rawApi, testRawApi, apiInfoKey, null, true, context);
-                matchingKeySet = dataOperandsFilterResponse.getMatchedEntities();
-                result = operator.equals("and") ? result && dataOperandsFilterResponse.getResult() : result || dataOperandsFilterResponse.getResult();
-                if (matchingKeySet.size() == 0) {
-                    return new DataOperandsFilterResponse(false, matchingKeySet);
-                }
-            }
-        }
-
-        for (int i = 0; i < childNodes.size(); i++) {
-            FilterNode childNode = childNodes.get(i);
-            if (hasKeyOperand && childNode.getOperand().toLowerCase().equals("key")) {
-                continue;
-            }
-            dataOperandsFilterResponse = isEndpointValid(childNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, keyOperandSeen,context);
-            result = operator.equals("and") ? result && dataOperandsFilterResponse.getResult() : result || dataOperandsFilterResponse.getResult();
-            if (childNode.getSubConcernedProperty() != null && childNode.getSubConcernedProperty().toLowerCase().equals("key")) {
-                matchingKeySet =  evaluateMatchingKeySet(matchingKeySet, dataOperandsFilterResponse.getMatchedEntities(), operator);
-            }
-        }
-
-        return new DataOperandsFilterResponse(result, matchingKeySet);
     }
 
     public ConfigParserValidationResult validateNodeAgainstRules(FilterNode curNode, FilterNode parentNode, Boolean termNodeExists, 
@@ -330,32 +295,6 @@ public class TestConfigParser {
         }
         
         return configParserValidationResult;
-    }
-
-    public List<String> evaluateMatchingKeySet(List<String> oldSet, List<String> newMatches, String operand) {
-        Set<String> s1 = new HashSet<>();
-        if (newMatches == null) {
-            return new ArrayList<>();
-        }
-        if (oldSet == null) {
-            // doing this for initial step where oldset would be null, hence assigning initially with newmatches
-            s1 = new HashSet<>(newMatches);
-        } else {
-            s1 = new HashSet<>(oldSet);
-        }
-        Set<String> s2 = new HashSet<>(newMatches);
-
-        if (operand == "and") {
-            s1.retainAll(s2);
-        } else {
-            s1.addAll(s2);
-        }
-
-        List<String> output = new ArrayList<>();
-        for (String s: s1) {
-            output.add(s);
-        }
-        return output;
     }
 
     public Boolean isString(Object value) {

@@ -1,4 +1,4 @@
-package com.akto.dao.test_editor.executor;
+package com.akto.test_editor.Execution;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,6 +12,7 @@ import com.akto.dto.test_editor.ExecutionResult;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.test_editor.ExecutorSingleRequest;
+import com.akto.testing.ApiExecutor;
 
 public class Executor {
 
@@ -25,15 +26,17 @@ public class Executor {
         ExecutorNode reqNodes = node.getChildNodes().get(1);
         OriginalHttpResponse testResponse;
         for (ExecutorNode reqNode: reqNodes.getChildNodes()) {
-            ExecutorSingleRequest singleReq = buildTestRequest(reqNodes, null, rawApi, varMap);
+            RawApi sampleRawApi = rawApi.copy();
+            // make copy of varMap as well
+            ExecutorSingleRequest singleReq = buildTestRequest(reqNode, null, sampleRawApi, varMap);
 
             try {
                 // follow redirects = true for now
-                //testResponse = ApiExecutor.sendRequest(testRequest, true);
+                testResponse = ApiExecutor.sendRequest(singleReq.getRawApi().getRequest(), true);
             } catch(Exception e) {
                 continue;
             }
-            result.add(new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), singleReq.getRawApi(), null));
+            result.add(new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), singleReq.getRawApi(), testResponse));
         }
         return result;
     }
