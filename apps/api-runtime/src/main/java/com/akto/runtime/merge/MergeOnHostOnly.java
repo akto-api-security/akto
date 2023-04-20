@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.akto.log.LoggerMaker;
+import com.mongodb.client.model.Projections;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.ApiCollectionsDao;
@@ -38,6 +40,8 @@ public class MergeOnHostOnly {
      * apiinfos, sampledata, sensitivesampledata, singletypeinfo, trafficInfo
      * delete in case the _id exists ( i.e. the apicollection already contains this url+method)
      */
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(MergeOnHostOnly.class);
 
     public MergeOnHostOnly() {} 
 
@@ -122,7 +126,7 @@ public class MergeOnHostOnly {
         Set<String> ret = new HashSet<>();
         
         Bson filterQ = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, true);
-        List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(filterQ);
+        List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(filterQ, Projections.include(SingleTypeInfo._URL));
 
         for(SingleTypeInfo s: singleTypeInfos){
             // urls will be merged without method: might result in some data loss
@@ -132,6 +136,7 @@ public class MergeOnHostOnly {
     }
 
     public void mergeHostUtil(String host, List<Integer> apiCollectionIds) {
+        loggerMaker.infoAndAddToDb("host: " + host  + " , apiCollectionIds: " + apiCollectionIds, LoggerMaker.LogDb.RUNTIME);
         if (apiCollectionIds.size() == 0) return;
 
         int newApiCollectionId = host.hashCode();
@@ -145,6 +150,7 @@ public class MergeOnHostOnly {
 
             try {
                 ApiCollectionsDao.instance.insertOne(new ApiCollection(newApiCollectionId, null, old.getStartTs(), new HashSet<>(), host, 0));
+                loggerMaker.infoAndAddToDb("Finished inserting original host collection: " + newApiCollectionId, LoggerMaker.LogDb.RUNTIME);
             } catch (Exception e) {
                 return;
             }
@@ -152,23 +158,28 @@ public class MergeOnHostOnly {
             int currOldId = apiCollectionIds.get(0);
 
             ApiCollectionsDao.instance.getMCollection().deleteOne(Filters.eq( "_id", currOldId));
+            loggerMaker.infoAndAddToDb("Finished deleting duplicate collection: " + currOldId, LoggerMaker.LogDb.RUNTIME);
 
             updateSTI(currOldId, newApiCollectionId);
             updateAllCollections(currOldId, newApiCollectionId);
 
             apiCollectionIds.remove(0);
+
+            loggerMaker.infoAndAddToDb("Original done", LoggerMaker.LogDb.RUNTIME);
         }
 
         try {
 
             Set<String> urls = getUrlList(host, newApiCollectionId);
-            for (int i = 0; i < apiCollectionIds.size(); i++) {    
-    
+            loggerMaker.infoAndAddToDb("Initial Collection id: " + newApiCollectionId +  " urls count: " + urls.size(), LoggerMaker.LogDb.RUNTIME);
+
+            for (int i = 0; i < apiCollectionIds.size(); i++) {
                 List<String> urlList = new ArrayList<>(urls);
                 int sz = urlList.size();
                 int j = 0;
                 int currOldId = apiCollectionIds.get(i);
-                do { 
+                loggerMaker.infoAndAddToDb("Collection id: " + currOldId +  " urls count: " + urls.size(), LoggerMaker.LogDb.RUNTIME);
+                do {
                     deleteFromAllCollections(currOldId, urlList.subList(j, Math.min(j + 1000, sz)));
                     j += 1000;
                 } while (j < sz);
@@ -178,6 +189,7 @@ public class MergeOnHostOnly {
                 ApiCollectionsDao.instance.getMCollection().deleteOne(Filters.eq("_id", currOldId));
                 updateSTI(currOldId, newApiCollectionId);
                 updateAllCollections(currOldId, newApiCollectionId);
+                loggerMaker.infoAndAddToDb("DONE!!!", LoggerMaker.LogDb.RUNTIME);
             }
 
         } catch (Exception e) {
@@ -206,6 +218,7 @@ public class MergeOnHostOnly {
             apiCollectionIds.add(it.getId());
         }
 
+        loggerMaker.infoAndAddToDb("hostToApiCollectionId map: " + hostToApiCollectionId, LoggerMaker.LogDb.RUNTIME);
         for (String host : hostToApiCollectionId.keySet()) {
             mergeHostUtil(host, hostToApiCollectionId.get(host));
         }
