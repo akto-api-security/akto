@@ -183,7 +183,7 @@ export default {
             return !this.selectedLabel || this.selectedLabel.indexOf("${input}") == -1
         },
         disabledQuery() {
-            let ret = !!this.selectedLabel && (this.selectedLabel.indexOf("${input}") == -1 || (this.searchKey || '').length > 0)
+            let ret = !!this.selectedLabel && (this.selectedLabel.indexOf("${input}") == -1 || (this.searchKey || '').length > 0) && !this.loading
             return !ret
         },
         textSearch: {
