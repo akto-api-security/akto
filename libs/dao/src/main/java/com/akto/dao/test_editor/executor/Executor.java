@@ -1,17 +1,44 @@
 package com.akto.dao.test_editor.executor;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.ExecutorOperandTypes;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.ExecutionResult;
 import com.akto.dto.test_editor.ExecutorNode;
+import com.akto.dto.test_editor.ExecutorSingleOperationResp;
+import com.akto.dto.test_editor.ExecutorSingleRequest;
 
 public class Executor {
 
-    public ExecutionResult execute(ExecutorNode node, String operation, RawApi rawApi, Map<String, Object> varMap) {
+    public List<ExecutionResult> execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap) {
+
+        List<ExecutionResult> result = new ArrayList<>();
+        
+        if (node.getChildNodes().size() < 2) {
+            return result;
+        }
+        ExecutorNode reqNodes = node.getChildNodes().get(1);
+        OriginalHttpResponse testResponse;
+        for (ExecutorNode reqNode: reqNodes.getChildNodes()) {
+            ExecutorSingleRequest singleReq = buildTestRequest(reqNodes, null, rawApi, varMap);
+
+            try {
+                // follow redirects = true for now
+                //testResponse = ApiExecutor.sendRequest(testRequest, true);
+            } catch(Exception e) {
+                continue;
+            }
+            result.add(new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), singleReq.getRawApi(), null));
+        }
+        return result;
+    }
+
+    public ExecutorSingleRequest buildTestRequest(ExecutorNode node, String operation, RawApi rawApi, Map<String, Object> varMap) {
 
         List<ExecutorNode> childNodes = node.getChildNodes();
         if (node.getNodeType().equalsIgnoreCase(ExecutorOperandTypes.NonTerminal.toString()) || node.getNodeType().equalsIgnoreCase(ExecutorOperandTypes.Terminal.toString())) {
@@ -19,7 +46,7 @@ public class Executor {
         }
 
         if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorParentOperands.TYPE.toString())) {
-            return new ExecutionResult(true, "");
+            return new ExecutorSingleRequest(true, "", null);
         }
         if (childNodes.size() == 0) {
             String key = node.getOperationType();
@@ -28,26 +55,26 @@ public class Executor {
                 key = (String) node.getValues();
                 value = null;
             }
-            ExecutionResult executionResult = invokeOperation(operation, key, value, rawApi, varMap);
-            if (!executionResult.getSuccess()) {
-                return executionResult;
+            ExecutorSingleOperationResp resp = invokeOperation(operation, key, value, rawApi, varMap);
+            if (!resp.getSuccess()) {
+                return new ExecutorSingleRequest(false, resp.getErrMsg(), null);
             }
         }
 
         ExecutorNode childNode;
         for (int i = 0; i < childNodes.size(); i++) {
             childNode = childNodes.get(i);
-            ExecutionResult executionResult = execute(childNode, operation, rawApi, varMap);
+            ExecutorSingleRequest executionResult = buildTestRequest(childNode, operation, rawApi, varMap);
             if (!executionResult.getSuccess()) {
                 return executionResult;
             }
         }
 
-        return new ExecutionResult(true, "");
+        return new ExecutorSingleRequest(true, "", rawApi);
 
     }
 
-    public ExecutionResult invokeOperation(String operationType, String key, Object value, RawApi rawApi, Map<String, Object> varMap) {
+    public ExecutorSingleOperationResp invokeOperation(String operationType, String key, Object value, RawApi rawApi, Map<String, Object> varMap) {
         try {
 
             if (key instanceof String) {
@@ -82,11 +109,11 @@ public class Executor {
                 case "modify_method":
                     return Operations.modifyMethod(rawApi, key);
                 default:
-                    return new ExecutionResult(false, "invalid operationType");
+                    return new ExecutorSingleOperationResp(false, "invalid operationType");
     
             }
         } catch(Exception e) {
-            return new ExecutionResult(false, "error executing executor operation " + e.getMessage());
+            return new ExecutorSingleOperationResp(false, "error executing executor operation " + e.getMessage());
         }
         
     }
