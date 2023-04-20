@@ -175,7 +175,7 @@ export default {
                     }
 
                     if(entry2 == b[columnToSort]){
-                        entry2 = Date.parse(entry1)
+                        entry2 = Date.parse(entry2)
                     }
 
                     ret = entry1 > entry2 ? -1 : 1
