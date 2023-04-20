@@ -61,10 +61,8 @@ export default {
         }
     },
     async mounted() {
-        console.log("CCC");
     },
     destroyed() {
-        console.log("AA");
     },
     computed: {
 
