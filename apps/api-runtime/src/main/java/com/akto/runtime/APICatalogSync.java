@@ -1171,15 +1171,19 @@ public class APICatalogSync {
         loggerMaker.infoAndAddToDb("Started building from dB", LogDb.RUNTIME);
         if (mergeAsyncOutside) {
             if (Context.now() - lastMergeAsyncOutsideTs > 600) {
+                loggerMaker.infoAndAddToDb("Started mergeAsyncOutside", LogDb.RUNTIME);
                 this.lastMergeAsyncOutsideTs = Context.now();
 
                 boolean gotDibs = Cluster.callDibs(Cluster.RUNTIME_MERGER, 1800, 60);
                 if (gotDibs) {
+                    loggerMaker.infoAndAddToDb("Got dibs", LogDb.RUNTIME);
                     BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
                     if (backwardCompatibility.getMergeOnHostInit() == 0) {
+                        loggerMaker.infoAndAddToDb("Merging hosts...", LogDb.RUNTIME);
                         new MergeOnHostOnly().mergeHosts();
                         Bson update = Updates.set(BackwardCompatibility.MERGE_ON_HOST_INIT, Context.now());
                         BackwardCompatibilityDao.instance.getMCollection().updateMany(new BasicDBObject(), update);
+                        loggerMaker.infoAndAddToDb("Merging hosts completed", LogDb.RUNTIME);
                     }
 
                     try {
@@ -1197,6 +1201,7 @@ public class APICatalogSync {
                         e.printStackTrace();
                     }
                 }
+                loggerMaker.infoAndAddToDb("Finished mergeAsyncOutside", LogDb.RUNTIME);
             }
         }
 
