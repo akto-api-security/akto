@@ -258,5 +258,23 @@ export default {
             return resp
         })
     },
+    fetchAktoGptConfig(){
+        return request({
+            url: '/api/fetchAktoGptConfig',
+            method: 'post',
+            data: {
+                "apiCollectionId": -1
+            }
+        })
+    },
+    saveAktoGptConfig(aktoConfigList){
+        return request({
+            url: '/api/saveAktoGptConfig',
+            method: 'post',
+            data: {
+                "currentState": aktoConfigList
+            }
+        })
+    }
 
 }
