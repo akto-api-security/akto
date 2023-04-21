@@ -1,29 +1,30 @@
-package com.akto.dao.test_editor;
+package com.akto.test_editor.filter;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.akto.dao.test_editor.data_operands_impl.ContainsAllFilter;
-import com.akto.dao.test_editor.data_operands_impl.ContainsEitherFilter;
-import com.akto.dao.test_editor.data_operands_impl.DataOperandsImpl;
-import com.akto.dao.test_editor.data_operands_impl.EqFilter;
-import com.akto.dao.test_editor.data_operands_impl.GreaterThanEqFilter;
-import com.akto.dao.test_editor.data_operands_impl.GreaterThanFilter;
-import com.akto.dao.test_editor.data_operands_impl.LesserThanEqFilter;
-import com.akto.dao.test_editor.data_operands_impl.LesserThanFilter;
-import com.akto.dao.test_editor.data_operands_impl.NeqFilter;
-import com.akto.dao.test_editor.data_operands_impl.RegexFilter;
+import com.akto.dao.test_editor.TestEditorEnums.BodyOperator;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.DataOperandFilterRequest;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.FilterActionRequest;
 import com.akto.dto.type.RequestTemplate;
-import com.akto.util.JSONUtils;
+import com.akto.rules.TestPlugin;
+import com.akto.test_editor.Utils;
+import com.akto.test_editor.filter.data_operands_impl.ContainsAllFilter;
+import com.akto.test_editor.filter.data_operands_impl.ContainsEitherFilter;
+import com.akto.test_editor.filter.data_operands_impl.DataOperandsImpl;
+import com.akto.test_editor.filter.data_operands_impl.EqFilter;
+import com.akto.test_editor.filter.data_operands_impl.GreaterThanEqFilter;
+import com.akto.test_editor.filter.data_operands_impl.GreaterThanFilter;
+import com.akto.test_editor.filter.data_operands_impl.LesserThanEqFilter;
+import com.akto.test_editor.filter.data_operands_impl.LesserThanFilter;
+import com.akto.test_editor.filter.data_operands_impl.NeqFilter;
+import com.akto.test_editor.filter.data_operands_impl.RegexFilter;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
@@ -158,6 +159,29 @@ public final class FilterAction {
         } else if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("value")) {
             matchingKeys = filterActionRequest.getMatchingKeySet();
             res = valueExists(payloadObj, null, filterActionRequest.getQuerySet(), filterActionRequest.getOperand(), matchingKeys, filterActionRequest.getKeyOperandSeen());
+            return new DataOperandsFilterResponse(res, null);
+        } else if (filterActionRequest.getConcernedSubProperty() == null) {
+            // && bodyOperator != null
+            // resolve value based on operation
+            Object val = payload;
+
+            if (filterActionRequest.getBodyOperand().equalsIgnoreCase(BodyOperator.LENGTH.toString())) {
+                val = payload.trim().length() - 2;
+            } else if (filterActionRequest.getBodyOperand().equalsIgnoreCase(BodyOperator.PERCENTAGE_MATCH.toString())) {
+                RawApi sampleRawApi = filterActionRequest.getRawApi();
+                if (sampleRawApi == null) {
+                    return new DataOperandsFilterResponse(false, null);
+                }
+                double percentageMatch = TestPlugin.compareWithOriginalResponse(payload, payload, null);
+                val = (int) percentageMatch;
+            }
+            
+            DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(val, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
+            res = invokeFilter(dataOperandFilterRequest);
+            return new DataOperandsFilterResponse(res, null);
+        } else if (filterActionRequest.getConcernedSubProperty() == null) {
+            DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(payload, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
+            res = invokeFilter(dataOperandFilterRequest);
             return new DataOperandsFilterResponse(res, null);
         }
 

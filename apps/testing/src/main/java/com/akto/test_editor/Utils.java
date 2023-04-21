@@ -1,4 +1,4 @@
-package com.akto.dao.test_editor;
+package com.akto.test_editor;
 
 import java.util.Set;
 import java.util.regex.Matcher;

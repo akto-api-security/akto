@@ -1,10 +1,10 @@
-package com.akto.dao.test_editor.data_operands_impl;
+package com.akto.test_editor.filter.data_operands_impl;
 
 import java.util.List;
 
 import com.akto.dto.test_editor.DataOperandFilterRequest;
 
-public class EqFilter extends DataOperandsImpl {
+public class NeqFilter extends DataOperandsImpl {
 
     @Override
     public Boolean isValid(DataOperandFilterRequest dataOperandFilterRequest) {
@@ -19,7 +19,7 @@ public class EqFilter extends DataOperandsImpl {
                 if (queryList == null || queryList.size() == 0) {
                     return false;
                 }
-                result = data.toString().toLowerCase().equals(queryList.get(0).toLowerCase());
+                result = !data.toString().toLowerCase().equals(queryList.get(0).toLowerCase());
             }
 
             if (data instanceof Integer) {
@@ -28,7 +28,7 @@ public class EqFilter extends DataOperandsImpl {
                     return false;
                 }
                 Integer dataInt = (Integer) data;
-                result = ((int) dataInt == (int) queryList.get(0));                
+                result = ((int) dataInt != (int) queryList.get(0));              
             }
             
             if (data instanceof Boolean && querySet instanceof Boolean) {

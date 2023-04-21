@@ -36,9 +36,14 @@ public class TestEditorEnums {
         OR
     }
 
-    public enum PayloadOperator {
+    public enum KeyValOperator {
         KEY,
         VALUE
+    }
+
+    public enum BodyOperator {
+        LENGTH,
+        PERCENTAGE_MATCH
     }
 
     public enum OperandTypes {
@@ -46,7 +51,8 @@ public class TestEditorEnums {
         Pred,
         Term,
         Collection,
-        Payload
+        Payload,
+        Body
     }
 
 
@@ -76,7 +82,7 @@ public class TestEditorEnums {
             }
         }
 
-        for (PayloadOperator operand: PayloadOperator.values()) {
+        for (KeyValOperator operand: KeyValOperator.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
                 return operand.toString();
             }
@@ -111,7 +117,7 @@ public class TestEditorEnums {
             }
         }
         
-        for (PayloadOperator operand: PayloadOperator.values()) {
+        for (KeyValOperator operand: KeyValOperator.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
                 return "payload";
             }

@@ -1,7 +1,7 @@
 package com.akto.rules;
 
-import com.akto.dao.test_editor.TestConfigParser;
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.test_editor.filter.ConfigParser;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
@@ -14,6 +14,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.RelationshipSync;
 import com.akto.store.TestingUtil;
+import com.akto.test_editor.filter.Filter;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.StatusCodeAnalyser;
 import com.akto.types.CappedSet;
@@ -422,8 +423,8 @@ public abstract class TestPlugin {
         if (rawApi == null) {
             return null;
         }
-        TestConfigParser parser = new TestConfigParser();
-        DataOperandsFilterResponse dataOperandsFilterResponse = parser.isEndpointValid(filterNode, rawApi, null, apiInfoKey, new ArrayList<>(), false, context);
+        Filter filter = new Filter();
+        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(filterNode, rawApi, null, apiInfoKey, new ArrayList<>(), false, context);
         return dataOperandsFilterResponse.getResult();
     }
     
