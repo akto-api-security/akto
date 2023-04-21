@@ -5,12 +5,14 @@ import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.utils.cloud.Utils;
 import com.akto.utils.cloud.serverless.aws.Lambda;
 import com.akto.utils.cloud.stack.aws.AwsStack;
 import com.akto.utils.cloud.stack.dto.StackState;
 import com.akto.utils.platform.DashboardStackDetails;
 import com.akto.utils.platform.MirroringStackDetails;
 import com.amazonaws.services.lambda.model.*;
+import com.amazonaws.util.EC2MetadataUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -132,6 +134,18 @@ public class AccountAction extends UserAction {
             }
     }
 
+    public void dashboardReboot(){
+        try{
+            String instanceId = EC2MetadataUtils.getInstanceId();
+            if(instanceId!=null){
+                Utils.rebootInstance(instanceId);
+                loggerMaker.infoAndAddToDb("Dashboard instance rebooted", LogDb.DASHBOARD);
+            }
+        } catch (Exception e){
+            loggerMaker.errorAndAddToDb("Failed to update Akto Dashboard via instance reboot" + e, LogDb.DASHBOARD);
+        }
+    }
+
     public String takeUpdate() {
         if(checkIfStairwayInstallation()) {
             RefreshPreferences refreshPreferences = new RefreshPreferences();
@@ -151,7 +165,7 @@ public class AccountAction extends UserAction {
             loggerMaker.infoAndAddToDb("This is an old installation, updating via old way", LogDb.DASHBOARD);
             listMatchingLambda("InstanceRefresh");
         }
-        
+        dashboardReboot();
         return Action.SUCCESS.toUpperCase();
     }
 

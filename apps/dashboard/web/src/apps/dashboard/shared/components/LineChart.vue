@@ -132,10 +132,7 @@ export default {
                   min : 0
                 }
               })
-          ],
-          legend: {
-            enabled: false
-          }
+          ]
         }
 
         return merge.deepmerge(basicOpts, this.defaultChartOptions)
