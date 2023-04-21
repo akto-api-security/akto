@@ -36,7 +36,7 @@ public class Executor {
             } catch(Exception e) {
                 continue;
             }
-            result.add(new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), singleReq.getRawApi(), testResponse));
+            result.add(new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), singleReq.getRawApi().getRequest(), testResponse));
         }
         return result;
     }
