@@ -1276,7 +1276,6 @@ public class APICatalogSync {
     }
 
     private static void buildHelper(SingleTypeInfo param, Map<Integer, APICatalog> ret) {
-        loggerMaker.infoAndAddToDb("Build helper start", LogDb.RUNTIME);
         String url = param.getUrl();
         int collId = param.getApiCollectionId();
         APICatalog catalog = ret.get(collId);
@@ -1355,7 +1354,6 @@ public class APICatalogSync {
         }
 
         keyTypes.getOccurrences().put(param.getSubType(), param);
-        loggerMaker.infoAndAddToDb("Build helper end", LogDb.RUNTIME);
     }
 
 
