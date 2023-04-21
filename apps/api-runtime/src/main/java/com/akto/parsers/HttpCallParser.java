@@ -175,6 +175,7 @@ public class HttpCallParser {
     }
 
     public void syncTrafficMetricsWithDB() {
+        loggerMaker.infoAndAddToDb("Starting syncing traffic metrics", LogDb.RUNTIME);
         try {
             syncTrafficMetricsWithDBHelper();
         } catch (Exception e) {
@@ -182,6 +183,7 @@ public class HttpCallParser {
         } finally {
             trafficMetricsMap = new HashMap<>();
         }
+        loggerMaker.infoAndAddToDb("Finished syncing traffic metrics", LogDb.RUNTIME);
     }
 
     public void syncTrafficMetricsWithDBHelper() {
