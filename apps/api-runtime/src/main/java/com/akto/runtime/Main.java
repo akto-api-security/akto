@@ -133,6 +133,7 @@ public class Main {
 
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
+        loggerMaker.infoAndAddToDb("Runtime starting at " + Context.now() + "....", LogDb.RUNTIME);
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         String configName = System.getenv("AKTO_CONFIG_NAME");
         String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
@@ -206,6 +207,7 @@ public class Main {
 
         try {
             main.consumer.subscribe(Arrays.asList(topicName, "har_"+topicName));
+            loggerMaker.infoAndAddToDb("Consumer subscribed", LogDb.RUNTIME);
             while (true) {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 main.consumer.commitSync();
@@ -258,6 +260,7 @@ public class Main {
                     }
 
                     if ((Context.now() - accountInfo.lastEstimatedCountTime) > 60*60) {
+                        loggerMaker.infoAndAddToDb("current time: " + Context.now() + " lastEstimatedCountTime: " + accountInfo.lastEstimatedCountTime, LogDb.RUNTIME);
                         accountInfo.lastEstimatedCountTime = Context.now();
                         accountInfo.estimatedCount = SingleTypeInfoDao.instance.getMCollection().estimatedDocumentCount();
                         loggerMaker.infoAndAddToDb("STI Estimated count: " + accountInfo.estimatedCount, LogDb.RUNTIME);
@@ -326,6 +329,7 @@ public class Main {
           // nothing to catch. This exception is called from the shutdown hook.
         } catch (Exception e) {
             printL(e);
+            loggerMaker.errorAndAddToDb("Error in main runtime: " + e.getMessage(),LogDb.RUNTIME);
             e.printStackTrace();
         } finally {
             main.consumer.close();
