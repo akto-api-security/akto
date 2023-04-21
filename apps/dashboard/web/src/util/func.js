@@ -206,12 +206,18 @@ export default {
         return count + ' ' + unit + plural + ' ago'
     },
     getDateFromPrettyData(timeAgo){
-        const now = new Date();
-        const regex = /^(\d+) (minute|hour|day|week|month)s? ago$/;
-        const match = timeAgo.match(regex);
+
+        if(typeof timeAgo !== 'string'){
+            return timeAgo
+        }
+
+        let now = new Date();
+        let regex = /^(\d+) (minute|hour|day|week|month)s? ago$/;
+        let regexDate = /^[A-Z][a-z]{2}\s\d{1,2}\s\d{4}$/;
+        let match = timeAgo.match(regex);
         if (match) {
-            const quantity = parseInt(match[1]);
-            const unit = match[2];
+            let quantity = parseInt(match[1]);
+            let unit = match[2];
             let date;
             switch (unit) {
             case 'minute':
@@ -231,6 +237,8 @@ export default {
                 break;
             }
             return date.getTime();
+        }else if(timeAgo.match(regexDate)){
+            return Date.parse(timeAgo)
         }else{
             return timeAgo
         }

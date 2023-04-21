@@ -164,24 +164,10 @@ export default {
                 if (a[columnToSort] === b[columnToSort]) {                    
                     return 0
                 }
+                let entry1 = func.getDateFromPrettyData(a[columnToSort])
+                let entry2 = func.getDateFromPrettyData(b[columnToSort])
 
-                let ret
-                if(columnToSort == "detected" || columnToSort == "last_seen" || columnToSort == "added"){
-                    let entry1 = func.getDateFromPrettyData(a[columnToSort])
-                    let entry2 = func.getDateFromPrettyData(b[columnToSort])
-
-                    if(entry1 == a[columnToSort]){
-                        entry1 = Date.parse(entry1)
-                    }
-
-                    if(entry2 == b[columnToSort]){
-                        entry2 = Date.parse(entry2)
-                    }
-
-                    ret = entry1 > entry2 ? -1 : 1
-                }else{
-                    ret = a[columnToSort] > b[columnToSort] ? -1 : 1
-                }
+                let ret = entry1 > entry2 ? -1 : 1
 
                 if (isDesc[0]) {
                     ret = -ret
