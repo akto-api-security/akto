@@ -9,7 +9,6 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
-import com.akto.dto.test_editor.ApiSelectionFilters;
 import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.test_editor.TestConfig;

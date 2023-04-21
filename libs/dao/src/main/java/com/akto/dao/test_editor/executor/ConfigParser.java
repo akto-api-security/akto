@@ -14,6 +14,21 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class ConfigParser {
 
+    public ExecutorConfigParserResult parseConfigMap(Object config) {
+
+        Map<String, Object> configMap = (Map) config;
+
+        if (configMap == null) {
+            return null;
+        }
+        
+        ExecutorNode node = new ExecutorNode("_ETHER_", new ArrayList<>(), config, "_ETHER_");
+
+        ExecutorConfigParserResult configParserResult = parse(configMap, node, node);
+
+        return configParserResult;
+    }
+
     public ExecutorConfigParserResult parse(Map<String, Object> config, ExecutorNode curNode, ExecutorNode parentNode) {
 
         Object values = curNode.getValues();
