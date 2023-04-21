@@ -992,50 +992,50 @@ public class APICatalogSync {
             update = Updates.combine(update, Updates.max(SingleTypeInfo.MAX_VALUE, deltaInfo.getMaxValue()));
             update = Updates.combine(update, Updates.min(SingleTypeInfo.MIN_VALUE, deltaInfo.getMinValue()));
 
-            if (dbInfo != null) {
-                SingleTypeInfo.Domain domain = dbInfo.getDomain();
-                if (domain ==  SingleTypeInfo.Domain.ENUM) {
-                    CappedSet<String> values = dbInfo.getValues();
-                    Set<String> elements = new HashSet<>();
-                    if (values != null) {
-                        elements = values.getElements();
-                    }
-                    int valuesSize = elements.size();
-                    if (valuesSize >= SingleTypeInfo.VALUES_LIMIT) {
-                        SingleTypeInfo.Domain newDomain;
-                        if (dbInfo.getSubType().equals(SingleTypeInfo.INTEGER_32) || dbInfo.getSubType().equals(SingleTypeInfo.INTEGER_64) || dbInfo.getSubType().equals(SingleTypeInfo.FLOAT)) {
-                            newDomain = SingleTypeInfo.Domain.RANGE;
-                        } else {
-                            newDomain = SingleTypeInfo.Domain.ANY;
-                        }
-                        update = Updates.combine(update, Updates.set(SingleTypeInfo._DOMAIN, newDomain));
-                    }
-                } else {
-                    deltaInfo.setDomain(dbInfo.getDomain());
-                    deltaInfo.setValues(new CappedSet<>());
-                    if (!dbInfo.getValues().getElements().isEmpty()) {
-                        Bson bson = Updates.set(SingleTypeInfo._VALUES +".elements",new ArrayList<>());
-                        update = Updates.combine(update, bson);
-                    }
-                }
-            }
-
-            if (dbInfo == null || dbInfo.getDomain() == SingleTypeInfo.Domain.ENUM) {
-                CappedSet<String> values = deltaInfo.getValues();
-                if (values != null) {
-                    Set<String> elements = new HashSet<>();
-                    for (String el: values.getElements()) {
-                        if (redactSampleData) {
-                            elements.add(el.hashCode()+"");
-                        } else {
-                            elements.add(el);
-                        }
-                    }
-                    Bson bson = Updates.addEachToSet(SingleTypeInfo._VALUES +".elements",new ArrayList<>(elements));
-                    update = Updates.combine(update, bson);
-                    deltaInfo.setValues(new CappedSet<>());
-                }
-            }
+//            if (dbInfo != null) {
+//                SingleTypeInfo.Domain domain = dbInfo.getDomain();
+//                if (domain ==  SingleTypeInfo.Domain.ENUM) {
+//                    CappedSet<String> values = dbInfo.getValues();
+//                    Set<String> elements = new HashSet<>();
+//                    if (values != null) {
+//                        elements = values.getElements();
+//                    }
+//                    int valuesSize = elements.size();
+//                    if (valuesSize >= SingleTypeInfo.VALUES_LIMIT) {
+//                        SingleTypeInfo.Domain newDomain;
+//                        if (dbInfo.getSubType().equals(SingleTypeInfo.INTEGER_32) || dbInfo.getSubType().equals(SingleTypeInfo.INTEGER_64) || dbInfo.getSubType().equals(SingleTypeInfo.FLOAT)) {
+//                            newDomain = SingleTypeInfo.Domain.RANGE;
+//                        } else {
+//                            newDomain = SingleTypeInfo.Domain.ANY;
+//                        }
+//                        update = Updates.combine(update, Updates.set(SingleTypeInfo._DOMAIN, newDomain));
+//                    }
+//                } else {
+//                    deltaInfo.setDomain(dbInfo.getDomain());
+//                    deltaInfo.setValues(new CappedSet<>());
+//                    if (!dbInfo.getValues().getElements().isEmpty()) {
+//                        Bson bson = Updates.set(SingleTypeInfo._VALUES +".elements",new ArrayList<>());
+//                        update = Updates.combine(update, bson);
+//                    }
+//                }
+//            }
+//
+//            if (dbInfo == null || dbInfo.getDomain() == SingleTypeInfo.Domain.ENUM) {
+//                CappedSet<String> values = deltaInfo.getValues();
+//                if (values != null) {
+//                    Set<String> elements = new HashSet<>();
+//                    for (String el: values.getElements()) {
+//                        if (redactSampleData) {
+//                            elements.add(el.hashCode()+"");
+//                        } else {
+//                            elements.add(el);
+//                        }
+//                    }
+//                    Bson bson = Updates.addEachToSet(SingleTypeInfo._VALUES +".elements",new ArrayList<>(elements));
+//                    update = Updates.combine(update, bson);
+//                    deltaInfo.setValues(new CappedSet<>());
+//                }
+//            }
 
 
             if (!redactSampleData && deltaInfo.getExamples() != null && !deltaInfo.getExamples().isEmpty()) {
@@ -1161,7 +1161,7 @@ public class APICatalogSync {
         loggerMaker.infoAndAddToDb("Fetching STIs: " + fetchAllSTI, LogDb.RUNTIME);
         List<SingleTypeInfo> allParams;
         if (fetchAllSTI) {
-            allParams = SingleTypeInfoDao.instance.fetchAll();
+            allParams = SingleTypeInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(SingleTypeInfo._VALUES));
         } else {
             List<Integer> apiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
             allParams = SingleTypeInfoDao.instance.fetchStiOfCollections(apiCollectionIds);
