@@ -36,61 +36,6 @@ public class ConfigParser {
     public ConfigParser() {
         this.filterAction = new FilterAction();
     }
-
-    public TestConfig parseConfig(Map<String, Object> config) {
-
-        TestConfig testConfig = null;
-
-        String id = (String) config.get("id");
-        if (id == null) {
-            return testConfig;
-        }
-
-        Object infoMap = config.get("info");
-        if (infoMap == null) {
-            return testConfig;
-        }
-        Info info = parseInfo(infoMap);
-        if (info == null) {
-            return testConfig;
-        }
-
-        Object filterMap = config.get("api_selection_filters");
-        if (filterMap == null) {
-            // todo: should not be null, throw error
-            return new TestConfig(id, info, null, null, null);
-        }
-        
-        ConfigParserResult filters = parse(filterMap);
-        if (filters == null) {
-            // todo: throw error
-            new TestConfig(id, info, null, null, null);
-        }
-
-        Object executionMap = config.get("execute");
-        if (executionMap == null) {
-            // todo: should not be null, throw error
-            return new TestConfig(id, info, null, null, null);
-        }
-        
-        // ExecutorConfigParserResult executeOperations = parse(filterMap);
-        // if (filters == null) {
-        //     // todo: throw error
-        //     new TestConfig(id, info, null, null, null);
-        // }
-
-
-
-        // testConfig = new TestConfig(id, info, filters);
-        return testConfig;
-    }
-
-    public Info parseInfo(Object infoObj) {
-        Map<String, Object> infoMap = (Map) infoObj;
-        ObjectMapper objectMapper = new ObjectMapper();
-        Info info = objectMapper.convertValue(infoMap, Info.class);
-        return info;
-    }
     
     public ConfigParserResult parse(Object filters) {
 
