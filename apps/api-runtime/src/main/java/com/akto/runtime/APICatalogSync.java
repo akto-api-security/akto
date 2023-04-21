@@ -1168,7 +1168,7 @@ public class APICatalogSync {
     private int lastMergeAsyncOutsideTs = 0;
     public void buildFromDB(boolean calcDiff, boolean fetchAllSTI) {
 
-        loggerMaker.infoAndAddToDb("Started building from dB", LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("Started building from dB with calcDiff " + calcDiff + " fetchAllSTI: " + fetchAllSTI, LogDb.RUNTIME);
         if (mergeAsyncOutside) {
             if (Context.now() - lastMergeAsyncOutsideTs > 600) {
                 loggerMaker.infoAndAddToDb("Started mergeAsyncOutside", LogDb.RUNTIME);
@@ -1197,7 +1197,8 @@ public class APICatalogSync {
                             loggerMaker.infoAndAddToDb("Finished merging API collection " + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
                         }
                     } catch (Exception e) {
-                        System.out.println("mergeUrlsAndSave: " + e.getMessage());
+                        String err = e.getStackTrace().length > 0 ? e.getStackTrace()[0].toString() : e.getMessage() ;
+                        loggerMaker.errorAndAddToDb("error in mergeUrlsAndSave: " + err, LogDb.RUNTIME);
                         e.printStackTrace();
                     }
                 }
@@ -1205,6 +1206,7 @@ public class APICatalogSync {
             }
         }
 
+        loggerMaker.infoAndAddToDb("Fetching STIs: " + fetchAllSTI, LogDb.RUNTIME);
         List<SingleTypeInfo> allParams;
         if (fetchAllSTI) {
             allParams = SingleTypeInfoDao.instance.fetchAll();
@@ -1212,9 +1214,12 @@ public class APICatalogSync {
             List<Integer> apiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
             allParams = SingleTypeInfoDao.instance.fetchStiOfCollections(apiCollectionIds);
         }
+        loggerMaker.infoAndAddToDb("Fetched STIs count: " + allParams.size(), LogDb.RUNTIME);
         this.dbState = build(allParams);
+        loggerMaker.infoAndAddToDb("Done building dbState", LogDb.RUNTIME);
         this.sensitiveParamInfoBooleanMap = new HashMap<>();
         List<SensitiveParamInfo> sensitiveParamInfos = SensitiveParamInfoDao.instance.getUnsavedSensitiveParamInfos();
+        loggerMaker.infoAndAddToDb("Done fetching sensitiveParamInfos", LogDb.RUNTIME);
         for (SensitiveParamInfo sensitiveParamInfo: sensitiveParamInfos) {
             this.sensitiveParamInfoBooleanMap.put(sensitiveParamInfo, false);
         }
@@ -1266,9 +1271,12 @@ public class APICatalogSync {
                 }
             }
         }
+
+        loggerMaker.infoAndAddToDb("Building from db completed", LogDb.RUNTIME);
     }
 
     private static void buildHelper(SingleTypeInfo param, Map<Integer, APICatalog> ret) {
+        loggerMaker.infoAndAddToDb("Build helper start", LogDb.RUNTIME);
         String url = param.getUrl();
         int collId = param.getApiCollectionId();
         APICatalog catalog = ret.get(collId);
@@ -1347,6 +1355,7 @@ public class APICatalogSync {
         }
 
         keyTypes.getOccurrences().put(param.getSubType(), param);
+        loggerMaker.infoAndAddToDb("Build helper end", LogDb.RUNTIME);
     }
 
 
@@ -1368,6 +1377,7 @@ public class APICatalogSync {
     int counter = 0;
     
     public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI) {
+        loggerMaker.infoAndAddToDb("Started sync with db! syncImmediately="+syncImmediately + " fetchAllSTI="+fetchAllSTI, LogDb.RUNTIME);
         List<WriteModel<SingleTypeInfo>> writesForParams = new ArrayList<>();
         List<WriteModel<SensitiveSampleData>> writesForSensitiveSampleData = new ArrayList<>();
         List<WriteModel<TrafficInfo>> writesForTraffic = new ArrayList<>();
@@ -1429,13 +1439,17 @@ public class APICatalogSync {
 
         if (writesForSensitiveSampleData.size() > 0) {
             SensitiveSampleDataDao.instance.getMCollection().bulkWrite(writesForSensitiveSampleData);
+            loggerMaker.infoAndAddToDb("successfully added " + writesForSensitiveSampleData.size() + " updates for sensitive sample data" , LogDb.RUNTIME);
         }
 
         if (writesForSensitiveParamInfo.size() > 0) {
             SensitiveParamInfoDao.instance.getMCollection().bulkWrite(writesForSensitiveParamInfo);
+            loggerMaker.infoAndAddToDb("successfully added " + writesForSensitiveParamInfo.size() + " updates for sensitive sample param info" , LogDb.RUNTIME);
         }
 
+        loggerMaker.infoAndAddToDb("starting build from db inside syncWithDb", LogDb.RUNTIME);
         buildFromDB(true, fetchAllSTI);
+        loggerMaker.infoAndAddToDb("Finished syncing with db", LogDb.RUNTIME);
     }
 
     public void printNewURLsInDelta(APICatalog deltaCatalog) {
