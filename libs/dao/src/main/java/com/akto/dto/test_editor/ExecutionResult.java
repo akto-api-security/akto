@@ -1,16 +1,16 @@
 package com.akto.dto.test_editor;
 
+import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
-import com.akto.dto.RawApi;
 
 public class ExecutionResult {
     
     private Boolean success;
     private String errMsg;
-    private RawApi request;
+    private OriginalHttpRequest request;
     private OriginalHttpResponse response;
 
-    public ExecutionResult(Boolean success, String errMsg, RawApi request, OriginalHttpResponse response) {
+    public ExecutionResult(Boolean success, String errMsg, OriginalHttpRequest request, OriginalHttpResponse response) {
         this.success = success;
         this.errMsg = errMsg;
         this.request = request;
@@ -35,11 +35,11 @@ public class ExecutionResult {
         this.errMsg = errMsg;
     }
     
-    public RawApi getRequest() {
+    public OriginalHttpRequest getRequest() {
         return request;
     }
 
-    public void setRequest(RawApi request) {
+    public void setRequest(OriginalHttpRequest request) {
         this.request = request;
     }
 
