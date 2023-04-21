@@ -1,11 +1,10 @@
-package com.akto.dao.test_editor.data_operands_impl;
+package com.akto.test_editor.filter.data_operands_impl;
 
 import java.util.List;
 
 import com.akto.dto.test_editor.DataOperandFilterRequest;
-import com.akto.dto.test_editor.DataOperandsFilterResponse;
 
-public class GreaterThanEqFilter extends DataOperandsImpl {
+public class LesserThanFilter extends DataOperandsImpl {
     
     @Override
     public Boolean isValid(DataOperandFilterRequest dataOperandFilterRequest) {
@@ -22,7 +21,7 @@ public class GreaterThanEqFilter extends DataOperandsImpl {
                     return false;
                 }
                 Integer dataInt = (Integer) data;
-                result = ((int) dataInt >= (int) queryList.get(0));                
+                result = ((int) dataInt < (int) queryList.get(0));                
             }
             
         } catch (Exception e) {
@@ -31,5 +30,4 @@ public class GreaterThanEqFilter extends DataOperandsImpl {
 
         return result;
     }
-
 }

@@ -1,11 +1,10 @@
-package com.akto.test_editor.Filter;
+package com.akto.test_editor.filter;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import com.akto.dao.test_editor.FilterAction;
 import com.akto.dao.test_editor.TestEditorEnums.OperandTypes;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.RawApi;
@@ -29,7 +28,7 @@ public class Filter {
                 return new DataOperandsFilterResponse(false, null);
             }
             String operand = node.getOperand();
-            FilterActionRequest filterActionRequest = new FilterActionRequest(node.getValues(), rawApi, testRawApi, apiInfoKey, node.getConcernedProperty(), node.getSubConcernedProperty(), matchingKeySet, operand, context, keyOperandSeen);
+            FilterActionRequest filterActionRequest = new FilterActionRequest(node.getValues(), rawApi, testRawApi, apiInfoKey, node.getConcernedProperty(), node.getSubConcernedProperty(), matchingKeySet, operand, context, keyOperandSeen, node.getBodyOperand());
             Object updatedQuerySet = filterAction.resolveQuerySetValues(filterActionRequest, node.getValues());
             filterActionRequest.setQuerySet(updatedQuerySet);
             return filterAction.apply(filterActionRequest);

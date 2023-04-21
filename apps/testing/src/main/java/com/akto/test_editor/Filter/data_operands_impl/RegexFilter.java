@@ -1,11 +1,12 @@
-package com.akto.dao.test_editor.data_operands_impl;
+package com.akto.test_editor.filter.data_operands_impl;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import com.akto.dto.test_editor.DataOperandFilterRequest;
+import com.akto.test_editor.Utils;
 
-public class ContainsEitherFilter extends DataOperandsImpl {
+public class RegexFilter extends DataOperandsImpl {
     
     @Override
     public Boolean isValid(DataOperandFilterRequest dataOperandFilterRequest) {
@@ -21,24 +22,10 @@ public class ContainsEitherFilter extends DataOperandsImpl {
             return result;
         }
         for (String queryString: querySet) {
-            res = evaluateOnStringQuerySet(data, queryString);
-            result = result || res;
-        }
-        return result;        
-    }
-
-    public Boolean evaluateOnListQuerySet(String data, List<String> querySet) {
-        Boolean result = false;
-        Boolean res;
-        for (String queryString: querySet) {
-            res = evaluateOnStringQuerySet(data, queryString);
+            res = Utils.checkIfContainsMatch(data, queryString);
             result = result || res;
         }
         return result;
-    }
-
-    public Boolean evaluateOnStringQuerySet(String data, String query) {
-        return data.contains(query);
     }
 
 }
