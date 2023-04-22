@@ -147,7 +147,8 @@ export default {
                         meta: {
                             "sample_data": this.allSamples[0].message,
                             "response_details": this.parseMsgForGenerateCurl(this.allSamples[0].message),
-                            "test_type": "ssrf"
+                            "test_type": "ssrf",
+                            "apiCollectionId": this.apiCollectionId
                         }                        
                     }},
                     callback: (data) => console.log("callback create api groups", data)
@@ -160,7 +161,8 @@ export default {
                         meta: {
                             "sample_data": this.allSamples[0].message,
                             "response_details": this.parseMsgForGenerateCurl(this.allSamples[0].message),
-                            "test_type": "sqlinjection"
+                            "test_type": "sqlinjection",
+                            "apiCollectionId": this.apiCollectionId
                         }                        
                     }},
                     callback: (data) => console.log("callback create api groups", data)

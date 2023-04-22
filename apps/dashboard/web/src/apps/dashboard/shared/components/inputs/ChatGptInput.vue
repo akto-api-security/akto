@@ -66,9 +66,8 @@
             <div class="response-body" v-else>
                 <v-icon class="gpt-icon" :size="16">$aktoWhite</v-icon>
                     <div v-if="queryType === 'generate_curl_for_test'">
-                        <div v-if="responses[0] && responses[0].curl !== 'NOT_APPLICABLE'">
-                            <div class="fw-500" style="text-transform: uppercase">Curl</div>
-                            <div>{{responses[0].curl}}</div>
+                        <div v-if="responses[0] && responses[0].curl && responses[0].curl.includes('-H')">
+                            <div class="code"> <code-block :lines="[responses[0].curl]" onCopyBtnClickText="Curl copied to clipboard"></code-block> </div>
                         </div>
                         <div v-else>
                             It seems that this API is not vulnerable to {{ responses[0].vulnerability }}.
@@ -96,12 +95,14 @@ import obj from '@/util/obj';
 import SimpleMenu from '../SimpleMenu'
 import Spinner from '../Spinner'
 import request from '@/util/request'
+import CodeBlock from '@/apps/dashboard/shared/components/CodeBlock'
 
 export default {
     name: "ChatGptInput",
     components: {
         SimpleMenu,
-        Spinner
+        Spinner,
+        CodeBlock
     },
     props: {
         items: obj.arrR,
@@ -317,6 +318,10 @@ export default {
 
     .chat-gpt-text-field >>> fieldset {
         border: 0px
+    }
+
+    .code{
+        max-width: 600px;
     }
 
 </style>
