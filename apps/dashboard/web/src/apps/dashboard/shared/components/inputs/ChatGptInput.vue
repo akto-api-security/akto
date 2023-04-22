@@ -47,16 +47,16 @@
         </div>    
         <div class="prompt-body" v-if="responses || loading">
             <div class="gpt-prompt">
-                <span class="gpt-prompt-text">
-                    <v-icon :size=14 :color='("var(--hexColor"+Math.floor(Math.random() * 13 + 1)+")")'>$fas_user-graduate</v-icon>
-                    {{ computedLabel }}
-                </span>
+                <div class="gpt-prompt-text d-flex">
+                    <owner-name :owner-name="getUsername()" :owner-id="0" :show-name="false" />
+                    <div class="ml-2 label">{{ computedLabel }}</div>
+                </div>
             </div>
             <div class="prompt-loader" v-if="loading">
                 <spinner :size=28 />
             </div>
             <div class="response-body" v-else-if="responses.length == 0">
-                <v-icon class="gpt-icon" :size="14">$aktoWhite</v-icon>
+                <v-icon class="gpt-icon" :size="20">$aktoWhite</v-icon>
                 <span class="listItem">
                     Sorry couldn't find any response with your prompt.
                     Try again.
@@ -64,24 +64,28 @@
             </div>
 
             <div class="response-body" v-else>
-                <v-icon class="gpt-icon" :size="16">$aktoWhite</v-icon>
-                    <div v-if="queryType === 'generate_curl_for_test'">
-                        <div v-if="responses[0] && responses[0].curl && responses[0].curl.includes('-H')">
-                            <div class="code"> <code-block :lines="[responses[0].curl]" onCopyBtnClickText="Curl copied to clipboard"></code-block> </div>
+                    <div class="d-flex">
+                        <div>
+                            <v-icon class="gpt-icon" :size="20">$aktoWhite</v-icon>
+                        </div>
+                        <div class="akto-gpt-resp" v-if="queryType === 'generate_curl_for_test'">
+                            <div v-if="responses[0] && responses[0].curl && responses[0].curl.includes('-H')">
+                                <div class="code"> <code-block :lines="[responses[0].curl]" onCopyBtnClickText="Curl copied to clipboard"></code-block> </div>
+                            </div>
+                            <div v-else>
+                                It seems that this API is not vulnerable to {{ responses[0].vulnerability }}.
+                            </div>
                         </div>
                         <div v-else>
-                            It seems that this API is not vulnerable to {{ responses[0].vulnerability }}.
+                            <v-list-item v-for="(item, index) in responses" :key="index" class="listItem">
+                                <div v-if="item.functionality">
+                                    <div class="fw-500" style="text-transform: uppercase">{{item.functionality}}</div>
+                                    <div v-for="(api, ii) in item.apis" :key="'api_'+ii">- {{api}}</div>
+                                </div>
+                                <span v-else>{{ item }}</span>
+                                
+                            </v-list-item>
                         </div>
-                    </div>
-                    <div v-else>
-                        <v-list-item v-for="(item, index) in responses" :key="index" class="listItem">
-                            <div v-if="item.functionality">
-                                <div class="fw-500" style="text-transform: uppercase">{{item.functionality}}</div>
-                                <div v-for="(api, ii) in item.apis" :key="'api_'+ii">- {{api}}</div>
-                            </div>
-                            <span v-else>{{ item }}</span>
-                            
-                        </v-list-item>
                     </div>
             </div>
         </div>
@@ -96,13 +100,16 @@ import SimpleMenu from '../SimpleMenu'
 import Spinner from '../Spinner'
 import request from '@/util/request'
 import CodeBlock from '@/apps/dashboard/shared/components/CodeBlock'
+import OwnerName from '@/apps/dashboard/shared/components/OwnerName'
+import { mapGetters } from 'vuex';
 
 export default {
     name: "ChatGptInput",
     components: {
         SimpleMenu,
         Spinner,
-        CodeBlock
+        CodeBlock,
+        OwnerName
     },
     props: {
         items: obj.arrR,
@@ -131,6 +138,7 @@ export default {
         }
     },
     methods: {
+        ...mapGetters('auth',['getUsername']),
         openDocsOnAktoGPT() {
             return window.open("https://docs.akto.io/aktogpt")
         },
@@ -324,4 +332,11 @@ export default {
         max-width: 600px;
     }
 
+    .label{
+        margin-top: 3px;
+    }
+
+    .akto-gpt-resp{
+        margin-left: 3px;
+    }
 </style>
