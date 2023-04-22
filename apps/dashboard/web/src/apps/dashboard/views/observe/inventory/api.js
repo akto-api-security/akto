@@ -368,6 +368,15 @@ export default {
         }).then((resp) => {
             return resp
         })
+    },
+    fetchAktoGptConfig(apiCollectionId){
+        return request({
+            url: '/api/fetchAktoGptConfig',
+            method: 'post',
+            data: {apiCollectionId}
+        }).then((resp) => {
+            return resp
+        })
     }
 
 }
