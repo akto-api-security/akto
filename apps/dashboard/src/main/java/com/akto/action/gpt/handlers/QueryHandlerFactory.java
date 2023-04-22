@@ -14,16 +14,16 @@ public class QueryHandlerFactory {
     private static List<ValidateQuery> validators = Collections.singletonList(new ApiCollectionAllowedValidation());
     public static QueryHandler getQueryHandler(GptQuery query){
         if (query.equals(GptQuery.LIST_APIS_BY_TYPE)) {
-            return new ListApisByType(new ListApisEndpointNames(Collections.singletonList(new FilterJunkEndpoints())), new SimpleResultFetcherStrategy(), validators);
+            return new ListApisByType(new ListApisEndpointNames(Collections.singletonList(new FilterJunkEndpoints())), new AsyncResultFetcherStrategy(), validators);
         }
         if (query.equals(GptQuery.GROUP_APIS_BY_FUNCTIONALITY)) {
-            return new GroupApisByFunctionality(new ListApisEndpointNames(Collections.singletonList(new FilterJunkEndpoints())), new SimpleResultFetcherStrategy(), validators);
+            return new GroupApisByFunctionality(new ListApisEndpointNames(Collections.singletonList(new FilterJunkEndpoints())), new AsyncResultFetcherStrategy(), validators);
         }
         if(query.equals(GptQuery.LIST_SENSITIVE_PARAMS)){
-            return new ListSensitiveParameters(new AsyncResultFetcherStrategy());
+            return new ListSensitiveParameters(new AsyncResultFetcherStrategy(), validators);
         }
         if(query.equals(GptQuery.GENERATE_CURL_FOR_TEST)){
-            return new ListSensitiveParameters(new SimpleResultFetcherStrategy(), validators);
+            return new GenerateCurlForTest(new AsyncResultFetcherStrategy());
         }
         throw new IllegalArgumentException("No such query handler");
     }
