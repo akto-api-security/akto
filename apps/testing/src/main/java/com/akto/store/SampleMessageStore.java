@@ -27,9 +27,10 @@ public class SampleMessageStore {
 
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(SampleMessageStore.class);
-    public static Map<String, SingleTypeInfo> buildSingleTypeInfoMap(TestingEndpoints testingEndpoints) {
-        Map<String, SingleTypeInfo> singleTypeInfoMap = new HashMap<>();
-        if (testingEndpoints == null) return singleTypeInfoMap;
+    private Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
+    private Map<String, SingleTypeInfo> singleTypeInfos = new HashMap<>();
+    public void buildSingleTypeInfoMap(TestingEndpoints testingEndpoints) {
+        if (testingEndpoints == null) return;
         TestingEndpoints.Type type = testingEndpoints.getType();
         List<SingleTypeInfo> singleTypeInfoList = new ArrayList<>();
         try {
@@ -48,7 +49,7 @@ public class SampleMessageStore {
                 List<ApiInfoKey> apiInfoKeys = customTestingEndpoints.getApisList();
 
                 if (apiInfoKeys.size() == 0) {
-                    return singleTypeInfoMap;
+                    return;
                 } else {
                     int apiCollectionId = apiInfoKeys.get(0).getApiCollectionId();
                     singleTypeInfoList = SingleTypeInfoDao.instance.findAll(
@@ -62,21 +63,27 @@ public class SampleMessageStore {
             }
 
             for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
-                singleTypeInfoMap.put(singleTypeInfo.composeKeyWithCustomSubType(SingleTypeInfo.GENERIC), singleTypeInfo);
+                singleTypeInfos.put(singleTypeInfo.composeKeyWithCustomSubType(SingleTypeInfo.GENERIC), singleTypeInfo);
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while building STI map: " + e, LogDb.TESTING);
         }
-
-        return singleTypeInfoMap;
     }
 
-    public static List<TestRoles> fetchTestRoles() {
+    private SampleMessageStore() {}
+
+    public static SampleMessageStore create() {
+        SampleMessageStore ret = new SampleMessageStore();
+        ret.fetchSampleMessages();
+        return ret;
+    }
+
+    public List<TestRoles> fetchTestRoles() {
         return TestRolesDao.instance.findAll(new BasicDBObject());
     }
 
 
-    public static Map<ApiInfo.ApiInfoKey, List<String>> fetchSampleMessages() {
+    public void fetchSampleMessages() {
         List<SampleData> sampleDataList = SampleDataDao.instance.findAll(new BasicDBObject(), 0, 10_000, null);
         Map<ApiInfo.ApiInfoKey, List<String>> tempSampleDataMap = new HashMap<>();
         for (SampleData sampleData: sampleDataList) {
@@ -90,16 +97,16 @@ public class SampleMessageStore {
             }
         }
 
-        return new HashMap<>(tempSampleDataMap);
+        sampleDataMap = new HashMap<>(tempSampleDataMap);
     }
 
 
 
-    public static List<RawApi> fetchAllOriginalMessages(ApiInfoKey apiInfoKey, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages) {
+    public List<RawApi> fetchAllOriginalMessages(ApiInfoKey apiInfoKey) {
         List<RawApi> messages = new ArrayList<>();
 
-        List<String> samples = sampleMessages.get(apiInfoKey);
-        if (samples == null || samples.isEmpty()) return messages;
+        List<String> samples = sampleDataMap.get(apiInfoKey);
+        if (samples == null || samples.isEmpty()) return null;
 
         for (String message: samples) {
             try {
@@ -122,6 +129,14 @@ public class SampleMessageStore {
         }
 
         return filteredMessages;
+    }
+
+    public Map<String, SingleTypeInfo> getSingleTypeInfos() {
+        return this.singleTypeInfos;
+    }
+
+    public Map<ApiInfoKey, List<String>> getSampleDataMap() {
+        return this.sampleDataMap;
     }
 
 }

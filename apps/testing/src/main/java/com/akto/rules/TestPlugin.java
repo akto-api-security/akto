@@ -9,6 +9,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.RelationshipSync;
+import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.StatusCodeAnalyser;
@@ -233,7 +234,7 @@ public abstract class TestPlugin {
         BasicDBObject payload = RequestTemplate.parseRequestPayload(originalHttpRequest.getJsonRequestBody(), urlWithParams);
     }
 
-    public ContainsPrivateResourceResult containsPrivateResource(OriginalHttpRequest originalHttpRequest, ApiInfo.ApiInfoKey apiInfoKey, Map<String, SingleTypeInfo> singleTypeInfoMap) {
+    public ContainsPrivateResourceResult containsPrivateResource(OriginalHttpRequest originalHttpRequest, ApiInfo.ApiInfoKey apiInfoKey, SampleMessageStore sampleMessageStore) {
         String urlWithParams = originalHttpRequest.getFullUrlWithParams();
         String url = apiInfoKey.url;
         URLMethods.Method method = apiInfoKey.getMethod();
@@ -250,7 +251,7 @@ public abstract class TestPlugin {
             for (int i = 0;i < tokens.length; i++) {
                 if (tokens[i] == null) {
                     atLeastOneValueInRequest = true;
-                    SingleTypeInfo singleTypeInfo = findSti(i+"", true,apiInfoKey, false, -1, singleTypeInfoMap);
+                    SingleTypeInfo singleTypeInfo = findSti(i+"", true,apiInfoKey, false, -1, sampleMessageStore.getSingleTypeInfos());
                     if (singleTypeInfo != null) {
                         String v = ogTokens[i];
                         Set<String> values = new HashSet<>();
@@ -268,7 +269,7 @@ public abstract class TestPlugin {
         Map<String, Set<Object>> flattened = JSONUtils.flatten(payload);
         for (String param: flattened.keySet()) {
             atLeastOneValueInRequest = true;
-            SingleTypeInfo singleTypeInfo = findSti(param,false,apiInfoKey, false, -1, singleTypeInfoMap);
+            SingleTypeInfo singleTypeInfo = findSti(param,false,apiInfoKey, false, -1, sampleMessageStore.getSingleTypeInfos());
             if (singleTypeInfo != null) {
                 Set<Object> valSet = flattened.get(param);
                 Set<String> valStringSet = new HashSet<>();

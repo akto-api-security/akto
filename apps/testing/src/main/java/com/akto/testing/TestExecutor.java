@@ -18,6 +18,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.*;
 import com.akto.rules.SSRFOnAwsMetadataEndpoint;
+import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.testing_issues.TestingIssuesHandler;
@@ -48,32 +49,32 @@ public class TestExecutor {
 
 
 
-    public void init(TestingRun testingRun, ObjectId summaryId) {
+    public void init(TestingRun testingRun, SampleMessageStore sampleMessageStore, AuthMechanismStore authMechanismStore, ObjectId summaryId) {
         if (testingRun.getTestIdConfig() != 1) {
-            apiWiseInit(testingRun, summaryId);
+            apiWiseInit(testingRun, sampleMessageStore, authMechanismStore, summaryId);
         } else {
-            workflowInit(testingRun, summaryId);
+            workflowInit(testingRun, sampleMessageStore, authMechanismStore, summaryId);
         }
     }
 
-    public static void main(String[] args) {
-        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
-        //todo: shivam change to saas
-        Context.accountId.set(1_000_000);
+//    public static void main(String[] args) {
+//        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
+//        //todo: shivam change to saas
+//        Context.accountId.set(1_000_000);
+//
+//        TestExecutor testExecutor = new TestExecutor();
+//        TestingRun testingRun = TestingRunDao.instance.findLatestOne(new BasicDBObject());
+//        if (testingRun.getTestIdConfig() > 1) {
+//            TestingRunConfig testingRunConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
+//            if (testingRunConfig != null) {
+//                loggerMaker.infoAndAddToDb("Found testing run config with id :" + testingRunConfig.getId(), LogDb.TESTING);
+//                testingRun.setTestingRunConfig(testingRunConfig);
+//            }
+//        }
+//        testExecutor.init(testingRun, new ObjectId());
+//    }
 
-        TestExecutor testExecutor = new TestExecutor();
-        TestingRun testingRun = TestingRunDao.instance.findLatestOne(new BasicDBObject());
-        if (testingRun.getTestIdConfig() > 1) {
-            TestingRunConfig testingRunConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
-            if (testingRunConfig != null) {
-                loggerMaker.infoAndAddToDb("Found testing run config with id :" + testingRunConfig.getId(), LogDb.TESTING);
-                testingRun.setTestingRunConfig(testingRunConfig);
-            }
-        }
-        testExecutor.init(testingRun, new ObjectId());
-    }
-
-    public void workflowInit (TestingRun testingRun, ObjectId summaryId) {
+    public void workflowInit (TestingRun testingRun,SampleMessageStore sampleMessageStore, AuthMechanismStore authMechanismStore, ObjectId summaryId) {
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
         if (!testingEndpoints.getType().equals(TestingEndpoints.Type.WORKFLOW)) {
             loggerMaker.errorAndAddToDb("Invalid workflow type", LogDb.TESTING);
@@ -114,16 +115,15 @@ public class TestExecutor {
         );
     }
 
-    public void apiWiseInit(TestingRun testingRun, ObjectId summaryId) {
+    public void apiWiseInit(TestingRun testingRun, SampleMessageStore sampleMessageStore, AuthMechanismStore authMechanismStore, ObjectId summaryId) {
         int accountId = Context.accountId.get();
         int now = Context.now();
         int maxConcurrentRequests = testingRun.getMaxConcurrentRequests() > 0 ? testingRun.getMaxConcurrentRequests() : 100;
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
-        Map<String, SingleTypeInfo> singleTypeInfoMap = SampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
-        Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = SampleMessageStore.fetchSampleMessages();
-        List<TestRoles> testRoles = SampleMessageStore.fetchTestRoles();
-        AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
+        sampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
+        List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
+        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
 
         List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
 
@@ -154,7 +154,7 @@ public class TestExecutor {
 
         authMechanism.setAuthParams(authParams);
 
-        TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessages, singleTypeInfoMap, testRoles);
+        TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessageStore, testRoles);
 
         try {
             LoginFlowResponse loginFlowResponse = triggerLoginFlow(authMechanism, 3);
@@ -271,7 +271,7 @@ public class TestExecutor {
         List<String> sampleMessages = sampleMessagesMap.get(apiInfoKey);
         if (sampleMessages == null || sampleMessagesMap.isEmpty()) return null;
 
-        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
+        List<RawApi> messages = testingUtil.getSampleMessageStore().fetchAllOriginalMessages(apiInfoKey);
         if (messages.isEmpty()) return null;
 
         OriginalHttpRequest originalHttpRequest = messages.get(0).getRequest();

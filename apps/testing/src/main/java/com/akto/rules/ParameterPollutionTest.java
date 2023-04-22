@@ -16,7 +16,7 @@ public class ParameterPollutionTest extends TestPlugin {
 
     @Override
     public Result start(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) {
-        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
+        List<RawApi> messages = testingUtil.getSampleMessageStore().fetchAllOriginalMessages(apiInfoKey);
         if (messages.isEmpty()) return null;
         List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, testingUtil.getAuthMechanism());
         if (filteredMessages.size() < 2) return addWithoutRequestError(null, TestResult.TestError.INSUFFICIENT_MESSAGES);
@@ -27,7 +27,7 @@ public class ParameterPollutionTest extends TestPlugin {
         OriginalHttpRequest testRequest1 = message1.getRequest();
         OriginalHttpRequest testRequest2 = message2.getRequest();
 
-        ContainsPrivateResourceResult containsPrivateResourceResult2 = containsPrivateResource(testRequest2, apiInfoKey, testingUtil.getSingleTypeInfoMap());
+        ContainsPrivateResourceResult containsPrivateResourceResult2 = containsPrivateResource(testRequest2, apiInfoKey, testingUtil.getSampleMessageStore());
 
         boolean atLeastOneParam = false;
         for (SingleTypeInfo singleTypeInfo: containsPrivateResourceResult2.findPrivateOnes()) {

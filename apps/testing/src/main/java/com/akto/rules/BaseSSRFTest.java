@@ -32,7 +32,7 @@ public abstract class BaseSSRFTest extends TestPlugin{
 
     @Override
     public Result start(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) {
-        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
+        List<RawApi> messages = testingUtil.getSampleMessageStore().fetchAllOriginalMessages(apiInfoKey);
         RawApi rawApi = null;
         boolean flag = false;
         for (RawApi message: messages) {

@@ -29,7 +29,7 @@ public abstract class ChangeMethodPlugin extends TestPlugin {
 
         List<URLMethods.Method> undocumentedMethods = findUndocumentedMethods( testingUtil.getSampleMessages(), apiInfoKey);
 
-        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
+        List<RawApi> messages = testingUtil.getSampleMessageStore().fetchAllOriginalMessages(apiInfoKey);
         if (messages.isEmpty()) return null;
 
         RawApi rawApi = messages.get(0);

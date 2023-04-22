@@ -8,6 +8,7 @@ import com.akto.dto.*;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
@@ -44,11 +45,14 @@ public class StatusCodeAnalyser {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(StatusCodeAnalyser.class);
     public static int MAX_COUNT = 30;
-    public static void run() {
+    public static void run(SampleMessageStore sampleMessageStore, AuthMechanismStore authMechanismStore) {
         loggerMaker.infoAndAddToDb("Running status analyser", LogDb.TESTING);
-        Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = SampleMessageStore.fetchSampleMessages();
-
-        AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
+        Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = sampleMessageStore.getSampleDataMap();
+        if (sampleDataMap == null) {
+            loggerMaker.errorAndAddToDb("No sample data", LogDb.TESTING);
+            return;
+        }
+        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
         if (authMechanism == null) {
             loggerMaker.errorAndAddToDb("No auth mechanism", LogDb.TESTING);
             return;
@@ -73,7 +77,7 @@ public class StatusCodeAnalyser {
 
             if (count > MAX_COUNT) break;
             try {
-                List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleDataMap);
+                List<RawApi> messages = sampleMessageStore.fetchAllOriginalMessages(apiInfoKey);
                 boolean success;
                 try {
                     success = fillFrequencyMap(messages, authMechanism, frequencyMap);
