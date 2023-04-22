@@ -2,29 +2,19 @@ package com.akto.dao.test_editor.filter;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.OperandTypes;
-import com.akto.dto.ApiInfo;
-import com.akto.dto.RawApi;
-import com.akto.dto.api_workflow.Node;
 import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.ConfigParserValidationResult;
-import com.akto.dto.test_editor.DataOperandsFilterResponse;
-import com.akto.dto.test_editor.ExecutorConfigParserResult;
-import com.akto.dto.test_editor.FilterActionRequest;
 import com.akto.dto.test_editor.FilterNode;
-import com.akto.dto.test_editor.Info;
-import com.akto.dto.test_editor.TestConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class ConfigParser {
 
-    private List<String> allowedDataParentNodes = Arrays.asList("pred", "payload", "term");
+    private List<String> allowedDataParentNodes = Arrays.asList("pred", "payload", "term", "body");
     private List<String> allowedPredParentNodes = Arrays.asList("pred", "collection", "payload", "term");
     private List<String> allowedTermParentNodes = Arrays.asList("pred");
     private List<String> allowedCollectionParentNodes = Arrays.asList("pred", "term");
@@ -71,7 +61,7 @@ public class ConfigParser {
         }
 
         if (curNode.getNodeType().equals(OperandTypes.Body.toString().toLowerCase())) {
-            bodyOperand = curNode.getSubConcernedProperty();
+            bodyOperand = curNode.getOperand();
         }
 
         if (curNode.getNodeType().equals(OperandTypes.Payload.toString().toLowerCase())) {
