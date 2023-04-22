@@ -21,7 +21,7 @@ public class GreaterThanFilter extends DataOperandsImpl {
                     return false;
                 }
                 Integer dataInt = (Integer) data;
-                result = ((int) dataInt == (int) queryList.get(0));                
+                result = ((int) dataInt > (int) queryList.get(0));
             }
             
         } catch (Exception e) {

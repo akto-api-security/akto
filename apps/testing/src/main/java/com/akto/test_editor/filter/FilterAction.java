@@ -165,14 +165,14 @@ public final class FilterAction {
             // resolve value based on operation
             Object val = payload;
 
-            if (filterActionRequest.getBodyOperand().equalsIgnoreCase(BodyOperator.LENGTH.toString())) {
+            if (filterActionRequest.getBodyOperand() != null && filterActionRequest.getBodyOperand().equalsIgnoreCase(BodyOperator.LENGTH.toString())) {
                 val = payload.trim().length() - 2;
-            } else if (filterActionRequest.getBodyOperand().equalsIgnoreCase(BodyOperator.PERCENTAGE_MATCH.toString())) {
+            } else if (filterActionRequest.getBodyOperand() != null && filterActionRequest.getBodyOperand().equalsIgnoreCase(BodyOperator.PERCENTAGE_MATCH.toString())) {
                 RawApi sampleRawApi = filterActionRequest.getRawApi();
                 if (sampleRawApi == null) {
                     return new DataOperandsFilterResponse(false, null);
                 }
-                double percentageMatch = TestPlugin.compareWithOriginalResponse(payload, payload, null);
+                double percentageMatch = TestPlugin.compareWithOriginalResponse(payload, sampleRawApi.getResponse().getBody(), new HashMap<>());
                 val = (int) percentageMatch;
             }
             

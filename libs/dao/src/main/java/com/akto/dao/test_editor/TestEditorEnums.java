@@ -88,6 +88,12 @@ public class TestEditorEnums {
             }
         }
 
+        for (BodyOperator operand: BodyOperator.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return operand.toString();
+            }
+        }
+
         return null;
     }
 
@@ -120,6 +126,12 @@ public class TestEditorEnums {
         for (KeyValOperator operand: KeyValOperator.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
                 return "payload";
+            }
+        }
+
+        for (BodyOperator operand: BodyOperator.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return "body";
             }
         }
 
