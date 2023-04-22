@@ -132,19 +132,20 @@ public class TestTestPlugin extends MongoBasedTest {
 
     @Test
     public void testContainsPrivateResource() {
-        Map<String, SingleTypeInfo> singleTypeInfoMap = new HashMap<>();
+        Context.accountId.set(1_000_000);
+        SampleMessageStore sampleMessageStore = SampleMessageStore.create();
         BOLATest bolaTest = new BOLATest();
 
         // FIRST (Contains only private resources)
         ApiInfo.ApiInfoKey apiInfoKey1 = new ApiInfo.ApiInfoKey(123, "/api/books", URLMethods.Method.GET);
 
-        insertIntoStiMap(apiInfoKey1,"param1", SingleTypeInfo.EMAIL, false, true, singleTypeInfoMap);
-        insertIntoStiMap(apiInfoKey1,"param2", SingleTypeInfo.GENERIC, false, true, singleTypeInfoMap);
-        insertIntoStiMap(apiInfoKey1,"param3", SingleTypeInfo.GENERIC, false, true, singleTypeInfoMap);
+        insertIntoStiMap(apiInfoKey1,"param1", SingleTypeInfo.EMAIL, false, true, sampleMessageStore);
+        insertIntoStiMap(apiInfoKey1,"param2", SingleTypeInfo.GENERIC, false, true, sampleMessageStore);
+        insertIntoStiMap(apiInfoKey1,"param3", SingleTypeInfo.GENERIC, false, true, sampleMessageStore);
 
         String payload1 = "{\"param1\": \"avneesh@akto.io\", \"param2\": \"ankush\"}";
         OriginalHttpRequest originalHttpRequest1 = new OriginalHttpRequest("/api/books", "param3=ankita", apiInfoKey1.getMethod().name(), payload1, new HashMap<>(), "");
-        TestPlugin.ContainsPrivateResourceResult result1 = bolaTest.containsPrivateResource(originalHttpRequest1, apiInfoKey1, singleTypeInfoMap);
+        TestPlugin.ContainsPrivateResourceResult result1 = bolaTest.containsPrivateResource(originalHttpRequest1, apiInfoKey1, sampleMessageStore);
         assertEquals(3, result1.singleTypeInfos.size());
         assertEquals(3, result1.findPrivateOnes().size());
         assertTrue(result1.isPrivate);
@@ -152,13 +153,13 @@ public class TestTestPlugin extends MongoBasedTest {
         // SECOND (Contains 2 public resources)
         ApiInfo.ApiInfoKey apiInfoKey2 = new ApiInfo.ApiInfoKey(123, "api/INTEGER/cars/STRING", URLMethods.Method.GET);
 
-        insertIntoStiMap(apiInfoKey2,"1", SingleTypeInfo.INTEGER_32, true, true, singleTypeInfoMap);
-        insertIntoStiMap(apiInfoKey2,"3", SingleTypeInfo.GENERIC, true,false, singleTypeInfoMap);
-        insertIntoStiMap(apiInfoKey2,"param1", SingleTypeInfo.GENERIC, false, true, singleTypeInfoMap);
-        insertIntoStiMap(apiInfoKey2,"param2", SingleTypeInfo.GENERIC, false,false, singleTypeInfoMap);
+        insertIntoStiMap(apiInfoKey2,"1", SingleTypeInfo.INTEGER_32, true, true, sampleMessageStore);
+        insertIntoStiMap(apiInfoKey2,"3", SingleTypeInfo.GENERIC, true,false, sampleMessageStore);
+        insertIntoStiMap(apiInfoKey2,"param1", SingleTypeInfo.GENERIC, false, true, sampleMessageStore);
+        insertIntoStiMap(apiInfoKey2,"param2", SingleTypeInfo.GENERIC, false,false, sampleMessageStore);
         String payload2 = "{\"param1\": \"Ronaldo\", \"param2\": \"Messi\"}";
         OriginalHttpRequest originalHttpRequest2 = new OriginalHttpRequest("/api/INTEGER/cars/STRING", null ,apiInfoKey2.getMethod().name(), payload2, new HashMap<>(), "");
-        TestPlugin.ContainsPrivateResourceResult result2 = bolaTest.containsPrivateResource(originalHttpRequest2, apiInfoKey2, singleTypeInfoMap);
+        TestPlugin.ContainsPrivateResourceResult result2 = bolaTest.containsPrivateResource(originalHttpRequest2, apiInfoKey2, sampleMessageStore);
         assertEquals(4, result2.singleTypeInfos.size());
         assertFalse(result2.isPrivate);
         assertEquals(2, result2.findPrivateOnes().size());
@@ -168,7 +169,7 @@ public class TestTestPlugin extends MongoBasedTest {
 
         String payload3 = "{\"param1\": \"Ronaldo\", \"param2\": \"Messi\"}";
         OriginalHttpRequest originalHttpRequest3 = new OriginalHttpRequest("/api/bus", null, apiInfoKey3.method.name(), payload3, new HashMap<>(), "");
-        TestPlugin.ContainsPrivateResourceResult result3 = bolaTest.containsPrivateResource(originalHttpRequest3, apiInfoKey3, singleTypeInfoMap);
+        TestPlugin.ContainsPrivateResourceResult result3 = bolaTest.containsPrivateResource(originalHttpRequest3, apiInfoKey3, sampleMessageStore);
         assertEquals(0, result3.singleTypeInfos.size());
         assertTrue(result3.isPrivate);
         assertEquals(0, result3.findPrivateOnes().size());
@@ -178,7 +179,7 @@ public class TestTestPlugin extends MongoBasedTest {
 
         String payload4 = "{}";
         OriginalHttpRequest originalHttpRequest4 = new OriginalHttpRequest("/api/toys",null, apiInfoKey4.getMethod().name(), payload4, new HashMap<>(), "");
-        TestPlugin.ContainsPrivateResourceResult result4 = bolaTest.containsPrivateResource(originalHttpRequest4, apiInfoKey4, singleTypeInfoMap);
+        TestPlugin.ContainsPrivateResourceResult result4 = bolaTest.containsPrivateResource(originalHttpRequest4, apiInfoKey4, sampleMessageStore);
         assertEquals(0, result4.singleTypeInfos.size());
         assertFalse(result4.isPrivate);
         assertEquals(0, result4.findPrivateOnes().size());
@@ -192,7 +193,7 @@ public class TestTestPlugin extends MongoBasedTest {
     }
 
     private void insertIntoStiMap(ApiInfo.ApiInfoKey apiInfoKey, String param, SingleTypeInfo.SubType subType,
-                                  boolean isUrlParam, boolean isPrivate, Map<String, SingleTypeInfo> singleTypeInfoMap)  {
+                                  boolean isUrlParam, boolean isPrivate, SampleMessageStore sampleMessageStore)  {
         int apiCollectionId = apiInfoKey.getApiCollectionId();
         String url = apiInfoKey.getUrl();
         String method = apiInfoKey.getMethod().name();
@@ -212,7 +213,7 @@ public class TestTestPlugin extends MongoBasedTest {
             singleTypeInfo.setUniqueCount(10);
         }
 
-        singleTypeInfoMap.put(singleTypeInfo.composeKeyWithCustomSubType(SingleTypeInfo.GENERIC), singleTypeInfo);
+        sampleMessageStore.getSingleTypeInfos().put(singleTypeInfo.composeKeyWithCustomSubType(SingleTypeInfo.GENERIC), singleTypeInfo);
     }
 
 

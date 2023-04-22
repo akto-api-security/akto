@@ -2,13 +2,10 @@ package com.akto.rules;
 
 import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
-import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
-import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.types.CappedSet;
 
@@ -24,7 +21,7 @@ public class AddUserIdTest extends AuthRequiredTestPlugin{
         );
 
         Map<String, SingleTypeInfo> validUserIdNameMap = new HashMap<>();
-        for (SingleTypeInfo singleTypeInfo: testingUtil.getSingleTypeInfoMap().values()) {
+        for (SingleTypeInfo singleTypeInfo: testingUtil.getSampleMessageStore().getSingleTypeInfos().values()) {
             String param = singleTypeInfo.getParam();
             String key = SingleTypeInfo.findLastKeyFromParam(param);
             if (key == null) continue;

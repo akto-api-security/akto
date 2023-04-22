@@ -37,7 +37,7 @@ public class BOLATest extends AuthRequiredRunAllTestPlugin {
 
         testingUtil.getAuthMechanism().addAuthToRequest(testRequest);
 
-        ContainsPrivateResourceResult containsPrivateResourceResult = containsPrivateResource(testRequest, apiInfoKey, testingUtil.getSingleTypeInfoMap());
+        ContainsPrivateResourceResult containsPrivateResourceResult = containsPrivateResource(testRequest, apiInfoKey, testingUtil.getSampleMessageStore());
         // We consider API contains private resources if : 
         //      a) Contains 1 or more private resources
         //      b) We couldn't find uniqueCount or publicCount for some request params

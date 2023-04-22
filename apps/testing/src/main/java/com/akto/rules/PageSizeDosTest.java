@@ -39,7 +39,7 @@ import java.util.*;
      }
      @Override
      public Result start(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) {
-         List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
+         List<RawApi> messages = testingUtil.getSampleMessageStore().fetchAllOriginalMessages(apiInfoKey);
         if (messages.size() == 0) {
             logger.error("No messages found for apiInfoKey: " + apiInfoKey);
             return null;
