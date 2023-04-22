@@ -17,13 +17,14 @@ import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.*;
 
 public class ExportSampleDataAction extends UserAction {
     private final static ObjectMapper mapper = new ObjectMapper();
-    JsonFactory factory = mapper.getFactory();
+    private static final JsonFactory factory = mapper.getFactory();
     @Override
     public String execute() {
         return SUCCESS.toUpperCase();
@@ -172,6 +173,17 @@ public class ExportSampleDataAction extends UserAction {
     private String curlString;
     private String sampleData;
     public String generateCurl() {
+
+        try {
+            curlString = getCurl(sampleData);
+            return SUCCESS.toUpperCase();
+        } catch (IOException e) {
+            addActionError("Couldn't parse the data");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public static String getCurl(String sampleData) throws IOException {
         HttpResponseParams httpResponseParams;
         try {
             httpResponseParams = HttpCallParser.parseKafkaMessage(sampleData);
@@ -188,8 +200,9 @@ public class ExportSampleDataAction extends UserAction {
                 httpResponseParams = new HttpResponseParams();
                 httpResponseParams.requestParams = httpRequestParams;
             } catch (Exception e1) {
-                addActionError("Couldn't parse the data");
-                return ERROR.toUpperCase();
+//                addActionError("Couldn't parse the data");
+                throw e1;
+//                return ERROR.toUpperCase();
             }
 
         }
@@ -256,17 +269,15 @@ public class ExportSampleDataAction extends UserAction {
             }
         } catch (Exception e) {
             ;
-            addActionError("Error parsing the body");
-            return ERROR.toUpperCase();
+//            addActionError("Error parsing the body");
+            throw e;
         }
 
 
         // URL
         builder.append("\"").append(url).append("\"");
 
-        curlString = builder.toString();
-
-        return SUCCESS.toUpperCase();
+        return builder.toString();
     }
 
     public String getCurlString() {

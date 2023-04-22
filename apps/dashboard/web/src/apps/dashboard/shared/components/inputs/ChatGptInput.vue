@@ -65,14 +65,25 @@
 
             <div class="response-body" v-else>
                 <v-icon class="gpt-icon" :size="16">$aktoWhite</v-icon>
-                    <v-list-item v-for="(item, index) in responses" :key="index" class="listItem">
-                        <div v-if="item.functionality">
-                            <div class="fw-500" style="text-transform: uppercase">{{item.functionality}}</div>
-                            <div v-for="(api, ii) in item.apis" :key="'api_'+ii">- {{api}}</div>
+                    <div v-if="queryType === 'generate_curl_for_test'">
+                        <div v-if="responses[0] && responses[0].curl !== 'NOT_APPLICABLE'">
+                            <div class="fw-500" style="text-transform: uppercase">Curl</div>
+                            <div>{{responses[0].curl}}</div>
                         </div>
-                        <span v-else>{{ item }}</span>
-                        
-                    </v-list-item>
+                        <div v-else>
+                            It seems that this API is not vulnerable to {{ responses[0].vulnerability }}.
+                        </div>
+                    </div>
+                    <div v-else>
+                        <v-list-item v-for="(item, index) in responses" :key="index" class="listItem">
+                            <div v-if="item.functionality">
+                                <div class="fw-500" style="text-transform: uppercase">{{item.functionality}}</div>
+                                <div v-for="(api, ii) in item.apis" :key="'api_'+ii">- {{api}}</div>
+                            </div>
+                            <span v-else>{{ item }}</span>
+                            
+                        </v-list-item>
+                    </div>
             </div>
         </div>
 
@@ -104,12 +115,14 @@ export default {
             selectedObject: null,
             searchKey: null,
             responses: null,
+            queryType: null,
             menuItems: this.items.map(x => {
                 return {
                     icon: x.icon,
                     label: x.label.replaceAll("${input}", "_________"),
                     click: () => {
                         _this.responses = null
+                        _this.queryType = null
                         _this.selectedObject = x
                     }
                 }
@@ -128,6 +141,8 @@ export default {
             this.loading = true;
             this.askGPT(queryPayload).then(resp => {
                 _this.responses = resp.response.responses || []
+                _this.queryType = resp.type
+                console.log("type", _this.queryType)
                 _this.loading = false
             }).catch(() => {
                 _this.responses = []

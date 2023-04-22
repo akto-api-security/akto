@@ -134,6 +134,32 @@ export default {
                         }                        
                     }},
                     callback: (data) => console.log("callback create api groups", data)
+                },
+                {
+                    icon: "$fas_user-lock",
+                    label: "Generate curl for testing SSRF vulnerability",
+                    prepareQuery: () => { return {
+                        type: "generate_curl_for_test",
+                        meta: {
+                            "sample_data": this.allSamples[0].message,
+                            "response_details": this.parseMsgForGenerateCurl(this.allSamples[0].message),
+                            "test_type": "ssrf"
+                        }                        
+                    }},
+                    callback: (data) => console.log("callback create api groups", data)
+                },
+                {
+                    icon: "$fas_user-lock",
+                    label: "Generate curl for testing SQLI vulnerability",
+                    prepareQuery: () => { return {
+                        type: "generate_curl_for_test",
+                        meta: {
+                            "sample_data": this.allSamples[0].message,
+                            "response_details": this.parseMsgForGenerateCurl(this.allSamples[0].message),
+                            "test_type": "sqlinjection"
+                        }                        
+                    }},
+                    callback: (data) => console.log("callback create api groups", data)
                 }
             ],
             headers: [
@@ -189,6 +215,25 @@ export default {
                 request: JSON.parse(json.requestPayload),
                 response: JSON.parse(json.responsePayload)
             }
+        },
+        parseMsgForGenerateCurl(jsonStr) {
+            let json = JSON.parse(jsonStr)
+            console.log('original json: ', json)
+            let responsePayload = {}
+            let responseHeaders = {}
+            let statusCode = 0
+
+            if (json) {
+                responsePayload = json["response"] ?  json["response"]["body"] : json["responsePayload"]
+                responseHeaders = json["response"] ?  json["response"]["headers"] : json["responseHeaders"]
+                statusCode = json["response"] ?  json["response"]["statusCode"] : json["statusCode"]
+            }
+
+            return {
+                "responsePayload": responsePayload,
+                "responseHeaders": responseHeaders,
+                "statusCode": statusCode
+            };
         },
         showGPTScreen(){
             this.showGptDialog=true
