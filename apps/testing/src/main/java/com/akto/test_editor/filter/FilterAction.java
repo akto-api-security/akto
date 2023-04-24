@@ -214,12 +214,8 @@ public final class FilterAction {
 
         } else if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("value")) {
             matchingKeys = filterActionRequest.getMatchingKeySet();
-            res = valueExists(payloadObj, null, filterActionRequest.getQuerySet(), filterActionRequest.getOperand(), matchingKeys, filterActionRequest.getKeyOperandSeen());
-            for (String key : matchingKeys) {
-                Object val = getValue(payloadObj, null, key);
-                matchingValues.add(val.toString());
-            }
-            return new DataOperandsFilterResponse(res, null, matchingValues);
+            valueExists(payloadObj, null, filterActionRequest.getQuerySet(), filterActionRequest.getOperand(), matchingKeys, filterActionRequest.getKeyOperandSeen(), matchingValues);
+            return new DataOperandsFilterResponse(matchingValues.size() > 0, null, matchingValues);
         } else if (filterActionRequest.getConcernedSubProperty() == null) {
             Object val = payload;
 
@@ -278,7 +274,7 @@ public final class FilterAction {
 
         } else if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("value")) {
             if (filterActionRequest.getMatchingValues() != null && filterActionRequest.getMatchingValues().size() > 0) {
-                val = getValue(reqObj, null, filterActionRequest.getMatchingValues().get(0));
+                val = filterActionRequest.getMatchingValues().get(0);
             }        
         } else if (filterActionRequest.getBodyOperand() != null) {
             if (filterActionRequest.getBodyOperand().equalsIgnoreCase(BodyOperator.LENGTH.toString())) {
@@ -567,7 +563,7 @@ public final class FilterAction {
         }
     }
 
-    public Boolean valueExists(Object obj, String parentKey, Object querySet, String operand, List<String> matchingKeys, Boolean keyOperandSeen) {
+    public void valueExists(Object obj, String parentKey, Object querySet, String operand, List<String> matchingKeys, Boolean keyOperandSeen, List<String> matchingValues) {
         Boolean res = false;
         if (obj instanceof BasicDBObject) {
             BasicDBObject basicDBObject = (BasicDBObject) obj;
@@ -579,27 +575,50 @@ public final class FilterAction {
                     continue;
                 }
                 Object value = basicDBObject.get(key);
-                res = valueExists(value, key, querySet, operand, matchingKeys, keyOperandSeen);
-                if (res) {
-                    break;
-                }
+                valueExists(value, key, querySet, operand, matchingKeys, keyOperandSeen, matchingValues);
             }
         } else if (obj instanceof BasicDBList) {
             for(Object elem: (BasicDBList) obj) {
-                res = valueExists(elem, parentKey, querySet, operand, matchingKeys, keyOperandSeen);
-                if (res) {
-                    break;
-                }
+                valueExists(elem, parentKey, querySet, operand, matchingKeys, keyOperandSeen, matchingValues);
             }
         } else {
             if (keyOperandSeen && matchingKeys != null && !matchingKeys.contains(parentKey)) {
-                return false;
+                return;
             }
             DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(obj, querySet, operand);
             res = invokeFilter(dataOperandFilterRequest);
+            if (res) {
+                matchingValues.add(obj.toString());
+            }
         }
 
-        return res;
+        return;
+    }
+
+    public void getAllMatchingValues(Object obj, String parentKey, List<String> matchingKeys, Boolean keyOperandSeen, List<String> matchingValues) {
+        if (obj instanceof BasicDBObject) {
+            BasicDBObject basicDBObject = (BasicDBObject) obj;
+
+            Set<String> keySet = basicDBObject.keySet();
+
+            for(String key: keySet) {
+                if (key == null) {
+                    continue;
+                }
+                Object value = basicDBObject.get(key);
+                getAllMatchingValues(value, key, matchingKeys, keyOperandSeen, matchingValues);
+            }
+        } else if (obj instanceof BasicDBList) {
+            for(Object elem: (BasicDBList) obj) {
+                getAllMatchingValues(elem, parentKey, matchingKeys, keyOperandSeen, matchingValues);
+            }
+        } else {
+            if (keyOperandSeen && matchingKeys != null && !matchingKeys.contains(parentKey)) {
+                return;
+            }
+            matchingValues.add(obj.toString());
+        }
+
     }
 
     public Object getValue(Object obj, String parentKey, String queryKey) {

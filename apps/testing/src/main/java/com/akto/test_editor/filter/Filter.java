@@ -71,9 +71,9 @@ public class Filter {
             }
             dataOperandsFilterResponse = isEndpointValid(childNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, matchingValues, keyOperandSeen,context, varMap);
             result = operator.equals("and") ? result && dataOperandsFilterResponse.getResult() : result || dataOperandsFilterResponse.getResult();
-            if (childNode.getSubConcernedProperty() != null && childNode.getSubConcernedProperty().toLowerCase().equals("key")) {
+            if (childNode.getSubConcernedProperty() != null && childNode.getSubConcernedProperty().toLowerCase().equals("key") && !childNode.getNodeType().equalsIgnoreCase("extract")) {
                 matchingKeySet = evaluateMatchingKeySet(matchingKeySet, dataOperandsFilterResponse.getMatchedEntities(), operator);
-            } else if (childNode.getSubConcernedProperty() != null && childNode.getSubConcernedProperty().toLowerCase().equals("key")) {
+            } else if (childNode.getSubConcernedProperty() != null && childNode.getSubConcernedProperty().toLowerCase().equals("value") && !childNode.getNodeType().equalsIgnoreCase("extract")) {
                 matchingValues = evaluateMatchingKeySet(matchingValues, dataOperandsFilterResponse.getMatchedValues(), operator);
             }
         }
