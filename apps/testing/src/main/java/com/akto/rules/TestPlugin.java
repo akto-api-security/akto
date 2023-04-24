@@ -416,21 +416,20 @@ public abstract class TestPlugin {
         return comparisonExcludedKeys;
     }
 
-    public static boolean validateFilter(FilterNode filterNode, RawApi rawApi, ApiInfoKey apiInfoKey) {
+    public static boolean validateFilter(FilterNode filterNode, RawApi rawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap) {
         if (filterNode == null) return true;
         if (rawApi == null) return false;
-        return validate(filterNode, rawApi, null, apiInfoKey,"filter");
+        return validate(filterNode, rawApi, null, apiInfoKey,"filter", varMap);
     }
 
-    public static boolean validateValidator(FilterNode validatorNode, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey) {
+    public static boolean validateValidator(FilterNode validatorNode, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap) {
         if (validatorNode == null) return true;
         if (testRawApi == null) return false;
-        return validate(validatorNode,rawApi,testRawApi, apiInfoKey,"validator");
+        return validate(validatorNode,rawApi,testRawApi, apiInfoKey,"validator", varMap);
     }
 
-    private static boolean validate(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, String context) {
+    private static boolean validate(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, String context, Map<String, Object> varMap) {
         Filter filter = new Filter();
-        Map<String, Object> varMap = new HashMap<>();
         DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(node, rawApi, testRawApi, apiInfoKey, new ArrayList<>(), new ArrayList<>(), false, context, varMap);
         return dataOperandsFilterResponse.getResult();
     }
