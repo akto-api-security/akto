@@ -36,11 +36,11 @@ public abstract class SecurityTestTemplate {
 
     public abstract List<TestResult> validator(List<ExecutionResult> attempts);
 
-    public void run() {
+    public List<TestResult> run() {
         boolean valid = filter();
-        if (!valid) return;
+        if (!valid) return null;
         List<ExecutionResult> attempts = executor();
-        List<TestResult> testResults = validator(attempts);
+        return validator(attempts);
     }
 
     public ApiInfo.ApiInfoKey getApiInfoKey() {

@@ -23,7 +23,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
 
     @Override
     public boolean filter() {
-        return TestPlugin.validateFilter(this.getFilterNode(),this.getRawApi(), this.getApiInfoKey());
+        return TestPlugin.validateFilter(this.getFilterNode(),this.getRawApi(), this.getApiInfoKey(), this.varMap);
     }
 
     @Override
@@ -37,7 +37,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
         for (ExecutionResult attempt: attempts) {
             String msg = RedactSampleData.convertOriginalReqRespToString(attempt.getRequest(), attempt.getResponse());
             RawApi testRawApi = new RawApi(attempt.getRequest(), attempt.getResponse(), msg);
-            boolean vulnerable = TestPlugin.validateValidator(this.getValidatorNode(), this.getRawApi(), testRawApi , this.getApiInfoKey());
+            boolean vulnerable = TestPlugin.validateValidator(this.getValidatorNode(), this.getRawApi(), testRawApi , this.getApiInfoKey(), this.varMap);
             double percentageMatch = TestPlugin.compareWithOriginalResponse(
                     this.rawApi.getOriginalMessage(), testRawApi.getOriginalMessage(), new HashMap<>()
             );

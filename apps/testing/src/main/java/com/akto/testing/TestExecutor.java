@@ -10,6 +10,7 @@ import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.ConfigParserResult;
+import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.*;
@@ -23,6 +24,7 @@ import com.akto.rules.*;
 import com.akto.rules.SSRFOnAwsMetadataEndpoint;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
+import com.akto.testing.yaml_tests.YamlTestTemplate;
 import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
@@ -469,6 +471,7 @@ public class TestExecutor {
         if ( timeToKill <= 0 || now - startTime <= timeToKill) {
             try {
                 testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId);
+                testingRunResults.addAll(startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId));
                 String size = testingRunResults == null ? "null" : testingRunResults.size()+"";
                 loggerMaker.infoAndAddToDb("testingRunResults size: " + size, LogDb.TESTING);
                 if (testingRunResults != null && !testingRunResults.isEmpty()) {
@@ -480,6 +483,7 @@ public class TestExecutor {
                    handler.handleIssuesCreationFromTestingRunResults(testingRunResults);
                 }
             } catch (Exception e) {
+                e.printStackTrace();
                 loggerMaker.errorAndAddToDb("error while running tests: " + e, LogDb.TESTING);
             }
         }
@@ -518,6 +522,58 @@ public class TestExecutor {
         for (TestingRunResult testingRunResult: testingRunResults) {
             trim(testingRunResult);
         }
+    }
+
+    public List<TestingRunResult> startTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId,
+                                               TestingRunConfig testingRunConfig, TestingUtil testingUtil, ObjectId testRunResultSummaryId) {
+        List<TestingRunResult> testingRunResults = new ArrayList<>();
+
+        for (String id: TestEditorConfigMap.testConfigMap.keySet()) {
+            TestConfig testConfig = TestEditorConfigMap.testConfigMap.get(id);
+            TestingRunResult testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig);
+            if (testingRunResult != null) testingRunResults.add(testingRunResult);
+        }
+
+        return testingRunResults;
+    }
+
+    public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil, ObjectId testRunResultSummaryId, TestConfig testConfig) {
+
+        List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
+        if (messages == null || messages.size() == 0) return null;
+
+        String message = messages.get(0);
+
+        RawApi rawApi = RawApi.buildFromMessage(message);
+
+        int startTime = Context.now();
+
+        FilterNode filterNode = testConfig.getApiSelectionFilters().getNode();
+        FilterNode validatorNode = testConfig.getValidation().getNode();
+        ExecutorNode executorNode = testConfig.getExecute().getNode();
+        Map<String, Object> varMap = new HashMap<>();
+
+        String testSuperType = testConfig.getInfo().getCategory().getName();
+        String testSubType = testConfig.getInfo().getSubCategory();
+
+        YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode, rawApi, varMap);
+        List<TestResult> testResults = yamlTestTemplate.run();
+        int endTime = Context.now();
+
+        boolean vulnerable = false;
+        for (TestResult testResult: testResults) {
+            vulnerable = vulnerable || testResult.isVulnerable();
+        }
+
+        List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
+
+        int confidencePercentage = 100;
+
+        return new TestingRunResult(
+                testRunId, apiInfoKey, testSuperType, testSubType ,testResults,
+                vulnerable,singleTypeInfos,confidencePercentage,startTime,
+                endTime, testRunResultSummaryId
+        );
     }
 
     public List<TestingRunResult> start(ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId,
@@ -648,7 +704,7 @@ public class TestExecutor {
         if (testPlugin == null) {
             return null;
         }
-        if (!TestPlugin.validateFilter(filterNode, rawApi, apiInfoKey)) {
+        if (!TestPlugin.validateFilter(filterNode, rawApi, apiInfoKey, new HashMap<>())) {
             return null;
         }
         TestPlugin.Result result = testPlugin.start(apiInfoKey, testingUtil);
