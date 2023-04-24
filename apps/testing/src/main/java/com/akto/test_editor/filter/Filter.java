@@ -22,12 +22,12 @@ public class Filter {
         this.filterAction = new FilterAction();
     }
     
-    public DataOperandsFilterResponse isEndpointValid(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfo.ApiInfoKey apiInfoKey, List<String> matchingKeySet, Boolean keyOperandSeen, String context, Map<String, Object> varMap) {
+    public DataOperandsFilterResponse isEndpointValid(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfo.ApiInfoKey apiInfoKey, List<String> matchingKeySet, List<String> matchingValues, Boolean keyOperandSeen, String context, Map<String, Object> varMap) {
 
         List<FilterNode> childNodes = node.getChildNodes();
         if (childNodes.size() == 0) {
             if (! (node.getNodeType().toLowerCase().equals(OperandTypes.Data.toString().toLowerCase()) || node.getNodeType().toLowerCase().equals(OperandTypes.Extract.toString().toLowerCase()))) {
-                return new DataOperandsFilterResponse(false, null);
+                return new DataOperandsFilterResponse(false, null, null);
             }
             String operand = node.getOperand();
             FilterActionRequest filterActionRequest = new FilterActionRequest(node.getValues(), rawApi, testRawApi, apiInfoKey, node.getConcernedProperty(), node.getSubConcernedProperty(), matchingKeySet, operand, context, keyOperandSeen, node.getBodyOperand());
@@ -35,7 +35,7 @@ public class Filter {
             filterActionRequest.setQuerySet(updatedQuerySet);
             if (node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACT.toString())) {
                 filterAction.extract(filterActionRequest, varMap);
-                return new DataOperandsFilterResponse(true, null);
+                return new DataOperandsFilterResponse(true, null, null);
             } else {
                 return filterAction.apply(filterActionRequest);
             }
@@ -55,11 +55,11 @@ public class Filter {
             if (childNodes.get(i).getOperand().toLowerCase().equals("key")) {
                 hasKeyOperand = true;
                 keyOperandSeen = true;
-                dataOperandsFilterResponse = isEndpointValid(childNodes.get(i), rawApi, testRawApi, apiInfoKey, null, true, context, varMap);
+                dataOperandsFilterResponse = isEndpointValid(childNodes.get(i), rawApi, testRawApi, apiInfoKey, null, null, true, context, varMap);
                 matchingKeySet = dataOperandsFilterResponse.getMatchedEntities();
                 result = operator.equals("and") ? result && dataOperandsFilterResponse.getResult() : result || dataOperandsFilterResponse.getResult();
                 if (matchingKeySet.size() == 0) {
-                    return new DataOperandsFilterResponse(false, matchingKeySet);
+                    return new DataOperandsFilterResponse(false, matchingKeySet, null);
                 }
             }
         }
@@ -69,14 +69,16 @@ public class Filter {
             if (hasKeyOperand && childNode.getOperand().toLowerCase().equals("key")) {
                 continue;
             }
-            dataOperandsFilterResponse = isEndpointValid(childNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, keyOperandSeen,context, varMap);
+            dataOperandsFilterResponse = isEndpointValid(childNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, matchingValues, keyOperandSeen,context, varMap);
             result = operator.equals("and") ? result && dataOperandsFilterResponse.getResult() : result || dataOperandsFilterResponse.getResult();
             if (childNode.getSubConcernedProperty() != null && childNode.getSubConcernedProperty().toLowerCase().equals("key")) {
                 matchingKeySet = evaluateMatchingKeySet(matchingKeySet, dataOperandsFilterResponse.getMatchedEntities(), operator);
+            } else if (childNode.getSubConcernedProperty() != null && childNode.getSubConcernedProperty().toLowerCase().equals("key")) {
+                matchingValues = evaluateMatchingKeySet(matchingValues, dataOperandsFilterResponse.getMatchedValues(), operator);
             }
         }
 
-        return new DataOperandsFilterResponse(result, matchingKeySet);
+        return new DataOperandsFilterResponse(result, matchingKeySet, matchingValues);
     }
 
     public List<String> evaluateMatchingKeySet(List<String> oldSet, List<String> newMatches, String operand) {
