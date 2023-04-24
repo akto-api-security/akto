@@ -35,7 +35,7 @@ public class UsersDao extends CommonContextDao<User> {
     }
 
     public static void addAccount(String login, int accountId, String name) {
-        BasicDBObject setQ = new BasicDBObject(User.ACCOUNTS, new BasicDBObject(""+accountId, new UserAccountEntry(accountId, name)));
+        BasicDBObject setQ = new BasicDBObject(User.ACCOUNTS + "." + accountId,new UserAccountEntry(accountId, name));
         UsersDao.instance.getMCollection().updateOne(eq(User.LOGIN, login), new BasicDBObject(SET, setQ));
     }
 
