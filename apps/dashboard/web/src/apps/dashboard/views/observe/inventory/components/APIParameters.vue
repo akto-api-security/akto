@@ -361,14 +361,6 @@ export default {
     },
     async mounted() {
         let _this = this;
-        api.fetchAktoGptConfig(this.apiCollectionId).then(aktoGptConfig => {
-            if(aktoGptConfig.currentState[0].state === "ENABLED") {
-                _this.renderAktoGptButton = true;
-            }
-            else {
-                _this.renderAktoGptButton = false;
-            }
-        })
         this.$emit('mountedView', {apiCollectionId: this.apiCollectionId, urlAndMethod: this.urlAndMethod, type: 2})
         if (
             this.$store.state.inventory.apiCollectionId !== this.apiCollectionId || 
@@ -414,6 +406,21 @@ export default {
 
             this.sensitiveSampleData.push({"message": c, "highlightPaths": highlightPaths})
         }
+        let j = JSON.parse(this.sampleData[0].message)
+        let requestHeaders = JSON.parse(j.requestHeaders)
+        for(let header in requestHeaders){
+            if(header.toLowerCase().includes("content") && header.toLocaleLowerCase().includes("type") && requestHeaders[header].toLocaleLowerCase().includes("json")){
+                api.fetchAktoGptConfig(this.apiCollectionId).then(aktoGptConfig => {
+                    if(aktoGptConfig.currentState[0].state === "ENABLED") {
+                        _this.renderAktoGptButton = true;
+                    }
+                    else {
+                        _this.renderAktoGptButton = false;
+                    }
+                })
+            }
+        }
+        
     }
 }
 </script>
