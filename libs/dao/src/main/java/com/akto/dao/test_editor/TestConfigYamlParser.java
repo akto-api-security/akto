@@ -28,7 +28,7 @@ public class TestConfigYamlParser {
             TestConfig configParserResult = parseConfig(config);
             return configParserResult;
         } catch (Exception e) {
-        System.out.print(e);
+            System.out.print(e);
             return null;
         }
     }
@@ -73,7 +73,7 @@ public class TestConfigYamlParser {
         }
         
         com.akto.dao.test_editor.executor.ConfigParser executorConfigParser = new com.akto.dao.test_editor.executor.ConfigParser();
-        ExecutorConfigParserResult executeOperations = executorConfigParser.parseConfigMap(filterMap);
+        ExecutorConfigParserResult executeOperations = executorConfigParser.parseConfigMap(executionMap);
         if (executeOperations == null) {
             // todo: throw error
             new TestConfig(id, info, filters, null, null);
