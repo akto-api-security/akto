@@ -69,20 +69,20 @@ public class TestConfigYamlParser {
         Object executionMap = config.get("execute");
         if (executionMap == null) {
             // todo: should not be null, throw error
-            return new TestConfig(id, info, null, null, null);
+            return new TestConfig(id, info, filters, null, null);
         }
         
         com.akto.dao.test_editor.executor.ConfigParser executorConfigParser = new com.akto.dao.test_editor.executor.ConfigParser();
         ExecutorConfigParserResult executeOperations = executorConfigParser.parseConfigMap(filterMap);
-        if (filters == null) {
+        if (executeOperations == null) {
             // todo: throw error
-            new TestConfig(id, info, null, null, null);
+            new TestConfig(id, info, filters, null, null);
         }
 
         Object validationMap = config.get("validation");
         if (validationMap == null) {
             // todo: should not be null, throw error
-            return new TestConfig(id, info, null, null, null);
+            return new TestConfig(id, info, filters, executeOperations, null);
         }
 
         ConfigParserResult validations = configParser.parse(validationMap);
