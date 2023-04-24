@@ -424,7 +424,8 @@ public abstract class TestPlugin {
             return null;
         }
         Filter filter = new Filter();
-        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(filterNode, rawApi, null, apiInfoKey, new ArrayList<>(), false, context);
+        Map<String, Object> varMap = new HashMap<>();
+        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(filterNode, rawApi, null, apiInfoKey, new ArrayList<>(), false, context, varMap);
         return dataOperandsFilterResponse.getResult();
     }
     
