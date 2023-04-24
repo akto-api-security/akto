@@ -46,13 +46,18 @@ public class TestEditorEnums {
         PERCENTAGE_MATCH
     }
 
+    public enum ExtractOperator {
+        EXTRACT
+    }
+
     public enum OperandTypes {
         Data,
         Pred,
         Term,
         Collection,
         Payload,
-        Body
+        Body,
+        Extract
     }
 
 
@@ -89,6 +94,12 @@ public class TestEditorEnums {
         }
 
         for (BodyOperator operand: BodyOperator.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return operand.toString();
+            }
+        }
+
+        for (ExtractOperator operand: ExtractOperator.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
                 return operand.toString();
             }
@@ -132,6 +143,12 @@ public class TestEditorEnums {
         for (BodyOperator operand: BodyOperator.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
                 return "body";
+            }
+        }
+
+        for (ExtractOperator operand: ExtractOperator.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return "extract";
             }
         }
 

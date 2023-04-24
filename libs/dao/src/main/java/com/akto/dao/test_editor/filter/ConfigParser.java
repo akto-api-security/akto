@@ -46,7 +46,7 @@ public class ConfigParser {
             return new ConfigParserResult(null, false, configParserValidationResult.getErrMsg());
         }
 
-        if (curNode.getNodeType().equals(OperandTypes.Data.toString().toLowerCase())) {
+        if (curNode.getNodeType().equals(OperandTypes.Data.toString().toLowerCase()) || curNode.getNodeType().equals(OperandTypes.Extract.toString().toLowerCase())) {
             return new ConfigParserResult(null, true, "");
         }
 
@@ -174,12 +174,12 @@ public class ConfigParser {
             return configParserValidationResult;
         }
 
-        // 5. Last Node should always be a data node
-        if (!curNodeType.equals(OperandTypes.Data.toString().toLowerCase())) {
+        // 5. Last Node should always be a data/extract node
+        if (! (curNodeType.equals(OperandTypes.Data.toString().toLowerCase()) || curNodeType.equals(OperandTypes.Extract.toString().toLowerCase()))) {
 
             if (isString(values) || isListOfString(values)) {
                 configParserValidationResult.setIsValid(false);
-                configParserValidationResult.setErrMsg("Last Node should always be a data node");
+                configParserValidationResult.setErrMsg("Last Node should always be a data/extract node");
                 return configParserValidationResult;
             }
         }

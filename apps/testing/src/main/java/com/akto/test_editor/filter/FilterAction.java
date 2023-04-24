@@ -25,6 +25,7 @@ import com.akto.test_editor.filter.data_operands_impl.LesserThanEqFilter;
 import com.akto.test_editor.filter.data_operands_impl.LesserThanFilter;
 import com.akto.test_editor.filter.data_operands_impl.NeqFilter;
 import com.akto.test_editor.filter.data_operands_impl.RegexFilter;
+import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
@@ -83,6 +84,43 @@ public final class FilterAction {
         }
     }
 
+    public void extract(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
+
+        String concernedProperty = filterActionRequest.getConcernedProperty();
+        switch (concernedProperty.toLowerCase()) {
+            case "url":
+                extractUrl(filterActionRequest, varMap);
+                return;
+            case "method":
+                extractMethod(filterActionRequest, varMap);
+                return;
+            case "api_collection_id":
+                extractApiCollectionId(filterActionRequest, varMap);
+                return;
+            case "request_payload":
+                extractReqPayload(filterActionRequest, varMap);
+                return;
+            case "response_payload":
+                extractRespPayload(filterActionRequest, varMap);
+                return;
+            case "request_headers":
+                extractRequestHeaders(filterActionRequest, varMap);
+                return;
+            case "response_headers":
+                extractResponseHeaders(filterActionRequest, varMap);
+                return;
+            case "query_param":
+                extractQueryParams(filterActionRequest, varMap);
+                return;
+            case "response_code":
+                extractResponseCode(filterActionRequest, varMap);
+                return;
+            default:
+                return;
+
+        }
+    }
+
     public DataOperandsFilterResponse applyFilterOnUrl(FilterActionRequest filterActionRequest) {
 
         String url = filterActionRequest.getApiInfoKey().getUrl();
@@ -90,6 +128,12 @@ public final class FilterAction {
         DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(url, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
         Boolean res = invokeFilter(dataOperandFilterRequest);
         return new DataOperandsFilterResponse(res, null);
+    }
+
+    public void extractUrl(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
+        String url = filterActionRequest.getApiInfoKey().getUrl();
+        List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
+        varMap.put(querySet.get(0), url);
     }
 
     public DataOperandsFilterResponse applyFilterOnMethod(FilterActionRequest filterActionRequest) {
@@ -100,12 +144,24 @@ public final class FilterAction {
         return new DataOperandsFilterResponse(res, null);
     }
 
+    public void extractMethod(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
+        String method = filterActionRequest.getApiInfoKey().getMethod().toString();
+        List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
+        varMap.put(querySet.get(0), method);
+    }
+
     public DataOperandsFilterResponse applyFilterOnApiCollectionId(FilterActionRequest filterActionRequest) {
 
         String apiCollectionId = Integer.toString(filterActionRequest.getApiInfoKey().getApiCollectionId());
         DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(apiCollectionId, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
         Boolean res = invokeFilter(dataOperandFilterRequest);
         return new DataOperandsFilterResponse(res, null);
+    }
+
+    public void extractApiCollectionId(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
+        String apiCollectionId = Integer.toString(filterActionRequest.getApiInfoKey().getApiCollectionId());
+        List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
+        varMap.put(querySet.get(0), apiCollectionId);
     }
 
     public DataOperandsFilterResponse applyFilterOnResponseCode(FilterActionRequest filterActionRequest) {
@@ -118,6 +174,16 @@ public final class FilterAction {
         DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(respCode, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
         Boolean res = invokeFilter(dataOperandFilterRequest);
         return new DataOperandsFilterResponse(res, null);
+    }
+
+    public void extractResponseCode(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
+        RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+        if (rawApi == null) {
+            return;
+        }
+        String respCode = Integer.toString(rawApi.getResponse().getStatusCode());
+        List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
+        varMap.put(querySet.get(0), respCode);
     }
 
     public DataOperandsFilterResponse applyFilterOnRequestPayload(FilterActionRequest filterActionRequest) {
@@ -161,8 +227,6 @@ public final class FilterAction {
             res = valueExists(payloadObj, null, filterActionRequest.getQuerySet(), filterActionRequest.getOperand(), matchingKeys, filterActionRequest.getKeyOperandSeen());
             return new DataOperandsFilterResponse(res, null);
         } else if (filterActionRequest.getConcernedSubProperty() == null) {
-            // && bodyOperator != null
-            // resolve value based on operation
             Object val = payload;
 
             if (filterActionRequest.getBodyOperand() != null && filterActionRequest.getBodyOperand().equalsIgnoreCase(BodyOperator.LENGTH.toString())) {
@@ -188,6 +252,60 @@ public final class FilterAction {
         return new DataOperandsFilterResponse(false, null);
     }
 
+    public void extractReqPayload(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
+        RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+        if (rawApi == null) {
+            return;
+        }
+        String payload = rawApi.getRequest().getBody();
+        extractPayload(filterActionRequest, varMap, payload);
+    }
+
+    public void extractRespPayload(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
+        RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+        if (rawApi == null) {
+            return;
+        }
+        String payload = rawApi.getResponse().getBody();
+        extractPayload(filterActionRequest, varMap, payload);
+    }
+
+    public void extractPayload(FilterActionRequest filterActionRequest, Map<String, Object> varMap, String payload) {
+
+        List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
+        Object val = null;
+        String key = querySet.get(0);
+        BasicDBObject reqObj =  BasicDBObject.parse(payload);
+
+        if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("key")) {
+            if (filterActionRequest.getMatchingKeySet() != null && filterActionRequest.getMatchingKeySet().size() > 0) {
+                val = filterActionRequest.getMatchingKeySet().get(0);
+            }
+
+        } else if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("value")) {
+            if (filterActionRequest.getMatchingKeySet() != null && filterActionRequest.getMatchingKeySet().size() > 0) {
+                val = getValue(reqObj, null, filterActionRequest.getMatchingKeySet().get(0));
+            }        
+        } else if (filterActionRequest.getBodyOperand() != null) {
+            if (filterActionRequest.getBodyOperand().equalsIgnoreCase(BodyOperator.LENGTH.toString())) {
+                val = payload.length() - 2;
+            } else if (filterActionRequest.getBodyOperand().equalsIgnoreCase(BodyOperator.PERCENTAGE_MATCH.toString())) {
+                RawApi sampleRawApi = filterActionRequest.getRawApi();
+                if (sampleRawApi == null) {
+                    return;
+                }
+                double percentageMatch = TestPlugin.compareWithOriginalResponse(payload, sampleRawApi.getResponse().getBody(), new HashMap<>());
+                val = (int) percentageMatch;
+            }
+        } else {
+            val = payload;
+        }
+
+        if (val != null) {
+            varMap.put(key, val);
+        }
+    }
+
     public DataOperandsFilterResponse applyFilterOnRequestHeaders(FilterActionRequest filterActionRequest) {
 
         RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
@@ -209,6 +327,63 @@ public final class FilterAction {
         Map<String, List<String>> respHeaders = rawApi.getResponse().getHeaders();
 
         return applyFiltersOnHeaders(filterActionRequest, respHeaders);
+    }
+
+    public void extractRequestHeaders(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
+
+        RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+        if (rawApi == null) {
+            return;
+        }
+        
+        Map<String, List<String>> reqHeaders = rawApi.getRequest().getHeaders();
+
+        extractHeaders(filterActionRequest, varMap, reqHeaders);
+    }
+
+    public void extractResponseHeaders(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
+
+        RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+        if (rawApi == null) {
+            return;
+        }
+        
+        Map<String, List<String>> respHeaders = rawApi.getResponse().getHeaders();
+
+        extractHeaders(filterActionRequest, varMap, respHeaders);
+    }
+
+    public void extractHeaders(FilterActionRequest filterActionRequest, Map<String, Object> varMap, Map<String, List<String>> headers) {
+
+        RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+        if (rawApi == null) {
+            return;
+        }
+        
+        String headerString = RedactSampleData.convertHeaders(headers);
+        String val = null;
+
+        List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
+        String key = querySet.get(0);
+
+        if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("key")) {
+            if (filterActionRequest.getMatchingKeySet() != null && filterActionRequest.getMatchingKeySet().size() > 0) {
+                val = filterActionRequest.getMatchingKeySet().get(0);
+            }
+        } else if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("value")) {
+            if (filterActionRequest.getMatchingKeySet() != null && filterActionRequest.getMatchingKeySet().size() > 0) {
+                List<String> values = headers.get(filterActionRequest.getMatchingKeySet().get(0));
+                if (values != null && values.size() > 0) {
+                    val = values.get(0);
+                }
+            }
+        } else {
+            val = headerString;
+        }
+
+        if (val != null) {
+            varMap.put(key, val);
+        }
     }
 
     public DataOperandsFilterResponse applyFiltersOnHeaders(FilterActionRequest filterActionRequest, Map<String, List<String>> headers) {
@@ -244,8 +419,12 @@ public final class FilterAction {
                 result = result || res;
             }
             return new DataOperandsFilterResponse(result, null);
+        } else {
+            String headerString = RedactSampleData.convertHeaders(headers);
+            DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(headerString, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
+            res = invokeFilter(dataOperandFilterRequest);
+            return new DataOperandsFilterResponse(res, null);
         }
-        return new DataOperandsFilterResponse(false, null);
     }
 
     public DataOperandsFilterResponse applyFilterOnQueryParams(FilterActionRequest filterActionRequest) {
@@ -261,17 +440,18 @@ public final class FilterAction {
         List<String> matchingKeys = new ArrayList<>();
         Boolean res = false;
 
-        for (String key: queryParamObj.keySet()) {
-
-            if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("key")) {
+        if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("key")) {
+            for (String key: queryParamObj.keySet()) {
                 DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(key, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
                 res = invokeFilter(dataOperandFilterRequest);
                 if (res) {
                     matchingKeys.add(key);
                 }
-                return new DataOperandsFilterResponse(res, matchingKeys);
-            } else if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("value")) {
-                matchingKeys = filterActionRequest.getMatchingKeySet();
+            }
+            return new DataOperandsFilterResponse(matchingKeys.size() > 0, matchingKeys);
+        } else if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("value")) {
+            matchingKeys = filterActionRequest.getMatchingKeySet();
+            for (String key: queryParamObj.keySet()) {
                 if (filterActionRequest.getKeyOperandSeen() && matchingKeys != null && !matchingKeys.contains(key)) {
                     continue;
                 }
@@ -280,11 +460,42 @@ public final class FilterAction {
                 if (res) {
                     break;
                 }
-                return new DataOperandsFilterResponse(res, null);
             }
+            return new DataOperandsFilterResponse(res, null);
+        } else {
+            DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(queryParams, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
+            res = invokeFilter(dataOperandFilterRequest);
+            return new DataOperandsFilterResponse(res, null);
+        }
+    }
+
+    public void extractQueryParams(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
+
+        RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+        if (rawApi == null) {
+            return;
         }
 
-        return new DataOperandsFilterResponse(res, null);
+        Object val = null;
+        List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
+        String key = querySet.get(0);
+
+        String queryParams = rawApi.getRequest().getQueryParams();
+        String url = filterActionRequest.getApiInfoKey().getUrl();
+        BasicDBObject queryParamObj = RequestTemplate.getQueryJSON(url + "?" + queryParams);
+        
+        if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("key")) {
+            if (filterActionRequest.getMatchingKeySet().size() > 0) {
+                val = filterActionRequest.getMatchingKeySet().get(0);
+            }
+        } else if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("value")) {
+            val = queryParamObj.get(filterActionRequest.getMatchingKeySet().get(0));
+        } else {
+            val = queryParams;
+        }
+
+        varMap.put(key, val);
+
     }
 
     public Boolean invokeFilter(DataOperandFilterRequest dataOperandFilterRequest) {
