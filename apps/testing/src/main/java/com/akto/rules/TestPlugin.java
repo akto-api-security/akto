@@ -416,17 +416,22 @@ public abstract class TestPlugin {
         return comparisonExcludedKeys;
     }
 
-    public Boolean validate(FilterNode filterNode, RawApi rawApi, ApiInfoKey apiInfoKey, String context) {
-        if (filterNode == null) {
-            return true;
-        }
-        if (rawApi == null) {
-            return null;
-        }
-        Filter filter = new Filter();
-        Map<String, Object> varMap = new HashMap<>();
-        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(filterNode, rawApi, null, apiInfoKey, new ArrayList<>(), false, context, varMap);
-        return dataOperandsFilterResponse.getResult();
+    public static boolean validateFilter(FilterNode filterNode, RawApi rawApi, ApiInfoKey apiInfoKey) {
+        if (filterNode == null) return true;
+        if (rawApi == null) return false;
+        return validate(filterNode, rawApi, null, apiInfoKey,"filter");
+    }
+
+    public static boolean validateValidator(FilterNode validatorNode, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey) {
+        if (validatorNode == null) return true;
+        if (testRawApi == null) return false;
+        return validate(validatorNode,rawApi,testRawApi, apiInfoKey,"validator");
+    }
+
+    private static boolean validate(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, String context) {
+            Filter filter = new Filter();
+            DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(node, rawApi, testRawApi, apiInfoKey, new ArrayList<>(), false, context, new HashMap<>());
+            return dataOperandsFilterResponse.getResult();
     }
     
     private SampleRequestReplayResponse replaySampleReq(OriginalHttpRequest testRequest, int replayCount, boolean followRedirects, OriginalHttpResponse originalHttpResponse) throws Exception {
