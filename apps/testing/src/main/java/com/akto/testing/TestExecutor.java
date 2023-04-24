@@ -648,7 +648,7 @@ public class TestExecutor {
         if (testPlugin == null) {
             return null;
         }
-        if (!testPlugin.validate(filterNode, rawApi, apiInfoKey, "filter")) {
+        if (!TestPlugin.validateFilter(filterNode, rawApi, apiInfoKey)) {
             return null;
         }
         TestPlugin.Result result = testPlugin.start(apiInfoKey, testingUtil);
