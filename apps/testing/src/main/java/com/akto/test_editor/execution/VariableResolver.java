@@ -29,6 +29,13 @@ public class VariableResolver {
             } catch (Exception e) {
                 return expression;
             }
+        } else {
+            Object val = getValue(varMap, expression);
+            if (val == null) {
+                return expression;
+            } else {
+                return val.toString();
+            }
         }
         return expression;
 
