@@ -49,8 +49,8 @@ public class EqFilter extends DataOperandsImpl {
 
                 Object query = queryList.get(0);
                 if (query instanceof String) {
-                    String queryInt = Boolean.valueOf((String) query);
-                    result = (int) dataInt >= queryInt;
+                    Boolean queryBool = Boolean.valueOf((String) query);
+                    result = (boolean) dataBool == queryBool;
                 } else {
                     result = ((boolean) dataBool == (boolean) queryList.get(0));
                 }
