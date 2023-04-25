@@ -127,7 +127,7 @@ public class ConfigParser {
             return configParserValidationResult;
         }
 
-        if ((curNodeType.equalsIgnoreCase(ExecutorOperandTypes.Data.toString()) || curNodeType.equalsIgnoreCase(ExecutorOperandTypes.Terminal.toString())) && !(values instanceof String)) {
+        if ((curNodeType.equalsIgnoreCase(ExecutorOperandTypes.Data.toString()) || curNodeType.equalsIgnoreCase(ExecutorOperandTypes.Terminal.toString())) && !( (values instanceof String) || (values instanceof Integer) || (values instanceof Boolean) )) {
             configParserValidationResult.setIsValid(false);
             configParserValidationResult.setErrMsg("terminalOperands should only have string value");
             return configParserValidationResult;

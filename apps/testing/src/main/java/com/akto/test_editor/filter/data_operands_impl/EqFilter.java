@@ -1,5 +1,7 @@
 package com.akto.test_editor.filter.data_operands_impl;
 
+import static org.mockito.Answers.valueOf;
+
 import java.util.List;
 
 import com.akto.dto.test_editor.DataOperandFilterRequest;
@@ -28,7 +30,14 @@ public class EqFilter extends DataOperandsImpl {
                     return false;
                 }
                 Integer dataInt = (Integer) data;
-                result = ((int) dataInt == (int) queryList.get(0));                
+
+                Object query = queryList.get(0);
+                if (query instanceof String) {
+                    int queryInt = Integer.parseInt((String) query);
+                    result = (int) dataInt == queryInt;
+                } else {
+                    result = ((int) dataInt == (int) queryList.get(0));
+                }
             }
             
             if (data instanceof Boolean && querySet instanceof Boolean) {
@@ -37,7 +46,14 @@ public class EqFilter extends DataOperandsImpl {
                     return false;
                 }
                 Boolean dataBool = (Boolean) data;
-                result = ((boolean) dataBool == (boolean) queryList.get(0));
+
+                Object query = queryList.get(0);
+                if (query instanceof String) {
+                    String queryInt = Boolean.valueOf((String) query);
+                    result = (int) dataInt >= queryInt;
+                } else {
+                    result = ((boolean) dataBool == (boolean) queryList.get(0));
+                }
             }
             
         } catch (Exception e) {

@@ -15,6 +15,7 @@ import com.akto.dto.test_editor.FilterActionRequest;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
+import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ContainsAllFilter;
 import com.akto.test_editor.filter.data_operands_impl.ContainsEitherFilter;
 import com.akto.test_editor.filter.data_operands_impl.DataOperandsImpl;
@@ -502,7 +503,7 @@ public final class FilterAction {
         return handler.isValid(dataOperandFilterRequest);
     }
 
-    public Object resolveQuerySetValues(FilterActionRequest filterActionRequest, Object querySet) {
+    public Object resolveQuerySetValues(FilterActionRequest filterActionRequest, Object querySet, Map<String, Object> varMap) {
         Object obj = null;
         List<Object> listVal = new ArrayList<>();
         try {
@@ -524,7 +525,11 @@ public final class FilterAction {
                     if (params.length > 1) {
                         secondParam = params[1];
                     }
-                    obj = resolveDynamicValue(filterActionRequest, firstParam, secondParam);
+                    if (secondParam == null) {
+                        obj = VariableResolver.resolveExpression(varMap, val);
+                    } else {
+                        obj = resolveDynamicValue(filterActionRequest, firstParam, secondParam);
+                    }
                     listVal.set(index, obj);
                     index++;
                 }
@@ -664,7 +669,7 @@ public final class FilterAction {
             case "sample_response_payload":
                 return resolveResponsePayload(filterActionRequest, true, secondParam);
             case "test_request_payload":
-                return resolveResponsePayload(filterActionRequest, false, secondParam);
+                return resolveRequestPayload(filterActionRequest, false, secondParam);
             case "test_response_payload":
                 return resolveResponsePayload(filterActionRequest, false, secondParam);
             case "sample_request_headers":
@@ -672,7 +677,7 @@ public final class FilterAction {
             case "sample_response_headers":
                 return resolveResponseHeader(filterActionRequest, true, secondParam);
             case "test_request_headers":
-                return resolveResponseHeader(filterActionRequest, false, secondParam);
+                return resolveRequestHeader(filterActionRequest, false, secondParam);
             case "test_response_headers":
                 return resolveResponseHeader(filterActionRequest, false, secondParam);
             default:
