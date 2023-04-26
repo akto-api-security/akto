@@ -97,7 +97,7 @@ public class InviteUserAction extends UserAction{
             return ERROR.toUpperCase();
         }
 
-        String finalInviteCode = websiteHostName + "/signup?signupInvitationCode=" + inviteCode + "&signupEmailId=" + inviteeEmail;
+        finalInviteCode = websiteHostName + "/signup?signupInvitationCode=" + inviteCode + "&signupEmailId=" + inviteeEmail;
         String inviteFrom = getSUser().getName();
         Mail email = SendgridEmail.buildInvitationEmail(inviteeName, inviteeEmail, inviteFrom, finalInviteCode);
         try {
