@@ -11,7 +11,7 @@
                 </v-card-title>
 
                 <v-card-text style="font-size: 14px;">
-                    Invitation emails have been sent. You can also copy the links and share it with them.
+                    Your invitation emails have been successfully sent. Alternatively, you can copy the links provided and share them directly with your invitees.
                 </v-card-text>
 
                 <div style="padding: 8px 24px 0px 24px">
