@@ -72,8 +72,11 @@
                             <div v-if="responses[0] && responses[0].curl && responses[0].curl.includes('-H')">
                                 <div class="code"> <code-block :lines="[responses[0].curl]" onCopyBtnClickText="Curl copied to clipboard"></code-block> </div>
                             </div>
+                            <div v-else-if="responses[0] && responses[0].error" class="error-resp">
+                                {{ responses[0].error }}
+                            </div>
                             <div v-else>
-                                It seems that this API is not vulnerable to {{ responses[0].vulnerability }}.
+                                It seems that this API is not vulnerable to {{ responses[0].test_type }}.
                             </div>
                         </div>
                         <div v-else>
@@ -338,5 +341,9 @@ export default {
 
     .akto-gpt-resp{
         margin-left: 3px;
+    }
+
+    .error-resp{
+        font-size: 14px;
     }
 </style>
