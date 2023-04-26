@@ -53,6 +53,8 @@ public class InviteUserAction extends UserAction{
         return null;
     }
 
+    private String finalInviteCode;
+
     @Override
     public String execute() {
         int user_id = getSUser().getId();
@@ -95,7 +97,7 @@ public class InviteUserAction extends UserAction{
             return ERROR.toUpperCase();
         }
 
-        String finalInviteCode = websiteHostName + "/signup?signupInvitationCode=" + inviteCode + "&signupEmailId=" + inviteeEmail;
+        finalInviteCode = websiteHostName + "/signup?signupInvitationCode=" + inviteCode + "&signupEmailId=" + inviteeEmail;
         String inviteFrom = getSUser().getName();
         Mail email = SendgridEmail.buildInvitationEmail(inviteeName, inviteeEmail, inviteFrom, finalInviteCode);
         try {
@@ -129,5 +131,9 @@ public class InviteUserAction extends UserAction{
 
     public void setWebsiteHostName(String websiteHostName) {
         this.websiteHostName = websiteHostName;
+    }
+
+    public String getFinalInviteCode() {
+        return finalInviteCode;
     }
 }
