@@ -3,8 +3,10 @@ package com.akto.dao.test_editor;
 import java.io.File;
 import java.util.Map;
 
+import com.akto.dao.test_editor.auth.Parser;
 import com.akto.dao.test_editor.filter.ConfigParser;
 import com.akto.dao.test_editor.info.InfoParser;
+import com.akto.dto.test_editor.Auth;
 import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.ExecutorConfigParserResult;
 import com.akto.dto.test_editor.Info;
@@ -53,46 +55,57 @@ public class TestConfigYamlParser {
             return testConfig;
         }
 
+        Object authMap = config.get("auth");
+        if (authMap == null) {
+            return new TestConfig(id, info, null, null, null, null);
+        }
+
+        Parser authParser = new Parser();
+        Auth auth = authParser.parse(authMap);
+        if (auth == null) {
+            return new TestConfig(id, info, null, null, null, null);
+        }
+
         Object filterMap = config.get("api_selection_filters");
         if (filterMap == null) {
             // todo: should not be null, throw error
-            return new TestConfig(id, info, null, null, null);
+            return new TestConfig(id, info, auth, null, null, null);
         }
         
         ConfigParser configParser = new ConfigParser();
         ConfigParserResult filters = configParser.parse(filterMap);
         if (filters == null) {
             // todo: throw error
-            new TestConfig(id, info, null, null, null);
+            new TestConfig(id, info, auth, null, null, null);
         }
 
         Object executionMap = config.get("execute");
         if (executionMap == null) {
             // todo: should not be null, throw error
-            return new TestConfig(id, info, filters, null, null);
+            return new TestConfig(id, info, auth, filters, null, null);
         }
         
         com.akto.dao.test_editor.executor.ConfigParser executorConfigParser = new com.akto.dao.test_editor.executor.ConfigParser();
         ExecutorConfigParserResult executeOperations = executorConfigParser.parseConfigMap(executionMap);
         if (executeOperations == null) {
             // todo: throw error
-            new TestConfig(id, info, filters, null, null);
+            new TestConfig(id, info, auth, filters, null, null);
         }
 
         Object validationMap = config.get("validation");
         if (validationMap == null) {
             // todo: should not be null, throw error
-            return new TestConfig(id, info, filters, executeOperations, null);
+            return new TestConfig(id, info, auth, filters, executeOperations, null);
         }
 
         ConfigParserResult validations = configParser.parse(validationMap);
         if (validations == null) {
             // todo: throw error
-            new TestConfig(id, info, null, null, null);
+            new TestConfig(id, info, auth, filters, executeOperations, null);
         }
 
 
-        testConfig = new TestConfig(id, info, filters, executeOperations, validations);
+        testConfig = new TestConfig(id, info, auth, filters, executeOperations, validations);
         return testConfig;
     }
 
