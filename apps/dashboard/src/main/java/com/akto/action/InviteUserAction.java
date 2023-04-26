@@ -53,6 +53,8 @@ public class InviteUserAction extends UserAction{
         return null;
     }
 
+    private String finalInviteCode;
+
     @Override
     public String execute() {
         int user_id = getSUser().getId();
@@ -129,5 +131,9 @@ public class InviteUserAction extends UserAction{
 
     public void setWebsiteHostName(String websiteHostName) {
         this.websiteHostName = websiteHostName;
+    }
+
+    public String getFinalInviteCode() {
+        return finalInviteCode;
     }
 }
