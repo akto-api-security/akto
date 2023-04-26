@@ -2,6 +2,7 @@ package com.akto.testing.yaml_tests;
 
 import com.akto.dto.ApiInfo;
 import com.akto.dto.RawApi;
+import com.akto.dto.test_editor.Auth;
 import com.akto.dto.test_editor.ExecutionResult;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.FilterNode;
@@ -30,16 +31,16 @@ public abstract class SecurityTestTemplate {
         this.varMap = varMap;
     }
 
-    public abstract boolean filter();
+    public abstract boolean filter(Auth auth);
 
-    public abstract List<ExecutionResult>  executor();
+    public abstract List<ExecutionResult>  executor(Auth auth);
 
     public abstract List<TestResult> validator(List<ExecutionResult> attempts);
 
-    public List<TestResult> run() {
-        boolean valid = filter();
+    public List<TestResult> run(Auth auth) {
+        boolean valid = filter(auth);
         if (!valid) return null;
-        List<ExecutionResult> attempts = executor();
+        List<ExecutionResult> attempts = executor(auth);
         return validator(attempts);
     }
 

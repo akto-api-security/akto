@@ -6,17 +6,20 @@ public class TestConfig {
     
     private Info info;
 
+    private Auth auth;
+
     private ConfigParserResult apiSelectionFilters;
 
     private ExecutorConfigParserResult execute;
 
     private ConfigParserResult validation;
 
-    public TestConfig(String id, Info info, ConfigParserResult apiSelectionFilters, ExecutorConfigParserResult execute, 
+    public TestConfig(String id, Info info, Auth auth, ConfigParserResult apiSelectionFilters, ExecutorConfigParserResult execute, 
         ConfigParserResult validation) {
         
         this.id = id;
         this.info = info;
+        this.auth = auth;
         this.apiSelectionFilters = apiSelectionFilters;
         this.execute = execute;
         this.validation = validation;
@@ -38,6 +41,14 @@ public class TestConfig {
 
     public void setInfo(Info info) {
         this.info = info;
+    }
+
+    public Auth getAuth() {
+        return auth;
+    }
+
+    public void setAuth(Auth auth) {
+        this.auth = auth;
     }
 
     public ConfigParserResult getApiSelectionFilters() {
