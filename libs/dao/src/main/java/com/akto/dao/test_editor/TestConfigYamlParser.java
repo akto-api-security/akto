@@ -56,14 +56,13 @@ public class TestConfigYamlParser {
         }
 
         Object authMap = config.get("auth");
-        if (authMap == null) {
-            return new TestConfig(id, info, null, null, null, null);
-        }
-
-        Parser authParser = new Parser();
-        Auth auth = authParser.parse(authMap);
-        if (auth == null) {
-            return new TestConfig(id, info, null, null, null, null);
+        Auth auth = null;
+        if (authMap != null) {
+            Parser authParser = new Parser();
+            auth = authParser.parse(authMap);
+            if (auth == null) {
+                return new TestConfig(id, info, null, null, null, null);
+            }
         }
 
         Object filterMap = config.get("api_selection_filters");

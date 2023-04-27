@@ -21,12 +21,12 @@ import java.util.Map;
 
 public class YamlTestTemplate extends SecurityTestTemplate {
 
-    public YamlTestTemplate(ApiInfo.ApiInfoKey apiInfoKey, FilterNode filterNode, FilterNode validatorNode, ExecutorNode executorNode, RawApi rawApi, Map<String, Object> varMap) {
-        super(apiInfoKey, filterNode, validatorNode, executorNode ,rawApi, varMap);
+    public YamlTestTemplate(ApiInfo.ApiInfoKey apiInfoKey, FilterNode filterNode, FilterNode validatorNode, ExecutorNode executorNode, RawApi rawApi, Map<String, Object> varMap, Auth auth) {
+        super(apiInfoKey, filterNode, validatorNode, executorNode ,rawApi, varMap, auth);
     }
 
     @Override
-    public boolean filter(Auth auth) {
+    public boolean filter() {
         boolean validAuthHeaders = AuthValidator.validate(auth, rawApi);
         if (!validAuthHeaders) {
             return false;
@@ -35,7 +35,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     }
 
     @Override
-    public List<ExecutionResult>  executor(Auth auth) {
+    public List<ExecutionResult>  executor() {
         ExecutionResult res = AuthValidator.checkAuth(auth, rawApi);
         if(res.getSuccess()) {
             OriginalHttpResponse resp = res.getResponse();
