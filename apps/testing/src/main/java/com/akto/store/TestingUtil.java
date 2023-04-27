@@ -13,11 +13,14 @@ public class TestingUtil {
     private AuthMechanism authMechanism;
     private SampleMessageStore sampleMessageStore;
     private List<TestRoles> testRoles;
+    private String userEmail;
 
-    public TestingUtil(AuthMechanism authMechanism, SampleMessageStore sampleMessageStore, List<TestRoles> testRoles) {
+    public TestingUtil(AuthMechanism authMechanism, SampleMessageStore sampleMessageStore, List<TestRoles> testRoles,
+                       String userEmail) {
         this.authMechanism = authMechanism;
         this.sampleMessageStore = sampleMessageStore;
         this.testRoles = testRoles;
+        this.userEmail = userEmail;
     }
 
     public TestingUtil() {
@@ -49,5 +52,13 @@ public class TestingUtil {
 
     public void setSampleMessageStore(SampleMessageStore sampleMessageStore) {
         this.sampleMessageStore = sampleMessageStore;
+    }
+
+    public String getUserEmail() {
+        return userEmail;
+    }
+
+    public void setUserEmail(String userEmail) {
+        this.userEmail = userEmail;
     }
 }

@@ -54,6 +54,9 @@ public class ApiExecutor {
     public static OriginalHttpResponse common(Request request, boolean followRedirects) throws Exception {
 
         OkHttpClient client = HTTPClientHandler.instance.getHTTPClient(followRedirects);
+        if (!HostDNSLookup.isRequestValid(request.url().host())) {
+            throw new IllegalArgumentException("SSRF attack attempt");
+        }
 
         Builder builder = client.newBuilder();
         builder.sslSocketFactory(trustAllSslSocketFactory, (X509TrustManager)trustAllCerts[0]);

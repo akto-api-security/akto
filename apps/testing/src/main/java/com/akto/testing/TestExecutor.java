@@ -1,6 +1,7 @@
 package com.akto.testing;
 
 import com.akto.DaoInit;
+import com.akto.calendar.DateUtils;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
@@ -46,8 +47,10 @@ public class TestExecutor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class);
     public static long acceptableSizeInBytes = 5_000_000;
-
-
+    private static Map<String, Map<String, Integer>> requestRestrictionMap = new ConcurrentHashMap<>();
+    public static final String REQUEST_HOUR = "requestHour";
+    public static final String COUNT = "count";
+    public static final int ALLOWED_REQUEST_PER_HOUR = 100;
 
     public void init(TestingRun testingRun, SampleMessageStore sampleMessageStore, AuthMechanismStore authMechanismStore, ObjectId summaryId) {
         if (testingRun.getTestIdConfig() != 1) {
@@ -154,7 +157,7 @@ public class TestExecutor {
 
         authMechanism.setAuthParams(authParams);
 
-        TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessageStore, testRoles);
+        TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessageStore, testRoles, testingRun.getUserEmail());
 
         try {
             LoginFlowResponse loginFlowResponse = triggerLoginFlow(authMechanism, 3);
@@ -648,6 +651,27 @@ public class TestExecutor {
     public TestingRunResult runTest(TestPlugin testPlugin, ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil, ObjectId testRunId, ObjectId testRunResultSummaryId) {
 
         int startTime = Context.now();
+        Map<String, Integer> requestCount = requestRestrictionMap.get(testingUtil.getUserEmail());
+        if (requestCount == null) {//First time case
+            requestCount = new ConcurrentHashMap<>();
+            requestCount.put(REQUEST_HOUR,Context.currentHour());
+            requestCount.put(COUNT, 1);
+            requestRestrictionMap.put(testingUtil.getUserEmail(), requestCount);
+        } else {
+            int currentHour = Context.currentHour();
+            int requestHour = requestCount.get(REQUEST_HOUR);
+            int count = requestCount.get(COUNT);
+            if (currentHour == requestHour) {//hour hasn't changed, will increment the count
+                if (count >= ALLOWED_REQUEST_PER_HOUR) {
+                    return null;
+                }
+                count++;
+                requestCount.put(COUNT, count);
+            } else {//Hour changed, start count again
+                requestCount.put(REQUEST_HOUR, currentHour);
+                requestCount.put(COUNT, 1);
+            }
+        }
         TestPlugin.Result result = testPlugin.start(apiInfoKey, testingUtil);
         if (result == null) return null;
         int endTime = Context.now();
