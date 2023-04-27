@@ -62,7 +62,7 @@ public class TestExecutorTest extends MongoBasedTest {
         SampleDataDao.instance.insertOne(data);
         SampleMessageStore messageStore = SampleMessageStore.create();
         AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
-        TestingUtil testingUtil = new TestingUtil(authMechanismStore.getAuthMechanism(), messageStore, new ArrayList<>());
+        TestingUtil testingUtil = new TestingUtil(authMechanismStore.getAuthMechanism(), messageStore, new ArrayList<>(), "");
 
         String host = TestExecutor.findHost(apiInfoKey, testingUtil);
         assertEquals(answer,host);
