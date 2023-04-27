@@ -9,6 +9,7 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
+import com.akto.dto.test_editor.Auth;
 import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.FilterNode;
@@ -551,12 +552,13 @@ public class TestExecutor {
         FilterNode filterNode = testConfig.getApiSelectionFilters().getNode();
         FilterNode validatorNode = testConfig.getValidation().getNode();
         ExecutorNode executorNode = testConfig.getExecute().getNode();
+        Auth auth = testConfig.getAuth();
         Map<String, Object> varMap = new HashMap<>();
 
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();
 
-        YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode, rawApi, varMap);
+        YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode, rawApi, varMap, auth);
         List<TestResult> testResults = yamlTestTemplate.run();
         int endTime = Context.now();
 
