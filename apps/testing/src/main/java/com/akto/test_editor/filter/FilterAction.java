@@ -274,9 +274,12 @@ public final class FilterAction {
             }
 
         } else if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("value")) {
-            if (filterActionRequest.getMatchingValues() != null && filterActionRequest.getMatchingValues().size() > 0) {
+            if (filterActionRequest.getMatchingKeySet() != null && filterActionRequest.getMatchingKeySet().size() > 0) {
+                val = getValue(reqObj, null, filterActionRequest.getMatchingKeySet().get(0));
+            }
+            else if (filterActionRequest.getMatchingValues() != null && filterActionRequest.getMatchingValues().size() > 0) {
                 val = filterActionRequest.getMatchingValues().get(0);
-            }        
+            }
         } else if (filterActionRequest.getBodyOperand() != null) {
             if (filterActionRequest.getBodyOperand().equalsIgnoreCase(BodyOperator.LENGTH.toString())) {
                 val = payload.length() - 2;
