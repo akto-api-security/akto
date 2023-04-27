@@ -201,7 +201,11 @@ public class AccountAction extends UserAction {
     }
 
     public String createNewAccount() {
-        String email = getSUser().getLogin();
+        User sessionUser = getSUser();
+        if (sessionUser.getAccounts().keySet().size() > 10) {//Do not allow account creation when user has 10 accounts
+            return Action.ERROR.toUpperCase();
+        }
+        String email = sessionUser.getLogin();
         int newAccountId = createAccountRecord(newAccountName);
         User user = initializeAccount(email, newAccountId, newAccountName,true);
         getSession().put("user", user);

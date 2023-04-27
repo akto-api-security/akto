@@ -33,6 +33,7 @@ import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.ApiWorkflowExecutor;
+import com.akto.testing.HostDNSLookup;
 import com.akto.util.AccountTask;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.Severity;
@@ -327,6 +328,9 @@ public class InitializerListener implements ServletContextListener {
                                 String payload = dailyUpdate.toJSON();
                                 loggerMaker.infoAndAddToDb(payload, LogDb.DASHBOARD);
                                 try {
+                                    if (!HostDNSLookup.isRequestValid(webhookUrl)) {
+                                        throw new IllegalArgumentException("SSRF attack attempt");
+                                    }
                                     WebhookResponse response = slack.send(webhookUrl, payload);
                                     loggerMaker.infoAndAddToDb("*********************************************************", LogDb.DASHBOARD);
 
