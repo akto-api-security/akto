@@ -32,7 +32,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
             return false;
         }
         if (auth.getAuthenticated()) {
-            this.varMap.put("authHeaders", auth.getHeaders());
+            this.varMap.put("auth_headers", auth.getHeaders());
         }
         return TestPlugin.validateFilter(this.getFilterNode(),this.getRawApi(), this.getApiInfoKey(), this.varMap);
     }

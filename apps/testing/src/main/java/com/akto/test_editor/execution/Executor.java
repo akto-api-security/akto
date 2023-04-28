@@ -118,7 +118,7 @@ public class Executor {
                 case "modify_method":
                     return Operations.modifyMethod(rawApi, key);
                 case "remove_auth_headers":
-                    List<String> authHeaders = (List<String>) varMap.get("authHeaders");
+                    List<String> authHeaders = (List<String>) varMap.get("auth_headers");
                     for (String header: authHeaders) {
                         Operations.deleteHeader(rawApi, header);
                     }
