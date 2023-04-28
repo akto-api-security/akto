@@ -32,7 +32,7 @@ public class Executor {
 
             try {
                 // follow redirects = true for now
-                testResponse = ApiExecutor.sendRequest(singleReq.getRawApi().getRequest(), true);
+                testResponse = ApiExecutor.sendRequest(singleReq.getRawApi().getRequest(), singleReq.getFollowRedirect());
             } catch(Exception e) {
                 continue;
             }
@@ -49,8 +49,13 @@ public class Executor {
         }
 
         if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorParentOperands.TYPE.toString())) {
-            return new ExecutorSingleRequest(true, "", null);
+            return new ExecutorSingleRequest(true, "", null, false);
         }
+
+        if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.TerminalExecutorDataOperands.FOLLOW_REDIRECT.toString())) {
+            return new ExecutorSingleRequest(true, "", null, true);
+        }
+        Boolean followRedirect = false;
         if (childNodes.size() == 0) {
             String key = node.getOperationType();
             Object value = node.getValues();
@@ -60,7 +65,7 @@ public class Executor {
             }
             ExecutorSingleOperationResp resp = invokeOperation(operation, key, value, rawApi, varMap);
             if (!resp.getSuccess()) {
-                return new ExecutorSingleRequest(false, resp.getErrMsg(), null);
+                return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
             }
         }
 
@@ -71,9 +76,10 @@ public class Executor {
             if (!executionResult.getSuccess()) {
                 return executionResult;
             }
+            followRedirect = followRedirect || executionResult.getFollowRedirect();
         }
 
-        return new ExecutorSingleRequest(true, "", rawApi);
+        return new ExecutorSingleRequest(true, "", rawApi, followRedirect);
 
     }
 
