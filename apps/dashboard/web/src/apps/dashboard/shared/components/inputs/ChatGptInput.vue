@@ -79,6 +79,20 @@
                                 It seems that this API is not vulnerable to {{ responses[0].test_type }}.
                             </div>
                         </div>
+                        <div class="akto-gpt-resp" v-if="queryType === 'generate_regex'">
+                            <div v-if="responses[0] && responses[0].regex">
+                                <div class="code"> 
+                                    <code-block :lines="[responses[0].regex.trim()]" onCopyBtnClickText="Regex copied to clipboard"></code-block> 
+                                    <v-btn primary dark depressed class="github-btn" @click='addRegexToAkto'>Create sensitive param in Akto</v-btn>
+                                </div>
+                            </div>
+                            <div v-else-if="responses[0] && responses[0].error" class="error-resp">
+                                {{ responses[0].error }}
+                            </div>
+                            <div v-else>
+                                It seems that this API is not vulnerable to {{ responses[0].test_type }} vulnerability.
+                            </div>
+                        </div>
                         <div v-else>
                             <v-list-item v-for="(item, index) in responses" :key="index" class="listItem">
                                 <div v-if="item.functionality">
@@ -166,6 +180,12 @@ export default {
                 url: '/api/ask_ai',
                 method: 'post',
                 data
+            })
+        },
+        addRegexToAkto(){
+            this.$emit('addRegexToAkto', {
+                "regex": this.responses[0].regex.trim(),
+                "name": this.searchKey
             })
         }
     },

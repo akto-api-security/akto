@@ -1,73 +1,95 @@
 <template>
-    <layout-with-tabs title="Settings" :tabs="getTabs()">
-        <template slot="Data types">
-            <data-types title="Data types" :data_types="data_types" :toggleActivateFieldFunc='toggleActivateDataTypes'
-                :createNewDataType="createNewDataType" @selectedEntry="selectedDataType">
-                <template #details-container="{}">
-                    <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
-                        <data-type-details :data_type="data_type" />
-                    </a-card>
-                </template>
-            </data-types>
-        </template>
-        <template slot="Auth types">
-            <data-types title="Auth types" :data_types="auth_types" :toggleActivateFieldFunc='toggleActivateAuthTypes'
-                :createNewDataType="createNewAuthType" @selectedEntry="selectedAuthType">
-                <template #details-container="{}">
-                    <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
-                        <auth-type-details :auth_type_copy="auth_type" />
-                    </a-card>
-                </template>
-            </data-types>
-        </template>
-        <template slot="Tags">
-            <data-types title="Tags" :data_types="tag_configs" :toggleActivateFieldFunc='toggleActivateTagConfig'
-                :createNewDataType="createNewTagConfig" @selectedEntry="selectedTagConfig">
-                <template #details-container="{}">
-                    <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
-                        <tag-config-details :tag_config_copy="tag_config" />
-                    </a-card>
-                </template>
-            </data-types>
-        </template>
-        <template slot="Integrations">
-            <integration-center />
-        </template>
-        <template slot="Account">
-            <div>
-                <account />
-                <div class="px-8">
-                    <div class="py-4">
-                        <v-dialog v-model="showDialog" width="500">
-                            <template v-slot:activator="{ on, attrs }">
-                                <v-btn primary dark color="var(--themeColor)" @click="showDialog = true" v-bind="attrs" v-on="on">
-                                    Update Akto
-                                </v-btn>
-                            </template>
-                            <div class="dialog-box">
-                                <div class="entry-text"> Please note that this will incur a downtime of 10 mins to
-                                    update the system. </div>
-                                <div class="d-flex jc-end">
-                                    <v-btn primary dark color="var(--themeColor)" @click="takeUpdate">
-                                        Proceed
+    <div>
+        <div class="fix-at-top">
+            <v-btn dark depressed color="var(--gptColor)" @click="showGPTScreen()">
+                Ask AktoGPT
+                <v-icon size="16">$chatGPT</v-icon>
+            </v-btn>
+        </div>
+        <v-dialog
+            v-model="showGptDialog"
+            width="fit-content" 
+            content-class="dialog-no-shadow"
+            overlay-opacity="0.7"
+        >
+            <div class="gpt-dialog-container ma-0">
+                <chat-gpt-input @addRegexToAkto="addRegexToAkto" 
+                    v-if="showGptDialog"
+                    :items="chatGptPrompts"
+                />
+            </div>
+
+        </v-dialog>
+        <layout-with-tabs title="Settings" :tabs="getTabs()">
+            <template slot="Data types">
+                <data-types title="Data types" :data_types="data_types" :toggleActivateFieldFunc='toggleActivateDataTypes'
+                    :createNewDataType="createNewDataType" @selectedEntry="selectedDataType">
+                    <template #details-container="{}">
+                        <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
+                            <data-type-details :data_type="data_type" />
+                        </a-card>
+                    </template>
+                </data-types>
+            </template>
+            <template slot="Auth types">
+                <data-types title="Auth types" :data_types="auth_types" :toggleActivateFieldFunc='toggleActivateAuthTypes'
+                    :createNewDataType="createNewAuthType" @selectedEntry="selectedAuthType">
+                    <template #details-container="{}">
+                        <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
+                            <auth-type-details :auth_type_copy="auth_type" />
+                        </a-card>
+                    </template>
+                </data-types>
+            </template>
+            <template slot="Tags">
+                <data-types title="Tags" :data_types="tag_configs" :toggleActivateFieldFunc='toggleActivateTagConfig'
+                    :createNewDataType="createNewTagConfig" @selectedEntry="selectedTagConfig">
+                    <template #details-container="{}">
+                        <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
+                            <tag-config-details :tag_config_copy="tag_config" />
+                        </a-card>
+                    </template>
+                </data-types>
+            </template>
+            <template slot="Integrations">
+                <integration-center />
+            </template>
+            <template slot="Account">
+                <div>
+                    <account />
+                    <div class="px-8">
+                        <div class="py-4">
+                            <v-dialog v-model="showDialog" width="500">
+                                <template v-slot:activator="{ on, attrs }">
+                                    <v-btn primary dark color="var(--themeColor)" @click="showDialog = true" v-bind="attrs" v-on="on">
+                                        Update Akto
                                     </v-btn>
+                                </template>
+                                <div class="dialog-box">
+                                    <div class="entry-text"> Please note that this will incur a downtime of 10 mins to
+                                        update the system. </div>
+                                    <div class="d-flex jc-end">
+                                        <v-btn primary dark color="var(--themeColor)" @click="takeUpdate">
+                                            Proceed
+                                        </v-btn>
+                                    </div>
                                 </div>
-                            </div>
-                        </v-dialog>
+                            </v-dialog>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </template>
-        <template slot="Users">
-            <team-overview />
-        </template>
-        <template slot="Health">
-            <health :defaultStartTimestamp="defaultStartTimestamp" :defaultEndTimestamp="defaultEndTimestamp"/>
-        </template>
-        <template slot="Metrics">
-            <traffic-metrics/>
-        </template>
-    </layout-with-tabs>
+            </template>
+            <template slot="Users">
+                <team-overview />
+            </template>
+            <template slot="Health">
+                <health :defaultStartTimestamp="defaultStartTimestamp" :defaultEndTimestamp="defaultEndTimestamp"/>
+            </template>
+            <template slot="Metrics">
+                <traffic-metrics/>
+            </template>
+        </layout-with-tabs>
+    </div>
 </template>
 
 <script>
@@ -85,6 +107,7 @@ import IntegrationCenter from './components/integrations/IntegrationCenter'
 import AuthTypeDetails from './components/auth_types/AuthTypeDetails.vue'
 import TrafficMetrics from './components/traffic_metrics/TrafficMetrics.vue'
 import obj from "@/util/obj"
+import ChatGptInput from '../../shared/components/inputs/ChatGptInput.vue'
 
 import { mapState } from 'vuex'
 export default {
@@ -101,7 +124,8 @@ export default {
         DataTypeDetails,
         AuthTypeDetails,
         ACard,
-        TrafficMetrics
+        TrafficMetrics,
+        ChatGptInput
     },
     props:{
         defaultStartTimestamp: obj.strN,
@@ -115,10 +139,32 @@ export default {
     },
     data() {
         return {
-            showDialog: false
+            showDialog: false,
+            showGptDialog: false,
+            chatGptPrompts: [
+                {
+                    icon: "$fas_layer-group",
+                    label: "Write regex to find ${input}",
+                    prepareQuery: (filterApi) => { return {
+                        type: "generate_regex",
+                        meta: {
+                            "input_query": filterApi
+                        }                        
+                    }},
+                    callback: (data) => console.log("callback Tell me all the apis", data)
+                }
+            ],
         }
     },
     methods: {
+        showGPTScreen(){
+            this.showGptDialog = true
+        },
+        addRegexToAkto(payload){
+            this.showGptDialog = false
+            console.log("payload", payload)
+            return this.$store.dispatch('data_types/setNewDataTypeByAktoGpt', payload)
+        },
         createNewDataType() {
             return this.$store.dispatch('data_types/setNewDataType')
         },
@@ -179,5 +225,14 @@ export default {
 
 .dialog-box
     padding: 16px
-    background: var(--white)  
+    background: var(--white) 
+    
+.gpt-dialog-container
+    background-color: var(--gptBackground)
+
+
+.fix-at-top
+    position: absolute
+    right: 260px
+    top: 18px
 </style>
