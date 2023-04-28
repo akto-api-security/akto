@@ -117,6 +117,12 @@ public class Executor {
                     return Operations.modifyUrl(rawApi, key);
                 case "modify_method":
                     return Operations.modifyMethod(rawApi, key);
+                case "remove_auth_headers":
+                    List<String> authHeaders = (List<String>) varMap.get("authHeaders");
+                    for (String header: authHeaders) {
+                        Operations.deleteHeader(rawApi, header);
+                    }
+                    return new ExecutorSingleOperationResp(true, "");
                 default:
                     return new ExecutorSingleOperationResp(false, "invalid operationType");
     

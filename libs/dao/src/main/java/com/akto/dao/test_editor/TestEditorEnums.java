@@ -171,7 +171,8 @@ public class TestEditorEnums {
         DELETE_QUERYPARAM,
         MODIFY_URL,
         MODIFY_METHOD,
-        FOLLOW_REDIRECT
+        FOLLOW_REDIRECT,
+        REMOVE_AUTH_HEADERS
     }
 
     public enum NonTerminalExecutorDataOperands {

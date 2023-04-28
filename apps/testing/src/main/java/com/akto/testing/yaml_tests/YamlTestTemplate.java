@@ -31,6 +31,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
         if (!validAuthHeaders) {
             return false;
         }
+        this.varMap.put("authHeaders", auth.getHeaders());
         return TestPlugin.validateFilter(this.getFilterNode(),this.getRawApi(), this.getApiInfoKey(), this.varMap);
     }
 
