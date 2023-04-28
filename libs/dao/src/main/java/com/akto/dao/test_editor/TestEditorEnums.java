@@ -170,7 +170,8 @@ public class TestEditorEnums {
         DELETE_BODY_PARAM,
         DELETE_QUERYPARAM,
         MODIFY_URL,
-        MODIFY_METHOD
+        MODIFY_METHOD,
+        FOLLOW_REDIRECT
     }
 
     public enum NonTerminalExecutorDataOperands {

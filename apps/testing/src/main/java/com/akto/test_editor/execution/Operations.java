@@ -24,7 +24,7 @@ public class Operations {
         if (headers.containsKey(key)) {
             headers.remove(key);
         } else {
-            return new ExecutorSingleOperationResp(false, "header key not present " + key);
+            return new ExecutorSingleOperationResp(true, "header key not present " + key);
         }
         rawApi.modifyReqHeaders(headers);
         return new ExecutorSingleOperationResp(true, "");
@@ -33,7 +33,7 @@ public class Operations {
     public static ExecutorSingleOperationResp modifyHeader(RawApi rawApi, String key, String value) {
         Map<String, List<String>> headers = rawApi.fetchReqHeaders();
         if (!headers.containsKey(key)) {
-            return new ExecutorSingleOperationResp(false, "header key not present " + key);
+            return new ExecutorSingleOperationResp(true, "header key not present " + key);
         }
         List<String> valList = Collections.singletonList(value);
         headers.put(key, valList);
@@ -53,7 +53,7 @@ public class Operations {
         if (queryParamObj.containsKey(key)) {
             queryParamObj.remove(key);
         } else {
-            return new ExecutorSingleOperationResp(false, "query param key not present " + key);
+            return new ExecutorSingleOperationResp(true, "query param key not present " + key);
         }
         rawApi.modifyQueryParam(queryParamObj);
         return new ExecutorSingleOperationResp(true, "");
@@ -62,7 +62,7 @@ public class Operations {
     public static ExecutorSingleOperationResp modifyQueryParam(RawApi rawApi, String key, Object value) {
         BasicDBObject queryParamObj = rawApi.fetchQueryParam();
         if (!queryParamObj.containsKey(key)) {
-            return new ExecutorSingleOperationResp(false, "query param key not present " + key);
+            return new ExecutorSingleOperationResp(true, "query param key not present " + key);
         }
         queryParamObj.put(key, value);
         rawApi.modifyQueryParam(queryParamObj);
@@ -80,7 +80,7 @@ public class Operations {
         BasicDBObject payload = rawApi.fetchReqPayload();
         boolean deleted = Utils.deleteKeyFromPayload(payload, null, key);
         if (!deleted) {
-            return new ExecutorSingleOperationResp(false, "body param not present " + key);
+            return new ExecutorSingleOperationResp(true, "body param not present " + key);
         }
         rawApi.modifyReqPayload(payload);
         return new ExecutorSingleOperationResp(true, "");
@@ -90,7 +90,7 @@ public class Operations {
         BasicDBObject payload = rawApi.fetchReqPayload();
         boolean modified = Utils.modifyValueInPayload(payload, null, key, value);
         if (!modified) {
-            return new ExecutorSingleOperationResp(false, "body param not present " + key);
+            return new ExecutorSingleOperationResp(true, "body param not present " + key);
         }
         rawApi.modifyReqPayload(payload);
         return new ExecutorSingleOperationResp(true, "");
