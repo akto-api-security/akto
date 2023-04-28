@@ -25,6 +25,9 @@ public class QueryHandlerFactory {
         if(query.equals(GptQuery.GENERATE_CURL_FOR_TEST)){
             return new GenerateCurlForTest(new AsyncResultFetcherStrategy());
         }
+        if(query.equals(GptQuery.GENERATE_REGEX)){
+            return new GenerateRegex(new AsyncResultFetcherStrategy()s);
+        }
         throw new IllegalArgumentException("No such query handler");
     }
 }
