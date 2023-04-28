@@ -370,6 +370,8 @@ public final class FilterAction {
                 if (values != null && values.size() > 0) {
                     val = values.get(0);
                 }
+            } else if (filterActionRequest.getMatchingValues() != null && filterActionRequest.getMatchingValues().size() > 0) {
+                val = filterActionRequest.getMatchingValues().get(0);
             }
         } else {
             val = headerString;
@@ -487,7 +489,12 @@ public final class FilterAction {
                 val = filterActionRequest.getMatchingKeySet().get(0);
             }
         } else if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("value")) {
-            val = queryParamObj.get(filterActionRequest.getMatchingKeySet().get(0));
+            if (filterActionRequest.getMatchingKeySet() != null && filterActionRequest.getMatchingKeySet().size() > 0) {
+                val = queryParamObj.get(filterActionRequest.getMatchingKeySet().get(0));
+            }
+            else if (filterActionRequest.getMatchingValues() != null && filterActionRequest.getMatchingValues().size() > 0) {
+                val = filterActionRequest.getMatchingValues().get(0);
+            }
         } else {
             val = queryParams;
         }
