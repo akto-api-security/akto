@@ -25,4 +25,6 @@ info:
     - "https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html"
     - "https://cwe.mitre.org/data/definitions/798.html"
   author: Akto
+auth:
+  authenticated: true
 api_selection_filters:
