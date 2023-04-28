@@ -36,12 +36,14 @@ public class YamlTestTemplate extends SecurityTestTemplate {
 
     @Override
     public List<ExecutionResult>  executor() {
-        ExecutionResult res = AuthValidator.checkAuth(auth, rawApi);
-        if(res.getSuccess()) {
-            OriginalHttpResponse resp = res.getResponse();
-            int statusCode = StatusCodeAnalyser.getStatusCode(resp.getBody(), resp.getStatusCode());
-            if (statusCode >= 200 && statusCode < 300) {
-                return null;
+        if (auth.getAuthenticated()) {
+            ExecutionResult res = AuthValidator.checkAuth(auth, rawApi);
+            if(res.getSuccess()) {
+                OriginalHttpResponse resp = res.getResponse();
+                int statusCode = StatusCodeAnalyser.getStatusCode(resp.getBody(), resp.getStatusCode());
+                if (statusCode >= 200 && statusCode < 300) {
+                    return null;
+                }
             }
         }
         return new Executor().execute(this.executorNode, this.rawApi, this.varMap);
