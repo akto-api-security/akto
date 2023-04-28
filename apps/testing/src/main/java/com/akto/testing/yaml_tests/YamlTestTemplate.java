@@ -27,12 +27,12 @@ public class YamlTestTemplate extends SecurityTestTemplate {
 
     @Override
     public boolean filter() {
-        boolean validAuthHeaders = AuthValidator.validate(auth, rawApi);
+        boolean validAuthHeaders = AuthValidator.validate(this.auth, this.rawApi);
         if (!validAuthHeaders) {
             return false;
         }
         if (auth.getAuthenticated()) {
-            this.varMap.put("auth_headers", auth.getHeaders());
+            this.varMap.put("auth_headers", this.auth.getHeaders());
         }
         return TestPlugin.validateFilter(this.getFilterNode(),this.getRawApi(), this.getApiInfoKey(), this.varMap);
     }
@@ -40,7 +40,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     @Override
     public List<ExecutionResult>  executor() {
         if (auth.getAuthenticated()) {
-            ExecutionResult res = AuthValidator.checkAuth(auth, rawApi);
+            ExecutionResult res = AuthValidator.checkAuth(this.auth, this.rawApi.copy());
             if(res.getSuccess()) {
                 OriginalHttpResponse resp = res.getResponse();
                 int statusCode = StatusCodeAnalyser.getStatusCode(resp.getBody(), resp.getStatusCode());
