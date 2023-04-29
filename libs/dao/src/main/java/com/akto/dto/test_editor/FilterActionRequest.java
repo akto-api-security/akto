@@ -14,15 +14,14 @@ public class FilterActionRequest {
     private String concernedProperty;
     private String concernedSubProperty;
     private List<String> matchingKeySet;
-    private List<String> matchingValues;
     private String operand;
     private String context;
-    private Boolean keyOperandSeen;
+    private Boolean keyValOperandSeen;
     private String bodyOperand;
 
     public FilterActionRequest(Object querySet, RawApi rawApi, RawApi testRunRawApi, ApiInfo.ApiInfoKey apiInfoKey,
-            String concernedProperty, String concernedSubProperty, List<String> matchingKeySet, List<String> matchingValues, 
-            String operand, String context, Boolean keyOperandSeen, String bodyOperand) {
+            String concernedProperty, String concernedSubProperty, List<String> matchingKeySet, 
+            String operand, String context, Boolean keyValOperandSeen, String bodyOperand) {
         this.querySet = querySet;
         this.rawApi = rawApi;
         this.testRunRawApi = testRunRawApi;
@@ -30,10 +29,9 @@ public class FilterActionRequest {
         this.concernedProperty = concernedProperty;
         this.concernedSubProperty = concernedSubProperty;
         this.matchingKeySet = matchingKeySet;
-        this.matchingValues = matchingValues;
         this.operand = operand;
         this.context = context;
-        this.keyOperandSeen = keyOperandSeen;
+        this.keyValOperandSeen = keyValOperandSeen;
         this.bodyOperand = bodyOperand;
     }
 
@@ -95,14 +93,6 @@ public class FilterActionRequest {
         this.matchingKeySet = matchingKeySet;
     }
 
-    public List<String> getMatchingValues() {
-        return matchingValues;
-    }
-
-    public void setMatchingValues(List<String> matchingValues) {
-        this.matchingValues = matchingValues;
-    }
-
     public String getOperand() {
         return operand;
     }
@@ -135,12 +125,12 @@ public class FilterActionRequest {
         }
     }
 
-    public Boolean getKeyOperandSeen() {
-        return keyOperandSeen;
+    public Boolean getKeyValOperandSeen() {
+        return keyValOperandSeen;
     }
 
-    public void setKeyOperandSeen(Boolean keyOperandSeen) {
-        this.keyOperandSeen = keyOperandSeen;
+    public void setKeyValOperandSeen(Boolean keyValOperandSeen) {
+        this.keyValOperandSeen = keyValOperandSeen;
     }
 
     public String getBodyOperand() {

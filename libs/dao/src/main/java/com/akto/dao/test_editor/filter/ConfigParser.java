@@ -57,7 +57,6 @@ public class ConfigParser {
 
         if (curNode.getNodeType().equals(OperandTypes.Collection.toString().toLowerCase())) {
             collectionNodeExists = true;
-            //subConcernedProperty = curNode.getSubConcernedProperty();
         }
 
         if (curNode.getNodeType().equals(OperandTypes.Body.toString().toLowerCase())) {
