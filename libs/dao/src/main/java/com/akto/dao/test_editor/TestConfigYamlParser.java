@@ -91,7 +91,7 @@ public class TestConfigYamlParser {
             new TestConfig(id, info, auth, filters, null, null);
         }
 
-        Object validationMap = config.get("validation");
+        Object validationMap = config.get("validate");
         if (validationMap == null) {
             // todo: should not be null, throw error
             return new TestConfig(id, info, auth, filters, executeOperations, null);
