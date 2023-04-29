@@ -168,7 +168,7 @@ public class TestEditorEnums {
     public enum TerminalExecutorDataOperands {
         DELETE_HEADER,
         DELETE_BODY_PARAM,
-        DELETE_QUERYPARAM,
+        DELETE_QUERY_PARAM,
         MODIFY_URL,
         MODIFY_METHOD,
         FOLLOW_REDIRECT,
@@ -178,10 +178,10 @@ public class TestEditorEnums {
     public enum NonTerminalExecutorDataOperands {
         ADD_HEADER,
         ADD_BODY_PARAM,
-        ADD_QUERYPARAM,
+        ADD_QUERY_PARAM,
         MODIFY_HEADER,
         MODIFY_BODY_PARAM,
-        MODIFY_QUERYPARAM
+        MODIFY_QUERY_PARAM
     }
 
     public enum ExecutorOperandTypes {

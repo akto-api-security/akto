@@ -107,11 +107,11 @@ public class Executor {
                     return Operations.modifyHeader(rawApi, key, value.toString());
                 case "delete_header":
                     return Operations.deleteHeader(rawApi, key);
-                case "add_queryparam":
+                case "add_query_param":
                     return Operations.addQueryParam(rawApi, key, value);
-                case "modify_queryparam":
+                case "modify_query_param":
                     return Operations.modifyQueryParam(rawApi, key, value);
-                case "delete_queryparam":
+                case "delete_query_param":
                     return Operations.deleteQueryParam(rawApi, key);
                 case "modify_url":
                     return Operations.modifyUrl(rawApi, key);

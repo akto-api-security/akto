@@ -198,7 +198,12 @@ public final class FilterAction {
 
     public DataOperandsFilterResponse applyFilterOnPayload(FilterActionRequest filterActionRequest, String payload) {
 
-        BasicDBObject payloadObj =  BasicDBObject.parse(payload);
+        BasicDBObject payloadObj = new BasicDBObject();
+        try {
+            payloadObj =  BasicDBObject.parse(payload);
+        } catch(Exception e) {
+            // add log
+        }
 
         Set<String> matchingKeySet = new HashSet<>();
         List<String> matchingKeys = new ArrayList<>();
@@ -266,7 +271,12 @@ public final class FilterAction {
         List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
         Object val = null;
         String key = querySet.get(0);
-        BasicDBObject reqObj =  BasicDBObject.parse(payload);
+        BasicDBObject reqObj = new BasicDBObject();
+        try {
+            reqObj =  BasicDBObject.parse(payload);
+        } catch(Exception e) {
+            // add log
+        }
 
         if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("key")) {
             if (filterActionRequest.getMatchingKeySet() != null && filterActionRequest.getMatchingKeySet().size() > 0) {
@@ -670,7 +680,13 @@ public final class FilterAction {
         }
 
         String reqBody = rawApi.getRequest().getBody();
-        BasicDBObject reqObj =  BasicDBObject.parse(reqBody);
+        
+        BasicDBObject reqObj = new BasicDBObject();
+        try {
+            reqObj =  BasicDBObject.parse(reqBody);
+        } catch(Exception e) {
+            // add log
+        }
 
         Object val = getValue(reqObj, null, key);
 
@@ -686,7 +702,12 @@ public final class FilterAction {
         }
 
         String reqBody = rawApi.getResponse().getBody();
-        BasicDBObject reqObj =  BasicDBObject.parse(reqBody);
+        BasicDBObject reqObj = new BasicDBObject();
+        try {
+            reqObj =  BasicDBObject.parse(reqBody);
+        } catch(Exception e) {
+            // add log
+        }
 
         Object val = getValue(reqObj, null, key);
 
