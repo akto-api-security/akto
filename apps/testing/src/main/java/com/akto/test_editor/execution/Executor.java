@@ -25,19 +25,25 @@ public class Executor {
         }
         ExecutorNode reqNodes = node.getChildNodes().get(1);
         OriginalHttpResponse testResponse;
-        for (ExecutorNode reqNode: reqNodes.getChildNodes()) {
-            RawApi sampleRawApi = rawApi.copy();
-            // make copy of varMap as well
-            ExecutorSingleRequest singleReq = buildTestRequest(reqNode, null, sampleRawApi, varMap);
-
-            try {
-                // follow redirects = true for now
-                testResponse = ApiExecutor.sendRequest(singleReq.getRawApi().getRequest(), singleReq.getFollowRedirect());
-            } catch(Exception e) {
-                continue;
-            }
-            result.add(new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), singleReq.getRawApi().getRequest(), testResponse));
+        RawApi sampleRawApi = rawApi.copy();
+        ExecutorSingleRequest singleReq = null;
+        if (reqNodes.getChildNodes() == null || reqNodes.getChildNodes().size() == 0) {
+            return null;
         }
+        for (ExecutorNode reqNode: reqNodes.getChildNodes()) {
+            // make copy of varMap as well
+            singleReq = buildTestRequest(reqNode, null, sampleRawApi, varMap);
+            sampleRawApi = singleReq.getRawApi();
+        }
+
+        try {
+            // follow redirects = true for now
+            testResponse = ApiExecutor.sendRequest(singleReq.getRawApi().getRequest(), singleReq.getFollowRedirect());
+        } catch(Exception e) {
+            return null;
+        }
+        result.add(new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), singleReq.getRawApi().getRequest(), testResponse));
+
         return result;
     }
 
