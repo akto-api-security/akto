@@ -1,20 +1,6 @@
 <template>
     <spinner v-if="endpointsLoading" />
     <div class="pr-4 api-endpoints" v-else>
-        <v-dialog
-            v-model="showGptDialog"
-            width="fit-content" 
-            content-class="dialog-no-shadow"
-            overlay-opacity="0.7"
-        >
-            <div class="gpt-dialog-container ma-0">
-                <chat-gpt-input
-                    v-if="showGptDialog"
-                    :items="chatGptPrompts"
-                />
-            </div>
-
-        </v-dialog>
         <div>
             <div class="d-flex jc-end pb-3 pt-3">
                     <v-tooltip bottom>
@@ -181,15 +167,6 @@
         <v-dialog v-model="showTestSelectorDialog" width="800px"> 
             <tests-selector :collectionName="apiCollectionName" @testsSelected=startTest v-if="showTestSelectorDialog"/>
         </v-dialog>
-
-        <div v-if="renderAktoGptButton">
-            <div class="fix-at-top">
-                <v-btn dark depressed color="var(--gptColor)" @click="showGPTScreen()">
-                    Ask AktoGPT
-                    <v-icon size="16">$chatGPT</v-icon>
-                </v-btn>
-            </div>
-        </div>
     </div>
 </template>
 
@@ -229,7 +206,6 @@ export default {
         WorkflowTestBuilder,
         TestsSelector,
         SecondaryButton,
-        ChatGptInput
     },
     props: {
         apiCollectionId: obj.numR
@@ -249,34 +225,6 @@ export default {
     data() {
         return {
             filteredItems: [],
-            chatGptPrompts: [
-                {
-                    icon: "$fas_magic",
-                    label: "Create API groups",
-                    prepareQuery: () => { return {
-                        type: "group_apis_by_functionality",
-                        meta: {
-                            "urls": this.filteredItems.map(x => x.endpoint),
-                            "apiCollectionId": this.apiCollectionId
-                        }                        
-                    }},
-                    callback: (data) => console.log("callback create api groups", data)
-                },
-                {
-                    icon: "$fas_layer-group",
-                    label: "Tell me APIs related to ${input}",
-                    prepareQuery: (filterApi) => { return {
-                        type: "list_apis_by_type",
-                        meta: {
-                            "urls": this.filteredItems.map(x => x.endpoint),
-                            "type_of_apis": filterApi,
-                            "apiCollectionId": this.apiCollectionId
-                        }                        
-                    }},
-                    callback: (data) => console.log("callback Tell me all the apis", data)
-                }
-            ],
-            showGptDialog: false,
             file: null,
             rules: [
                 value => !value || value.size < 50e6 || 'HAR file size should be less than 50 MB!',
@@ -414,9 +362,7 @@ export default {
     methods: {
         filterApplied(data) {
             this.filteredItems = data
-        },
-        showGPTScreen(){
-            this.showGptDialog = true
+            this.$store.commit('inventory/FILTERED_ITEMS', data)
         },
         rowClicked(row) {
             this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.endpoint + " " + row.method, type: 2})
@@ -609,9 +555,6 @@ export default {
             }
             return ret
         },
-        fetchAktoGptButton(){
-            
-        }
     },
     async mounted() {
         
@@ -620,12 +563,6 @@ export default {
 </script>
 
 <style lang="sass" scoped>  
-.fix-at-top
-    position: absolute
-    right: 260px
-    top: 18px
-.gpt-dialog-container
-    background-color: var(--gptBackground)
 .api-endpoints
     & .table-column
         &:nth-child(1)    

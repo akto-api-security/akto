@@ -48,7 +48,7 @@
         <div class="prompt-body" v-if="responses || loading">
             <div class="gpt-prompt">
                 <div class="gpt-prompt-text d-flex">
-                    <owner-name :owner-name="getUsername()" :owner-id="0" :show-name="false" />
+                    <owner-name :owner-name="ownerName" :owner-id="0" :show-name="false" />
                     <div class="ml-2 label">{{ computedLabel }}</div>
                 </div>
             </div>
@@ -93,7 +93,7 @@
                                 It seems that this API is not vulnerable to {{ responses[0].test_type }} vulnerability.
                             </div>
                         </div>
-                        <div v-else>
+                        <div v-else :style="{'overflow-x' : 'scroll'}">
                             <v-list-item v-for="(item, index) in responses" :key="index" class="listItem">
                                 <div v-if="item.functionality">
                                     <div class="fw-500" style="text-transform: uppercase">{{item.functionality}}</div>
@@ -130,7 +130,8 @@ export default {
     },
     props: {
         items: obj.arrR,
-        showDialog: obj.boolN
+        showDialog: obj.boolN,
+        ownerName: obj.strR,
     },
     data () {
         let _this = this;
@@ -155,7 +156,6 @@ export default {
         }
     },
     methods: {
-        ...mapGetters('auth',['getUsername']),
         openDocsOnAktoGPT() {
             return window.open("https://docs.akto.io/aktogpt")
         },
@@ -168,7 +168,6 @@ export default {
             this.askGPT(queryPayload).then(resp => {
                 _this.responses = resp.response.responses || []
                 _this.queryType = resp.type
-                console.log("type", _this.queryType)
                 _this.loading = false
             }).catch(() => {
                 _this.responses = []

@@ -98,14 +98,19 @@
           </template>
         </router-view>
         <div class="akto-external-links">
+          <v-btn dark depressed color="var(--gptColor)" v-if="showOnRoute" @click="showGPTScreen()">
+                Ask AktoGPT
+                <v-icon size="16">$chatGPT</v-icon>
+          </v-btn>
+
           <v-btn primary dark depressed color="var(--hexColor40)" @click='openDiscordCommunity'>
             Ask us on <v-icon size="16">$fab_discord</v-icon>
           </v-btn>
+
           <v-btn primary dark depressed class="github-btn" @click='openGithubRepoPage'>    
             <v-icon size="16">$githubIcon</v-icon>  
             Star
-          </v-btn>        
-          
+          </v-btn>
         </div>
       </div>
     </v-main>
@@ -119,18 +124,35 @@
       :index="index"
       @close="closeLoadingSnackBar(data)"
     />
+    <v-dialog
+        v-model="showGptDialog"
+        width="fit-content" 
+        content-class="dialog-no-shadow"
+        overlay-opacity="0.7"
+      >
+        <div class="gpt-dialog-container ma-0">
+            <chat-gpt-input
+                v-if="showGptDialog"
+                :items="computeChatGptPrompts"
+                :apiCollectionId="apiCollectionId"
+                @addRegexToAkto="addRegexToAkto"
+                :owner-name="getUsername()"
+            />
+        </div>
+
+    </v-dialog>
   </v-app>
 </template>
 
 <script>
-import { mapGetters } from 'vuex';
+import { mapGetters , mapState } from 'vuex';
 import CreateAccountDialog from "./shared/components/CreateAccountDialog"
 import api from "./appbar/api"
 import OwnerName from "./shared/components/OwnerName";
 import SimpleTextField from "./shared/components/SimpleTextField";
 import SimpleMenu from "./shared/components/SimpleMenu"
 import LoadingSnackBar from './shared/components/LoadingSnackBar';
-import {mapState} from 'vuex'
+import ChatGptInput from './shared/components/inputs/ChatGptInput.vue';
 
 export default {
   name: 'PageDashboard',
@@ -139,7 +161,8 @@ export default {
     OwnerName,
     'create-account-dialog': CreateAccountDialog,
     SimpleMenu,
-    LoadingSnackBar
+    LoadingSnackBar,
+    ChatGptInput
   },
   data() {
     const myItems = [
@@ -185,7 +208,8 @@ export default {
         link: '/dashboard/library'
       }
     ]
-
+    let route1 = "/dashboard/observe/inventory"
+    let route2 = "/dashboard/settings"
     return {
       msg: '',
       drawer: null,
@@ -196,6 +220,10 @@ export default {
       showField: {},
       showTeamField: false,
       newName: '',
+      route1,
+      route2,
+      showGptDialog:false,
+      regexRequired:false,
       myAccountItems: [
         {
           label: "Settings",
@@ -213,7 +241,89 @@ export default {
             })
           }
         }
-      ]
+      ],
+      settingsPrompt: [
+        {
+          icon: "$fas_layer-group",
+          label: "Write regex to find ${input}",
+          prepareQuery: (filterApi) => { return {
+              type: "generate_regex",
+              meta: {
+                  "input_query": filterApi
+              }                        
+          }},
+          callback: (data) => console.log("callback Tell me all the apis", data)
+        }
+      ],
+      collectionsGptPrompts: [
+          {
+              icon: "$fas_magic",
+              label: "Create API groups",
+              prepareQuery: () => { return {
+                  type: "group_apis_by_functionality",
+                  meta: {
+                      "urls": this.filteredItems.map(x => x.endpoint),
+                      "apiCollectionId": this.apiCollectionId
+                  }                        
+              }},
+              callback: (data) => console.log("callback create api groups", data)
+          },
+          {
+              icon: "$fas_layer-group",
+              label: "Tell me APIs related to ${input}",
+              prepareQuery: (filterApi) => { return {
+                  type: "list_apis_by_type",
+                  meta: {
+                      "urls": this.filteredItems.map(x => x.endpoint),
+                      "type_of_apis": filterApi,
+                      "apiCollectionId": this.apiCollectionId
+                  }                        
+              }},
+              callback: (data) => console.log("callback Tell me all the apis", data)
+          }
+      ],
+      parameterPrompts: [
+        {
+            icon: "$fas_user-lock",
+            label: "Fetch Sensitive Params",
+            prepareQuery: () => { return {
+                type: "list_sensitive_params",
+                meta: {
+                    "sampleData": this.parseMsg(this.allSamples[0].message),
+                    "apiCollectionId": this.apiCollectionId
+                }                        
+            }},
+            callback: (data) => console.log("callback create api groups", data)
+        },
+        {
+            icon: "$fas_user-lock",
+            label: "Generate curl for testing SSRF vulnerability",
+            prepareQuery: () => { return {
+                type: "generate_curl_for_test",
+                meta: {
+                    "sample_data": this.allSamples[0].message,
+                    "response_details": this.parseMsgForGenerateCurl(this.allSamples[0].message),
+                    "test_type": "ssrf",
+                    "apiCollectionId": this.apiCollectionId
+                }                        
+            }},
+            callback: (data) => console.log("callback create api groups", data)
+        },
+        {
+            icon: "$fas_user-lock",
+            label: "Generate curl for testing SQLI vulnerability",
+            prepareQuery: () => { return {
+                type: "generate_curl_for_test",
+                meta: {
+                    "sample_data": this.allSamples[0].message,
+                    "response_details": this.parseMsgForGenerateCurl(this.allSamples[0].message),
+                    "test_type": "sqlinjection",
+                    "apiCollectionId": this.apiCollectionId
+                }                        
+            }},
+            callback: (data) => console.log("callback create api groups", data)
+        }
+      ],
     }
   },
   mounted() {
@@ -226,6 +336,41 @@ export default {
     ...mapGetters('auth', ['getUsername', 'getAvatar', 'getActiveAccount', 'getAccounts']),
     openDiscordCommunity() {
       return window.open("https://discord.gg/Wpc6xVME4s")
+    },
+    showGPTScreen(){
+      this.showGptDialog = true
+    },
+    addRegexToAkto(payload){
+        if(this.regexRequired){
+          this.showGptDialog = false
+          return this.$store.dispatch('data_types/setNewDataTypeByAktoGpt', payload)
+        }
+    },
+    parseMsg(jsonStr) {
+        let json = JSON.parse(jsonStr)
+        console.log(json)
+        return {
+            request: JSON.parse(json.requestPayload),
+            response: JSON.parse(json.responsePayload)
+        }
+    },
+    parseMsgForGenerateCurl(jsonStr) {
+        let json = JSON.parse(jsonStr)
+        let responsePayload = {}
+        let responseHeaders = {}
+        let statusCode = 0
+
+        if (json) {
+            responsePayload = json["response"] ?  json["response"]["body"] : json["responsePayload"]
+            responseHeaders = json["response"] ?  json["response"]["headers"] : json["responseHeaders"]
+            statusCode = json["response"] ?  json["response"]["statusCode"] : json["statusCode"]
+        }
+
+        return {
+            "responsePayload": responsePayload,
+            "responseHeaders": responseHeaders,
+            "statusCode": statusCode
+        };
     },
     openGithubRepoPage() {
       return window.open("https://github.com/akto-api-security/community-edition/")
@@ -254,11 +399,35 @@ export default {
 
   computed: {
       ...mapState('dashboard', ['loadingSnackBars']),
-  }
+      ...mapState('inventory',['apiCollectionId','filteredItems', 'allSamples']),
+      showOnRoute(){
+        if(this.$route.path.includes(this.route1) && this.$route.params['apiCollectionId']){
+          return true
+        }
+        return !!(this.$route.path.includes(this.route2) && this.$route.hash === "#Data-types");
+      },
+      computeChatGptPrompts(){
+        if(this.$route.path.includes(this.route2) && this.$route.hash === "#Data-types"){
+          this.regexRequired = true
+          return this.settingsPrompt
+        }else if(this.$route.path.includes(this.route1) && this.$route.params['apiCollectionId']){
+          this.regexRequired = false
+          if(this.$route.params['urlAndMethod']){
+            return this.parameterPrompts
+          }
+          else{
+            return this.collectionsGptPrompts
+          }
+        }
+      }
+  },
 }
 </script>
 
 <style lang="sass" scoped>
+
+.gpt-dialog-container
+    background-color: var(--gptBackground)
 .akto-toolbar
   & .logo
     height: 25px
@@ -414,16 +583,17 @@ export default {
   background: linear-gradient(180deg, var(--hexColor26), var(--hexColor23) 90%)  
   color: var(--hexColor6) !important
   border: 1px solid var(--rgbaColor3)
-  margin-left: 8px
 
 .discord-btn
-  background: #ffffff !important
-  color: #24292f !important
-  border: 1px solid rgba(27,31,36,.15)
+  background: var(--white) !important
+  color: var(--hexColor6) !important
+  border: 1px solid var(--rgbaColor3)
 
 .akto-external-links
   position: absolute
   right: 0px
   top: 0px  
-  padding: 18px 24px
+  padding: 12px 18px
+  display: flex
+  gap: 8px
 </style>

@@ -1,25 +1,5 @@
 <template>
     <div>
-        <div class="fix-at-top">
-            <v-btn dark depressed color="var(--gptColor)" @click="showGPTScreen()">
-                Ask AktoGPT
-                <v-icon size="16">$chatGPT</v-icon>
-            </v-btn>
-        </div>
-        <v-dialog
-            v-model="showGptDialog"
-            width="fit-content" 
-            content-class="dialog-no-shadow"
-            overlay-opacity="0.7"
-        >
-            <div class="gpt-dialog-container ma-0">
-                <chat-gpt-input @addRegexToAkto="addRegexToAkto" 
-                    v-if="showGptDialog"
-                    :items="chatGptPrompts"
-                />
-            </div>
-
-        </v-dialog>
         <layout-with-tabs title="Settings" :tabs="getTabs()">
             <template slot="Data types">
                 <data-types title="Data types" :data_types="data_types" :toggleActivateFieldFunc='toggleActivateDataTypes'
@@ -107,7 +87,6 @@ import IntegrationCenter from './components/integrations/IntegrationCenter'
 import AuthTypeDetails from './components/auth_types/AuthTypeDetails.vue'
 import TrafficMetrics from './components/traffic_metrics/TrafficMetrics.vue'
 import obj from "@/util/obj"
-import ChatGptInput from '../../shared/components/inputs/ChatGptInput.vue'
 
 import { mapState } from 'vuex'
 export default {
@@ -125,7 +104,6 @@ export default {
         AuthTypeDetails,
         ACard,
         TrafficMetrics,
-        ChatGptInput
     },
     props:{
         defaultStartTimestamp: obj.strN,
@@ -140,31 +118,9 @@ export default {
     data() {
         return {
             showDialog: false,
-            showGptDialog: false,
-            chatGptPrompts: [
-                {
-                    icon: "$fas_layer-group",
-                    label: "Write regex to find ${input}",
-                    prepareQuery: (filterApi) => { return {
-                        type: "generate_regex",
-                        meta: {
-                            "input_query": filterApi
-                        }                        
-                    }},
-                    callback: (data) => console.log("callback Tell me all the apis", data)
-                }
-            ],
         }
     },
     methods: {
-        showGPTScreen(){
-            this.showGptDialog = true
-        },
-        addRegexToAkto(payload){
-            this.showGptDialog = false
-            console.log("payload", payload)
-            return this.$store.dispatch('data_types/setNewDataTypeByAktoGpt', payload)
-        },
         createNewDataType() {
             return this.$store.dispatch('data_types/setNewDataType')
         },
@@ -226,13 +182,5 @@ export default {
 .dialog-box
     padding: 16px
     background: var(--white) 
-    
-.gpt-dialog-container
-    background-color: var(--gptBackground)
 
-
-.fix-at-top
-    position: absolute
-    right: 260px
-    top: 18px
 </style>
