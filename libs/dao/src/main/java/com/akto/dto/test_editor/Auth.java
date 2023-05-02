@@ -4,18 +4,18 @@ import java.util.List;
 
 public class Auth {
 
-    private boolean authenticated;
+    private Boolean authenticated;
 
     private List<String> headers;
 
     public Auth() { }
 
-    public Auth(boolean authenticated, List<String> headers) {
+    public Auth(Boolean authenticated, List<String> headers) {
         this.authenticated = authenticated;
         this.headers = headers;
     }
 
-    public boolean getAuthenticated() {
+    public Boolean getAuthenticated() {
         return authenticated;
     }
 

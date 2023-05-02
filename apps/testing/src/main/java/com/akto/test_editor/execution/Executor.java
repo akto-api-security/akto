@@ -66,7 +66,11 @@ public class Executor {
             String key = node.getOperationType();
             Object value = node.getValues();
             if (node.getNodeType().equalsIgnoreCase(ExecutorOperandTypes.Terminal.toString())) {
-                key = (String) node.getValues();
+                if (node.getValues() instanceof Boolean) {
+                    key = Boolean.toString((Boolean) node.getValues());
+                } else {
+                    key = (String) node.getValues();
+                }
                 value = null;
             }
             ExecutorSingleOperationResp resp = invokeOperation(operation, key, value, rawApi, varMap);
@@ -91,6 +95,10 @@ public class Executor {
 
     public ExecutorSingleOperationResp invokeOperation(String operationType, String key, Object value, RawApi rawApi, Map<String, Object> varMap) {
         try {
+
+            if (key == null || value == null) {
+                return new ExecutorSingleOperationResp(false, "error executing executor operation, key or value is null " + key + " " + value);
+            }
 
             if (key instanceof String) {
                 key = VariableResolver.resolveExpression(varMap, key);
