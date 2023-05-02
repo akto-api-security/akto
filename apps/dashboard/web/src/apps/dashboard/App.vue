@@ -153,6 +153,7 @@ import SimpleTextField from "./shared/components/SimpleTextField";
 import SimpleMenu from "./shared/components/SimpleMenu"
 import LoadingSnackBar from './shared/components/LoadingSnackBar';
 import ChatGptInput from './shared/components/inputs/ChatGptInput.vue';
+import apiFunc from "../dashboard/views/observe/inventory/api"
 
 export default {
   name: 'PageDashboard',
@@ -224,6 +225,8 @@ export default {
       route2,
       showGptDialog:false,
       regexRequired:false,
+      renderAktoButton:false,
+      apiCollectionId:-1,
       myAccountItems: [
         {
           label: "Settings",
@@ -348,7 +351,6 @@ export default {
     },
     parseMsg(jsonStr) {
         let json = JSON.parse(jsonStr)
-        console.log(json)
         return {
             request: JSON.parse(json.requestPayload),
             response: JSON.parse(json.responsePayload)
@@ -394,32 +396,69 @@ export default {
     },
     closeLoadingSnackBar(data) {
       this.$store.dispatch('dashboard/closeLoader', data['hexId'])
-    }
+    },
   },
 
   computed: {
       ...mapState('dashboard', ['loadingSnackBars']),
-      ...mapState('inventory',['apiCollectionId','filteredItems', 'allSamples']),
+      ...mapState('inventory',['filteredItems', 'allSamples']),
       showOnRoute(){
+        if(this.$route.params['apiCollectionId']){
+          this.apiCollectionId = this.$route.params['apiCollectionId']
+        }
+        if(this.apiCollectionId !== -1){
+          apiFunc.fetchAktoGptConfig(this.apiCollectionId).then((resp)=>{
+              this.renderAktoButton = resp.currentState[0].state === "ENABLED"; 
+          })
+        }
+
+        if(!this.renderAktoButton){
+          return false
+        }
+
         if(this.$route.path.includes(this.route1) && this.$route.params['apiCollectionId']){
           return true
         }
-        return !!(this.$route.path.includes(this.route2) && this.$route.hash === "#Data-types");
+        else if(this.$route.path.includes(this.route2) && this.$route.hash === "#Data-types"){
+          this.renderAktoButton = true
+          return true
+        }
+        else{
+          return false
+        }
       },
       computeChatGptPrompts(){
         if(this.$route.path.includes(this.route2) && this.$route.hash === "#Data-types"){
           this.regexRequired = true
           return this.settingsPrompt
-        }else if(this.$route.path.includes(this.route1) && this.$route.params['apiCollectionId']){
+        }
+        else if(this.$route.path.includes(this.route1) && this.$route.params['apiCollectionId']){
           this.regexRequired = false
+          let tempArr = this.parameterPrompts
           if(this.$route.params['urlAndMethod']){
-            return this.parameterPrompts
+            if(this.allSamples.length == 0){
+              tempArr = tempArr.slice(1)
+              return tempArr
+            }
+            let json = JSON.parse(this.allSamples[0].message)
+
+            let type = ""
+            let payload = ""
+
+            if(json.contentType){type = json.contentType.toString()}
+            if(json.requestPayload){payload = json.responsePayload.toString()}
+
+            const pattern = /^\{.*\}$/;
+            if(!(type.indexOf('application/json') !== -1 ||  pattern.test(payload))){
+              tempArr = tempArr.slice(1)
+            }
+            return tempArr
           }
           else{
             return this.collectionsGptPrompts
           }
         }
-      }
+      },
   },
 }
 </script>

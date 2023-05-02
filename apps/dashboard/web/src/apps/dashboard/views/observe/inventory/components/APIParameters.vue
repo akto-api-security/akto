@@ -142,7 +142,6 @@ export default {
             trafficInfo: {},
             sampleData: null,
             sensitiveSampleData: null,
-            renderAktoGptButton: false
         }  
     },
     methods: {
@@ -261,14 +260,6 @@ export default {
     },
     async mounted() {
         let _this = this;
-        api.fetchAktoGptConfig(this.apiCollectionId).then(aktoGptConfig => {
-            if(aktoGptConfig.currentState[0].state === "ENABLED") {
-                _this.renderAktoGptButton = true;
-            }
-            else {
-                _this.renderAktoGptButton = false;
-            }
-        })
         this.$emit('mountedView', {apiCollectionId: this.apiCollectionId, urlAndMethod: this.urlAndMethod, type: 2})
         if (
             this.$store.state.inventory.apiCollectionId !== this.apiCollectionId || 
