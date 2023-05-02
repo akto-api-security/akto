@@ -189,7 +189,6 @@ import IconMenu from '@/apps/dashboard/shared/components/IconMenu'
 import WorkflowTestBuilder from './WorkflowTestBuilder'
 import TestsSelector from './TestsSelector'
 import SecondaryButton from '@/apps/dashboard/shared/components/buttons/SecondaryButton'
-import ChatGptInput from '@/apps/dashboard/shared/components/inputs/ChatGptInput'
 
 export default {
     name: "ApiEndpoints",
@@ -212,15 +211,6 @@ export default {
     },
     activated(){
         this.refreshPage(true)
-        let _this = this;
-        api.fetchAktoGptConfig(this.apiCollectionId).then(aktoGptConfig => {
-            if(aktoGptConfig.currentState[0].state === "ENABLED") {
-                _this.renderAktoGptButton = true;
-            }
-            else {
-                _this.renderAktoGptButton = false;
-            }
-        })
     },
     data() {
         return {
@@ -356,7 +346,6 @@ export default {
             getResponse:false,
             promptText: "",
             responseArr:[],
-            renderAktoGptButton: false
         }
     },
     methods: {
