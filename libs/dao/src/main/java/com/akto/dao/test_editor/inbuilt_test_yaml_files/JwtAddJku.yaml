@@ -20,14 +20,12 @@ info:
     displayName: Broken User Authentication (BUA)
   subCategory: ADD_JKU_TO_JWT
   severity: HIGH
-  confidence: HIGH
-  tags: 
+  tags:
     - Business logic
     - OWASP top 10
     - HackerOne top 10
   references:
     - "https://redhuntlabs.com/a-practical-guide-to-attack-jwt-json-web-token"
     - "https://portswigger.net/web-security/jwt/lab-jwt-authentication-bypass-via-jku-header-injection"
-  author: Akto
 api_selection_filters:
   #authenticated: true

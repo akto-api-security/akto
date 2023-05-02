@@ -31,7 +31,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
         if (!validAuthHeaders) {
             return false;
         }
-        if (auth.getAuthenticated()) {
+        if (auth != null && auth.getAuthenticated()) {
             this.varMap.put("auth_headers", this.auth.getHeaders());
         }
         return TestPlugin.validateFilter(this.getFilterNode(),this.getRawApi(), this.getApiInfoKey(), this.varMap);
@@ -39,7 +39,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
 
     @Override
     public List<ExecutionResult>  executor() {
-        if (auth.getAuthenticated()) {
+        if (auth != null && auth.getAuthenticated()) {
             ExecutionResult res = AuthValidator.checkAuth(this.auth, this.rawApi.copy());
             if(res.getSuccess()) {
                 OriginalHttpResponse resp = res.getResponse();

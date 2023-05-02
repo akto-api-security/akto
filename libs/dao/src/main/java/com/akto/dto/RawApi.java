@@ -31,7 +31,12 @@ public class RawApi {
     public BasicDBObject fetchReqPayload() {
         OriginalHttpRequest req = this.getRequest();
         String reqBody = req.getBody();
-        BasicDBObject payload = BasicDBObject.parse(reqBody);
+        BasicDBObject payload;
+        try {
+             payload = BasicDBObject.parse(reqBody);
+        } catch (Exception e) {
+            payload = new BasicDBObject();
+        }
         return payload;
     }
 

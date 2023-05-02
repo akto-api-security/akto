@@ -14,8 +14,7 @@ info:
     displayName: Broken User Authentication (BUA)
   subCategory: REMOVE_TOKENS
   severity: HIGH
-  confidence: HIGH
-  tags: 
+  tags:
     - Business logic
     - OWASP top 10
     - HackerOne top 10
@@ -24,7 +23,20 @@ info:
     - "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa2-broken-user-authentication.md"
     - "https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html"
     - "https://cwe.mitre.org/data/definitions/798.html"
-  author: Akto
-auth:
-  authenticated: true
+
 api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+
+execute:
+  type: single
+  requests:
+    - req:
+        - remove_auth_headers: true
+
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+

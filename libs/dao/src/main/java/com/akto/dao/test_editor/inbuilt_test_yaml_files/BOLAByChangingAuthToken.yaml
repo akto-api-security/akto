@@ -16,7 +16,6 @@ info:
     shortName: BOLA
     displayName: Broken Object Level Authorization (BOLA)
   subCategory: REPLACE_AUTH_TOKEN
-  confidence: HIGH
   severity: HIGH
   tags: 
     - Business logic
@@ -29,6 +28,5 @@ info:
     - "https://cwe.mitre.org/data/definitions/284.html"
     - "https://cwe.mitre.org/data/definitions/285.html"
     - "https://cwe.mitre.org/data/definitions/639.html"
-  author: Akto
 api_selection_filters:
   #isPrivate: true

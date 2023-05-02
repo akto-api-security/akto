@@ -1,6 +1,7 @@
 package com.akto.action.testing_issues;
 
 import com.akto.action.UserAction;
+import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
@@ -11,13 +12,11 @@ import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
-import com.akto.util.TestEditorConfigMap;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
-import org.bouncycastle.util.test.Test;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
@@ -129,7 +128,7 @@ public class IssuesAction extends UserAction {
     private List<TestSourceConfig> testSourceConfigs;
     public String fetchAllSubCategories() {
 
-        Map<String, TestConfig> testConfigMap  = TestEditorConfigMap.testConfigMap;
+        Map<String, TestConfig> testConfigMap  = YamlTemplateDao.instance.fetchTestConfigMap();
         subCategories = new ArrayList<>();
         for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {
             Info info = entry.getValue().getInfo();
