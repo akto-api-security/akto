@@ -1215,6 +1215,8 @@ public class APICatalogSync {
             allParams = SingleTypeInfoDao.instance.fetchStiOfCollections(apiCollectionIds);
         }
         loggerMaker.infoAndAddToDb("Fetched STIs count: " + allParams.size(), LogDb.RUNTIME);
+        this.dbState.clear();
+        loggerMaker.infoAndAddToDb("Starting building dbState", LogDb.RUNTIME);
         this.dbState = build(allParams);
         loggerMaker.infoAndAddToDb("Done building dbState", LogDb.RUNTIME);
         this.sensitiveParamInfoBooleanMap = new HashMap<>();
