@@ -10,12 +10,10 @@ info:
     displayName: Broken Function Level Authorization (BFLA)
   subCategory: BFLA
   severity: HIGH
-  confidence: HIGH
-  tags: 
+  tags:
     - Business logic
     - OWASP top 10
     - HackerOne top 10
   references:
-  author: Akto
 api_selection_filters:
   #isPrivate: true

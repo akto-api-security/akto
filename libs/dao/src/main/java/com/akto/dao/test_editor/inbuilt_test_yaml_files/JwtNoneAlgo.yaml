@@ -17,14 +17,12 @@ info:
     displayName: Broken User Authentication (BUA)
   subCategory: JWT_NONE_ALGO
   severity: HIGH
-  confidence: HIGH
-  tags: 
+  tags:
     - Business logic
     - OWASP top 10
     - HackerOne top 10
   references:
     - "https://redhuntlabs.com/a-practical-guide-to-attack-jwt-json-web-token"
     - "https://portswigger.net/kb/issues/00200901_jwt-none-algorithm-supported"
-  author: Akto
 api_selection_filters:
   #authenticated: true

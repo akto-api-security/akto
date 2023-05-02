@@ -18,24 +18,15 @@ public class TestConfigYamlParser {
 
     public TestConfigYamlParser() { }
 
-    public TestConfig parseTemplate(String filePath) {
+    public static TestConfig parseTemplate(String content) throws Exception {
 
         ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
 
-        try {
-            //String filePath = new File("").getAbsolutePath() + "/libs/dao/src/main/java/com/akto/dto/test_editor/" + fileName + ".yaml";
-            //String filePath = "/Users/admin/akto_code/akto/libs/dao/src/main/java/com/akto/dao/test_editor/inbuilt_test_yaml_files/" + fileName + ".yaml";
-            Map<String, Object> config = mapper.readValue(new File(filePath), Map.class);
-            ConfigParser testConfigParser = new ConfigParser();
-            TestConfig configParserResult = parseConfig(config);
-            return configParserResult;
-        } catch (Exception e) {
-            System.out.print(e);
-            return null;
-        }
+        Map<String, Object> config = mapper.readValue(content, Map.class);
+        return parseConfig(config);
     }
 
-    public TestConfig parseConfig(Map<String, Object> config) {
+    public static TestConfig parseConfig(Map<String, Object> config) throws Exception {
 
         TestConfig testConfig = null;
 

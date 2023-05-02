@@ -20,10 +20,8 @@ info:
     - Business logic
     - OWASP top 10
     - HackerOne top 10
-  confidence: HIGH
   references:
     - "https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management_Testing/06-Test_HTTP_Methods"
     - "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa5-broken-function-level-authorization.md"
     - "https://cwe.mitre.org/data/definitions/285.html"
-  author: Akto
 api_selection_filters:

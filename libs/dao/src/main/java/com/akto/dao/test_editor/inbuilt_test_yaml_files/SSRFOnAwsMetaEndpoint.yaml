@@ -1,4 +1,4 @@
-id: MASS_ASSIGNMENT_CREATE_ADMIN_ROLE
+id: SSRF_ON_AWS_META_ENDPOINT
 info:
   name: "Sensitive AWS details exposed due to SSRF"
   description: "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing the URI parameter with metadata endpoint provided by AWS. The application responded with 2XX success code and also gave out sensitive AWS information in response." 
@@ -16,15 +16,13 @@ info:
     displayName: Server Side Request Forgery (SSRF)
   subCategory: SSRF_AWS_METADATA_EXPOSED
   severity: HIGH
-  confidence: HIGH
-  tags: 
+  tags:
     - Business logic
     - OWASP top 10
     - HackerOne top 10
   references:
     - "https://github.com/OWASP/API-Security/blob/master/2023/en/src/0xa6-server-side-request-forgery.md"
     - "https://www.akto.io/blog/how-to-prevent-server-side-request-forgery-ssrf-as-a-developer"
-  author: Akto
 api_selection_filters:
   response_code:
     and:
@@ -34,15 +32,27 @@ api_selection_filters:
     - request_headers:
         for_one:
           value:
-            - regex: "https://"
-            - regex: "http://"
-    - request_payload:
-        for_one:
-          value:
-            - regex: "https://"
-            - regex: "http://"
-    - query_param:
-        for_one:
-          value:
-            - regex: "https://"
-            - regex: "http://"
+            - contains_either:
+              - http
+          key:
+            extract: url_key
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_query_param:
+          url_key: https://evil.com
+      - modify_body_param:
+          url_key: https://evil.com
+      - modify_header:
+          url_key: https://evil.com
+
+validate:
+  response_payload:
+    contains_either:
+      - "ami-id"
+      - "ami-launch-index"
+      - "ami-manifest-path"
+      - "block-device-mapping"
+      - "instance-action"

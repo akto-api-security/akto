@@ -55,7 +55,9 @@ public class AuthValidator {
         }
 
         for (AuthParam authParam: authMechanism.getAuthParams()) {
-            headerKeys.add(authParam.getKey());
+            String key = authParam.getKey();
+            if (key == null) continue;
+            headerKeys.add(key.toLowerCase());
         }
 
         auth.setHeaders(headerKeys);

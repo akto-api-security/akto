@@ -13,12 +13,10 @@ info:
     displayName: Broken Object Level Authorization (BOLA)
   subCategory: ADD_USER_ID
   severity: HIGH
-  confidence: HIGH
-  tags: 
+  tags:
     - Business logic
     - OWASP top 10
     - HackerOne top 10
-  author: Akto
   references:
     - "https://www.akto.io/blog/bola-exploitation-using-unauthorized-uuid-on-api-endpoint"
     - "https://www.akto.io/blog/what-is-broken-object-level-authorization-bola"

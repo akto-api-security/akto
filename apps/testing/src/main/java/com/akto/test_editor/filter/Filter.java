@@ -25,6 +25,9 @@ public class Filter {
     public DataOperandsFilterResponse isEndpointValid(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfo.ApiInfoKey apiInfoKey, List<String> matchingKeySet, boolean keyValOperandSeen, String context, Map<String, Object> varMap) {
 
         List<FilterNode> childNodes = node.getChildNodes();
+        if (node.getNodeType().equalsIgnoreCase(OperandTypes.Term.toString())) {
+            matchingKeySet = null;
+        }
         if (childNodes.size() == 0) {
             if (! (node.getNodeType().toLowerCase().equals(OperandTypes.Data.toString().toLowerCase()) || node.getNodeType().toLowerCase().equals(OperandTypes.Extract.toString().toLowerCase()))) {
                 return new DataOperandsFilterResponse(false, null);

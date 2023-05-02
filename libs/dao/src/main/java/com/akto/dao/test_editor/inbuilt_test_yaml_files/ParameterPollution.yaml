@@ -13,8 +13,7 @@ info:
     displayName: Broken Object Level Authorization (BOLA)
   subCategory: PARAMETER_POLLUTION
   severity: HIGH
-  confidence: HIGH
-  tags: 
+  tags:
     - Business logic
     - OWASP top 10
     - HackerOne top 10
@@ -24,5 +23,4 @@ info:
     - "https://www.akto.io/blog/what-is-broken-object-level-authorization-bola"
     - "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa1-broken-object-level-authorization.md"
     - "https://cwe.mitre.org/data/definitions/284.html"
-  author: Akto
 api_selection_filters:

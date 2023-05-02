@@ -16,29 +16,24 @@ public class Info {
 
     private String subCategory;
 
-    private String confidence;
-
     private String severity;
 
     private List<String> tags;
 
     private List<String> references;
 
-    private String author;
 
-    public Info(String name, String description, String details, String impact, Category category, String subCategory, String confidence,
-            String severity, List<String> tags, List<String> references, String author) {
+    public Info(String name, String description, String details, String impact, Category category, String subCategory,
+            String severity, List<String> tags, List<String> references) {
         this.name = name;
         this.description = description;
         this.details = details;
         this.impact = impact;
         this.category = category;
         this.subCategory = subCategory;
-        this.confidence = confidence;
         this.severity = severity;
         this.tags = tags;
         this.references = references;
-        this.author = author;
     }
 
     public Info() { }
@@ -91,14 +86,6 @@ public class Info {
         this.subCategory = subCategory;
     }
 
-    public String getConfidence() {
-        return confidence;
-    }
-
-    public void setConfidence(String confidence) {
-        this.confidence = confidence;
-    }
-
     public String getSeverity() {
         return severity;
     }
@@ -122,13 +109,4 @@ public class Info {
     public void setReferences(List<String> references) {
         this.references = references;
     }
-
-    public String getAuthor() {
-        return author;
-    }
-
-    public void setAuthor(String author) {
-        this.author = author;
-    }
-    
 }

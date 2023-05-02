@@ -13,14 +13,12 @@ info:
     displayName: Security Misconfiguration (SM)
   subCategory: OPEN_REDIRECT
   severity: HIGH
-  confidence: HIGH
-  tags: 
+  tags:
     - Business logic
     - OWASP top 10
     - HackerOne top 10
   references:
     - "https://portswigger.net/kb/issues/00500100_open-redirection-reflected"
-  author: Akto
 api_selection_filters:
   response_code:
     eq: 302
@@ -28,13 +26,44 @@ api_selection_filters:
     - request_payload:
         for_one:
           value:
-            eq: ${sample_response_headers.location}
+            eq: "${sample_response_headers.location}"
+            extract: payload_location_value
+          key:
+            extract: payload_location_key
     - query_param:
         for_one:
           value:
-            eq: ${sample_response_headers.location}
+            eq: "${sample_response_headers.location}"
+            extract: payload_location_value
+          key:
+            extract: payload_location_key
     - request_headers:
         for_one:
           value:
-            eq: ${sample_response_headers.location}
+            eq: "${sample_response_headers.location}"
+            extract: payload_location_value
+          key:
+            extract: payload_location_key
 
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_query_param:
+          payload_location_key: evil.com/?p=${payload_location_value}
+      - modify_body_param:
+          payload_location_key: evil.com/?p=${payload_location_value}
+      - modify_header:
+          payload_location_key: evil.com/?p=${payload_location_value}
+
+
+validate:
+  response_code:
+    eq: 302
+  response_headers:
+    for_one:
+      key:
+        eq: location
+      value:
+        contains_either:
+          - evil.com

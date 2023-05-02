@@ -22,7 +22,7 @@ import com.google.api.services.drive.Drive.Changes.List;
 public class TestFilterTest {
     
     @Test
-    public void testContainsPrivateResource() {
+    public void testContainsPrivateResource() throws Exception {
         Map<String, SingleTypeInfo> singleTypeInfoMap = new HashMap<>();
         BOLATest bolaTest = new BOLATest();
 
