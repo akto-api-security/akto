@@ -123,6 +123,9 @@ public final class FilterAction {
     public void extractUrl(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
         String url = filterActionRequest.getApiInfoKey().getUrl();
         List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
+        if (varMap.containsKey(querySet.get(0)) && varMap.get(querySet.get(0)) != null) {
+            return;
+        }
         varMap.put(querySet.get(0), url);
     }
 
@@ -137,6 +140,9 @@ public final class FilterAction {
     public void extractMethod(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
         String method = filterActionRequest.getApiInfoKey().getMethod().toString();
         List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
+        if (varMap.containsKey(querySet.get(0)) && varMap.get(querySet.get(0)) != null) {
+            return;
+        }
         varMap.put(querySet.get(0), method);
     }
 
@@ -151,6 +157,9 @@ public final class FilterAction {
     public void extractApiCollectionId(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
         String apiCollectionId = Integer.toString(filterActionRequest.getApiInfoKey().getApiCollectionId());
         List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
+        if (varMap.containsKey(querySet.get(0)) && varMap.get(querySet.get(0)) != null) {
+            return;
+        }
         varMap.put(querySet.get(0), apiCollectionId);
     }
 
@@ -173,6 +182,9 @@ public final class FilterAction {
         }
         String respCode = Integer.toString(rawApi.getResponse().getStatusCode());
         List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
+        if (varMap.containsKey(querySet.get(0)) && varMap.get(querySet.get(0)) != null) {
+            return;
+        }
         varMap.put(querySet.get(0), respCode);
     }
 
@@ -303,6 +315,9 @@ public final class FilterAction {
         }
 
         if (val != null) {
+            if (varMap.containsKey(key) && varMap.get(key) != null) {
+                return;
+            }
             varMap.put(key, val);
         }
     }
@@ -383,6 +398,9 @@ public final class FilterAction {
         }
 
         if (val != null) {
+            if (varMap.containsKey(key) && varMap.get(key) != null) {
+                return;
+            }
             varMap.put(key, val);
         }
     }
@@ -501,8 +519,12 @@ public final class FilterAction {
             val = queryParams;
         }
 
-        varMap.put(key, val);
-
+        if (val != null) {
+            if (varMap.containsKey(key) && varMap.get(key) != null) {
+                return;
+            }
+            varMap.put(key, val);
+        }
     }
 
     public Boolean invokeFilter(DataOperandFilterRequest dataOperandFilterRequest) {
