@@ -61,7 +61,7 @@ public class Executor {
         if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.TerminalExecutorDataOperands.FOLLOW_REDIRECT.toString())) {
             return new ExecutorSingleRequest(true, "", null, true);
         }
-        Boolean followRedirect = false;
+        Boolean followRedirect = true;
         if (childNodes.size() == 0) {
             String key = node.getOperationType();
             Object value = node.getValues();
