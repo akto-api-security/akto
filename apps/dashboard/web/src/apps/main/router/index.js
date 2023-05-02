@@ -1,6 +1,7 @@
 import Vue from 'vue'
 import Router from 'vue-router'
 const PageLogin  = () => import( '@/apps/login/App')
+const GrowthHackingTool = () => import('@/apps/tools/App')
 const PageDashboard  = () => import( '@/apps/dashboard/App')
 const PageToday  = () => import( "@/apps/dashboard/views/today/Today")
 const PageMarketplace  = () => import( "@/apps/dashboard/views/marketplace/PageMarketplace")
@@ -35,6 +36,11 @@ const router =  new Router({
     mode: 'history',
     base: process.env.BASE_URL,
     routes: [
+        {
+            path: '/tools',
+            name: 'tools',
+            component: GrowthHackingTool
+        },
         {
             path: '/',
             redirect: 'login',
