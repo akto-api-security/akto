@@ -18,7 +18,7 @@ public class SecurityHeadersFilter implements Filter {
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
         HttpServletResponse httpServletResponse = (HttpServletResponse) response;
 
-        httpServletResponse.addHeader("X-Frame-Options", "deny");
+        httpServletResponse.addHeader("Content-Security-Policy", "frame-ancestors 'self' akto.io *.akto.io;");
         httpServletResponse.addHeader("X-XSS-Protection", "1");
         httpServletResponse.addHeader("X-Content-Type-Options", "nosniff");
         httpServletResponse.addHeader("cache-control", "no-cache, no-store, must-revalidate, pre-check=0, post-check=0");
