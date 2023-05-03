@@ -91,4 +91,14 @@ public class Utils {
         return res;
     }
 
+    // public static String[] trimAndSplit(String url) {
+    //     return trim(url).split("/");
+    // }
+
+    // public static String trim(String url) {
+    //     if (url.startsWith("/")) url = url.substring(1, url.length());
+    //     if (url.endsWith("/")) url = url.substring(0, url.length()-1);
+    //     return url;
+    // }
+
 }

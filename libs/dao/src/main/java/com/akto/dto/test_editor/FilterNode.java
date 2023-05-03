@@ -13,9 +13,10 @@ public class FilterNode {
     private List<FilterNode> childNodes;
     private String subConcernedProperty;
     private String bodyOperand;
+    private String contextProperty;
 
     public FilterNode(String operand, Boolean result, String concernedProperty, Object values, String nodeType, 
-        List<FilterNode> childNodes, String subConcernedProperty, String bodyOperand) {
+        List<FilterNode> childNodes, String subConcernedProperty, String bodyOperand, String contextProperty) {
         this.operand = operand;
         this.result = result;
         this.concernedProperty = concernedProperty;
@@ -24,6 +25,7 @@ public class FilterNode {
         this.childNodes = childNodes;
         this.subConcernedProperty = subConcernedProperty;
         this.bodyOperand = bodyOperand;
+        this.contextProperty = contextProperty;
     }
 
     public FilterNode() { }
@@ -90,6 +92,14 @@ public class FilterNode {
 
     public void setBodyOperand(String bodyOperand) {
         this.bodyOperand = bodyOperand;
+    }
+
+    public String getContextProperty() {
+        return contextProperty;
+    }
+
+    public void setContextProperty(String contextProperty) {
+        this.contextProperty = contextProperty;
     }
 
     public List<Object> fetchNodeValues() {

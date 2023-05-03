@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.akto.dto.ApiInfo;
 import com.akto.dto.RawApi;
+import com.mongodb.BasicDBObject;
 
 public class FilterActionRequest {
     
@@ -14,14 +15,16 @@ public class FilterActionRequest {
     private String concernedProperty;
     private String concernedSubProperty;
     private List<String> matchingKeySet;
+    private List<BasicDBObject> contextEntities;
     private String operand;
     private String context;
     private Boolean keyValOperandSeen;
     private String bodyOperand;
+    private String contextProperty;
 
     public FilterActionRequest(Object querySet, RawApi rawApi, RawApi testRunRawApi, ApiInfo.ApiInfoKey apiInfoKey,
-            String concernedProperty, String concernedSubProperty, List<String> matchingKeySet, 
-            String operand, String context, Boolean keyValOperandSeen, String bodyOperand) {
+            String concernedProperty, String concernedSubProperty, List<String> matchingKeySet, List<BasicDBObject> contextEntities,
+            String operand, String context, Boolean keyValOperandSeen, String bodyOperand, String contextProperty) {
         this.querySet = querySet;
         this.rawApi = rawApi;
         this.testRunRawApi = testRunRawApi;
@@ -29,10 +32,12 @@ public class FilterActionRequest {
         this.concernedProperty = concernedProperty;
         this.concernedSubProperty = concernedSubProperty;
         this.matchingKeySet = matchingKeySet;
+        this.contextEntities = contextEntities;
         this.operand = operand;
         this.context = context;
         this.keyValOperandSeen = keyValOperandSeen;
         this.bodyOperand = bodyOperand;
+        this.contextProperty = contextProperty;
     }
 
     public FilterActionRequest() { }
@@ -93,6 +98,14 @@ public class FilterActionRequest {
         this.matchingKeySet = matchingKeySet;
     }
 
+    public List<BasicDBObject> getContextEntities() {
+        return contextEntities;
+    }
+
+    public void setContextEntities(List<BasicDBObject> contextEntities) {
+        this.contextEntities = contextEntities;
+    }
+
     public String getOperand() {
         return operand;
     }
@@ -139,6 +152,14 @@ public class FilterActionRequest {
 
     public void setBodyOperand(String bodyOperand) {
         this.bodyOperand = bodyOperand;
+    }
+
+    public String getContextProperty() {
+        return contextProperty;
+    }
+
+    public void setContextProperty(String contextProperty) {
+        this.contextProperty = contextProperty;
     }
 
 }
