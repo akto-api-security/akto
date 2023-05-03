@@ -22,7 +22,9 @@ public class AuthValidator {
             return true;
         }
 
-        List<String> headerKeys = getHeaders(auth, rawApi);
+        List<String> headerKeys = getHeaders(auth);
+
+        auth.setHeaders(headerKeys);
 
         if (headerKeys == null || headerKeys.size() == 0) {
             return false;
@@ -41,9 +43,9 @@ public class AuthValidator {
         return true;
     }
 
-    public static List<String> getHeaders(Auth auth, RawApi rawApi) {
+    public static List<String> getHeaders(Auth auth) {
 
-        if (auth.getHeaders() != null && auth.getHeaders().size() > 0) {
+        if (auth != null && auth.getHeaders() != null && auth.getHeaders().size() > 0) {
             return auth.getHeaders();
         }
 
@@ -60,12 +62,10 @@ public class AuthValidator {
             headerKeys.add(key.toLowerCase());
         }
 
-        auth.setHeaders(headerKeys);
-
         return headerKeys;
 
     }
-
+    
     public static ExecutionResult checkAuth(Auth auth, RawApi rawApi) {
 
         Map<String, List<String>> headers = rawApi.getRequest().getHeaders();

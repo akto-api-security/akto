@@ -1,5 +1,6 @@
 package com.akto.dto.test_editor;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class FilterNode {
@@ -89,6 +90,15 @@ public class FilterNode {
 
     public void setBodyOperand(String bodyOperand) {
         this.bodyOperand = bodyOperand;
+    }
+
+    public List<Object> fetchNodeValues() {
+        List<Object> valListCopy = new ArrayList<>();
+        List<Object> valueList = (List) this.values;
+        for (Object objVal: valueList) {
+            valListCopy.add(objVal);
+        }
+        return valListCopy;
     }
 
 }
