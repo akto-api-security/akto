@@ -165,13 +165,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         Config.GoogleConfig aktoGoogleConfig = (Config.GoogleConfig) ConfigsDao.instance.findOne("_id", "GOOGLE-ankush");
         if (aktoGoogleConfig == null) {
             Config.GoogleConfig newConfig = new Config.GoogleConfig();
-            newConfig.setClientId("779574722609-j4scecjhuiiu8u8g9hegjs27ihhpa3c2.apps.googleusercontent.com");
-            newConfig.setProjectId("ankitas-playground");
-            newConfig.setAuthURI("https://accounts.google.com/o/oauth2/auth");
-            newConfig.setCertURL("https://www.googleapis.com/oauth2/v1/certs");
-            newConfig.setJsOrigins(InitializerListener.getDomain());
-            newConfig.setClientSecret("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");
-            newConfig.setTokenURI("https://oauth2.googleapis.com/token");
+            //Inserting blank config won't work, need to fill in Config manually in db
             ConfigsDao.instance.insertOne(newConfig);
             aktoGoogleConfig = (Config.GoogleConfig) ConfigsDao.instance.findOne("_id", "GOOGLE-ankush");
         }

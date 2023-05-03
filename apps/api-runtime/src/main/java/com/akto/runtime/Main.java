@@ -159,7 +159,6 @@ public class Main {
 
         if (topicName == null) topicName = "akto.api.logs";
 
-        // mongoURI = "mongodb://write_ops:write_ops@cluster0-shard-00-00.yg43a.mongodb.net:27017,cluster0-shard-00-01.yg43a.mongodb.net:27017,cluster0-shard-00-02.yg43a.mongodb.net:27017/myFirstDatabase?ssl=true&replicaSet=atlas-qd3mle-shard-0&authSource=admin&retryWrites=true&w=majority";
         DaoInit.init(new ConnectionString(mongoURI));
         initializeRuntime();
 
