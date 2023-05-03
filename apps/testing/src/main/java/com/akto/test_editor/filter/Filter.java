@@ -34,7 +34,7 @@ public class Filter {
             }
             String operand = node.getOperand();
             FilterActionRequest filterActionRequest = new FilterActionRequest(node.getValues(), rawApi, testRawApi, apiInfoKey, node.getConcernedProperty(), node.getSubConcernedProperty(), matchingKeySet, operand, context, keyValOperandSeen, node.getBodyOperand());
-            Object updatedQuerySet = filterAction.resolveQuerySetValues(filterActionRequest, node.getValues(), varMap);
+            Object updatedQuerySet = filterAction.resolveQuerySetValues(filterActionRequest, node.fetchNodeValues(), varMap);
             filterActionRequest.setQuerySet(updatedQuerySet);
             if (node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACT.toString())) {
                 filterAction.extract(filterActionRequest, varMap);
