@@ -1,5 +1,5 @@
 <template>
-    <div>
+    <div style="height: 100%;">
         <div class="brdb pl-8">
             <div v-if="title" class="pt-6">
                 <div>
@@ -70,15 +70,33 @@
                 this.tabName = 0
             },
             setTabWithName(tabName) {
-                this.tabName = this.tabs.indexOf(tabName)
+                let tabRealName = tabName.replace("-"," ")
+                this.tabName = this.tabs.indexOf(tabRealName)
             }
         },
         watch: {
             defaultTabName: function (newVal) {
-                console.log(newVal, this.tabs.indexOf(newVal))
                 this.tabName = this.tabs.indexOf(newVal)
+            },
+            tabName: function (newVal) {
+                let tabName = this.tabs[newVal]
+                if(tabName){
+                    tabName = this.tabs[newVal].replace(" ", "-")
+                }
+                window.location.hash = "#" + tabName
             }
-        }
+        },
+        mounted() {
+            let currTab = this.$router.history.current.query['tab']
+            if(currTab){
+                let tab = this.tabs.find(x=> x.toLowerCase().replace(" ", "").startsWith(currTab.toLowerCase()))
+                if(tab){
+                    this.setTabWithName(tab)
+                }
+            } else {
+                this.setTabWithName(window.location.hash.substring(1))
+            }
+        },
     }
 
 </script>

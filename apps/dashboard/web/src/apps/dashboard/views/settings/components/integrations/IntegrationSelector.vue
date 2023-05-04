@@ -53,6 +53,7 @@ import Postman from "./Postman"
 import AktoAPIIntegration from "./AktoApiIntegration"
 import WebhookIntegration from "./webhook/WebhookIntegration";
 import func from "@/util/func";
+import AktoGptConfig from "./AktoGptConfig";
 
 export default {
   name: "IntegrationSelector",
@@ -61,7 +62,8 @@ export default {
     SlackIntegration,
     Postman,
     AktoAPIIntegration,
-    WebhookIntegration
+    WebhookIntegration,
+    AktoGptConfig
   },
   data () {
     let integrationsList = [
@@ -102,6 +104,13 @@ export default {
             tokenUtility:func.testingResultType().CICD,
             avatar_image:"$cicdicon"
           }
+        }]
+      },
+      {
+        name: 'Akto GPT',
+        connectors: [{
+          name: 'Akto GPT',
+          component: AktoGptConfig
         }]
       },
       {
