@@ -826,7 +826,7 @@ public final class FilterAction {
         Bson filter = Filters.and(
             Filters.eq("apiCollectionId", apiInfoKey.getApiCollectionId()),
             Filters.ne("url", request.getUrl()),
-            Filters.eq("param", param)
+            Filters.regex("param", param)
         );
         SingleTypeInfo singleTypeInfo = SingleTypeInfoDao.instance.findOne(filter);
 
@@ -839,7 +839,7 @@ public final class FilterAction {
         Set<String> valSet = singleTypeInfo.getValues().getElements();
 
         for (String val: valSet) {
-            boolean exists = paramExists(filterActionRequest.getRawApi(), param, val);
+            boolean exists = paramExists(filterActionRequest.getRawApi(), singleTypeInfo.getParam(), val);
             if (!exists) {
                 obj.put("key", param);
                 obj.put("value", val);
