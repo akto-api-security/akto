@@ -1516,6 +1516,19 @@
             </result>
         </action>
 
+        <action name="api/fetchSearchTestResults" class="com.akto.action.testing.MarketplaceAction" method="searchTestResults">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="enumAsBean">true</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchBurpPluginInfo" class="com.akto.action.BurpJarAction" method="fetchBurpPluginInfo">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -1529,7 +1542,9 @@
         <action name="api/fetchTestingSources" class="com.akto.action.testing.MarketplaceAction" method="fetchTestingSources">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="enumAsBean">true</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
