@@ -905,7 +905,41 @@ public final class FilterAction {
 
     public boolean paramExists(RawApi rawApi, String param, String val) {
 
-        // todo: add
+        Map<String, List<String>> headers = rawApi.getRequest().getHeaders();
+
+        if (headers.containsKey(param)) {
+            List<String> headerVal = headers.get(param);
+            if (headerVal.contains(val)) {
+                return true;
+            }
+        }
+
+        String queryParams = rawApi.getRequest().getQueryParams();
+        String url = rawApi.getRequest().getUrl();
+        BasicDBObject queryParamObj = RequestTemplate.getQueryJSON(url + "?" + queryParams);
+
+        if (queryParamObj.containsKey(param)) {
+            Object paramVal = queryParamObj.get(param);
+            if (val.equalsIgnoreCase(paramVal.toString())) {
+                return true;
+            }
+        }
+
+        String payload = rawApi.getRequest().getBody();
+        BasicDBObject reqObj = new BasicDBObject();
+        try {
+            reqObj =  BasicDBObject.parse(payload);
+        } catch(Exception e) {
+            // add log
+        }
+
+        if (reqObj.containsKey(param)) {
+            Object paramVal = reqObj.get(param);
+            if (val.equalsIgnoreCase(paramVal.toString())) {
+                return true;
+            }
+        }
+
         return false;
 
     }
