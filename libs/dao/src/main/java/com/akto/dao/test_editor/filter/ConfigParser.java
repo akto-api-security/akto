@@ -14,7 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class ConfigParser {
 
-    private List<String> allowedDataParentNodes = Arrays.asList("pred", "payload", "term", "body");
+    private List<String> allowedDataParentNodes = Arrays.asList("pred", "payload", "term", "body", "context");
     private List<String> allowedPredParentNodes = Arrays.asList("pred", "collection", "payload", "term");
     private List<String> allowedTermParentNodes = Arrays.asList("pred");
     private List<String> allowedCollectionParentNodes = Arrays.asList("pred", "term");
@@ -30,40 +30,44 @@ public class ConfigParser {
             return null;
         }
         
-        FilterNode node = new FilterNode("and", false, null, filters, "_ETHER_", new ArrayList<>(), null, null);
-        ConfigParserResult configParserResult = validateAndTransform(filterMap, node, node, false, false, null, null, null);
+        FilterNode node = new FilterNode("and", false, null, filters, "_ETHER_", new ArrayList<>(), null, null, null);
+        ConfigParserResult configParserResult = validateAndTransform(filterMap, node, node, false, false, null, null, null, null);
 
         return configParserResult;
     }
 
     public ConfigParserResult validateAndTransform(Map<String, Object> filters, FilterNode curNode, FilterNode parentNode, Boolean termNodeExists, 
-        Boolean collectionNodeExists, String concernedProperty, String subConcernedProperty, String bodyOperand) {
+        Boolean collectionNodeExists, String concernedProperty, String subConcernedProperty, String bodyOperand, String contextProperty) {
 
         Object values = curNode.getValues();
 
-        ConfigParserValidationResult configParserValidationResult = validateNodeAgainstRules(curNode, parentNode, termNodeExists, collectionNodeExists, concernedProperty);
+        ConfigParserValidationResult configParserValidationResult = validateNodeAgainstRules(curNode, parentNode, termNodeExists, collectionNodeExists, concernedProperty, contextProperty);
         if (!configParserValidationResult.getIsValid()) {
             return new ConfigParserResult(null, false, configParserValidationResult.getErrMsg());
         }
 
-        if (curNode.getNodeType().equals(OperandTypes.Data.toString().toLowerCase()) || curNode.getNodeType().equals(OperandTypes.Extract.toString().toLowerCase())) {
+        if (curNode.getNodeType().equalsIgnoreCase(OperandTypes.Data.toString()) || curNode.getNodeType().equalsIgnoreCase(OperandTypes.Extract.toString())) {
             return new ConfigParserResult(null, true, "");
         }
 
-        if (curNode.getNodeType().equals(OperandTypes.Term.toString().toLowerCase())) {
+        if (curNode.getNodeType().equalsIgnoreCase(OperandTypes.Term.toString())) {
             termNodeExists = true;
             concernedProperty = curNode.getOperand();
         }
 
-        if (curNode.getNodeType().equals(OperandTypes.Collection.toString().toLowerCase())) {
+        if (curNode.getNodeType().equalsIgnoreCase(OperandTypes.Context.toString())) {
+            contextProperty = curNode.getOperand();
+        }
+
+        if (curNode.getNodeType().equalsIgnoreCase(OperandTypes.Collection.toString())) {
             collectionNodeExists = true;
         }
 
-        if (curNode.getNodeType().equals(OperandTypes.Body.toString().toLowerCase())) {
+        if (curNode.getNodeType().equalsIgnoreCase(OperandTypes.Body.toString())) {
             bodyOperand = curNode.getOperand();
         }
 
-        if (curNode.getNodeType().equals(OperandTypes.Payload.toString().toLowerCase())) {
+        if (curNode.getNodeType().equalsIgnoreCase(OperandTypes.Payload.toString())) {
             subConcernedProperty = curNode.getOperand();
         }
 
@@ -84,8 +88,8 @@ public class ConfigParser {
                     if (!(entry.getValue() instanceof List)) {
                         entry.setValue(Arrays.asList(entry.getValue()));
                     }
-                    FilterNode node = new FilterNode(operand, false, concernedProperty, entry.getValue(), operandType, new ArrayList<>(), subConcernedProperty, bodyOperand);
-                    ConfigParserResult configParserResult = validateAndTransform(filters, node, curNode, termNodeExists, collectionNodeExists, concernedProperty, subConcernedProperty, bodyOperand);
+                    FilterNode node = new FilterNode(operand, false, concernedProperty, entry.getValue(), operandType, new ArrayList<>(), subConcernedProperty, bodyOperand, contextProperty);
+                    ConfigParserResult configParserResult = validateAndTransform(filters, node, curNode, termNodeExists, collectionNodeExists, concernedProperty, subConcernedProperty, bodyOperand, contextProperty);
                     if (!configParserResult.getIsValid()) {
                         return configParserResult;
                     }
@@ -102,8 +106,8 @@ public class ConfigParser {
                 if (!(entry.getValue() instanceof List)) {
                     entry.setValue(Arrays.asList(entry.getValue()));
                 }
-                FilterNode node = new FilterNode(operand, false, concernedProperty, entry.getValue(), operandType, new ArrayList<>(), subConcernedProperty, bodyOperand);
-                ConfigParserResult configParserResult = validateAndTransform(filters, node, curNode, termNodeExists, collectionNodeExists, concernedProperty, subConcernedProperty, bodyOperand);
+                FilterNode node = new FilterNode(operand, false, concernedProperty, entry.getValue(), operandType, new ArrayList<>(), subConcernedProperty, bodyOperand, contextProperty);
+                ConfigParserResult configParserResult = validateAndTransform(filters, node, curNode, termNodeExists, collectionNodeExists, concernedProperty, subConcernedProperty, bodyOperand, contextProperty);
                 if (!configParserResult.getIsValid()) {
                     return configParserResult;
                 }
@@ -121,7 +125,7 @@ public class ConfigParser {
     }
 
     public ConfigParserValidationResult validateNodeAgainstRules(FilterNode curNode, FilterNode parentNode, Boolean termNodeExists, 
-        Boolean collectionNodeExists, String concernedProperty) {
+        Boolean collectionNodeExists, String concernedProperty, String contextProperty) {
 
         Object values = curNode.getValues();
 
@@ -167,7 +171,7 @@ public class ConfigParser {
         // 4. data nodes and collection nodes cannot have a null concerned property, i.e. they have to 
         // know what which property they are working on (for ex - request_body, url, method, queryParam etc)
 
-        if (((curNodeType.equals(OperandTypes.Data.toString().toLowerCase()) || curNodeType.equals(OperandTypes.Collection.toString().toLowerCase())) && concernedProperty == null)) {
+        if (((curNodeType.equals(OperandTypes.Data.toString().toLowerCase()) || curNodeType.equals(OperandTypes.Collection.toString().toLowerCase())) && concernedProperty == null && contextProperty == null)) {
             configParserValidationResult.setIsValid(false);
             configParserValidationResult.setErrMsg("data nodes and collection nodes cannot have a null concerned property");
             return configParserValidationResult;
@@ -221,7 +225,7 @@ public class ConfigParser {
         }
 
         // 10. data, collection nodes cannot have a null term
-        if ((curNodeType.equals(OperandTypes.Data.toString().toLowerCase()) || curNodeType.equals(OperandTypes.Collection.toString().toLowerCase())) && !termNodeExists) {
+        if ((curNodeType.equals(OperandTypes.Data.toString().toLowerCase()) || curNodeType.equals(OperandTypes.Collection.toString().toLowerCase())) && (contextProperty == null &&!termNodeExists)) {
             configParserValidationResult.setIsValid(false);
             configParserValidationResult.setErrMsg("data, collection nodes cannot have a null term");
             return configParserValidationResult;

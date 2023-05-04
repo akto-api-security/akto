@@ -13,6 +13,7 @@ import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.FilterActionRequest;
 import com.akto.dto.test_editor.FilterNode;
+import com.mongodb.BasicDBObject;
 
 public class Filter {
 
@@ -22,7 +23,7 @@ public class Filter {
         this.filterAction = new FilterAction();
     }
     
-    public DataOperandsFilterResponse isEndpointValid(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfo.ApiInfoKey apiInfoKey, List<String> matchingKeySet, boolean keyValOperandSeen, String context, Map<String, Object> varMap) {
+    public DataOperandsFilterResponse isEndpointValid(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfo.ApiInfoKey apiInfoKey, List<String> matchingKeySet, List<BasicDBObject> contextEntities, boolean keyValOperandSeen, String context, Map<String, Object> varMap) {
 
         List<FilterNode> childNodes = node.getChildNodes();
         if (node.getNodeType().equalsIgnoreCase(OperandTypes.Term.toString())) {
@@ -30,17 +31,23 @@ public class Filter {
         }
         if (childNodes.size() == 0) {
             if (! (node.getNodeType().toLowerCase().equals(OperandTypes.Data.toString().toLowerCase()) || node.getNodeType().toLowerCase().equals(OperandTypes.Extract.toString().toLowerCase()))) {
-                return new DataOperandsFilterResponse(false, null);
+                return new DataOperandsFilterResponse(false, null, null);
             }
             String operand = node.getOperand();
-            FilterActionRequest filterActionRequest = new FilterActionRequest(node.getValues(), rawApi, testRawApi, apiInfoKey, node.getConcernedProperty(), node.getSubConcernedProperty(), matchingKeySet, operand, context, keyValOperandSeen, node.getBodyOperand());
+            FilterActionRequest filterActionRequest = new FilterActionRequest(node.getValues(), rawApi, testRawApi, apiInfoKey, node.getConcernedProperty(), node.getSubConcernedProperty(), matchingKeySet, contextEntities, operand, context, keyValOperandSeen, node.getBodyOperand(), node.getContextProperty());
             Object updatedQuerySet = filterAction.resolveQuerySetValues(filterActionRequest, node.fetchNodeValues(), varMap);
             filterActionRequest.setQuerySet(updatedQuerySet);
             if (node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACT.toString())) {
-                filterAction.extract(filterActionRequest, varMap);
-                return new DataOperandsFilterResponse(true, null);
-            } else {
+                if (filterActionRequest.getConcernedProperty() != null) {
+                    filterAction.extract(filterActionRequest, varMap);
+                } else {
+                    filterAction.extractContextVar(filterActionRequest, varMap);
+                }
+                return new DataOperandsFilterResponse(true, null, null);
+            } else if (filterActionRequest.getConcernedProperty() != null) {
                 return filterAction.apply(filterActionRequest);
+            } else {
+                return filterAction.evaluateContext(filterActionRequest);
             }
         }
 
@@ -55,7 +62,8 @@ public class Filter {
         
         for (int i = 0; i < childNodes.size(); i++) {
             FilterNode childNode = childNodes.get(i);
-            dataOperandsFilterResponse = isEndpointValid(childNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, keyValOpSeen,context, varMap);
+            dataOperandsFilterResponse = isEndpointValid(childNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, contextEntities, keyValOpSeen,context, varMap);
+            contextEntities = dataOperandsFilterResponse.getContextEntities();
             result = operator.equals("and") ? result && dataOperandsFilterResponse.getResult() : result || dataOperandsFilterResponse.getResult();
             
             if (childNodes.get(i).getOperand().toLowerCase().equals("key")) {
@@ -67,7 +75,7 @@ public class Filter {
             }
         }
 
-        return new DataOperandsFilterResponse(result, matchingKeySet);
+        return new DataOperandsFilterResponse(result, matchingKeySet, contextEntities);
 
     }
 

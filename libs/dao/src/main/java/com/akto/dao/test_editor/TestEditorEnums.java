@@ -5,13 +5,15 @@ public class TestEditorEnums {
     public enum DataOperands {
         CONTAINS_EITHER,
         CONTAINS_ALL,
+        NOT_CONTAINS,
         REGEX,
         EQ,
         GTE,
         GT,
         LTE,
         LT,
-        NEQ
+        NEQ,
+        PARAM
     }
 
     public enum CollectionOperands {
@@ -57,7 +59,13 @@ public class TestEditorEnums {
         Collection,
         Payload,
         Body,
-        Extract
+        Extract,
+        Context
+    }
+
+    public enum ContextOperator {
+        PRIVATE_VARIABLE_CONTEXT,
+        PARAM_CONTEXT
     }
 
 
@@ -100,6 +108,12 @@ public class TestEditorEnums {
         }
 
         for (ExtractOperator operand: ExtractOperator.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return operand.toString();
+            }
+        }
+
+        for (ContextOperator operand: ContextOperator.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
                 return operand.toString();
             }
@@ -149,6 +163,12 @@ public class TestEditorEnums {
         for (ExtractOperator operand: ExtractOperator.values()) {
             if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
                 return "extract";
+            }
+        }
+
+        for (ContextOperator operand: ContextOperator.values()) {
+            if (operand.toString().toLowerCase().equals(key.toLowerCase())) {
+                return "context";
             }
         }
 

@@ -99,6 +99,27 @@ public class Executor {
             if (key == null || value == null) {
                 return new ExecutorSingleOperationResp(false, "error executing executor operation, key or value is null " + key + " " + value);
             }
+            Object keyContext = null, valContext = null;
+            if (key instanceof String) {
+                keyContext = VariableResolver.resolveContextKey(varMap, key);
+            }
+            if (value instanceof String) {
+                valContext = VariableResolver.resolveContextVariable(varMap, value.toString());
+            }
+
+            if (keyContext instanceof ArrayList && valContext instanceof ArrayList) {
+                List<String> keyContextList = (List<String>) keyContext;
+                List<String> valueContextList = (List<String>) valContext;
+
+                for (int i = 0; i < keyContextList.size(); i++) {
+                    String v1 = valueContextList.get(i);
+                    ExecutorSingleOperationResp resp = runOperation(operationType, rawApi, keyContextList.get(i), v1, varMap);
+                    if (!resp.getSuccess()) {
+                        return resp;
+                    }
+                }
+                return new ExecutorSingleOperationResp(true, "");
+            }
 
             if (key instanceof String) {
                 key = VariableResolver.resolveExpression(varMap, key);
@@ -108,43 +129,48 @@ public class Executor {
                 value = VariableResolver.resolveExpression(varMap, value.toString());
             }
 
-            switch (operationType.toLowerCase()) {
-                case "add_body_param":
-                    return Operations.addBody(rawApi, key, value);
-                case "modify_body_param":
-                    return Operations.modifyBodyParam(rawApi, key, value);
-                case "delete_body_param":
-                    return Operations.deleteBodyParam(rawApi, key);
-                case "add_header":
-                    return Operations.addHeader(rawApi, key, value.toString());
-                case "modify_header":
-                    return Operations.modifyHeader(rawApi, key, value.toString());
-                case "delete_header":
-                    return Operations.deleteHeader(rawApi, key);
-                case "add_query_param":
-                    return Operations.addQueryParam(rawApi, key, value);
-                case "modify_query_param":
-                    return Operations.modifyQueryParam(rawApi, key, value);
-                case "delete_query_param":
-                    return Operations.deleteQueryParam(rawApi, key);
-                case "modify_url":
-                    return Operations.modifyUrl(rawApi, key);
-                case "modify_method":
-                    return Operations.modifyMethod(rawApi, key);
-                case "remove_auth_headers":
-                    List<String> authHeaders = (List<String>) varMap.get("auth_headers");
-                    for (String header: authHeaders) {
-                        Operations.deleteHeader(rawApi, header);
-                    }
-                    return new ExecutorSingleOperationResp(true, "");
-                default:
-                    return new ExecutorSingleOperationResp(false, "invalid operationType");
-    
-            }
+            ExecutorSingleOperationResp resp = runOperation(operationType, rawApi, key, value, varMap);
+            return resp;
         } catch(Exception e) {
             return new ExecutorSingleOperationResp(false, "error executing executor operation " + e.getMessage());
         }
         
+    }
+    
+    public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, String key, Object value, Map<String, Object> varMap) {
+        switch (operationType.toLowerCase()) {
+            case "add_body_param":
+                return Operations.addBody(rawApi, key, value);
+            case "modify_body_param":
+                return Operations.modifyBodyParam(rawApi, key, value);
+            case "delete_body_param":
+                return Operations.deleteBodyParam(rawApi, key);
+            case "add_header":
+                return Operations.addHeader(rawApi, key, value.toString());
+            case "modify_header":
+                return Operations.modifyHeader(rawApi, key, value.toString());
+            case "delete_header":
+                return Operations.deleteHeader(rawApi, key);
+            case "add_query_param":
+                return Operations.addQueryParam(rawApi, key, value);
+            case "modify_query_param":
+                return Operations.modifyQueryParam(rawApi, key, value);
+            case "delete_query_param":
+                return Operations.deleteQueryParam(rawApi, key);
+            case "modify_url":
+                return Operations.modifyUrl(rawApi, key);
+            case "modify_method":
+                return Operations.modifyMethod(rawApi, key);
+            case "remove_auth_headers":
+                List<String> authHeaders = (List<String>) varMap.get("auth_headers");
+                for (String header: authHeaders) {
+                    Operations.deleteHeader(rawApi, header);
+                }
+                return new ExecutorSingleOperationResp(true, "");
+            default:
+                return new ExecutorSingleOperationResp(false, "invalid operationType");
+
+        }
     }
 
 }
