@@ -5,6 +5,7 @@ import com.akto.dao.BurpPluginInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiToken;
 import com.akto.dto.BurpPluginInfo;
+import com.akto.dto.ApiToken.Utility;
 import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -50,7 +51,8 @@ public class BurpJarAction extends UserAction implements ServletResponseAware, S
         if (apiToken == null) {
             ApiTokenAction apiTokenAction = new ApiTokenAction();
             apiTokenAction.setSession(this.getSession());
-            apiTokenAction.addBurpToken();
+            apiTokenAction.setTokenUtility(Utility.BURP);
+            apiTokenAction.addApiToken();
             List<ApiToken> apiTokenList = apiTokenAction.getApiTokenList();
             if (apiTokenList == null || apiTokenList.isEmpty()) {
                 addActionError("Couldn't generate burp token");

@@ -22,6 +22,7 @@ import NGINX from "../apps/dashboard/shared/icons/NGINX"
 import Discord from "../apps/dashboard/shared/icons/Discord"
 import DeleteIcon from "../apps/dashboard/shared/icons/DeleteIcon"
 import PlusIcon from "../apps/dashboard/shared/icons/PlusIcon"
+import CICDIcon from "../apps/dashboard/shared/icons/CICDIcon"
 import ChatGPT from "../apps/dashboard/shared/icons/ChatGPT"
 
 Vue.component('font-awesome-icon', FontAwesomeIcon)
@@ -261,6 +262,11 @@ faIconsOpts.trashSingleTick = {
 
 faIconsOpts.trashDoubleTick = {
   component: TrashDoubleTick
+}
+
+faIconsOpts.cicdicon = {
+  component: CICDIcon
+
 }
 
 faIconsOpts.nginx = {
