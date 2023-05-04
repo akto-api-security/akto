@@ -69,20 +69,11 @@ export default {
             return resp
         })
     },
-    addBurpToken() {
+    addApiToken(tokenUtility) {
         return request({
-            url: '/api/addBurpToken',
+            url: '/api/addApiToken',
             method: 'post',
-            data: {}
-        }).then((resp) => {
-            return resp
-        })
-    },
-    addExternalApiToken() {
-        return request({
-            url: '/api/addExternalApiToken',
-            method: 'post',
-            data: {}
+            data: {tokenUtility}
         }).then((resp) => {
             return resp
         })
