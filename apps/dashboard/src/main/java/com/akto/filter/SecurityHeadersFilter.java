@@ -20,7 +20,7 @@ public class SecurityHeadersFilter implements Filter {
         Context.accountId.remove();
         HttpServletResponse httpServletResponse = (HttpServletResponse) response;
 
-        httpServletResponse.addHeader("Content-Security-Policy", "frame-ancestors 'self' akto.io *.akto.io *.framer.*;");
+        httpServletResponse.addHeader("Content-Security-Policy", "frame-ancestors 'self' akto.io https://dazzled-choices-451983.framer.app *.akto.io  *.framer.*;");
         httpServletResponse.addHeader("X-XSS-Protection", "1");
         httpServletResponse.addHeader("X-Content-Type-Options", "nosniff");
         httpServletResponse.addHeader("cache-control", "no-cache, no-store, must-revalidate, pre-check=0, post-check=0");
