@@ -5,7 +5,8 @@ public enum GptQuery {
     GROUP_APIS_BY_FUNCTIONALITY("group_apis_by_functionality"),
     LIST_SENSITIVE_PARAMS("list_sensitive_params"),
     GENERATE_CURL_FOR_TEST("generate_curl_for_test"),
-    GENERATE_REGEX("generate_regex");
+    GENERATE_REGEX("generate_regex"),
+    SUGGEST_TESTS("suggest_tests");
 
     private final String name;
 

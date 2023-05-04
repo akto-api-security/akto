@@ -93,6 +93,15 @@
                                 It seems that this API is not vulnerable to {{ responses[0].test_type }} vulnerability.
                             </div>
                         </div>
+                        <div v-else-if="queryType === 'suggest_tests'">
+                            <div v-if="responses[0] && responses[0].tests">
+                                <div> This api is vulnerable to {{ responses[0].tests.join(", ") }} vulnerability. </div>
+                                <v-btn primary dark depressed @click="runTestsInAkto"> Run these tests in Akto</v-btn>
+                            </div>
+                            <div v-else class="error-resp">
+                                {{ responses[0].error }}
+                            </div>
+                        </div>
                         <div v-else>
                             <v-list-item v-for="(item, index) in responses" :key="index" class="listItem">
                                 <div v-if="item.functionality">
@@ -187,6 +196,10 @@ export default {
                 "regex": this.responses[0].regex.trim(),
                 "name": this.searchKey
             })
+        },
+        async runTestsInAkto(){
+            let selectedTests = this.responses[0].tests
+            this.$emit('runTests', {selectedTests})
         }
     },
     mounted () {

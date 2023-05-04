@@ -23,6 +23,7 @@
                     v-if="showGptDialog"
                     :items="chatGptPrompts"
                     :apiCollectionId="apiCollectionId"
+                    @runTests="runTests"
                 />
             </div>
 
@@ -166,6 +167,19 @@ export default {
                         }                        
                     }},
                     callback: (data) => console.log("callback create api groups", data)
+                },
+                {
+                    icon: "$fas_user-lock",
+                    label: "Suggest API Security tests for this API",
+                    prepareQuery: () => { return {
+                        type: "suggest_tests",
+                        meta: {
+                            "sample_data": this.allSamples[0].message,
+                            "response_details": this.parseMsgForGenerateCurl(this.allSamples[0].message),
+                            "apiCollectionId": this.apiCollectionId
+                        }                        
+                    }},
+                    callback: (data) => console.log("callback create api groups", data)
                 }
             ],
             headers: [
@@ -293,6 +307,25 @@ export default {
             obj.savedAsSensitive = false
             obj.sensitive = false
             return !func.isSubTypeSensitive(obj)
+        },
+        async runTests(payload){
+            console.log("run tests payload", payload)
+            payload['testName'] = "akto_gpt_test";
+            payload['apiInfoKeyList'] = [
+                {
+                    "url": this.url,
+                    "method": this.method,
+                    "apiCollectionId": this.apiCollectionId
+                }
+            ]
+            payload['isCallFromAktoGpt'] = true;
+            await this.$store.dispatch('testing/scheduleTestForCustomEndpoints', payload)
+            this.showGptDialog = false;
+            window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: 'Triggered tests successfully!',
+                    color: 'green'
+                });
         }
     },
     computed: {
