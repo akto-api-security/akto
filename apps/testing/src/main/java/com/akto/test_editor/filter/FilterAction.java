@@ -35,6 +35,7 @@ import com.akto.test_editor.filter.data_operands_impl.GreaterThanFilter;
 import com.akto.test_editor.filter.data_operands_impl.LesserThanEqFilter;
 import com.akto.test_editor.filter.data_operands_impl.LesserThanFilter;
 import com.akto.test_editor.filter.data_operands_impl.NeqFilter;
+import com.akto.test_editor.filter.data_operands_impl.NotContainsFilter;
 import com.akto.test_editor.filter.data_operands_impl.RegexFilter;
 import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
@@ -47,6 +48,7 @@ public final class FilterAction {
     public final Map<String, DataOperandsImpl> filters = new HashMap<String, DataOperandsImpl>() {{
         put("contains_all", new ContainsAllFilter());
         put("contains_either", new ContainsEitherFilter());
+        put("not_contains", new NotContainsFilter());
         put("regex", new RegexFilter());
         put("eq", new EqFilter());
         put("neq", new NeqFilter());
@@ -265,12 +267,22 @@ public final class FilterAction {
             for (String s: matchingKeySet) {
                 matchingKeys.add(s);
             }
-            return new DataOperandsFilterResponse(matchingKeys.size() > 0, matchingKeys, null);
+            Boolean filterResp = matchingKeys.size() > 0;
+            if (filterActionRequest.getOperand().equalsIgnoreCase("not_contains")) {
+                int keyCount = getKeyCount(payloadObj, null);
+                filterResp = matchingKeySet.size() == keyCount;
+            }
+            return new DataOperandsFilterResponse(filterResp, matchingKeys, null);
 
         } else if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("value")) {
             matchingKeys = filterActionRequest.getMatchingKeySet();
             valueExists(payloadObj, null, filterActionRequest.getQuerySet(), filterActionRequest.getOperand(), matchingKeys, filterActionRequest.getKeyValOperandSeen(), matchingValueKeySet);
-            return new DataOperandsFilterResponse(matchingValueKeySet.size() > 0, matchingValueKeySet, null);
+            Boolean filterResp = matchingValueKeySet.size() > 0;
+            if (filterActionRequest.getOperand().equalsIgnoreCase("not_contains")) {
+                int keyCount = getKeyCount(payloadObj, null);
+                filterResp = matchingKeySet.size() == keyCount;
+            }
+            return new DataOperandsFilterResponse(filterResp, matchingValueKeySet, null);
         } else if (filterActionRequest.getConcernedSubProperty() == null) {
             Object val = payload;
 
@@ -459,6 +471,9 @@ public final class FilterAction {
                 }
                 result = result || res;
             }
+            if (filterActionRequest.getOperand().equalsIgnoreCase("not_contains")) {
+                result = newMatchingKeys.size() == headers.size();
+            }
             return new DataOperandsFilterResponse(result, newMatchingKeys, null);
         } else if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("value")) {
             
@@ -475,6 +490,9 @@ public final class FilterAction {
                     }
                 }
                 result = result || res;
+            }
+            if (filterActionRequest.getOperand().equalsIgnoreCase("not_contains")) {
+                result = matchingValueKeySet.size() == headers.size();
             }
             return new DataOperandsFilterResponse(result, matchingValueKeySet, null);
         } else {
@@ -705,6 +723,32 @@ public final class FilterAction {
 
         return val;
     }
+
+    public int getKeyCount(Object obj, String parentKey) {
+        int count = 0;
+        if (obj instanceof BasicDBObject) {
+            BasicDBObject basicDBObject = (BasicDBObject) obj;
+
+            Set<String> keySet = basicDBObject.keySet();
+
+            for(String key: keySet) {
+                if (key == null) {
+                    continue;
+                }
+                Object value = basicDBObject.get(key);
+                count += getKeyCount(value, key);
+            }
+        } else if (obj instanceof BasicDBList) {
+            for(Object elem: (BasicDBList) obj) {
+                count += getKeyCount(elem, parentKey);
+            }
+        } else {
+            count++;
+        }
+
+        return count;
+
+    }
     
     public Object resolveDynamicValue(FilterActionRequest filterActionRequest, String firstParam, String secondParam) {
 
@@ -821,7 +865,7 @@ public final class FilterAction {
         OriginalHttpRequest request = filterActionRequest.getRawApi().getRequest();
 
         List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
-        String param = querySet.get(0);
+        String param = querySet.get(0).trim();
 
         Bson filter = Filters.and(
             Filters.eq("apiCollectionId", apiInfoKey.getApiCollectionId()),
