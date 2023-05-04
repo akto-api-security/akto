@@ -14,6 +14,8 @@ import auth_types from '../../dashboard/views/settings/components/auth_types/sto
 import issues from '@/apps/dashboard/views/issues/store/module'
 import test_roles from '@/apps/dashboard/views/testing/components/test_roles/store/module'
 import marketplace from '@/apps/dashboard/views/marketplace/store/module'
+import onboarding from '@/apps/dashboard/views/onboarding/store/module'
+import dashboard from '@/apps/dashboard/store/module'
 
 Vue.use(Vuex)
 
@@ -33,7 +35,12 @@ const store = new Vuex.Store({
         testing,
         issues,
         test_roles,
-        marketplace
+        marketplace,
+        onboarding,
+        dashboard
+    },
+    state:{
+        globalUid:-1
     }
 })
 

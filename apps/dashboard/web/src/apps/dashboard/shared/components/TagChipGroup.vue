@@ -7,13 +7,13 @@
             v-for="tag in tags.slice(0,2)"
             :key="tag"
             label
-            color="#6200EA19"
-            text-color="#6200EA99"
+            color="var(--themeColor10)"
+            text-color="var(--themeColor5)"
             class="tag-chip"
         >
             #{{toTitleCase(tag)}}
         </v-chip>
-        <span v-if="tags.length > 2" color="#6200EA" style="margin: auto 0px">
+        <span v-if="tags.length > 2" color="var(--themeColor)" style="margin: auto 0px">
             + {{tags.length-2}} more
         </span>
     </v-chip-group>

@@ -1,14 +1,13 @@
 package com.akto.util;
 
-import java.util.*;
-
-import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.util.modifier.PayloadModifier;
 import com.google.gson.Gson;
+import com.google.gson.JsonParser;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
-import org.json.JSONArray;
+
+import java.util.*;
 
 public class JSONUtils {
     private static void flatten(Object obj, String prefix, Map<String, Set<Object>> ret) {
@@ -152,6 +151,26 @@ public class JSONUtils {
             }
         }
     }
+
+    public static String parseIfJsonP(String payload) {
+        if (payload == null) return null;
+        if (!payload.startsWith("{") && !payload.startsWith("[") && !payload.startsWith("<")) {//candidate for json with padding handleRequest ({abc : abc})
+            int indexOfMethodStart = payload.indexOf('(');
+            int indexOfMethodEnd = payload.lastIndexOf(')');
+            try {
+                String nextChar = payload.substring(indexOfMethodStart + 1, indexOfMethodStart + 5);
+                if (nextChar.startsWith("{")) {
+                    String json = payload.substring(indexOfMethodStart + 1, indexOfMethodEnd);//Getting the content of method
+                    JsonParser.parseString(json);
+                    return json;
+                }
+            }catch (Exception e) {
+                return payload;
+            }
+        }
+        return payload;
+    }
+
 
 
     public static Map<String, List<String>> modifyHeaderValues(Map<String, List<String>> headers, PayloadModifier payloadModifier) {

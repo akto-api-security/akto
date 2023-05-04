@@ -8,37 +8,83 @@
             :options.sync="options"
             :sort-by="sortKey"
             :sort-desc="sortDesc"
-            :items-per-page="rowsPerPage"            
-            :hide-default-footer="false"
+            :items-per-page="rowsPerPage"           
+            :hide-default-footer="!(filteredItems && filteredItems.length > 0)"
             :footer-props="{
                 showFirstLastPage: false,
                 prevIcon: '$fas_angle-left',
                 nextIcon: '$fas_angle-right',
                 'items-per-page-options': itemsPerPage                
-            }"
-
-            hide-default-header
+            }"            hide-default-header
             :loading="loading"
+            tabindex="0"
+            @keydown.native.37="moveLeft"
+            @keydown.native.38="moveUp"
+            @keydown.native.39="moveRight"
+            @keydown.native.40="moveDown"
+            @keydown.native.13="pressEnter"
+            :ref="tableId"
         >
             <template v-slot:top="{ pagination, options, updateOptions }">
-                <div class="d-flex jc-sb">
-                    <div v-if="showName" class="table-name">
-                      {{name}}
-                    </div>
-                    <div>
-                        <slot name="massActions"/>
-                    </div>
-                    <div class="d-flex jc-end">
-                        <div class="d-flex board-table-cards jc-end">
-                            <slot name="add-new-row-btn" 
-                                v-bind:filters="filters"  
-                                v-bind:filterOperators="filterOperators"
-                                v-bind:sortKey="sortKey"
-                                v-bind:sortDesc="sortDesc"
-                                v-bind:total="total"
-                            />
+                <div class="d-flex jc-sb mt-4">
+                    
+                        <div v-if="showName" class="table-name">
+                        {{name}}
                         </div>
-                    </div>
+                        <div class="d-flex headerButtons">
+                            <template v-for = "(header,index) in selectedHeaders">
+                                <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.sortKey || header.value]"> 
+                                    <template v-slot:activator="{ on, attrs }">
+                                        <secondary-button 
+                                            :text="header.text" 
+                                            v-bind="attrs"
+                                            v-on="on"
+                                            :color="filters[header.sortKey || header.value].size > 0 ? 'var(--themeColor) !important' : null"
+                                        />
+                                    </template>
+                                    <filter-column 
+                                        :title="header.text"
+                                        :typeAndItems="getColumnValueList(header.sortKey || header.value)" 
+                                        @clickedItem="appliedFilter(header.sortKey || header.value, $event)" 
+                                        @operatorChanged="operatorChanged(header.sortKey || header.value, $event)"
+                                        @selectedAll="selectedAll(header.sortKey || header.value, $event)"
+                                    />
+                                </v-menu>
+                            </template>
+                            <v-menu offset-y :close-on-content-click="false" v-if="convertHeadersList().length > 0">
+                                <template v-slot:activator="{ on, attrs }">
+                                    <secondary-button 
+                                        text="More Filters" 
+                                        v-bind="attrs"
+                                        v-on="on"
+                                    />
+                                </template>
+
+                                <filter-list
+                                    :title="headers[1].text"
+                                    hideOperators
+                                    hideListTitle
+                                    :items="convertHeadersList()"
+                                    @clickedItem = "pushIntoNew($event)"
+                                />
+
+                            </v-menu>
+
+                        </div>
+                        <div>
+                            <slot name="massActions"/>
+                        </div>
+                        <div class="d-flex jc-end">
+                            <div class="d-flex jc-end">
+                                <slot name="add-at-top" 
+                                    v-bind:filters="filters"  
+                                    v-bind:filterOperators="filterOperators"
+                                    v-bind:sortKey="sortKey"
+                                    v-bind:sortDesc="sortDesc"
+                                    v-bind:total="total"
+                                />
+                            </div>
+                        </div>
                 </div>
             </template>
             <template v-slot:footer.prepend="{}">
@@ -57,30 +103,6 @@
                                         <span class="clickable"  @click="setSortOrInvertOrder(header)">
                                             {{header.text}} 
                                         </span>
-                                        <span v-if="header.showFilterMenu">
-                                            <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.sortKey || header.value]"> 
-                                                <template v-slot:activator="{ on, attrs }">                         
-                                                    <v-btn 
-                                                        :ripple="false" 
-                                                        v-bind="attrs" 
-                                                        v-on="on"
-                                                        primary 
-                                                        icon
-                                                        class="filter-icon" 
-                                                        :style="{display: hover || showFilterMenu[header.sortKey || header.value] || !showHideFilterIcon(header.sortKey || header.value) ? '' : 'none'}"
-                                                    >
-                                                        <v-icon :size="14">$fas_filter</v-icon>
-                                                    </v-btn>
-                                                </template>
-                                                <filter-column
-                                                    :title="header.text"
-                                                    :typeAndItems="getColumnValueList(header.sortKey || header.value)" 
-                                                    @clickedItem="appliedFilter(header.sortKey || header.value, $event)" 
-                                                    @operatorChanged="operatorChanged(header.sortKey || header.value, $event)"
-                                                    @selectedAll="selectedAll(header.sortKey || header.value, $event)"
-                                                />
-                                            </v-menu>
-                                        </span>
                                     </span>
                                 
                             </div>
@@ -94,31 +116,26 @@
                 </template>
 
             </template>
-            <template v-slot:item="{item}">
-                <v-hover
-                    v-slot="{ hover }"
-                >
-                    <tr class="table-row" >
-                        <td
-                            class="table-column"
-                            :style="{'background-color':item.color, 'padding' : '0px !important'}"
-                        />
-                        <td 
-                            v-for="(header, index) in headers.slice(1)"
-                            :key="index"
-                            class="table-column clickable"
-                            @click="$emit('rowClicked', item)"
-                        >
-                            <slot :name="[`item.${header.value}`]" :item="item">
-                                <div class="table-entry">{{item[header.value]}}</div>
-                            </slot>
-                        </td>
-
-                        <div v-if="actions && hover && actions.length > 0" class="table-row-actions">
-                            <actions-tray :actions="actions || []" :subject=item></actions-tray>
-                        </div>
-                    </tr>
-                </v-hover>
+            <template v-slot:item="{item, index}">
+                <slot name="row-view" :rowData="item" :index="index" :current="currRowIndex">
+                    <server-table-rows
+                        :actions="actions" 
+                        :item="item" 
+                        :index="index" 
+                        :currRowIndex="currRowIndex" 
+                        :headers="headers" 
+                        @clickRow="clickRow"
+                        @highlightRow="() => {currRowIndex = index}"
+                        :dense="dense"
+                    >
+                        <template v-for="(index, name) in $slots" v-slot:[name]>
+                            <slot :name="name" />
+                        </template>
+                        <template v-for="(index, name) in $scopedSlots" v-slot:[name]="data">
+                            <slot :name="name" v-bind="data"></slot>
+                        </template>
+                    </server-table-rows>
+                </slot>
             </template>
         </v-data-table>
     </div>
@@ -131,14 +148,24 @@ import func from "@/util/func"
 import { saveAs } from 'file-saver'
 import ActionsTray from './ActionsTray'
 import FilterColumn from './FilterColumn'
+import FilterList from './FilterList'
 import SimpleTextField from '@/apps/dashboard/shared/components/SimpleTextField.vue'
+import SecondaryButton from './buttons/SecondaryButton'
+import SimpleMenu from './SimpleMenu.vue'
+import ServerTableRows from "./rows/ServerTableRows.vue"
+import ServerTableBlock from "./rows/ServerTableBlock.vue"
 
 export default {
     name: "ServerTable",
     components: {
         ActionsTray,
         FilterColumn,
-        SimpleTextField
+        SimpleTextField,
+        FilterList,
+        SecondaryButton,
+        SimpleMenu,
+        ServerTableRows,
+        ServerTableBlock,
     },
     props: {
         headers: obj.arrR,
@@ -151,17 +178,22 @@ export default {
         actions: obj.arrN,
         allowNewRow: obj.boolN,
         hideDownloadCSVIcon: obj.boolN,
-        showName: obj.boolN
+        showName: obj.boolN,
+        dense: obj.boolN,
+        pageSize: obj.numN
     },
     data () {
-        let rowsPerPage = 100
+        let rowsPerPage = this.pageSize || 100
         return {
+            tableId: "table_"+parseInt(Math.random() * 10000000),
             options:{},
             rowsPerPage: rowsPerPage,
             itemsPerPage: [rowsPerPage],
             filteredItems: [],
+            selectedHeaders: [],
             total: 0,
-            loading: true,
+            currRowIndex: 0,
+            loading: false,
             currPage: 1,
             search: null,
             sortKey: this.sortKeyDefault || null,
@@ -245,26 +277,22 @@ export default {
             return ret
         },
         fetchRecentParams() {
-            const { sortBy, sortDesc, page, itemsPerPage } = this.options
+            this.loading = true
+            const { sortBy, sortDesc, page, itemsPerPage } = {...this.options, sortKey: this.sortKey, sortDesc: [this.sortDesc]}
             this.currPage = page
             this.rowsPerPage = itemsPerPage
             let skip = (this.currPage-1)*this.rowsPerPage
+            let _this = this
+            
             this.fetchParams(sortBy[0], sortDesc[0] ? -1: 1, skip, this.rowsPerPage, this.filters, this.filterOperators).then(resp => {
                 this.loading = false
                 let params = resp.endpoints
                 let total = resp.total
                 this.total = total
                 let listParams = params.map(this.processParams)
-                let sortedParams = listParams.sort((a, b) => {
-                    if (a.detectedTs > b.detectedTs + 3600) {
-                        return -1
-                    } else if (a.detectedTs < b.detectedTs - 3600) {
-                        return 1
-                    } else {
-                        return func.isSubTypeSensitive(a.x) > func.isSubTypeSensitive(b.x) ? -1 : 1
-                    }
-                })
+                let sortedParams = listParams
                 this.filteredItems = sortedParams
+                _this.$emit("filterApplied", sortedParams)
             }).catch(e => {
                 this.loading = false
             })
@@ -284,7 +312,11 @@ export default {
             if (this.filters[header].size < 1) {
                 return true
             } 
-            
+
+            if (itemValue instanceof Array) {
+                itemValue = new Set(itemValue);
+            }
+          
             if(itemValue instanceof Set) {
                 switch(this.filterOperators[header]) {
                     case "OR":
@@ -307,7 +339,67 @@ export default {
         },
         getDataFromApi () {
             this.loading = true
+            this.$refs[this.tableId].$el.focus()
             this.fetchRecentParams()
+            this.$refs[this.tableId].$el.focus()
+            this.currRowIndex = 0
+        },
+        convertHeadersList(){
+            return this.headers.filter(x => (x.value !== 'color' && (typeof x.showFilterMenu === "undefined") || x.showFilterMenu )).slice(4).map(x => {return {title: x.text, ...x}})
+        },
+        pushIntoNew({item , checked}){
+            if(checked) {
+                this.selectedHeaders.push(item)
+            }
+            else{
+                let index = this.selectedHeaders.findIndex(x => x.value === item.value)
+                this.selectedHeaders.splice(index, 1)
+
+                this.filters[item.sortKey || item.value] = new Set()
+                this.filters = {...this.filters}
+
+                this.operatorChanged(item.sortKey || item.value, {operator: "OR"})
+            }
+        },
+        fillInitial(){
+            this.selectedHeaders = this.headers.filter(x => (x.value !== 'color' && (typeof x.showFilterMenu === "undefined") || x.showFilterMenu)).slice(0, 4)
+        },
+        changePage(page) {
+            this.options = {...this.options, page}
+        },
+        moveLeft(){
+            let currPage = this.options.page
+            if (currPage == 1) return
+            
+            this.changePage(currPage-1)
+        },
+        moveUp() {
+            if (this.currRowIndex == 0) {
+                this.moveLeft()
+            } else {
+                this.currRowIndex--
+            }
+        },
+        moveRight(){
+            let currPage = this.options.page
+            if (currPage * this.rowsPerPage >= this.total) return
+            
+            this.changePage(currPage+1)
+        },
+        moveDown() {
+            if (this.currRowIndex == this.filteredItems.length-1) {
+                this.moveRight()
+            } else {
+                this.currRowIndex++
+            }
+        },
+        pressEnter() {
+            let item = this.filteredItems[this.currRowIndex]
+            this.$emit('rowClicked', item)
+        },
+        clickRow(index) {
+            this.currRowIndex = index
+            this.pressEnter()
         }
     },
     watch: {
@@ -320,6 +412,7 @@ export default {
     },
     mounted () {
         this.fetchRecentParams()
+        this.fillInitial()
     }
 
 }
@@ -359,32 +452,7 @@ export default {
         vertical-align: bottom
         text-align: left
         padding: 12px 8px !important
-        border: 1px solid #FFFFFF !important
-
-    .table-column
-        padding: 4px 8px !important
-        border-top: 1px solid #FFFFFF !important
-        border-bottom: 1px solid #FFFFFF !important
-        background: rgba(71, 70, 106, 0.03)
-        color: #47466A
-        max-width: 250px
-        text-overflow: ellipsis
-        overflow : hidden
-        white-space: nowrap
-
-        &:hover
-            text-overflow: clip
-            white-space: normal
-            word-break: break-all
-
-
-    .table-row
-        border: 0px solid #FFFFFF !important
-        position: relative
-
-        &:hover
-            background-color: #edecf0 !important
-            
+        border: 1px solid var(--white) !important
     .form-field-text
         padding-top: 8px !important
         margin-top: 0px !important
@@ -406,17 +474,19 @@ export default {
         color: var(--v-themeColor-base)
         font-weight: bold
         display: flex
-
-    .table-row-actions
-        position: absolute
-        right: 30px
-        padding: 8px 16px !important
-
+    
+    &:focus    
+        outline: none !important
+    
 .table-sub-header
     position: relative
 
+.headerButtons
+    flex-wrap: wrap
+    max-width: 660px
+
 .filter-icon
-    color: #6200EA !important
+    color: var(--themeColor) !important
     opacity:0.8
     min-width: 0px !important
     position: absolute
@@ -427,13 +497,13 @@ export default {
 <style scoped>
 .form-field-text >>> .v-label {
   font-size: 12px;
-  color: #6200EA;
+  color: var(--themeColor);
   font-weight: 400;
 }
 
 .form-field-text >>> input {
   font-size: 14px;
-  color: #6200EA;
+  color: var(--themeColor);
   font-weight: 500;
 }
 
@@ -448,5 +518,4 @@ export default {
 .board-table-cards >>> .v-data-footer__select {
     display: none;
 }
-
 </style>

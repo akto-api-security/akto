@@ -44,7 +44,7 @@
 
                         <template slot="append-outer" >
                             <spinner v-if="progressBar.show"></spinner>
-                            <v-btn v-else primary dark color="#6200EA" @click="saveLBs" :disabled="selectedLBs.length === initialLBCount" class="ml-3">
+                            <v-btn v-else primary dark color="var(--themeColor)" @click="saveLBs" :disabled="selectedLBs.length === initialLBCount" class="ml-3">
                                 Apply
                             </v-btn>
                         </template>
@@ -53,7 +53,7 @@
                 <div class="text_msg" v-html="text_msg"></div>
                 <div v-if="progressBar.show">
                     <div class="d-flex">
-                        <v-progress-linear class="mt-2" background-color="rgba(98, 0, 234,0.2)" color="rgb(98, 0, 234)"
+                        <v-progress-linear class="mt-2" background-color="var(--rgbaColor13)" color="var(--rgbaColor7)"
                             :value="progressBar.value">
                         </v-progress-linear>
                         <div class="ml-2">{{ progressBar.value }}%</div>
@@ -494,13 +494,13 @@ export default {
 
 .clickable-docs{
     cursor: pointer;
-    color: #6200B0 !important;
+    color: var(--quickStartTheme) !important;
     text-decoration: underline;
 }
 
 .text_msg >>> .clickable-docs{
     cursor: pointer;
-    color: #6200B0 !important;
+    color: var(--quickStartTheme) !important;
     text-decoration: underline;
 } 
 </style>

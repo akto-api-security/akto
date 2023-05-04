@@ -4,7 +4,7 @@
             <div>{{title}}</div>
             <div>{{Object.values(checkedMap).filter(x => x).length}}/{{Object.values(checkedMap).length}}</div>
         </div>
-        <div v-if="!hideOperators" class="d-flex jc-end pr-2" style="background-color: #FFFFFF">
+        <div v-if="!hideOperators" class="d-flex jc-end pr-2" style="background-color: var(--white)">
             <v-btn 
                 v-for="key, index in operators" 
                 plain 
@@ -29,11 +29,11 @@
                 <v-text-field
                     v-model="searchText"
                     dense
-                    color="#6200EA"
+                    color="var(--themeColor)"
                     prepend-inner-icon="$fas_search"
                 >
                     <template v-slot:prepend-inner>
-                        <v-icon size="12" color="#6200EA">$fas_search</v-icon>
+                        <v-icon size="12" color="var(--themeColor)">$fas_search</v-icon>
                     </template>
                 </v-text-field>
             </v-list-item>
@@ -134,9 +134,9 @@ export default {
         filteredItems () {
             this.pageNumber = 1
             if (this.searchText && this.searchText.length > 0) {
-                return this.items.filter(x => x.title.toLowerCase().indexOf(this.searchText) != -1)
+                return this.items.filter(x => x.title.toLowerCase().indexOf(this.searchText) != -1).sort((x,y) => x.title > y.title ? 1 : -1)
             } else {
-                return this.items
+                return this.items.sort((x,y) => x.title > y.title ? 1 : -1)
             }
             
         },
@@ -156,29 +156,29 @@ export default {
     padding: 0px !important
 .item-subtitle
     font-size: 9px
-    color: #47466A99
+    color: var(--themeColorDark7)
 .checkbox-btn
     min-height: 24px !important
-    color: #47466A !important
+    color: var(--themeColorDark) !important
 .filter-list
     height: 350px
     overflow-y: scrollbar
     overflow-x: hidden
 .list-header
-    border-bottom: 1px solid #47466A    
+    border-bottom: 1px solid var(--themeColorDark)    
     font-weight: 500
     display: flex
     justify-content: space-between
     padding: 8px 16px
-    color: #47466A
+    color: var(--themeColorDark)
     background: white
     opacity: 1
     font-size: 14px
 .underline
     text-decoration: underline 
-    color: #6200EA !important
+    color: var(--themeColor) !important
 .operator
-    color: #47466A99
+    color: var(--themeColorDark7)
     min-width: unset !important
     padding: 0px 8px !important
 

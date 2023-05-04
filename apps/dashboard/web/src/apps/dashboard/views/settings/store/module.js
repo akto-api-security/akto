@@ -17,6 +17,7 @@ const team = {
         mergeAsyncOutside: null,
         dashboardVersion: null,
         apiRuntimeVersion: null,
+        urlRegexMatchingEnabled: null,
         setupType: null,
         lastLoginTs: null
     },
@@ -28,6 +29,7 @@ const team = {
         getRedactPayload: (state) => state.redactPayload,
         getDashboardVersion: (state) => state.dashboardVersion,
         getApiRuntimeVersion: (state) => state.apiRuntimeVersion,
+        getUrlRegexMatchingEnabled: (state) => state.urlRegexMatchingEnabled,
         getSetupType: (state) => state.setupType,
         getLastLoginTs: (state) => state.lastLoginTs
     },
@@ -50,12 +52,14 @@ const team = {
             if (!resp.accountSettings) {
                 state.redactPayload = false
                 state.apiRuntimeVersion = "-"
+                state.urlRegexMatchingEnabled = false
                 state.dashboardVersion = "-"
                 state.setupType = "PROD"
                 state.mergeAsyncOutside = false
             } else {
                 state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
                 state.apiRuntimeVersion = resp.accountSettings.apiRuntimeVersion ? resp.accountSettings.apiRuntimeVersion : "-"
+                state.urlRegexMatchingEnabled = resp.accountSettings.urlRegexMatchingEnabled
                 state.dashboardVersion = resp.accountSettings.dashboardVersion ? resp.accountSettings.dashboardVersion : "-"
                 state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
                 state.setupType = resp.accountSettings.setupType
@@ -90,6 +94,11 @@ const team = {
         updateMergeAsyncOutside({commit, dispatch, state}) {
             api.updateMergeAsyncOutside().then((resp => {
                 state.mergeAsyncOutside = true
+            }))
+        },
+        updateEnableNewMerge({commit, dispatch, state}, v) {
+            api.toggleNewMergingEnabled(v).then((resp => {
+                state.urlRegexMatchingEnabled = v
             }))
         },
         updateSetupType({commit, dispatch, state}, v) {

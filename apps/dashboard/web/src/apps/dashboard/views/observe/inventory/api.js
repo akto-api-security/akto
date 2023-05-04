@@ -1,6 +1,13 @@
 import request from '@/util/request'
 
 export default {
+    askAi(data){
+        return request({
+            url: '/api/ask_ai',
+            method: 'post',
+            data: data
+        })
+    },
     saveContent(apiSpec) {
         return request({
             url: '/api/saveContent',
@@ -358,6 +365,15 @@ export default {
             url: '/api/setFalsePositives',
             method: 'post',
             data: {falsePositives:falsePositives}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    fetchAktoGptConfig(apiCollectionId){
+        return request({
+            url: '/api/fetchAktoGptConfig',
+            method: 'post',
+            data: {apiCollectionId}
         }).then((resp) => {
             return resp
         })

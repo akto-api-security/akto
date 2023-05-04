@@ -4,7 +4,7 @@
             <data-types title="Data types" :data_types="data_types" :toggleActivateFieldFunc='toggleActivateDataTypes'
                 :createNewDataType="createNewDataType" @selectedEntry="selectedDataType">
                 <template #details-container="{}">
-                    <a-card title="Details" color="rgba(33, 150, 243)" style="min-height: 600px">
+                    <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
                         <data-type-details :data_type="data_type" />
                     </a-card>
                 </template>
@@ -14,7 +14,7 @@
             <data-types title="Auth types" :data_types="auth_types" :toggleActivateFieldFunc='toggleActivateAuthTypes'
                 :createNewDataType="createNewAuthType" @selectedEntry="selectedAuthType">
                 <template #details-container="{}">
-                    <a-card title="Details" color="rgba(33, 150, 243)" style="min-height: 600px">
+                    <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
                         <auth-type-details :auth_type_copy="auth_type" />
                     </a-card>
                 </template>
@@ -24,7 +24,7 @@
             <data-types title="Tags" :data_types="tag_configs" :toggleActivateFieldFunc='toggleActivateTagConfig'
                 :createNewDataType="createNewTagConfig" @selectedEntry="selectedTagConfig">
                 <template #details-container="{}">
-                    <a-card title="Details" color="rgba(33, 150, 243)" style="min-height: 600px">
+                    <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
                         <tag-config-details :tag_config_copy="tag_config" />
                     </a-card>
                 </template>
@@ -40,7 +40,7 @@
                     <div class="py-4">
                         <v-dialog v-model="showDialog" width="500">
                             <template v-slot:activator="{ on, attrs }">
-                                <v-btn primary dark color="#6200EA" @click="showDialog = true" v-bind="attrs" v-on="on">
+                                <v-btn primary dark color="var(--themeColor)" @click="showDialog = true" v-bind="attrs" v-on="on">
                                     Update Akto
                                 </v-btn>
                             </template>
@@ -48,7 +48,7 @@
                                 <div class="entry-text"> Please note that this will incur a downtime of 10 mins to
                                     update the system. </div>
                                 <div class="d-flex jc-end">
-                                    <v-btn primary dark color="#6200EA" @click="takeUpdate">
+                                    <v-btn primary dark color="var(--themeColor)" @click="takeUpdate">
                                         Proceed
                                     </v-btn>
                                 </div>
@@ -63,6 +63,9 @@
         </template>
         <template slot="Health">
             <health :defaultStartTimestamp="defaultStartTimestamp" :defaultEndTimestamp="defaultEndTimestamp"/>
+        </template>
+        <template slot="Metrics">
+            <traffic-metrics/>
         </template>
     </layout-with-tabs>
 </template>
@@ -80,6 +83,7 @@ import TagConfigDetails from './components/tag_configs/TagConfigDetails.vue'
 import ACard from '@/apps/dashboard/shared/components/ACard'
 import IntegrationCenter from './components/integrations/IntegrationCenter'
 import AuthTypeDetails from './components/auth_types/AuthTypeDetails.vue'
+import TrafficMetrics from './components/traffic_metrics/TrafficMetrics.vue'
 import obj from "@/util/obj"
 
 import { mapState } from 'vuex'
@@ -96,7 +100,8 @@ export default {
         TagConfigDetails,
         DataTypeDetails,
         AuthTypeDetails,
-        ACard
+        ACard,
+        TrafficMetrics
     },
     props:{
         defaultStartTimestamp: obj.strN,
@@ -150,12 +155,13 @@ export default {
 
         },
         getTabs() {
-          if(window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'){
-            return ['Data types','Auth types', 'Tags', 'Users', 'Integrations'];
-          } else if(this.tab && this.tab=="health"){
+          if(this.tab && this.tab=="health"){
             return ['Health', 'Data types','Auth types', 'Tags', 'Account', 'Users', 'Integrations'];
           }
-          return ['Data types','Auth types', 'Tags', 'Account', 'Users', 'Health', 'Integrations'];
+          else if(window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'){
+            return ['Data types','Auth types', 'Tags', 'Users', 'Health' ,'Integrations'];
+          }
+          return ['Data types','Auth types', 'Tags', 'Account', 'Users', 'Health', 'Integrations', 'Metrics'];
         }
     },
     computed: {
@@ -169,9 +175,9 @@ export default {
 .entry-text
     font-weight: 500
     margin-right: 16px
-    color: #47466A
+    color: var(--themeColorDark)
 
 .dialog-box
     padding: 16px
-    background: #ffffff    
+    background: var(--white)  
 </style>

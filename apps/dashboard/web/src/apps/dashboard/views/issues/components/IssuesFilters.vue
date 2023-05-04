@@ -240,6 +240,7 @@ export default {
             this.$store.dispatch('issues/loadIssues')
         },
         appliedFilter(value, $event) {
+
             let filterCollectionsId = this.filterCollectionsId
             let filterSeverity = this.filterSeverity
             let filterSubCategory1 = this.filterSubCategory1
@@ -304,6 +305,7 @@ export default {
             this.$store.dispatch('issues/loadIssues')
         },
         selectedAll(value, $event) {
+
             let filterStatus = this.filterStatus
             let filterCollectionsId = this.filterCollectionsId
             let filterSeverity = this.filterSeverity
@@ -374,13 +376,13 @@ export default {
     width: fit-content;
     height: 40px;
 
-    background: #FFFFFF;
-    border: 1px solid #D0D5DD;
+    background: var(--white);
+    border: 1px solid var(--hexColor22);
 
     font-weight: 500;
     font-size: 14px;
 
-    box-shadow: 0px 1px 2px rgba(16, 24, 40, 0.05);
+    box-shadow: 0px 1px 2px var(--rgbaColor12);
     border-radius: 4px;
 }
 </style>

@@ -3,6 +3,31 @@
         <spinner/>
     </div>
     <div v-else>
+        <div v-if="renderAktoGptButton">
+            <div class="fix-at-top" v-if="allSamples && allSamples.length > 0">
+                <v-btn dark depressed color="var(--gptColor)" @click="showGPTScreen()">
+                    Ask AktoGPT 
+                    <v-icon size="16">$chatGPT</v-icon>
+                </v-btn>
+            </div>
+        </div>
+
+        <v-dialog
+            v-model="showGptDialog"
+            width="fit-content" 
+            content-class="dialog-no-shadow"
+            overlay-opacity="0.7"
+        >
+            <div class="gpt-dialog-container ma-0">
+                <chat-gpt-input
+                    v-if="showGptDialog"
+                    :items="chatGptPrompts"
+                    :apiCollectionId="apiCollectionId"
+                />
+            </div>
+
+        </v-dialog>
+
         <v-row>
             <v-col md="6">
                 <sensitive-params-card title="Sensitive parameters" :sensitiveParams="sensitiveParamsForChart"/>
@@ -13,13 +38,13 @@
                     <spinner v-if="loadingTrafficData"/>
                     <line-chart
                         type='spline'
-                        color='#6200EA'
+                        color='var(--themeColor)'
                         :areaFillHex="true"
                         :height="230"
                         title="Traffic"
                         :data="trafficTrend"
                         :defaultChartOptions="{legend:{enabled: false}}"
-                        background-color="rgba(0,0,0,0.0)"
+                        background-color="var(--transparent)"
                         :text="true"
                         :input-metrics="[]"
                         class="pa-5"
@@ -38,22 +63,6 @@
                     sortKeyDefault="sensitive" 
                     :sortDescDefault="true" 
                 >
-                    <template #item.domain="{item}">
-                        <v-tooltip bottom max-width="300px">
-                            <template v-slot:activator='{ on, attrs }'>
-                                <div
-                                    v-bind="attrs"
-                                    v-on="on"
-                                    class="table-entry"
-                                >
-                                  {{item.domain}}
-                                </div>
-                            </template class="table-entry">
-                            <div>
-                                {{item.valuesString}}
-                            </div>
-                        </v-tooltip>
-                    </template>
                 </simple-table>
             </template>
             <template slot="Response">
@@ -65,22 +74,6 @@
                     sortKeyDefault="sensitive" 
                     :sortDescDefault="true"
                 >
-                    <template #item.domain="{item}">
-                        <v-tooltip bottom max-width="300px">
-                            <template v-slot:activator='{ on, attrs }'>
-                                <div
-                                    v-bind="attrs"
-                                    v-on="on"
-                                    class="table-entry"
-                                >
-                                  {{item.domain}}
-                                </div>
-                            </template>
-                            <div class="fs-12">
-                                {{item.valuesString}}
-                            </div>
-                        </v-tooltip>
-                    </template>
                 </simple-table>
             </template>
             <template slot="Values">
@@ -107,6 +100,7 @@ import SensitiveParamsCard from '@/apps/dashboard/shared/components/SensitivePar
 import LineChart from '@/apps/dashboard/shared/components/LineChart'
 import SampleData from '@/apps/dashboard/shared/components/SampleData'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
+import ChatGptInput from '@/apps/dashboard/shared/components/inputs/ChatGptInput.vue'
 
 import api from '../api'
 import SampleDataList from '@/apps/dashboard/shared/components/SampleDataList'
@@ -122,7 +116,8 @@ export default {
     LineChart,
     Spinner,
     SampleData,
-    SampleDataList
+    SampleDataList,
+    ChatGptInput
 },
     props: {
         urlAndMethod: obj.strR,
@@ -130,6 +125,21 @@ export default {
     },
     data () {
         return {
+            showGptDialog:false,
+            chatGptPrompts: [
+                {
+                    icon: "$fas_user-lock",
+                    label: "Fetch Sensitive Params",
+                    prepareQuery: () => { return {
+                        type: "list_sensitive_params",
+                        meta: {
+                            "sampleData": this.parseMsg(this.allSamples[0].message),
+                            "apiCollectionId": this.apiCollectionId
+                        }                        
+                    }},
+                    callback: (data) => console.log("callback create api groups", data)
+                }
+            ],
             headers: [
                 {
                     text: '',
@@ -153,8 +163,7 @@ export default {
                 },
                 {
                     text: 'Discovered',
-                    value: 'date',
-                    sortKey: 'detectedTs'
+                    value: 'date'
                 },
                 {
                   text: 'Values',
@@ -174,10 +183,23 @@ export default {
             loadingTrafficData: false,
             trafficInfo: {},
             sampleData: null,
-            sensitiveSampleData: null
+            sensitiveSampleData: null,
+            renderAktoGptButton: false
         }  
     },
     methods: {
+        parseMsg(jsonStr) {
+            let json = JSON.parse(jsonStr)
+            return {
+                request: JSON.parse(json.requestPayload),
+                response: JSON.parse(json.responsePayload)
+            }
+        },
+        showGPTScreen(){
+            this.showGptDialog=true
+            console.log(this.sampleData)
+            console.log(this.sensitiveSampleData)
+        },
         prettifyDate(ts) {
             if (ts) {
                 return func.prettifyEpoch(ts)
@@ -228,6 +250,9 @@ export default {
     },
     computed: {
         ...mapState('inventory', ['parameters', 'parametersLoading']),
+        allSamples(){
+            return  [...(this.sampleData || []), ...(this.sensitiveSampleData || [])]
+        },
         url () {
             return this.urlAndMethod.split(" ")[0]
         },
@@ -252,7 +277,7 @@ export default {
                 ret.push([func.toDate(func.toYMD(currDate)), dateToCount[func.toYMD(currDate)] || 0])
                 currDate = func.incrDays(currDate, 1)
             }
-            return ret
+            return [{"data": ret, "color": "#6200EA", "name": "Traffic"}]
         },
         sensitiveParamsForChart() {
             if (this.parameters.length == 0) {
@@ -268,14 +293,14 @@ export default {
                 return {
                     name: x[0],
                     y: x[1],
-                    color: ["#6200EAFF", "#6200EADF", "#6200EABF", "#6200EA9F", "#6200EA7F", "#6200EA5F", "#6200EA3F", "#6200EA1F"][i]
+                    color: ["var(--themeColor)", "var(--themeColor2)", "var(--themeColor3)", "var(--themeColor4)", "var(--themeColor6)", "var(--themeColor7)", "var(--themeColor8)", "var(--themeColor11)"][i]
                 }
             })
 
             ret.push({
                 name: "Generic",
                 y: numGenericParams,
-                color: "#7D787838"
+                color: "var(--hexColor16)"
             })
             
             return ret
@@ -285,9 +310,18 @@ export default {
         },
         responseItems() {
             return this.parameters.filter(x => x.responseCode > -1).map(this.prepareItem)
-        }
+        },
     },
     async mounted() {
+        let _this = this;
+        api.fetchAktoGptConfig(this.apiCollectionId).then(aktoGptConfig => {
+            if(aktoGptConfig.currentState[0].state === "ENABLED") {
+                _this.renderAktoGptButton = true;
+            }
+            else {
+                _this.renderAktoGptButton = false;
+            }
+        })
         this.$emit('mountedView', {apiCollectionId: this.apiCollectionId, urlAndMethod: this.urlAndMethod, type: 2})
         if (
             this.$store.state.inventory.apiCollectionId !== this.apiCollectionId || 
@@ -338,11 +372,17 @@ export default {
 </script>
 
 <style lang="sass" scoped>
-    .table-title
-        font-size: 16px    
-        color: #47466A
-        font-weight: 500
-        padding-top: 16px
-    .v-tooltip__content
-        font-size: 15px !important
+.fix-at-top
+    position: absolute
+    right: 260px
+    top: 18px
+.gpt-dialog-container
+    background-color: var(--gptBackground)
+.table-title
+    font-size: 16px    
+    color: var(--themeColorDark)
+    font-weight: 500
+    padding-top: 16px
+.v-tooltip__content
+    font-size: 15px !important
 </style>

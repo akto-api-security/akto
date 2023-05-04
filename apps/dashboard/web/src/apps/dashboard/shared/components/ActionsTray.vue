@@ -54,5 +54,5 @@ export default {
 
 <style lang="sass" scoped>
 .tray-button   
-    color: #6200EA !important
+    color: var(--themeColor) !important
 </style>

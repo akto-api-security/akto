@@ -9,7 +9,7 @@
         <spinner v-if="loading"/>
         <div v-else class="testcases-layout">
             <div v-for="(item, index) in testSourceConfigs" :key="index" class="testcase-container">
-                <v-icon size="20" color="#24292F" class="icon-border">
+                <v-icon size="20" color="var(--hexColor6)" class="icon-border">
 
                     {{isAktoTest(item) ? '$aktoWhite' : '$fab_github'}}
                 </v-icon>
@@ -138,7 +138,7 @@ export default {
 
 .icon-border
     border-radius: 50%
-    box-shadow: 0px 2px 4px rgb(45 44 87 / 10%)
+    box-shadow: 0px 2px 4px var(--rgbaColor20)
     min-width: 40px    
     min-height: 40px
     margin-right: 8px

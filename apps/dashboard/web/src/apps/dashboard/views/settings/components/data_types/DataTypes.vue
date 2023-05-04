@@ -2,10 +2,10 @@
     <div class="data-types-container d-flex">
                 <a-card
                     :title="title" 
-                    color="rgba(33, 150, 243)"
+                    color="var(--rgbaColor2)"
                     style="min-height: 600px; flex: 1 1 20%"
                     icon_right="$fas_plus"
-                    icon_right_color="#6200EA"
+                    icon_right_color="var(--themeColor)"
                     @icon_right_clicked="createNewDataType"
                 >
                     <div v-for="data_type in data_types" :key="data_type.name">
@@ -75,7 +75,7 @@ export default {
 
 <style lang="sass" scoped>
 .main
-    background-color: #47466A
+    background-color: var(--themeColorDark)
     
 .details-container
     flex: 1 1 80%
