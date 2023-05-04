@@ -22,6 +22,7 @@
           <v-stepper-content step="2">
             <component
               v-if="connectorType"
+              v-bind="connectorType.props"
               :is="connectorType.component"
             />
           </v-stepper-content>
