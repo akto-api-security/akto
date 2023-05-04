@@ -5,6 +5,7 @@ public class TestEditorEnums {
     public enum DataOperands {
         CONTAINS_EITHER,
         CONTAINS_ALL,
+        NOT_CONTAINS,
         REGEX,
         EQ,
         GTE,
