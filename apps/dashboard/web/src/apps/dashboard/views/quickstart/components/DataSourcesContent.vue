@@ -4,7 +4,7 @@
         <div v-for='title in titles' :key="title">
             <div class="title">
                 {{ title }} connections
-                <v-icon color="#47466A">$fas_caret-down</v-icon>
+                <v-icon color="var(--themeColorDark)">$fas_caret-down</v-icon>
             </div>
             <div v-for="source in getSourcesInOrder()" :key="source.title + title">
                 <single-data-source v-if="source.connected === title" :icon=source.icon :title=source.title
@@ -24,6 +24,7 @@ import AwsTrafficMirroring from './AwsTrafficMirroring'
 import GcpTrafficMirroring from './GcpTrafficMirroring'
 import BurpsuiteSource from './BurpsuiteSource'
 import PostmanSource from './PostmanSource'
+import NginxSource from "./NginxSource"
 import SingleDataSource from './SingleDataSource'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
 import api from '../api'
@@ -37,6 +38,7 @@ export default {
         GcpTrafficMirroring,
         BurpsuiteSource,
         PostmanSource,
+        NginxSource,
         Spinner
     },
     data() {
@@ -73,7 +75,14 @@ export default {
                     title: "Postman",
                     detailComponent: 'PostmanSource',
                     connected: "More"
-                }
+                },
+                "NGINX": {
+                    icon: "$nginx",
+                    key: "NGINX",
+                    title: "NGINX",
+                    detailComponent: 'NginxSource',
+                    connected: "More"
+                },
             }
         }
     },
@@ -84,9 +93,9 @@ export default {
         getSourcesInOrder(){
             let order = []
             if (window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'){
-                order = ['BURP', 'POSTMAN', 'AWS', 'GCP']
+                order = ['BURP', 'POSTMAN', 'AWS', 'GCP', 'NGINX']
             } else {
-                order = ['AWS', 'BURP', 'POSTMAN', 'GCP']
+                order = ['AWS', 'BURP', 'POSTMAN', 'GCP', 'NGINX']
             }
             let final_order = []
             order.forEach(item => {
@@ -114,7 +123,7 @@ export default {
 <style lang="sass" scoped>
 .no-pointer-events
     pointer-events: none
-    color: #47466A
+    color: var(--themeColorDark)
 
 .title
     font-weight: 600

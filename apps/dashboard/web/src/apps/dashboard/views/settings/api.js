@@ -141,6 +141,16 @@ export default {
         });
     },
 
+    toggleNewMergingEnabled(newMergingEnabled) {
+        return request({
+            url: '/api/toggleNewMergingEnabled',
+            method: 'post',
+            data: {
+                newMergingEnabled
+            }
+        });
+    },
+
     updateSetupType(setupType) {
         return request({
             url: '/api/updateSetupType',
@@ -248,5 +258,23 @@ export default {
             return resp
         })
     },
+    fetchAktoGptConfig(){
+        return request({
+            url: '/api/fetchAktoGptConfig',
+            method: 'post',
+            data: {
+                "apiCollectionId": -1
+            }
+        })
+    },
+    saveAktoGptConfig(aktoConfigList){
+        return request({
+            url: '/api/saveAktoGptConfig',
+            method: 'post',
+            data: {
+                "currentState": aktoConfigList
+            }
+        })
+    }
 
 }

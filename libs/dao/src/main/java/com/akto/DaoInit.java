@@ -2,6 +2,11 @@ package com.akto;
 
 import com.akto.dto.*;
 import com.akto.dto.data_types.*;
+import com.akto.dto.gpt.AktoGptConfig;
+import com.akto.dto.gpt.AktoGptConfigState;
+import com.akto.dto.loaders.Loader;
+import com.akto.dto.loaders.NormalLoader;
+import com.akto.dto.loaders.PostmanUploadLoader;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.runtime_filters.FieldExistsFilter;
@@ -17,6 +22,7 @@ import com.akto.dto.testing.info.TestInfo;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
+import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.type.URLTemplate;
@@ -159,6 +165,11 @@ public class DaoInit {
         ClassModel<LoginFlowStepsData> loginFlowStepsData = ClassModel.builder(LoginFlowStepsData.class)
         .enableDiscriminator(true).build();
 
+        ClassModel<Loader> loaderClassModel = ClassModel.builder(Loader.class).enableDiscriminator(true).build();
+        ClassModel<NormalLoader> normalLoaderClassModel = ClassModel.builder(NormalLoader.class).enableDiscriminator(true).build();
+        ClassModel<PostmanUploadLoader> postmanUploadLoaderClassModel = ClassModel.builder(PostmanUploadLoader.class).enableDiscriminator(true).build();
+        ClassModel<AktoGptConfig> aktoGptConfigClassModel = ClassModel.builder(AktoGptConfig.class).enableDiscriminator(true).build();
+
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel,
                 signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -178,7 +189,8 @@ public class DaoInit {
                 nodeResultClassModel, awsResourcesModel, AktoDataTypeClassModel, testingRunIssuesClassModel,
                 testingIssuesIdClassModel, testSourceConfigClassModel, endpointLogicalGroupClassModel, testRolesClassModel,
                 logicalGroupTestingEndpointClassModel, testInfoClassModel , bflaTestInfoClassModel, nucleiTestInfoClassModel, customAuthTypeModel,
-                containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData).automatic(true).build());
+                containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData,
+                loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -205,7 +217,10 @@ public class DaoInit {
                 new EnumCodec<>(GlobalEnums.TestCategory.class),
                 new EnumCodec<>(GlobalEnums.TestSubCategory.class),
                 new EnumCodec<>(GlobalEnums.IssueTags.class),
-                new EnumCodec<>(GlobalEnums.Severity.class));
+                new EnumCodec<>(GlobalEnums.Severity.class),
+                new EnumCodec<>(TrafficMetrics.Name.class),
+                new EnumCodec<>(Loader.Type.class),
+                new EnumCodec<>(AktoGptConfigState.class));
 
         CodecRegistry codecRegistry = fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
                 customEnumCodecs);

@@ -1,13 +1,27 @@
 <template>
     <spinner v-if="endpointsLoading" />
     <div class="pr-4 api-endpoints" v-else>
+        <v-dialog
+            v-model="showGptDialog"
+            width="fit-content" 
+            content-class="dialog-no-shadow"
+            overlay-opacity="0.7"
+        >
+            <div class="gpt-dialog-container ma-0">
+                <chat-gpt-input
+                    v-if="showGptDialog"
+                    :items="chatGptPrompts"
+                />
+            </div>
+
+        </v-dialog>
         <div>
             <div class="d-flex jc-end pb-3 pt-3">
                     <v-tooltip bottom>
                         <template v-slot:activator='{on, attrs}'>
                             <v-btn 
                                 icon 
-                                color="#47466A" 
+                                color="var(--themeColorDark)" 
                                 @click="refreshPage(false)"
                                 v-on="on"
                                 v-bind="attrs"
@@ -37,21 +51,18 @@
                     :headers=tableHeaders 
                     :items=allEndpoints 
                     @rowClicked=rowClicked 
+                    @filterApplied="filterApplied"
                     name="All" 
                     sortKeyDefault="sensitiveTags" 
                     :sortDescDefault="true"
                 >
                     <template #add-new-row-btn="{filteredItems}">
-                        <div style="align-items: center; display: flex;">
-                            <v-tooltip>
-                                <template v-slot:activator='{ on, attrs }'>
-                                    <v-btn icon primary dark color="#47466A" @click="showScheduleDialog(filteredItems)">
-                                        <v-icon>$fas_play</v-icon>
-                                    </v-btn>
-                                </template>
-                                "Run test"
-                            </v-tooltip>
-                            
+                        <div>
+                            <secondary-button 
+                                @click="showScheduleDialog(filteredItems)"
+                                icon="$fas_play"
+                                text="Run Test" 
+                            />                            
                         </div>
                         
                     </template>
@@ -67,7 +78,8 @@
                 <simple-table 
                     :headers=tableHeaders 
                     :items=sensitiveEndpoints 
-                    @rowClicked=rowClicked name="Sensitive"
+                    @rowClicked=rowClicked 
+                    name="Sensitive"
                 >
                     <template #item.sensitiveTags="{item}">
                         <sensitive-chip-group :sensitiveTags="Array.from(item.sensitiveTags || new Set())" />
@@ -137,7 +149,7 @@
             <template slot="Tests">
                 <div>
                     <div class="d-flex jc-end ma-2">
-                        <v-btn v-if="!showWorkflowTestBuilder" primary dark color="#6200EA" @click="() => {originalStateFromDb = null; showWorkflowTestBuilder = true}">
+                        <v-btn v-if="!showWorkflowTestBuilder" primary dark color="var(--themeColor)" @click="() => {originalStateFromDb = null; showWorkflowTestBuilder = true}">
                             Create new workflow
                         </v-btn>
                         <div style="align-items: center; display: flex; padding-right: 12px ">
@@ -155,7 +167,7 @@
                         v-if="showWorkflowTestBuilder"
                         width="80%"
                     >
-                        <v-btn icon primary dark color="#6200EA" class="float-right" @click="() => {originalStateFromDb = null; showWorkflowTestBuilder = false}">
+                        <v-btn icon primary dark color="var(--themeColor)" class="float-right" @click="() => {originalStateFromDb = null; showWorkflowTestBuilder = false}">
                             <v-icon>$fas_times</v-icon>
                         </v-btn>
                         <workflow-test-builder :endpointsList=allEndpoints :apiCollectionId="apiCollectionId" :originalStateFromDb="originalStateFromDb" :defaultOpenResult="false" class="white-background"/>
@@ -169,6 +181,15 @@
         <v-dialog v-model="showTestSelectorDialog" width="800px"> 
             <tests-selector :collectionName="apiCollectionName" @testsSelected=startTest v-if="showTestSelectorDialog"/>
         </v-dialog>
+
+        <div v-if="renderAktoGptButton">
+            <div class="fix-at-top">
+                <v-btn dark depressed color="var(--gptColor)" @click="showGPTScreen()">
+                    Ask AktoGPT
+                    <v-icon size="16">$chatGPT</v-icon>
+                </v-btn>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -190,6 +211,8 @@ import JsonViewer from "@/apps/dashboard/shared/components/JSONViewer"
 import IconMenu from '@/apps/dashboard/shared/components/IconMenu'
 import WorkflowTestBuilder from './WorkflowTestBuilder'
 import TestsSelector from './TestsSelector'
+import SecondaryButton from '@/apps/dashboard/shared/components/buttons/SecondaryButton'
+import ChatGptInput from '@/apps/dashboard/shared/components/inputs/ChatGptInput'
 
 export default {
     name: "ApiEndpoints",
@@ -204,16 +227,56 @@ export default {
         JsonViewer,
         IconMenu,
         WorkflowTestBuilder,
-        TestsSelector
+        TestsSelector,
+        SecondaryButton,
+        ChatGptInput
     },
     props: {
         apiCollectionId: obj.numR
     },
     activated(){
         this.refreshPage(true)
+        let _this = this;
+        api.fetchAktoGptConfig(this.apiCollectionId).then(aktoGptConfig => {
+            if(aktoGptConfig.currentState[0].state === "ENABLED") {
+                _this.renderAktoGptButton = true;
+            }
+            else {
+                _this.renderAktoGptButton = false;
+            }
+        })
     },
     data() {
         return {
+            filteredItems: [],
+            chatGptPrompts: [
+                {
+                    icon: "$fas_magic",
+                    label: "Create API groups",
+                    prepareQuery: () => { return {
+                        type: "group_apis_by_functionality",
+                        meta: {
+                            "urls": this.filteredItems.map(x => x.endpoint),
+                            "apiCollectionId": this.apiCollectionId
+                        }                        
+                    }},
+                    callback: (data) => console.log("callback create api groups", data)
+                },
+                {
+                    icon: "$fas_layer-group",
+                    label: "Tell me APIs related to ${input}",
+                    prepareQuery: (filterApi) => { return {
+                        type: "list_apis_by_type",
+                        meta: {
+                            "urls": this.filteredItems.map(x => x.endpoint),
+                            "type_of_apis": filterApi,
+                            "apiCollectionId": this.apiCollectionId
+                        }                        
+                    }},
+                    callback: (data) => console.log("callback Tell me all the apis", data)
+                }
+            ],
+            showGptDialog: false,
             file: null,
             rules: [
                 value => !value || value.size < 50e6 || 'HAR file size should be less than 50 MB!',
@@ -247,28 +310,23 @@ export default {
                 },
                 {
                   text: 'Last Seen',
-                  value: 'last_seen',
-                  sortKey: 'last_seen'
+                  value: 'last_seen'
                 },
                 {
                   text: 'Access Type',
-                  value: 'access_type',
-                  sortKey: 'access_type'
+                  value: 'access_type'
                 },
                 {
                   text: 'Auth Type',
-                  value: 'auth_type',
-                  sortKey: 'auth_type'
+                  value: 'auth_type'
                 },
                 {
                     text: constants.DISCOVERED,
-                    value: 'added',
-                    sortKey: 'detectedTs'
+                    value: 'added'
                 },
                 {
                     text: 'Changes',
                     value: 'changes',
-                    sortKey: 'changesCount',
                     hideFilter: true
                 }
             ],
@@ -304,6 +362,29 @@ export default {
                     click: this.downloadData
                 }
             ],
+            prompts: [
+                {
+                    keyword: "Payment",
+                },
+                {
+                    keyword: "User",
+                },
+                {
+                    keyword: "Order",
+                },
+                {
+                    keyword: "Product",
+                },
+                {
+                    keyword: "Authentication",
+                },
+                {
+                    keyword: "Login",           
+                },
+                {
+                    keyword: "Search",                
+                }   
+            ],
             showTestSelectorDialog: false,
             filteredItemsForScheduleTest: [],
             workflowTestHeaders: [
@@ -322,10 +403,21 @@ export default {
             ],
             showWorkflowTestBuilder: false,
             originalStateFromDb: null,
-            workflowTests: []
+            workflowTests: [],
+            showGPTPrompts:false,
+            getResponse:false,
+            promptText: "",
+            responseArr:[],
+            renderAktoGptButton: false
         }
     },
     methods: {
+        filterApplied(data) {
+            this.filteredItems = data
+        },
+        showGPTScreen(){
+            this.showGptDialog = true
+        },
         rowClicked(row) {
             this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.endpoint + " " + row.method, type: 2})
         },
@@ -376,7 +468,7 @@ export default {
                     } else if (type === "uploadWorkflow") {
                         let resp = await this.$store.dispatch('inventory/uploadWorkflowJson', { content: reader.result, filename: file.name})
                         resp.workflowTests.forEach((x) => {
-                          this.workflowTests.push({...x, color: "#FFFFFF"})
+                          this.workflowTests.push({...x, color: "var(--white)"})
                         })
                     }
                 }
@@ -437,7 +529,7 @@ export default {
             this.workflowTests = (await api.fetchWorkflowTests()).workflowTests.filter(x => x.apiCollectionId === this.apiCollectionId).map(x => {
                 return {
                     ...x,
-                    color: "#FFFFFF"
+                    color: "var(--white)"
                 }
             })
 
@@ -516,13 +608,24 @@ export default {
             } catch (e) {
             }
             return ret
+        },
+        fetchAktoGptButton(){
+            
         }
     },
-    async mounted() {}
+    async mounted() {
+        
+    }
 }
 </script>
 
-<style lang="sass">
+<style lang="sass" scoped>  
+.fix-at-top
+    position: absolute
+    right: 260px
+    top: 18px
+.gpt-dialog-container
+    background-color: var(--gptBackground)
 .api-endpoints
     & .table-column
         &:nth-child(1)    
@@ -551,5 +654,4 @@ export default {
 .menu
     display: flex
     justify-content: right
-
 </style>

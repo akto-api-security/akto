@@ -2,7 +2,7 @@
     <div v-if="messages && messages.length > 0">
         <div>
             <div v-if="messages.length > 1" class="d-flex jc-sb mr-3">
-                <div v-if="json.title" style="margin: auto 8px; color: #47466A">{{json.title}}</div>
+                <div v-if="json.title" style="margin: auto 8px; color: var(--themeColorDark)">{{json.title}}</div>
                 
                 <v-btn icon @click="currentIndex = (++currentIndex)%messages.length">
                     <v-icon>$fas_angle-double-right</v-icon>
@@ -55,7 +55,7 @@ export default {
 
 .empty-container
     font-size: 13px
-    color: #47466A
+    color: var(--themeColorDark)
     margin: 8px 8px 0 0 
 
 </style>

@@ -28,7 +28,7 @@ export default {
     defaultChartOptions: obj.objR,
     backgroundColor: {
       type: String,
-      default: "#FFFFFF"
+      default: "var(--white)"
     },
     text: obj.boolR,
     inputMetrics: {
@@ -49,9 +49,23 @@ export default {
           linearGradient: {x1:0, y1:0, x2:0, y2:1},
           stops: [
             [0, this.color+"3b"],
-            [1, "#FFFFFF"]
+            [1, "var(--white)"]
           ]
         }
+
+        var dataForChart = []
+        this.data.forEach((x,idx) => {
+          let b = {
+            data: x['data'],
+            color: x['color'],
+            name: x['name'],
+            fillColor: this.areaFillHex ? fillColor : {},
+            marker: { enabled: x['data'].length <= 2},
+            yAxis: 0
+          }
+
+          dataForChart.push(b)
+        })
 
         var basicOpts = {
           chart: {
@@ -70,16 +84,7 @@ export default {
             shared: true
           },
           series: [
-            {
-              data: this.data,
-              color: this.color,
-              name: this.title,
-              fillColor: this.areaFillHex ? fillColor : {},
-              marker: {
-                enabled: this.data.length <= 2
-              },
-              yAxis: 0
-            },
+            ...dataForChart,
             ...this.inputMetrics.map((x, i) => {
               return {
                 data: x.data,
@@ -92,8 +97,8 @@ export default {
                 fillColor: {
                   linearGradient: {x1:0, y1:0, x2:0, y2:1},
                   stops: [
-                    [0, "#FFFFFF"],
-                    [1, "#FFFFFF"]
+                    [0, "var(--white)"],
+                    [1, "var(--white)"]
                   ]
                 },
                 yAxis: (i+1)
@@ -127,10 +132,7 @@ export default {
                   min : 0
                 }
               })
-          ],
-          legend: {
-            enabled: false
-          }
+          ]
         }
 
         return merge.deepmerge(basicOpts, this.defaultChartOptions)
@@ -147,6 +149,6 @@ export default {
 
 <style scoped lang="sass">
 .no-data-chart
-  color: #d2d3d4
+  color: var(--hexColor20)
   font-size: 18px
 </style>

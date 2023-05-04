@@ -587,6 +587,9 @@ export default {
             
             case "WEBHOOKS":
                 return {name: '$customwebhooks', color: '#fe7b5b'}
+
+            case "AKTOGPT":
+                return {name: '$chatGPT', color: 'rgb(16, 163, 127)'}
         }
     },
 
@@ -659,4 +662,69 @@ export default {
     toEpochInMs(hyphenatedDate) {
         return +this.toDate(hyphenatedDate.replace(/\-/g, ''))
     },
+
+    convertTrafficMetricsToTrend(trafficMetricsMap) {
+        let result = []
+        for (const [key, countMap] of Object.entries(trafficMetricsMap)) {
+            let trafficArr = []
+            for (const [key, value] of Object.entries(countMap)) {
+                const epochHours = parseInt(key);
+                const epochMilliseconds = epochHours * 3600000;
+                trafficArr.push([epochMilliseconds, value]);
+            }
+
+            result.push(
+                {"data": trafficArr, "color": null, "name": key},
+            )
+        }
+
+        return result
+    },
+
+    getListOfHosts(apiCollections) {
+        let result = []
+        if (!apiCollections || apiCollections.length == 0) return []
+        apiCollections.forEach((x) => {
+            let hostName = x['hostName']
+            if (!hostName) return
+            result.push(
+                {
+                    "title": hostName,
+                    "value": hostName
+                }
+            )
+        })
+
+        return result
+    },
+
+    convertToRelativePath(url) {
+        if (!url) return url
+        if (!url.startsWith("http")) return url
+        try {
+            var url = new URL(url)
+            return url.pathname
+        }catch(e) {
+            console.log(e);
+        }
+        return url
+    },
+
+    getRunResultSubCategory (runResult, subCategoryFromSourceConfigMap, subCatogoryMap, fieldName) {
+        if (subCatogoryMap[runResult.testSubType] === undefined) {
+            let a = subCategoryFromSourceConfigMap[runResult.testSubType]
+            return a ? a.subcategory : null
+        } else {
+            return subCatogoryMap[runResult.testSubType][fieldName]
+        }
+    },
+
+    getRunResultCategory (runResult, subCatogoryMap, subCategoryFromSourceConfigMap, fieldName) {
+        if (subCatogoryMap[runResult.testSubType] === undefined) {
+            let a = subCategoryFromSourceConfigMap[runResult.testSubType]
+            return a ? a.category.shortName : null
+        } else {
+            return subCatogoryMap[runResult.testSubType].superCategory[fieldName]
+        }
+    }
 }

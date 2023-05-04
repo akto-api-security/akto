@@ -5,6 +5,7 @@ import com.akto.action.AdminSettingsAction;
 import com.akto.action.observe.InventoryAction;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.notifications.CustomWebhooksDao;
 import com.akto.dao.notifications.CustomWebhooksResultDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
@@ -12,6 +13,7 @@ import com.akto.dao.pii.PIISourceDao;
 import com.akto.dao.testing.*;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.*;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
@@ -34,6 +36,7 @@ import com.akto.testing.ApiWorkflowExecutor;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
+import com.akto.utils.DashboardMode;
 import com.akto.utils.HttpUtils;
 import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBList;
@@ -208,6 +211,9 @@ public class InitializerListener implements ServletContextListener {
                 BasicDBObject fileDetails = (BasicDBObject) fileObj;
                 String filePath = fileDetails.getString("path");
                 if (filePath.endsWith(".yaml") || filePath.endsWith(".yml")) {
+                    if(filePath.contains("business-logic")){
+                        continue;
+                    }
                     String categoryFolder = filePath.split("/")[0];
                     filePath = "https://github.com/akto-api-security/tests-library/blob/master/" + filePath;
                     if (!currConfigsMap.containsKey(filePath)) {
@@ -692,6 +698,23 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
+    public void enableNewMerging(BackwardCompatibility backwardCompatibility) {
+        if (!DashboardMode.isLocalDeployment()) {
+            return;
+        }
+        if (backwardCompatibility.getEnableNewMerging() == 0) {
+
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(), 
+                Updates.set(AccountSettings.URL_REGEX_MATCHING_ENABLED, true));
+        }
+
+        BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.ENABLE_NEW_MERGING, Context.now())
+        );
+    }
+
     public void readyForNewTestingFramework(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getReadyForNewTestingFramework() == 0) {
             TestingRunDao.instance.getMCollection().drop();
@@ -770,12 +793,14 @@ public class InitializerListener implements ServletContextListener {
 
     public void runInitializerFunctions() {
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
+        TrafficMetricsDao.instance.createIndicesIfAbsent();
         TestRolesDao.instance.createIndicesIfAbsent();
 
         ApiInfoDao.instance.createIndicesIfAbsent();
         RuntimeLogsDao.instance.createIndicesIfAbsent();
         LogsDao.instance.createIndicesIfAbsent();
         DashboardLogsDao.instance.createIndicesIfAbsent();
+        LoadersDao.instance.createIndicesIfAbsent();
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
         if (backwardCompatibility == null) {
             backwardCompatibility = new BackwardCompatibility();
@@ -793,6 +818,7 @@ public class InitializerListener implements ServletContextListener {
             dropAuthMechanismData(backwardCompatibility);
             deleteAccessListFromApiToken(backwardCompatibility);
             deleteNullSubCategoryIssues(backwardCompatibility);
+            enableNewMerging(backwardCompatibility);
 
             SingleTypeInfo.init();
 
@@ -812,7 +838,13 @@ public class InitializerListener implements ServletContextListener {
                 piiSource.setId("Fin");
                 PIISourceDao.instance.insertOne(piiSource);
             }
-
+            
+            if (PIISourceDao.instance.findOne("_id", "File") == null) {
+                String fileUrl = "https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/filetypes.json";
+                PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
+                piiSource.setId("File");
+                PIISourceDao.instance.insertOne(piiSource);
+            }
 
             setUpDailyScheduler();
             setUpWebhookScheduler();

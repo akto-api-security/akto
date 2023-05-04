@@ -1,4 +1,5 @@
 <template>
+    <div>
     <div class="d-flex">
         <div class="flex-equal" >
             <sample-single-side
@@ -24,10 +25,12 @@
             />
         </div>
     </div>
+</div>
 </template>
 
 <script>
 import obj from "@/util/obj"
+import api from "../api"
 
 import SampleSingleSide from './SampleSingleSide'
 

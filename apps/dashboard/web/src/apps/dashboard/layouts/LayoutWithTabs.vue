@@ -1,5 +1,5 @@
 <template>
-    <div>
+    <div style="height: 100%;">
         <div class="brdb pl-8">
             <div v-if="title" class="pt-6">
                 <div>
@@ -17,7 +17,7 @@
                     <div class="tabs-container">
                         <v-tabs
                             active-class="active-tab"
-                            slider-color="#6200ea"
+                            slider-color="var(--themeColor)"
                             height="40px"
                             v-model="tabName"
                             :show-arrows="false"
@@ -25,7 +25,7 @@
                             <v-tab class="right-pane-tab" v-for="tab in tabs" :key="tab">
                                 {{tab}}
                                 <v-chip v-if="tabsContent && tabsContent[tab]" :style="{ 'height': '18px !important' }"
-                                 class="ml-2 mr-2" color="#47466AB2" text-color="#FFFFFF">
+                                 class="ml-2 mr-2" color="var(--themeColorDark6)" text-color="var(--white)">
                                         {{ tabsContent[tab] }}
                                 </v-chip>
                             </v-tab>
@@ -70,15 +70,33 @@
                 this.tabName = 0
             },
             setTabWithName(tabName) {
-                this.tabName = this.tabs.indexOf(tabName)
+                let tabRealName = tabName.replace("-"," ")
+                this.tabName = this.tabs.indexOf(tabRealName)
             }
         },
         watch: {
             defaultTabName: function (newVal) {
-                console.log(newVal, this.tabs.indexOf(newVal))
                 this.tabName = this.tabs.indexOf(newVal)
+            },
+            tabName: function (newVal) {
+                let tabName = this.tabs[newVal]
+                if(tabName){
+                    tabName = this.tabs[newVal].replace(" ", "-")
+                }
+                window.location.hash = "#" + tabName
             }
-        }
+        },
+        mounted() {
+            let currTab = this.$router.history.current.query['tab']
+            if(currTab){
+                let tab = this.tabs.find(x=> x.toLowerCase().replace(" ", "").startsWith(currTab.toLowerCase()))
+                if(tab){
+                    this.setTabWithName(tab)
+                }
+            } else {
+                this.setTabWithName(window.location.hash.substring(1))
+            }
+        },
     }
 
 </script>
@@ -87,12 +105,12 @@
 .board-name
     font-weight: 600
     font-size: 24px
-    color: #47466A
+    color: var(--themeColorDark)
 
 .board-description
     font-weight: 500
     font-size: 13px
-    color: #47466A
+    color: var(--themeColorDark)
     opacity: 0.7
     padding-top: 4px
 
@@ -103,7 +121,7 @@
     margin: 0 16px 0 0
     font-weight: 400
     font-size: 13px
-    color: #2d2434
+    color: var(--base)
     opacity: 0.5
 
     &.active-tab

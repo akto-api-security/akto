@@ -36,7 +36,7 @@
         </div>
 
         <div>
-            <v-btn color="#6200EA" @click="completed" :disabled="!allFieldsFilled" style="float: right">
+            <v-btn color="var(--themeColor)" @click="completed" :disabled="!allFieldsFilled" style="float: right">
                 <span class="info-text">{{btnText}}</span>
             </v-btn>
         </div>
@@ -107,23 +107,23 @@ import { mapState } from 'vuex'
 
 <style scoped lang="sass">
 .info-text
-    color: #FFFFFF
+    color: var(--white)
     
 .dialog-title
     font-size: 16px
     font-weight: 600
-    color: #47466A
+    color: var(--themeColorDark)
     margin-bottom: 16px
 
 .heading
     font-size: 14px
     font-weight: 500
-    color: #47466A
+    color: var(--themeColorDark)
 
 .protocol-type
     font-size: 14px
     font-weight: 500   
-    color: #47466A
+    color: var(--themeColorDark)
     opacity: 0.5
 
 .form-field-text
@@ -135,13 +135,13 @@ import { mapState } from 'vuex'
 <style scoped>
 .form-field-text >>> .v-label {
   font-size: 12px;
-  color: #6200EA;
+  color: var(--themeColor);
   font-weight: 400;
 }
 
 .form-field-text >>> input {
   font-size: 14px;
-  color: #6200EA;
+  color: var(--themeColor);
   font-weight: 500;
 }
 </style>

@@ -397,6 +397,70 @@ public class GlobalEnums {
                 }, new IssueTags[]{
                 IssueTags.OWASPTOP10,
                 IssueTags.HACKERONETOP10,
+        }),
+
+        MASS_ASSIGNMENT_CREATE_ADMIN_ROLE(
+                "MASS_ASSIGNMENT_CREATE_ADMIN_ROLE",
+                TestCategory.MA,
+                "Mass assignment leading to creation of admin role",
+                "The endpoint appears to be vulnerable to Mass Assignment attack. The original request was replayed by adding role with admin permissions in request body. The application responded with 2XX success code in response.",
+                "The endpoint appears to be vulnerable to Mass Assignment attack. The original request was replayed by adding role with admin permissions in request body. The application responded with 2XX success code in response." +
+                        "<b>Background:</b>" +
+                        "Objects in modern applications might contain many properties. Some of these properties should be updated directly by the client (e.g., user.first_name or user.address) and some of them should not (e.g., user.is_vip flag).\n" +
+                        "An API endpoint is vulnerable if it automatically converts client parameters into internal object properties, without considering the sensitivity and the exposure level of these properties. This could allow an attacker to update object properties that they should not have access to.\n" +
+                        "Examples for sensitive properties:" +
+                        "Permission-related properties: user.is_admin, user.is_vip should only be set by admins." +
+                        "Process-dependent properties: user.cash should only be set internally after payment verification." +
+                        "Internal properties: article.created_time should only be set internally by the application.",
+                "Exploitation can lead to privilege escalation.",
+                new String[]{
+                        "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa6-mass-assignment.md",
+                }, new IssueTags[]{
+                IssueTags.OWASPTOP10,
+                IssueTags.HACKERONETOP10,
+                IssueTags.BL
+        }),
+
+        PORT_SCANNING(
+                "PORT_SCANNING",
+                TestCategory.SSRF,
+                "Port scanning with SSRF",
+                "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing the URI parameter with some of the popular ports. The application responded with 2XX success code indicating that the port is open.",
+                "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing the URI parameter with some of the popular ports. The application responded with 2XX success code indicating that the port is open.\n" +
+                        "Modern concepts in application development make SSRF more common and more dangerous.\n" +
+                        "More common - the following concepts encourage developers to access an external resource based on user input: Webhooks, file fetching from URLs, custom SSO, and URL previews.\n" +
+                        "More dangerous - Modern technologies like cloud providers, Kubernetes, and Docker expose management and control channels over HTTP on predictable, well-known paths. Those channels are an easy target for an SSRF attack.\n" +
+                        "It is also more challenging to limit outbound traffic from your application, because of the connected nature of modern applications.\n" +
+                        "The SSRF risk can not always be completely eliminated. While choosing a protection mechanism, it is important to consider the business risks and needs.",
+                "Successful exploitation can lead to access control bypass, sensitive data leak, or even compromise the application.",
+                new String[]{
+                        "https://github.com/OWASP/API-Security/blob/master/2023/en/src/0xa6-server-side-request-forgery.md",
+                        "https://www.akto.io/blog/how-to-prevent-server-side-request-forgery-ssrf-as-a-developer",
+                        "https://www.cobalt.io/blog/from-ssrf-to-port-scanner"
+
+                }, new IssueTags[]{
+                IssueTags.OWASPTOP10,
+                IssueTags.HACKERONETOP10,
+        }),
+
+        FETCH_SENSITIVE_FILES(
+                "FETCH_SENSITIVE_FILES",
+                TestCategory.SSRF,
+                "Sensitive files exposed due to SSRF",
+                "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing the URI parameter with popular sensitive file paths. The application responded with 2XX success code and also gave out details of these files.",
+                "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing the URI parameter with popular sensitive file paths. The application responded with 2XX success code and also gave out details of these files.\n" +
+                        "Modern concepts in application development make SSRF more common and more dangerous.\n" +
+                        "More common - the following concepts encourage developers to access an external resource based on user input: Webhooks, file fetching from URLs, custom SSO, and URL previews.\n" +
+                        "More dangerous - Modern technologies like cloud providers, Kubernetes, and Docker expose management and control channels over HTTP on predictable, well-known paths. Those channels are an easy target for an SSRF attack.\n" +
+                        "It is also more challenging to limit outbound traffic from your application, because of the connected nature of modern applications.\n" +
+                        "The SSRF risk can not always be completely eliminated. While choosing a protection mechanism, it is important to consider the business risks and needs.",
+                "Successful exploitation might compromise sensitive data such as passwords, source-code, confidential files etc.",
+                new String[]{
+                        "https://github.com/OWASP/API-Security/blob/master/2023/en/src/0xa6-server-side-request-forgery.md",
+                        "https://www.akto.io/blog/how-to-prevent-server-side-request-forgery-ssrf-as-a-developer"
+                }, new IssueTags[]{
+                IssueTags.OWASPTOP10,
+                IssueTags.HACKERONETOP10,
         });
 
 

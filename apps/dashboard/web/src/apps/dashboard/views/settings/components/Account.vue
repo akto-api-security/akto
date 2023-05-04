@@ -52,7 +52,7 @@
             <div class="entry-text">Redact sample data</div>
             <div class="entry-value">
                 <v-switch
-                    color="#6200EA"
+                    color="var(--themeColor)"
                     v-model="localRedactPayload"
                 />
             </div>
@@ -62,8 +62,18 @@
             <div class="entry-text">Activate new merging</div>
             <div class="entry-value">
                 <v-switch
-                    color="#6200EA"
+                    color="var(--themeColor)"
                     v-model="localMergeAsyncOutside"
+                />
+            </div>
+        </div>
+
+        <div class="toggle-redact-feature">
+            <div class="entry-text">Enable New Merging</div>
+            <div class="entry-value">
+                <v-switch
+                    color="var(--themeColor)"
+                    v-model="newMerging"
                 />
             </div>
         </div>
@@ -96,7 +106,7 @@ import {mapState} from 'vuex'
             this.$store.dispatch('team/fetchUserLastLoginTs')
         },
         computed: {
-            ...mapState('team', ['redactPayload', 'setupType', 'dashboardVersion', 'apiRuntimeVersion', 'mergeAsyncOutside', 'lastLoginTs']),
+            ...mapState('team', ['redactPayload', 'setupType', 'dashboardVersion', 'apiRuntimeVersion', 'mergeAsyncOutside', 'lastLoginTs', 'urlRegexMatchingEnabled']),
             localRedactPayload: {
                 get() {
                     return this.redactPayload
@@ -119,6 +129,15 @@ import {mapState} from 'vuex'
                 },
                 set(v) {
                     this.$store.dispatch('team/updateMergeAsyncOutside')
+                }
+            },
+            newMerging: {
+                get() {
+                    return this.urlRegexMatchingEnabled
+                },
+                set(v) {
+                    console.log(v)
+                    this.$store.dispatch('team/updateEnableNewMerge', v)
                 }
             }
         }
