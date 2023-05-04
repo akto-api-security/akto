@@ -412,11 +412,11 @@ public class CustomDataTypeAction extends UserAction{
 
     public CustomDataType generateCustomDataType(int userId) throws AktoCustomException {
         if (name == null || name.length() == 0) throw new AktoCustomException("Name cannot be empty");
-        if (name.split(" ").length > 1) throw new AktoCustomException("Name has to be single word");
-        if (name.length() > 15) throw new AktoCustomException("Maximum length allowed is 15 characters");
+        int maxChars = 25;
+        if (name.length() > maxChars) throw new AktoCustomException("Maximum length allowed is "+maxChars+" characters");
         name = name.trim();
         name = name.toUpperCase();
-        if (!(name.matches("[A-Z_0-9]+"))) throw new AktoCustomException("Name can only contain alphabets, numbers and underscores");
+        if (!(name.matches("[A-Z_0-9 ]+"))) throw new AktoCustomException("Name can only contain alphabets, spaces, numbers and underscores");
 
         if (SingleTypeInfo.subTypeMap.containsKey(name)) {
             throw new AktoCustomException("Data type name reserved");

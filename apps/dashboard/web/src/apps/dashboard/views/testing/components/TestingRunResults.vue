@@ -260,29 +260,13 @@ export default {
                 this.selectedDate = Math.max(...this.testingRunResultSummaries.map(o => o.startTimestamp))
             })
         },
-        getRunResultSubCategory (runResult) {
-            if (this.subCatogoryMap[runResult.testSubType] === undefined) {
-                let a = this.subCategoryFromSourceConfigMap[runResult.testSubType]
-                return a ? a.subcategory : null
-            } else {
-                return this.subCatogoryMap[runResult.testSubType].testName
-            }
-        },
-        getRunResultCategory (runResult) {
-            if (this.subCatogoryMap[runResult.testSubType] === undefined) {
-                let a = this.subCategoryFromSourceConfigMap[runResult.testSubType]
-                return a ? a.category.shortName : null
-            } else {
-                return this.subCatogoryMap[runResult.testSubType].superCategory.shortName
-            }
-        },
         prepareForTable(runResult) {
             return {
                 ...runResult,
                 endpoint: runResult.apiInfoKey.method + " " + runResult.apiInfoKey.url,
                 severity: runResult["vulnerable"] ? "HIGH" : null,
-                testSubType: this.getRunResultSubCategory (runResult),
-                testSuperType: this.getRunResultCategory(runResult)
+                testSubType: func.getRunResultSubCategory (runResult, this.subCategoryFromSourceConfigMap, this.subCatogoryMap, "testName"),
+                testSuperType: func.getRunResultCategory(runResult, this.subCatogoryMap, this.subCategoryFromSourceConfigMap, "shortName")
             }
         },
         async openDetails(row) {
@@ -332,6 +316,11 @@ export default {
             }
         }, 5000)
 
+        if(this.currentTest){
+            if(this.startTimestamp > this.currentTest.startTimestamp){
+                this.startTimestamp = this.currentTest.startTimestamp
+            }
+        }
     },
 
     destroyed() {

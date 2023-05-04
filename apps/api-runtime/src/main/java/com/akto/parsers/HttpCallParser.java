@@ -2,7 +2,9 @@ package com.akto.parsers;
 
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.*;
+import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -10,12 +12,8 @@ import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
 import com.akto.util.JSONUtils;
 import com.akto.util.HttpRequestResponseUtils;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.FindOneAndUpdateOptions;
-import com.mongodb.client.model.UpdateOptions;
-import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.*;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
 
@@ -30,6 +28,7 @@ public class HttpCallParser {
     private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class);
     public APICatalogSync apiCatalogSync;
     private Map<String, Integer> hostNameToIdMap = new HashMap<>();
+    private Map<TrafficMetrics.Key, TrafficMetrics> trafficMetricsMap = new HashMap<>();
 
     public HttpCallParser(String userIdentifier, int thresh, int sync_threshold_count, int sync_threshold_time, boolean fetchAllSTI) {
         last_synced = 0;
@@ -127,12 +126,12 @@ public class HttpCallParser {
             id += i;
             try {
                 Bson updates = Updates.combine(
-                    Updates.setOnInsert(ApiCollection.HOST_NAME, host),
+                    Updates.setOnInsert("_id", id),
                     Updates.setOnInsert("startTs", Context.now()),
                     Updates.setOnInsert("urls", new HashSet<>())
                 );
 
-                ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq("_id", id), updates, updateOptions);
+                ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
 
                 flag = true;
                 break;
@@ -141,6 +140,7 @@ public class HttpCallParser {
             }
         }
         if (flag) { // flag tells if we were successfully able to insert collection
+            loggerMaker.infoAndAddToDb("Using collectionId=" + id + " for " + host, LogDb.RUNTIME);
             return id;
         } else {
             throw new Exception("Not able to insert");
@@ -165,12 +165,50 @@ public class HttpCallParser {
         if (syncImmediately || this.sync_count >= syncThresh || (Context.now() - this.last_synced) > this.sync_threshold_time || isHarOrPcap) {
             numberOfSyncs++;
             apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI);
+            syncTrafficMetricsWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
             return apiCatalogSync;
         }
 
         return null;
+    }
+
+    public void syncTrafficMetricsWithDB() {
+        try {
+            syncTrafficMetricsWithDBHelper();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while updating traffic metrics: " + e.getMessage(), LogDb.RUNTIME);
+        } finally {
+            trafficMetricsMap = new HashMap<>();
+        }
+    }
+
+    public void syncTrafficMetricsWithDBHelper() {
+        ArrayList<WriteModel<TrafficMetrics>> bulkUpdates = new ArrayList<>();
+        for (TrafficMetrics trafficMetrics: trafficMetricsMap.values()) {
+            TrafficMetrics.Key key = trafficMetrics.getId();
+            Map<String, Long> countMap = trafficMetrics.getCountMap();
+
+            if (countMap == null || countMap.isEmpty()) continue;
+
+            Bson updateKey = TrafficMetricsDao.filtersForUpdate(key);
+
+            List<Bson> individualUpdates = new ArrayList<>();
+            for (String ts: countMap.keySet()) {
+                individualUpdates.add(Updates.inc("countMap." + ts, countMap.get(ts)));
+            }
+
+            Bson update = Updates.combine(individualUpdates);
+
+            UpdateOneModel<TrafficMetrics> updateOneModel = new UpdateOneModel<>(updateKey, update, new UpdateOptions().upsert(true));
+            bulkUpdates.add(updateOneModel);
+        }
+
+        if (bulkUpdates.size() > 0) {
+            TrafficMetricsDao.instance.getMCollection().bulkWrite(bulkUpdates);
+        }
+
     }
 
     public static boolean useHostCondition(String hostName, HttpResponseParams.Source source) {
@@ -184,10 +222,50 @@ public class HttpCallParser {
         return whiteListSource.contains(source) &&  hostNameCondition && ApiCollection.useHost;
     }
 
+    public static int getBucketStartEpoch() {
+        return Context.now()/(3600*24);
+    }
+
+    public static int getBucketEndEpoch() {
+        return Context.now()/(3600*24) + 1;
+    }
+
+    public static TrafficMetrics.Key getTrafficMetricsKey(HttpResponseParams httpResponseParam, TrafficMetrics.Name name) {
+        int bucketStartEpoch = getBucketStartEpoch();
+        int bucketEndEpoch = getBucketEndEpoch();
+
+        String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
+
+        if (hostName != null &&  hostName.toLowerCase().equals(hostName.toUpperCase()) ) {
+            hostName = "ip-host";
+        }
+
+        return new TrafficMetrics.Key(
+                httpResponseParam.getSourceIP(), hostName, httpResponseParam.requestParams.getApiCollectionId(),
+                name, bucketStartEpoch, bucketEndEpoch
+        );
+    }
+
+    public void incTrafficMetrics(TrafficMetrics.Key key, int value)  {
+        if (trafficMetricsMap == null) trafficMetricsMap = new HashMap<>();
+        TrafficMetrics trafficMetrics = trafficMetricsMap.get(key);
+        if (trafficMetrics == null) {
+            trafficMetrics = new TrafficMetrics(key, new HashMap<>());
+            trafficMetricsMap.put(key, trafficMetrics);
+        }
+
+        trafficMetrics.inc(value);
+    }
 
     public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
         for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
+
+            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
+                TrafficMetrics.Key totalRequestsKey = getTrafficMetricsKey(httpResponseParam, TrafficMetrics.Name.TOTAL_REQUESTS_RUNTIME);
+                incTrafficMetrics(totalRequestsKey,1);
+            }
+
             boolean cond = HttpResponseParams.validHttpResponseCode(httpResponseParam.getStatusCode());
             if (!cond) continue;
             
@@ -242,6 +320,12 @@ public class HttpCallParser {
             } else {
                 filteredResponseParams.addAll(responseParamsList);
             }
+
+            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
+                TrafficMetrics.Key processedRequestsKey = getTrafficMetricsKey(httpResponseParam, TrafficMetrics.Name.FILTERED_REQUESTS_RUNTIME);
+                incTrafficMetrics(processedRequestsKey,1);
+            }
+
         }
 
         return filteredResponseParams;
@@ -298,4 +382,10 @@ public class HttpCallParser {
     public void setHostNameToIdMap(Map<String, Integer> hostNameToIdMap) {
         this.hostNameToIdMap = hostNameToIdMap;
     }
+
+    public void setTrafficMetricsMap(Map<TrafficMetrics.Key, TrafficMetrics> trafficMetricsMap) {
+        this.trafficMetricsMap = trafficMetricsMap;
+    }
+
+    
 }
