@@ -21,7 +21,7 @@ public class EqFilter extends DataOperandsImpl {
                 if (queryList == null || queryList.size() == 0) {
                     return false;
                 }
-                result = data.toString().toLowerCase().equals(queryList.get(0).toLowerCase());
+                result = data.toString().trim().toLowerCase().equals(queryList.get(0).trim().toLowerCase());
             }
 
             if (data instanceof Integer) {

@@ -22,7 +22,7 @@ public class NotContainsFilter extends DataOperandsImpl {
         }
 
         for (String queryString: querySet) {
-            res = evaluateOnStringQuerySet(data, queryString);
+            res = evaluateOnStringQuerySet(data.trim(), queryString.trim());
             result = result && res;
         }
         return result;    
