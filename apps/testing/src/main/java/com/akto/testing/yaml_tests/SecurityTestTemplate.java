@@ -20,8 +20,9 @@ public abstract class SecurityTestTemplate {
     RawApi rawApi;
     Map<String, Object> varMap;
     Auth auth;
+    String logId;
 
-    public SecurityTestTemplate(ApiInfo.ApiInfoKey apiInfoKey, FilterNode filterNode, FilterNode validatorNode, ExecutorNode executorNode ,RawApi rawApi, Map<String, Object> varMap, Auth auth) {
+    public SecurityTestTemplate(ApiInfo.ApiInfoKey apiInfoKey, FilterNode filterNode, FilterNode validatorNode, ExecutorNode executorNode ,RawApi rawApi, Map<String, Object> varMap, Auth auth, String logId) {
         this.apiInfoKey = apiInfoKey;
         this.filterNode = filterNode;
         this.validatorNode = validatorNode;
@@ -29,6 +30,7 @@ public abstract class SecurityTestTemplate {
         this.rawApi = rawApi;
         this.varMap = varMap;
         this.auth = auth;
+        this.logId = logId;
     }
 
     public abstract boolean filter();
@@ -99,4 +101,13 @@ public abstract class SecurityTestTemplate {
     public void setAuth(Auth auth) {
         this.auth = auth;
     }
+
+    public String getLogId() {
+        return logId;
+    }
+
+    public void setLogId(String logId) {
+        this.logId = logId;
+    }
+    
 }
