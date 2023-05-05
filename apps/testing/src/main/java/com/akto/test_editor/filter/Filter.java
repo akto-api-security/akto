@@ -5,6 +5,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 
 import com.akto.dao.test_editor.TestEditorEnums.ExtractOperator;
 import com.akto.dao.test_editor.TestEditorEnums.OperandTypes;
@@ -18,12 +20,13 @@ import com.mongodb.BasicDBObject;
 public class Filter {
 
     private FilterAction filterAction;
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Filter.class);
 
     public Filter() {
         this.filterAction = new FilterAction();
     }
     
-    public DataOperandsFilterResponse isEndpointValid(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfo.ApiInfoKey apiInfoKey, List<String> matchingKeySet, List<BasicDBObject> contextEntities, boolean keyValOperandSeen, String context, Map<String, Object> varMap) {
+    public DataOperandsFilterResponse isEndpointValid(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfo.ApiInfoKey apiInfoKey, List<String> matchingKeySet, List<BasicDBObject> contextEntities, boolean keyValOperandSeen, String context, Map<String, Object> varMap, String logId) {
 
         List<FilterNode> childNodes = node.getChildNodes();
         if (node.getNodeType().equalsIgnoreCase(OperandTypes.Term.toString())) {
@@ -62,7 +65,12 @@ public class Filter {
         
         for (int i = 0; i < childNodes.size(); i++) {
             FilterNode childNode = childNodes.get(i);
-            dataOperandsFilterResponse = isEndpointValid(childNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, contextEntities, keyValOpSeen,context, varMap);
+            dataOperandsFilterResponse = isEndpointValid(childNode, rawApi, testRawApi, apiInfoKey, matchingKeySet, contextEntities, keyValOpSeen,context, varMap, logId);
+            if (!dataOperandsFilterResponse.getResult()) {
+                loggerMaker.infoAndAddToDb("node execution failed, operand " + childNode.getOperand() + 
+                "concernedProperty " + childNode.getConcernedProperty() + "subConcernedProperty " + childNode.getSubConcernedProperty()
+                + "contextProperty " + childNode.getContextProperty() + "context " + context, LogDb.TESTING);
+            }
             contextEntities = dataOperandsFilterResponse.getContextEntities();
             result = operator.equals("and") ? result && dataOperandsFilterResponse.getResult() : result || dataOperandsFilterResponse.getResult();
             
