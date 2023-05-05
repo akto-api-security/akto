@@ -564,7 +564,12 @@ public class TestExecutor {
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();
 
-        YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode, rawApi, varMap, auth);
+        String testExecutionLogId = UUID.randomUUID().toString();
+        
+        loggerMaker.infoAndAddToDb("triggering test run for apiInfoKey " + apiInfoKey + "test " + 
+            testSubType + "logId" + testExecutionLogId, LogDb.TESTING);
+
+        YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode, rawApi, varMap, auth, testExecutionLogId);
         List<TestResult> testResults = yamlTestTemplate.run();
         if (testResults == null) return null;
         int endTime = Context.now();
