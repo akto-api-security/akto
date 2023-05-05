@@ -353,6 +353,7 @@
         --hexColor39: #f2f2f2;
         --hexColor40: #5865F2;
         --hexColor41: #F7F7F7;
+        --hexColor42: #fe7b5b;
 
         --primary: #126BFF;
         --quickStartTheme:#6200B0;
