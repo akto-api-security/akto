@@ -40,7 +40,7 @@ public class EqFilter extends DataOperandsImpl {
                 }
             }
             
-            if (data instanceof Boolean && querySet instanceof Boolean) {
+            if (data instanceof Boolean ) {
                 List<Boolean> queryList = (List) querySet;
                 if (queryList == null || queryList.size() == 0) {
                     return false;

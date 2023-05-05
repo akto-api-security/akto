@@ -56,11 +56,11 @@ execute:
   requests:
     - req:
         - modify_query_param:
-            url_key: http://⑯⑨。②⑤④。⑯⑨｡②⑤④/
+            url_key: http://⑯⑨。②⑤④。⑯⑨｡②⑤④/latest/meta-data/local-ipv4
         - modify_body_param:
-            url_key: http://⑯⑨。②⑤④。⑯⑨｡②⑤④/
+            url_key: http://⑯⑨。②⑤④。⑯⑨｡②⑤④/latest/meta-data/local-ipv4
         - modify_header:
-            url_key: http://⑯⑨。②⑤④。⑯⑨｡②⑤④/
+            url_key: http://⑯⑨。②⑤④。⑯⑨｡②⑤④/latest/meta-data/local-ipv4
 
 validate:
   response_payload:

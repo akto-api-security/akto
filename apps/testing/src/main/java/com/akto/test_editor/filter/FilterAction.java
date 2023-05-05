@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.test_editor.filter.data_operands_impl.*;
 import org.bson.conversions.Bson;
 
@@ -235,6 +236,11 @@ public final class FilterAction {
         if (rawApi == null) {
             return new DataOperandsFilterResponse(false, null, null);
         }
+        OriginalHttpRequest request = rawApi.getRequest();
+        if (request == null) {
+            return new DataOperandsFilterResponse(false, null, null);
+        }
+
         String reqBody = rawApi.getRequest().getBody();
         return applyFilterOnPayload(filterActionRequest, reqBody);
     }
@@ -245,7 +251,12 @@ public final class FilterAction {
         if (rawApi == null) {
             return new DataOperandsFilterResponse(false, null, null);
         }
-        String reqBody = rawApi.getResponse().getBody();
+        OriginalHttpResponse response = rawApi.getResponse();
+        if (response == null) {
+            return new DataOperandsFilterResponse(false, null, null);
+        }
+
+        String reqBody = response.getBody();
         return applyFilterOnPayload(filterActionRequest, reqBody);
     }
 
