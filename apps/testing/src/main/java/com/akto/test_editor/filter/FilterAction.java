@@ -602,6 +602,15 @@ public final class FilterAction {
                 if (!(objVal instanceof String)) {
                     continue;
                 }
+
+                Object contextVal = VariableResolver.resolveContextKey(varMap, objVal.toString());
+                List<String> contextList = (List<String>) contextVal;
+                if (contextList != null && contextList.size() > 0) {
+                    listVal.set(index, contextList.get(0));
+                    index++;
+                    continue;
+                }
+
                 String val = (String) objVal;
                 Boolean matches = Utils.checkIfContainsMatch(val, "\\$\\{[^}]*\\}");
                 if (matches) {
