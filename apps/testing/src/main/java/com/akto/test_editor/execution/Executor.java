@@ -45,7 +45,7 @@ public class Executor {
             // follow redirects = true for now
             testResponse = ApiExecutor.sendRequest(singleReq.getRawApi().getRequest(), singleReq.getFollowRedirect());
         } catch(Exception e) {
-            loggerMaker.errorAndAddToDb("error executing test request " + logId, LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
             return null;
         }
         result.add(new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), singleReq.getRawApi().getRequest(), testResponse));
