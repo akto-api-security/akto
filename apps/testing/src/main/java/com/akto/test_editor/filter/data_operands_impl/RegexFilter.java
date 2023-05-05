@@ -22,7 +22,7 @@ public class RegexFilter extends DataOperandsImpl {
             return result;
         }
         for (String queryString: querySet) {
-            res = Utils.checkIfContainsMatch(data, queryString);
+            res = Utils.checkIfContainsMatch(data.trim(), queryString.trim());
             result = result || res;
         }
         return result;

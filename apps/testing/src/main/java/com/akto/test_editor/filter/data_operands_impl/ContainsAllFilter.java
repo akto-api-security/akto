@@ -21,7 +21,7 @@ public class ContainsAllFilter extends DataOperandsImpl {
             return result;
         }
         for (String queryString: querySet) {
-            res = evaluateOnStringQuerySet(data, queryString);
+            res = evaluateOnStringQuerySet(data.trim(), queryString.trim());
             result = result && res;
         }
         return result;
@@ -30,7 +30,7 @@ public class ContainsAllFilter extends DataOperandsImpl {
     public Boolean evaluateOnListQuerySet(String data, List<String> querySet) {
         Boolean result = true;
         for (String queryString: querySet) {
-            result = result && evaluateOnStringQuerySet(data, queryString);
+            result = result && evaluateOnStringQuerySet(data.trim(), queryString.trim());
         }
         return result;
     }
