@@ -76,12 +76,14 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     @Override
     public List<TestResult> validator(List<ExecutionResult> attempts) {
         List<TestResult> testResults = new ArrayList<>();
-        loggerMaker.infoAndAddToDb("validation started" + logId, LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("validation started " + logId, LogDb.TESTING);
         for (ExecutionResult attempt: attempts) {
             String msg = RedactSampleData.convertOriginalReqRespToString(attempt.getRequest(), attempt.getResponse());
             RawApi testRawApi = new RawApi(attempt.getRequest(), attempt.getResponse(), msg);
             boolean vulnerable = TestPlugin.validateValidator(this.getValidatorNode(), this.getRawApi(), testRawApi , this.getApiInfoKey(), this.varMap, this.logId);
-            loggerMaker.infoAndAddToDb("found vulnerable  " + logId, LogDb.TESTING);
+            if (vulnerable) {
+                loggerMaker.infoAndAddToDb("found vulnerable " + logId, LogDb.TESTING);
+            }
             double percentageMatch = TestPlugin.compareWithOriginalResponse(
                     this.rawApi.getOriginalMessage(), testRawApi.getOriginalMessage(), new HashMap<>()
             );
