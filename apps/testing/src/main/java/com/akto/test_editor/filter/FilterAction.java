@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.akto.test_editor.filter.data_operands_impl.*;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.SingleTypeInfoDao;
@@ -56,6 +57,7 @@ public final class FilterAction {
         put("gte", new GreaterThanEqFilter());
         put("lt", new LesserThanFilter());
         put("lte", new LesserThanEqFilter());
+        put("not_contains", new NotContainsFilter());
     }};
 
     public FilterAction() { }
@@ -586,7 +588,7 @@ public final class FilterAction {
 
         DataOperandsImpl handler = this.filters.get(dataOperandFilterRequest.getOperand().toLowerCase());
         if (handler == null) {
-            return false;
+          return false;
         }
 
         return handler.isValid(dataOperandFilterRequest);
@@ -604,11 +606,13 @@ public final class FilterAction {
                 }
 
                 Object contextVal = VariableResolver.resolveContextVariable(varMap, objVal.toString());
-                List<String> contextList = (List<String>) contextVal;
-                if (contextList != null && contextList.size() > 0) {
-                    listVal.set(index, contextList.get(0));
-                    index++;
-                    continue;
+                if (contextVal instanceof  List) {
+                    List<String> contextList = (List<String>) contextVal;
+                    if (contextList != null && contextList.size() > 0) {
+                        listVal.set(index, contextList.get(0));
+                        index++;
+                        continue;
+                    }
                 }
 
                 String val = (String) objVal;
@@ -878,26 +882,30 @@ public final class FilterAction {
 
         Bson filter = Filters.and(
             Filters.eq("apiCollectionId", apiInfoKey.getApiCollectionId()),
-            Filters.ne("url", request.getUrl()),
             Filters.regex("param", param)
         );
-        SingleTypeInfo singleTypeInfo = SingleTypeInfoDao.instance.findOne(filter);
 
-        if (singleTypeInfo == null || singleTypeInfo.getValues() == null || singleTypeInfo.getValues().getElements().size() == 0) {
+        List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(filter, 0, 5, null);
+
+        if (singleTypeInfos.isEmpty()) {
             return new DataOperandsFilterResponse(false, null, null);
         }
 
         List<BasicDBObject> paramValues = new ArrayList<>();
         BasicDBObject obj = new BasicDBObject();
-        Set<String> valSet = singleTypeInfo.getValues().getElements();
 
-        for (String val: valSet) {
-            boolean exists = paramExists(filterActionRequest.getRawApi(), singleTypeInfo.getParam(), val);
-            if (!exists) {
-                obj.put("key", param);
-                obj.put("value", val);
-                paramValues.add(obj);
-                break;
+        for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
+            Set<String> valSet  = singleTypeInfo.getValues() != null ? singleTypeInfo.getValues().getElements() : new HashSet<>();
+            if (valSet == null) continue;
+
+            for (String val: valSet) {
+                boolean exists = paramExists(filterActionRequest.getRawApi(), singleTypeInfo.getParam(), val);
+                if (!exists) {
+                    obj.put("key", param);
+                    obj.put("value", val);
+                    paramValues.add(obj);
+                    break;
+                }
             }
         }
 
@@ -978,7 +986,7 @@ public final class FilterAction {
             }
         }
 
-        String payload = rawApi.getRequest().getBody();
+        String payload = rawApi.getRequest().getJsonRequestBody();
         BasicDBObject reqObj = new BasicDBObject();
         try {
             reqObj =  BasicDBObject.parse(payload);
@@ -988,6 +996,21 @@ public final class FilterAction {
 
         if (reqObj.containsKey(param)) {
             Object paramVal = reqObj.get(param);
+            if (val.equalsIgnoreCase(paramVal.toString())) {
+                return true;
+            }
+        }
+
+        String responsePayload = rawApi.getResponse().getJsonResponseBody();
+        BasicDBObject respObj = new BasicDBObject();
+        try {
+            respObj =  BasicDBObject.parse(responsePayload);
+        } catch(Exception e) {
+            // add log
+        }
+
+        if (respObj.containsKey(param)) {
+            Object paramVal = respObj.get(param);
             if (val.equalsIgnoreCase(paramVal.toString())) {
                 return true;
             }

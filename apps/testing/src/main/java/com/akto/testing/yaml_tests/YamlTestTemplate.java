@@ -29,7 +29,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     public boolean filter() {
         List<String> authHeaders = AuthValidator.getHeaders(this.auth);
         if (authHeaders != null && authHeaders.size() > 0) {
-            this.varMap.put("auth_headers", this.auth.getHeaders());
+            this.varMap.put("auth_headers", authHeaders);
         }
         if (this.auth != null && this.auth.getAuthenticated() != null) {
             boolean validAuthHeaders = AuthValidator.validate(this.auth, this.rawApi);
