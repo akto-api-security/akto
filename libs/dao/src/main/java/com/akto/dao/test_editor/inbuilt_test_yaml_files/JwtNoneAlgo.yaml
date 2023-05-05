@@ -1,0 +1,28 @@
+id: JWT_NONE_ALGO
+info:
+  name: "JWT None Algorithm"
+  description: "Since NONE Algorithm JWT is accepted by the server the attacker can tamper with the payload of JWT and access protected resources."
+  details: >   
+            "The endpoint appears to be vulnerable to broken authentication attack.The original request was replayed by changing algorithm of JWT token
+            to NONE in request headers. The server responded with 2XX success codes. This indicates that this endpoint can be accessed without JWT signature which means a malicious user can get unauthorized access to this endpoint.<br><br>"
+            "<b>Background:</b> All JSON Web Tokens should contain the \"alg\" header parameter, which specifies the algorithm that the server should use to verify the signature of the token. In addition to cryptographically strong algorithms
+            the JWT specification also defines the \"none\" algorithm, which can be used with \"unsecured\" (unsigned) JWTs. When this algorithm is supported on the server, it may accept tokens that have no signature at all.<br><br>"
+            "As the JWT header can be tampered with client-side, a malicious user could change the \"alg\" header to \"none\", then remove the signature and check whether the server still accepts the token."
+  impact: >
+            "If JWT none algorithm works, attacker can do a full account takeover.
+            They can also exploit this vulnerability by supplying an arbitrary claim in the JWT payload to escalate their privileges or impersonate other users. For example, if the token contains a \"username\": \"joe\" claim, they could change this to \"username\": \"admin\"."
+  category:
+    name: NO_AUTH
+    shortName: Broken Authentication
+    displayName: Broken User Authentication (BUA)
+  subCategory: JWT_NONE_ALGO
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://redhuntlabs.com/a-practical-guide-to-attack-jwt-json-web-token"
+    - "https://portswigger.net/kb/issues/00200901_jwt-none-algorithm-supported"
+api_selection_filters:
+  #authenticated: true
