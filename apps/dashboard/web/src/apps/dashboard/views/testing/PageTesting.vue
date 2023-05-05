@@ -274,7 +274,7 @@ export default {
     },
     computed: {
         ...mapState('test_roles', ['testRoles', 'loading', 'selectedRole']),
-        ...mapState('testing', ['testingRuns', 'authMechanism', 'testingRunResults', 'pastTestingRuns']),
+        ...mapState('testing', ['testingRuns', 'authMechanism', 'testingRunResults', 'pastTestingRuns','cicdTestingRuns']),
         mapCollectionIdToName() {
             return this.$store.state.collections.apiCollections.reduce((m, e) => {
                 m[e.id] = e.displayName
@@ -329,6 +329,30 @@ export default {
                     ]
                 },
                 {
+                    icon: "$fas_search",
+                    active: true,
+                    title: "CI/CD tests",
+                    group: "/dashboard/testing/",
+                    color: "var(--rgbaColor17)",
+                    items: [
+                        {
+                            title: "All CI/CD tests",
+                            link: "/dashboard/testing/cicd",
+                            icon: "$fas_search",
+                            class: "bold",
+                            active: true
+                        },
+                        ...(this.cicdTestingRuns || []).map(x => {
+                            return {
+                                title: x.displayName || testing.getCollectionName(x.testingEndpoints, this.mapCollectionIdToName),
+                                link: "/dashboard/testing/" + x.hexId + "/results",
+                                active: true,
+                                cicd: true
+                            }
+                        })
+                    ]
+                },
+                {
                     icon: "$fas_plus",
                     title: "Previous tests",
                     group: "/dashboard/testing/",
@@ -374,11 +398,11 @@ export default {
             return dayStr + " " + date.slice(11)
         }
     },
-    mounted() {
+    async mounted() {
         this.fetchAuthMechanismData()
         let now = func.timeNow()
         this.$store.dispatch('test_roles/loadTestRoles')
-        this.$store.dispatch('testing/loadTestingDetails', { startTimestamp: now - func.recencyPeriod, endTimestamp: now })
+        await this.$store.dispatch('testing/loadTestingDetails', { startTimestamp: now - func.recencyPeriod, endTimestamp: now })
     },
     watch: {
         authMechanism: {

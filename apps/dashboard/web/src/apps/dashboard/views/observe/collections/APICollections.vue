@@ -250,9 +250,9 @@ export default {
             })
         }
     },
-    mounted () {
+    async mounted () {
         let now = func.timeNow()
-        this.$store.dispatch('testing/loadTestingDetails', {startTimestamp: now - func.recencyPeriod, endTimestamp: now})
+        await this.$store.dispatch('testing/loadTestingDetails', {startTimestamp: now - func.recencyPeriod, endTimestamp: now})
         this.$emit('mountedView', {type: 0})
     }
 }
