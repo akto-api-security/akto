@@ -1,5 +1,5 @@
 <template>
-    <div ref="editor" style="width: 800px; height: 100%;">
+    <div ref="editor" style="width: 800px; height: 800px;">
         <v-btn @click="getEditorValue">Test</v-btn>
     </div>
 </template>
@@ -15,6 +15,8 @@ export default {
                 minimap: { enabled: false },
                 wordWrap: true,
                 automaticLayout:true,
+                colorDecorations:true,
+                scrollBeyondLastLine:false,
             },
             textEditor:null,
         }
