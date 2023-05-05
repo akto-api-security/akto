@@ -603,7 +603,7 @@ public final class FilterAction {
                     continue;
                 }
 
-                Object contextVal = VariableResolver.resolveContextKey(varMap, objVal.toString());
+                Object contextVal = VariableResolver.resolveContextVariable(varMap, objVal.toString());
                 List<String> contextList = (List<String>) contextVal;
                 if (contextList != null && contextList.size() > 0) {
                     listVal.set(index, contextList.get(0));
