@@ -708,15 +708,15 @@ public class TestExecutor {
 
         }
 
-        if(testSubCategories == null || testSubCategories.contains(TestSubCategory.PORT_SCANNING.name())) {
-            TestingRunResult portScanningViaSSRFResult = runTest(portScanningViaSSRF, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-            if (portScanningViaSSRFResult != null) testingRunResults.add(portScanningViaSSRFResult);
-        }
-
-        if(testSubCategories == null || testSubCategories.contains(TestSubCategory.FETCH_SENSITIVE_FILES.name())) {
-            TestingRunResult fetchSensitiveFilesViaSSRFResult = runTest(fetchSensitiveFilesViaSSRF, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-            if (fetchSensitiveFilesViaSSRFResult != null) testingRunResults.add(fetchSensitiveFilesViaSSRFResult);
-        }
+//        if(testSubCategories == null || testSubCategories.contains("PORT_SCANNING")) {
+//            TestingRunResult portScanningViaSSRFResult = runTest(portScanningViaSSRF, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+//            if (portScanningViaSSRFResult != null) testingRunResults.add(portScanningViaSSRFResult);
+//        }
+//
+//        if(testSubCategories == null || testSubCategories.contains("FETCH_SENSITIVE_FILES")) {
+//            TestingRunResult fetchSensitiveFilesViaSSRFResult = runTest(fetchSensitiveFilesViaSSRF, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+//            if (fetchSensitiveFilesViaSSRFResult != null) testingRunResults.add(fetchSensitiveFilesViaSSRFResult);
+//        }
 
         return testingRunResults;
     }
