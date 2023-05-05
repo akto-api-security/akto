@@ -13,14 +13,19 @@ import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.test_editor.ExecutorSingleRequest;
 import com.akto.testing.ApiExecutor;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 
 public class Executor {
 
-    public List<ExecutionResult> execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap) {
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class);
+
+    public List<ExecutionResult> execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId) {
 
         List<ExecutionResult> result = new ArrayList<>();
         
         if (node.getChildNodes().size() < 2) {
+            loggerMaker.errorAndAddToDb("executor child nodes is less than 2, returning empty execution result", LogDb.TESTING);
             return result;
         }
         ExecutorNode reqNodes = node.getChildNodes().get(1);

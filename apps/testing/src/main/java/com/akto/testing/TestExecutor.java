@@ -719,7 +719,8 @@ public class TestExecutor {
         if (testPlugin == null) {
             return null;
         }
-        if (!TestPlugin.validateFilter(filterNode, rawApi, apiInfoKey, new HashMap<>())) {
+        String logId = UUID.randomUUID().toString();
+        if (!TestPlugin.validateFilter(filterNode, rawApi, apiInfoKey, new HashMap<>(), logId)) {
             return null;
         }
         TestPlugin.Result result = testPlugin.start(apiInfoKey, testingUtil);

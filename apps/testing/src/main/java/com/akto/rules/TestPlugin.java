@@ -416,21 +416,21 @@ public abstract class TestPlugin {
         return comparisonExcludedKeys;
     }
 
-    public static boolean validateFilter(FilterNode filterNode, RawApi rawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap) {
+    public static boolean validateFilter(FilterNode filterNode, RawApi rawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap, String logId) {
         if (filterNode == null) return true;
         if (rawApi == null) return false;
-        return validate(filterNode, rawApi, null, apiInfoKey,"filter", varMap);
+        return validate(filterNode, rawApi, null, apiInfoKey,"filter", varMap, logId);
     }
 
-    public static boolean validateValidator(FilterNode validatorNode, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap) {
+    public static boolean validateValidator(FilterNode validatorNode, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap, String logId) {
         if (validatorNode == null) return true;
         if (testRawApi == null) return false;
-        return validate(validatorNode,rawApi,testRawApi, apiInfoKey,"validator", varMap);
+        return validate(validatorNode,rawApi,testRawApi, apiInfoKey,"validator", varMap, logId);
     }
 
-    private static boolean validate(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, String context, Map<String, Object> varMap) {
+    private static boolean validate(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, String context, Map<String, Object> varMap, String logId) {
         Filter filter = new Filter();
-        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(node, rawApi, testRawApi, apiInfoKey, null, null , false,context, varMap);
+        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(node, rawApi, testRawApi, apiInfoKey, null, null , false,context, varMap, logId);
         return dataOperandsFilterResponse.getResult();
     }
     

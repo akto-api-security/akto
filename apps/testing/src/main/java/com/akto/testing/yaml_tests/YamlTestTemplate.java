@@ -26,7 +26,6 @@ import org.slf4j.LoggerFactory;
 
 public class YamlTestTemplate extends SecurityTestTemplate {
 
-    private static final Logger logger = LoggerFactory.getLogger(YamlTestTemplate.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(YamlTestTemplate.class);
 
     public YamlTestTemplate(ApiInfo.ApiInfoKey apiInfoKey, FilterNode filterNode, FilterNode validatorNode, ExecutorNode executorNode, RawApi rawApi, Map<String, Object> varMap, Auth auth, String logId) {
@@ -49,7 +48,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
                 return false;
             }
         }
-        boolean isValid = TestPlugin.validateFilter(this.getFilterNode(),this.getRawApi(), this.getApiInfoKey(), this.varMap);
+        boolean isValid = TestPlugin.validateFilter(this.getFilterNode(),this.getRawApi(), this.getApiInfoKey(), this.varMap, this.logId);
         loggerMaker.infoAndAddToDb("filter status " + isValid + " " + logId, LogDb.TESTING);
         return isValid;
     }
@@ -69,7 +68,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
                 }
             }
         }
-        List<ExecutionResult> results = new Executor().execute(this.executorNode, this.rawApi, this.varMap);
+        List<ExecutionResult> results = new Executor().execute(this.executorNode, this.rawApi, this.varMap, this.logId);
         loggerMaker.infoAndAddToDb("execution result size " + results.size() +  " " + logId, LogDb.TESTING);
         return results;
     }
@@ -81,7 +80,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
         for (ExecutionResult attempt: attempts) {
             String msg = RedactSampleData.convertOriginalReqRespToString(attempt.getRequest(), attempt.getResponse());
             RawApi testRawApi = new RawApi(attempt.getRequest(), attempt.getResponse(), msg);
-            boolean vulnerable = TestPlugin.validateValidator(this.getValidatorNode(), this.getRawApi(), testRawApi , this.getApiInfoKey(), this.varMap);
+            boolean vulnerable = TestPlugin.validateValidator(this.getValidatorNode(), this.getRawApi(), testRawApi , this.getApiInfoKey(), this.varMap, this.logId);
             loggerMaker.infoAndAddToDb("found vulnerable  " + logId, LogDb.TESTING);
             double percentageMatch = TestPlugin.compareWithOriginalResponse(
                     this.rawApi.getOriginalMessage(), testRawApi.getOriginalMessage(), new HashMap<>()
