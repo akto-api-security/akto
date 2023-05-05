@@ -25,7 +25,7 @@ public class Executor {
         List<ExecutionResult> result = new ArrayList<>();
         
         if (node.getChildNodes().size() < 2) {
-            loggerMaker.errorAndAddToDb("executor child nodes is less than 2, returning empty execution result", LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("executor child nodes is less than 2, returning empty execution result " + logId, LogDb.TESTING);
             return result;
         }
         ExecutorNode reqNodes = node.getChildNodes().get(1);
@@ -45,6 +45,7 @@ public class Executor {
             // follow redirects = true for now
             testResponse = ApiExecutor.sendRequest(singleReq.getRawApi().getRequest(), singleReq.getFollowRedirect());
         } catch(Exception e) {
+            loggerMaker.errorAndAddToDb("error executing test request " + logId, LogDb.TESTING);
             return null;
         }
         result.add(new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), singleReq.getRawApi().getRequest(), testResponse));
