@@ -171,6 +171,6 @@ public class CreateAdminUserViaMassAssignment extends TestPlugin{
 
     @Override
     public String subTestName() {
-        return GlobalEnums.TestSubCategory.MASS_ASSIGNMENT_CREATE_ADMIN_ROLE.toString();
+        return "MASS_ASSIGNMENT_CREATE_ADMIN_ROLE";
     }
 }
