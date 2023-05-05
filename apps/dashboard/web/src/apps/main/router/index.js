@@ -1,5 +1,6 @@
 import Vue from 'vue'
 import Router from 'vue-router'
+import func from "@/util/func";
 const PageLogin  = () => import( '@/apps/login/App')
 const GrowthHackingTool = () => import('@/apps/tools/App')
 const PageDashboard  = () => import( '@/apps/dashboard/App')
@@ -96,7 +97,7 @@ const router =  new Router({
                             name: 'testResults',
                             component: TestingRunsTable,
                             props: route => ({
-                                active: true
+                                type: func.testingType().active
                             })
                         },
                         {
@@ -104,7 +105,7 @@ const router =  new Router({
                             name: 'testResults',
                             component: TestingRunsTable,
                             props: route => ({
-                                active: false
+                                type: func.testingType().inactive
                             })
                         },
                         {
@@ -112,7 +113,15 @@ const router =  new Router({
                             name: 'inactiveTestResults',
                             component: TestingRunsTable,
                             props: route => ({
-                                active: false
+                                type: func.testingType().inactive
+                            })
+                        },
+                        {
+                            path: 'cicd',
+                            name: 'cicdTestResults',
+                            component: TestingRunsTable,
+                            props: route => ({
+                                type: func.testingType().cicd
                             })
                         },
                         {
