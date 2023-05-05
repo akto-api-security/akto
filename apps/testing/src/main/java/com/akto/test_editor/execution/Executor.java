@@ -44,11 +44,11 @@ public class Executor {
         try {
             // follow redirects = true for now
             testResponse = ApiExecutor.sendRequest(singleReq.getRawApi().getRequest(), singleReq.getFollowRedirect());
+            result.add(new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), singleReq.getRawApi().getRequest(), testResponse));
         } catch(Exception e) {
             loggerMaker.errorAndAddToDb("error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
-            return null;
+            result.add(new ExecutionResult(false, singleReq.getErrMsg(), singleReq.getRawApi().getRequest(), null));
         }
-        result.add(new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), singleReq.getRawApi().getRequest(), testResponse));
 
         return result;
     }
