@@ -79,7 +79,7 @@
                                 It seems that this API is not vulnerable to {{ responses[0].test_type }}.
                             </div>
                         </div>
-                        <div class="akto-gpt-resp" v-if="queryType === 'generate_regex'">
+                        <div class="akto-gpt-resp" v-else-if="queryType === 'generate_regex'">
                             <div v-if="responses[0] && responses[0].regex">
                                 <div class="code"> 
                                     <code-block :lines="[responses[0].regex.trim()]" onCopyBtnClickText="Regex copied to clipboard"></code-block> 
@@ -91,6 +91,21 @@
                             </div>
                             <div v-else>
                                 It seems that this API is not vulnerable to {{ responses[0].test_type }} vulnerability.
+                            </div>
+                        </div>
+                        <div v-else-if="queryType === 'suggest_tests'">
+                            <div v-if="responses[0] && responses[0].tests">
+                                <!-- <div> This api is vulnerable to {{ responses[0].tests.join(", ") }} vulnerability. </div> -->
+                                <div>
+                                    <div> This api is vulnerable to the following vulnerabilities:</div>
+                                    <v-list-item v-for="(item, index) in responses[0].tests" :key="index">
+                                        {{ responses[0].test_details[item] }}
+                                    </v-list-item>
+                                </div>
+                                <v-btn primary dark depressed @click="runTestsViaAktoGpt"> Run these tests in Akto</v-btn>
+                            </div>
+                            <div v-else class="error-resp">
+                                {{ responses[0].error }}
                             </div>
                         </div>
                         <div v-else :style="{'overflow-x' : 'scroll'}">
@@ -186,6 +201,11 @@ export default {
                 "regex": this.responses[0].regex.trim(),
                 "name": this.searchKey
             })
+        },
+        async runTestsViaAktoGpt(){
+            console.log("runTestsViaAktoGpt")
+            let selectedTests = this.responses[0].tests
+            this.$emit('runTestsViaAktoGpt', {selectedTests})
         }
     },
     mounted () {

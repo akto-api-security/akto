@@ -136,6 +136,7 @@
                 :items="computeChatGptPrompts"
                 :apiCollectionId="apiCollectionId"
                 @addRegexToAkto="addRegexToAkto"
+                @runTestsViaAktoGpt="runTestsViaAktoGpt"
                 :owner-name="getUsername()"
             />
         </div>
@@ -209,8 +210,7 @@ export default {
         link: '/dashboard/library'
       }
     ]
-    let route1 = "/dashboard/observe/inventory"
-    let route2 = "/dashboard/settings"
+
     return {
       msg: '',
       drawer: null,
@@ -221,8 +221,8 @@ export default {
       showField: {},
       showTeamField: false,
       newName: '',
-      route1,
-      route2,
+      api_inventory_route: "/dashboard/observe/inventory",
+      settings_route: "/dashboard/settings",
       showGptDialog:false,
       regexRequired:false,
       renderAktoButton:false,
@@ -325,6 +325,19 @@ export default {
                 }                        
             }},
             callback: (data) => console.log("callback create api groups", data)
+        },
+        {
+            icon: "$fas_user-lock",
+            label: "Suggest API Security tests for this API",
+            prepareQuery: () => { return {
+                type: "suggest_tests",
+                meta: {
+                    "sample_data": this.allSamples[0].message,
+                    "response_details": this.parseMsgForGenerateCurl(this.allSamples[0].message),
+                    "apiCollectionId": this.apiCollectionId
+                }                        
+            }},
+            callback: (data) => console.log("callback create api groups", data)
         }
       ],
     }
@@ -348,6 +361,25 @@ export default {
           this.showGptDialog = false
           return this.$store.dispatch('data_types/setNewDataTypeByAktoGpt', payload)
         }
+    },
+    async runTestsViaAktoGpt(payload){
+      console.log("caught payload", payload)
+      payload['testName'] = "akto_gpt_test";
+      payload['apiInfoKeyList'] = [
+          {
+              "url": this.url,
+              "method": this.method,
+              "apiCollectionId": this.apiCollectionId
+          }
+      ]
+      payload['source'] = "AKTO_GPT";
+      await this.$store.dispatch('testing/scheduleTestForCustomEndpoints', payload)
+      this.showGptDialog = false;
+      window._AKTO.$emit('SHOW_SNACKBAR', {
+          show: true,
+          text: 'Triggered tests successfully!',
+          color: 'green'
+      });
     },
     parseMsg(jsonStr) {
         let json = JSON.parse(jsonStr)
@@ -416,10 +448,10 @@ export default {
           return false
         }
 
-        if(this.$route.path.includes(this.route1) && this.$route.params['apiCollectionId']){
+        if(this.$route.path.includes(this.api_inventory_route) && this.$route.params['apiCollectionId']){
           return true
         }
-        else if(this.$route.path.includes(this.route2) && this.$route.hash === "#Data-types"){
+        else if(this.$route.path.includes(this.settings_route) && this.$route.hash === "#Data-types"){
           this.renderAktoButton = true
           return true
         }
@@ -428,11 +460,11 @@ export default {
         }
       },
       computeChatGptPrompts(){
-        if(this.$route.path.includes(this.route2) && this.$route.hash === "#Data-types"){
+        if(this.$route.path.includes(this.settings_route) && this.$route.hash === "#Data-types"){
           this.regexRequired = true
           return this.settingsPrompt
         }
-        else if(this.$route.path.includes(this.route1) && this.$route.params['apiCollectionId']){
+        else if(this.$route.path.includes(this.api_inventory_route) && this.$route.params['apiCollectionId']){
           this.regexRequired = false
           let tempArr = this.parameterPrompts
           if(this.$route.params['urlAndMethod']){
