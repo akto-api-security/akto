@@ -102,8 +102,8 @@ public class Executor {
     public ExecutorSingleOperationResp invokeOperation(String operationType, String key, Object value, RawApi rawApi, Map<String, Object> varMap) {
         try {
 
-            if (key == null || value == null) {
-                return new ExecutorSingleOperationResp(false, "error executing executor operation, key or value is null " + key + " " + value);
+            if (key == null) {
+                return new ExecutorSingleOperationResp(false, "error executing executor operation, key is null " + key);
             }
             Object keyContext = null, valContext = null;
             if (key instanceof String) {
