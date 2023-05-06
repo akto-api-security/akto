@@ -27,6 +27,7 @@ export default {
         },
         getEditorValue(){
             console.log(this.textEditor.getValue())
+            this.$store.dispatch('testing/addTestTemplate',{content:this.textEditor.getValue()})
             return this.textEditor.getValue()
         }
     },
