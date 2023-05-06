@@ -1,5 +1,5 @@
 <template>
-    <layout-with-tabs title="API Testing" class="page-testing" :tabs='["Text editor","Test results", "User config", "Roles"]' :tab="tab">
+    <layout-with-tabs title="API Testing" class="page-testing" :tabs='["Test results", "User config", "Roles"]' :tab="tab">
         <template slot="Test results">
             <div class="py-8">
                 <div>
@@ -129,9 +129,6 @@
                 <log-fetch />
             </div>
         </template>
-        <template slot="Text editor">
-            <text-editor/>
-        </template>
     </layout-with-tabs>
 </template>
 
@@ -157,7 +154,6 @@ import LoginStepBuilder from './components/token/LoginStepBuilder'
 import TokenAutomation from './components/token/TokenAutomation'
 import HelpTooltip from '@/apps/dashboard/shared/components/help/HelpTooltip'
 import obj from "@/util/obj";
-import TextEditor from './components/TextEditor.vue'
 
 export default {
     name: "PageTesting",
@@ -175,7 +171,6 @@ export default {
         TokenAutomation,
         HelpTooltip,
         LogFetch,
-        TextEditor
     },
     props: {
         tab: obj.strN
