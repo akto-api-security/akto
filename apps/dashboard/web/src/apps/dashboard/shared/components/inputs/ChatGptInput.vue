@@ -83,7 +83,9 @@
                             <div v-if="responses[0] && responses[0].regex">
                                 <div class="code"> 
                                     <code-block :lines="[responses[0].regex.trim()]" onCopyBtnClickText="Regex copied to clipboard"></code-block> 
-                                    <v-btn primary dark depressed class="github-btn" @click='addRegexToAkto'>Create sensitive param in Akto</v-btn>
+                                    <div class="mt-6">
+                                        <v-btn primary color="var(--themeColor)" @click="addRegexToAkto" dark depressed>Create sensitive param in Akto</v-btn>
+                                    </div>
                                 </div>
                             </div>
                             <div v-else-if="responses[0] && responses[0].error" class="error-resp">
@@ -95,14 +97,19 @@
                         </div>
                         <div v-else-if="queryType === 'suggest_tests'">
                             <div v-if="responses[0] && responses[0].tests">
-                                <!-- <div> This api is vulnerable to {{ responses[0].tests.join(", ") }} vulnerability. </div> -->
                                 <div>
                                     <div> This api is vulnerable to the following vulnerabilities:</div>
-                                    <v-list-item v-for="(item, index) in responses[0].tests" :key="index">
-                                        {{ responses[0].test_details[item] }}
-                                    </v-list-item>
+                                        <div class="mt-4">
+                                            <ul> 
+                                                <li v-for="(item, index) in responses[0].tests" :key="index">
+                                                    {{ responses[0].test_details[item] }}
+                                                </li>
+                                            </ul>
+                                        </div>
                                 </div>
-                                <v-btn primary dark depressed @click="runTestsViaAktoGpt"> Run these tests in Akto</v-btn>
+                                <div class="mt-6">
+                                    <v-btn primary color="var(--themeColor)" dark depressed @click="runTestsViaAktoGpt"> Run these tests in Akto</v-btn>
+                                </div>
                             </div>
                             <div v-else class="error-resp">
                                 {{ responses[0].error }}
@@ -325,6 +332,7 @@ export default {
     
     .response-body
         padding: 20px
+        font-size: 16px
         .listItem
             min-height: 16px !important
             font-size: 12px !important
@@ -376,6 +384,7 @@ export default {
 
     .label{
         margin-top: 3px;
+        font-size: 16px;
     }
 
     .akto-gpt-resp{
