@@ -444,10 +444,6 @@ export default {
           })
         }
 
-        if(!this.renderAktoButton){
-          return false
-        }
-
         if(this.$route.path.includes(this.api_inventory_route) && this.$route.params['apiCollectionId']){
           return true
         }
