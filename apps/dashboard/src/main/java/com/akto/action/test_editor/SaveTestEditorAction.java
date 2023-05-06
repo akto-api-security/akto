@@ -1,13 +1,18 @@
 package com.akto.action.test_editor;
 
 import com.akto.action.UserAction;
+import com.akto.action.testing.StartTestAction;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.testing.TestingEndpoints;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class SaveTestEditorAction extends UserAction {
 
@@ -16,9 +21,10 @@ public class SaveTestEditorAction extends UserAction {
         return super.execute();
     }
 
-    String content;
+    private String content;
+    private String testingRunHexId;
     public String saveTestEditorFile() {
-        TestConfig testConfig = null;
+        TestConfig testConfig;
         try {
             testConfig = TestConfigYamlParser.parseTemplate(content);
         } catch (Exception e) {
@@ -49,10 +55,28 @@ public class SaveTestEditorAction extends UserAction {
                 )
         );
 
+        StartTestAction testAction = new StartTestAction();
+        testAction.setSession(getSession());
+        testAction.setRecurringDaily(false);
+        testAction.setApiCollectionId(0);//default id
+        testAction.setType(TestingEndpoints.Type.COLLECTION_WISE);
+        List<String> idList = new ArrayList<>();
+        idList.add(id);
+        testAction.setSelectedTests(idList);
+        testAction.startTest();
+        this.setTestingRunHexId(testAction.getTestingRunHexId());
         return SUCCESS.toUpperCase();
     }
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public String getTestingRunHexId() {
+        return testingRunHexId;
+    }
+
+    public void setTestingRunHexId(String testingRunHexId) {
+        this.testingRunHexId = testingRunHexId;
     }
 }
