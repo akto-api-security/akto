@@ -473,8 +473,9 @@ public class TestExecutor {
         int now = Context.now();
         if ( timeToKill <= 0 || now - startTime <= timeToKill) {
             try {
-                testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap);
-                testingRunResults.addAll(startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap));
+                // todo: commented out older one
+//                testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap);
+                testingRunResults = startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap);
                 String size = testingRunResults.size()+"";
                 loggerMaker.infoAndAddToDb("testingRunResults size: " + size, LogDb.TESTING);
                 if (!testingRunResults.isEmpty()) {
@@ -537,7 +538,13 @@ public class TestExecutor {
         for (String testSubCategory: testSubCategories) {
             TestConfig testConfig = testConfigMap.get(testSubCategory);
             if (testConfig == null) continue;
-            TestingRunResult testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig);
+            TestingRunResult testingRunResult = null;
+            try {
+                testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error while running tests for " + testSubCategory +  ": " + e.getMessage(), LogDb.TESTING);
+                e.printStackTrace();
+            }
             if (testingRunResult != null) testingRunResults.add(testingRunResult);
         }
 
