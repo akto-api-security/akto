@@ -3,11 +3,7 @@ package com.akto.utils.platform;
 public class MirroringStackDetails {
 
     public static String getStackName(){
-        String dashboardStackName = DashboardStackDetails.getStackName();
-        if(dashboardStackName != null){
-            return dashboardStackName + "-mirroring";
-        }
-        return "akto-mirroring"; // keep this backward compatible
+        return "akto-mirroring";
     }
 
     public static final String CREATE_MIRROR_SESSION_LAMBDA = "CreateMirrorSession";

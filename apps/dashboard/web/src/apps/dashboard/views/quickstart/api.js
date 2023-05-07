@@ -37,11 +37,11 @@ export default{
             return resp
         })
     },
-    fetchLBs(){
+    fetchLBs(data){
         return request({
             url: '/api/fetchLoadBalancers',
             method: 'post',
-            data: {}
+            data: data
         })
     },
     saveLBs(selectedLBs){
@@ -51,11 +51,11 @@ export default{
             data: {selectedLBs}
         })
     },
-    fetchStackCreationStatus(){
+    fetchStackCreationStatus(data){
         return request({
             url: 'api/checkStackCreationProgress',
             method: 'post',
-            data: {}
+            data
         })
     },
     getPostmanCredentials() {
@@ -109,6 +109,15 @@ export default{
             method: 'post',
             data: {},
             responseType: 'blob'
+        }).then((resp) => {
+            return resp
+        })
+    },
+    createKubernetesStack() {
+        return request({
+            url: '/api/createKubernetesStack',
+            method: 'post',
+            data: {}
         }).then((resp) => {
             return resp
         })

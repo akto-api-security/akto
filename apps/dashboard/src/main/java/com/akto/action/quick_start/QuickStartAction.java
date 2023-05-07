@@ -3,6 +3,7 @@ package com.akto.action.quick_start;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.InetAddress;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -11,11 +12,11 @@ import com.akto.utils.DashboardMode;
 import com.akto.utils.platform.DashboardStackDetails;
 import com.akto.utils.platform.MirroringStackDetails;
 import com.akto.utils.cloud.stack.dto.StackState;
-import com.amazonaws.services.cloudformation.model.Tag;
+import com.amazonaws.services.cloudformation.AmazonCloudFormation;
+import com.amazonaws.services.cloudformation.AmazonCloudFormationClientBuilder;
+import com.amazonaws.services.cloudformation.model.*;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.akto.action.UserAction;
 import com.akto.dao.ApiTokensDao;
@@ -60,6 +61,25 @@ public class QuickStartAction extends UserAction {
 
     private String aktoDashboardStackName;
 
+    private DeploymentMethod deploymentMethod;
+
+    public enum DeploymentMethod {
+        AWS_TRAFFIC_MIRRORING,
+        KUBERNETES;
+
+        public DeploymentMethod getDeploymentMethod(String deploymentMethod) {
+            if (StringUtils.isEmpty(deploymentMethod)) {
+                return AWS_TRAFFIC_MIRRORING;
+            }
+            for (DeploymentMethod method : DeploymentMethod.values()) {
+                if (method.name().equalsIgnoreCase(deploymentMethod)) {
+                    return method;
+                }
+            }
+            return null;
+        }
+    }
+
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(QuickStartAction.class);
 
@@ -87,6 +107,9 @@ public class QuickStartAction extends UserAction {
     }
 
     public String fetchLoadBalancers() {
+        if(deploymentMethod != null && deploymentMethod.equals(DeploymentMethod.KUBERNETES)) {
+            return handleKubernetes();
+        }
         List<AwsResource> availableLBs = new ArrayList<>();
         List<AwsResource> selectedLBs = new ArrayList<>();
         ExecutorService executorService = Executors.newFixedThreadPool(3);
@@ -132,6 +155,52 @@ public class QuickStartAction extends UserAction {
         this.aktoDashboardRoleName = DashboardStackDetails.getAktoDashboardRole();
         this.aktoMirroringStackName = MirroringStackDetails.getStackName();
         this.aktoDashboardStackName = DashboardStackDetails.getStackName();
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    private String handleKubernetes(){
+        try {
+            DescribeStackResourcesRequest req = new DescribeStackResourcesRequest();
+            req.setStackName(MirroringStackDetails.getStackName());
+            req.setLogicalResourceId(MirroringStackDetails.AKTO_NLB);
+            AmazonCloudFormation cloudFormation = AmazonCloudFormationClientBuilder.standard()
+                    .build();
+            cloudFormation.describeStackResources(req);
+            this.dashboardHasNecessaryRole = true;
+        } catch (Exception e){ // TODO: Handle specific exception
+            if(e.getMessage().contains("not authorized")){
+                this.dashboardHasNecessaryRole = false;
+            } else{
+                this.dashboardHasNecessaryRole = true;
+            }
+        }
+        this.awsRegion = System.getenv(Constants.AWS_REGION);
+        this.awsAccountId = System.getenv(Constants.AWS_ACCOUNT_ID);
+        this.aktoMirroringStackName = MirroringStackDetails.getStackName();
+        this.aktoDashboardStackName = DashboardStackDetails.getStackName();
+        this.aktoDashboardRoleName = DashboardStackDetails.getAktoDashboardRole();
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String createKubernetesStack(){
+        if (!AwsStack.getInstance().checkIfStackExists(MirroringStackDetails.getStackName())) {
+            try {
+                Map<String, String> parameters = new HashMap<>();
+                parameters.put("MongoIp", System.getenv("AKTO_MONGO_CONN_1"));
+                parameters.put("KeyPair", System.getenv("EC2_KEY_PAIR"));
+                parameters.put("SubnetId", System.getenv("EC2_SUBNET_ID"));
+                String template = convertStreamToString(AwsStack.class
+                        .getResourceAsStream("/cloud_formation_templates/kubernetes_mirroring.template"));
+                List<Tag> tags = Utils.fetchTags(DashboardStackDetails.getStackName());
+                String stackId = AwsStack.getInstance().createStack(MirroringStackDetails.getStackName(), parameters, template, tags);
+                loggerMaker.infoAndAddToDb(String.format("Stack %s creation started successfully", stackId), LogDb.DASHBOARD);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        } else {
+            throw new RuntimeException("Akto mirroring setup is complete!!");
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -341,5 +410,13 @@ public class QuickStartAction extends UserAction {
         }
         in.close();
         return stringbuilder.toString();
+    }
+
+    public DeploymentMethod getDeploymentMethod() {
+        return deploymentMethod;
+    }
+
+    public void setDeploymentMethod(DeploymentMethod deploymentMethod) {
+        this.deploymentMethod = deploymentMethod;
     }
 }

@@ -918,10 +918,16 @@
   },
   "Outputs": {
     "AktoNLB": {
+      "Description": "The IP address of the AktoNLB",
       "Value": {
-        "Ref": "AktoNLB"
+        "Fn::GetAtt": [
+          "AktoNLB",
+          "DNSName"
+        ]
       },
-      "Description": "Arn of Akto Network Load Balancer"
+      "Export": {
+        "Name": "AktoNLBIP"
+      }
     }
   }
 }

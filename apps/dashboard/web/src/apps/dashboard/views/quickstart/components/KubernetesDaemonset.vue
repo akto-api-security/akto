@@ -4,53 +4,25 @@
     <div v-else class="lb_dropdown">
         <div v-if="isLocalDeploy">
             <div>
-                Use AWS packet mirroring to send duplicate stream of traffic to Akto. 
-                No performance impact, only mirrored traffic is used to analyze APIs. 
+                Use Kubernetes based agent deployment to send traffic to Akto.
                 <div v-if="!isLocalDeploy"><a  class="clickable-docs" _target="blank" href="https://docs.akto.io/getting-started/quick-start-with-akto-self-hosted/aws-deploy">Know more</a></div>
             </div>
-          <banner-horizontal class="mt-3">
-            <div slot="content">
-              <div>To setup traffic mirroring from AWS, deploy in AWS. Go to <a class="clickable-docs" target="blank" href="https://docs.akto.io/getting-started/quick-start-with-akto-self-hosted/aws-deploy">docs</a>.</div>
-            </div>
-          </banner-horizontal>
+            <banner-horizontal class="mt-3">
+                <div slot="content">
+                <div>To setup traffic mirroring from AWS, deploy in AWS. Go to <a class="clickable-docs" target="blank" href="https://docs.akto.io/getting-started/quick-start-with-akto-self-hosted/aws-deploy">docs</a>.</div>
+                </div>
+            </banner-horizontal>
         </div>
         <div v-else>
             <div v-if="hasRequiredAccess">
-                    <v-select v-model="selectedLBs" append-icon="$fas_edit" :items="availableLBs" item-text="resourceName" item-value="resourceId"
-                        label="Select Loadbalancer(s)" return-object multiple>
-                        <template v-slot:selection="{ item, index }">
-                            <v-chip v-if="index === 0">
-                                <span>{{ item.resourceName }}</span>
-                            </v-chip>
-                            <span v-if="index === 1" class="grey--text text-caption">
-                                (+{{ selectedLBs.length - 1 }} others)
-                            </span>
-                        </template>
-                        <template v-slot:item="{ active, item, attrs, on }">
-                            <v-list-item :class="item.alreadySelected ? 'disabled_lb' : ''" v-on="on" v-bind="attrs" #default="{ active }">
-                                <v-list-item-action>
-                                    <v-checkbox :input-value="active" on-icon="$far_check-square" off-icon="$far_square">
-                                    </v-checkbox>
-                                </v-list-item-action>
-                                <v-list-item-content>
-                                    <v-list-item-title>
-                                        <v-row no-gutters align="center">
-                                            <span>{{ item.resourceName }}</span>
-                                        </v-row>
-                                    </v-list-item-title>
-                                </v-list-item-content>
-                            </v-list-item>
-                        </template>
-
-                        <template slot="append-outer" >
-                            <spinner v-if="progressBar.show"></spinner>
-                            <v-btn v-else primary dark color="var(--themeColor)" @click="saveLBs" :disabled="selectedLBs.length === initialLBCount" class="ml-3">
-                                Apply
-                            </v-btn>
-                        </template>
-                    </v-select>
+                <v-btn primary dark color="var(--themeColor)" @click="createKubernetesStack" 
+                    class="ml-3" 
+                    v-if="showSetupMirroringForKubernetesButton && !createStackClicked"
+                >
+                    Setup Mirroring
+                </v-btn>
                 
-                <div class="text_msg" v-html="text_msg"></div>
+                <div class="text_msg mt-3" v-html="text_msg"></div>
                 <div v-if="progressBar.show">
                     <div class="d-flex">
                         <v-progress-linear class="mt-2" background-color="var(--rgbaColor13)" color="var(--rgbaColor7)"
@@ -59,6 +31,10 @@
                         <div class="ml-2">{{ progressBar.value }}%</div>
                     </div>
                 </div>
+                <div v-if="stackStatus === 'CREATE_COMPLETE'">
+                    <div>Create a file daemonset-deploy.yaml with the following config</div>
+                    <code-block :lines="yaml" onCopyBtnClickText="Policy copied to clipboard"></code-block>
+                </div>
             </div>
             <div v-else>
                 <div class="steps">Your dashboard's instance needs relevant access to setup traffic mirroring, please
@@ -66,7 +42,7 @@
                     following steps:</div>
                 <div class="steps">
                     <b>Step 1</b>: Grab the policy JSON below and navigate to Akto Dashboard's current role by clicking <a target="_blank" class="clickable-docs" :href="getAktoDashboardRoleUpdateUrl()">here</a>
-                    <code-block :lines="quick_start_policy_lines" onCopyBtnClickText="Policy copied to clipboard"></code-block>
+                    <code-block :lines="arr" onCopyBtnClickText="Policy copied to clipboard"></code-block>
                 </div>
                 <div class="steps">
                     <b>Step 2</b>: We will create an inline policy, navigate to JSON tab and paste the copied JSON here.
@@ -96,7 +72,7 @@ import CodeBlock from '@/apps/dashboard/shared/components/CodeBlock'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
 import BannerHorizontal from '../../../shared/components/BannerHorizontal.vue'
 export default {
-    name: 'LoadBalancers',
+    name: 'KubernetesDaemonset',
     components: {
         CodeBlock,
         Spinner,
@@ -118,7 +94,8 @@ export default {
             },
             initialLBCount: 0,
             text_msg: null,
-            quick_start_policy_lines: [
+            arr: [],
+            quick_start_policy_lines_kubernetes: [
                 `{`,
                 `    "Version": "2012-10-17",`,
                 `    "Statement": [`,
@@ -132,6 +109,8 @@ export default {
                 `                "autoscaling:DescribeLaunchConfigurations",`,
                 `                "ec2:DescribeSubnets",`,
                 `                "ec2:DescribeKeyPairs",`,
+                `                "cloudformation:DescribeStacks",`,
+                `                "cloudformation:ListStacks",`,
                 `                "ec2:DescribeSecurityGroups"`,
                 `            ],`,
                 `            "Resource": "*"`,
@@ -146,8 +125,8 @@ export default {
                 `                "autoscaling:StartInstanceRefresh"`,
                 `            ],`,
                 `            "Resource": [`,
-                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/DASHBOARD_STACK_NAME*",`,
-                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/MIRRORING_STACK_NAME*"`,
+                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/*akto*",`,
+                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:autoScalingGroup:*:autoScalingGroupName/*akto*"`,
                 `            ]`,
                 `        },`,
                 `        {`,
@@ -157,8 +136,8 @@ export default {
                 `                "autoscaling:CreateLaunchConfiguration"`,
                 `            ],`,
                 `            "Resource": [`,
-                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:launchConfiguration:*:launchConfigurationName/MIRRORING_STACK_NAME*",`,
-                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:launchConfiguration:*:launchConfigurationName/DASHBOARD_STACK_NAME*"`,
+                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:launchConfiguration:*:launchConfigurationName/*akto*",`,
+                `                "arn:aws:autoscaling:AWS_REGION:AWS_ACCOUNT_ID:launchConfiguration:*:launchConfigurationName/*akto*"`,
                 `             ]`,
                 `        },`,
                 `        {`,
@@ -170,8 +149,8 @@ export default {
                 `                "cloudformation:DescribeStacks"`,
                 `            ],`,
                 `            "Resource": [`,
-                `                "arn:aws:cloudformation:AWS_REGION:AWS_ACCOUNT_ID:stack/MIRRORING_STACK_NAME/*",`,
-                `                "arn:aws:cloudformation:AWS_REGION:AWS_ACCOUNT_ID:stack/DASHBOARD_STACK_NAME/*"`,
+                `                "arn:aws:cloudformation:AWS_REGION:AWS_ACCOUNT_ID:stack/*akto*/*",`,
+                `                "arn:aws:cloudformation:AWS_REGION:AWS_ACCOUNT_ID:stack/*akto*/*"`,
                 `            ]`,
                 `        },`,
                 `        {`,
@@ -210,27 +189,6 @@ export default {
                 `            "Resource": [`,
                 `                "arn:aws:ec2:AWS_REGION:AWS_ACCOUNT_ID:security-group/*", `,
                 `                "arn:aws:ec2:AWS_REGION:AWS_ACCOUNT_ID:security-group-rule/*"`,
-                `            ]`,
-                `        }, `,
-                `        {`,
-                `            "Sid": "8", `,
-                `            "Effect": "Allow", `,
-                `            "Action": [`,
-                `                "ec2:CreateTrafficMirrorTarget"`,
-                `            ], `,
-                `            "Resource": [`,
-                `                "arn:aws:ec2:AWS_REGION:AWS_ACCOUNT_ID:traffic-mirror-target/*"`,
-                `            ]`,
-                `        }, `,
-                `        {`,
-                `            "Sid": "9", `,
-                `            "Effect": "Allow", `,
-                `            "Action": [`,
-                `                "ec2:ModifyTrafficMirrorFilterNetworkServices", `,
-                `                "ec2:CreateTrafficMirrorFilter"`,
-                `            ], `,
-                `            "Resource": [`,
-                `                "arn:aws:ec2:AWS_REGION:AWS_ACCOUNT_ID:traffic-mirror-filter/*"`,
                 `            ]`,
                 `        }, `,
                 `        {`,
@@ -309,8 +267,8 @@ export default {
                 `                "logs:CreateLogGroup"`,
                 `            ], `,
                 `            "Resource": [`,
-                `                "arn:aws:logs:AWS_REGION:AWS_ACCOUNT_ID:log-group:/aws/lambda/MIRRORING_STACK_NAME*", `,
-                `                "arn:aws:logs:AWS_REGION:AWS_ACCOUNT_ID:log-group:/aws/lambda/MIRRORING_STACK_NAME*:log-stream:"`,
+                `                "arn:aws:logs:AWS_REGION:AWS_ACCOUNT_ID:log-group:/aws/lambda/*akto*", `,
+                `                "arn:aws:logs:AWS_REGION:AWS_ACCOUNT_ID:log-group:/aws/lambda/*akto*:log-stream:"`,
                 `            ]`,
                 `        }, `,
                 `        {`,
@@ -336,7 +294,7 @@ export default {
                 `                "iam:CreateInstanceProfile", `,
                 `                "iam:GetInstanceProfile"`,
                 `            ], `,
-                `            "Resource": "arn:aws:iam::AWS_ACCOUNT_ID:instance-profile/MIRRORING_STACK_NAME*"`,
+                `            "Resource": "arn:aws:iam::AWS_ACCOUNT_ID:instance-profile/*akto*"`,
                 `        }, `,
                 `        {`,
                 `            "Sid": "18", `,
@@ -344,7 +302,7 @@ export default {
                 `            "Action": [`,
                 `                "iam:AddRoleToInstanceProfile"`,
                 `            ], `,
-                `            "Resource": ["arn:aws:iam::AWS_ACCOUNT_ID:instance-profile/MIRRORING_STACK_NAME*", "arn:aws:iam::AWS_ACCOUNT_ID:role/MIRRORING_STACK_NAME-*"]`,
+                `            "Resource": ["arn:aws:iam::AWS_ACCOUNT_ID:instance-profile/*akto*", "arn:aws:iam::AWS_ACCOUNT_ID:role/*akto*"]`,
                 `        }, `,
                 `        {`,
                 `            "Sid": "19", `,
@@ -365,14 +323,48 @@ export default {
                 `                "events:PutTargets"`,
                 `            ], `,
                 `            "Resource": [`,
-                `                "arn:aws:events:AWS_REGION:AWS_ACCOUNT_ID:rule/MIRRORING_STACK_NAME-PeriodicRule"`,
+                `                "arn:aws:events:AWS_REGION:AWS_ACCOUNT_ID:rule/*akto*"`,
                 `            ]`,
                 `        } `,
                 `    ]`,
                 `}`
             ],
+            yaml:[
+            `apiVersion: apps/v1`,
+            `kind: DaemonSet`,
+            `metadata:`,
+            `  name: mirroring`,
+            `  namespace: sample-app`,
+            `  labels:`,
+            `    app: sample-linux-app`,
+            `spec:`,
+            `  selector:`,
+            `    matchLabels:`,
+            `      app: sample-linux-app`,
+            `  template:`,
+            `    metadata:`,
+            `      labels:`,
+            `        app: sample-linux-app`,
+            `    spec:`,
+            `      hostNetwork: true`,
+            `      containers:`,
+            `      - name: mirror-api-logging`,
+            `        image: aktosecurity/mirror-api-logging:direct_tcp`,
+            `        env: `,
+            `          - name: AKTO_TRAFFIC_BATCH_TIME_SECS`,
+            `            value: "10"`,
+            `          - name: AKTO_TRAFFIC_BATCH_SIZE`,
+            `            value: "100"`,
+            `          - name: AKTO_INFRA_MIRRORING_MODE`,
+            `            value: "gcp"`,
+            `          - name: AKTO_KAFKA_BROKER_MAL`,
+            `            value: "<AKTO_NLB_IP>:29092"`,
+            ],
             aktoDashboardRoleName: null,
             isLocalDeploy: false,
+            deploymentMethod: "KUBERNETES",
+            stackStatus: "",
+            createStackClicked: false
         }
     },
     mounted() {
@@ -387,58 +379,31 @@ export default {
                 this.loading = false;
                 this.isLocalDeploy = true;
             } else {
-                api.fetchLBs().then((resp) => {
+                api.fetchLBs({deploymentMethod: this.deploymentMethod}).then((resp) => {
                     if (!resp.dashboardHasNecessaryRole) {
-                        for (let i = 0; i < this.quick_start_policy_lines.length; i++) {
-                            let line = this.quick_start_policy_lines[i];
+                        this.arr = this.quick_start_policy_lines_kubernetes;
+                        for (let i = 0; i < this.arr.length; i++) {
+                            let line = this.arr[i];
                             line = line.replaceAll('AWS_REGION', resp.awsRegion);
                             line = line.replaceAll('AWS_ACCOUNT_ID', resp.awsAccountId);
-                            line = line.replaceAll('MIRRORING_STACK_NAME', resp.aktoMirroringStackName);
-                            line = line.replaceAll('DASHBOARD_STACK_NAME', resp.aktoDashboardStackName);
-                            this.quick_start_policy_lines[i] = line;
+                            this.arr[i] = line;
                         }
                     }
                     this.hasRequiredAccess = resp.dashboardHasNecessaryRole
-                    this.selectedLBs = resp.selectedLBs;
-                    for(let i=0; i<resp.availableLBs.length; i++){
-                        let lb = resp.availableLBs[i];
-                        let alreadySelected = false;
-                        for(let j=0; j<this.selectedLBs.length; j++){
-                            if(this.selectedLBs[j].resourceName === lb.resourceName){
-                                alreadySelected = true;
-                            }
-                        }
-                        lb['alreadySelected'] = alreadySelected;
-                    }
-                    this.availableLBs = resp.availableLBs;
-                    this.existingSelectedLBs = resp.selectedLBs;
-                    this.initialLBCount = this.selectedLBs.length;
                     this.aktoDashboardRoleName = resp.aktoDashboardRoleName;
                     this.checkStackState()
                 })
             }
         },
-        saveLBs() {
-            api.saveLBs(this.selectedLBs).then((resp) => {
-                this.availableLBs = resp.availableLBs;
-                this.selectedLBs = resp.selectedLBs;
-                this.existingSelectedLBs = resp.selectedLBs;
-                if (resp.isFirstSetup) {
-                    this.checkStackState()
-                    mixpanel.track("mirroring_stack_creation_initialized");
-                } else {
-                    mixpanel.track("loadbalancers_updated");
-                }
-            })
-        },
         checkStackState() {
             let intervalId = null;
             intervalId = setInterval(async () => {
-                api.fetchStackCreationStatus({deploymentMethod: "AWS_TRAFFIC_MIRRORING"}).then((resp) => {
+                api.fetchStackCreationStatus({deploymentMethod: this.deploymentMethod}).then((resp) => {
                     if (this.initialCall) {
                         this.initialCall = false;
                         this.loading = false;
                     }
+                    this.stackStatus = resp.stackState.status;
                     this.handleStackState(resp.stackState, intervalId)
                 }
                 )
@@ -456,7 +421,12 @@ export default {
             else if (stackState.status == 'DOES_NOT_EXISTS') {
                 this.removeProgressBarAndStatuschecks(intervalId);
                 this.text_msg = 'Mirroring is not setup currently, choose 1 or more LBs to enable mirroring.';
-            } else {
+            }
+            else if (stackState.status == 'CREATION_FAILED') {
+                this.removeProgressBarAndStatuschecks(intervalId);
+                this.text_msg = 'Current deployment is getting deleted, please refresh this page in sometime.';
+            } 
+            else {
                 this.removeProgressBarAndStatuschecks(intervalId);
                 this.text_msg = 'Something went wrong while setting up mirroring, please write to us at support@akto.io'
             }
@@ -476,6 +446,25 @@ export default {
             this.progressBar.show = false;
             this.progressBar.value = 0;
             clearInterval(intervalId);
+        },
+        createKubernetesStack(){
+            console.log('I am clicked!!!')
+            this.createStackClicked = true
+            this.text_msg = "Starting deployment!!!";
+            api.createKubernetesStack().then((resp) => {
+                this.checkStackState();
+            })
+        }
+    },
+    computed: {
+        showSetupMirroringForKubernetesButton(){
+            let status = !(this.stackStatus === 'CREATE_COMPLETE' || this.stackStatus === 'CREATE_IN_PROGRESS'
+             || this.stackStatus === 'CREATION_FAILED');
+            console.log(this.stackStatus, status);
+            return status;
+        },
+        disableKubernetesButton(){
+            return this.stackStatus === 'CREATE_COMPLETE' || this.stackStatus === 'CREATE_IN_PROGRESS';
         }
     }
 }
