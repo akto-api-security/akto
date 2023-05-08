@@ -473,8 +473,9 @@ public class TestExecutor {
         int now = Context.now();
         if ( timeToKill <= 0 || now - startTime <= timeToKill) {
             try {
-                testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap);
-                testingRunResults.addAll(startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap));
+                // todo: commented out older one
+//                testingRunResults = start(apiInfoKey, testIdConfig, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap);
+                testingRunResults = startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap);
                 String size = testingRunResults.size()+"";
                 loggerMaker.infoAndAddToDb("testingRunResults size: " + size, LogDb.TESTING);
                 if (!testingRunResults.isEmpty()) {
@@ -537,7 +538,13 @@ public class TestExecutor {
         for (String testSubCategory: testSubCategories) {
             TestConfig testConfig = testConfigMap.get(testSubCategory);
             if (testConfig == null) continue;
-            TestingRunResult testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig);
+            TestingRunResult testingRunResult = null;
+            try {
+                testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error while running tests for " + testSubCategory +  ": " + e.getMessage(), LogDb.TESTING);
+                e.printStackTrace();
+            }
             if (testingRunResult != null) testingRunResults.add(testingRunResult);
         }
 
@@ -564,7 +571,12 @@ public class TestExecutor {
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();
 
-        YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode, rawApi, varMap, auth);
+        String testExecutionLogId = UUID.randomUUID().toString();
+        
+        loggerMaker.infoAndAddToDb("triggering test run for apiInfoKey " + apiInfoKey + "test " + 
+            testSubType + "logId" + testExecutionLogId, LogDb.TESTING);
+
+        YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode, rawApi, varMap, auth, testExecutionLogId);
         List<TestResult> testResults = yamlTestTemplate.run();
         if (testResults == null) return null;
         int endTime = Context.now();
@@ -727,7 +739,8 @@ public class TestExecutor {
         if (testPlugin == null) {
             return null;
         }
-        if (!TestPlugin.validateFilter(filterNode, rawApi, apiInfoKey, new HashMap<>())) {
+        String logId = UUID.randomUUID().toString();
+        if (!TestPlugin.validateFilter(filterNode, rawApi, apiInfoKey, new HashMap<>(), logId)) {
             return null;
         }
         TestPlugin.Result result = testPlugin.start(apiInfoKey, testingUtil);

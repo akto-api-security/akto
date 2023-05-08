@@ -13,14 +13,19 @@ import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.test_editor.ExecutorSingleRequest;
 import com.akto.testing.ApiExecutor;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 
 public class Executor {
 
-    public List<ExecutionResult> execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap) {
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class);
+
+    public List<ExecutionResult> execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId) {
 
         List<ExecutionResult> result = new ArrayList<>();
         
         if (node.getChildNodes().size() < 2) {
+            loggerMaker.errorAndAddToDb("executor child nodes is less than 2, returning empty execution result " + logId, LogDb.TESTING);
             return result;
         }
         ExecutorNode reqNodes = node.getChildNodes().get(1);
@@ -39,10 +44,11 @@ public class Executor {
         try {
             // follow redirects = true for now
             testResponse = ApiExecutor.sendRequest(singleReq.getRawApi().getRequest(), singleReq.getFollowRedirect());
+            result.add(new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), singleReq.getRawApi().getRequest(), testResponse));
         } catch(Exception e) {
-            return null;
+            loggerMaker.errorAndAddToDb("error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
+            result.add(new ExecutionResult(false, singleReq.getErrMsg(), singleReq.getRawApi().getRequest(), null));
         }
-        result.add(new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), singleReq.getRawApi().getRequest(), testResponse));
 
         return result;
     }
@@ -96,8 +102,8 @@ public class Executor {
     public ExecutorSingleOperationResp invokeOperation(String operationType, String key, Object value, RawApi rawApi, Map<String, Object> varMap) {
         try {
 
-            if (key == null || value == null) {
-                return new ExecutorSingleOperationResp(false, "error executing executor operation, key or value is null " + key + " " + value);
+            if (key == null) {
+                return new ExecutorSingleOperationResp(false, "error executing executor operation, key is null " + key);
             }
             Object keyContext = null, valContext = null;
             if (key instanceof String) {

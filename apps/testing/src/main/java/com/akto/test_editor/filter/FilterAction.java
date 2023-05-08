@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.test_editor.filter.data_operands_impl.*;
 import org.bson.conversions.Bson;
 
@@ -235,6 +236,11 @@ public final class FilterAction {
         if (rawApi == null) {
             return new DataOperandsFilterResponse(false, null, null);
         }
+        OriginalHttpRequest request = rawApi.getRequest();
+        if (request == null) {
+            return new DataOperandsFilterResponse(false, null, null);
+        }
+
         String reqBody = rawApi.getRequest().getBody();
         return applyFilterOnPayload(filterActionRequest, reqBody);
     }
@@ -245,7 +251,12 @@ public final class FilterAction {
         if (rawApi == null) {
             return new DataOperandsFilterResponse(false, null, null);
         }
-        String reqBody = rawApi.getResponse().getBody();
+        OriginalHttpResponse response = rawApi.getResponse();
+        if (response == null) {
+            return new DataOperandsFilterResponse(false, null, null);
+        }
+
+        String reqBody = response.getBody();
         return applyFilterOnPayload(filterActionRequest, reqBody);
     }
 
@@ -882,7 +893,8 @@ public final class FilterAction {
 
         Bson filter = Filters.and(
             Filters.eq("apiCollectionId", apiInfoKey.getApiCollectionId()),
-            Filters.regex("param", param)
+            Filters.regex("param", param),
+            Filters.eq("isHeader", false)
         );
 
         List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(filter, 0, 5, null);
@@ -892,7 +904,6 @@ public final class FilterAction {
         }
 
         List<BasicDBObject> paramValues = new ArrayList<>();
-        BasicDBObject obj = new BasicDBObject();
 
         for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
             Set<String> valSet  = singleTypeInfo.getValues() != null ? singleTypeInfo.getValues().getElements() : new HashSet<>();
@@ -901,11 +912,15 @@ public final class FilterAction {
             for (String val: valSet) {
                 boolean exists = paramExists(filterActionRequest.getRawApi(), singleTypeInfo.getParam(), val);
                 if (!exists) {
+                    BasicDBObject obj = new BasicDBObject();
                     obj.put("key", param);
                     obj.put("value", val);
                     paramValues.add(obj);
                     break;
                 }
+            }
+            if (paramValues.size() > 0) {
+                break;
             }
         }
 
