@@ -128,7 +128,7 @@ public class IssuesAction extends UserAction {
     private List<TestSourceConfig> testSourceConfigs;
     public String fetchAllSubCategories() {
 
-        Map<String, TestConfig> testConfigMap  = YamlTemplateDao.instance.fetchTestConfigMap();
+        Map<String, TestConfig> testConfigMap  = YamlTemplateDao.instance.fetchTestConfigMap(true);
         subCategories = new ArrayList<>();
         for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {
             Info info = entry.getValue().getInfo();
@@ -146,6 +146,7 @@ public class IssuesAction extends UserAction {
             infoObj.put("references", info.getReferences());
             infoObj.put("name", entry.getValue().getId());
             infoObj.put("_name", entry.getValue().getId());
+            infoObj.put("content", entry.getValue().getContent());
             
             superCategory.put("displayName", info.getCategory().getDisplayName());
             superCategory.put("name", info.getCategory().getName());

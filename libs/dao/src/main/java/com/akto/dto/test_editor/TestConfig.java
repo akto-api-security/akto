@@ -13,6 +13,7 @@ public class TestConfig {
     private ExecutorConfigParserResult execute;
 
     private ConfigParserResult validation;
+    private String content;
 
     public TestConfig(String id, Info info, Auth auth, ConfigParserResult apiSelectionFilters, ExecutorConfigParserResult execute, 
         ConfigParserResult validation) {
@@ -75,4 +76,11 @@ public class TestConfig {
         this.validation = validation;
     }
 
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
 }

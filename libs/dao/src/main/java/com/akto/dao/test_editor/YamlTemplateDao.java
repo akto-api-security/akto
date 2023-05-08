@@ -13,12 +13,15 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
 
     public static final YamlTemplateDao instance = new YamlTemplateDao();
 
-    public Map<String, TestConfig> fetchTestConfigMap() {
+    public Map<String, TestConfig> fetchTestConfigMap(boolean includeYamlContent) {
         Map<String, TestConfig> testConfigMap = new HashMap<>();
         List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(new BasicDBObject());
         for (YamlTemplate yamlTemplate: yamlTemplates) {
             try {
                 TestConfig testConfig = TestConfigYamlParser.parseTemplate(yamlTemplate.getContent());
+                if (includeYamlContent) {
+                    testConfig.setContent(yamlTemplate.getContent());
+                }
                 testConfigMap.put(testConfig.getId(), testConfig);
             } catch (Exception e) {
                 e.printStackTrace();
@@ -26,6 +29,10 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
         }
 
         return testConfigMap;
+    }
+
+    public Map<String, TestConfig> fetchTestConfigMap() {
+        return fetchTestConfigMap(false);
     }
 
     @Override
