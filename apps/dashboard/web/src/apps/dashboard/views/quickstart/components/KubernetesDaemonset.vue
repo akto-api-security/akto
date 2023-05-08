@@ -478,7 +478,6 @@ export default {
             clearInterval(intervalId);
         },
         createKubernetesStack(){
-            console.log('I am clicked!!!')
             this.createStackClicked = true
             this.text_msg = "Starting deployment!!!";
             api.createKubernetesStack().then((resp) => {
@@ -490,7 +489,6 @@ export default {
         showSetupMirroringForKubernetesButton(){
             let status = !(this.stackStatus === 'CREATE_COMPLETE' || this.stackStatus === 'CREATE_IN_PROGRESS'
              || this.stackStatus === 'CREATION_FAILED');
-            console.log(this.stackStatus, status);
             return status;
         },
         disableKubernetesButton(){
