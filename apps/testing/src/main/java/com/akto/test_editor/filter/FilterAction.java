@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.Set;
 
 import com.akto.dto.OriginalHttpResponse;
-import com.akto.test_editor.filter.data_operands_impl.*;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.SingleTypeInfoDao;
@@ -30,6 +29,7 @@ import com.akto.test_editor.Utils;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ContainsAllFilter;
 import com.akto.test_editor.filter.data_operands_impl.ContainsEitherFilter;
+import com.akto.test_editor.filter.data_operands_impl.ContainsJwt;
 import com.akto.test_editor.filter.data_operands_impl.DataOperandsImpl;
 import com.akto.test_editor.filter.data_operands_impl.EqFilter;
 import com.akto.test_editor.filter.data_operands_impl.GreaterThanEqFilter;
@@ -59,6 +59,7 @@ public final class FilterAction {
         put("lt", new LesserThanFilter());
         put("lte", new LesserThanEqFilter());
         put("not_contains", new NotContainsFilter());
+        put("contains_jwt", new ContainsJwt());
     }};
 
     public FilterAction() { }
@@ -897,7 +898,7 @@ public final class FilterAction {
             Filters.eq("isHeader", false)
         );
 
-        List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(filter, 0, 5, null);
+        List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(filter, 0, 500, null);
 
         if (singleTypeInfos.isEmpty()) {
             return new DataOperandsFilterResponse(false, null, null);
@@ -911,7 +912,7 @@ public final class FilterAction {
 
             for (String val: valSet) {
                 boolean exists = paramExists(filterActionRequest.getRawApi(), singleTypeInfo.getParam(), val);
-                if (!exists) {
+                if (!exists && val != null && val.length() > 0) {
                     BasicDBObject obj = new BasicDBObject();
                     obj.put("key", param);
                     obj.put("value", val);
@@ -1037,15 +1038,21 @@ public final class FilterAction {
 
     public static SingleTypeInfo querySti(String param, boolean isUrlParam, ApiInfo.ApiInfoKey apiInfoKey, boolean isHeader, int responseCode) {
 
+        Bson urlParamFilters = Filters.and(
+            Filters.exists("isUrlParam"),
+            Filters.eq("isUrlParam", isUrlParam)
+        );
+
         Bson filter = Filters.and(
             Filters.eq("apiCollectionId", apiInfoKey.getApiCollectionId()),
             Filters.eq("url", apiInfoKey.url),
             Filters.eq("method", apiInfoKey.method.name()),
             Filters.eq("responseCode", responseCode),
             Filters.eq("isHeader", isHeader),
-            Filters.eq("param", param),
-            Filters.eq("isUrlParam", isUrlParam)
+            Filters.regex("param", param),
+            urlParamFilters
         );
+        
         SingleTypeInfo singleTypeInfo = SingleTypeInfoDao.instance.findOne(filter);
 
         if (singleTypeInfo == null) return null;

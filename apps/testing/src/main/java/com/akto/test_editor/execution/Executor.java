@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.ExecutorOperandTypes;
 import com.akto.dto.OriginalHttpResponse;
@@ -12,7 +13,9 @@ import com.akto.dto.test_editor.ExecutionResult;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.test_editor.ExecutorSingleRequest;
+import com.akto.dto.testing.AuthMechanism;
 import com.akto.testing.ApiExecutor;
+import com.mongodb.client.model.Filters;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 
@@ -164,6 +167,7 @@ public class Executor {
             case "delete_query_param":
                 return Operations.deleteQueryParam(rawApi, key);
             case "modify_url":
+                // read regex block
                 return Operations.modifyUrl(rawApi, key);
             case "modify_method":
                 return Operations.modifyMethod(rawApi, key);
@@ -173,6 +177,33 @@ public class Executor {
                     Operations.deleteHeader(rawApi, header);
                 }
                 return new ExecutorSingleOperationResp(true, "");
+            case "replace_auth_headers":
+                authHeaders = (List<String>) varMap.get("auth_headers");
+                String authHeader;
+                if (authHeaders.size() == 0 || authHeaders.size() > 1) {
+                    AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(Filters.eq("type", "HARDCODED"));
+                    if (authMechanism == null || authMechanism.getAuthParams() == null || authMechanism.getAuthParams().size() == 0) {
+                        return new ExecutorSingleOperationResp(false, "auth headers missing");
+                    }
+                    authHeader = authMechanism.getAuthParams().get(0).getKey();
+                } else {
+                    authHeader = authHeaders.get(0);
+                }
+
+                String authVal;
+                if (VariableResolver.isAuthContext(key)) {
+                    authVal = VariableResolver.resolveAuthContext(key, rawApi.getRequest().getHeaders(), authHeader);
+                } else {
+                    AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(Filters.eq("type", "HARDCODED"));
+                    if (authMechanism == null || authMechanism.getAuthParams() == null || authMechanism.getAuthParams().size() == 0) {
+                        return new ExecutorSingleOperationResp(false, "auth headers missing");
+                    }
+                    authVal = authMechanism.getAuthParams().get(0).getValue();
+                }
+                if (authVal == null) {
+                    return new ExecutorSingleOperationResp(false, "auth value missing");
+                }
+                return Operations.modifyHeader(rawApi, authHeader, authVal);
             default:
                 return new ExecutorSingleOperationResp(false, "invalid operationType");
 
