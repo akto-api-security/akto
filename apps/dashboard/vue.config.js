@@ -6,7 +6,17 @@ module.exports = {
       plugins: [
         new MonacoWebpackPlugin({
           languages: ["python","yaml","java","javascript"],//configure your languages here
-          features: ["coreCommands", "find","folding","bracketMatching","comment","codelens","colorPicker","format","gotoLine"],
+          features: ["coreCommands", "find","folding","bracketMatching","comment","codelens","colorPicker","format","gotoLine","indentation",
+                     "inlineCompletions", "snippet", "suggest" , "codelens" , "wordHighlighter"],
+          customLanguages: [{
+              label: 'yaml',
+              entry: 'monaco-yaml',
+              worker: {
+                id: 'monaco-yaml/yamlWorker',
+                entry: 'monaco-yaml/yaml.worker',
+              },
+            },
+          ]
         }), // Place it here
       ],
     },
