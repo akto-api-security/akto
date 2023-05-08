@@ -63,6 +63,9 @@ public class QuickStartAction extends UserAction {
 
     private DeploymentMethod deploymentMethod;
 
+    private String aktoNLBIp;
+    private String aktoMongoConn;
+
     public enum DeploymentMethod {
         AWS_TRAFFIC_MIRRORING,
         KUBERNETES;
@@ -284,6 +287,12 @@ public class QuickStartAction extends UserAction {
                 loggerMaker.infoAndAddToDb("Nothing set in DB, moving on", LogDb.DASHBOARD);
             }
         }
+        if(DeploymentMethod.KUBERNETES.equals(this.deploymentMethod) && Stack.StackStatus.CREATE_COMPLETE.toString().equals(this.stackState.getStatus())){
+            loggerMaker.infoAndAddToDb("Stack creation complete, fetching outputs", LogDb.DASHBOARD);
+            Map<String, String> outputsMap = Utils.fetchOutputs(MirroringStackDetails.getStackName());
+            this.aktoNLBIp = outputsMap.get("AktoNLB");
+            this.aktoMongoConn = System.getenv("AKTO_MONGO_CONN");
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -418,5 +427,21 @@ public class QuickStartAction extends UserAction {
 
     public void setDeploymentMethod(DeploymentMethod deploymentMethod) {
         this.deploymentMethod = deploymentMethod;
+    }
+
+    public String getAktoNLBIp() {
+        return aktoNLBIp;
+    }
+
+    public void setAktoNLBIp(String aktoNLBIp) {
+        this.aktoNLBIp = aktoNLBIp;
+    }
+
+    public String getAktoMongoConn() {
+        return aktoMongoConn;
+    }
+
+    public void setAktoMongoConn(String aktoMongoConn) {
+        this.aktoMongoConn = aktoMongoConn;
     }
 }

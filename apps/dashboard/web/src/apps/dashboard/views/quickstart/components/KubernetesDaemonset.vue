@@ -5,11 +5,11 @@
         <div v-if="isLocalDeploy">
             <div>
                 Use Kubernetes based agent deployment to send traffic to Akto.
-                <div v-if="!isLocalDeploy"><a  class="clickable-docs" _target="blank" href="https://docs.akto.io/getting-started/quick-start-with-akto-self-hosted/aws-deploy">Know more</a></div>
+                <div v-if="!isLocalDeploy"><a  class="clickable-docs" _target="blank" href="https://docs.akto.io/">Know more</a></div>
             </div>
             <banner-horizontal class="mt-3">
                 <div slot="content">
-                <div>To setup traffic mirroring from AWS, deploy in AWS. Go to <a class="clickable-docs" target="blank" href="https://docs.akto.io/getting-started/quick-start-with-akto-self-hosted/aws-deploy">docs</a>.</div>
+                <div>Akto daemonset config can duplicate your node-traffic inside Kubernetes and send to Akto dashboard. Go to <a class="clickable-docs" target="blank" href="https://docs.akto.io/">docs</a>.</div>
                 </div>
             </banner-horizontal>
         </div>
@@ -19,7 +19,7 @@
                     class="ml-3" 
                     v-if="showSetupMirroringForKubernetesButton && !createStackClicked"
                 >
-                    Setup Mirroring
+                    Setup daemonset stack
                 </v-btn>
                 
                 <div class="text_msg mt-3" v-html="text_msg"></div>
@@ -32,12 +32,32 @@
                     </div>
                 </div>
                 <div v-if="stackStatus === 'CREATE_COMPLETE'">
-                    <div>Create a file daemonset-deploy.yaml with the following config</div>
-                    <code-block :lines="yaml" onCopyBtnClickText="Policy copied to clipboard"></code-block>
+                    <!-- <code-block :lines="yaml" onCopyBtnClickText="Policy copied to clipboard"></code-block> -->
+                    <div class="steps">You need to setup a daemonset for your Kubernetes environment:</div>
+                    <div class="steps">
+                        <b>Step 1</b>: Create a file akto-daemonset-deploy.yaml with the following config
+                        <code-block :lines="yaml" onCopyBtnClickText="Config file copied to clipboard"></code-block>
+                    </div>
+                    <div class="steps">
+                        <b>Step 2</b>: Replace the following values:
+                            <div class="ml-4">
+                                a. {NAMESPACE} : With the namespace of your app
+                            </div>
+                            <div class="ml-4">
+                                b. {APP_NAME} : Replace with the name of the app where daemonset will be deployed. Note that this has to be done at 3 places in the config
+                            </div>
+                    </div>
+                    <div class="steps">
+                        <b>Step 3</b>: Run the following command with appropriate namespace.
+                        <code-block :lines="k8s_command" onCopyBtnClickText="Command copied to clipboard"></code-block>
+                    </div>
+                    <div class="steps">
+                        <b>Step 4</b>: Akto will start processing traffic to protect your APIs. Click <a class="clickable-docs" href="/dashboard/observe/inventory">here</a> to navigate to API Inventory.
+                    </div>
                 </div>
             </div>
             <div v-else>
-                <div class="steps">Your dashboard's instance needs relevant access to setup traffic mirroring, please
+                <div class="steps">Your dashboard's instance needs relevant access to setup daemonset stack, please
                     do the
                     following steps:</div>
                 <div class="steps">
@@ -332,18 +352,18 @@ export default {
             `apiVersion: apps/v1`,
             `kind: DaemonSet`,
             `metadata:`,
-            `  name: mirroring`,
-            `  namespace: sample-app`,
+            `  name: akto-k8s`,
+            `  namespace: {NAMESPACE}`,
             `  labels:`,
-            `    app: sample-linux-app`,
+            `    app: {APP_NAME}`,
             `spec:`,
             `  selector:`,
             `    matchLabels:`,
-            `      app: sample-linux-app`,
+            `      app: {APP_NAME}`,
             `  template:`,
             `    metadata:`,
             `      labels:`,
-            `        app: sample-linux-app`,
+            `        app: {APP_NAME}`,
             `    spec:`,
             `      hostNetwork: true`,
             `      containers:`,
@@ -357,13 +377,16 @@ export default {
             `          - name: AKTO_INFRA_MIRRORING_MODE`,
             `            value: "gcp"`,
             `          - name: AKTO_KAFKA_BROKER_MAL`,
-            `            value: "<AKTO_NLB_IP>:29092"`,
+            `            value: "<AKTO_NLB_IP>:9092"`,
+            `          - name: AKTO_MONGO_CONN`,
+            `            value: "<AKTO_MONGO_CONN>"`,
             ],
             aktoDashboardRoleName: null,
             isLocalDeploy: false,
             deploymentMethod: "KUBERNETES",
             stackStatus: "",
-            createStackClicked: false
+            createStackClicked: false,
+            k8s_command: ["kubectl apply -f akto-daemonset-deploy.yaml -n <NAMESPACE>"]
         }
     },
     mounted() {
@@ -404,6 +427,14 @@ export default {
                     }
                     this.stackStatus = resp.stackState.status;
                     this.handleStackState(resp.stackState, intervalId)
+                    if(resp.aktoNLBIp && resp.aktoMongoConn){
+                        for(let i=0; i<this.yaml.length; i++){
+                            let line = this.yaml[i];
+                            line = line.replace('<AKTO_NLB_IP>', resp.aktoNLBIp);
+                            line = line.replace('<AKTO_MONGO_CONN>', resp.aktoMongoConn);
+                            this.yaml[i] = line;
+                        }
+                    }
                 }
                 )
             }, 5000)
@@ -411,15 +442,15 @@ export default {
         handleStackState(stackState, intervalId) {
             if (stackState.status == 'CREATE_IN_PROGRESS') {
                 this.renderProgressBar(stackState.creationTime)
-                this.text_msg = 'We are setting up mirroring for you! Grab a cup of coffee, sit back and relax while we work our magic!';
+                this.text_msg = 'We are setting up daemonset stack for you! Grab a cup of coffee, sit back and relax while we work our magic!';
             }
             else if (stackState.status == 'CREATE_COMPLETE') {
                 this.removeProgressBarAndStatuschecks(intervalId);
-                this.text_msg = 'Akto is tirelessly processing mirrored traffic to protect your APIs. Click <a class="clickable-docs" href="/dashboard/observe/inventory">here</a> to navigate to API Inventory.';
+                // this.text_msg = 'Akto is tirelessly processing mirrored traffic to protect your APIs. Click <a class="clickable-docs" href="/dashboard/observe/inventory">here</a> to navigate to API Inventory.';
             }
             else if (stackState.status == 'DOES_NOT_EXISTS') {
                 this.removeProgressBarAndStatuschecks(intervalId);
-                this.text_msg = 'Mirroring is not setup currently, choose 1 or more LBs to enable mirroring.';
+                this.text_msg = 'Daemonset stack is not setup currently';
             }
             else if (stackState.status == 'CREATION_FAILED') {
                 this.removeProgressBarAndStatuschecks(intervalId);
@@ -427,7 +458,7 @@ export default {
             } 
             else {
                 this.removeProgressBarAndStatuschecks(intervalId);
-                this.text_msg = 'Something went wrong while setting up mirroring, please write to us at support@akto.io'
+                this.text_msg = 'Something went wrong while setting up daemonset stack, please write to us at support@akto.io'
             }
         },
         renderProgressBar(creationTimeInMs) {
