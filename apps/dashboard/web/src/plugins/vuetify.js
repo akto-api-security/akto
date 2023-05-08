@@ -11,6 +11,7 @@ import GithubIcon from "../apps/dashboard/shared/icons/GithubIcon"
 import Postman from "../apps/dashboard/shared/icons/Postman"
 import AWS from "../apps/dashboard/shared/icons/AWS"
 import GCP from "../apps/dashboard/shared/icons/GCP"
+import k8s from '../apps/dashboard/shared/icons/k8s'
 import Swagger from "../apps/dashboard/shared/icons/Swagger"
 import Restapi from "../apps/dashboard/shared/icons/Restapi"
 import CustomWebhooks from "../apps/dashboard/shared/icons/CustomWebhooks"
@@ -220,6 +221,10 @@ faIconsOpts.postman = {
 
 faIconsOpts.aws = {
   component: AWS
+}
+
+faIconsOpts.k8s = {
+  component: k8s
 }
 
 faIconsOpts.swagger = {

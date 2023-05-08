@@ -21,6 +21,7 @@
 <script>
 import DetailExpansionPanel from './DetailExpansionPanel'
 import AwsTrafficMirroring from './AwsTrafficMirroring'
+import KubernetesDaemonset from './KubernetesDaemonset'
 import GcpTrafficMirroring from './GcpTrafficMirroring'
 import BurpsuiteSource from './BurpsuiteSource'
 import PostmanSource from './PostmanSource'
@@ -37,7 +38,8 @@ export default {
         GcpTrafficMirroring,
         BurpsuiteSource,
         PostmanSource,
-        Spinner
+        Spinner,
+        KubernetesDaemonset
     },
     data() {
         return {
@@ -50,6 +52,14 @@ export default {
                     title: "AWS Traffic Mirroring",
                     subtitle: 'Recommended',
                     detailComponent: 'AwsTrafficMirroring',
+                    connected: "More"
+                },
+                "KUBERNETES": {
+                    icon: "$k8s",
+                    key: "KUBERNETES",
+                    title: "Kubernetes Daemonset",
+                    subtitle: 'Recommended',
+                    detailComponent: 'KubernetesDaemonset',
                     connected: "More"
                 },
                 "GCP": {
@@ -84,9 +94,9 @@ export default {
         getSourcesInOrder(){
             let order = []
             if (window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'){
-                order = ['BURP', 'POSTMAN', 'AWS', 'GCP']
+                order = ['BURP', 'POSTMAN','AWS','GCP', 'KUBERNETES']
             } else {
-                order = ['AWS', 'BURP', 'POSTMAN', 'GCP']
+                order = [ 'AWS','KUBERNETES', 'BURP', 'POSTMAN', 'GCP']
             }
             let final_order = []
             order.forEach(item => {
