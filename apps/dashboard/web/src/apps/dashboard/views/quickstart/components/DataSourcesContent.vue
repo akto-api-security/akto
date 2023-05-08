@@ -55,7 +55,7 @@ export default {
                     connected: "More"
                 },
                 "KUBERNETES": {
-                    icon: "$aws",
+                    icon: "$k8s",
                     key: "KUBERNETES",
                     title: "Kubernetes Daemonset",
                     subtitle: 'Recommended',
