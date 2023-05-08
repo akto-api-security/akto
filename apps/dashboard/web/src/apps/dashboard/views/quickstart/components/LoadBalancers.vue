@@ -373,6 +373,7 @@ export default {
             ],
             aktoDashboardRoleName: null,
             isLocalDeploy: false,
+            deploymentMethod: "AWS_TRAFFIC_MIRRORING"
         }
     },
     mounted() {
@@ -387,7 +388,7 @@ export default {
                 this.loading = false;
                 this.isLocalDeploy = true;
             } else {
-                api.fetchLBs().then((resp) => {
+                api.fetchLBs({deploymentMethod: this.deploymentMethod}).then((resp) => {
                     if (!resp.dashboardHasNecessaryRole) {
                         for (let i = 0; i < this.quick_start_policy_lines.length; i++) {
                             let line = this.quick_start_policy_lines[i];
@@ -434,7 +435,7 @@ export default {
         checkStackState() {
             let intervalId = null;
             intervalId = setInterval(async () => {
-                api.fetchStackCreationStatus({deploymentMethod: "AWS_TRAFFIC_MIRRORING"}).then((resp) => {
+                api.fetchStackCreationStatus({deploymentMethod: this.deploymentMethod}).then((resp) => {
                     if (this.initialCall) {
                         this.initialCall = false;
                         this.loading = false;
