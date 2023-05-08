@@ -14,7 +14,7 @@ info:
     name: SSRF
     shortName: Server Side Request Forgery
     displayName: Server Side Request Forgery (SSRF)
-  subCategory: SSRF_AWS_METADATA_EXPOSED
+  subCategory: SSRF_ON_AWS_META_ENDPOINT
   severity: HIGH
   tags:
     - Business logic
