@@ -73,7 +73,15 @@ export default {
             return resp
         })        
     },
-
+    addTestTemplate(content) {
+        return request({
+            url: '/api/saveTestEditorFile',
+            method: 'post',
+            data:{content}
+        }).then((resp) => {
+            return resp
+        })
+    },
     fetchTestingRunResults(testingRunResultSummaryHexId) {
         return request({
             url: '/api/fetchTestingRunResults',
