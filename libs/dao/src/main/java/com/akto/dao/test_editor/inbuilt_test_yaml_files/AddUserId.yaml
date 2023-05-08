@@ -25,4 +25,22 @@ info:
     - "https://cwe.mitre.org/data/definitions/285.html"
     - "https://cwe.mitre.org/data/definitions/639.html"
 api_selection_filters:
-
+  response_code:
+    gte: 200
+    lt: 300
+  param_context:
+    param: user|customer
+    extract: user_context
+execute:
+  type: single
+  requests:
+    - req:
+        - add_query_param:
+            user_context.key: ${user_context.value}
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_payload:
+    percentage_match:
+      lt: 50

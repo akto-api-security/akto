@@ -1,10 +1,14 @@
 package com.akto.test_editor.execution;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.akto.util.modifier.AddJkuJWTModifier;
+import com.akto.util.modifier.InvalidSignatureJWTModifier;
+import com.akto.util.modifier.NoneAlgoJWTModifier;
 import com.mongodb.BasicDBObject;
 
 public class VariableResolver {
@@ -114,6 +118,84 @@ public class VariableResolver {
             }
         }
         return listVal;
+    }
+
+    public static Boolean isAuthContext(Object val) {
+        if (!(val instanceof String)) {
+            return false;
+        }
+
+        String expression = val.toString();
+
+        Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
+        Matcher matcher = pattern.matcher(expression);
+        if (matcher.find()) {
+            try {
+
+                // split with '.', check if length is 2 and second element should be key/value
+
+                String match = matcher.group(0);
+                match = match.substring(2, match.length());
+                match = match.substring(0, match.length() - 1);
+
+                String[] params = match.split("\\.");
+                if (params.length < 2) {
+                    return false;
+                }
+                String firstParam = params[0];
+                String secondParam = params[1];
+
+                if (!firstParam.equalsIgnoreCase("auth_context")) {
+                    return false;
+                }
+
+                if (secondParam.equalsIgnoreCase("none_algo_token") || secondParam.equalsIgnoreCase("invalid_signature_token") 
+                    || secondParam.equalsIgnoreCase("jku_added_token")) {
+                        return true;
+                }
+            } catch (Exception e) {
+                return false;
+            }
+        }
+
+        return false;
+
+    }
+
+    public static String resolveAuthContext(String expression, Map<String, List<String>> headers, String headerKey) {
+        expression = expression.substring(2, expression.length());
+        expression = expression.substring(0, expression.length() - 1);
+
+        String[] params = expression.split("\\.");
+        String secondParam = params[1];
+
+        if (!headers.containsKey(headerKey)) {
+            return null;
+        }
+
+        String headerVal = headers.get(headerKey).get(0);
+        String modifiedHeaderVal = null;
+
+        if (secondParam.equalsIgnoreCase("none_algo_token")) {
+            NoneAlgoJWTModifier noneAlgoJWTModifier = new NoneAlgoJWTModifier("none");
+            try {
+                modifiedHeaderVal = noneAlgoJWTModifier.jwtModify("", headerVal);
+            } catch(Exception e) {
+                return null;
+            }
+        } else if (secondParam.equalsIgnoreCase("invalid_signature_token")) {
+            InvalidSignatureJWTModifier invalidSigModified = new InvalidSignatureJWTModifier();
+            modifiedHeaderVal = invalidSigModified.jwtModify("", headerVal);
+        } else if (secondParam.equalsIgnoreCase("invalid_signature_token")) {
+            AddJkuJWTModifier addJkuJWTModifier = new AddJkuJWTModifier();
+            try {
+                modifiedHeaderVal = addJkuJWTModifier.jwtModify("", headerVal);
+            } catch(Exception e) {
+                return null;
+            }
+        }
+        
+        return modifiedHeaderVal;
     }
 
     // public Object resolveExpression(Map<String, Object> varMap, String expression) {
