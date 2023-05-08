@@ -187,7 +187,7 @@ public class QuickStartAction extends UserAction {
         if (!AwsStack.getInstance().checkIfStackExists(MirroringStackDetails.getStackName())) {
             try {
                 Map<String, String> parameters = new HashMap<>();
-                parameters.put("MongoIp", System.getenv("AKTO_MONGO_CONN_1"));
+                parameters.put("MongoIp", System.getenv("AKTO_MONGO_CONN"));
                 parameters.put("KeyPair", System.getenv("EC2_KEY_PAIR"));
                 parameters.put("SubnetId", System.getenv("EC2_SUBNET_ID"));
                 String template = convertStreamToString(AwsStack.class
