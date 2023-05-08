@@ -368,7 +368,7 @@ export default {
             `      hostNetwork: true`,
             `      containers:`,
             `      - name: mirror-api-logging`,
-            `        image: aktosecurity/mirror-api-logging:direct_tcp`,
+            `        image: aktosecurity/mirror-api-logging:k8s_agent`,
             `        env: `,
             `          - name: AKTO_TRAFFIC_BATCH_TIME_SECS`,
             `            value: "10"`,
