@@ -1,6 +1,6 @@
-id: ADD_METHOD_OVERRIDE_HEADERS
+id: ADD_DELETE_METHOD_OVERRIDE_HEADERS
 info:
-  name: "BFLA by HTTP method overriding"
+  name: "BFLA by HTTP DELETE method overriding"
   description: "Attacker can access resources of any user by replacing method of the endpoint (eg: changemethod from get to post). This way attacker can get access to unauthorized endpoints."
   details: >
             "The endpoint appears to be vulnerable to broken function level authorization attack.The original request was replayed with addition of alternative headers
@@ -14,7 +14,7 @@ info:
     name: BFLA
     shortName: Broken Function Level Authorization
     displayName: Broken Function Level Authorization (BFLA)
-  subCategory: ADD_METHOD_OVERRIDE_HEADERS
+  subCategory: ADD_DELETE_METHOD_OVERRIDE_HEADERS
   severity: HIGH
   tags: 
     - Business logic
@@ -29,17 +29,17 @@ api_selection_filters:
     gte: 200
     lt: 300
   method:
-    neq: POST
+    neq: DELETE
 execute:
   type: single
   requests:
     - req:
       - add_header:
-          x-http-method: POST
+          x-http-method: DELETE
       - add_header:
-          x-http-method-override: POST
+          x-http-method-override: DELETE
       - add_header:
-          x-method-override: POST
+          x-method-override: DELETE
 validate:
   response_code:
     gte: 200
@@ -47,3 +47,5 @@ validate:
   response_payload:
     percentage_match:
       lt: 30
+    length:
+      gt: 0

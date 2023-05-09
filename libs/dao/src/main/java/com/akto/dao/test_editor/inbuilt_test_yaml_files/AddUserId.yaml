@@ -44,3 +44,5 @@ validate:
   response_payload:
     percentage_match:
       lt: 50
+    length:
+      gt: 0

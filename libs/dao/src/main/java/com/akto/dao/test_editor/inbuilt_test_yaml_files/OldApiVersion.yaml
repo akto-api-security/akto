@@ -30,5 +30,22 @@ info:
     - "https://cwe.mitre.org/data/definitions/285.html"
     - "https://cwe.mitre.org/data/definitions/639.html"
 api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
   url:
     regex: v(\d+)/
+execute:
+  type: single
+  requests:
+    - req: 
+      - modify_url:
+          regexReplace:
+            regex: v(\d+)/
+            replace_with: v1/
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    endpoint_in_traffic_context: false

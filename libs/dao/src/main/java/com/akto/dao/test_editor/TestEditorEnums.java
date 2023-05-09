@@ -13,7 +13,8 @@ public class TestEditorEnums {
         LTE,
         LT,
         NEQ,
-        PARAM
+        PARAM,
+        CONTAINS_JWT
     }
 
     public enum CollectionOperands {
@@ -65,7 +66,8 @@ public class TestEditorEnums {
 
     public enum ContextOperator {
         PRIVATE_VARIABLE_CONTEXT,
-        PARAM_CONTEXT
+        PARAM_CONTEXT,
+        ENDPOINT_IN_TRAFFIC_CONTEXT
     }
 
 
@@ -192,7 +194,8 @@ public class TestEditorEnums {
         MODIFY_URL,
         MODIFY_METHOD,
         FOLLOW_REDIRECT,
-        REMOVE_AUTH_HEADERS
+        REMOVE_AUTH_HEADER,
+        REPLACE_AUTH_HEADER
     }
 
     public enum NonTerminalExecutorDataOperands {

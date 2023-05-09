@@ -1,8 +1,0 @@
-id: FUZZING
-info:
-  name: FUZZING
-  description: ""
-  details: ""
-  impact: ""
-  subCategory: FUZZING
-api_selection_filters:

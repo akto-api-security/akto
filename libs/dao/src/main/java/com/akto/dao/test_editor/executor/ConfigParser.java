@@ -127,9 +127,23 @@ public class ConfigParser {
             return configParserValidationResult;
         }
 
-        if ((curNodeType.equalsIgnoreCase(ExecutorOperandTypes.Data.toString()) || curNodeType.equalsIgnoreCase(ExecutorOperandTypes.Terminal.toString())) && !( (values instanceof String) || (values instanceof Integer) || (values instanceof Boolean) )) {
+        if (curNodeType.equalsIgnoreCase(ExecutorOperandTypes.Terminal.toString())) {
+            if (values instanceof Map) {
+                Map<String, Object> mapVal = (Map) values;
+                if (!mapVal.containsKey("regex_replace")) {
+                    configParserValidationResult.setIsValid(false);
+                    configParserValidationResult.setErrMsg("terminalOperands Executor operand doesn't have regex replace value");
+                }
+            } else if (!( (values instanceof String) || (values instanceof Integer) || (values instanceof Boolean) )) {
+                configParserValidationResult.setIsValid(false);
+                configParserValidationResult.setErrMsg("terminalOperands should only have string/boolean/int value");
+            }
+        }
+
+        if (curNodeType.equalsIgnoreCase(ExecutorOperandTypes.Data.toString()) && !( (values instanceof String) || (values instanceof Integer) || (values instanceof Boolean) )) {
+            if (values instanceof Map)
             configParserValidationResult.setIsValid(false);
-            configParserValidationResult.setErrMsg("terminalOperands should only have string value");
+            configParserValidationResult.setErrMsg("data should only have string value");
             return configParserValidationResult;
         }
 

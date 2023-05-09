@@ -91,6 +91,15 @@ public class Utils {
         return res;
     }
 
+    public static String applyRegexModifier(String data, String regex, String replaceWith) {
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(data);
+        if (matcher.find()) {
+            data = data.replaceAll(regex, replaceWith);
+        }
+        return data;
+    }
+
     // public static String[] trimAndSplit(String url) {
     //     return trim(url).split("/");
     // }
