@@ -186,7 +186,7 @@ public class VariableResolver {
         } else if (secondParam.equalsIgnoreCase("invalid_signature_token")) {
             InvalidSignatureJWTModifier invalidSigModified = new InvalidSignatureJWTModifier();
             modifiedHeaderVal = invalidSigModified.jwtModify("", headerVal);
-        } else if (secondParam.equalsIgnoreCase("invalid_signature_token")) {
+        } else if (secondParam.equalsIgnoreCase("jku_added_token")) {
             AddJkuJWTModifier addJkuJWTModifier = new AddJkuJWTModifier();
             try {
                 modifiedHeaderVal = addJkuJWTModifier.jwtModify("", headerVal);
