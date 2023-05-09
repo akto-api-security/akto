@@ -4,7 +4,9 @@
             <template v-slot:activator="{on,attrs}">
                 <v-icon v-bind="attrs" v-on="on">$far_question-circle</v-icon>
             </template>
-            {{ value }}
+            <div style="max-width: 160px;">
+                {{ value }}
+            </div>
         </v-tooltip>
     </div>
 </template>

@@ -31,6 +31,10 @@ public class AccountSettings {
     private boolean showOnboarding;
     public static final String SHOW_ONBOARDING = "showOnboarding";
 
+    private boolean urlRegexMatchingEnabled;
+
+    public static final String URL_REGEX_MATCHING_ENABLED = "urlRegexMatchingEnabled";
+
     public AccountSettings() {
     }
 
@@ -144,5 +148,12 @@ public class AccountSettings {
         this.showOnboarding = showOnboarding;
     }
 
+    public boolean getUrlRegexMatchingEnabled() {
+        return urlRegexMatchingEnabled;
+    }
+
+    public void setUrlRegexMatchingEnabled(boolean urlRegexMatchingEnabled) {
+        this.urlRegexMatchingEnabled = urlRegexMatchingEnabled;
+    }
     
 }

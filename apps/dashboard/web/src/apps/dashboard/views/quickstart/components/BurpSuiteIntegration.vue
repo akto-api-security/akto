@@ -6,6 +6,7 @@
 
 import ApiToken from "../../settings/components/integrations/ApiToken.vue"
 import api from "../api.js"
+import func from '@/util/func'
 
 export default {
   name: "BurpSuiteIntegration",
@@ -19,7 +20,7 @@ export default {
   },
   methods: {
     addBurpToken() {
-      api.addBurpToken().then((resp) => {
+      api.addApiToken(func.testingResultType().BURP).then((resp) => {
         this.burp_tokens.push(...resp.apiTokenList)
         this.burp_tokens = [...this.burp_tokens]
       })
@@ -36,7 +37,7 @@ export default {
     let resp = await api.fetchApiTokens()
     resp.apiTokenList.forEach(x => {
       switch (x.utility) {
-        case "BURP":
+        case func.testingResultType().BURP:
           this.burp_tokens.push(x)
           break;
       }

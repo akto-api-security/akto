@@ -51,6 +51,11 @@
                         </span>
                     </div>
                 </div>                  
+
+                <div class="testing-results-header" v-if="this.currentTest && this.currentTest.metadata">
+                    CI/CD Run Details: {{ this.currentTest.metadata }}
+                </div>
+
                 <simple-table
                     :headers="testingRunResultsHeaders" 
                     :items="testingRunResultsItems" 
@@ -255,29 +260,13 @@ export default {
                 this.selectedDate = Math.max(...this.testingRunResultSummaries.map(o => o.startTimestamp))
             })
         },
-        getRunResultSubCategory (runResult) {
-            if (this.subCatogoryMap[runResult.testSubType] === undefined) {
-                let a = this.subCategoryFromSourceConfigMap[runResult.testSubType]
-                return a ? a.subcategory : null
-            } else {
-                return this.subCatogoryMap[runResult.testSubType].testName
-            }
-        },
-        getRunResultCategory (runResult) {
-            if (this.subCatogoryMap[runResult.testSubType] === undefined) {
-                let a = this.subCategoryFromSourceConfigMap[runResult.testSubType]
-                return a ? a.category.shortName : null
-            } else {
-                return this.subCatogoryMap[runResult.testSubType].superCategory.shortName
-            }
-        },
         prepareForTable(runResult) {
             return {
                 ...runResult,
                 endpoint: runResult.apiInfoKey.method + " " + runResult.apiInfoKey.url,
                 severity: runResult["vulnerable"] ? "HIGH" : null,
-                testSubType: this.getRunResultSubCategory (runResult),
-                testSuperType: this.getRunResultCategory(runResult)
+                testSubType: func.getRunResultSubCategory (runResult, this.subCategoryFromSourceConfigMap, this.subCatogoryMap, "testName"),
+                testSuperType: func.getRunResultCategory(runResult, this.subCatogoryMap, this.subCategoryFromSourceConfigMap, "shortName")
             }
         },
         async openDetails(row) {
@@ -327,6 +316,11 @@ export default {
             }
         }, 5000)
 
+        if(this.currentTest){
+            if(this.startTimestamp > this.currentTest.startTimestamp){
+                this.startTimestamp = this.currentTest.startTimestamp
+            }
+        }
     },
 
     destroyed() {
@@ -335,7 +329,7 @@ export default {
     },
 
     computed: {
-        ...mapState('testing', ['testingRuns', 'pastTestingRuns']),
+        ...mapState('testing', ['testingRuns', 'pastTestingRuns','cicdTestingRuns']),
         subCatogoryMap: {
             get() {
                 return this.$store.state.issues.subCatogoryMap
@@ -358,7 +352,7 @@ export default {
             }, {})
         },
         testingRun() {
-            return [...this.testingRuns, ...this.pastTestingRuns].filter(x => x.hexId === this.testingRunHexId)[0]
+            return [...this.testingRuns, ...this.pastTestingRuns, ...this.cicdTestingRuns].filter(x => x.hexId === this.testingRunHexId)[0]
         },
         endpoints() {
             return this.testingRun ? testing.getEndpoints(this.testingRun.testingEndpoints) : "-"

@@ -1,11 +1,11 @@
 import request from '@/util/request'
 
 export default{
-    addBurpToken() {
+    addApiToken(tokenUtility) {
         return request({
-            url: '/api/addBurpToken',
+            url: '/api/addApiToken',
             method: 'post',
-            data: {}
+            data: {tokenUtility}
         }).then((resp) => {
             return resp
         })
@@ -76,11 +76,20 @@ export default{
             return resp
         })
     },
-    importPostmanWorkspace(workspace_id) {
+    importPostmanWorkspace(workspace_id, allowReplay, api_key) {
         return request({
             url: '/api/importPostmanWorkspace',
             method: 'post',
-            data: {workspace_id}
+            data: {workspace_id, allowReplay, api_key}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    importDataFromPostmanFile(postmanCollectionFile, allowReplay) {
+        return request({
+            url: '/api/importDataFromPostmanFile',
+            method: 'post',
+            data: {postmanCollectionFile, allowReplay}
         }).then((resp) => {
             return resp
         })
