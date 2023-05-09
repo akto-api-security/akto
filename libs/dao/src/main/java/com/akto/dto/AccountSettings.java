@@ -35,6 +35,10 @@ public class AccountSettings {
 
     public static final String URL_REGEX_MATCHING_ENABLED = "urlRegexMatchingEnabled";
 
+    private String initStackType;
+
+    public static final String INIT_STACK_TYPE = "initStackType";
+
     public AccountSettings() {
     }
 
@@ -155,5 +159,12 @@ public class AccountSettings {
     public void setUrlRegexMatchingEnabled(boolean urlRegexMatchingEnabled) {
         this.urlRegexMatchingEnabled = urlRegexMatchingEnabled;
     }
-    
+
+    public String getInitStackType() {
+        return initStackType;
+    }
+
+    public void setInitStackType(String initStackType) {
+        this.initStackType = initStackType;
+    }
 }

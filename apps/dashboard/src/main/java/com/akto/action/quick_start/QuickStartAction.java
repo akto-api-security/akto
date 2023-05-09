@@ -3,10 +3,11 @@ package com.akto.action.quick_start;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.net.InetAddress;
 import java.util.*;
 import java.util.concurrent.*;
 
+import com.akto.dao.*;
+import com.akto.dto.*;
 import com.akto.util.Constants;
 import com.akto.utils.DashboardMode;
 import com.akto.utils.platform.DashboardStackDetails;
@@ -19,13 +20,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
 import com.akto.action.UserAction;
-import com.akto.dao.ApiTokensDao;
-import com.akto.dao.AwsResourcesDao;
-import com.akto.dao.BackwardCompatibilityDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.AwsResources;
-import com.akto.dto.BackwardCompatibility;
-import com.akto.dto.User;
 import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -40,8 +35,6 @@ import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancingC
 import com.amazonaws.services.elasticloadbalancingv2.model.DescribeLoadBalancersRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.DescribeLoadBalancersResult;
 import com.amazonaws.services.elasticloadbalancingv2.model.LoadBalancer;
-import com.akto.dto.ApiToken;
-import com.akto.dto.AwsResource;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -68,7 +61,8 @@ public class QuickStartAction extends UserAction {
 
     public enum DeploymentMethod {
         AWS_TRAFFIC_MIRRORING,
-        KUBERNETES;
+        KUBERNETES,
+        FARGATE;
 
         public DeploymentMethod getDeploymentMethod(String deploymentMethod) {
             if (StringUtils.isEmpty(deploymentMethod)) {
@@ -165,7 +159,7 @@ public class QuickStartAction extends UserAction {
         try {
             DescribeStackResourcesRequest req = new DescribeStackResourcesRequest();
             req.setStackName(MirroringStackDetails.getStackName());
-            req.setLogicalResourceId(MirroringStackDetails.AKTO_NLB);
+            req.setLogicalResourceId(MirroringStackDetails.AKTO_CONTEXT_ANALYZER_AUTO_SCALING_GROUP);
             AmazonCloudFormation cloudFormation = AmazonCloudFormationClientBuilder.standard()
                     .build();
             cloudFormation.describeStackResources(req);
@@ -186,7 +180,7 @@ public class QuickStartAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String createKubernetesStack(){
+    public String createRuntimeStack(){
         if (!AwsStack.getInstance().checkIfStackExists(MirroringStackDetails.getStackName())) {
             try {
                 Map<String, String> parameters = new HashMap<>();
@@ -197,6 +191,7 @@ public class QuickStartAction extends UserAction {
                         .getResourceAsStream("/cloud_formation_templates/kubernetes_mirroring.template"));
                 List<Tag> tags = Utils.fetchTags(DashboardStackDetails.getStackName());
                 String stackId = AwsStack.getInstance().createStack(MirroringStackDetails.getStackName(), parameters, template, tags);
+                AccountSettingsDao.instance.updateInitStackType(this.deploymentMethod.name());
                 loggerMaker.infoAndAddToDb(String.format("Stack %s creation started successfully", stackId), LogDb.DASHBOARD);
             } catch (Exception e) {
                 e.printStackTrace();
@@ -235,6 +230,7 @@ public class QuickStartAction extends UserAction {
                         .getResourceAsStream("/cloud_formation_templates/akto_aws_mirroring.template"));
                 List<Tag> tags = Utils.fetchTags(DashboardStackDetails.getStackName());
                 String stackId = AwsStack.getInstance().createStack(MirroringStackDetails.getStackName(), parameters, template, tags);
+                AccountSettingsDao.instance.updateInitStackType(DeploymentMethod.AWS_TRAFFIC_MIRRORING.name());
                 System.out.println("Started creation of stack with id: " + stackId);
             } catch (Exception e) {
                 e.printStackTrace();
@@ -272,6 +268,13 @@ public class QuickStartAction extends UserAction {
 
     public String checkStackCreationProgress() {
         this.stackState = AwsStack.getInstance().fetchStackStatus(MirroringStackDetails.getStackName());
+        String initStackType = AccountSettingsDao.instance.getInitStackType();
+
+        if (initStackType != null && !this.deploymentMethod.name().equalsIgnoreCase(initStackType) && this.stackState.getStatus().equalsIgnoreCase(Stack.StackStatus.CREATE_IN_PROGRESS.name())) {
+            this.stackState.setStatus(Stack.StackStatus.TEMP_DISABLE.name());
+            return Action.SUCCESS.toUpperCase();
+        }
+
         invokeLambdaIfNecessary(stackState);
         if(Stack.StackStatus.CREATION_FAILED.toString().equalsIgnoreCase(this.stackState.getStatus())){
             AwsResourcesDao.instance.getMCollection().deleteOne(Filters.eq("_id", Context.accountId.get()));
@@ -287,7 +290,7 @@ public class QuickStartAction extends UserAction {
                 loggerMaker.infoAndAddToDb("Nothing set in DB, moving on", LogDb.DASHBOARD);
             }
         }
-        if(DeploymentMethod.KUBERNETES.equals(this.deploymentMethod) && Stack.StackStatus.CREATE_COMPLETE.toString().equals(this.stackState.getStatus())){
+        if(!DeploymentMethod.AWS_TRAFFIC_MIRRORING.equals(this.deploymentMethod) && Stack.StackStatus.CREATE_COMPLETE.toString().equals(this.stackState.getStatus())){
             loggerMaker.infoAndAddToDb("Stack creation complete, fetching outputs", LogDb.DASHBOARD);
             Map<String, String> outputsMap = Utils.fetchOutputs(MirroringStackDetails.getStackName());
             this.aktoNLBIp = outputsMap.get("AktoNLB");
