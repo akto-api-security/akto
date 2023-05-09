@@ -1,6 +1,6 @@
 id: ADD_PUT_METHOD_OVERRIDE_HEADERS
 info:
-  name: "BFLA by HTTP method overriding"
+  name: "BFLA by HTTP PUT method overriding"
   description: "Attacker can access resources of any user by replacing method of the endpoint (eg: changemethod from get to post). This way attacker can get access to unauthorized endpoints."
   details: >
             "The endpoint appears to be vulnerable to broken function level authorization attack.The original request was replayed with addition of alternative headers
