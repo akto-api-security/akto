@@ -33,5 +33,6 @@ validate:
   response_code:
     gte: 200
     lt: 300
-  length:
-    gt: 0
+  response_payload:
+    length:
+      gt: 0

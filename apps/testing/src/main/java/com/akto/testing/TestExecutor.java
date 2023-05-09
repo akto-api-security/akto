@@ -51,7 +51,7 @@ public class TestExecutor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class);
     public static long acceptableSizeInBytes = 5_000_000;
-
+    
     public void init(TestingRun testingRun, ObjectId summaryId) {
         if (testingRun.getTestIdConfig() != 1) {
             apiWiseInit(testingRun, summaryId);
@@ -61,7 +61,7 @@ public class TestExecutor {
     }
 
     public static void main(String[] args) {
-
+        
         DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
         Context.accountId.set(1_000_000);
 
@@ -624,9 +624,8 @@ public class TestExecutor {
         // OpenRedirectTest openRedirectTest = new OpenRedirectTest(testRunId.toHexString(), testRunResultSummaryId.toHexString());
         // SSRFOnAwsMetadataEndpoint ssrfOnAwsMetadataEndpoint = new SSRFOnAwsMetadataEndpoint(testRunId.toHexString(), testRunResultSummaryId.toHexString());
         // CreateAdminUserViaMassAssignment createAdminUserViaMassAssignment = new CreateAdminUserViaMassAssignment(testRunId.toHexString(), testRunResultSummaryId.toHexString());
-        PortScanningViaSSRF portScanningViaSSRF = new PortScanningViaSSRF(testRunId.toHexString(), testRunResultSummaryId.toHexString());
-        FetchSensitiveFilesViaSSRF fetchSensitiveFilesViaSSRF = new FetchSensitiveFilesViaSSRF(testRunId.toHexString(), testRunResultSummaryId.toHexString());
-
+        // PortScanningViaSSRF portScanningViaSSRF = new PortScanningViaSSRF(testRunId.toHexString(), testRunResultSummaryId.toHexString());
+        // FetchSensitiveFilesViaSSRF fetchSensitiveFilesViaSSRF = new FetchSensitiveFilesViaSSRF(testRunId.toHexString(), testRunResultSummaryId.toHexString());
         List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
         //if (messages.isEmpty()) return null;
         List<RawApi> filteredMessages = SampleMessageStore.filterMessagesWithAuthToken(messages, testingUtil.getAuthMechanism());
@@ -651,7 +650,7 @@ public class TestExecutor {
         boolean shouldRunAuthTests = true;
 
         TestPlugin.TestRoleMatcher testRoleMatcher = new TestPlugin.TestRoleMatcher(testingUtil.getTestRoles(), apiInfoKey);
-
+        
         for (String subCategory: testSubCategories) {
             if (!testConfigMap.containsKey(subCategory)) {
                 loggerMaker.infoAndAddToDb("invalid test subcateogry specified " + subCategory, LogDb.TESTING);
@@ -720,15 +719,15 @@ public class TestExecutor {
 
         }
 
-//        if(testSubCategories == null || testSubCategories.contains("PORT_SCANNING")) {
-//            TestingRunResult portScanningViaSSRFResult = runTest(portScanningViaSSRF, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-//            if (portScanningViaSSRFResult != null) testingRunResults.add(portScanningViaSSRFResult);
-//        }
-//
-//        if(testSubCategories == null || testSubCategories.contains("FETCH_SENSITIVE_FILES")) {
-//            TestingRunResult fetchSensitiveFilesViaSSRFResult = runTest(fetchSensitiveFilesViaSSRF, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
-//            if (fetchSensitiveFilesViaSSRFResult != null) testingRunResults.add(fetchSensitiveFilesViaSSRFResult);
-//        }
+        // if(testSubCategories == null || testSubCategories.contains(TestSubCategory.PORT_SCANNING.name())) {
+        //     TestingRunResult portScanningViaSSRFResult = runTest(portScanningViaSSRF, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+        //     if (portScanningViaSSRFResult != null) testingRunResults.add(portScanningViaSSRFResult);
+        // }
+
+        // if(testSubCategories == null || testSubCategories.contains(TestSubCategory.FETCH_SENSITIVE_FILES.name())) {
+        //     TestingRunResult fetchSensitiveFilesViaSSRFResult = runTest(fetchSensitiveFilesViaSSRF, apiInfoKey, testingUtil, testRunId, testRunResultSummaryId);
+        //     if (fetchSensitiveFilesViaSSRFResult != null) testingRunResults.add(fetchSensitiveFilesViaSSRFResult);
+        // }
 
         return testingRunResults;
     }

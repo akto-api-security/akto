@@ -56,61 +56,61 @@ public class TestingIssuesHandlerTest extends MongoBasedTest {
                 summaryId);
     }
 
-    @Test
-    public void testHandler() {
-//        TestingRunIssuesDao.instance.getMCollection().drop();
-//        TestSourceConfigsDao.instance.getMCollection().drop();
-//
-//        String testSourceString = "https://custom-test.akto.io";
-//
-//        TestSourceConfigsDao.instance.insertOne(
-//                new TestSourceConfig(
-//                        testSourceString, GlobalEnums.TestCategory.BOLA, "fuzzing", GlobalEnums.Severity.HIGH,
-//                        "", "", Context.now()
-//                )
-//        );
-//
-//        List<TestingRunResult> testingRunResultList = new ArrayList<>();
-//        Random random = new Random();
-//        for (int i = 0; i < 100; i++) {
-//            int COLLECTION_ID = 123;
-//            String testSubType = GlobalEnums.TestSubCategory.getValuesArray()[getIndex(GlobalEnums.TestSubCategory.getValuesArray().length, random)].getName();
-//            // string comparison (nuclei test)
-//            if (testSubType.equals(GlobalEnums.TestSubCategory.CUSTOM_IAM.name())) {
-//                testSubType = testSourceString;
-//            }
-//            testingRunResultList.add(getTestingRunResult(new ApiInfo.ApiInfoKey(COLLECTION_ID, urls[getIndex(urls.length,random)],
-//                            URLMethods.Method.getValuesArray()[getIndex(URLMethods.Method.getValuesArray().length,random)]),
-//                    testSubType, random));
-//        }
-//
-//        TestingIssuesHandler handler = new TestingIssuesHandler();
-//        handler.handleIssuesCreationFromTestingRunResults(testingRunResultList);
-//
-//        TestingRunIssues issues = TestingRunIssuesDao.instance.findOne(new BasicDBObject());
-//        issues.setTestRunIssueStatus(GlobalEnums.TestRunIssueStatus.IGNORED);
-//        TestingRunIssuesDao.instance.replaceOne(new BasicDBObject(ID, issues.getId()),issues);
-//
-//        handler.handleIssuesCreationFromTestingRunResults(testingRunResultList);
-//
-//        TestingRunIssues issuesReturned = TestingRunIssuesDao.instance.findOne(Filters.eq(ID, issues.getId()));
-//
-//        assertEquals(GlobalEnums.TestRunIssueStatus.IGNORED, issuesReturned.getTestRunIssueStatus());
-//
-//        TestingRunResult runResult = testingRunResultList.get(5);
-//        runResult.setVulnerable(false);
-//        handler.handleIssuesCreationFromTestingRunResults(testingRunResultList);
-//
-//        issues = TestingRunIssuesDao.instance.findOne(Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.FIXED));
-//        assertNotNull(issues);
-//        //When all said and done, total issue can't be more than 36
-//
-//        int size = TestingRunIssuesDao.instance.findAll(new BasicDBObject()).size();
-//        assertTrue(size <=
-//                urls.length
-//                        * URLMethods.Method.getValuesArray().length
-//                        * GlobalEnums.TestSubCategory.getValuesArray().length
-//        );
+//     @Test
+//     public void testHandler() {
+//         TestingRunIssuesDao.instance.getMCollection().drop();
+//         TestSourceConfigsDao.instance.getMCollection().drop();
 
-    }
+//         String testSourceString = "https://custom-test.akto.io";
+
+//         TestSourceConfigsDao.instance.insertOne(
+//                 new TestSourceConfig(
+//                         testSourceString, GlobalEnums.TestCategory.BOLA, "fuzzing", GlobalEnums.Severity.HIGH,
+//                         "", "", Context.now(), new ArrayList<>()
+//                 )
+//         );
+
+//         List<TestingRunResult> testingRunResultList = new ArrayList<>();
+//         Random random = new Random();
+//         for (int i = 0; i < 100; i++) {
+//             int COLLECTION_ID = 123;
+//             String testSubType = GlobalEnums.TestSubCategory.getValuesArray()[getIndex(GlobalEnums.TestSubCategory.getValuesArray().length, random)].getName();
+//            String testSubType = GlobalEnums.TestSubCategory.getValuesArray()[getIndex(GlobalEnums.TestSubCategory.getValuesArray().length, random)].getName();
+//             if (testSubType.equals(GlobalEnums.TestSubCategory.CUSTOM_IAM.name())) {
+//                 testSubType = testSourceString;
+//             }
+//             testingRunResultList.add(getTestingRunResult(new ApiInfo.ApiInfoKey(COLLECTION_ID, urls[getIndex(urls.length,random)],
+//                             URLMethods.Method.getValuesArray()[getIndex(URLMethods.Method.getValuesArray().length,random)]),
+//                     testSubType, random));
+//         }
+
+//         TestingIssuesHandler handler = new TestingIssuesHandler();
+//         handler.handleIssuesCreationFromTestingRunResults(testingRunResultList);
+
+//         TestingRunIssues issues = TestingRunIssuesDao.instance.findOne(new BasicDBObject());
+//         issues.setTestRunIssueStatus(GlobalEnums.TestRunIssueStatus.IGNORED);
+//         TestingRunIssuesDao.instance.replaceOne(new BasicDBObject(ID, issues.getId()),issues);
+
+//         handler.handleIssuesCreationFromTestingRunResults(testingRunResultList);
+
+//         TestingRunIssues issuesReturned = TestingRunIssuesDao.instance.findOne(Filters.eq(ID, issues.getId()));
+
+//         assertEquals(GlobalEnums.TestRunIssueStatus.IGNORED, issuesReturned.getTestRunIssueStatus());
+
+//         TestingRunResult runResult = testingRunResultList.get(5);
+//         runResult.setVulnerable(false);
+//         handler.handleIssuesCreationFromTestingRunResults(testingRunResultList);
+
+//         issues = TestingRunIssuesDao.instance.findOne(Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.FIXED));
+//         assertNotNull(issues);
+//         //When all said and done, total issue can't be more than 36
+
+//         int size = TestingRunIssuesDao.instance.findAll(new BasicDBObject()).size();
+//         assertTrue(size <=
+//                 urls.length
+//                         * URLMethods.Method.getValuesArray().length
+//                         * GlobalEnums.TestSubCategory.getValuesArray().length
+//         );
+
+//     }
 }
