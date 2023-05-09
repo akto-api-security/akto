@@ -1,4 +1,4 @@
-id: ADD_METHOD_IN_PARAMETER
+id: ADD_PATCH_METHOD_IN_PARAMETER
 info:
   name: "BFLA by HTTP verb tunneling by adding method param"
   description: "Attacker can access resources of any user by replacing method of the endpoint (eg: changemethod from get to post). This way attacker can get access to unauthorized endpoints."
@@ -14,7 +14,7 @@ info:
     name: BFLA
     shortName: Broken Function Level Authorization
     displayName: Broken Function Level Authorization (BFLA)
-  subCategory: ADD_METHOD_IN_PARAMETER
+  subCategory: ADD_PATCH_METHOD_IN_PARAMETER
   severity: HIGH
   tags: 
     - Business logic
@@ -30,13 +30,13 @@ api_selection_filters:
     gte: 200
     lt: 300
   method:
-    neq: POST
+    neq: PATCH
 execute:
   type: single
   requests:
     - req:
       - add_query_param:
-          method: POST
+          method: PATCH
 validate:
   response_code:
     gte: 200

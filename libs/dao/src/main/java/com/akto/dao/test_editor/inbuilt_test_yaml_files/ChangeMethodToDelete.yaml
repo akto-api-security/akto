@@ -1,6 +1,6 @@
-id: CHANGE_METHOD
+id: CHANGE_METHOD_TO_DELETE
 info:
-  name: CHANGE_METHOD
+  name: CHANGE_METHOD_TO_DELETE
   description: "Attacker can access resources of any user by replacing method of the endpoint (eg: changemethod from get to post). This way attacker can get access to unauthorized endpoints."
   details: "The endpoint appears to be vulnerable to broken function level authorization attack. The original request was modified by changing the HTTP methods and sent to application server. The server responded with 2XX success codes."
   impact: "An attacker can perform sensitive actions (e.g., creation, modification, or erasure) that they should not have access to by simply changing the HTTP method."
@@ -8,7 +8,7 @@ info:
     name: BFLA
     shortName: Broken Function Level Authorization
     displayName: Broken Function Level Authorization (BFLA)
-  subCategory: CHANGE_METHOD
+  subCategory: CHANGE_METHOD_TO_DELETE
   severity: HIGH
   tags:
     - Business logic
@@ -23,13 +23,15 @@ api_selection_filters:
     gte: 200
     lt: 300
   method:
-    neq: POST
+    neq: DELETE
 execute:
   type: single
   requests:
     - req:
-        - modify_method: POST
+        - modify_method: DELETE
 validate:
   response_code:
     gte: 200
     lt: 300
+  length:
+    gt: 0

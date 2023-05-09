@@ -1,0 +1,37 @@
+id: CHANGE_METHOD_TO_PATCH
+info:
+  name: CHANGE_METHOD_TO_PATCH
+  description: "Attacker can access resources of any user by replacing method of the endpoint (eg: changemethod from get to post). This way attacker can get access to unauthorized endpoints."
+  details: "The endpoint appears to be vulnerable to broken function level authorization attack. The original request was modified by changing the HTTP methods and sent to application server. The server responded with 2XX success codes."
+  impact: "An attacker can perform sensitive actions (e.g., creation, modification, or erasure) that they should not have access to by simply changing the HTTP method."
+  category:
+    name: BFLA
+    shortName: Broken Function Level Authorization
+    displayName: Broken Function Level Authorization (BFLA)
+  subCategory: CHANGE_METHOD_TO_PATCH
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management_Testing/06-Test_HTTP_Methods"
+    - "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa5-broken-function-level-authorization.md"
+    - "https://cwe.mitre.org/data/definitions/285.html"
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  method:
+    neq: PATCH
+execute:
+  type: single
+  requests:
+    - req:
+        - modify_method: PATCH
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  length:
+    gt: 0

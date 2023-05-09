@@ -33,7 +33,7 @@ execute:
   type: single
   requests:
     - req:
-        - remove_auth_headers: true
+        - remove_auth_header: true
 
 validate:
   response_code:
