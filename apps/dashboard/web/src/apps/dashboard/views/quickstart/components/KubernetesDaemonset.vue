@@ -4,7 +4,7 @@
     <div v-else class="lb_dropdown">
         <div v-if="isLocalDeploy">
             <div>
-                Use Kubernetes based agent deployment to send traffic to Akto.
+                Use Kubernetes based traffic collector to send traffic to Akto.
                 <div v-if="!isLocalDeploy"><a  class="clickable-docs" _target="blank" href="https://docs.akto.io/">Know more</a></div>
             </div>
             <banner-horizontal class="mt-3">
@@ -455,8 +455,11 @@ export default {
             else if (stackState.status == 'CREATION_FAILED') {
                 this.removeProgressBarAndStatuschecks(intervalId);
                 this.text_msg = 'Current deployment is getting deleted, please refresh this page in sometime.';
-            } 
-            else {
+            }
+            else if (stackState.status == 'TEMP_DISABLE') {
+                this.removeProgressBarAndStatuschecks(intervalId);
+                this.text_msg = 'Current deployment is in progress, please refresh this page in sometime.';
+            } else {
                 this.removeProgressBarAndStatuschecks(intervalId);
                 this.text_msg = 'Something went wrong while setting up daemonset stack, please write to us at support@akto.io'
             }
@@ -480,7 +483,7 @@ export default {
         createKubernetesStack(){
             this.createStackClicked = true
             this.text_msg = "Starting deployment!!!";
-            api.createKubernetesStack().then((resp) => {
+            api.createRuntimeStack(this.deploymentMethod).then((resp) => {
                 this.checkStackState();
             })
         }

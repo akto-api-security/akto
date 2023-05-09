@@ -12,6 +12,7 @@ import Postman from "../apps/dashboard/shared/icons/Postman"
 import AWS from "../apps/dashboard/shared/icons/AWS"
 import GCP from "../apps/dashboard/shared/icons/GCP"
 import k8s from '../apps/dashboard/shared/icons/k8s'
+import FargateIcon from '../apps/dashboard/shared/icons/FargateIcon'
 import Swagger from "../apps/dashboard/shared/icons/Swagger"
 import Restapi from "../apps/dashboard/shared/icons/Restapi"
 import CustomWebhooks from "../apps/dashboard/shared/icons/CustomWebhooks"
@@ -225,6 +226,10 @@ faIconsOpts.aws = {
 
 faIconsOpts.k8s = {
   component: k8s
+}
+
+faIconsOpts.fargateIcon = {
+  component: FargateIcon
 }
 
 faIconsOpts.swagger = {

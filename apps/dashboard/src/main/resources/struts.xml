@@ -1488,7 +1488,7 @@
             </result>
         </action>
 
-        <action name="api/createKubernetesStack" class="com.akto.action.quick_start.QuickStartAction" method="createKubernetesStack">
+        <action name="api/createRuntimeStack" class="com.akto.action.quick_start.QuickStartAction" method="createRuntimeStack">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>

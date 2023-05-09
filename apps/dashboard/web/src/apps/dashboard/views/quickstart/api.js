@@ -113,11 +113,11 @@ export default{
             return resp
         })
     },
-    createKubernetesStack() {
+    createRuntimeStack(deploymentMethod) {
         return request({
-            url: '/api/createKubernetesStack',
+            url: '/api/createRuntimeStack',
             method: 'post',
-            data: {}
+            data: {deploymentMethod}
         }).then((resp) => {
             return resp
         })

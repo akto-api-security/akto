@@ -22,6 +22,7 @@
 import DetailExpansionPanel from './DetailExpansionPanel'
 import AwsTrafficMirroring from './AwsTrafficMirroring'
 import KubernetesDaemonset from './KubernetesDaemonset'
+import Fargate from './Fargate'
 import GcpTrafficMirroring from './GcpTrafficMirroring'
 import BurpsuiteSource from './BurpsuiteSource'
 import PostmanSource from './PostmanSource'
@@ -39,7 +40,8 @@ export default {
         BurpsuiteSource,
         PostmanSource,
         Spinner,
-        KubernetesDaemonset
+        KubernetesDaemonset,
+        Fargate
     },
     data() {
         return {
@@ -54,11 +56,19 @@ export default {
                     detailComponent: 'AwsTrafficMirroring',
                     connected: "More"
                 },
+                "DATA_PROCESSORS": {
+                    icon: "$fargateIcon",
+                    key: "DATA_PROCESSORS",
+                    title: "Data processors",
+                    subtitle: '',
+                    detailComponent: 'Fargate',
+                    connected: "More"
+                },
                 "KUBERNETES": {
                     icon: "$k8s",
                     key: "KUBERNETES",
                     title: "Kubernetes Daemonset",
-                    subtitle: 'Recommended',
+                    subtitle: '',
                     detailComponent: 'KubernetesDaemonset',
                     connected: "More"
                 },
@@ -94,9 +104,9 @@ export default {
         getSourcesInOrder(){
             let order = []
             if (window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'){
-                order = ['BURP', 'POSTMAN','AWS','GCP', 'KUBERNETES']
+                order = ['BURP', 'POSTMAN','AWS','GCP', 'KUBERNETES', 'DATA_PROCESSORS']
             } else {
-                order = [ 'AWS','KUBERNETES', 'BURP', 'POSTMAN', 'GCP']
+                order = [ 'AWS','KUBERNETES', 'DATA_PROCESSORS', 'BURP', 'POSTMAN', 'GCP']
             }
             let final_order = []
             order.forEach(item => {

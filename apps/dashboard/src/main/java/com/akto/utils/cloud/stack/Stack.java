@@ -15,7 +15,7 @@ public interface Stack {
 
     public enum StackStatus {
         DOES_NOT_EXISTS, CREATE_IN_PROGRESS, FAILED_TO_INITIALIZE, CREATION_FAILED, CREATE_COMPLETE,
-        FAILED_TO_FETCH_STACK_STATUS;
+        FAILED_TO_FETCH_STACK_STATUS, TEMP_DISABLE;
     }
 
     public String fetchResourcePhysicalIdByLogicalId(String stackName, String logicalId);
