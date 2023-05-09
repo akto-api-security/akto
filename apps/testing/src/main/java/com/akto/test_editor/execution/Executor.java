@@ -18,6 +18,7 @@ import com.akto.testing.ApiExecutor;
 import com.mongodb.client.model.Filters;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.test_editor.Utils;
 
 public class Executor {
 
@@ -72,13 +73,15 @@ public class Executor {
         }
         Boolean followRedirect = true;
         if (childNodes.size() == 0) {
-            String key = node.getOperationType();
+            Object key = node.getOperationType();
             Object value = node.getValues();
             if (node.getNodeType().equalsIgnoreCase(ExecutorOperandTypes.Terminal.toString())) {
                 if (node.getValues() instanceof Boolean) {
                     key = Boolean.toString((Boolean) node.getValues());
-                } else {
+                } else if (node.getValues() instanceof String) {
                     key = (String) node.getValues();
+                } else {
+                    key = (Map) node.getValues();
                 }
                 value = null;
             }
@@ -102,7 +105,7 @@ public class Executor {
 
     }
 
-    public ExecutorSingleOperationResp invokeOperation(String operationType, String key, Object value, RawApi rawApi, Map<String, Object> varMap) {
+    public ExecutorSingleOperationResp invokeOperation(String operationType, Object key, Object value, RawApi rawApi, Map<String, Object> varMap) {
         try {
 
             if (key == null) {
@@ -110,7 +113,7 @@ public class Executor {
             }
             Object keyContext = null, valContext = null;
             if (key instanceof String) {
-                keyContext = VariableResolver.resolveContextKey(varMap, key);
+                keyContext = VariableResolver.resolveContextKey(varMap, key.toString());
             }
             if (value instanceof String) {
                 valContext = VariableResolver.resolveContextVariable(varMap, value.toString());
@@ -131,7 +134,7 @@ public class Executor {
             }
 
             if (key instanceof String) {
-                key = VariableResolver.resolveExpression(varMap, key);
+                key = VariableResolver.resolveExpression(varMap, key.toString());
             }
 
             if (value instanceof String) {
@@ -146,41 +149,52 @@ public class Executor {
         
     }
     
-    public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, String key, Object value, Map<String, Object> varMap) {
+    public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap) {
         switch (operationType.toLowerCase()) {
             case "add_body_param":
-                return Operations.addBody(rawApi, key, value);
+                return Operations.addBody(rawApi, key.toString(), value);
             case "modify_body_param":
-                return Operations.modifyBodyParam(rawApi, key, value);
+                return Operations.modifyBodyParam(rawApi, key.toString(), value);
             case "delete_body_param":
-                return Operations.deleteBodyParam(rawApi, key);
+                return Operations.deleteBodyParam(rawApi, key.toString());
             case "add_header":
-                return Operations.addHeader(rawApi, key, value.toString());
+                return Operations.addHeader(rawApi, key.toString(), value.toString());
             case "modify_header":
-                return Operations.modifyHeader(rawApi, key, value.toString());
+                return Operations.modifyHeader(rawApi, key.toString(), value.toString());
             case "delete_header":
-                return Operations.deleteHeader(rawApi, key);
+                return Operations.deleteHeader(rawApi, key.toString());
             case "add_query_param":
-                return Operations.addQueryParam(rawApi, key, value);
+                return Operations.addQueryParam(rawApi, key.toString(), value);
             case "modify_query_param":
-                return Operations.modifyQueryParam(rawApi, key, value);
+                return Operations.modifyQueryParam(rawApi, key.toString(), value);
             case "delete_query_param":
-                return Operations.deleteQueryParam(rawApi, key);
+                return Operations.deleteQueryParam(rawApi, key.toString());
             case "modify_url":
-                // read regex block
-                return Operations.modifyUrl(rawApi, key);
+                String newUrl = null;
+                if (key instanceof Map) {
+                    Map<String, Map<String, String>> regexReplace = (Map) key;
+                    String url = rawApi.getRequest().getUrl();
+                    Map<String, String> regexInfo = regexReplace.get("regex_replace");
+                    String regex = regexInfo.get("regex");
+                    String replaceWith = regexInfo.get("replace_with");
+                    newUrl = Utils.applyRegexModifier(url, regex, replaceWith);
+                }
+                return Operations.modifyUrl(rawApi, newUrl);
             case "modify_method":
-                return Operations.modifyMethod(rawApi, key);
-            case "remove_auth_headers":
+                return Operations.modifyMethod(rawApi, key.toString());
+            case "remove_auth_header":
                 List<String> authHeaders = (List<String>) varMap.get("auth_headers");
                 for (String header: authHeaders) {
                     Operations.deleteHeader(rawApi, header);
                 }
                 return new ExecutorSingleOperationResp(true, "");
-            case "replace_auth_headers":
+            case "replace_auth_header":
                 authHeaders = (List<String>) varMap.get("auth_headers");
                 String authHeader;
-                if (authHeaders.size() == 0 || authHeaders.size() > 1) {
+                if (authHeaders == null) {
+                    return new ExecutorSingleOperationResp(false, "auth headers missing from var map");
+                }
+                if (authHeaders.size() == 0 || authHeaders.size() > 1){
                     AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(Filters.eq("type", "HARDCODED"));
                     if (authMechanism == null || authMechanism.getAuthParams() == null || authMechanism.getAuthParams().size() == 0) {
                         return new ExecutorSingleOperationResp(false, "auth headers missing");
@@ -192,7 +206,7 @@ public class Executor {
 
                 String authVal;
                 if (VariableResolver.isAuthContext(key)) {
-                    authVal = VariableResolver.resolveAuthContext(key, rawApi.getRequest().getHeaders(), authHeader);
+                    authVal = VariableResolver.resolveAuthContext(key.toString(), rawApi.getRequest().getHeaders(), authHeader);
                 } else {
                     AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(Filters.eq("type", "HARDCODED"));
                     if (authMechanism == null || authMechanism.getAuthParams() == null || authMechanism.getAuthParams().size() == 0) {

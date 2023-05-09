@@ -24,21 +24,22 @@ info:
   references:
     - "https://redhuntlabs.com/a-practical-guide-to-attack-jwt-json-web-token"
     - "https://portswigger.net/kb/issues/00200901_jwt-none-algorithm-supported"
-api_selection_filters:
-  auth:
+auth:
     authenticated: true
+api_selection_filters:
   response_code:
     gte: 200
     lt: 300
   request_headers:
-    contains_jwt: true
+    for_one:
+      value:
+        contains_jwt: true
 execute:
   type: single
   requests:
     - req:
-        replace_auth_headers: ${auth_context.none_algo_token}
+        replace_auth_header: ${auth_context.none_algo_token}
 validate:
   response_code:
     gte: 200
     lt: 300
-
