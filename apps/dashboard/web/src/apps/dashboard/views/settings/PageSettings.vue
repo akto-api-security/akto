@@ -64,6 +64,9 @@
         <template slot="Health">
             <health :defaultStartTimestamp="defaultStartTimestamp" :defaultEndTimestamp="defaultEndTimestamp"/>
         </template>
+        <template slot="Metrics">
+            <traffic-metrics/>
+        </template>
     </layout-with-tabs>
 </template>
 
@@ -80,6 +83,7 @@ import TagConfigDetails from './components/tag_configs/TagConfigDetails.vue'
 import ACard from '@/apps/dashboard/shared/components/ACard'
 import IntegrationCenter from './components/integrations/IntegrationCenter'
 import AuthTypeDetails from './components/auth_types/AuthTypeDetails.vue'
+import TrafficMetrics from './components/traffic_metrics/TrafficMetrics.vue'
 import obj from "@/util/obj"
 
 import { mapState } from 'vuex'
@@ -96,7 +100,8 @@ export default {
         TagConfigDetails,
         DataTypeDetails,
         AuthTypeDetails,
-        ACard
+        ACard,
+        TrafficMetrics
     },
     props:{
         defaultStartTimestamp: obj.strN,
@@ -156,7 +161,7 @@ export default {
           else if(window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'){
             return ['Data types','Auth types', 'Tags', 'Users', 'Health' ,'Integrations'];
           }
-          return ['Data types','Auth types', 'Tags', 'Account', 'Users', 'Health', 'Integrations'];
+          return ['Data types','Auth types', 'Tags', 'Account', 'Users', 'Health', 'Integrations', 'Metrics'];
         }
     },
     computed: {

@@ -12,7 +12,6 @@
                 @rowClicked=rowClicked
                 hide-default-footer ="true"
                 :hideDownloadCSVIcon="true"
-                :hideMoreActions="true"
             >
                 <template v-slot:add-new-row-btn="{}">
                     <div class="clickable download-csv d-flex">
@@ -160,9 +159,7 @@ export default {
         deleteCollection(item) {
             this.deletedCollection = item.name
             if(confirm("Are you sure you want to delete this collection?")) {
-                const summ = this.$store.dispatch('collections/deleteCollection', {apiCollection: item})
-                console.log(summ)
-                return summ
+                return this.$store.dispatch('collections/deleteCollection', {apiCollection: item})
             }
         },
         successfullyDeleted(resp,item) {
@@ -253,9 +250,9 @@ export default {
             })
         }
     },
-    mounted () {
+    async mounted () {
         let now = func.timeNow()
-        this.$store.dispatch('testing/loadTestingDetails', {startTimestamp: now - func.recencyPeriod, endTimestamp: now})
+        await this.$store.dispatch('testing/loadTestingDetails', {startTimestamp: now - func.recencyPeriod, endTimestamp: now})
         this.$emit('mountedView', {type: 0})
     }
 }

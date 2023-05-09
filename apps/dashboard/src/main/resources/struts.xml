@@ -509,16 +509,6 @@
             </result>
         </action>
 
-        <action name="api/addBurpToken" class="com.akto.action.ApiTokenAction" method="addBurpToken">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS"  type="json">
-            </result>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
-            </result>
-        </action>
-
         <action name="api/addSlackWebhook" class="com.akto.action.ApiTokenAction" method="addSlackWebhook">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -539,7 +529,7 @@
             </result>
         </action>
 
-        <action name="api/addExternalApiToken" class="com.akto.action.ApiTokenAction" method="addExternalApiToken">
+        <action name="api/addApiToken" class="com.akto.action.ApiTokenAction" method="addApiToken">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS"  type="json">
@@ -929,6 +919,17 @@
         </action>
 
         <action name="api/updateSetupType" class="com.akto.action.AdminSettingsAction" method="updateSetupType">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/toggleNewMergingEnabled" class="com.akto.action.AdminSettingsAction" method="toggleNewMergingEnabled">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
@@ -1505,6 +1506,19 @@
             </result>
         </action>
 
+        <action name="api/fetchSearchTestResults" class="com.akto.action.testing.MarketplaceAction" method="searchTestResults">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="enumAsBean">true</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchBurpPluginInfo" class="com.akto.action.BurpJarAction" method="fetchBurpPluginInfo">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -1518,7 +1532,9 @@
         <action name="api/fetchTestingSources" class="com.akto.action.testing.MarketplaceAction" method="fetchTestingSources">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="enumAsBean">true</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -1605,6 +1621,98 @@
             <result name="SUCCESS" type="json">
                 <param name="enumAsBean">true</param>
             </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/ask_ai" class="com.akto.action.gpt.GptAction" method="askAi">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchAktoGptConfig" class="com.akto.action.gpt.GptConfigAction" method="fetchAktoGptConfig">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/saveAktoGptConfig" class="com.akto.action.gpt.GptConfigAction" method="saveAktoGptConfig">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchTrafficMetrics" class="com.akto.action.traffic_metrics.TrafficMetricsAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+                
+        <action name="api/fetchTrafficMetricsDesciptions" class="com.akto.action.traffic_metrics.TrafficMetricsAction" method="fetchTrafficMetricsDesciptions">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="enumAsBean">true</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/importDataFromPostmanFile" class="com.akto.action.PostmanAction" method="importDataFromPostmanFile">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchActiveLoaders" class="com.akto.action.LoadersAction" method="fetchActiveLoaders">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="enumAsBean">true</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/closeLoader" class="com.akto.action.LoadersAction" method="closeLoader">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>

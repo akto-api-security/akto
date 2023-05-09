@@ -21,8 +21,10 @@ public class ApiToken {
     public enum Utility{
         BURP(Arrays.asList("/api/uploadHar", "/api/importInBurp", "/api/sendHealthCheck")),
         EXTERNAL_API(Collections.singletonList(FULL_STRING_ALLOWED_API)),
-        SLACK(Collections.emptyList());
-
+        SLACK(Collections.emptyList()),
+        CICD(Arrays.asList("/api/startTest", "api/retrieveAllCollectionTests", "api/fetchTestingRunResultSummaries", 
+        "api/fetchTestingRunResults","api/fetchWorkflowTestingRun","api/fetchWorkflowTestingSchedule",
+        "api/stopAllTests","api/fetchTestRunResultDetails","api/fetchIssueFromTestRunResultDetails"));
         private final List<String> accessList;
 
         Utility(List<String> accessList) {
