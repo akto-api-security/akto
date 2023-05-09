@@ -27,14 +27,16 @@ info:
   references:
     - "https://redhuntlabs.com/a-practical-guide-to-attack-jwt-json-web-token"
     - "https://portswigger.net/web-security/jwt/lab-jwt-authentication-bypass-via-jku-header-injection"
-api_selection_filters:
-  auth:
+auth:
     authenticated: true
+api_selection_filters:
   response_code:
     gte: 200
     lt: 300
   request_headers:
-    contains_jwt: true
+    for_one:
+      value:
+        contains_jwt: true
 execute:
   type: single
   requests:
