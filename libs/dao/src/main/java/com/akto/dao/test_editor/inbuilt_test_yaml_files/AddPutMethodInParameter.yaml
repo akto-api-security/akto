@@ -1,6 +1,6 @@
 id: ADD_PUT_METHOD_IN_PARAMETER
 info:
-  name: "BFLA by HTTP verb tunneling by adding method param"
+  name: "BFLA by HTTP verb tunneling by adding PUT method param"
   description: "Attacker can access resources of any user by replacing method of the endpoint (eg: changemethod from get to post). This way attacker can get access to unauthorized endpoints."
   details: >
             "The endpoint appears to be vulnerable to broken object level authorization attack. The original request
