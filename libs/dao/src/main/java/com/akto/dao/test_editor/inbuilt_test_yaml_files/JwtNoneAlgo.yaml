@@ -36,9 +36,8 @@ execute:
   type: single
   requests:
     - req:
-        replace_auth_headers: ${auth_context.none_algo_token}
+        replace_auth_header: ${auth_context.none_algo_token}
 validate:
   response_code:
     gte: 200
     lt: 300
-

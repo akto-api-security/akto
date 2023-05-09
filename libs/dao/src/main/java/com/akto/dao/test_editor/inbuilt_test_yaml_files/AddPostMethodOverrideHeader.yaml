@@ -1,4 +1,4 @@
-id: ADD_METHOD_OVERRIDE_HEADERS
+id: ADD_POST_METHOD_OVERRIDE_HEADERS
 info:
   name: "BFLA by HTTP method overriding"
   description: "Attacker can access resources of any user by replacing method of the endpoint (eg: changemethod from get to post). This way attacker can get access to unauthorized endpoints."
@@ -14,7 +14,7 @@ info:
     name: BFLA
     shortName: Broken Function Level Authorization
     displayName: Broken Function Level Authorization (BFLA)
-  subCategory: ADD_METHOD_OVERRIDE_HEADERS
+  subCategory: ADD_POST_METHOD_OVERRIDE_HEADERS
   severity: HIGH
   tags: 
     - Business logic
@@ -47,3 +47,5 @@ validate:
   response_payload:
     percentage_match:
       lt: 30
+    length:
+      gt: 0

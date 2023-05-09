@@ -72,6 +72,8 @@ public final class FilterAction {
                 return evaluatePrivateVariables(filterActionRequest);
             case "param_context":
                 return evaluateParamContext(filterActionRequest);
+            case "endpoint_in_traffic_context":
+                return endpointInTraffic(filterActionRequest);
             default:
                 return new DataOperandsFilterResponse(false, null, null);
         }
@@ -927,6 +929,21 @@ public final class FilterAction {
 
         return new DataOperandsFilterResponse(paramValues.size() > 0, null, paramValues);
 
+    }
+
+    public DataOperandsFilterResponse endpointInTraffic(FilterActionRequest filterActionRequest) {
+        ApiInfo.ApiInfoKey apiInfoKey = filterActionRequest.getApiInfoKey();
+
+        List<Boolean> querySet = (List) filterActionRequest.getQuerySet();
+        Boolean shouldBePresent = (Boolean) querySet.get(0);
+
+        Bson filters = Filters.and(
+            Filters.eq("apiCollectionId", apiInfoKey.getApiCollectionId()),
+            Filters.regex("url", filterActionRequest.getTestRunRawApi().getRequest().getUrl()),
+            Filters.eq("method", apiInfoKey.getMethod())
+        );
+        SingleTypeInfo singleTypeInfo = SingleTypeInfoDao.instance.findOne(filters);
+        return new DataOperandsFilterResponse(singleTypeInfo != null && shouldBePresent, null, null);
     }
 
     public List<BasicDBObject> getPrivateResourceCount(OriginalHttpRequest originalHttpRequest, ApiInfo.ApiInfoKey apiInfoKey) {

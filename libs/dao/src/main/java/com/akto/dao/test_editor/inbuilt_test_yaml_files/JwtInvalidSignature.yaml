@@ -37,7 +37,7 @@ execute:
   type: single
   requests:
     - req:
-        replace_auth_headers: ${auth_context.invalid_signature_token}
+        replace_auth_header: ${auth_context.invalid_signature_token}
 validate:
   response_code:
     gte: 200
