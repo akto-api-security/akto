@@ -25,3 +25,25 @@ info:
     - "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa5-broken-function-level-authorization.md"
     - "https://cwe.mitre.org/data/definitions/285.html"
 api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  method:
+    neq: POST
+execute:
+  type: single
+  requests:
+    - req:
+      - add_header:
+          x-http-method: POST
+      - add_header:
+          x-http-method-override: POST
+      - add_header:
+          x-method-override: POST
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_payload:
+    percentage_match:
+      lt: 30
