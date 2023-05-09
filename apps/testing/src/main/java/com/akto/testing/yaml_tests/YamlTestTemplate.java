@@ -82,7 +82,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
                 loggerMaker.infoAndAddToDb("found vulnerable " + logId, LogDb.TESTING);
             }
             double percentageMatch = TestPlugin.compareWithOriginalResponse(
-                    this.rawApi.getOriginalMessage(), testRawApi.getOriginalMessage(), new HashMap<>()
+                    this.rawApi.getResponse().getBody(), testRawApi.getResponse().getBody(), new HashMap<>()
             );
 
             // todo: fix errors

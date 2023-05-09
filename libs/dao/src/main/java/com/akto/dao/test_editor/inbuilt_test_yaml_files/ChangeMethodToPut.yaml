@@ -28,7 +28,7 @@ execute:
   type: single
   requests:
     - req:
-        - modify_method: PUt
+        - modify_method: PUT
 validate:
   response_code:
     gte: 200
