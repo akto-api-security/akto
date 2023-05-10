@@ -923,7 +923,7 @@ public final class FilterAction {
                 boolean exists = paramExists(filterActionRequest.getRawApi(), key, val);
                 if (!exists && val != null && val.length() > 0) {
                     BasicDBObject obj = new BasicDBObject();
-                    obj.put("key", singleTypeInfo.getParam());
+                    obj.put("key", key);
                     obj.put("value", val);
                     paramValues.add(obj);
                     break;
