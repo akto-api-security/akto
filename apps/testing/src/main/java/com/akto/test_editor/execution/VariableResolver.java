@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.akto.dto.type.KeyTypes;
 import com.akto.util.modifier.AddJkuJWTModifier;
 import com.akto.util.modifier.InvalidSignatureJWTModifier;
 import com.akto.util.modifier.NoneAlgoJWTModifier;
@@ -174,24 +175,31 @@ public class VariableResolver {
         }
 
         String headerVal = headers.get(headerKey).get(0);
+
+        String[] splitValue = headerVal.toString().split(" ");
         String modifiedHeaderVal = null;
 
-        if (secondParam.equalsIgnoreCase("none_algo_token")) {
-            NoneAlgoJWTModifier noneAlgoJWTModifier = new NoneAlgoJWTModifier("none");
-            try {
-                modifiedHeaderVal = noneAlgoJWTModifier.jwtModify("", headerVal);
-            } catch(Exception e) {
-                return null;
+        for (String val: splitValue) {
+            if (!KeyTypes.isJWT(val)) {
+                continue;
             }
-        } else if (secondParam.equalsIgnoreCase("invalid_signature_token")) {
-            InvalidSignatureJWTModifier invalidSigModified = new InvalidSignatureJWTModifier();
-            modifiedHeaderVal = invalidSigModified.jwtModify("", headerVal);
-        } else if (secondParam.equalsIgnoreCase("jku_added_token")) {
-            AddJkuJWTModifier addJkuJWTModifier = new AddJkuJWTModifier();
-            try {
-                modifiedHeaderVal = addJkuJWTModifier.jwtModify("", headerVal);
-            } catch(Exception e) {
-                return null;
+            if (secondParam.equalsIgnoreCase("none_algo_token")) {
+                NoneAlgoJWTModifier noneAlgoJWTModifier = new NoneAlgoJWTModifier("none");
+                try {
+                    modifiedHeaderVal = noneAlgoJWTModifier.jwtModify("", val);
+                } catch(Exception e) {
+                    return null;
+                }
+            } else if (secondParam.equalsIgnoreCase("invalid_signature_token")) {
+                InvalidSignatureJWTModifier invalidSigModified = new InvalidSignatureJWTModifier();
+                modifiedHeaderVal = invalidSigModified.jwtModify("", val);
+            } else if (secondParam.equalsIgnoreCase("jku_added_token")) {
+                AddJkuJWTModifier addJkuJWTModifier = new AddJkuJWTModifier();
+                try {
+                    modifiedHeaderVal = addJkuJWTModifier.jwtModify("", val);
+                } catch(Exception e) {
+                    return null;
+                }
             }
         }
         

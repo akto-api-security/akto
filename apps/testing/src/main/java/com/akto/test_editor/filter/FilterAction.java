@@ -889,10 +889,12 @@ public final class FilterAction {
     public DataOperandsFilterResponse evaluateParamContext(FilterActionRequest filterActionRequest) {
 
         ApiInfo.ApiInfoKey apiInfoKey = filterActionRequest.getApiInfoKey();
-        OriginalHttpRequest request = filterActionRequest.getRawApi().getRequest();
 
         List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
-        String param = querySet.get(0).trim();
+        if (querySet.get(0) == null) {
+            return new DataOperandsFilterResponse(false, null, null);
+        }
+        String param = querySet.get(0).toString().trim();
 
         Bson filter = Filters.and(
             Filters.eq("apiCollectionId", apiInfoKey.getApiCollectionId()),
@@ -912,11 +914,16 @@ public final class FilterAction {
             Set<String> valSet  = singleTypeInfo.getValues() != null ? singleTypeInfo.getValues().getElements() : new HashSet<>();
             if (valSet == null) continue;
 
+            String key = SingleTypeInfo.findLastKeyFromParam(singleTypeInfo.getParam());
+            if (key == null || !Utils.checkIfContainsMatch(key, param)) {
+                continue;
+            }
+
             for (String val: valSet) {
-                boolean exists = paramExists(filterActionRequest.getRawApi(), singleTypeInfo.getParam(), val);
+                boolean exists = paramExists(filterActionRequest.getRawApi(), key, val);
                 if (!exists && val != null && val.length() > 0) {
                     BasicDBObject obj = new BasicDBObject();
-                    obj.put("key", param);
+                    obj.put("key", singleTypeInfo.getParam());
                     obj.put("value", val);
                     paramValues.add(obj);
                     break;
@@ -968,7 +975,7 @@ public final class FilterAction {
                     String val = valSet.iterator().next();
                     obj.put("key", i+"");
                     obj.put("value", val);
-                    if (privateValues.size() <= 5) {
+                    if (privateValues.size() < 5) {
                         privateValues.add(obj);
                     }
                 }
@@ -988,7 +995,7 @@ public final class FilterAction {
             String val = valSet.iterator().next();
             obj.put("key", param);
             obj.put("value", val);
-            if (privateValues.size() <= 5) {
+            if (privateValues.size() < 5) {
                 privateValues.add(obj);
             }
         }
@@ -1055,10 +1062,19 @@ public final class FilterAction {
 
     public static SingleTypeInfo querySti(String param, boolean isUrlParam, ApiInfo.ApiInfoKey apiInfoKey, boolean isHeader, int responseCode) {
 
-        Bson urlParamFilters = Filters.and(
-            Filters.exists("isUrlParam"),
-            Filters.eq("isUrlParam", isUrlParam)
-        );
+        Bson urlParamFilters;
+        if (!isUrlParam) {
+            urlParamFilters = Filters.or(
+                Filters.and(
+                    Filters.exists("isUrlParam"),
+                    Filters.eq("isUrlParam", isUrlParam)
+                ),
+                Filters.exists("isUrlParam", false)
+            );
+
+        } else {
+            urlParamFilters = Filters.eq("isUrlParam", isUrlParam);
+        }
 
         Bson filter = Filters.and(
             Filters.eq("apiCollectionId", apiInfoKey.getApiCollectionId()),
