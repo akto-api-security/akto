@@ -111,7 +111,7 @@ export default {
         marketplaceApi.fetchAllMarketplaceSubcategories().then(resp => {
             _this.testSourceConfigs = resp.testSourceConfigs
             issuesApi.fetchAllSubCategories().then(resp => {
-                resp.subCategories.splice(resp.subCategories.findIndex(x => x.name === "CUSTOM_IAM"), 1)
+                //resp.subCategories.splice(resp.subCategories.findIndex(x => x.name === "CUSTOM_IAM"), 1)
                 _this.businessLogicSubcategories = resp.subCategories
                 _this.categories = resp.categories
                 _this.loading = false
