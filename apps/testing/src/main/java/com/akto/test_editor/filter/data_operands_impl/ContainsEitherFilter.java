@@ -21,7 +21,11 @@ public class ContainsEitherFilter extends DataOperandsImpl {
             return result;
         }
         for (String queryString: querySet) {
-            res = evaluateOnStringQuerySet(data.trim(), queryString.trim());
+            try {
+                res = evaluateOnStringQuerySet(data.trim(), queryString.trim());
+            } catch (Exception e) {
+                res = false;
+            }
             result = result || res;
         }
         return result;    
