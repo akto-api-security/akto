@@ -183,6 +183,17 @@ export default {
         title: 'Tests library',
         icon: '$bookBookmark',
         link: '/dashboard/library'
+      },
+      {
+        title: 'Tools',
+        icon: '$fas_cog',
+        children:[
+          {
+            title: 'Text Editor',
+            icon: '$aktoWhite',
+            link: '/dashboard/tools/Text-Editor'
+          }
+        ]
       }
     ]
 

@@ -1,55 +1,61 @@
 <template>
-    <div class="d-flex">
-        <div class="test-col">
-            <layout-with-left-pane>
-                <search placeholder="Search Tests" @changed="setSearchText" />
-                <div class="tests-container">
-                    <v-list dense nav>
-                        <v-list-group
-                            v-for="item in selectedTestCategories"
-                            :key="item.displayName"
-                            class="tests-category-container"
-                            active-class="tests-category-container-active"
-                        >
-                            <template v-slot:appendIcon>
-                                <v-icon >$fas_angle-down</v-icon>
-                            </template>
-                            <template v-slot:activator>
-                                <v-list-item-content>
-                                    <v-list-item-title v-text="item.displayName"></v-list-item-title>
-                                </v-list-item-content>
-                            </template>
+    <simple-layout title="Text Editor">
+        <template>
+            <div class="d-flex">
+                <div class="test-col">
+                    <layout-with-left-pane>
+                        <search placeholder="Search Tests" @changed="setSearchText" />
+                        <div class="tests-container">
+                            <v-list dense nav>
+                                <v-list-group
+                                    v-for="item in selectedTestCategories"
+                                    :key="item.displayName"
+                                    class="tests-category-container"
+                                    active-class="tests-category-container-active"
+                                >
+                                    <template v-slot:appendIcon>
+                                        <v-icon >$fas_angle-down</v-icon>
+                                    </template>
+                                    <template v-slot:activator>
+                                        <v-list-item-content>
+                                            <v-list-item-title v-text="item.displayName"></v-list-item-title>
+                                        </v-list-item-content>
+                                    </template>
 
-                            <v-list-item
-                                v-for="(test,index) in testsObj[item.name].all"
-                                :key="index"
-                                class="test-container"
-                            >
-                                <v-list-item-content>
-                                    <v-list-item-title v-text="test.label" class="test-name" @click="changeValue(test.label)"></v-list-item-title>
-                                </v-list-item-content>
-                            </v-list-item>
-                        </v-list-group>
-                    </v-list>
+                                    <v-list-item
+                                        v-for="(test,index) in testsObj[item.name].all"
+                                        :key="index"
+                                        class="test-container"
+                                    >
+                                        <v-list-item-content>
+                                            <v-list-item-title v-text="test.label" class="test-name" @click="changeValue(test.label)"></v-list-item-title>
+                                        </v-list-item-content>
+                                    </v-list-item>
+                                </v-list-group>
+                            </v-list>
+                        </div>
+                    </layout-with-left-pane>
                 </div>
-            </layout-with-left-pane>
-        </div>
-        <div class="editor-col">
-            <div ref="editor" style="width: 800px; height: 800px;" >
-                <v-btn @click="getEditorValue">Test</v-btn>
+                <div class="editor-col">
+                    <div ref="editor" style="width: 680px; height: 800px;" >
+                        <v-btn @click="getEditorValue">Test</v-btn>
+                    </div>
+                </div>
+                <div class="req-resp-col">
+                </div>
             </div>
-        </div>
-        <div class="req-resp-col">
-
-        </div>
-    </div>
+        </template>
+    </simple-layout>
 </template>
 
 <script>
 
 import {editor} from "monaco-editor/esm/vs/editor/editor.api"
-import Search from '../dashboard/shared/components/inputs/Search.vue';
-import LayoutWithLeftPane from '../dashboard/layouts/LayoutWithLeftPane.vue';
+import Search from '../shared/components/inputs/Search.vue';
+import LayoutWithLeftPane from '../layouts/LayoutWithLeftPane.vue';
+import issuesApi from "../views/issues/api"
+import SampleData from '../shared/components/SampleData.vue';
+import SimpleLayout from '../layouts/SimpleLayout.vue';
 
 import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController';
 import 'monaco-editor/esm/vs/editor/contrib/folding/browser/folding';
@@ -67,13 +73,13 @@ import 'monaco-editor/esm/vs/editor/contrib/wordHighlighter/browser/wordHighligh
 
 import "monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution"
 
-import issuesApi from "../dashboard/views/issues/api"
-
 export default {
     name: "TextEditor",
     components:{
         Search,
-        LayoutWithLeftPane
+        LayoutWithLeftPane,
+        SampleData,
+        SimpleLayout
     },
     data(){
         return{
@@ -104,7 +110,11 @@ export default {
             return this.textEditor.getValue()
         },
         changeValue(testName){
-            this.textEditor.setValue(this.mapTestToYaml[testName])
+            if(!this.mapTestToYaml[testName]){
+                this.textEditor.setValue('')
+            }else{
+                this.textEditor.setValue(this.mapTestToYaml[testName])
+            }
         },
         setSearchText(val){
             this.searchText = val

@@ -2,7 +2,6 @@ import Vue from 'vue'
 import Router from 'vue-router'
 import func from "@/util/func";
 const PageLogin  = () => import( '@/apps/login/App')
-const GrowthHackingTool = () => import('@/apps/tools/App')
 const PageDashboard  = () => import( '@/apps/dashboard/App')
 const PageToday  = () => import( "@/apps/dashboard/views/today/Today")
 const PageMarketplace  = () => import( "@/apps/dashboard/views/marketplace/PageMarketplace")
@@ -25,6 +24,7 @@ const ApiChanges = () => import("@/apps/dashboard/views/observe/changes/Changes"
 const ParamState = () => import("@/apps/dashboard/views/observe/misc/ParamState")
 const MPTestCategory = () => import("@/apps/dashboard/views/marketplace/components/MPTestCategory")
 const Onboarding = () => import("@/apps/dashboard/views/onboarding/Onboarding.vue")
+const TextEditor = () => import("@/apps/dashboard/tools/TextEditor.vue")
 
 Vue.use(Router)
 
@@ -37,11 +37,6 @@ const router =  new Router({
     mode: 'history',
     base: process.env.BASE_URL,
     routes: [
-        {
-            path: '/tools',
-            name: 'tools',
-            component: GrowthHackingTool
-        },
         {
             path: '/',
             redirect: 'login',
@@ -242,6 +237,11 @@ const router =  new Router({
                             })
                         }
                     ]                    
+                },
+                {
+                    path: 'tools/Text-Editor',
+                    name: 'tools',
+                    component: TextEditor
                 }
             ]
         },
