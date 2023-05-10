@@ -34,14 +34,14 @@ api_selection_filters:
     gte: 200
     lt: 300
   url:
-    regex: v(\d+)/
+    regex: v([2-9]\d*|\d{2,})/
 execute:
   type: single
   requests:
     - req: 
       - modify_url:
-          regexReplace:
-            regex: v(\d+)/
+          regex_replace:
+            regex: v([2-9]\d*|\d{2,})/
             replace_with: v1/
 validate:
   response_code:
