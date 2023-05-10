@@ -26,6 +26,10 @@ public class ContainsJwt extends DataOperandsImpl {
             return false;
         }
 
+        if (data == null || queryVal == null) {
+            return false;
+        }
+
         String[] splitValue = data.toString().split(" ");
         for (String x: splitValue) {
             if (KeyTypes.isJWT(x)) {

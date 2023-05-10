@@ -1,5 +1,7 @@
 package com.akto.test_editor;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -67,6 +69,7 @@ public class Utils {
                     continue;
                 }
                 Object value = basicDBObject.get(key);
+
                 if (!( (value instanceof BasicDBObject) || (value instanceof BasicDBList) )) {
                     if (key.equalsIgnoreCase(queryKey)) {
                         basicDBObject.remove(key);
@@ -74,6 +77,22 @@ public class Utils {
                         return true;
                     }
                 }
+
+                if (value instanceof BasicDBList) {
+                    BasicDBList valList = (BasicDBList) value;
+                    if (valList.size() == 0 && key.equalsIgnoreCase(queryKey)) {
+                        List<Object> queryList = Collections.singletonList(queryVal);
+                        basicDBObject.remove(key);
+                        basicDBObject.put(queryKey, queryList);
+                        return true;
+                    } else if (valList.size() > 0 && !( (valList.get(0) instanceof BasicDBObject) || (valList.get(0) instanceof BasicDBList) ) && key.equalsIgnoreCase(queryKey)) {
+                        List<Object> queryList = Collections.singletonList(queryVal);
+                        basicDBObject.remove(key);
+                        basicDBObject.put(queryKey, queryList);
+                        return true;
+                    }
+                }
+
                 res = modifyValueInPayload(value, key, queryKey, queryVal);
                 if (res) {
                     break;
