@@ -1,9 +1,9 @@
 id: SSRF_ON_CSV_UPLOAD
 info:
-  name: "Sensitive AWS details exposed due to SSRF"
-  description: "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing the URI parameter with metadata endpoint provided by AWS. The application responded with 2XX success code and also gave out sensitive AWS information in response."
+  name: "Sensitive AWS details exposed via replacing CSV param"
+  description: "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing CSV upload parameter with url that redirects to AWS IMDS endpoint. The application responded with 2XX success code and also gave out sensitive AWS information in response."
   details: >
-    "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing the URI parameter with metadata endpoint provided by AWS. The application responded with 2XX success code and also gave out sensitive AWS information in response. Server-Side Request Forgery (SSRF) flaws occur whenever an API is fetching a remote resource without validating the user-supplied URL. It allows an attacker to coerce the application to send a crafted request to an unexpected destination, even when protected by a firewall or a VPN.\n
+    "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing CSV upload parameter with url that redirects to AWS IMDS endpoint. The application responded with 2XX success code and also gave out sensitive AWS information in response. Server-Side Request Forgery (SSRF) flaws occur whenever an API is fetching a remote resource without validating the user-supplied URL. It allows an attacker to coerce the application to send a crafted request to an unexpected destination, even when protected by a firewall or a VPN.\n
     "Modern concepts in application development make SSRF more common and more dangerous.\n"
     "More common - the following concepts encourage developers to access an external resource based on user input: Webhooks, file fetching from URLs, custom SSO, and URL previews.\n"
     "More dangerous - Modern technologies like cloud providers, Kubernetes, and Docker expose management and control channels over HTTP on predictable, well-known paths. Those channels are an easy target for an SSRF attack.\n"
