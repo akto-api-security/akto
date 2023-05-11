@@ -923,7 +923,7 @@ public final class FilterAction {
                 boolean exists = paramExists(filterActionRequest.getRawApi(), key, val);
                 if (!exists && val != null && val.length() > 0) {
                     BasicDBObject obj = new BasicDBObject();
-                    obj.put("key", singleTypeInfo.getParam());
+                    obj.put("key", key);
                     obj.put("value", val);
                     paramValues.add(obj);
                     break;
@@ -950,7 +950,13 @@ public final class FilterAction {
             Filters.eq("method", apiInfoKey.getMethod())
         );
         SingleTypeInfo singleTypeInfo = SingleTypeInfoDao.instance.findOne(filters);
-        return new DataOperandsFilterResponse(singleTypeInfo != null && shouldBePresent, null, null);
+        boolean res = false;
+        if (shouldBePresent) {
+            res = singleTypeInfo != null;
+        } else {
+            res = singleTypeInfo == null;
+        }
+        return new DataOperandsFilterResponse(res, null, null);
     }
 
     public List<BasicDBObject> getPrivateResourceCount(OriginalHttpRequest originalHttpRequest, ApiInfo.ApiInfoKey apiInfoKey) {
