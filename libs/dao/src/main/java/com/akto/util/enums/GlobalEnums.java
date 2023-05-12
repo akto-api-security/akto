@@ -88,6 +88,12 @@ public class GlobalEnums {
         FIXED
     }
 
+    /* YamlTemplate source enum */
+    public enum YamlTemplateSource {
+        AKTO_TEMPLATES,
+        CUSTOM
+    }
+
 
     /* ********************************************************************** */
 }

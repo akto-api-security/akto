@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.akto.dao.test_editor.TestEditorEnums;
+import com.akto.dao.test_editor.TestEditorEnums.ContextOperator;
 import com.akto.dao.test_editor.TestEditorEnums.OperandTypes;
 import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.ConfigParserValidationResult;
@@ -47,6 +48,10 @@ public class ConfigParser {
         }
 
         if (curNode.getNodeType().equalsIgnoreCase(OperandTypes.Data.toString()) || curNode.getNodeType().equalsIgnoreCase(OperandTypes.Extract.toString())) {
+            return new ConfigParserResult(null, true, "");
+        }
+
+        if (curNode.getNodeType().equalsIgnoreCase(OperandTypes.Context.toString()) && curNode.getOperand().equalsIgnoreCase(ContextOperator.ENDPOINT_IN_TRAFFIC_CONTEXT.toString()) && (isString(values) || isListOfString(values))) {
             return new ConfigParserResult(null, true, "");
         }
 
@@ -178,7 +183,7 @@ public class ConfigParser {
         }
 
         // 5. Last Node should always be a data/extract node
-        if (! (curNodeType.equals(OperandTypes.Data.toString().toLowerCase()) || curNodeType.equals(OperandTypes.Extract.toString().toLowerCase()))) {
+        if (! (curNodeType.equals(OperandTypes.Data.toString().toLowerCase()) || curNodeType.equals(OperandTypes.Extract.toString().toLowerCase()) || curNodeType.equals(OperandTypes.Context.toString().toLowerCase()))) {
 
             if (isString(values) || isListOfString(values)) {
                 configParserValidationResult.setIsValid(false);

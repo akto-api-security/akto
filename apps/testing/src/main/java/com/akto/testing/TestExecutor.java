@@ -231,7 +231,7 @@ public class TestExecutor {
 
         for (String host: hostsToApiCollectionMap.keySet()) {
             Integer apiCollectionId = hostsToApiCollectionMap.get(host);
-            List<TestingRunResult> nucleiResults = runNucleiTests(new ApiInfo.ApiInfoKey(apiCollectionId, host, URLMethods.Method.GET), testingRun, testingUtil, summaryId, testConfigMap);
+            List<TestingRunResult> nucleiResults = runNucleiTests(new ApiInfo.ApiInfoKey(apiCollectionId, host, URLMethods.Method.GET), testingRun, testingUtil, summaryId);
             if (nucleiResults != null && !nucleiResults.isEmpty()) {
                 testingRunResults.addAll(nucleiResults);
             }
@@ -307,12 +307,9 @@ public class TestExecutor {
         return loginFlowResponse;
     }
 
-
-    public List<TestingRunResult> runNucleiTests(ApiInfo.ApiInfoKey apiInfoKey, TestingRun testingRun, TestingUtil testingUtil, ObjectId summaryId, Map<String, TestConfig> testConfigMap) {
+    public List<TestingRunResult> runNucleiTests(ApiInfo.ApiInfoKey apiInfoKey, TestingRun testingRun, TestingUtil testingUtil, ObjectId summaryId) {
         List<TestingRunResult> testingRunResults = new ArrayList<>();
         List<String> testSubCategories = testingRun.getTestingRunConfig().getTestSubCategoryList();
-        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
-        RawApi message = messages.size() == 0? null: messages.get(0);
         if (testSubCategories != null) {
             for (String testSubCategory: testSubCategories) {
                 if (testSubCategory.startsWith("http://") || testSubCategory.startsWith("https://")) {
@@ -321,9 +318,8 @@ public class TestExecutor {
                         origTemplateURL = origTemplateURL.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/");
                         String subcategory = origTemplateURL.substring(origTemplateURL.lastIndexOf("/")+1).split("\\.")[0];
 
-                        TestPlugin fuzzingTest = new FuzzingTest(testingRun.getId().toHexString(), summaryId.toHexString(), origTemplateURL, subcategory, testSubCategory, null);
-                        TestConfig testConfig = testConfigMap.get("FUZZING");
-                        TestingRunResult fuzzResult = runTest(fuzzingTest, apiInfoKey, testingUtil, testingRun.getId(), summaryId, testConfig.getApiSelectionFilters().getNode(), message);
+                        FuzzingTest fuzzingTest = new FuzzingTest(testingRun.getId().toHexString(), summaryId.toHexString(), origTemplateURL, subcategory, testSubCategory, null);
+                        TestingRunResult fuzzResult = runTestNuclei(fuzzingTest, apiInfoKey, testingUtil, testingRun.getId(), summaryId);
                         if (fuzzResult != null) {
                             trim(fuzzResult);
                             TestingRunResultDao.instance.insertOne(fuzzResult);
@@ -336,10 +332,43 @@ public class TestExecutor {
                     }
                 }
             }
+            
         }
-
         return testingRunResults;
     }
+
+    // public List<TestingRunResult> runNucleiTests(ApiInfo.ApiInfoKey apiInfoKey, TestingRun testingRun, TestingUtil testingUtil, ObjectId summaryId, Map<String, TestConfig> testConfigMap) {
+    //     List<TestingRunResult> testingRunResults = new ArrayList<>();
+    //     List<String> testSubCategories = testingRun.getTestingRunConfig().getTestSubCategoryList();
+    //     List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
+    //     RawApi message = messages.size() == 0? null: messages.get(0);
+    //     if (testSubCategories != null) {
+    //         for (String testSubCategory: testSubCategories) {
+    //             if (testSubCategory.startsWith("http://") || testSubCategory.startsWith("https://")) {
+    //                 try {
+    //                     String origTemplateURL = testSubCategory;
+    //                     origTemplateURL = origTemplateURL.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/");
+    //                     String subcategory = origTemplateURL.substring(origTemplateURL.lastIndexOf("/")+1).split("\\.")[0];
+
+    //                     TestPlugin fuzzingTest = new FuzzingTest(testingRun.getId().toHexString(), summaryId.toHexString(), origTemplateURL, subcategory, testSubCategory, null);
+    //                     TestConfig testConfig = testConfigMap.get("FUZZING");
+    //                     TestingRunResult fuzzResult = runTest(fuzzingTest, apiInfoKey, testingUtil, testingRun.getId(), summaryId, testConfig.getApiSelectionFilters().getNode(), message);
+    //                     if (fuzzResult != null) {
+    //                         trim(fuzzResult);
+    //                         TestingRunResultDao.instance.insertOne(fuzzResult);
+    //                         TestingIssuesHandler handler = new TestingIssuesHandler();
+    //                         handler.handleIssuesCreationFromTestingRunResults(Collections.singletonList(fuzzResult));
+    //                         testingRunResults.add(fuzzResult);
+    //                     }
+    //                 } catch (Exception e) {
+    //                     loggerMaker.errorAndAddToDb("unable to execute fuzzing for " + testSubCategory, LogDb.TESTING);
+    //                 }
+    //             }
+    //         }
+    //     }
+
+    //     return testingRunResults;
+    // }
 
     public LoginFlowResponse executeLoginFlow(AuthMechanism authMechanism, LoginFlowParams loginFlowParams) throws Exception {
 
@@ -742,6 +771,27 @@ public class TestExecutor {
         if (!TestPlugin.validateFilter(filterNode, rawApi, apiInfoKey, new HashMap<>(), logId)) {
             return null;
         }
+        TestPlugin.Result result = testPlugin.start(apiInfoKey, testingUtil);
+        if (result == null) return null;
+        int endTime = Context.now();
+
+        String subTestName = testPlugin.subTestName();
+
+        if (testPlugin instanceof FuzzingTest) {
+            FuzzingTest test = (FuzzingTest) testPlugin;
+            subTestName = test.getTestSourceConfigCategory();
+        }
+
+        return new TestingRunResult(
+                testRunId, apiInfoKey, testPlugin.superTestName(), subTestName, result.testResults,
+                result.isVulnerable,result.singleTypeInfos, result.confidencePercentage,
+                startTime, endTime, testRunResultSummaryId
+        );
+    }
+
+    public TestingRunResult runTestNuclei(TestPlugin testPlugin, ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil, ObjectId testRunId, ObjectId testRunResultSummaryId) {
+
+        int startTime = Context.now();
         TestPlugin.Result result = testPlugin.start(apiInfoKey, testingUtil);
         if (result == null) return null;
         int endTime = Context.now();
