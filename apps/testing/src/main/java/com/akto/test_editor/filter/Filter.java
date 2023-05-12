@@ -33,7 +33,7 @@ public class Filter {
             matchingKeySet = null;
         }
         if (childNodes.size() == 0) {
-            if (! (node.getNodeType().toLowerCase().equals(OperandTypes.Data.toString().toLowerCase()) || node.getNodeType().toLowerCase().equals(OperandTypes.Extract.toString().toLowerCase()))) {
+            if (! (node.getNodeType().toLowerCase().equals(OperandTypes.Data.toString().toLowerCase()) || node.getNodeType().toLowerCase().equals(OperandTypes.Extract.toString().toLowerCase()) || node.getNodeType().toLowerCase().equals(OperandTypes.Context.toString().toLowerCase() ))) {
                 return new DataOperandsFilterResponse(false, null, null);
             }
             String operand = node.getOperand();
@@ -47,9 +47,12 @@ public class Filter {
                     filterAction.extractContextVar(filterActionRequest, varMap);
                 }
                 return new DataOperandsFilterResponse(true, null, null);
-            } else if (filterActionRequest.getConcernedProperty() != null) {
+            } else if (filterActionRequest.getConcernedProperty() != null && !node.getNodeType().equalsIgnoreCase("context")) {
                 return filterAction.apply(filterActionRequest);
             } else {
+                if (filterActionRequest.getContextProperty() == null) {
+                    filterActionRequest.setContextProperty(node.getOperand());
+                }
                 return filterAction.evaluateContext(filterActionRequest);
             }
         }
