@@ -1,6 +1,7 @@
 package com.akto.dao.test_editor;
 
-import java.io.File;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.akto.dao.test_editor.auth.Parser;
@@ -52,50 +53,62 @@ public class TestConfigYamlParser {
             Parser authParser = new Parser();
             auth = authParser.parse(authMap);
             if (auth == null) {
-                return new TestConfig(id, info, null, null, null, null);
+                return new TestConfig(id, info, null, null, null, null, null);
             }
         }
 
         Object filterMap = config.get("api_selection_filters");
         if (filterMap == null) {
             // todo: should not be null, throw error
-            return new TestConfig(id, info, auth, null, null, null);
+            return new TestConfig(id, info, auth, null, null, null, null);
         }
         
         ConfigParser configParser = new ConfigParser();
         ConfigParserResult filters = configParser.parse(filterMap);
         if (filters == null) {
             // todo: throw error
-            new TestConfig(id, info, auth, null, null, null);
+            new TestConfig(id, info, auth, null, null, null, null);
+        }
+
+        Map<String, List<String>> wordListMap = new HashMap<>();
+        try {
+            if (config.containsKey("wordLists")) {
+                wordListMap = (Map) config.get("wordLists");
+                if (wordListMap.size() > 1) {
+                    return new TestConfig(id, info, null, null, null, null, null);
+                }
+            }
+        } catch (Exception e) {
+            return new TestConfig(id, info, null, null, null, null, null);
         }
 
         Object executionMap = config.get("execute");
         if (executionMap == null) {
             // todo: should not be null, throw error
-            return new TestConfig(id, info, auth, filters, null, null);
+            return new TestConfig(id, info, auth, filters, wordListMap, null, null);
         }
         
         com.akto.dao.test_editor.executor.ConfigParser executorConfigParser = new com.akto.dao.test_editor.executor.ConfigParser();
         ExecutorConfigParserResult executeOperations = executorConfigParser.parseConfigMap(executionMap);
         if (executeOperations == null) {
             // todo: throw error
-            new TestConfig(id, info, auth, filters, null, null);
+            new TestConfig(id, info, auth, filters, wordListMap, null, null);
         }
 
         Object validationMap = config.get("validate");
         if (validationMap == null) {
             // todo: should not be null, throw error
-            return new TestConfig(id, info, auth, filters, executeOperations, null);
+            return new TestConfig(id, info, auth, filters, wordListMap, executeOperations, null);
         }
 
         ConfigParserResult validations = configParser.parse(validationMap);
         if (validations == null) {
             // todo: throw error
-            new TestConfig(id, info, auth, filters, executeOperations, null);
+            new TestConfig(id, info, auth, filters, wordListMap, executeOperations, null);
         }
 
 
-        testConfig = new TestConfig(id, info, auth, filters, executeOperations, validations);
+        testConfig = new TestConfig(id, info, auth, filters, wordListMap, executeOperations, validations);
         return testConfig;
     }
 

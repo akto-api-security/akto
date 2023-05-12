@@ -1,5 +1,8 @@
 package com.akto.dto.test_editor;
 
+import java.util.List;
+import java.util.Map;
+
 public class TestConfig {
     
     private String id;
@@ -10,17 +13,20 @@ public class TestConfig {
 
     private ConfigParserResult apiSelectionFilters;
 
+    private Map<String, List<String>> wordlists;
+
     private ExecutorConfigParserResult execute;
 
     private ConfigParserResult validation;
 
-    public TestConfig(String id, Info info, Auth auth, ConfigParserResult apiSelectionFilters, ExecutorConfigParserResult execute, 
+    public TestConfig(String id, Info info, Auth auth, ConfigParserResult apiSelectionFilters, Map<String, List<String>> wordlists, ExecutorConfigParserResult execute, 
         ConfigParserResult validation) {
         
         this.id = id;
         this.info = info;
         this.auth = auth;
         this.apiSelectionFilters = apiSelectionFilters;
+        this.wordlists = wordlists;
         this.execute = execute;
         this.validation = validation;
     }
@@ -57,6 +63,14 @@ public class TestConfig {
 
     public void setApiSelectionFilters(ConfigParserResult apiSelectionFilters) {
         this.apiSelectionFilters = apiSelectionFilters;
+    }
+
+    public Map<String, List<String>> getWordlists() {
+        return wordlists;
+    }
+
+    public void setWordlists(Map<String, List<String>> wordlists) {
+        this.wordlists = wordlists;
     }
 
     public ExecutorConfigParserResult getExecute() {

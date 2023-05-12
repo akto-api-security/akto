@@ -60,6 +60,9 @@ execute:
             url_key: http://make-127-0-0-1-rr.1u.ms/admin
 
 validate:
+  response_code:
+    gte: 200
+    lt: 300
   response_payload:
     contains_either:
       - "admin"

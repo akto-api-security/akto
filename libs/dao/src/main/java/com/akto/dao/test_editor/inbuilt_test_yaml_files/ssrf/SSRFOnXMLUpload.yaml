@@ -62,6 +62,9 @@ execute:
             csv_key: https://ssrf.localdomain.pw/xml-without-body-md/301-http-.x.xml
 
 validate:
+  response_code:
+    gte: 200
+    lt: 300
   response_payload:
     contains_either:
       - "ami-id"

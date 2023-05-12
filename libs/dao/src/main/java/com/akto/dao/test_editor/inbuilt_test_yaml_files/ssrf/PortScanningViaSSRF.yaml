@@ -41,14 +41,22 @@ api_selection_filters:
           key:
             extract: url_key
 
+wordLists:
+  filePaths: 
+    - http://localhost:22
+    - http://localhost:80
+    - http://localhost:443
+    - http://localhost:8080
+    - http://localhost:27017
+
 execute:
   type: single
   requests:
     - req:
       - modify_query_param:
-          url_key: http://localhost:80
+          url_key: ${filePaths}
       - modify_body_param:
-          url_key: http://localhost:80
+          url_key: ${filePaths}
 
 validate:
   response_code:
