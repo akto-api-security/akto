@@ -60,6 +60,9 @@ execute:
             url_key: http://①②⑦。⓪⓪⓪。⓪⓪①/admin
 
 validate:
+  response_code:
+    gte: 200
+    lt: 300
   response_payload:
     contains_either:
       - "admin"

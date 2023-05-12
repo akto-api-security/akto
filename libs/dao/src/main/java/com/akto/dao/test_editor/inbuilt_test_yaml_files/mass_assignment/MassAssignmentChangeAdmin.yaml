@@ -52,6 +52,9 @@ execute:
             admin_key: true
 
 validate:
+  response_code:
+    gte: 200
+    lt: 300
   response_payload:
     for_one:
       key:

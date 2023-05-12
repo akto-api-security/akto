@@ -58,6 +58,9 @@ execute:
             role_context.key: ${role_context.value}
 
 validate:
+  response_code:
+    gte: 200
+    lt: 300
   response_payload:
     for_one:
       key:

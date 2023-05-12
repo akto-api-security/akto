@@ -1,18 +1,20 @@
 package com.akto.dto.test_editor;
 
+import java.util.List;
+
 import com.akto.dto.RawApi;
 
 public class ExecutorSingleRequest {
     
     private Boolean success;
     private String errMsg;
-    private RawApi rawApi;
+    private List<RawApi> rawApis;
     private Boolean followRedirect;
 
-    public ExecutorSingleRequest(Boolean success, String errMsg, RawApi rawApi, Boolean followRedirect) {
+    public ExecutorSingleRequest(Boolean success, String errMsg, List<RawApi> rawApis, Boolean followRedirect) {
         this.success = success;
         this.errMsg = errMsg;
-        this.rawApi = rawApi;
+        this.rawApis = rawApis;
         this.followRedirect = followRedirect;
     }
 
@@ -34,12 +36,12 @@ public class ExecutorSingleRequest {
         this.errMsg = errMsg;
     }
 
-    public RawApi getRawApi() {
-        return rawApi;
+    public List<RawApi> getRawApis() {
+        return rawApis;
     }
 
-    public void setRawApi(RawApi rawApi) {
-        this.rawApi = rawApi;
+    public void setRawApis(List<RawApi> rawApis) {
+        this.rawApis = rawApis;
     }
 
     public Boolean getFollowRedirect() {
