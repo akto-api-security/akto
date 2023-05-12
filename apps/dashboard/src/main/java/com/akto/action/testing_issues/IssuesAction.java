@@ -1,11 +1,13 @@
 package com.akto.action.testing_issues;
 
 import com.akto.action.UserAction;
+import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.demo.VulnerableRequestForTemplate;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_run_findings.TestingIssuesId;
@@ -124,6 +126,7 @@ public class IssuesAction extends UserAction {
     }
 
     private ArrayList<BasicDBObject> subCategories;
+    private List<VulnerableRequestForTemplate> vulnerableRequests;
     private TestCategory[] categories;
     private List<TestSourceConfig> testSourceConfigs;
     public String fetchAllSubCategories() {
@@ -161,6 +164,7 @@ public class IssuesAction extends UserAction {
 
         this.categories = GlobalEnums.TestCategory.values();
         this.testSourceConfigs = TestSourceConfigsDao.instance.findAll(Filters.empty());
+        this.vulnerableRequests = VulnerableRequestForTemplateDao.instance.findAll(Filters.empty());
         return SUCCESS.toUpperCase();
     }
 
@@ -337,5 +341,13 @@ public class IssuesAction extends UserAction {
 
     public void setTestSourceConfigs(List<TestSourceConfig> testSourceConfigs) {
         this.testSourceConfigs = testSourceConfigs;
+    }
+
+    public List<VulnerableRequestForTemplate> getVulnerableRequests() {
+        return vulnerableRequests;
+    }
+
+    public void setVulnerableRequests(List<VulnerableRequestForTemplate> vulnerableRequests) {
+        this.vulnerableRequests = vulnerableRequests;
     }
 }
