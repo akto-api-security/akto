@@ -595,7 +595,12 @@ public class TestExecutor {
         FilterNode validatorNode = testConfig.getValidation().getNode();
         ExecutorNode executorNode = testConfig.getExecute().getNode();
         Auth auth = testConfig.getAuth();
+        Map<String, List<String>> wordListsMap = testConfig.getWordlists();
         Map<String, Object> varMap = new HashMap<>();
+
+        for (String key: wordListsMap.keySet()) {
+            varMap.put("wordList_" + key, wordListsMap.get(key));
+        }
 
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();
