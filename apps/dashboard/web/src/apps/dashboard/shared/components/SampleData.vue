@@ -1,7 +1,34 @@
 <template>
     <div>
-    <div class="d-flex">
-        <div class="flex-equal" >
+        <div v-if="tabularDisplay">
+            <layout-with-tabs :tabs="['Request', 'Response']" class="req-resp-tab">
+                <template slot="Request">
+                    <sample-single-side
+                        :title="requestTitle" 
+                        :firstLine='requestFirstLine'
+                        :firstLineToolTipValue="requestFirstLineToolTipValue"
+                        :headers="{}" 
+                        :data="requestJson"
+                        :complete-data="json['message']"
+                        :simpleCopy="false"
+                        style="margin: 8px"
+                    />
+                </template>
+                <template slot="Response">
+                    <sample-single-side               
+                        :title="responseTitle" 
+                        :firstLine='responseFirstLine' 
+                        :headers="{}" 
+                        :data="responseJson"
+                        :simpleCopy="true"
+                        :complete-data="json['message']"
+                        style="margin: 8px"
+                    />
+                </template>
+            </layout-with-tabs>
+        </div>
+        <div class="d-flex" v-else>
+        <div class="flex-equal">
             <sample-single-side
                 :title="requestTitle" 
                 :firstLine='requestFirstLine'
@@ -33,16 +60,19 @@ import obj from "@/util/obj"
 import api from "../api"
 
 import SampleSingleSide from './SampleSingleSide'
+import LayoutWithTabs from '../../layouts/LayoutWithTabs.vue'
 
 export default {
     name: "SampleData",
     components: {
-        SampleSingleSide
+        SampleSingleSide,
+        LayoutWithTabs
     },
     props: {
         json: obj.objR,
         requestTitle: obj.ObjR,
-        responseTitle: obj.ObjR
+        responseTitle: obj.ObjR,
+        tabularDisplay: obj.boolN,
     },
     data () {
         return {
@@ -184,9 +214,15 @@ export default {
     }
 }
 </script>
-
-<style lang="sass" scoped>
-.flex-equal
-    width: 50%
+<style scoped>
+.flex-equal{
+    width: 50%;
+}
+.req-resp-tab >>> .active-tab{
+    color: var(--themeColor) !important;
+}
+.req-resp-tab >>> .control-padding{
+    padding-top: 8px !important;
+}
 
 </style>
