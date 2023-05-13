@@ -63,6 +63,9 @@ execute:
             csv_key: https://ssrf.localdomain.pw/csv-without-body/301-http-169.254.169.254:80-.c.csv
 
 validate:
+  response_code:
+    gte: 200
+    lt: 300
   response_payload:
     contains_either:
       - "ami-id"

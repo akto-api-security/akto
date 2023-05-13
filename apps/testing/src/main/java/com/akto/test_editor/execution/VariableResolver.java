@@ -206,6 +206,33 @@ public class VariableResolver {
         return modifiedHeaderVal;
     }
 
+    public static Boolean isWordListVariable(Object key, Map<String, Object> varMap) {
+        if (key == null || !(key instanceof String)) {
+            return false;
+        }
+
+        if (key.toString().length() < 3) {
+            return false;
+        }
+
+        String expression = key.toString();
+
+        expression = expression.substring(2, expression.length());
+        expression = expression.substring(0, expression.length() - 1);
+
+        Boolean isWordListVar = varMap.containsKey("wordList_" + expression);
+        return isWordListVar;
+    }
+
+    public static List<String> resolveWordListVar(String key, Map<String, Object> varMap) {
+        String expression = key.toString();
+
+        expression = expression.substring(2, expression.length());
+        expression = expression.substring(0, expression.length() - 1);
+
+        return (List<String>) varMap.get("wordList_" + expression);
+    }
+
     // public Object resolveExpression(Map<String, Object> varMap, String expression) {
 
     //     Object val = null;
