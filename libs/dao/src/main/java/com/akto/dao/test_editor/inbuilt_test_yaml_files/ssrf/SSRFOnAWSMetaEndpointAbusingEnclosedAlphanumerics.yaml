@@ -64,6 +64,9 @@ execute:
             url_key: http://⑯⑨。②⑤④。⑯⑨｡②⑤④/latest/meta-data/local-ipv4
 
 validate:
+  response_code:
+    gte: 200
+    lt: 300
   response_payload:
     contains_either:
       - "ami-id"

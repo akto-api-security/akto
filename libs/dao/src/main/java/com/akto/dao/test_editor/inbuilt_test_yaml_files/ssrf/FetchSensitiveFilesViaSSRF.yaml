@@ -41,14 +41,27 @@ api_selection_filters:
           key:
             extract: url_key
 
+wordLists:
+  filePaths: 
+    - /etc/passwd
+    - /etc/lsb-release
+    - /etc/shadow
+    - /etc/hosts
+    - /proc/self/environ
+    - /proc/self/cmdline
+    - /proc/self/cwd/index.php
+    - /proc/self/cwd/application.py
+    - /proc/self/cwd/main.py"
+    - /proc/self/exe
+
 execute:
   type: single
   requests:
     - req:
       - modify_query_param:
-          url_key: "/etc/passwd"
+          url_key: ${filePaths}
       - modify_body_param:
-          url_key: "/etc/passwd"
+          url_key: ${filePaths}
 
 validate:
   response_code:

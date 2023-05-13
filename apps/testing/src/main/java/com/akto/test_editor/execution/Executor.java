@@ -39,25 +39,31 @@ public class Executor {
         if (reqNodes.getChildNodes() == null || reqNodes.getChildNodes().size() == 0) {
             return null;
         }
+
         for (ExecutorNode reqNode: reqNodes.getChildNodes()) {
             // make copy of varMap as well
-            singleReq = buildTestRequest(reqNode, null, sampleRawApi, varMap);
-            sampleRawApi = singleReq.getRawApi();
-        }
+            List<RawApi> sampleRawApis = new ArrayList<>();
+            sampleRawApis.add(sampleRawApi);
 
-        try {
-            // follow redirects = true for now
-            testResponse = ApiExecutor.sendRequest(singleReq.getRawApi().getRequest(), singleReq.getFollowRedirect());
-            result.add(new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), singleReq.getRawApi().getRequest(), testResponse));
-        } catch(Exception e) {
-            loggerMaker.errorAndAddToDb("error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
-            result.add(new ExecutionResult(false, singleReq.getErrMsg(), singleReq.getRawApi().getRequest(), null));
+            singleReq = buildTestRequest(reqNode, null, sampleRawApis, varMap);
+            List<RawApi> testRawApis = new ArrayList<>();
+            testRawApis = singleReq.getRawApis();
+            for (RawApi testReq: testRawApis) {
+                try {
+                    // follow redirects = true for now
+                    testResponse = ApiExecutor.sendRequest(testReq.getRequest(), singleReq.getFollowRedirect());
+                    result.add(new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse));
+                } catch(Exception e) {
+                    loggerMaker.errorAndAddToDb("error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
+                    result.add(new ExecutionResult(false, singleReq.getErrMsg(), testReq.getRequest(), null));
+                }
+            }
         }
 
         return result;
     }
 
-    public ExecutorSingleRequest buildTestRequest(ExecutorNode node, String operation, RawApi rawApi, Map<String, Object> varMap) {
+    public ExecutorSingleRequest buildTestRequest(ExecutorNode node, String operation, List<RawApi> rawApis, Map<String, Object> varMap) {
 
         List<ExecutorNode> childNodes = node.getChildNodes();
         if (node.getNodeType().equalsIgnoreCase(ExecutorOperandTypes.NonTerminal.toString()) || node.getNodeType().equalsIgnoreCase(ExecutorOperandTypes.Terminal.toString())) {
@@ -72,6 +78,7 @@ public class Executor {
             return new ExecutorSingleRequest(true, "", null, true);
         }
         Boolean followRedirect = true;
+        List<RawApi> newRawApis = new ArrayList<>();
         if (childNodes.size() == 0) {
             Object key = node.getOperationType();
             Object value = node.getValues();
@@ -85,24 +92,91 @@ public class Executor {
                 }
                 value = null;
             }
-            ExecutorSingleOperationResp resp = invokeOperation(operation, key, value, rawApi, varMap);
-            if (!resp.getSuccess()) {
-                return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
+            // if rawapi size is 1, var type is wordlist, iterate on values
+            RawApi rApi = rawApis.get(0).copy();
+            if (rawApis.size() == 1 && VariableResolver.isWordListVariable(key, varMap)) {
+                List<String> wordListVal = VariableResolver.resolveWordListVar(key.toString(), varMap);
+
+                for (int i = 0; i < wordListVal.size(); i++) {
+                    RawApi copyRApi = rApi.copy();
+                    ExecutorSingleOperationResp resp = invokeOperation(operation, wordListVal.get(i), value, copyRApi, varMap);
+                    if (!resp.getSuccess()) {
+                        return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
+                    }
+                    if (resp.getErrMsg() == null || resp.getErrMsg().length() == 0) {
+                        newRawApis.add(copyRApi);
+                    }
+                }
+
+            } else if (rawApis.size() == 1 && VariableResolver.isWordListVariable(value, varMap)) {
+                List<String> wordListVal = VariableResolver.resolveWordListVar(value.toString(), varMap);
+
+                for (int i = 0; i < wordListVal.size(); i++) {
+                    RawApi copyRApi = rApi.copy();
+                    ExecutorSingleOperationResp resp = invokeOperation(operation, key, wordListVal.get(i), copyRApi, varMap);
+                    if (!resp.getSuccess()) {
+                        return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
+                    }
+                    if (resp.getErrMsg() == null || resp.getErrMsg().length() == 0) {
+                        newRawApis.add(copyRApi);
+                    }
+                }
+
+            } else {
+                if (VariableResolver.isWordListVariable(key, varMap)) {
+                    List<String> wordListVal = VariableResolver.resolveWordListVar(key.toString(), varMap);
+                    int index = 0;
+                    for (RawApi rawApi : rawApis) {
+                        if (index >= wordListVal.size()) {
+                            break;
+                        }
+                        ExecutorSingleOperationResp resp = invokeOperation(operation, wordListVal.get(index), value, rawApi, varMap);
+                        if (!resp.getSuccess()) {
+                            return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
+                        }
+                        index++;
+                    }
+                } else if (VariableResolver.isWordListVariable(value, varMap)) {
+                    List<String> wordListVal = VariableResolver.resolveWordListVar(value.toString(), varMap);
+                    int index = 0;
+                    for (RawApi rawApi : rawApis) {
+                        if (index >= wordListVal.size()) {
+                            break;
+                        }
+                        ExecutorSingleOperationResp resp = invokeOperation(operation, key, wordListVal.get(index), rawApi, varMap);
+                        if (!resp.getSuccess()) {
+                            return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
+                        }
+                        index++;
+                    }
+                } else {
+                    for (RawApi rawApi : rawApis) {
+                        ExecutorSingleOperationResp resp = invokeOperation(operation, key, value, rawApi, varMap);
+                        if (!resp.getSuccess()) {
+                            return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
+                        }
+                    }
+                }
+                
             }
         }
 
         ExecutorNode childNode;
         for (int i = 0; i < childNodes.size(); i++) {
             childNode = childNodes.get(i);
-            ExecutorSingleRequest executionResult = buildTestRequest(childNode, operation, rawApi, varMap);
+            ExecutorSingleRequest executionResult = buildTestRequest(childNode, operation, rawApis, varMap);
+            rawApis = executionResult.getRawApis();
             if (!executionResult.getSuccess()) {
                 return executionResult;
             }
             followRedirect = followRedirect || executionResult.getFollowRedirect();
         }
 
-        return new ExecutorSingleRequest(true, "", rawApi, followRedirect);
-
+        if (newRawApis.size() > 0) {
+            return new ExecutorSingleRequest(true, "", newRawApis, followRedirect);
+        } else {
+            return new ExecutorSingleRequest(true, "", rawApis, followRedirect);
+        }
     }
 
     public ExecutorSingleOperationResp invokeOperation(String operationType, Object key, Object value, RawApi rawApi, Map<String, Object> varMap) {
