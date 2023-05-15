@@ -66,7 +66,7 @@ public class TestingIssuesHandlerTest extends MongoBasedTest {
         TestSourceConfigsDao.instance.insertOne(
                 new TestSourceConfig(
                         testSourceString, GlobalEnums.TestCategory.BOLA, "fuzzing", GlobalEnums.Severity.HIGH,
-                        "", "", Context.now()
+                        "", "", Context.now(), new ArrayList<>()
                 )
         );
 
