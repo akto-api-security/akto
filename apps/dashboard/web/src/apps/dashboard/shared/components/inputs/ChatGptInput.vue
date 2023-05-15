@@ -47,7 +47,7 @@
         </div>    
         <div class="prompt-body" v-if="responses || loading">
             <div class="gpt-prompt">
-                <div class="gpt-prompt-text d-flex">
+                <div class="d-flex">
                     <owner-name :owner-name="ownerName" :owner-id="0" :show-name="false" />
                     <div class="ml-2 label">{{ computedLabel }}</div>
                 </div>
@@ -59,7 +59,7 @@
                 <v-icon class="gpt-icon" :size="20">$aktoWhite</v-icon>
                 <span class="listItem">
                     Sorry couldn't find any response with your prompt.
-                    Try again.
+                    Please try again.
                 </span>
             </div>
 
@@ -97,7 +97,7 @@
                         </div>
                         <div v-else-if="queryType === 'suggest_tests'">
                             <div v-if="responses[0] && responses[0].tests">
-                                <div>
+                                <div class="test-suggestion-results ml-2">
                                     <div> This api is vulnerable to the following vulnerabilities:</div>
                                         <div class="mt-4">
                                             <ul> 
@@ -108,7 +108,7 @@
                                         </div>
                                 </div>
                                 <div class="mt-6">
-                                    <v-btn primary color="var(--themeColor)" dark depressed @click="runTestsViaAktoGpt"> Run these tests in Akto</v-btn>
+                                    <v-btn primary color="var(--themeColor)" dark depressed @click="runTestsViaAktoGpt">Run these tests in Akto</v-btn>
                                 </div>
                             </div>
                             <div v-else class="error-resp">
@@ -197,6 +197,9 @@ export default {
             })   
         },
         askGPT(data) {
+            if ('meta' in data && 'apiCollectionId' in data.meta) {
+                data.meta.apiCollectionId = parseInt(data.meta.apiCollectionId);
+            }
             return request({
                 url: '/api/ask_ai',
                 method: 'post',
@@ -302,8 +305,6 @@ export default {
     display: flex
     align-items: center
     padding: 0 20px
-    .gpt-prompt-text
-        font-size: 12px
 
 
 .chat-gpt-text-field
@@ -332,10 +333,11 @@ export default {
     
     .response-body
         padding: 20px
-        font-size: 16px
+        font-size: 16px !important
         .listItem
             min-height: 16px !important
-            font-size: 12px !important
+            font-size: 14px !important
+            padding-left: 4px !important
 </style>
 
 <style scoped>
@@ -383,12 +385,12 @@ export default {
     }
 
     .label{
-        margin-top: 3px;
         font-size: 16px;
+        font-weight: 500;
     }
 
     .akto-gpt-resp{
-        margin-left: 3px;
+        margin-left: 8px;
     }
 
     .error-resp{
