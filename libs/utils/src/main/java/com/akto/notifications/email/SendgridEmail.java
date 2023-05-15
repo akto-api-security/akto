@@ -25,7 +25,7 @@ public class SendgridEmail{
 
     Email fromEmail = new Email();
     fromEmail.setName("Ankita");
-    fromEmail.setEmail("ankita@akto.io");
+    fromEmail.setEmail("ankita.gupta@akto.io");
     mail.setFrom(fromEmail);
 
     //mail.setSubject("Welcome to Akto");
