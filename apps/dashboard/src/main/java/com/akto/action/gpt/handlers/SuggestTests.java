@@ -48,7 +48,6 @@ public class SuggestTests implements QueryHandler {
         request.put("response_details", meta.getString("response_details"));
         request.put("test_details", getTestDetails());
         request.put(GptAction.USER_EMAIL, meta.getString(GptAction.USER_EMAIL));
-        System.out.println("request: " + request.toJson());
         BasicDBObject resp = this.resultFetcherStrategy.fetchResult(request);
         String respStr = resp.toJson();
         respStr = HeadersUtils.replaceHeadersWithValues(Pair.of(respStr, modifiedHeaders.getRight()));
