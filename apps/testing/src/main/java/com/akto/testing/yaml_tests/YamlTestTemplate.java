@@ -74,6 +74,9 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     public List<TestResult> validator(List<ExecutionResult> attempts) {
         List<TestResult> testResults = new ArrayList<>();
         loggerMaker.infoAndAddToDb("validation started " + logId, LogDb.TESTING);
+        if (attempts == null) {
+            return testResults;
+        }
         for (ExecutionResult attempt: attempts) {
             String msg = RedactSampleData.convertOriginalReqRespToString(attempt.getRequest(), attempt.getResponse());
             RawApi testRawApi = new RawApi(attempt.getRequest(), attempt.getResponse(), msg);

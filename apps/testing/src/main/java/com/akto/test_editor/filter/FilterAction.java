@@ -214,6 +214,9 @@ public final class FilterAction {
         if (rawApi == null) {
             return new DataOperandsFilterResponse(false, null, null);
         }
+        if (rawApi.getResponse() == null) {
+            return new DataOperandsFilterResponse(false, null, null);
+        }
         int respCode = rawApi.getResponse().getStatusCode();
         DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(respCode, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
         Boolean res = invokeFilter(dataOperandFilterRequest);
@@ -223,6 +226,9 @@ public final class FilterAction {
     public void extractResponseCode(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
         RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
         if (rawApi == null) {
+            return;
+        }
+        if (rawApi.getResponse() == null) {
             return;
         }
         String respCode = Integer.toString(rawApi.getResponse().getStatusCode());
