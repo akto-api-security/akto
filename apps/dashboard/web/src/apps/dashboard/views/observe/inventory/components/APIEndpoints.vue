@@ -418,8 +418,8 @@ export default {
         showGPTScreen(){
             this.showGptDialog = true
         },
-        rowClicked(row) {
-            this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.endpoint + " " + row.method, type: 2})
+        rowClicked(row,$event) {
+            this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.endpoint + " " + row.method, type: 2},$event)
         },
         downloadData() {
             let headerTextToValueMap = Object.fromEntries(this.tableHeaders.map(x => [x.text, x.value]).filter(x => x[0].length > 0));
