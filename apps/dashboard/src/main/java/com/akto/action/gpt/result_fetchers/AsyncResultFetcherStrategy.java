@@ -11,8 +11,8 @@ import java.util.concurrent.TimeUnit;
 
 public class AsyncResultFetcherStrategy implements ResultFetcherStrategy<BasicDBObject> {
 
-    private static final String ASK_GPT_ASYNC_URL = "https://mzt87ut27e.execute-api.ap-south-1.amazonaws.com/test/ask_gpt_async";
-    private static final String FETCH_RESPONSE_URL = "https://mzt87ut27e.execute-api.ap-south-1.amazonaws.com/test/fetch_response";
+    private static final String ASK_GPT_ASYNC_URL = "https://18qazon803.execute-api.ap-south-1.amazonaws.com/ask_gpt_async";
+    private static final String FETCH_RESPONSE_URL = "https://18qazon803.execute-api.ap-south-1.amazonaws.com/fetch_response";
 
     private static final Logger logger = LoggerFactory.getLogger(AsyncResultFetcherStrategy.class);
     @Override
