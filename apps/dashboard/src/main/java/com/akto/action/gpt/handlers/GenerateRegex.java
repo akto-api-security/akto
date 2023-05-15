@@ -1,5 +1,6 @@
 package com.akto.action.gpt.handlers;
 
+import com.akto.action.gpt.GptAction;
 import com.akto.action.gpt.result_fetchers.ResultFetcherStrategy;
 import com.mongodb.BasicDBObject;
 
@@ -18,6 +19,7 @@ public class GenerateRegex implements QueryHandler{
         BasicDBObject request = new BasicDBObject();
         request.put("query_type", GptQuery.GENERATE_REGEX.getName());
         request.put("input_query", query);
+        request.put(GptAction.USER_EMAIL, meta.getString(GptAction.USER_EMAIL));
         return this.resultFetcherStrategy.fetchResult(request);
     }
 }
