@@ -341,7 +341,6 @@ public class Main {
 
         createIndices();
         insertRuntimeFilters();
-        saveTestEditorYaml();
         try {
             AccountSettingsDao.instance.updateVersion(AccountSettings.API_RUNTIME_VERSION);
         } catch (Exception e) {
@@ -370,62 +369,5 @@ public class Main {
         properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
 
         return properties;
-    }
-
-    public static void showFile(File file, List<String> files) {
-        if (!file.isDirectory()) {
-            files.add(file.getAbsolutePath());
-        }
-    }
-
-    public static void saveTestEditorYaml() {
-        String folderPath = new File("").getAbsolutePath() + "/libs/dao/src/main/java/com/akto/dao/test_editor/inbuilt_test_yaml_files";
-
-        Path dir = Paths.get(folderPath);
-        List<String> files = new ArrayList<>();
-        try {
-            Files.walk(dir).forEach(path -> showFile(path.toFile(), files));
-        } catch (Exception e) {
-            logger.error("invalid folder path for test yamls, skipping addition to db", e);
-        }
-
-        for (String filePath : files) {
-            List<String> lines = new ArrayList<>();
-            try {
-                lines = Files.readAllLines(Paths.get(filePath));
-            } catch (Exception e) {
-                logger.error("invalid yaml content for file " + filePath, e);
-            }
-            String content  = String.join("\n", lines);
-
-            TestConfig testConfig = null;
-            try {
-                testConfig = TestConfigYamlParser.parseTemplate(content);
-            } catch (Exception e) {
-                logger.error("invalid parsing yaml template for file " + filePath, e);
-            }
-
-            if (testConfig == null) {
-                logger.error("parsed template for file is null " + filePath);
-            }
-
-            String id = testConfig.getId();
-
-            int createdAt = Context.now();
-            int updatedAt = Context.now();
-            String author = "AKTO";
-
-            YamlTemplateDao.instance.updateOne(
-                Filters.eq("_id", id),
-                Updates.combine(
-                        Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
-                        Updates.setOnInsert(YamlTemplate.AUTHOR, author),
-                        Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
-                        Updates.set(YamlTemplate.CONTENT, content),
-                        Updates.set(YamlTemplate.INFO, testConfig.getInfo())
-                )
-            );
-        }
-
     }
 }
