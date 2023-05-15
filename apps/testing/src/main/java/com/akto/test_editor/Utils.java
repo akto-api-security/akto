@@ -119,14 +119,50 @@ public class Utils {
         return data;
     }
 
-    // public static String[] trimAndSplit(String url) {
-    //     return trim(url).split("/");
-    // }
+    public static Boolean applyIneqalityOperation(Object data, Object querySet, String operator) {
+        Boolean result = false;
+        try {
+            if (data instanceof Integer) {
+                List<Integer> queryList = (List) querySet;
+                if (queryList == null || queryList.size() == 0) {
+                    return false;
+                }
+                Integer dataInt = (Integer) data;
+                Object query = queryList.get(0);
+                if (query instanceof String) {
+                    int queryInt = Integer.parseInt((String) query);
+                    result = compareIntegers(operator, dataInt, queryInt);
+                } else {
+                    result = compareIntegers(operator, (int) dataInt, (int) queryList.get(0));
+                }
+            }
+            
+        } catch (Exception e) {
+            return false;
+        }
 
-    // public static String trim(String url) {
-    //     if (url.startsWith("/")) url = url.substring(1, url.length());
-    //     if (url.endsWith("/")) url = url.substring(0, url.length()-1);
-    //     return url;
-    // }
+        return result;
+    }
+
+    public static Boolean compareIntegers(String operator, int a, int b) {
+        Boolean result = false;
+        switch (operator) {
+            case "gte":
+                result = (int) a >= b;
+                break;
+            case "gt":
+                result = (int) a > b;
+                break;
+            case "lte":
+                result = (int) a <= b;
+                break;
+            case "lt":
+                result = (int) a < b;
+                break;
+            default:
+                return false;
+        }
+        return result;
+    }
 
 }
