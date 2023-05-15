@@ -149,8 +149,8 @@ export default {
                 this.$store.dispatch('collections/loadAllApiCollections')
             }
         },
-        rowClicked(item) {
-            this.$emit("selectedItem", {type: 1, collectionName: item.name, apiCollectionId: item.id})
+        rowClicked(item, $event) {
+            this.$emit("selectedItem", {type: 1, collectionName: item.name, apiCollectionId: item.id}, $event)
         },
         createCollection(name) {
           this.$store.dispatch('collections/createCollection', {name})
@@ -250,9 +250,9 @@ export default {
             })
         }
     },
-    mounted () {
+    async mounted () {
         let now = func.timeNow()
-        this.$store.dispatch('testing/loadTestingDetails', {startTimestamp: now - func.recencyPeriod, endTimestamp: now})
+        await this.$store.dispatch('testing/loadTestingDetails', {startTimestamp: now - func.recencyPeriod, endTimestamp: now})
         this.$emit('mountedView', {type: 0})
     }
 }

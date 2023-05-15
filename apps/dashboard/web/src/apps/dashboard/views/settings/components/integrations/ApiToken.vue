@@ -39,10 +39,7 @@ import obj from '@/util/obj'
 export default {
   name: "ApiToken",
   props: {
-    title: {
-      type: obj.strR,
-      required: false
-    },
+    title: obj.strN,
     burp_tokens: obj.arrR,
     avatar_image: obj.str,
     addTokenTitle: obj.strN
