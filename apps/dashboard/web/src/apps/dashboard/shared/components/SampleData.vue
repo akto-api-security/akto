@@ -13,6 +13,17 @@
                         :simpleCopy="false"
                         style="margin: 8px"
                     />
+                    <div class="d-flex jc-end" :style="{'margin' :'24px 36px 0 0'}">
+                        <v-btn 
+                            class="run-btn" primary dense dark color="var(--themeColor)" 
+                            @click="$emit('run_tests')" 
+                            :style="!isLoading ? {'cursor': 'pointer !important'} : {}"
+                        >
+                            <spinner v-if="isLoading" color="var(--white)" style="margin-right: 8px"/>
+                            <v-icon v-else size=16>$fas_play</v-icon>
+                            Run Test
+                        </v-btn>
+                    </div>
                 </template>
                 <template slot="Response">
                     <sample-single-side               
@@ -24,6 +35,17 @@
                         :complete-data="json['message']"
                         style="margin: 8px"
                     />
+                    <div class="d-flex jc-end" :style="{'margin' :'24px 36px 0 0'}">
+                        <v-btn 
+                            class="run-btn" primary dense dark color="var(--themeColor)" 
+                            @click="$emit('run_tests')" 
+                            :style="!isLoading ? {'cursor': 'pointer !important'} : {}"
+                        >
+                            <spinner v-if="isLoading" />
+                            <v-icon v-else size=16>$fas_play</v-icon>
+                            Run Test
+                        </v-btn>
+                    </div>
                 </template>
             </layout-with-tabs>
         </div>
@@ -61,22 +83,21 @@ import api from "../api"
 
 import SampleSingleSide from './SampleSingleSide'
 import LayoutWithTabs from '../../layouts/LayoutWithTabs.vue'
+import Spinner from "./Spinner.vue"
 
 export default {
     name: "SampleData",
     components: {
         SampleSingleSide,
-        LayoutWithTabs
+        LayoutWithTabs,
+        Spinner
     },
     props: {
         json: obj.objR,
         requestTitle: obj.ObjR,
         responseTitle: obj.ObjR,
         tabularDisplay: obj.boolN,
-    },
-    data () {
-        return {
-        }
+        isLoading: obj.boolN,
     },
     computed: {
         requestFirstLine: function() {
@@ -223,6 +244,14 @@ export default {
 }
 .req-resp-tab >>> .control-padding{
     padding-top: 8px !important;
+}
+.run-btn {
+    box-shadow: none !important;
+    display: flex;
+    width: 120px;
+    align-items: center;
+    gap: 8px;
+    cursor: auto !important;
 }
 
 </style>

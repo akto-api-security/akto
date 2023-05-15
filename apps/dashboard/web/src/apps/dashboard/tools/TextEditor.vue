@@ -26,7 +26,7 @@
                                 </span>
 
                                 <span class="total-tests">
-                                    {{ totalTests }}
+                                    {{ totalAktoTests }}
                                 </span>
                             </div>
                             <v-list dense nav v-if="aktoToggle" class="tests-list">
@@ -59,7 +59,7 @@
                                         class="test-container"
                                     >
                                         <v-list-item-content>
-                                            <v-list-item-title v-text="test.label" class="test-name" @click="changeValue(test.label)"></v-list-item-title>
+                                            <v-list-item-title v-text="test.label" class="test-name" @click="changeValue(test.label),setSelectedMethod(test.value)" />
                                         </v-list-item-content>
                                     </v-list-item>
                                 </v-list-group>
@@ -74,19 +74,76 @@
                                 Lorem Ipsum
                             </span>
                             <v-icon :style="{'cursor' : 'pointer'}" size=14 @click="openTestLink()">$githubIcon</v-icon>
+                            <span class="last-edited">(last edited 3 minutes ago)</span>
                         </div>
-                        <div class="file-title">
+                        <div class="file-title" :style="{cursor: IsEdited ? 'pointer' : ''}" @click="openDialogBox('save')">
                             <v-icon :style="{opacity: IsEdited ? '1' : '0.4'}" size=14>$aktoWhite</v-icon>
-                            <span class="file-name" :style="{opacity: IsEdited ? '1' : '0.2' ,'cursor' : 'pointer'}">Save</span>
+                            <span class="file-name" :style="{opacity: IsEdited ? '1' : '0.2'}">Save</span>
                         </div>
                     </div>
-                    <div ref="editor" style="width: 625px; height: 800px;" class="monaco-editor"></div>
+                    <div ref="editor" style="height: calc(100vh - 120px);" class="monaco-editor"></div>
+                    <selector-modal 
+                        :show-dialog="showDialogBox" 
+                        :title="titleBox" 
+                        @closeDialog="closeDialog" 
+                        :currentParam="currentParam"
+                        :test-categories="testCategories"
+                        @get_form_values="getFormValues"
+                    />
                 </div>
-                <div :style="{'width': '650px' , 'height' : '800px' , 'overflow-y' : 'scroll'}" class="req-resp-col">
-                    <sample-data :json="json" requestTitle="Request" responseTitle="Response" :tabularDisplay="true"/>
-                    <div class="select-url">
+                <div class="req-resp-col">
+                    <div class="req-box-container" v-if="messageJson.message">
+                        <sample-data 
+                            :json="json" 
+                            requestTitle="Request" 
+                            responseTitle="Response" 
+                            :tabularDisplay="true" 
+                            @run_tests="showRunTests"
+                            :isLoading="runTestObj.isLoading"
+                        />
+                    </div>
+                    <div class="empty-container" v-else>
+                        No Values Yet !!
+                    </div>
+                    <div class="select-url" @click="openDialogBox('choose')">
                         <v-icon size=12>$fas_check</v-icon>
-                        <span class="file-name url-name">Show Url Name here</span>
+                        <span class="file-name url-name">{{ selectedUrl.url }}</span>
+                    </div>
+                    <div class="footer-div">
+                        <div class="show-run-test" v-if="!runTest">
+                            Run test to see Results
+                        </div>
+                        <div class="show-run-test" v-else-if="runTestObj.isLoading">
+                            Running tests...
+                        </div>
+                        <div v-else>
+                            <div class="show-complete-details" v-if="showAllDetails">
+                                <span class="title-name">
+                                    {{ runTestObj.totalFoundAttempts }} / {{ runTestObj.totalAttempts }} Attempts Found Vulnerable
+                                </span>
+                                <v-btn class="show-attempts-box">
+                                    Show all Attempts
+                                    <v-icon size=14 :style="{'transform': 'rotate(45deg) !important'}">$fas_arrow-up</v-icon>
+                                </v-btn>
+                            </div>
+                            <div class="vulnerable-container">
+                                <span>
+                                    <v-icon 
+                                        size=14
+                                        :style="{transform: showAllDetails ? 'rotate(180deg)' : '', transition: 'all 0.2s linear', cursor: 'pointer'}"
+                                        @click="showAllDetails = !showAllDetails"
+                                    >
+                                        $fas_angle-double-down
+                                    </v-icon>
+                                    <span :style="{'color': getTextColor}">{{ runTestObj.vulnerability }}</span> 
+                                    <span>Vulnerability Found</span>
+                                </span>
+                                <span class="show-side">
+                                    <v-icon size=16>$far_clock</v-icon>
+                                    <span>{{ runTestObj.runTime }}</span>
+                                </span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -99,9 +156,12 @@
 import {editor} from "monaco-editor/esm/vs/editor/editor.api"
 import Search from '../shared/components/inputs/Search.vue';
 import LayoutWithLeftPane from '../layouts/LayoutWithLeftPane.vue';
-import issuesApi from "../views/issues/api"
 import SampleData from '../shared/components/SampleData.vue';
 import SimpleLayout from '../layouts/SimpleLayout.vue';
+import SelectorModal from './SelectorModal.vue';
+
+import issuesApi from "../views/issues/api"
+import inventoryApi from "../views/observe/inventory/api"
 
 import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController';
 import 'monaco-editor/esm/vs/editor/contrib/folding/browser/folding';
@@ -125,10 +185,10 @@ export default {
         Search,
         LayoutWithLeftPane,
         SampleData,
-        SimpleLayout
+        SimpleLayout,
+        SelectorModal
     },
     data(){
-        let message = {"method":"OPTIONS","requestPayload":"","responsePayload":null,"ip":"null","source":"HAR","type":"http/2.0","akto_vxlan_id":"1677246598","path":"https://metrics.api.drift.com/monitoring/metrics/widget/init/v2","requestHeaders":"{\"sec-fetch-mode\":\"cors\",\"referer\":\"https://js.driftt.com/\",\"sec-fetch-site\":\"cross-site\",\"accept-language\":\"en-US,en;q=0.9\",\"origin\":\"https://js.driftt.com\",\"access-control-request-method\":\"POST\",\"accept\":\"*/*\",\":method\":\"OPTIONS\",\":scheme\":\"https\",\"access-control-request-headers\":\"authorization,content-type\",\":path\":\"/monitoring/metrics/widget/init/v2\",\":authority\":\"metrics.api.drift.com\",\"accept-encoding\":\"gzip, deflate, br\",\"sec-fetch-dest\":\"empty\",\"user-agent\":\"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36\"}","responseHeaders":"{\"allow\":\"POST,OPTIONS\",\"date\":\"Fri, 24 Feb 2023 13:51:34 GMT\",\"content-length\":\"13\",\"server\":\"istio-envoy\",\"x-envoy-upstream-service-time\":\"1\",\"access-control-allow-headers\":\"origin, content-type, accept, authorization, auth-token, uber-trace-id, x-amzn-oidc-data, x-version\",\"access-control-allow-methods\":\"GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH\",\"strict-transport-security\":\"max-age=31536000; includeSubDomains\",\"access-control-expose-headers\":\"X-Results-Total-Count,X-Page-Info\",\"access-control-allow-origin\":\"*\",\"access-control-allow-credentials\":\"true\",\"access-control-max-age\":\"1209600\",\"requestid\":\"driftd26a1234f4392c3e80c91029004\",\"content-type\":\"text/plain\"}","time":"1677246694","contentType":"text/plain","akto_account_id":"1000000","statusCode":"200","status":""}
         return{
             editorOptions : {
                 language: "yaml",
@@ -143,17 +203,85 @@ export default {
             testCategories: [],
             testsObj:{},
             businessLogicSubcategories:[],
+            vulnerableRequests: [],
             mapTestToYaml : {},
-            totalTests: 0,
+            totalAktoTests: 0,
             aktoToggle: false,
             customToggle: false,
             totalCustomTests: 0,
             IsEdited: false,
             defaultValue: '',
-            messageJson: message
+            messageJson: {},
+            showDialogBox: false,
+            titleBox: '',
+            currentParam: '',
+            runTest:false,
+            showAllDetails: false,
+            mapRequestsToId: {},
+            selectedUrl: {},
+            runTestObj:{
+                isLoading:false,
+                totalAttempts: 16,
+                totalFoundAttempts: 12,
+                runTime: "0.50 seconds",
+                vulnerability: "HIGH",
+            }
         }
     },
     methods: {
+        getFormValues(param,formValues){
+            if(param === 'choose'){
+                this.selectedUrl = {
+                    apiCollectionId: formValues.name,
+                    url: formValues.url.url,
+                    method: formValues.url.method
+                }
+                this.makeJson()
+            }
+        },
+        setSelectedMethod(testId){
+            this.selectedUrl = {}
+            if(this.mapRequestsToId[testId] && this.mapRequestsToId[testId].length > 0){
+                let obj = {
+                    apiCollectionId : this.mapRequestsToId[testId][0].apiCollectionId,
+                    url : this.mapRequestsToId[testId][0].url,
+                    method : this.mapRequestsToId[testId][0].method._name
+                }
+                this.selectedUrl = obj
+                this.makeJson()
+            }
+        },
+        makeJson(){
+            this.messageJson = {}
+            inventoryApi.fetchSampleData(this.selectedUrl.url,this.selectedUrl.apiCollectionId,this.selectedUrl.method).then((resp)=>{
+                if(resp.sampleDataList[0].samples && resp.sampleDataList[0].samples.length > 0){
+                    this.messageJson = {"message" : resp.sampleDataList[0].samples[0], "highlightPaths":[]}
+                }
+            })
+        },
+        showRunTests(){
+            if(!this.runTestObj.isLoading){
+                this.runTest = true
+            }
+        },
+        openDialogBox(param){
+            this.currentParam = param
+            if(param === "save"){
+                if(this.IsEdited){
+                    // show collections
+                    this.showDialogBox = true
+                    this.titleBox = "Update Your Test Details"
+                }
+            }else{
+                // show urls
+                this.showDialogBox = true
+                this.titleBox = "Select API from Inventory"
+            }
+        },
+        closeDialog(){
+            this.showDialogBox = false
+            this.titleBox = ''
+        },
         openTestLink(){
             window.open("https://chat.openai.com/")
         },
@@ -195,16 +323,25 @@ export default {
                     value: x.name,
                     icon: "$aktoWhite"
                 }
+                this.mapTestToYaml[x.testName] = x.content
                 ret[x.superCategory.name].all.push(obj)
             })
-            this.totalTests = this.businessLogicSubcategories.length
+            this.totalAktoTests = this.businessLogicSubcategories.length
             return ret
         },
-        mapTestToYamlFunc(){
-            this.businessLogicSubcategories.forEach(x => {
-                this.mapTestToYaml[x.testName] = x.content
+        mapRequests(){
+            this.mapRequestsToId = {}
+            this.vulnerableRequests.forEach((x) =>{
+                let methodArr = x.templateIds
+                methodArr.forEach((method) =>{
+                    if (!this.mapRequestsToId[method]) {
+                        this.mapRequestsToId[method] =  []
+                    }
+
+                    this.mapRequestsToId[method].push(x.id)
+                })
             })
-        }
+        },
     },
     async mounted() {
         this.createEditor()
@@ -212,8 +349,9 @@ export default {
         issuesApi.fetchAllSubCategories().then(resp => {
             _this.testCategories = resp.categories
             _this.businessLogicSubcategories = resp.subCategories
+            _this.vulnerableRequests = resp.vulnerableRequests
             _this.testsObj = _this.populateMapCategoryToSubcategory()
-            this.mapTestToYamlFunc()
+            _this.mapRequests()
         })
         _this.textEditor.onDidChangeModelContent(() =>{
             _this.IsEdited = _this.textEditor.getValue() !== _this.defaultValue
@@ -222,9 +360,9 @@ export default {
     computed:{
         json(){
             return {
-                "message": this.messageJson,
-                title: "Aryan",
-                "highlightPaths": [],
+                "message": JSON.parse(this.messageJson["message"]),
+                title: this.messageJson["title"],
+                "highlightPaths": this.messageJson["highlightPaths"],
             }
         },
         selectedTestCategories(){
@@ -235,7 +373,20 @@ export default {
                 }
             })
             return arr
-        }
+        },
+        getTextColor(){
+            switch (this.runTestObj.vulnerability) {
+                case 'HIGH':
+                    return 'var(--hexColor3)';
+                case 'MEDIUM':
+                    return 'var(--hexColor2)';
+                case 'LOW':
+                    return 'var(--hexColor1)';
+                default:
+                    return 'var(--hexColor5)';
+            }
+
+        },
     }
 }
 </script>
@@ -265,17 +416,26 @@ export default {
     .test-col::-webkit-scrollbar {
         display: none;
     }
+    .req-box-container >>> .sample-data-container::-webkit-scrollbar {
+        display: none;
+    }
+    .req-box-container >>> .sample-data-container{
+        max-height: 650px;
+        overflow-y: scroll ;
+    }
 </style>
 
 <style lang="scss" scoped>
     .test-col {
-        width: 330px;
-        height: 800px;
+        flex:1.5;
+        max-height: calc(100vh - 72px);
+        overflow-y: scroll;
     }
     .editor-col {
-        width: 640px;
+        flex: 3;
         border-right: 4px solid var(--hexColor43);
         border-left: 4px solid var(--hexColor43);
+        max-width: 50vw;
         .editor-header-container {
             display: flex;
             padding: 18px 24px 8px 24px;
@@ -284,10 +444,69 @@ export default {
                 display: flex;
                 gap: 4px;
                 align-items: center;
-            } 
+            }
+            .last-edited {
+                font-size: 12px;
+                color: var(--themeColorDark10);
+            }
         }
         .monaco-editor{
             border-top: 0.2px solid var(--lighten2);
+        }
+    }
+    
+    .req-resp-col {
+        flex: 3;
+        height: calc(100vh - 120px);
+        overflow-y: scroll; 
+        display: flex;
+        flex-direction: column;
+        .empty-container{
+            padding: 42px 14px;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--themeColorDark);
+        }
+        .req-box-container{
+            flex: 16;
+        }
+        .footer-div{
+            flex: 1;
+            .show-run-test, .vulnerable-container {
+                position: absolute;
+                bottom: 0;
+                padding: 10px 14px;
+                border-top: 1px solid var(--hexColor44);
+                width: -webkit-fill-available;
+                font-weight: 500;
+                font-size: 16px;
+                color: var(--themeColorDark);
+            }
+            .vulnerable-container{
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                .show-side {
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                }
+            }
+            .show-complete-details {
+                display: flex;
+                flex-direction: column;
+                padding: 12px 20px;
+                gap: 16px;
+                border-top: 1px solid var(--hexColor44);
+                margin-top: 12px;
+            }
+            .show-attempts-box {
+                box-shadow: none;
+                border: 1px solid var(--black);
+                background: var(--white) !important;
+                color: var(--themeColorDark) !important;
+                width: 180px;
+            }
         }
     }
     .file-name{
@@ -310,21 +529,20 @@ export default {
         gap: 20px;
     }
     .main-list-title {
-        width: 260px;
+        // width: 260px;
         padding: 0px 6px;
         display: flex;
         gap: 10px;
         align-items:center;
         cursor: pointer;
-
-        .title-name{
-            font-size: 16px;
-            font-weight: 500;
-            color: var(--themeColorDark);
-            display: flex;
-            align-items: center;
-            gap: 7px;
-        }
+    }
+    .title-name{
+        font-size: 16px;
+        font-weight: 500;
+        color: var(--themeColorDark);
+        display: flex;
+        align-items: center;
+        gap: 7px;
     }
 
     .tests-list{
@@ -389,6 +607,7 @@ export default {
         height: 30px;
         gap:4px;
         cursor: pointer;
+        border-radius: 4px;
         .url-name{
             font-size: 12px !important;
             overflow:hidden;
