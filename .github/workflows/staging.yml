@@ -82,9 +82,9 @@ jobs:
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG $IMAGE_TAG_DASHBOARD . --push
           echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG" 
           cd ../api-runtime
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-api-runtime:$IMAGE_TAG .
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-runtime:$IMAGE_TAG .
           echo "Pushing image to ECR..."
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY-api-runtime:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY-runtime:$IMAGE_TAG
           echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-api-runtime:$IMAGE_TAG"  
           cd ../testing
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG $IMAGE_TAG_TESTING . --push
