@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 public class AsyncResultFetcherStrategy implements ResultFetcherStrategy<BasicDBObject> {
 
@@ -24,9 +25,9 @@ public class AsyncResultFetcherStrategy implements ResultFetcherStrategy<BasicDB
         data.put("request_id", requestId);
         logger.info("Request body:" + data.toJson());
         OkHttpClient client = new OkHttpClient().newBuilder()
-                .writeTimeout(3, java.util.concurrent.TimeUnit.SECONDS)
-                .readTimeout(3, java.util.concurrent.TimeUnit.SECONDS)
-                .callTimeout(3, java.util.concurrent.TimeUnit.SECONDS)
+                .writeTimeout(3, TimeUnit.SECONDS)
+                .readTimeout(3, TimeUnit.SECONDS)
+                .callTimeout(3, TimeUnit.SECONDS)
                 .build();
         MediaType mediaType = MediaType.parse("application/json");
         RequestBody body = RequestBody.create(mediaType, new BasicDBObject("data", data).toJson());
@@ -70,57 +71,53 @@ public class AsyncResultFetcherStrategy implements ResultFetcherStrategy<BasicDB
     private BasicDBObject fetchResponse(String requestId) {
         int attempts = 0;
         String status = "";
-        while(attempts < 10 && !status.equalsIgnoreCase("READY")){
-            logger.info("Attempt: " + attempts + " for request id: " + requestId);
+        OkHttpClient client = new OkHttpClient().newBuilder()
+                .writeTimeout(2, TimeUnit.SECONDS)
+                .readTimeout(2, TimeUnit.SECONDS)
+                .callTimeout(2, TimeUnit.SECONDS)
+                .build();
+
+        while (attempts < 10 && !status.equalsIgnoreCase("READY")) {
+            logger.info("Attempt: {} for request id: {}", attempts, requestId);
             BasicDBObject data = new BasicDBObject("request_id", requestId);
-            OkHttpClient client = new OkHttpClient().newBuilder()
-                    .writeTimeout(2, java.util.concurrent.TimeUnit.SECONDS)
-                    .readTimeout(2, java.util.concurrent.TimeUnit.SECONDS)
-                    .callTimeout(2, java.util.concurrent.TimeUnit.SECONDS)
-                    .build();
             MediaType mediaType = MediaType.parse("application/json");
             RequestBody body = RequestBody.create(mediaType, new BasicDBObject("data", data).toJson());
             Request request = new Request.Builder()
                     .url(FETCH_RESPONSE_URL)
-                    .method("POST", body)
+                    .post(body)
                     .addHeader("Content-Type", "application/json")
                     .build();
-            Response response = null;
-            String resp_body = "";
-            try {
-                response =  client.newCall(request).execute();
+
+            try (Response response = client.newCall(request).execute()) {
                 ResponseBody responseBody = response.body();
-                if(responseBody != null) {
-                    resp_body = responseBody.string();
+                if (responseBody != null) {
+                    String resp_body = responseBody.string();
+                    BasicDBObject responseJson = BasicDBObject.parse(resp_body);
+                    logger.info("Response from lambda: {}, attempt #{}", responseJson, attempts);
+                    status = responseJson.getString("status");
+
+                    if (status.equalsIgnoreCase("READY")) {
+                        logger.info("Response from lambda: {}. Found response in {} attempts", responseJson, attempts);
+                        String response1 = responseJson.getString("response");
+                        return BasicDBObject.parse(response1);
+                    }
                 }
             } catch (IOException e) {
-                logger.error("Error while executing request " + request.url() + ": " + e);
-            } finally {
-                if (response != null) {
-                    response.close();
-                }
+                logger.error("Error while executing request {}", request.url(), e);
             }
 
-            BasicDBObject responseJson = BasicDBObject.parse(resp_body);
-            logger.info("Response from lambda: {}, attempt #{}", responseJson, attempts);
-            status = responseJson.getString("status");
-
-            if(status.equalsIgnoreCase("READY")){
-                logger.info("Response from lambda: {}. Found response in {} attempts", responseJson, attempts);
-                String response1 = responseJson.getString("response");
-                return BasicDBObject.parse(response1);
-            }
             attempts++;
             try {
-                Thread.sleep(1000 * 5);
+                logger.info("Sleeping for 5 seconds");
+                Thread.sleep(5000);
             } catch (InterruptedException e) {
-                e.printStackTrace();
-                logger.info("Error while fetching AktoGPT response: " + e);
+                Thread.currentThread().interrupt();
+                logger.error("Error while fetching AktoGPT response", e);
             }
         }
         return new BasicDBObject("error", "Timed out while fetching response from AktoGPT");
-
     }
+
 
 
 }
