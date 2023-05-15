@@ -200,9 +200,7 @@ public class ExportSampleDataAction extends UserAction {
                 httpResponseParams = new HttpResponseParams();
                 httpResponseParams.requestParams = httpRequestParams;
             } catch (Exception e1) {
-//                addActionError("Couldn't parse the data");
                 throw e1;
-//                return ERROR.toUpperCase();
             }
 
         }
@@ -268,8 +266,6 @@ public class ExportSampleDataAction extends UserAction {
                 }
             }
         } catch (Exception e) {
-            ;
-//            addActionError("Error parsing the body");
             throw e;
         }
 
