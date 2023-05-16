@@ -20,8 +20,9 @@
         <div class="request-title">Headers</div>
         <template-string-editor :defaultText="this.updatedData['headerString']" :onChange=onChangeHeaders />
 
-        <div class="request-title">Body</div>
-        <template-string-editor :defaultText="this.updatedData['body']" :onChange=onChangeBody />
+        <!-- <div class="request-title">Body</div>
+        <template-string-editor :defaultText="this.updatedData['body']" :onChange=onChangeBody /> -->
+
         <div class="request-title">Options</div>
 
         <!-- @clickedItem="appliedFilter(filterMenu.value, $event)"
