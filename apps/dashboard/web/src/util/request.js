@@ -5,7 +5,7 @@ import router from "@/apps/main/router";
 // create axios
 const service = axios.create({
   baseURL: window.location.origin, // api base_url
-  timeout: 50000, // timeout,
+  timeout: 60000, // timeout,
   headers: { 'Access-Control-Allow-Origin': '*' }
 })
 
