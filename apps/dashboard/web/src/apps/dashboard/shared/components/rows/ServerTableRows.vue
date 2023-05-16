@@ -10,7 +10,7 @@
             v-for="(header, ii) in headers.slice(1)"
             :key="ii"
             class="table-column clickable"
-            @click="clickRow(index)"
+            @click="($event) => clickRow(index, $event)"
             :style="{'height': dense ? '24px !important' : '48px'}"
         >
             <slot :name="[`item.${header.value}`]" :item="item">
@@ -57,8 +57,8 @@ export default {
             })
             return arrayActions
         },
-        clickRow(index){
-            this.$emit('clickRow',index)
+        clickRow(index, $event){
+            this.$emit('clickRow',index, $event)
         },
         showRowFunctions(index) {
             this.$emit('highlightRow', index)
