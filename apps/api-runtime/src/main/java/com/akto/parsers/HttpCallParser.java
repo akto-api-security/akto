@@ -236,6 +236,10 @@ public class HttpCallParser {
 
         String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
 
+        if (hostName != null &&  hostName.toLowerCase().equals(hostName.toUpperCase()) ) {
+            hostName = "ip-host";
+        }
+
         return new TrafficMetrics.Key(
                 httpResponseParam.getSourceIP(), hostName, httpResponseParam.requestParams.getApiCollectionId(),
                 name, bucketStartEpoch, bucketEndEpoch

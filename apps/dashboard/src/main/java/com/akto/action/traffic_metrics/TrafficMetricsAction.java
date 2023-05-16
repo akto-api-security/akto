@@ -113,12 +113,21 @@ public class TrafficMetricsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String fetchTrafficMetricsDesciptions(){
+        names = Arrays.asList(TrafficMetrics.Name.values());
+        return SUCCESS.toUpperCase();
+    }
+
     public void setStartTimestamp(int startTimestamp) {
         this.startTimestamp = startTimestamp;
     }
 
     public void setEndTimestamp(int endTimestamp) {
         this.endTimestamp = endTimestamp;
+    }
+
+    public List<TrafficMetrics.Name> getNames() {
+        return names;
     }
 
     public void setNames(List<TrafficMetrics.Name> names) {

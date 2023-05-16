@@ -26,5 +26,14 @@ export default {
                 url, category, subcategory, severity, description
             }
         })
+    },
+    searchTestResults(searchText){
+        return request({
+            url: 'api/fetchSearchTestResults',
+            method: 'post',
+            data:{
+                searchText
+            }
+        })
     }
 }

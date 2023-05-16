@@ -51,6 +51,11 @@
                         </span>
                     </div>
                 </div>                  
+
+                <div class="testing-results-header" v-if="this.currentTest && this.currentTest.metadata">
+                    CI/CD Run Details: {{ this.currentTest.metadata }}
+                </div>
+
                 <simple-table
                     :headers="testingRunResultsHeaders" 
                     :items="testingRunResultsItems" 
@@ -311,6 +316,11 @@ export default {
             }
         }, 5000)
 
+        if(this.currentTest){
+            if(this.startTimestamp > this.currentTest.startTimestamp){
+                this.startTimestamp = this.currentTest.startTimestamp
+            }
+        }
     },
 
     destroyed() {
@@ -319,7 +329,7 @@ export default {
     },
 
     computed: {
-        ...mapState('testing', ['testingRuns', 'pastTestingRuns']),
+        ...mapState('testing', ['testingRuns', 'pastTestingRuns','cicdTestingRuns']),
         subCatogoryMap: {
             get() {
                 return this.$store.state.issues.subCatogoryMap
@@ -342,7 +352,7 @@ export default {
             }, {})
         },
         testingRun() {
-            return [...this.testingRuns, ...this.pastTestingRuns].filter(x => x.hexId === this.testingRunHexId)[0]
+            return [...this.testingRuns, ...this.pastTestingRuns, ...this.cicdTestingRuns].filter(x => x.hexId === this.testingRunHexId)[0]
         },
         endpoints() {
             return this.testingRun ? testing.getEndpoints(this.testingRun.testingEndpoints) : "-"

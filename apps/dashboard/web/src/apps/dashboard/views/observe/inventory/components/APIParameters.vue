@@ -3,11 +3,13 @@
         <spinner/>
     </div>
     <div v-else>
-        <div class="fix-at-top" v-if="allSamples && allSamples.length > 0">
-            <v-btn dark depressed color="var(--gptColor)" @click="showGPTScreen()">
-                Ask AktoGPT 
-                <v-icon size="16">$chatGPT</v-icon>
-            </v-btn>
+        <div v-if="renderAktoGptButton">
+            <div class="fix-at-top" v-if="allSamples && allSamples.length > 0">
+                <v-btn dark depressed color="var(--gptColor)" @click="showGPTScreen()">
+                    Ask AktoGPT 
+                    <v-icon size="16">$chatGPT</v-icon>
+                </v-btn>
+            </div>
         </div>
 
         <v-dialog
@@ -20,6 +22,7 @@
                 <chat-gpt-input
                     v-if="showGptDialog"
                     :items="chatGptPrompts"
+                    :apiCollectionId="apiCollectionId"
                 />
             </div>
 
@@ -130,7 +133,8 @@ export default {
                     prepareQuery: () => { return {
                         type: "list_sensitive_params",
                         meta: {
-                            "sampleData": this.parseMsg(this.allSamples[0].message)
+                            "sampleData": this.parseMsg(this.allSamples[0].message),
+                            "apiCollectionId": this.apiCollectionId
                         }                        
                     }},
                     callback: (data) => console.log("callback create api groups", data)
@@ -179,7 +183,8 @@ export default {
             loadingTrafficData: false,
             trafficInfo: {},
             sampleData: null,
-            sensitiveSampleData: null
+            sensitiveSampleData: null,
+            renderAktoGptButton: false
         }  
     },
     methods: {
@@ -305,9 +310,18 @@ export default {
         },
         responseItems() {
             return this.parameters.filter(x => x.responseCode > -1).map(this.prepareItem)
-        }
+        },
     },
     async mounted() {
+        let _this = this;
+        api.fetchAktoGptConfig(this.apiCollectionId).then(aktoGptConfig => {
+            if(aktoGptConfig.currentState[0].state === "ENABLED") {
+                _this.renderAktoGptButton = true;
+            }
+            else {
+                _this.renderAktoGptButton = false;
+            }
+        })
         this.$emit('mountedView', {apiCollectionId: this.apiCollectionId, urlAndMethod: this.urlAndMethod, type: 2})
         if (
             this.$store.state.inventory.apiCollectionId !== this.apiCollectionId || 
@@ -363,7 +377,6 @@ export default {
     right: 260px
     top: 18px
 .gpt-dialog-container
-    min-height: 300px
     background-color: var(--gptBackground)
 .table-title
     font-size: 16px    
