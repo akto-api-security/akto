@@ -1132,8 +1132,23 @@ public class APICatalogSync {
             );
         }
 
+        triggerUpdateStiView();
+
         return new DbUpdateReturn(bulkUpdates, bulkUpdatesForSampleData, bulkUpdatesForSensitiveParamInfo);
     }
+
+    public static void triggerUpdateStiView() {
+        try {
+            loggerMaker.infoAndAddToDb("trigger update sti view called " + Context.now(), LogDb.RUNTIME);
+            SingleTypeInfoDao.instance.createStiCollectionView();
+            logger.info("trigger update sti view merge called " + Context.now());
+            SingleTypeInfoDao.instance.mergeStiViewAndApiInfo();
+            logger.info("trigger update sti view merge finished " + Context.now());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in trigger update sti view " + e.getMessage(), LogDb.RUNTIME);
+        }
+    }
+
 
     public static class DbUpdateReturn {
         public ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSingleTypeInfo;

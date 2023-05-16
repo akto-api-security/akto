@@ -37,6 +37,12 @@ public class AccountSettings {
 
     public static final String URL_REGEX_MATCHING_ENABLED = "urlRegexMatchingEnabled";
 
+    private boolean runUpdateStiView;
+    public static final String RUN_UPDATE_STI_VIEW = "runUpdateStiView";
+
+    private boolean runRebuildStiView;
+    public static final String RUN_REBUILD_STI_VIEW = "runRebuildStiView";
+
     public AccountSettings() {
     }
 
@@ -164,6 +170,22 @@ public class AccountSettings {
 
     public void setUrlRegexMatchingEnabled(boolean urlRegexMatchingEnabled) {
         this.urlRegexMatchingEnabled = urlRegexMatchingEnabled;
+    }
+
+    public boolean getRunUpdateStiView() {
+        return runUpdateStiView;
+    }
+
+    public void setRunUpdateStiView(boolean runUpdateStiView) {
+        this.runUpdateStiView = runUpdateStiView;
+    }
+
+    public boolean getRunRebuildStiView() {
+        return runRebuildStiView;
+    }
+
+    public void setRunRebuildStiView(boolean runRebuildStiView) {
+        this.runRebuildStiView = runRebuildStiView;
     }
     
 }

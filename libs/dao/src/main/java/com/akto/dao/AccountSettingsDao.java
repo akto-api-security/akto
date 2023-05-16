@@ -2,6 +2,8 @@ package com.akto.dao;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
@@ -9,6 +11,7 @@ import org.bson.conversions.Bson;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.Map;
 
 public class AccountSettingsDao extends AccountsContextDao<AccountSettings> {
 
@@ -21,6 +24,8 @@ public class AccountSettingsDao extends AccountsContextDao<AccountSettings> {
     }
 
     public static final AccountSettingsDao instance = new AccountSettingsDao();
+
+    private static final Gson gson = new Gson();
 
     @Override
     public String getCollName() {
@@ -62,5 +67,24 @@ public class AccountSettingsDao extends AccountsContextDao<AccountSettings> {
             AccountSettingsDao.generateFilter(),
             Updates.set(AccountSettings.RUN_CREATE_STI_VIEW, value)
         );
+    }
+
+    public Boolean updateStiViewFlag(boolean value, String flag) {
+        Object obj = instance.updateMany(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(flag, value));
+
+        ObjectMapper mapper = new ObjectMapper();
+        String message;
+        try {
+            message = mapper.writeValueAsString(obj);
+            Map<String, Object> json = gson.fromJson(message, Map.class);
+            double modifiedCount = (double) json.get("modifiedCount");
+            int count = (int) modifiedCount;
+            return count > 0;
+        } catch (Exception e) {
+            return false;
+        }
+        
     }
 }

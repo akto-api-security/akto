@@ -332,38 +332,72 @@ public class Main {
     public static void createStiCollectionView() {
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-        boolean runCreateStiView = accountSettings == null ? false : accountSettings.getRunCreateStiView();
+        boolean runCreateStiView = accountSettings == null ? true : AccountSettingsDao.instance.updateStiViewFlag(true, AccountSettings.RUN_CREATE_STI_VIEW);
 
-        if (!runCreateStiView) {
-            AccountSettingsDao.instance.updateRunCreateStiViewFlag(true);
-            logger.info("create view called " + Context.now());
-            SingleTypeInfoDao.instance.createStiCollectionView();
-            logger.info("create sti view id index called " + Context.now());
-            SingleTypeInfoDao.instance.createStiViewIdIndex();
-            logger.info("create merge called " + Context.now());
-            SingleTypeInfoDao.instance.mergeStiViewAndApiInfo();
-            logger.info("create index called " + Context.now());
-            SingleTypeInfoDao.instance.createStiViewIndexes();
+        if (runCreateStiView) {
+            try {
+                AccountSettingsDao.instance.updateRunCreateStiViewFlag(true);
+                logger.info("create view called " + Context.now());
+                SingleTypeInfoDao.instance.createStiCollectionView();
+                logger.info("create sti view id index called " + Context.now());
+                SingleTypeInfoDao.instance.createStiViewIdIndex();
+                logger.info("create merge called " + Context.now());
+                SingleTypeInfoDao.instance.mergeStiViewAndApiInfo();
+                logger.info("create index called " + Context.now());
+                SingleTypeInfoDao.instance.createStiViewIndexes();
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error in create sti view " + e.getMessage(), LogDb.RUNTIME);
+            }
+            
         }
     }
 
     public static void updateStiCollectionView() {
-        logger.info("update view called " + Context.now());
-        SingleTypeInfoDao.instance.createStiCollectionView();
-        logger.info("update merge called " + Context.now());
-        SingleTypeInfoDao.instance.mergeStiViewAndApiInfo();
-        logger.info("update merge finished " + Context.now());
+
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        boolean runUpdateStiView = accountSettings == null ? true : AccountSettingsDao.instance.updateStiViewFlag(true, AccountSettings.RUN_UPDATE_STI_VIEW);
+
+        if (runUpdateStiView) {
+            try {
+                logger.info("update view called " + Context.now());
+                SingleTypeInfoDao.instance.createStiCollectionView();
+                logger.info("update merge called " + Context.now());
+                SingleTypeInfoDao.instance.mergeStiViewAndApiInfo();
+                logger.info("update merge finished " + Context.now());
+                AccountSettingsDao.instance.updateStiViewFlag(false, AccountSettings.RUN_UPDATE_STI_VIEW);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error in update sti view " + e.getMessage(), LogDb.RUNTIME);
+                AccountSettingsDao.instance.updateStiViewFlag(false, AccountSettings.RUN_UPDATE_STI_VIEW);
+            }
+        }
+
     }
 
     public static void rebuildStiCollectionView() {
-        SingleTypeInfoDao.instance.createStiCollectionViewReplica();
-        SingleTypeInfoDao.instance.createStiViewReplicaIdIndex();
-        SingleTypeInfoDao.instance.mergeStiViewReplicaAndApiInfo();
 
-        SingleTypeInfoViewDao.instance.dropCollection();
-        SingleTypeInfoViewReplicaDao.instance.renameCollection("single_type_info_view");
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        boolean runRebuildStiView = accountSettings == null ? true : AccountSettingsDao.instance.updateStiViewFlag(true, AccountSettings.RUN_REBUILD_STI_VIEW);
 
-        SingleTypeInfoDao.instance.createStiViewIndexes();
+        if (runRebuildStiView) {
+            try {
+                logger.info("rebuild view called " + Context.now());
+                SingleTypeInfoDao.instance.createStiCollectionViewReplica();
+                SingleTypeInfoDao.instance.createStiViewReplicaIdIndex();
+                SingleTypeInfoDao.instance.mergeStiViewReplicaAndApiInfo();
+
+                SingleTypeInfoViewDao.instance.dropCollection();
+                SingleTypeInfoViewReplicaDao.instance.renameCollection("single_type_info_view");
+
+                SingleTypeInfoDao.instance.createStiViewIndexes();
+
+                AccountSettingsDao.instance.updateStiViewFlag(false, AccountSettings.RUN_REBUILD_STI_VIEW);
+                logger.info("rebuild view finished " + Context.now());
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error in rebuild sti view " + e.getMessage(), LogDb.RUNTIME);
+                AccountSettingsDao.instance.updateStiViewFlag(false, AccountSettings.RUN_REBUILD_STI_VIEW);
+            }
+        }
+
     }
 
     public static void initializeRuntime(){
@@ -374,12 +408,16 @@ public class Main {
         insertRuntimeFilters();
         createStiCollectionView();
 
+        // setting sti view update flags false when server starts
+        AccountSettingsDao.instance.updateStiViewFlag(false, AccountSettings.RUN_UPDATE_STI_VIEW);   
+        AccountSettingsDao.instance.updateStiViewFlag(false, AccountSettings.RUN_REBUILD_STI_VIEW); 
+
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 Context.accountId.set(1_000_000);
                 updateStiCollectionView();
             }
-        }, 10, 15, TimeUnit.SECONDS);
+        }, 10, 30, TimeUnit.SECONDS);
 
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
