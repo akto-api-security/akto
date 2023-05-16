@@ -69,20 +69,11 @@ export default {
             return resp
         })
     },
-    addBurpToken() {
+    addApiToken(tokenUtility) {
         return request({
-            url: '/api/addBurpToken',
+            url: '/api/addApiToken',
             method: 'post',
-            data: {}
-        }).then((resp) => {
-            return resp
-        })
-    },
-    addExternalApiToken() {
-        return request({
-            url: '/api/addExternalApiToken',
-            method: 'post',
-            data: {}
+            data: {tokenUtility}
         }).then((resp) => {
             return resp
         })
@@ -258,5 +249,23 @@ export default {
             return resp
         })
     },
+    fetchAktoGptConfig(){
+        return request({
+            url: '/api/fetchAktoGptConfig',
+            method: 'post',
+            data: {
+                "apiCollectionId": -1
+            }
+        })
+    },
+    saveAktoGptConfig(aktoConfigList){
+        return request({
+            url: '/api/saveAktoGptConfig',
+            method: 'post',
+            data: {
+                "currentState": aktoConfigList
+            }
+        })
+    }
 
 }

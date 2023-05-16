@@ -182,11 +182,13 @@
             <tests-selector :collectionName="apiCollectionName" @testsSelected=startTest v-if="showTestSelectorDialog"/>
         </v-dialog>
 
-        <div class="fix-at-top">
-            <v-btn dark depressed color="var(--gptColor)" @click="showGPTScreen()">
-                Ask AktoGPT 
-                <v-icon size="16">$chatGPT</v-icon>
-            </v-btn>
+        <div v-if="renderAktoGptButton">
+            <div class="fix-at-top">
+                <v-btn dark depressed color="var(--gptColor)" @click="showGPTScreen()">
+                    Ask AktoGPT
+                    <v-icon size="16">$chatGPT</v-icon>
+                </v-btn>
+            </div>
         </div>
     </div>
 </template>
@@ -234,6 +236,15 @@ export default {
     },
     activated(){
         this.refreshPage(true)
+        let _this = this;
+        api.fetchAktoGptConfig(this.apiCollectionId).then(aktoGptConfig => {
+            if(aktoGptConfig.currentState[0].state === "ENABLED") {
+                _this.renderAktoGptButton = true;
+            }
+            else {
+                _this.renderAktoGptButton = false;
+            }
+        })
     },
     data() {
         return {
@@ -245,7 +256,8 @@ export default {
                     prepareQuery: () => { return {
                         type: "group_apis_by_functionality",
                         meta: {
-                            "urls": this.filteredItems.map(x => x.endpoint)
+                            "urls": this.filteredItems.map(x => x.endpoint),
+                            "apiCollectionId": this.apiCollectionId
                         }                        
                     }},
                     callback: (data) => console.log("callback create api groups", data)
@@ -257,7 +269,8 @@ export default {
                         type: "list_apis_by_type",
                         meta: {
                             "urls": this.filteredItems.map(x => x.endpoint),
-                            "type_of_apis": filterApi
+                            "type_of_apis": filterApi,
+                            "apiCollectionId": this.apiCollectionId
                         }                        
                     }},
                     callback: (data) => console.log("callback Tell me all the apis", data)
@@ -395,6 +408,7 @@ export default {
             getResponse:false,
             promptText: "",
             responseArr:[],
+            renderAktoGptButton: false
         }
     },
     methods: {
@@ -594,9 +608,14 @@ export default {
             } catch (e) {
             }
             return ret
+        },
+        fetchAktoGptButton(){
+            
         }
     },
-    async mounted() {}
+    async mounted() {
+        
+    }
 }
 </script>
 
