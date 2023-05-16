@@ -435,8 +435,8 @@ export default {
         showGPTScreen(){
             this.showGptDialog = true
         },
-        rowClicked(row) {
-            this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.endpoint + " " + row.method, type: 2})
+        rowClicked(row,$event) {
+            this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.endpoint + " " + row.method, type: 2},$event)
         },
         async downloadData() {
             
