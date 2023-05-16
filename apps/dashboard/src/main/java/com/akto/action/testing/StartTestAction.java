@@ -24,7 +24,6 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
-import com.akto.util.enums.GlobalEnums.TestSubCategory;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -250,9 +249,11 @@ public class StartTestAction extends UserAction {
         TestingRunResult result = TestingRunResultDao.instance.findOne(Constants.ID, testingRunResultId);
         try {
             if (result.isVulnerable()) {
-                TestSubCategory category = TestSubCategory.getTestCategory(result.getTestSubType());
+                // name = category
+                String category = result.getTestSubType();
                 TestSourceConfig config = null;
-                if (category.equals(GlobalEnums.TestSubCategory.CUSTOM_IAM)) {
+                // string comparison (nuclei test)
+                if (category.startsWith("http")) {
                     config = TestSourceConfigsDao.instance.getTestSourceConfig(result.getTestSubType());
                 }
                 TestingIssuesId issuesId = new TestingIssuesId(result.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING,

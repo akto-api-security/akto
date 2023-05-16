@@ -13,6 +13,7 @@ import com.akto.dto.runtime_filters.FieldExistsFilter;
 import com.akto.dto.FilterSampleData;
 import com.akto.dto.runtime_filters.ResponseCodeRuntimeFilter;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
@@ -215,7 +216,6 @@ public class DaoInit {
                 new EnumCodec<>(GlobalEnums.TestRunIssueStatus.class),
                 new EnumCodec<>(GlobalEnums.TestErrorSource.class),
                 new EnumCodec<>(GlobalEnums.TestCategory.class),
-                new EnumCodec<>(GlobalEnums.TestSubCategory.class),
                 new EnumCodec<>(GlobalEnums.IssueTags.class),
                 new EnumCodec<>(GlobalEnums.Severity.class),
                 new EnumCodec<>(TrafficMetrics.Name.class),

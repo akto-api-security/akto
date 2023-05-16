@@ -2,16 +2,18 @@ package com.akto.action.testing;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import com.akto.action.UserAction;
 import com.akto.dao.context.Context;
+import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
+import com.akto.dto.test_editor.Info;
+import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.util.enums.GlobalEnums;
-import com.akto.util.enums.GlobalEnums.IssueTags;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
-import com.akto.util.enums.GlobalEnums.TestSubCategory;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
@@ -44,7 +46,7 @@ public class MarketplaceAction extends UserAction {
     List<String> tags;
     String searchText;
     List<TestSourceConfig> searchResults = new ArrayList<>();
-    private List<TestSubCategory> inbuiltTests;
+    private List<BasicDBObject> inbuiltTests;
     private TestCategory[] categories;
 
     public String addCustomTest() {
@@ -63,14 +65,50 @@ public class MarketplaceAction extends UserAction {
         this.inbuiltTests = new ArrayList<>();
         this.categories = GlobalEnums.TestCategory.values();
         Bson filters = Filters.empty();
-        if(this.searchText == null){
-            for(TestSubCategory tsc : GlobalEnums.TestSubCategory.getValuesArray()){
-                this.inbuiltTests.add(tsc);
-            }
-        }
 
-        //fill from Updated test-source-config collection in mongodb
-        else{
+        Map<String, TestConfig> testConfigMap  = YamlTemplateDao.instance.fetchTestConfigMap();
+        this.searchText = this.searchText.toLowerCase();
+        
+        for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {
+            Info info = entry.getValue().getInfo();
+            if (info.getName().equals("FUZZING")) {
+                continue;
+            }
+            BasicDBObject infoObj = new BasicDBObject();
+            BasicDBObject superCategory = new BasicDBObject();
+            BasicDBObject severity = new BasicDBObject();
+            infoObj.put("issueDescription", info.getDescription());
+            infoObj.put("issueDetails", info.getDetails());
+            infoObj.put("issueImpact", info.getImpact());
+            infoObj.put("issueTags", info.getTags());
+            infoObj.put("testName", info.getName());
+            infoObj.put("references", info.getReferences());
+            infoObj.put("name", entry.getValue().getId());
+            infoObj.put("_name", entry.getValue().getId());
+
+            superCategory.put("displayName", info.getCategory().getDisplayName());
+            superCategory.put("name", info.getCategory().getName());
+            superCategory.put("shortName", info.getCategory().getShortName());
+
+            severity.put("_name",info.getSeverity());
+            superCategory.put("severity", severity);
+            infoObj.put("superCategory", superCategory);
+
+            String testCategory = info.getCategory().getDisplayName().toLowerCase();
+            String testSeverity = info.getSeverity().toLowerCase();
+            String businessTags = "";
+            List<String> tagInfo = info.getTags();
+            for (String tag: tagInfo) {
+                businessTags = businessTags + tag.toLowerCase();
+            }
+
+            String matchedString = info.getDescription().toLowerCase() + " " + info.getName() + " " + testCategory  + " " + testSeverity + " " + businessTags;
+            if(this.searchText == null || this.searchText.trim().length() == 0 || matchedString.matches("(.*)" + this.searchText + "(.*)")){
+                this.inbuiltTests.add(infoObj);
+            }
+
+        }
+        if(this.searchText != null){
             filters = Filters.or(
                 Filters.regex("severity", this.searchText, "i"),
                 Filters.regex("category", this.searchText, "i"),
@@ -78,24 +116,6 @@ public class MarketplaceAction extends UserAction {
                 Filters.regex("description", this.searchText, "i"),
                 Filters.regex("subcategory", this.searchText, "i")
             );
-
-            this.searchText = this.searchText.toLowerCase();
-            //fill from akto tests in global enums
-            for(TestSubCategory tsc : GlobalEnums.TestSubCategory.getValuesArray()){
-                String testCategory = tsc.getSuperCategory().getDisplayName().toLowerCase();
-                String testSeverity = tsc.getSuperCategory().getSeverity().toString().toLowerCase();
-                String businessTags = "";
-                IssueTags[] issueTags  = tsc.getIssueTags();
-                for(IssueTags tag : issueTags){
-                    businessTags = businessTags + tag.getName().toLowerCase();
-                }
-
-                String matchedString = tsc.getIssueDescription().toLowerCase() + " " + tsc.getTestName().toLowerCase() + " " + testCategory  + " " + testSeverity + " " + businessTags;
-                if(matchedString.matches("(.*)" + this.searchText + "(.*)")){
-                    this.inbuiltTests.add(tsc);
-                }
-
-            }
         }
         this.searchResults = TestSourceConfigsDao.instance.findAll(filters);
     }
@@ -189,7 +209,7 @@ public class MarketplaceAction extends UserAction {
         this.searchText = searchText;
     }
 
-    public List<TestSubCategory> getinbuiltTests() {
+    public List<BasicDBObject> getinbuiltTests() {
         return this.inbuiltTests;
     }
 
