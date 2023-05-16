@@ -48,21 +48,22 @@
 <script>
 
 import IntegrationLogo from "@/apps/dashboard/shared/components/integrations/IntegrationLogo";
-import BurpSuiteIntegration from "./BurpSuiteIntegration"
 import SlackIntegration from "./SlackIntegration"
 import Postman from "./Postman"
 import AktoAPIIntegration from "./AktoApiIntegration"
 import WebhookIntegration from "./webhook/WebhookIntegration";
+import func from "@/util/func";
+import AktoGptConfig from "./AktoGptConfig";
 
 export default {
   name: "IntegrationSelector",
   components: {
     IntegrationLogo,
-    BurpSuiteIntegration,
     SlackIntegration,
     Postman,
     AktoAPIIntegration,
-    WebhookIntegration
+    WebhookIntegration,
+    AktoGptConfig
   },
   data () {
     let integrationsList = [
@@ -70,7 +71,12 @@ export default {
         name:'Traffic Sources',
         connectors: [{
           name: 'BurpSuite',
-          component: BurpSuiteIntegration
+          component: AktoAPIIntegration,
+          props:{
+            title:"Burp",
+            tokenUtility:func.testingResultType().BURP,
+            avatar_image:"$burpsuite"
+          }
         }],
       },
       {
@@ -84,7 +90,27 @@ export default {
         name: 'Automation',
         connectors: [{
           name: 'Akto API',
-          component: AktoAPIIntegration
+          component: AktoAPIIntegration,
+          props:{
+            title:"External APIs",
+            tokenUtility:func.testingResultType().EXTERNAL_API,
+            avatar_image:"$restapi"
+          }
+        },{
+          name: 'CI/CD Integeration',
+          component: AktoAPIIntegration,
+          props:{
+            title:"CI/CD Integeration",
+            tokenUtility:func.testingResultType().CICD,
+            avatar_image:"$cicdicon"
+          }
+        }]
+      },
+      {
+        name: 'Akto GPT',
+        connectors: [{
+          name: 'Akto GPT',
+          component: AktoGptConfig
         }]
       },
       {
@@ -151,7 +177,6 @@ export default {
       setTimeout(() => this.scrolling = false, 500);
     },
     addConnector(type) {
-      console.log(type);
       this.$emit('connectorSelected', type)
     }
   }

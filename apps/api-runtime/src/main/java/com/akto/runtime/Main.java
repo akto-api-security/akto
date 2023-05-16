@@ -18,7 +18,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.testing.SingleTypeInfoView;
 import com.akto.runtime.policies.AktoPolicies;
 import com.google.gson.Gson;
 import com.mongodb.ConnectionString;

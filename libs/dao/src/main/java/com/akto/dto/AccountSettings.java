@@ -33,6 +33,9 @@ public class AccountSettings {
 
     private boolean runCreateStiView;
     public static final String RUN_CREATE_STI_VIEW = "runCreateStiView";
+    private boolean urlRegexMatchingEnabled;
+
+    public static final String URL_REGEX_MATCHING_ENABLED = "urlRegexMatchingEnabled";
 
     public AccountSettings() {
     }
@@ -155,5 +158,12 @@ public class AccountSettings {
         this.runCreateStiView = runCreateStiView;
     }
 
+    public boolean getUrlRegexMatchingEnabled() {
+        return urlRegexMatchingEnabled;
+    }
+
+    public void setUrlRegexMatchingEnabled(boolean urlRegexMatchingEnabled) {
+        this.urlRegexMatchingEnabled = urlRegexMatchingEnabled;
+    }
     
 }

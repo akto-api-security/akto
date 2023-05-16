@@ -42,11 +42,6 @@ public class CreateAdminUserViaMassAssignment extends TestPlugin{
             OriginalHttpRequest request = rawApi.getRequest();
             OriginalHttpResponse response = rawApi.getResponse();
             Set<String> extraParams;
-            Optional<String> validationResult = checkIfApiIsEligibleForTest(request, response);
-            if(validationResult.isPresent()){
-                logger.info("Skipping api: {} due to: {}", request.getUrl(), validationResult.get());
-                continue;
-            }
             extraParams = checkForExtraParams(request, response);
             if(extraParams == null || extraParams.isEmpty()){
                 logger.info("Skipping api: {} due to: no extra params found in response", request.getUrl());
@@ -109,33 +104,33 @@ public class CreateAdminUserViaMassAssignment extends TestPlugin{
         return jsonRequestBodyObj.toJson();
     }
 
-    protected Optional<String> checkIfApiIsEligibleForTest(OriginalHttpRequest request, OriginalHttpResponse response){
-        if(response.getStatusCode() < 200 && response.getStatusCode() >= 300){
-            return Optional.of("Response code is not 200");
-        }
-        if(!allowedMethods.contains(request.getMethod())){
-            return Optional.of("Request type is not allowed");
-        }
-        if(StringUtils.isEmpty(request.getBody())){
-            return Optional.of("Request body is empty");
-        }
-        if(StringUtils.isEmpty(response.getBody())){
-            return Optional.of("Response body is empty");
-        }
-        boolean endpointNameMatched = stringMatchContains(request.getUrl(), allowedEndpointNames);
-        if(!endpointNameMatched){
-            return Optional.of("Doesn't match any of the allowed endpoint names");
-        }
-        boolean reqBodyContainsRequiredKeys = stringMatchContains(request.getBody(), allowedKeysInRequest);
-        if(!reqBodyContainsRequiredKeys){
-            return Optional.of("Request body doesn't contain any of the allowed keys");
-        }
-        boolean respBodyContainsRequiredKeys = stringMatchContains(response.getBody(), allowedKeysInResponse);
-        if(!respBodyContainsRequiredKeys){
-            return Optional.of("Response body doesn't contain any of the allowed keys");
-        }
-        return Optional.empty();
-    }
+    // protected Optional<String> checkIfApiIsEligibleForTest(OriginalHttpRequest request, OriginalHttpResponse response){
+    //     if(response.getStatusCode() < 200 && response.getStatusCode() >= 300){
+    //         return Optional.of("Response code is not 200");
+    //     }
+    //     if(!allowedMethods.contains(request.getMethod())){
+    //         return Optional.of("Request type is not allowed");
+    //     }
+    //     if(StringUtils.isEmpty(request.getBody())){
+    //         return Optional.of("Request body is empty");
+    //     }
+    //     if(StringUtils.isEmpty(response.getBody())){
+    //         return Optional.of("Response body is empty");
+    //     }
+    //     boolean endpointNameMatched = stringMatchContains(request.getUrl(), allowedEndpointNames);
+    //     if(!endpointNameMatched){
+    //         return Optional.of("Doesn't match any of the allowed endpoint names");
+    //     }
+    //     boolean reqBodyContainsRequiredKeys = stringMatchContains(request.getBody(), allowedKeysInRequest);
+    //     if(!reqBodyContainsRequiredKeys){
+    //         return Optional.of("Request body doesn't contain any of the allowed keys");
+    //     }
+    //     boolean respBodyContainsRequiredKeys = stringMatchContains(response.getBody(), allowedKeysInResponse);
+    //     if(!respBodyContainsRequiredKeys){
+    //         return Optional.of("Response body doesn't contain any of the allowed keys");
+    //     }
+    //     return Optional.empty();
+    // }
 
     private static boolean stringMatchContains(String str, List<String> allowedStrings) {
         boolean stringMatched = false;
@@ -176,6 +171,7 @@ public class CreateAdminUserViaMassAssignment extends TestPlugin{
 
     @Override
     public String subTestName() {
-        return GlobalEnums.TestSubCategory.MASS_ASSIGNMENT_CREATE_ADMIN_ROLE.toString();
+        // replace with string?
+        return "MASS_ASSIGNMENT_CREATE_ADMIN_ROLE";
     }
 }

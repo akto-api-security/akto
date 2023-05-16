@@ -12,23 +12,28 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.testing.*;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
+import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
-import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
-import com.akto.util.enums.GlobalEnums.TestSubCategory;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 public class StartTestAction extends UserAction {
 
@@ -46,6 +51,19 @@ public class StartTestAction extends UserAction {
     private int endTimestamp;
     private String testName;
     private EndpointDataQuery endpointDataQuery;
+    private Map<String,String> metadata;
+    private boolean fetchCicd;
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
+
+    private static List<ObjectId> getCicdTests(){
+        Bson projections = Projections.fields(
+                Projections.excludeId(),
+                Projections.include("testingRunId"));
+        return TestingRunResultSummariesDao.instance.findAll(
+                Filters.exists("metadata"), projections).stream().map(summary -> summary.getTestingRunId())
+                .collect(Collectors.toList());
+    }
 
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds) {
         User user = getSUser();
@@ -98,13 +116,48 @@ public class StartTestAction extends UserAction {
     public String startTest() {
         int scheduleTimestamp = this.startTimestamp == 0 ? Context.now()  : this.startTimestamp;
 
-        TestingRun testingRun = createTestingRun(scheduleTimestamp, this.recurringDaily ? 86400 : 0);
-
-        if (testingRun == null) {
-            return ERROR.toUpperCase();
+        TestingRun localTestingRun = null;
+        if(this.testingRunHexId!=null){
+            try{
+                ObjectId testingId = new ObjectId(this.testingRunHexId);
+                localTestingRun = TestingRunDao.instance.findOne(Constants.ID,testingId);
+            } catch (Exception e){
+                loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+            }
+        }
+        if(localTestingRun==null){
+            try {
+                localTestingRun = createTestingRun(scheduleTimestamp, this.recurringDaily ? 86400 : 0);
+            } catch (Exception e){
+                loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+            }
+            
+            if (localTestingRun == null) {
+                return ERROR.toUpperCase();
+            } else {
+                TestingRunDao.instance.insertOne(localTestingRun);
+                testingRunHexId = localTestingRun.getId().toHexString();
+            }
         } else {
-            TestingRunDao.instance.insertOne(testingRun);
-            testingRunHexId = testingRun.getId().toHexString();
+            TestingRunDao.instance.updateOne(
+                Filters.eq(Constants.ID,localTestingRun.getId()), 
+                Updates.combine(
+                    Updates.set(TestingRun.STATE,TestingRun.State.SCHEDULED),
+                    Updates.set(TestingRun.SCHEDULE_TIMESTAMP,scheduleTimestamp)
+                ));
+        }
+
+        Map<String, Object> session = getSession();
+        String utility = (String) session.get("utility");
+        
+        if(utility!=null && ( Utility.CICD.toString().equals(utility) || Utility.EXTERNAL_API.toString().equals(utility))){
+            TestingRunResultSummary summary = new TestingRunResultSummary(scheduleTimestamp, 0, new HashMap<>(),
+            0, localTestingRun.getId(), localTestingRun.getId().toHexString(), 0);
+            summary.setState(TestingRun.State.SCHEDULED);
+            if(metadata!=null){
+                summary.setMetadata(metadata);
+            }
+            TestingRunResultSummariesDao.instance.insertOne(summary);
         }
         
         this.startTimestamp = 0;
@@ -124,12 +177,16 @@ public class StartTestAction extends UserAction {
 
         this.authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
 
-        Bson filterQ = Filters.and(
-            Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, this.endTimestamp),
-            Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, this.startTimestamp)
-        );
-
-        testingRuns = TestingRunDao.instance.findAll(filterQ);
+        if(fetchCicd){
+            testingRuns = TestingRunDao.instance.findAll(Filters.in(Constants.ID, getCicdTests()));
+        } else {
+            Bson filterQ = Filters.and(
+                Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, this.endTimestamp),
+                Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, this.startTimestamp),
+                Filters.nin(Constants.ID,getCicdTests())
+            );
+            testingRuns = TestingRunDao.instance.findAll(filterQ);
+        }
         testingRuns.sort((o1, o2) -> o2.getScheduleTimestamp() - o1.getScheduleTimestamp());
         return SUCCESS.toUpperCase();
     }
@@ -193,9 +250,11 @@ public class StartTestAction extends UserAction {
         TestingRunResult result = TestingRunResultDao.instance.findOne(Constants.ID, testingRunResultId);
         try {
             if (result.isVulnerable()) {
-                TestSubCategory category = TestSubCategory.getTestCategory(result.getTestSubType());
+                // name = category
+                String category = result.getTestSubType();
                 TestSourceConfig config = null;
-                if (category.equals(GlobalEnums.TestSubCategory.CUSTOM_IAM)) {
+                // string comparison (nuclei test)
+                if (category.startsWith("http")) {
                     config = TestSourceConfigsDao.instance.getTestSourceConfig(result.getTestSubType());
                 }
                 TestingIssuesId issuesId = new TestingIssuesId(result.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING,
@@ -381,5 +440,21 @@ public class StartTestAction extends UserAction {
 
     public void setEndpointDataQuery(EndpointDataQuery endpointDataQuery) {
         this.endpointDataQuery = endpointDataQuery;
+    }
+
+    public Map<String, String> getMetadata() {
+        return metadata;
+    }
+
+    public void setMetadata(Map<String, String> metadata) {
+        this.metadata = metadata;
+    }
+
+    public boolean isFetchCicd() {
+        return fetchCicd;
+    }
+
+    public void setFetchCicd(boolean fetchCicd) {
+        this.fetchCicd = fetchCicd;
     }
 }
