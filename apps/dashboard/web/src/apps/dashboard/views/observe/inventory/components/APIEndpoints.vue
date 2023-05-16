@@ -503,7 +503,7 @@ export default {
                 case "method": 
                     return {
                         type: "STRING",
-                        values: ["GET", "POST", "PUT", "HEAD", "OPTIONS"].map(x => {return {
+                        values: ["GET", "POST", "PUT", "HEAD", "OPTIONS", "DELETE", "PATCH"].map(x => {return {
                             title: x, 
                             subtitle: '',
                             value: x
@@ -584,17 +584,7 @@ export default {
         async fetchUnauthenticatedTableParams(sortKey, sortOrder, skip, limit, filters, filterOperators) {
             let query = this.buildFetchParamQuery(sortKey, sortOrder, skip, limit, filters, filterOperators)
 
-            let unauthenticatedKeyFound = false;
-            for (let k in query.filterConditions) {
-                let val = query.filterConditions[k]
-                if (val.key == "authType"){
-                    unauthenticatedKeyFound = true;
-                }
-            }
-
-            if (!unauthenticatedKeyFound) {
-                query.filterConditions.push({"key" : "authType", "operator": "AND", "values": ["UNAUTHENTICATED"]})
-            }
+            query.filterConditions.push({"key" : "authType", "operator": "AND", "values": ["UNAUTHENTICATED"]})
             return api.fetchEndpointData(query, skip/50)
         },
 

@@ -83,8 +83,6 @@ export default {
     async mounted() {
         let data = []
         data = await this.fetchAllEndpointsForWorkflow(this.apiCollectionId)
-        console.log("data")
-        console.log(data)
         this.endpointsList = data
     }
 }
