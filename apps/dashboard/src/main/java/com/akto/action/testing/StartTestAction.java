@@ -71,8 +71,6 @@ public class StartTestAction extends UserAction {
 
     private CallSource source;
 
-    private final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
-
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds) {
         User user = getSUser();
 
