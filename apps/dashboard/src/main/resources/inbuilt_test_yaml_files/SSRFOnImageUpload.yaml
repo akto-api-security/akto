@@ -29,13 +29,6 @@ api_selection_filters:
       gte: 200
       lt: 205
   or:
-    - request_headers:
-        for_one:
-          value:
-            contains_either:
-                - .jpg
-          key:
-            extract: image_key
     - request_payload:
         for_one:
           value:
@@ -58,8 +51,6 @@ execute:
         - modify_query_param:
             image_key: https://ssrf.localdomain.pw/img-without-body/301-http-169.254.169.254:80-.i.jpg
         - modify_body_param:
-            image_key: https://ssrf.localdomain.pw/img-without-body/301-http-169.254.169.254:80-.i.jpg
-        - modify_header:
             image_key: https://ssrf.localdomain.pw/img-without-body/301-http-169.254.169.254:80-.i.jpg
 
 validate:

@@ -612,7 +612,9 @@ public class TestExecutor {
 
         YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode, rawApi, varMap, auth, testExecutionLogId);
         List<TestResult> testResults = yamlTestTemplate.run();
-        if (testResults == null) return null;
+        if (testResults == null || testResults.size() == 0) {
+            return null;
+        }
         int endTime = Context.now();
 
         boolean vulnerable = false;
