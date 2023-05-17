@@ -28,13 +28,6 @@ api_selection_filters:
       gte: 200
       lt: 205
   or:
-    - request_headers:
-        for_one:
-          value:
-            contains_either:
-                - .xml
-          key:
-            extract: csv_key
     - request_payload:
         for_one:
           value:
@@ -57,8 +50,6 @@ execute:
         - modify_query_param:
             csv_key: https://ssrf.localdomain.pw/xml-without-body-md/301-http-.x.xml
         - modify_body_param:
-            csv_key: https://ssrf.localdomain.pw/xml-without-body-md/301-http-.x.xml
-        - modify_header:
             csv_key: https://ssrf.localdomain.pw/xml-without-body-md/301-http-.x.xml
 
 validate:
