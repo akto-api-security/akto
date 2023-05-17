@@ -1,9 +1,11 @@
 package com.akto.dao.test_editor;
 
 import com.akto.dao.AccountsContextDao;
+import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Projections;
 
 import java.util.HashMap;
 import java.util.List;
@@ -26,6 +28,16 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
         }
 
         return testConfigMap;
+    }
+
+    public Map<String, Info> fetchTestInfoMap() {
+        Map<String, Info> ret = new HashMap<>();
+        List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(new BasicDBObject(), Projections.include("info"));
+        for (YamlTemplate yamlTemplate: yamlTemplates) {
+            ret.put(yamlTemplate.getId(), yamlTemplate.getInfo());
+        }
+
+        return ret;
     }
 
     @Override
