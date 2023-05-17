@@ -3,6 +3,7 @@ package com.akto.action.testing;
 import com.akto.action.UserAction;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
@@ -13,6 +14,7 @@ import com.akto.dao.testing.*;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
 import com.akto.dto.ApiToken.Utility;
+import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
@@ -177,13 +179,13 @@ public class StartTestAction extends UserAction {
         }
         if (this.source.isCallFromAktoGpt() && !this.selectedTests.isEmpty()) {
             loggerMaker.infoAndAddToDb("Call from Akto GPT, " + this.selectedTests, LoggerMaker.LogDb.DASHBOARD);
-            TestSubCategory[] values = TestSubCategory.values();
+            Map<String, Info> testInfoMap = YamlTemplateDao.instance.fetchTestInfoMap();
             List<String> tests = new ArrayList<>();
             for (String selectedTest : this.selectedTests) {
                 List<String> testSubCategories = new ArrayList<>();
-                for (TestSubCategory value : values) {
-                    if (selectedTest.equals(value.getSuperCategory().getName())) {
-                        testSubCategories.add(value.getName());
+                for (Info testInfo : testInfoMap.values()) {
+                    if (selectedTest.equalsIgnoreCase(testInfo.getCategory().getName())) {
+                        testSubCategories.add(testInfo.getSubCategory());
                     }
                 }
                 if (testSubCategories.isEmpty()) {
