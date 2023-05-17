@@ -365,8 +365,8 @@ export default {
         }
     },
     methods: {
-        allEndpointTableRowClicked(row) {
-            this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.url + " " + row.method, type: 2})
+        allEndpointTableRowClicked(row, $event) {
+            this.$emit('selectedItem', {apiCollectionId: this.apiCollectionId || 0, urlAndMethod: row.url + " " + row.method, type: 2}, $event)
         },
         filterApplied(data) {
             this.filteredItems = data
