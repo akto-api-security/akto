@@ -98,7 +98,7 @@
           </template>
         </router-view>
         <div class="akto-external-links">
-          <v-btn dark depressed color="var(--gptColor)" v-if="showOnRoute" @click="showGPTScreen()">
+          <v-btn dark depressed color="var(--gptColor)" v-if="renderAktoButton" @click="showGPTScreen()">
                 Ask AktoGPT
                 <v-icon size="16">$chatGPT</v-icon>
           </v-btn>
@@ -362,6 +362,40 @@ export default {
           return this.$store.dispatch('data_types/setNewDataTypeByAktoGpt', payload)
         }
     },
+    async showAskAktoGPTButton(){
+      debugger;
+      let apiCollectionId = -1;
+      if(this.$route.params['apiCollectionId']){
+        apiCollectionId = this.$route.params['apiCollectionId']
+      }
+      if(apiCollectionId !== -1){
+        apiFunc.fetchAktoGptConfig(apiCollectionId).then((resp)=>{
+            this.renderAktoButton = resp.currentState[0].state === "ENABLED";
+            if(!this.renderAktoButton){
+              return false
+            }
+            if(this.$route.path.includes(this.api_inventory_route) && this.$route.params['apiCollectionId']){
+              this.renderAktoButton = true
+            }
+            else if(this.$route.path.includes(this.settings_route) && this.$route.hash === "#Data-types"){
+              this.renderAktoButton = true
+            }
+            else{
+              this.renderAktoButton = false
+            } 
+        })
+      }else {
+        if(this.$route.path.includes(this.api_inventory_route) && this.$route.params['apiCollectionId']){
+          this.renderAktoButton = true
+        }
+        else if(this.$route.path.includes(this.settings_route) && this.$route.hash === "#Data-types"){
+          this.renderAktoButton = true
+        }
+        else{
+          this.renderAktoButton = false
+        } 
+      }
+    },
     async runTestsViaAktoGpt(payload){
       console.log("caught payload", payload)
       payload['testName'] = "akto_gpt_test";
@@ -430,31 +464,13 @@ export default {
       this.$store.dispatch('dashboard/closeLoader', data['hexId'])
     },
   },
-
+  async beforeRouteUpdate(to, from, next) {
+    next();
+    await this.showAskAktoGPTButton();
+  },
   computed: {
       ...mapState('dashboard', ['loadingSnackBars']),
       ...mapState('inventory',['filteredItems', 'allSamples']),
-      showOnRoute(){
-        if(this.$route.params['apiCollectionId']){
-          this.apiCollectionId = this.$route.params['apiCollectionId']
-        }
-        if(this.apiCollectionId !== -1){
-          apiFunc.fetchAktoGptConfig(this.apiCollectionId).then((resp)=>{
-              this.renderAktoButton = resp.currentState[0].state === "ENABLED"; 
-          })
-        }
-
-        if(this.$route.path.includes(this.api_inventory_route) && this.$route.params['apiCollectionId']){
-          return true
-        }
-        else if(this.$route.path.includes(this.settings_route) && this.$route.hash === "#Data-types"){
-          this.renderAktoButton = true
-          return true
-        }
-        else{
-          return false
-        }
-      },
       computeChatGptPrompts(){
         if(this.$route.path.includes(this.settings_route) && this.$route.hash === "#Data-types"){
           this.regexRequired = true
