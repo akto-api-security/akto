@@ -363,7 +363,6 @@ export default {
         }
     },
     async showAskAktoGPTButton(){
-      debugger;
       let apiCollectionId = -1;
       if(this.$route.params['apiCollectionId']){
         apiCollectionId = this.$route.params['apiCollectionId']
