@@ -1,6 +1,6 @@
 id: REPLACE_AUTH_TOKEN
 info:
-  name: REPLACE_AUTH_TOKEN
+  name: BOLA by changing auth token
   description: "Attacker can access resources of any user by changing the auth token in request."
   details: >
             "The endpoint appears to be vulnerable to broken object level authorization attack. The original request

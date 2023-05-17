@@ -26,13 +26,6 @@ api_selection_filters:
       gte: 200
       lt: 205
   or:
-    - request_headers:
-        for_one:
-          value:
-            contains_either:
-                - http
-          key:
-            extract: url_key
     - request_payload:
         for_one:
           value:
@@ -55,8 +48,6 @@ execute:
         - modify_query_param:
             url_key: http://localhost/admin
         - modify_body_param:
-            url_key: http://localhost/admin
-        - modify_header:
             url_key: http://localhost/admin
 
 validate:
