@@ -155,6 +155,8 @@ public class DaoInit {
         // ClassModel<AwsResource> awsResourceModel =
         // ClassModel.builder(AwsResource.class).enableDiscriminator(true)
         // .build();
+        ClassModel<CollectionBelongsToPredicate> collectionBelongsToPredicateClassModel = ClassModel
+                .builder(CollectionBelongsToPredicate.class).enableDiscriminator(true).build();
         ClassModel<AwsResources> awsResourcesModel = ClassModel.builder(AwsResources.class).enableDiscriminator(true)
                 .build();
         ClassModel<AktoDataType> AktoDataTypeClassModel = ClassModel.builder(AktoDataType.class).enableDiscriminator(true).build();
@@ -188,9 +190,10 @@ public class DaoInit {
                 cappedSetClassModel, CustomWebhookClassModel, CustomWebhookResultClassModel,
                 nodeResultClassModel, awsResourcesModel, AktoDataTypeClassModel, testingRunIssuesClassModel,
                 testingIssuesIdClassModel, testSourceConfigClassModel, endpointLogicalGroupClassModel, testRolesClassModel,
-                logicalGroupTestingEndpointClassModel, testInfoClassModel , bflaTestInfoClassModel, nucleiTestInfoClassModel, customAuthTypeModel,
+                logicalGroupTestingEndpointClassModel, testInfoClassModel, bflaTestInfoClassModel, nucleiTestInfoClassModel, customAuthTypeModel,
                 containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData,
-                loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel).automatic(true).build());
+                loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
+                collectionBelongsToPredicateClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -220,7 +223,8 @@ public class DaoInit {
                 new EnumCodec<>(GlobalEnums.Severity.class),
                 new EnumCodec<>(TrafficMetrics.Name.class),
                 new EnumCodec<>(Loader.Type.class),
-                new EnumCodec<>(AktoGptConfigState.class));
+                new EnumCodec<>(AktoGptConfigState.class),
+                new EnumCodec<>(CustomWebhook.WebhookOptions.class));
 
         CodecRegistry codecRegistry = fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
                 customEnumCodecs);
