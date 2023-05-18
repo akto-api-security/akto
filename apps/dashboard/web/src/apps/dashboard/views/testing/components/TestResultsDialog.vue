@@ -41,7 +41,7 @@
                                                 <v-chip :style="{ 'height': '24px !important' }" color="var(--themeColorDark6)"
                                                     class="issue-summary mr-2" text-color="var(--white)" :key="index"
                                                     v-for="(chipItem, index) in subCatogoryMap[issuesDetails.id.testSubCategory].issueTags">
-                                                    {{ chipItem.name }}
+                                                    {{ chipItem }}
                                                 </v-chip>
                                             </v-col>
                                         </v-row>

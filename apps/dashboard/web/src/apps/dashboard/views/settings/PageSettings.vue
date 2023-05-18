@@ -1,73 +1,75 @@
 <template>
-    <layout-with-tabs title="Settings" :tabs="getTabs()">
-        <template slot="Data types">
-            <data-types title="Data types" :data_types="data_types" :toggleActivateFieldFunc='toggleActivateDataTypes'
-                :createNewDataType="createNewDataType" @selectedEntry="selectedDataType">
-                <template #details-container="{}">
-                    <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
-                        <data-type-details :data_type="data_type" />
-                    </a-card>
-                </template>
-            </data-types>
-        </template>
-        <template slot="Auth types">
-            <data-types title="Auth types" :data_types="auth_types" :toggleActivateFieldFunc='toggleActivateAuthTypes'
-                :createNewDataType="createNewAuthType" @selectedEntry="selectedAuthType">
-                <template #details-container="{}">
-                    <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
-                        <auth-type-details :auth_type_copy="auth_type" />
-                    </a-card>
-                </template>
-            </data-types>
-        </template>
-        <template slot="Tags">
-            <data-types title="Tags" :data_types="tag_configs" :toggleActivateFieldFunc='toggleActivateTagConfig'
-                :createNewDataType="createNewTagConfig" @selectedEntry="selectedTagConfig">
-                <template #details-container="{}">
-                    <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
-                        <tag-config-details :tag_config_copy="tag_config" />
-                    </a-card>
-                </template>
-            </data-types>
-        </template>
-        <template slot="Integrations">
-            <integration-center />
-        </template>
-        <template slot="Account">
-            <div>
-                <account />
-                <div class="px-8">
-                    <div class="py-4">
-                        <v-dialog v-model="showDialog" width="500">
-                            <template v-slot:activator="{ on, attrs }">
-                                <v-btn primary dark color="var(--themeColor)" @click="showDialog = true" v-bind="attrs" v-on="on">
-                                    Update Akto
-                                </v-btn>
-                            </template>
-                            <div class="dialog-box">
-                                <div class="entry-text"> Please note that this will incur a downtime of 10 mins to
-                                    update the system. </div>
-                                <div class="d-flex jc-end">
-                                    <v-btn primary dark color="var(--themeColor)" @click="takeUpdate">
-                                        Proceed
+    <div>
+        <layout-with-tabs title="Settings" :tabs="getTabs()">
+            <template slot="Data types">
+                <data-types title="Data types" :data_types="data_types" :toggleActivateFieldFunc='toggleActivateDataTypes'
+                    :createNewDataType="createNewDataType" @selectedEntry="selectedDataType">
+                    <template #details-container="{}">
+                        <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
+                            <data-type-details :data_type="data_type" />
+                        </a-card>
+                    </template>
+                </data-types>
+            </template>
+            <template slot="Auth types">
+                <data-types title="Auth types" :data_types="auth_types" :toggleActivateFieldFunc='toggleActivateAuthTypes'
+                    :createNewDataType="createNewAuthType" @selectedEntry="selectedAuthType">
+                    <template #details-container="{}">
+                        <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
+                            <auth-type-details :auth_type_copy="auth_type" />
+                        </a-card>
+                    </template>
+                </data-types>
+            </template>
+            <template slot="Tags">
+                <data-types title="Tags" :data_types="tag_configs" :toggleActivateFieldFunc='toggleActivateTagConfig'
+                    :createNewDataType="createNewTagConfig" @selectedEntry="selectedTagConfig">
+                    <template #details-container="{}">
+                        <a-card title="Details" color="var(--rgbaColor2)" style="min-height: 600px">
+                            <tag-config-details :tag_config_copy="tag_config" />
+                        </a-card>
+                    </template>
+                </data-types>
+            </template>
+            <template slot="Integrations">
+                <integration-center />
+            </template>
+            <template slot="Account">
+                <div>
+                    <account />
+                    <div class="px-8">
+                        <div class="py-4">
+                            <v-dialog v-model="showDialog" width="500">
+                                <template v-slot:activator="{ on, attrs }">
+                                    <v-btn primary dark color="var(--themeColor)" @click="showDialog = true" v-bind="attrs" v-on="on">
+                                        Update Akto
                                     </v-btn>
+                                </template>
+                                <div class="dialog-box">
+                                    <div class="entry-text"> Please note that this will incur a downtime of 10 mins to
+                                        update the system. </div>
+                                    <div class="d-flex jc-end">
+                                        <v-btn primary dark color="var(--themeColor)" @click="takeUpdate">
+                                            Proceed
+                                        </v-btn>
+                                    </div>
                                 </div>
-                            </div>
-                        </v-dialog>
+                            </v-dialog>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </template>
-        <template slot="Users">
-            <team-overview />
-        </template>
-        <template slot="Health">
-            <health :defaultStartTimestamp="defaultStartTimestamp" :defaultEndTimestamp="defaultEndTimestamp"/>
-        </template>
-        <template slot="Metrics">
-            <traffic-metrics/>
-        </template>
-    </layout-with-tabs>
+            </template>
+            <template slot="Users">
+                <team-overview />
+            </template>
+            <template slot="Health">
+                <health :defaultStartTimestamp="defaultStartTimestamp" :defaultEndTimestamp="defaultEndTimestamp"/>
+            </template>
+            <template slot="Metrics">
+                <traffic-metrics/>
+            </template>
+        </layout-with-tabs>
+    </div>
 </template>
 
 <script>
@@ -101,7 +103,7 @@ export default {
         DataTypeDetails,
         AuthTypeDetails,
         ACard,
-        TrafficMetrics
+        TrafficMetrics,
     },
     props:{
         defaultStartTimestamp: obj.strN,
@@ -115,7 +117,7 @@ export default {
     },
     data() {
         return {
-            showDialog: false
+            showDialog: false,
         }
     },
     methods: {
@@ -179,5 +181,6 @@ export default {
 
 .dialog-box
     padding: 16px
-    background: var(--white)  
+    background: var(--white) 
+
 </style>
