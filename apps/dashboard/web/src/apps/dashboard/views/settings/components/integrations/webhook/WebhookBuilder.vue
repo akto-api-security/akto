@@ -26,25 +26,25 @@
             <v-list-item-content>
               <div class="display-flex">
                 <span class="item-label">{{ item.title }}</span>
-                <v-menu v-if="item.title === 'New endpoint' && checkedMap[item.value]" offset-y>
+                <v-menu v-if="item.title === 'New endpoint' && checkedMap[item.value]" offset-y :close-on-content-click="false">
                   <template v-slot:activator="{ on, attrs }">
                     <v-btn class="ml-3" v-bind="attrs" v-on="on" primary>
                       <span>collections</span>
                       <v-icon>$fas_angle-down</v-icon>
                     </v-btn>
                   </template>
-                  <filter-list title="Collections" :items="getAllCollectionsForFilterList('New endpoint')"
+                  <filter-list title="Collections" :items="getAllCollectionsForFilterList('newEndpointCollections')"
                     @clickedItem="clickedNewEndpointCollection($event)"
                     @selectedAll="globalCheckboxNewEndpointCollection($event)" hideOperators></filter-list>
                 </v-menu>
-                <v-menu v-if="item.title === 'New sensitive endpoint' && checkedMap[item.value]" offset-y>
+                <v-menu v-if="item.title === 'New sensitive endpoint' && checkedMap[item.value]" offset-y :close-on-content-click="false">
                   <template v-slot:activator="{ on, attrs }">
                     <v-btn class="ml-3" v-bind="attrs" v-on="on" primary>
                       <span>collections</span>
                       <v-icon>$fas_angle-down</v-icon>
                     </v-btn>
                   </template>
-                  <filter-list title="Collections" :items="getAllCollectionsForFilterList('New sensitive endpoint')"
+                  <filter-list title="Collections" :items="getAllCollectionsForFilterList('newSensitiveEndpointCollections')"
                     @clickedItem="clickedNewSensitiveEndpointCollection($event)"
                     @selectedAll="globalCheckboxNewSensitiveEndpointCollection($event)" hideOperators></filter-list>
                 </v-menu>
