@@ -1,14 +1,16 @@
 package com.akto.dto.notifications;
 
+import com.akto.dto.data_types.Conditions;
 import org.bson.codecs.pojo.annotations.BsonId;
 
 import com.akto.dto.type.URLMethods.Method;
+
+import java.util.List;
 
 public class CustomWebhook {
 
     @BsonId
     int id;
-
     String webhookName;
     String url;
     String headerString;
@@ -20,18 +22,65 @@ public class CustomWebhook {
     int createTime;
     int lastUpdateTime;
     int lastSentTimestamp;
+    ActiveStatus activeStatus;
+    public static final String NEW_ENDPOINT_COLLECTIONS = "newEndpointCollections";
+    private List<String> newEndpointCollections;
+    public static final String NEW_SENSITIVE_ENDPOINT_COLLECTIONS = "newSensitiveEndpointCollections";
+    private List<String> newSensitiveEndpointCollections;
+//    public static final String NEW_ENDPOINT_CONDITIONS = "newEndpointConditions";
+//    private Conditions newEndpointConditions;
+//    public static final String NEW_SENSITIVE_ENDPOINT_CONDITIONS = "newSensitiveEndpointConditions";
+//    private Conditions newSensitiveEndpointConditions;
+    public static final String SELECTED_WEBHOOK_OPTIONS = "selectedWebhookOptions";
+    private List<WebhookOptions> selectedWebhookOptions;
+
+    public List<String> getNewEndpointCollections() {
+        return newEndpointCollections;
+    }
+
+    public void setNewEndpointCollections(List<String> newEndpointCollections) {
+        this.newEndpointCollections = newEndpointCollections;
+    }
+
+    public List<String> getNewSensitiveEndpointCollections() {
+        return newSensitiveEndpointCollections;
+    }
+
+    public void setNewSensitiveEndpointCollections(List<String> newSensitiveEndpointCollections) {
+        this.newSensitiveEndpointCollections = newSensitiveEndpointCollections;
+    }
+
     public enum ActiveStatus{
         ACTIVE,INACTIVE;
     }
-    ActiveStatus activeStatus;
 
-    public CustomWebhook(){
+    public enum WebhookOptions {
+        NEW_ENDPOINT ("New Endpoint", "${AKTO.changes_info.newEndpoints}"),
+        NEW_ENDPOINT_COUNT("New Endpoint Count", "${AKTO.changes_info.newEndpointsCount}"),
+        NEW_SENSITIVE_ENDPOINT ("New Sensitive Endpoint", "${AKTO.changes_info.newSensitiveEndpoints}"),
+        NEW_SENSITIVE_ENDPOINT_COUNT("New Sensitive Endpoint Count", "${AKTO.changes_info.newSensitiveEndpointsCount}"),
+        NEW_PARAMETER_COUNT("New Parameter Count", "${AKTO.changes_info.newParametersCount}"),
+        NEW_SENSITIVE_PARAMETER_COUNT("New Sensitive Parameter Count", "${AKTO.changes_info.newSensitiveParametersCount}");
 
+        final String optionName;
+        final String optionReplaceString;
+        WebhookOptions(String webhookName, String optionReplaceString){
+            this.optionName = webhookName;
+            this.optionReplaceString = optionReplaceString;
+        }
+        public String getOptionName() {
+            return optionName;
+        }
+        public String getOptionReplaceString() {
+            return optionReplaceString;
+        }
     }
+    public CustomWebhook(){}
 
     public CustomWebhook(int id, String webhookName, String url, String headerString, String queryParams, String body,
-            Method method, int frequencyInSeconds, String userEmail, int createTime, int lastUpdateTime,
-            int lastSentTimestamp, ActiveStatus activeStatus) {
+                         Method method, int frequencyInSeconds, String userEmail, int createTime, int lastUpdateTime,
+                         int lastSentTimestamp, ActiveStatus activeStatus, List<WebhookOptions> selectedWebhookOptions,
+                         List<String> newEndpointCollections, List<String> newSensitiveEndpointCollections) {
         this.id = id;
         this.webhookName = webhookName;
         this.url = url;
@@ -45,6 +94,34 @@ public class CustomWebhook {
         this.lastUpdateTime = lastUpdateTime;
         this.lastSentTimestamp = lastSentTimestamp;
         this.activeStatus = activeStatus;
+        this.selectedWebhookOptions = selectedWebhookOptions;
+//        this.newEndpointConditions = newEndpointConditions;
+//        this.newSensitiveEndpointConditions = newSensitiveEndpointConditions;
+        this.newEndpointCollections = newEndpointCollections;
+        this.newSensitiveEndpointCollections = newSensitiveEndpointCollections;
+    }
+//    public Conditions getNewEndpointConditions() {
+//        return newEndpointConditions;
+//    }
+//
+//    public void setNewEndpointConditions(Conditions newEndpointConditions) {
+//        this.newEndpointConditions = newEndpointConditions;
+//    }
+//
+//    public Conditions getNewSensitiveEndpointConditions() {
+//        return newSensitiveEndpointConditions;
+//    }
+//
+//    public void setNewSensitiveEndpointConditions(Conditions newSensitiveEndpointConditions) {
+//        this.newSensitiveEndpointConditions = newSensitiveEndpointConditions;
+//    }
+
+    public List<WebhookOptions> getSelectedWebhookOptions() {
+        return selectedWebhookOptions;
+    }
+
+    public void setSelectedWebhookOptions(List<WebhookOptions> selectedWebhookOptions) {
+        this.selectedWebhookOptions = selectedWebhookOptions;
     }
 
     public int getId() {
