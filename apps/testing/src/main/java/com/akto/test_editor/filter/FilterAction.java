@@ -1005,7 +1005,8 @@ public final class FilterAction {
             }
             Set<String> valSet = singleTypeInfo.getValues().getElements();
             String val = valSet.iterator().next();
-            obj.put("key", param);
+            String key = SingleTypeInfo.findLastKeyFromParam(param);
+            obj.put("key", key);
             obj.put("value", val);
             if (privateValues.size() < 5) {
                 privateValues.add(obj);

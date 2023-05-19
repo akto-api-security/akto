@@ -10,6 +10,7 @@ import com.mongodb.BasicDBObject;
 
 import java.util.*;
 
+import com.mongodb.client.model.UpdateOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,10 +41,10 @@ public class GptConfigAction extends UserAction {
             updatedAktoGptConfigList.add(obj);
         }
         for (Integer apiCollectionId : apiCollectionMap.keySet()) {
-            //These collection ids dont exist in AktoGptconfigDao, store them in DB with DEFAULT value
+            //These collection ids don't exist in AktoGptconfigDao, store them in DB with DEFAULT value
             //also store these entries in DB
             AktoGptConfig aktoGptConfig = new AktoGptConfig(apiCollectionId, DEFAULT_STATE);
-            AktoGptConfigDao.instance.insertOne(aktoGptConfig);
+            upsertAktoConfig(apiCollectionId, DEFAULT_STATE);
             BasicDBObject obj = new BasicDBObject("id", aktoGptConfig.getId())
                     .append("state", aktoGptConfig.getState().toString())
                     .append("collectionName", apiCollectionMap.get(apiCollectionId).getName());
@@ -52,21 +53,26 @@ public class GptConfigAction extends UserAction {
         return updatedAktoGptConfigList;
     }
 
+    private void upsertAktoConfig(int apiCollectionId, AktoGptConfigState state){
+        AktoGptConfigDao.instance.getMCollection().updateOne(new BasicDBObject("_id", apiCollectionId),
+                new BasicDBObject("$set", new BasicDBObject("state", state.toString())), new UpdateOptions().upsert(true));
+    }
+
     public String fetchAktoGptConfig(){
         if(apiCollectionId == -1){
             currentState = fetchUpdatedAktoGptConfigs();
+            logger.debug("Fetching all AktoGptConfig: {}", currentState);
         } else {
             AktoGptConfig aktoGptConfig = AktoGptConfigDao.instance.findOne(new BasicDBObject("_id", apiCollectionId));
             if(aktoGptConfig == null) {
-                aktoGptConfig = new AktoGptConfig(apiCollectionId, DEFAULT_STATE);
-                AktoGptConfigDao.instance.insertOne(aktoGptConfig);
+                upsertAktoConfig(apiCollectionId, DEFAULT_STATE);
             }
             String collectionName = ApiCollectionsDao.instance.findOne(new BasicDBObject("_id", apiCollectionId)).getName();
             currentState = Collections.singletonList(new BasicDBObject("id", aktoGptConfig.getId())
                     .append("state", aktoGptConfig.getState().toString())
                     .append("collectionName", collectionName));
+            logger.debug("Fetching AktoGptConfig for collectionId: {}, {}", apiCollectionId, currentState);
         }
-        logger.info("Current state of AktoGptConfig is {}", currentState);
         return SUCCESS.toUpperCase();
     }
 

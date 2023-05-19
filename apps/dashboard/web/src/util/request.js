@@ -136,7 +136,9 @@ service.interceptors.response.use((response) => {
 }, err)
 
 async function raiseMixpanelEvent(api){
-  window.mixpanel.track(api)
+  if (api && api.indexOf("/api/fetchActiveLoaders")==-1) {
+    window.mixpanel.track(api)
+  }
 }
 
 export default service
