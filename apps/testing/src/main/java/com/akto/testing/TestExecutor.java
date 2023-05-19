@@ -176,6 +176,23 @@ public class TestExecutor {
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
 
+        Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMapForStatusCodeAnalyser = new HashMap<>();
+        Set<ApiInfo.ApiInfoKey> apiInfoKeySet = new HashSet<>(apiInfoKeyList);
+        for (ApiInfo.ApiInfoKey apiInfoKey: sampleMessages.keySet()) {
+            if (apiInfoKeySet.contains(apiInfoKey)) {
+                sampleDataMapForStatusCodeAnalyser.put(apiInfoKey, sampleMessages.get(apiInfoKey));
+            }
+        }
+
+        try {
+            StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while running status code analyser " + e.getMessage(), LogDb.TESTING);
+        }
+
+        loggerMaker.infoAndAddToDb("StatusCodeAnalyser result = " + StatusCodeAnalyser.result, LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("StatusCodeAnalyser defaultPayloadsMap = " + StatusCodeAnalyser.defaultPayloadsMap, LogDb.TESTING);
+
         TestingRunResultSummariesDao.instance.updateOne(
             Filters.eq("_id", summaryId),
             Updates.set(TestingRunResultSummary.TOTAL_APIS, apiInfoKeyList.size()));
@@ -187,7 +204,7 @@ public class TestExecutor {
 
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
             try {
-                String host = findHost(apiInfoKey, testingUtil);
+                String host = findHost(apiInfoKey, testingUtil.getSampleMessages());
                 if (host != null && hostsToApiCollectionMap.get(host) == null) {
                     hostsToApiCollectionMap.put(host, apiInfoKey.getApiCollectionId());
                 }
@@ -210,7 +227,10 @@ public class TestExecutor {
         loggerMaker.infoAndAddToDb("Waiting...", LogDb.TESTING);
 
         try {
-            latch.await();
+            int maxRunTime = testingRun.getTestRunTime();
+            if (maxRunTime < 0) maxRunTime = 30*60; // if nothing specified wait for 30 minutes
+            boolean awaitResult = latch.await(maxRunTime, TimeUnit.SECONDS);
+            loggerMaker.infoAndAddToDb("Await result: " + awaitResult, LogDb.TESTING);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -271,12 +291,11 @@ public class TestExecutor {
 
     }
 
-    public static String findHost(ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) throws URISyntaxException {
-        Map<ApiInfo.ApiInfoKey, List<String>> sampleMessagesMap =  testingUtil.getSampleMessages();
+    public static String findHost(ApiInfo.ApiInfoKey apiInfoKey, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessagesMap) throws URISyntaxException {
         List<String> sampleMessages = sampleMessagesMap.get(apiInfoKey);
         if (sampleMessages == null || sampleMessagesMap.isEmpty()) return null;
 
-        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, testingUtil.getSampleMessages());
+        List<RawApi> messages = SampleMessageStore.fetchAllOriginalMessages(apiInfoKey, sampleMessagesMap);
         if (messages.isEmpty()) return null;
 
         OriginalHttpRequest originalHttpRequest = messages.get(0).getRequest();
