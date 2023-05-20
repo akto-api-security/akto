@@ -624,6 +624,7 @@ public class InitializerListener implements ServletContextListener {
             ret.recentSentiiveParams = 0;
             int delta = newSensitiveParamsFrequency;
             Map<Pair<String, String>, Set<String>> endpointToSubTypes = new HashMap<>();
+            Map<Pair<String, String>, ApiCollection> endpointToApiCollection = new HashMap<>();
             for (SingleTypeInfo sti : sensitiveParamsList) {
                 ApiCollection apiCollection = apiCollectionMap.get(sti.getApiCollectionId());
                 String url = sti.getUrl();
@@ -649,6 +650,7 @@ public class InitializerListener implements ServletContextListener {
                         subTypes = new HashSet<>();
                         endpointToSubTypes.put(key, subTypes);
                     }
+                    endpointToApiCollection.put(key, apiCollection);
                     subTypes.add(value);
                 }
             }
@@ -664,6 +666,10 @@ public class InitializerListener implements ServletContextListener {
                 basicDBObject.put("url", methodPlusUrlList[1]);
                 basicDBObject.put("method", methodPlusUrlList[0]);
                 basicDBObject.put("subTypes", subTypes);
+                basicDBObject.put("link", key.getSecond());
+                ApiCollection collection = endpointToApiCollection.get(key);
+                basicDBObject.put(SingleTypeInfo._API_COLLECTION_ID, collection != null ? collection.getId() : null);
+                basicDBObject.put(SingleTypeInfo.COLLECTION_NAME, collection != null ? collection.getDisplayName() : null);
                 ret.newSensitiveParamsObject.add(basicDBObject);
             }
 
