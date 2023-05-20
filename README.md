@@ -188,6 +188,7 @@ OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), 
   d. A list of running Java processes with show up. Select the web server process to attach the debugger
 
 </details>  
+<a href="https://hits.sh/github.com/akto-api-security/hits.svg?label=Hits%20since%206%2F23&color=FFFFFF&labelColor=FFFFFF"><img alt="Hits" src="https://hits.sh/github.com/akto-api-security/hits.svg?label=Hits%20since%206%2F23&color=FFFFFF&labelColor=FFFFFF"/></a> 
   
 ## Contributing
 
