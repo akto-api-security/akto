@@ -259,7 +259,10 @@ public class Executor {
             case "remove_auth_header":
                 List<String> authHeaders = (List<String>) varMap.get("auth_headers");
                 for (String header: authHeaders) {
-                    Operations.deleteHeader(rawApi, header);
+                    ExecutorSingleOperationResp resp = Operations.deleteHeader(rawApi, header);
+                    if (resp.getErrMsg().contains("header key not present")) {
+                        return new ExecutorSingleOperationResp(false, resp.getErrMsg());
+                    }
                 }
                 return new ExecutorSingleOperationResp(true, "");
             case "replace_auth_header":
