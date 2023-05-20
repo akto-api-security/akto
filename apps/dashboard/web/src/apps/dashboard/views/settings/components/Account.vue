@@ -20,6 +20,11 @@
             <div class="entry-value">{{epochToDateTime(this.lastLoginTs)}}</div>
         </div>
 
+        <div class="account-id">
+            <div class="entry-text">VPC CIDR</div>
+            <div class="entry-value">{{this.cidr}}</div>
+        </div>
+
         <div class="toggle-redact-feature" v-if="localSetupType !== null">
             <div class="entry-text">Setup Type</div>
             <div class="entry-value">
@@ -96,7 +101,7 @@ import {mapState} from 'vuex'
             this.$store.dispatch('team/fetchUserLastLoginTs')
         },
         computed: {
-            ...mapState('team', ['redactPayload', 'setupType', 'dashboardVersion', 'apiRuntimeVersion', 'mergeAsyncOutside', 'lastLoginTs']),
+            ...mapState('team', ['redactPayload', 'setupType', 'dashboardVersion', 'apiRuntimeVersion', 'mergeAsyncOutside', 'lastLoginTs', 'privateCidrList']),
             localRedactPayload: {
                 get() {
                     return this.redactPayload
@@ -120,7 +125,12 @@ import {mapState} from 'vuex'
                 set(v) {
                     this.$store.dispatch('team/updateMergeAsyncOutside')
                 }
-            }
+            },
+            cidr: {
+                get() {
+                    return this.privateCidrList && this.privateCidrList.length > 0 ? func.prettifyArray(this.privateCidrList) : "No values stored"
+                },
+            } 
         }
     }
 </script>

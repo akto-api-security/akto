@@ -18,7 +18,8 @@ const team = {
         dashboardVersion: null,
         apiRuntimeVersion: null,
         setupType: null,
-        lastLoginTs: null
+        lastLoginTs: null,
+        privateCidrList: null
     },
     getters: {
         getId: (state) => state.id,
@@ -29,7 +30,8 @@ const team = {
         getDashboardVersion: (state) => state.dashboardVersion,
         getApiRuntimeVersion: (state) => state.apiRuntimeVersion,
         getSetupType: (state) => state.setupType,
-        getLastLoginTs: (state) => state.lastLoginTs
+        getLastLoginTs: (state) => state.lastLoginTs,
+        getPrivateCidrList: (state) => state.privateCidrList
     },
     mutations: {
         SET_TEAM_DETAILS(state, details) {
@@ -60,6 +62,7 @@ const team = {
                 state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
                 state.setupType = resp.accountSettings.setupType
                 state.mergeAsyncOutside = resp.accountSettings.mergeAsyncOutside || false
+                state.privateCidrList = resp.accountSettings.privateCidrList
             }
         },
         SET_USER_INFO(state, resp) {
