@@ -8,6 +8,7 @@
         <div class="request-title">URL</div>
         <template-string-editor :defaultText="this.updatedData['url']" :onChange=onChangeURL />
 
+      
         <div class="request-title">Query params</div>
         <template-string-editor :defaultText="this.updatedData['queryParams']" :onChange=onChangeQueryParams />
 
@@ -83,7 +84,6 @@
 <script>
 
 import TemplateStringEditor from "../../../../testing/components/react/TemplateStringEditor.jsx";
-import CustomWebhookConditionsTable from "./CustomWebhookConditionsTable";
 import obj from "../../../../../../../util/obj";
 import FilterList from '@/apps/dashboard/shared/components/FilterList'
 
@@ -91,33 +91,15 @@ export default {
   name: "WebhookBuilder",
   components: {
     'template-string-editor': TemplateStringEditor,
-    FilterList,
-    CustomWebhookConditionsTable
+    FilterList
   },
   props: {
     originalStateFromDb: obj.objN,
     loading: obj.boolN
   },
   data() {
-    var operators = [
-      'OR'
-    ]
-    var requireTextInputForTypeArray = [
-      'CONTAINS'
-    ]
-    var requireCollectionNameInputForTypeArray = [
-      'COLLECTION_BELONGS_TO'
-    ]
-    var operation_types = [
-      { value: 'CONTAINS', text: 'contains', operators: ['OR'] },
-      { value: 'COLLECTION_BELONGS_TO', text: 'url belongs to collections', operators: ['OR'] }
-    ]
     return {
       checkedMap: [],
-      operators,
-      operation_types,
-      requireTextInputForTypeArray,
-      requireCollectionNameInputForTypeArray,
       defaultWebhookName: "",
       defaultUrl: "",
       defaultQueryParams: "",

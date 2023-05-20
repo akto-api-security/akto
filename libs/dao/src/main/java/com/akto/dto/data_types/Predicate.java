@@ -12,7 +12,7 @@ public abstract class Predicate {
     public static final String TYPE = "type";
 
     public enum Type {
-        REGEX, STARTS_WITH, ENDS_WITH, IS_NUMBER, EQUALS_TO, CONTAINS, BELONGS_TO, NOT_BELONGS_TO, COLLECTION_BELONGS_TO
+        REGEX, STARTS_WITH, ENDS_WITH, IS_NUMBER, EQUALS_TO, CONTAINS, BELONGS_TO, NOT_BELONGS_TO
     }
 
     public Predicate(Type type) {
@@ -76,30 +76,11 @@ public abstract class Predicate {
                 Object notBelongTo = valueMap.get(VALUE);
                 Set<ApiInfo.ApiInfoKey> setNotBelong = createApiInfoSetFromMap(notBelongTo);
                 return new NotBelongsToPredicate(setNotBelong);
-            case COLLECTION_BELONGS_TO:
-                Object collectionBelongsTo = valueMap.get(VALUE);
-                Set<String> setCollectionBelong = createApiCollectionSetFromMap(collectionBelongsTo);
-                return new CollectionBelongsToPredicate(setCollectionBelong);
-
             default:
                 return null;
         }
     }
 
-    private static Set<String> createApiCollectionSetFromMap(Object value) {
-        if (!(value instanceof List)) {
-            return null;
-        }
-        HashSet<String> set = new HashSet<>();
-        List listOfValues = (List) value;
-        for (Object obj : listOfValues) {
-            if (obj instanceof String) {
-                String apiCollectionName = (String) obj;
-                set.add(apiCollectionName);
-            }
-        }
-        return set;
-    }
     private static Set<ApiInfo.ApiInfoKey> createApiInfoSetFromMap(Object value) {
         if (!(value instanceof List)) {
             return null;

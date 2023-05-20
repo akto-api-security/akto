@@ -16,7 +16,6 @@ import test_roles from '@/apps/dashboard/views/testing/components/test_roles/sto
 import marketplace from '@/apps/dashboard/views/marketplace/store/module'
 import onboarding from '@/apps/dashboard/views/onboarding/store/module'
 import dashboard from '@/apps/dashboard/store/module'
-import integration from '@/apps/dashboard/views/settings/components/integrations/store/module'
 
 Vue.use(Vuex)
 
@@ -38,8 +37,7 @@ const store = new Vuex.Store({
         test_roles,
         marketplace,
         onboarding,
-        dashboard,
-        integration
+        dashboard
     },
     state:{
         globalUid:-1

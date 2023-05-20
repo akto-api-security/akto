@@ -27,28 +27,8 @@ public class CustomWebhook {
     private List<String> newEndpointCollections;
     public static final String NEW_SENSITIVE_ENDPOINT_COLLECTIONS = "newSensitiveEndpointCollections";
     private List<String> newSensitiveEndpointCollections;
-//    public static final String NEW_ENDPOINT_CONDITIONS = "newEndpointConditions";
-//    private Conditions newEndpointConditions;
-//    public static final String NEW_SENSITIVE_ENDPOINT_CONDITIONS = "newSensitiveEndpointConditions";
-//    private Conditions newSensitiveEndpointConditions;
     public static final String SELECTED_WEBHOOK_OPTIONS = "selectedWebhookOptions";
     private List<WebhookOptions> selectedWebhookOptions;
-
-    public List<String> getNewEndpointCollections() {
-        return newEndpointCollections;
-    }
-
-    public void setNewEndpointCollections(List<String> newEndpointCollections) {
-        this.newEndpointCollections = newEndpointCollections;
-    }
-
-    public List<String> getNewSensitiveEndpointCollections() {
-        return newSensitiveEndpointCollections;
-    }
-
-    public void setNewSensitiveEndpointCollections(List<String> newSensitiveEndpointCollections) {
-        this.newSensitiveEndpointCollections = newSensitiveEndpointCollections;
-    }
 
     public enum ActiveStatus{
         ACTIVE,INACTIVE;
@@ -95,27 +75,9 @@ public class CustomWebhook {
         this.lastSentTimestamp = lastSentTimestamp;
         this.activeStatus = activeStatus;
         this.selectedWebhookOptions = selectedWebhookOptions;
-//        this.newEndpointConditions = newEndpointConditions;
-//        this.newSensitiveEndpointConditions = newSensitiveEndpointConditions;
         this.newEndpointCollections = newEndpointCollections;
         this.newSensitiveEndpointCollections = newSensitiveEndpointCollections;
     }
-//    public Conditions getNewEndpointConditions() {
-//        return newEndpointConditions;
-//    }
-//
-//    public void setNewEndpointConditions(Conditions newEndpointConditions) {
-//        this.newEndpointConditions = newEndpointConditions;
-//    }
-//
-//    public Conditions getNewSensitiveEndpointConditions() {
-//        return newSensitiveEndpointConditions;
-//    }
-//
-//    public void setNewSensitiveEndpointConditions(Conditions newSensitiveEndpointConditions) {
-//        this.newSensitiveEndpointConditions = newSensitiveEndpointConditions;
-//    }
-
     public List<WebhookOptions> getSelectedWebhookOptions() {
         return selectedWebhookOptions;
     }
@@ -123,6 +85,23 @@ public class CustomWebhook {
     public void setSelectedWebhookOptions(List<WebhookOptions> selectedWebhookOptions) {
         this.selectedWebhookOptions = selectedWebhookOptions;
     }
+
+    public List<String> getNewEndpointCollections() {
+        return newEndpointCollections;
+    }
+
+    public void setNewEndpointCollections(List<String> newEndpointCollections) {
+        this.newEndpointCollections = newEndpointCollections;
+    }
+
+    public List<String> getNewSensitiveEndpointCollections() {
+        return newSensitiveEndpointCollections;
+    }
+
+    public void setNewSensitiveEndpointCollections(List<String> newSensitiveEndpointCollections) {
+        this.newSensitiveEndpointCollections = newSensitiveEndpointCollections;
+    }
+
 
     public int getId() {
         return id;

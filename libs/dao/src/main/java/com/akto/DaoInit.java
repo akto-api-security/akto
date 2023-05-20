@@ -156,8 +156,6 @@ public class DaoInit {
         // ClassModel<AwsResource> awsResourceModel =
         // ClassModel.builder(AwsResource.class).enableDiscriminator(true)
         // .build();
-        ClassModel<CollectionBelongsToPredicate> collectionBelongsToPredicateClassModel = ClassModel
-                .builder(CollectionBelongsToPredicate.class).enableDiscriminator(true).build();
         ClassModel<AwsResources> awsResourcesModel = ClassModel.builder(AwsResources.class).enableDiscriminator(true)
                 .build();
         ClassModel<AktoDataType> AktoDataTypeClassModel = ClassModel.builder(AktoDataType.class).enableDiscriminator(true).build();
@@ -193,8 +191,7 @@ public class DaoInit {
                 testingIssuesIdClassModel, testSourceConfigClassModel, endpointLogicalGroupClassModel, testRolesClassModel,
                 logicalGroupTestingEndpointClassModel, testInfoClassModel, bflaTestInfoClassModel, nucleiTestInfoClassModel, customAuthTypeModel,
                 containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData,
-                loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
-                collectionBelongsToPredicateClassModel).automatic(true).build());
+                loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
