@@ -10,6 +10,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import kotlin.Pair;
 import okhttp3.*;
 import okhttp3.OkHttpClient.Builder;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.security.KeyManagementException;
@@ -62,31 +63,45 @@ public class ApiExecutor {
 
         Call call = client.newCall(request);
         Response response = null;
-        String body;
-        try {
-            response = call.execute();
-            ResponseBody responseBody = response.body();
-            if (responseBody == null) {
-                throw new Exception("Couldn't read response body");
+        final String[] body = new String[1];
+        final Exception[] exception = {null};
+        final int[] statusCode = {0};
+        final Headers[] headers = {null};
+        final boolean[] isRequestProcessed = {false};
+        call.enqueue(new Callback() {
+            @Override
+            public void onFailure(@NotNull Call call, @NotNull IOException e) {
+                loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e, LogDb.TESTING);
+                exception[0] =  new Exception("Api Call failed");
+                isRequestProcessed[0] = true;
             }
-            try {
-                body = responseBody.string();
-            } catch (IOException e) {
-                loggerMaker.errorAndAddToDb("Error while parsing response body: " + e, LogDb.TESTING);
-                body = "{}";
+
+            @Override
+            public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
+                ResponseBody responseBody = response.body();
+                if (responseBody == null) {
+                    exception[0] = new Exception("Couldn't read response body");
+                    return;
+                }
+                try {
+                    body[0] = responseBody.string();
+                } catch (IOException e) {
+                    loggerMaker.errorAndAddToDb("Error while parsing response body: " + e, LogDb.TESTING);
+                    body[0] = "{}";
+                }
+                statusCode[0] = response.code();
+                headers[0] = response.headers();
+                isRequestProcessed[0] = true;
             }
-        } catch (IOException e) {
-            loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e, LogDb.TESTING);
-            throw new Exception("Api Call failed");
-        } finally {
-            if (response != null) {
-                response.close();
-            }
+        });
+        while (!isRequestProcessed[0]) {//wait for request to be processed
+            Thread.sleep(100);
+        }
+        if (exception[0] != null) {
+            throw exception[0];
         }
 
-        int statusCode = response.code();
-        Headers headers = response.headers();
-        Iterator<Pair<String, String>> headersIterator = headers.iterator();
+        Iterator<Pair<String, String>> headersIterator = headers[0].iterator();
         Map<String, List<String>> responseHeaders = new HashMap<>();
         while (headersIterator.hasNext()) {
             Pair<String,String> v = headersIterator.next();
@@ -98,7 +113,7 @@ public class ApiExecutor {
             responseHeaders.get(headerKey).add(headerValue);
         }
 
-        return new OriginalHttpResponse(body, responseHeaders, statusCode);
+        return new OriginalHttpResponse(body[0], responseHeaders, statusCode[0]);
     }
 
 
