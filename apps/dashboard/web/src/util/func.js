@@ -723,5 +723,14 @@ export default {
         } else {
             return subCatogoryMap[runResult.testSubType].superCategory[fieldName]
         }
+    },
+
+    prettifyArray(arr) {
+        if (!arr || arr.length == 0) return ""
+        if (arr.length >= 2) {
+            return arr.slice(0, -1).join(', ') + ' and ' + arr[arr.length - 1];
+          } else {
+            return arr[0] || ""
+          }
     }
 }

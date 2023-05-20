@@ -34,6 +34,7 @@ public class AktoPolicyNew {
 
     public void fetchFilters() {
         this.filters = RuntimeFilterDao.instance.findAll(new BasicDBObject());
+        loggerMaker.infoAndAddToDb("Filters found: " + this.filters.size(), LogDb.RUNTIME);
     }
 
     public AktoPolicyNew(boolean fetchAllSTI) {
