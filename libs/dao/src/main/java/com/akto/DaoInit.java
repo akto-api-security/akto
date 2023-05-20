@@ -189,7 +189,7 @@ public class DaoInit {
                 cappedSetClassModel, CustomWebhookClassModel, CustomWebhookResultClassModel,
                 nodeResultClassModel, awsResourcesModel, AktoDataTypeClassModel, testingRunIssuesClassModel,
                 testingIssuesIdClassModel, testSourceConfigClassModel, endpointLogicalGroupClassModel, testRolesClassModel,
-                logicalGroupTestingEndpointClassModel, testInfoClassModel , bflaTestInfoClassModel, nucleiTestInfoClassModel, customAuthTypeModel,
+                logicalGroupTestingEndpointClassModel, testInfoClassModel, bflaTestInfoClassModel, nucleiTestInfoClassModel, customAuthTypeModel,
                 containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData,
                 loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel).automatic(true).build());
 
@@ -220,7 +220,8 @@ public class DaoInit {
                 new EnumCodec<>(GlobalEnums.Severity.class),
                 new EnumCodec<>(TrafficMetrics.Name.class),
                 new EnumCodec<>(Loader.Type.class),
-                new EnumCodec<>(AktoGptConfigState.class));
+                new EnumCodec<>(AktoGptConfigState.class),
+                new EnumCodec<>(CustomWebhook.WebhookOptions.class));
 
         CodecRegistry codecRegistry = fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
                 customEnumCodecs);

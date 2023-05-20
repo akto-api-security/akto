@@ -386,6 +386,7 @@ public class SingleTypeInfo {
     public static final String _DURATION = "duration";
     int duration;
     public static final String _API_COLLECTION_ID = "apiCollectionId";
+    public static final String COLLECTION_NAME = "collectionName";
     int apiCollectionId;
     public static final String _SENSITIVE = "sensitive";
     @BsonIgnore

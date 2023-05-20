@@ -23,6 +23,7 @@ import com.akto.dto.data_types.Predicate;
 import com.akto.dto.data_types.RegexPredicate;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
+import com.akto.dto.notifications.CustomWebhook.WebhookOptions;
 import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.pii.PIISource;
@@ -48,7 +49,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
-import com.sendgrid.helpers.mail.Mail;
 import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;
 
@@ -60,6 +60,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
+import org.checkerframework.checker.units.qual.A;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -364,7 +365,7 @@ public class InitializerListener implements ServletContextListener {
 
                         loggerMaker.infoAndAddToDb(slackWebhook.toString(), LogDb.DASHBOARD);
 
-                        ChangesInfo ci = getChangesInfo(now - slackWebhook.getLastSentTimestamp(), now - slackWebhook.getLastSentTimestamp());
+                        ChangesInfo ci = getChangesInfo(now - slackWebhook.getLastSentTimestamp(), now - slackWebhook.getLastSentTimestamp(), null, null, false);
                         if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0) {
                             return;
                         }
@@ -412,7 +413,7 @@ public class InitializerListener implements ServletContextListener {
             return;
         }
 
-        ChangesInfo ci = getChangesInfo(now - webhook.getLastSentTimestamp(), now - webhook.getLastSentTimestamp());
+        ChangesInfo ci = getChangesInfo(now - webhook.getLastSentTimestamp(), now - webhook.getLastSentTimestamp(), webhook.getNewEndpointCollections(), webhook.getNewSensitiveEndpointCollections(), true);
         if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0) {
             return;
         }
@@ -420,6 +421,8 @@ public class InitializerListener implements ServletContextListener {
         List<String> errors = new ArrayList<>();
 
         Map<String, Object> valueMap = new HashMap<>();
+
+        createBodyForWebhook(webhook);
 
         valueMap.put("AKTO.changes_info.newSensitiveEndpoints", ci.newSensitiveParamsObject);
         valueMap.put("AKTO.changes_info.newSensitiveEndpointsCount", ci.newSensitiveParams.size());
@@ -447,9 +450,9 @@ public class InitializerListener implements ServletContextListener {
         OriginalHttpResponse response = null; // null response means api request failed. Do not use new OriginalHttpResponse() in such cases else the string parsing fails.
 
         try {
-            response = ApiExecutor.sendRequest(request,true);
+            response = ApiExecutor.sendRequest(request, true);
             loggerMaker.infoAndAddToDb("webhook request sent", LogDb.DASHBOARD);
-        } catch(Exception e){
+        } catch (Exception e) {
             errors.add("API execution failed");
         }
 
@@ -462,6 +465,24 @@ public class InitializerListener implements ServletContextListener {
 
         CustomWebhookResult webhookResult = new CustomWebhookResult(webhook.getId(), webhook.getUserEmail(), now, message, errors);
         CustomWebhooksResultDao.instance.insertOne(webhookResult);
+    }
+
+    private static void createBodyForWebhook(CustomWebhook webhook) {
+
+        if (webhook.getSelectedWebhookOptions() == null || webhook.getSelectedWebhookOptions().isEmpty()) {// no filtering
+            return;
+        }
+
+        StringBuilder body = new StringBuilder();
+        body.append("{");
+
+        List<WebhookOptions> allowedWebhookOptions = webhook.getSelectedWebhookOptions();
+        for (WebhookOptions webhookOption : allowedWebhookOptions) {
+            body.append("\"").append(webhookOption.getOptionName()).append("\":").append(webhookOption.getOptionReplaceString()).append(",");
+        }
+        body.deleteCharAt(body.length() - 1);//Removing last comma
+        body.append("}");
+        webhook.setBody(body.toString());
     }
 
     public void webhookSender() {
@@ -514,7 +535,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
 
-    public static UrlResult extractUrlFromBasicDbObject(BasicDBObject singleTypeInfo, Map<Integer, ApiCollection> apiCollectionMap) {
+    public static UrlResult extractUrlFromBasicDbObject(BasicDBObject singleTypeInfo, Map<Integer, ApiCollection> apiCollectionMap, List<String> collectionList, boolean allowCollectionIds) {
         String method = singleTypeInfo.getString("method");
         String path = singleTypeInfo.getString("url");
 
@@ -528,13 +549,22 @@ public class InitializerListener implements ServletContextListener {
             urlObject.put("host", null);
             urlObject.put("path", path);
             urlObject.put("method", method);
+            urlObject.put(SingleTypeInfo._API_COLLECTION_ID, null);
+            urlObject.put(SingleTypeInfo.COLLECTION_NAME, null);
             return new UrlResult(urlString, urlObject);
         }
 
         int apiCollectionId = (int) apiCollectionIdObj;
         ApiCollection apiCollection = apiCollectionMap.get(apiCollectionId);
+        if (apiCollection == null) {
+            apiCollection = new ApiCollection();
+        }
+        boolean apiCollectionContainsCondition = collectionList == null || collectionList.contains(apiCollection.getDisplayName());
+        if (!apiCollectionContainsCondition) {
+            return null;
+        }
 
-        String hostName = apiCollection != null ? apiCollection.getHostName() : "";
+        String hostName = apiCollection.getHostName() == null ?  "" : apiCollection.getHostName();
         String url;
         if (hostName != null) {
             url = path.startsWith("/") ? hostName + path : hostName + "/" + path;
@@ -548,11 +578,15 @@ public class InitializerListener implements ServletContextListener {
         urlObject.put("host", hostName);
         urlObject.put("path", path);
         urlObject.put("method", method);
+        urlObject.put(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId);
+        urlObject.put(SingleTypeInfo.COLLECTION_NAME, apiCollection.getDisplayName());
 
         return new UrlResult(urlString, urlObject);
     }
 
-    protected static ChangesInfo getChangesInfo(int newEndpointsFrequency, int newSensitiveParamsFrequency) {
+    protected static ChangesInfo getChangesInfo(int newEndpointsFrequency, int newSensitiveParamsFrequency,
+                                                List<String> newEndpointCollections, List<String> newSensitiveEndpointCollections,
+                                                boolean includeCollectionIds) {
         try {
 
             ChangesInfo ret = new ChangesInfo();
@@ -567,14 +601,20 @@ public class InitializerListener implements ServletContextListener {
             for (BasicDBObject singleTypeInfo : newEndpointsSmallerDuration) {
                 newParamInNewEndpoint += (int) singleTypeInfo.getOrDefault("countTs", 0);
                 singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
-                UrlResult urlResult = extractUrlFromBasicDbObject(singleTypeInfo, apiCollectionMap);
+                UrlResult urlResult = extractUrlFromBasicDbObject(singleTypeInfo, apiCollectionMap, newEndpointCollections, includeCollectionIds);
+                if (urlResult == null) {
+                    continue;
+                }
                 ret.newEndpointsLast7Days.add(urlResult.urlString);
                 ret.newEndpointsLast7DaysObject.add(urlResult.urlObject);
             }
 
             for (BasicDBObject singleTypeInfo : newEndpointsBiggerDuration) {
                 singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
-                UrlResult urlResult = extractUrlFromBasicDbObject(singleTypeInfo, apiCollectionMap);
+                UrlResult urlResult = extractUrlFromBasicDbObject(singleTypeInfo, apiCollectionMap, null, includeCollectionIds);
+                if (urlResult == null) {
+                    continue;
+                }
                 ret.newEndpointsLast31Days.add(urlResult.urlString);
                 ret.newEndpointsLast31DaysObject.add(urlResult.urlObject);
             }
@@ -584,12 +624,19 @@ public class InitializerListener implements ServletContextListener {
             ret.recentSentiiveParams = 0;
             int delta = newSensitiveParamsFrequency;
             Map<Pair<String, String>, Set<String>> endpointToSubTypes = new HashMap<>();
+            Map<Pair<String, String>, ApiCollection> endpointToApiCollection = new HashMap<>();
             for (SingleTypeInfo sti : sensitiveParamsList) {
                 ApiCollection apiCollection = apiCollectionMap.get(sti.getApiCollectionId());
                 String url = sti.getUrl();
+                boolean apiCollectionContainsCondition = true;
                 if (apiCollection != null && apiCollection.getHostName() != null) {
+                    apiCollectionContainsCondition = newSensitiveEndpointCollections == null || newSensitiveEndpointCollections.contains(apiCollection.getDisplayName());
                     String hostName = apiCollection.getHostName();
                     url = url.startsWith("/") ? hostName + url : hostName + "/" + url;
+                }
+
+                if (!apiCollectionContainsCondition) {
+                    continue;
                 }
 
                 String encoded = Base64.getEncoder().encodeToString((sti.getUrl() + " " + sti.getMethod()).getBytes());
@@ -603,6 +650,7 @@ public class InitializerListener implements ServletContextListener {
                         subTypes = new HashSet<>();
                         endpointToSubTypes.put(key, subTypes);
                     }
+                    endpointToApiCollection.put(key, apiCollection);
                     subTypes.add(value);
                 }
             }
@@ -618,6 +666,10 @@ public class InitializerListener implements ServletContextListener {
                 basicDBObject.put("url", methodPlusUrlList[1]);
                 basicDBObject.put("method", methodPlusUrlList[0]);
                 basicDBObject.put("subTypes", subTypes);
+                basicDBObject.put("link", key.getSecond());
+                ApiCollection collection = endpointToApiCollection.get(key);
+                basicDBObject.put(SingleTypeInfo._API_COLLECTION_ID, collection != null ? collection.getId() : null);
+                basicDBObject.put(SingleTypeInfo.COLLECTION_NAME, collection != null ? collection.getDisplayName() : null);
                 ret.newSensitiveParamsObject.add(basicDBObject);
             }
 
@@ -775,7 +827,7 @@ public class InitializerListener implements ServletContextListener {
         logger.info("MONGO URI " + mongoURI);
 
 
-        executorService.schedule( new Runnable() {
+        executorService.schedule(new Runnable() {
             public void run() {
                 boolean calledOnce = false;
                 do {
@@ -799,7 +851,7 @@ public class InitializerListener implements ServletContextListener {
                     }
                 } while (!connectedToMongo);
             }
-        }, 0 , TimeUnit.SECONDS);
+        }, 0, TimeUnit.SECONDS);
 
     }
 
@@ -852,7 +904,7 @@ public class InitializerListener implements ServletContextListener {
                 piiSource.setId("Fin");
                 PIISourceDao.instance.insertOne(piiSource);
             }
-            
+
             if (PIISourceDao.instance.findOne("_id", "File") == null) {
                 String fileUrl = "https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/filetypes.json";
                 PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
