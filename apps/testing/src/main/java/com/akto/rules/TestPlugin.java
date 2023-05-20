@@ -43,7 +43,7 @@ import static com.akto.runtime.APICatalogSync.trimAndSplit;
 public abstract class TestPlugin {
     static ObjectMapper mapper = new ObjectMapper();
     static JsonFactory factory = mapper.getFactory();
-    final LoggerMaker loggerMaker = new LoggerMaker(this.getClass());
+    static final LoggerMaker loggerMaker = new LoggerMaker(TestPlugin.class);
 
     private static final Logger logger = LoggerFactory.getLogger(TestPlugin.class);
     private static final Gson gson = new Gson();
@@ -425,7 +425,14 @@ public abstract class TestPlugin {
     public static boolean validateValidator(FilterNode validatorNode, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap, String logId) {
         if (validatorNode == null) return true;
         if (testRawApi == null) return false;
-        return validate(validatorNode,rawApi,testRawApi, apiInfoKey,"validator", varMap, logId);
+
+        OriginalHttpResponse response = rawApi.getResponse();
+        String body = response == null ? null : response.getBody();
+        boolean isDefaultPayload = StatusCodeAnalyser.isDefaultPayload(body);
+        boolean validateResult = validate(validatorNode,rawApi,testRawApi, apiInfoKey,"validator", varMap, logId);
+
+        loggerMaker.infoAndAddToDb(logId + " isDefaultPayload = " + isDefaultPayload + "; validateResult = " + validateResult, LogDb.TESTING);
+        return !isDefaultPayload && validateResult;
     }
 
     private static boolean validate(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, String context, Map<String, Object> varMap, String logId) {
