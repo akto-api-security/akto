@@ -1017,6 +1017,17 @@
             </result>
         </action>
 
+        <action name="api/toggleNewMergingEnabled" class="com.akto.action.AdminSettingsAction" method="toggleNewMergingEnabled">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchParamsStatus" class="com.akto.action.ParamStateAction" method="fetchParamsStatus">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -1467,6 +1478,17 @@
         </action>
 
         <action name="api/checkStackCreationProgress" class="com.akto.action.quick_start.QuickStartAction" method="checkStackCreationProgress">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name= "ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/createRuntimeStack" class="com.akto.action.quick_start.QuickStartAction" method="createRuntimeStack">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
