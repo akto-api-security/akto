@@ -155,6 +155,7 @@ import SimpleMenu from "./shared/components/SimpleMenu"
 import LoadingSnackBar from './shared/components/LoadingSnackBar';
 import ChatGptInput from './shared/components/inputs/ChatGptInput.vue';
 import apiFunc from "../dashboard/views/observe/inventory/api"
+import func from "@/util/func"
 
 export default {
   name: 'PageDashboard',
@@ -350,6 +351,7 @@ export default {
   },
   methods: {
     ...mapGetters('auth', ['getUsername', 'getAvatar', 'getActiveAccount', 'getAccounts']),
+    ...mapGetters('inventory', ['getUrl', 'getMethod']),
     openDiscordCommunity() {
       return window.open("https://discord.gg/Wpc6xVME4s")
     },
@@ -363,12 +365,13 @@ export default {
         }
     },
     async showAskAktoGPTButton(){
-      let apiCollectionId = -1;
+      let collectionId = -1;
       if(this.$route.params['apiCollectionId']){
-        apiCollectionId = this.$route.params['apiCollectionId']
+        collectionId = this.$route.params['apiCollectionId']
+        this.apiCollectionId = collectionId;
       }
-      if(apiCollectionId !== -1){
-        apiFunc.fetchAktoGptConfig(apiCollectionId).then((resp)=>{
+      if(collectionId !== -1){
+        apiFunc.fetchAktoGptConfig(collectionId).then((resp)=>{
             this.renderAktoButton = resp.currentState[0].state === "ENABLED";
             if(!this.renderAktoButton){
               return false
@@ -398,10 +401,15 @@ export default {
     async runTestsViaAktoGpt(payload){
       console.log("caught payload", payload)
       payload['testName'] = "akto_gpt_test";
+      payload['apiCollectionId'] = this.apiCollectionId;
+      payload['recurringDaily'] = false;
+      payload['testRunTime'] = -1;
+      payload['maxConcurrentRequests'] = -1;
+      payload['startTimestamp'] = func.timeNow();
       payload['apiInfoKeyList'] = [
           {
-              "url": this.url,
-              "method": this.method,
+              "url": this.getUrl(),
+              "method": this.getMethod(),
               "apiCollectionId": this.apiCollectionId
           }
       ]
