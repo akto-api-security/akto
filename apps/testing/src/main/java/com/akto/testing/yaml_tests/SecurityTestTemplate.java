@@ -6,6 +6,7 @@ import com.akto.dto.test_editor.Auth;
 import com.akto.dto.test_editor.ExecutionResult;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.FilterNode;
+import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
 
 import java.util.List;
@@ -20,9 +21,10 @@ public abstract class SecurityTestTemplate {
     RawApi rawApi;
     Map<String, Object> varMap;
     Auth auth;
+    AuthMechanism authMechanism;
     String logId;
 
-    public SecurityTestTemplate(ApiInfo.ApiInfoKey apiInfoKey, FilterNode filterNode, FilterNode validatorNode, ExecutorNode executorNode ,RawApi rawApi, Map<String, Object> varMap, Auth auth, String logId) {
+    public SecurityTestTemplate(ApiInfo.ApiInfoKey apiInfoKey, FilterNode filterNode, FilterNode validatorNode, ExecutorNode executorNode ,RawApi rawApi, Map<String, Object> varMap, Auth auth, AuthMechanism authMechanism, String logId) {
         this.apiInfoKey = apiInfoKey;
         this.filterNode = filterNode;
         this.validatorNode = validatorNode;
@@ -30,6 +32,7 @@ public abstract class SecurityTestTemplate {
         this.rawApi = rawApi;
         this.varMap = varMap;
         this.auth = auth;
+        this.authMechanism = authMechanism;
         this.logId = logId;
     }
 
@@ -100,6 +103,14 @@ public abstract class SecurityTestTemplate {
 
     public void setAuth(Auth auth) {
         this.auth = auth;
+    }
+
+    public AuthMechanism getAuthMechanism() {
+        return authMechanism;
+    }
+
+    public void setAuthMechanism(AuthMechanism authMechanism) {
+        this.authMechanism = authMechanism;
     }
 
     public String getLogId() {

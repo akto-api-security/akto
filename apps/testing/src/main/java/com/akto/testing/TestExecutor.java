@@ -129,33 +129,9 @@ public class TestExecutor {
         List<TestRoles> testRoles = SampleMessageStore.fetchTestRoles();
         AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(new BasicDBObject());
 
-        List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
-
         List<AuthParam> authParams = authMechanism.getAuthParams();
 
-        Set<String> authParamKeys = new HashSet<>();
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap();
-
-        for (AuthParam authParam : authParams) {
-            authParamKeys.add(authParam.getKey());
-        }
-
-        for (CustomAuthType customAuthType : customAuthTypes) {
-            List<String> customAuthTypeHeaderKeys = customAuthType.getHeaderKeys();
-            for (String headerAuthKey: customAuthTypeHeaderKeys) {
-                if (authParamKeys.contains(headerAuthKey)) {
-                    continue;
-                }
-                authParams.add(new HardcodedAuthParam(AuthParam.Location.HEADER, headerAuthKey, null, true));
-            }
-            List<String> customAuthTypePayloadKeys = customAuthType.getPayloadKeys();
-            for (String payloadAuthKey: customAuthTypePayloadKeys) {
-                if (authParamKeys.contains(payloadAuthKey)) {
-                    continue;
-                }
-                authParams.add(new HardcodedAuthParam(AuthParam.Location.BODY, payloadAuthKey, null, true));
-            }
-        }
 
         authMechanism.setAuthParams(authParams);
 
@@ -629,7 +605,7 @@ public class TestExecutor {
         loggerMaker.infoAndAddToDb("triggering test run for apiInfoKey " + apiInfoKey + "test " + 
             testSubType + "logId" + testExecutionLogId, LogDb.TESTING);
 
-        YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode, rawApi, varMap, auth, testExecutionLogId);
+        YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode, rawApi, varMap, auth, testingUtil.getAuthMechanism(), testExecutionLogId);
         List<TestResult> testResults = yamlTestTemplate.run();
         if (testResults == null || testResults.size() == 0) {
             return null;
