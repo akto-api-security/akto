@@ -104,50 +104,6 @@ public class InitializerListener implements ServletContextListener {
         return domain;
     }
 
-    private void setUpWeeklyScheduler() {
-
-        Map<Integer, Integer> dayToDelay = new HashMap<Integer, Integer>();
-        dayToDelay.put(Calendar.FRIDAY, 5);
-        dayToDelay.put(Calendar.SATURDAY, 4);
-        dayToDelay.put(Calendar.SUNDAY, 3);
-        dayToDelay.put(Calendar.MONDAY, 2);
-        dayToDelay.put(Calendar.TUESDAY, 1);
-        dayToDelay.put(Calendar.WEDNESDAY, 0);
-        dayToDelay.put(Calendar.THURSDAY, 6);
-        Calendar with = Calendar.getInstance();
-        Date aDate = new Date();
-        with.setTime(aDate);
-        int dayOfWeek = with.get(Calendar.DAY_OF_WEEK);
-        int delayInDays = dayToDelay.get(dayOfWeek);
-
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            public void run() {
-                try {
-                    ChangesInfo changesInfo = getChangesInfo(31, 7);
-                    if (changesInfo == null || (changesInfo.newEndpointsLast7Days.size() + changesInfo.newSensitiveParams.size()) == 0) {
-                        return;
-                    }
-                    String sendTo = UsersDao.instance.findOne(new BasicDBObject()).getLogin();
-                    logger.info("Sending weekly email");
-                    Mail mail = WeeklyEmail.buildWeeklyEmail(
-                            changesInfo.recentSentiiveParams,
-                            changesInfo.newEndpointsLast7Days.size(),
-                            changesInfo.newEndpointsLast31Days.size(),
-                            sendTo,
-                            changesInfo.newEndpointsLast7Days,
-                            changesInfo.newSensitiveParams.keySet()
-                    );
-
-                    WeeklyEmail.send(mail);
-
-                } catch (Exception ex) {
-                    ex.printStackTrace(); // or loggger would be better
-                }
-            }
-        }, delayInDays, 7, TimeUnit.DAYS);
-
-    }
-
     public void setUpPiiAndTestSourcesScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
@@ -972,7 +928,6 @@ public class InitializerListener implements ServletContextListener {
                 PIISourceDao.instance.insertOne(piiSource);
             }
 
-            setUpWeeklyScheduler();
             setUpDailyScheduler();
             setUpWebhookScheduler();
             setUpPiiAndTestSourcesScheduler();
