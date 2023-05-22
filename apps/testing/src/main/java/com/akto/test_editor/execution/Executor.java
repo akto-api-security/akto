@@ -4,9 +4,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import com.akto.dao.AuthMechanismsDao;
+import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.ExecutorOperandTypes;
+import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.ExecutionResult;
@@ -15,7 +16,6 @@ import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.test_editor.ExecutorSingleRequest;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.testing.ApiExecutor;
-import com.mongodb.client.model.Filters;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.Utils;
@@ -24,7 +24,7 @@ public class Executor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class);
 
-    public List<ExecutionResult> execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId) {
+    public List<ExecutionResult> execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId, AuthMechanism authMechanism) {
 
         List<ExecutionResult> result = new ArrayList<>();
         
@@ -45,9 +45,12 @@ public class Executor {
             List<RawApi> sampleRawApis = new ArrayList<>();
             sampleRawApis.add(sampleRawApi);
 
-            singleReq = buildTestRequest(reqNode, null, sampleRawApis, varMap);
+            singleReq = buildTestRequest(reqNode, null, sampleRawApis, varMap, authMechanism);
             List<RawApi> testRawApis = new ArrayList<>();
             testRawApis = singleReq.getRawApis();
+            if (testRawApis == null) {
+                continue;
+            }
             for (RawApi testReq: testRawApis) {
                 try {
                     // follow redirects = true for now
@@ -63,7 +66,7 @@ public class Executor {
         return result;
     }
 
-    public ExecutorSingleRequest buildTestRequest(ExecutorNode node, String operation, List<RawApi> rawApis, Map<String, Object> varMap) {
+    public ExecutorSingleRequest buildTestRequest(ExecutorNode node, String operation, List<RawApi> rawApis, Map<String, Object> varMap, AuthMechanism authMechanism) {
 
         List<ExecutorNode> childNodes = node.getChildNodes();
         if (node.getNodeType().equalsIgnoreCase(ExecutorOperandTypes.NonTerminal.toString()) || node.getNodeType().equalsIgnoreCase(ExecutorOperandTypes.Terminal.toString())) {
@@ -99,7 +102,7 @@ public class Executor {
 
                 for (int i = 0; i < wordListVal.size(); i++) {
                     RawApi copyRApi = rApi.copy();
-                    ExecutorSingleOperationResp resp = invokeOperation(operation, wordListVal.get(i), value, copyRApi, varMap);
+                    ExecutorSingleOperationResp resp = invokeOperation(operation, wordListVal.get(i), value, copyRApi, varMap, authMechanism);
                     if (!resp.getSuccess()) {
                         return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
                     }
@@ -113,7 +116,7 @@ public class Executor {
 
                 for (int i = 0; i < wordListVal.size(); i++) {
                     RawApi copyRApi = rApi.copy();
-                    ExecutorSingleOperationResp resp = invokeOperation(operation, key, wordListVal.get(i), copyRApi, varMap);
+                    ExecutorSingleOperationResp resp = invokeOperation(operation, key, wordListVal.get(i), copyRApi, varMap, authMechanism);
                     if (!resp.getSuccess()) {
                         return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
                     }
@@ -130,7 +133,7 @@ public class Executor {
                         if (index >= wordListVal.size()) {
                             break;
                         }
-                        ExecutorSingleOperationResp resp = invokeOperation(operation, wordListVal.get(index), value, rawApi, varMap);
+                        ExecutorSingleOperationResp resp = invokeOperation(operation, wordListVal.get(index), value, rawApi, varMap, authMechanism);
                         if (!resp.getSuccess()) {
                             return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
                         }
@@ -143,7 +146,7 @@ public class Executor {
                         if (index >= wordListVal.size()) {
                             break;
                         }
-                        ExecutorSingleOperationResp resp = invokeOperation(operation, key, wordListVal.get(index), rawApi, varMap);
+                        ExecutorSingleOperationResp resp = invokeOperation(operation, key, wordListVal.get(index), rawApi, varMap, authMechanism);
                         if (!resp.getSuccess()) {
                             return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
                         }
@@ -151,7 +154,7 @@ public class Executor {
                     }
                 } else {
                     for (RawApi rawApi : rawApis) {
-                        ExecutorSingleOperationResp resp = invokeOperation(operation, key, value, rawApi, varMap);
+                        ExecutorSingleOperationResp resp = invokeOperation(operation, key, value, rawApi, varMap, authMechanism);
                         if (!resp.getSuccess()) {
                             return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
                         }
@@ -164,7 +167,7 @@ public class Executor {
         ExecutorNode childNode;
         for (int i = 0; i < childNodes.size(); i++) {
             childNode = childNodes.get(i);
-            ExecutorSingleRequest executionResult = buildTestRequest(childNode, operation, rawApis, varMap);
+            ExecutorSingleRequest executionResult = buildTestRequest(childNode, operation, rawApis, varMap, authMechanism);
             rawApis = executionResult.getRawApis();
             if (!executionResult.getSuccess()) {
                 return executionResult;
@@ -179,7 +182,7 @@ public class Executor {
         }
     }
 
-    public ExecutorSingleOperationResp invokeOperation(String operationType, Object key, Object value, RawApi rawApi, Map<String, Object> varMap) {
+    public ExecutorSingleOperationResp invokeOperation(String operationType, Object key, Object value, RawApi rawApi, Map<String, Object> varMap, AuthMechanism authMechanism) {
         try {
 
             if (key == null) {
@@ -199,7 +202,7 @@ public class Executor {
 
                 for (int i = 0; i < keyContextList.size(); i++) {
                     String v1 = valueContextList.get(i);
-                    ExecutorSingleOperationResp resp = runOperation(operationType, rawApi, keyContextList.get(i), v1, varMap);
+                    ExecutorSingleOperationResp resp = runOperation(operationType, rawApi, keyContextList.get(i), v1, varMap, authMechanism);
                     if (!resp.getSuccess()) {
                         return resp;
                     }
@@ -215,7 +218,7 @@ public class Executor {
                 value = VariableResolver.resolveExpression(varMap, value.toString());
             }
 
-            ExecutorSingleOperationResp resp = runOperation(operationType, rawApi, key, value, varMap);
+            ExecutorSingleOperationResp resp = runOperation(operationType, rawApi, key, value, varMap, authMechanism);
             return resp;
         } catch(Exception e) {
             return new ExecutorSingleOperationResp(false, "error executing executor operation " + e.getMessage());
@@ -223,7 +226,7 @@ public class Executor {
         
     }
     
-    public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap) {
+    public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism) {
         switch (operationType.toLowerCase()) {
             case "add_body_param":
                 return Operations.addBody(rawApi, key.toString(), value);
@@ -264,6 +267,17 @@ public class Executor {
                         return new ExecutorSingleOperationResp(false, resp.getErrMsg());
                     }
                 }
+                List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
+                for (CustomAuthType customAuthType : customAuthTypes) {
+                    List<String> customAuthTypeHeaderKeys = customAuthType.getHeaderKeys();
+                    for (String headerAuthKey: customAuthTypeHeaderKeys) {
+                        Operations.deleteHeader(rawApi, headerAuthKey);
+                    }
+                    List<String> customAuthTypePayloadKeys = customAuthType.getPayloadKeys();
+                    for (String payloadAuthKey: customAuthTypePayloadKeys) {
+                        Operations.deleteBodyParam(rawApi, payloadAuthKey);
+                    }
+                }
                 return new ExecutorSingleOperationResp(true, "");
             case "replace_auth_header":
                 authHeaders = (List<String>) varMap.get("auth_headers");
@@ -272,7 +286,6 @@ public class Executor {
                     return new ExecutorSingleOperationResp(false, "auth headers missing from var map");
                 }
                 if (authHeaders.size() == 0 || authHeaders.size() > 1){
-                    AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(Filters.eq("type", "HARDCODED"));
                     if (authMechanism == null || authMechanism.getAuthParams() == null || authMechanism.getAuthParams().size() == 0) {
                         return new ExecutorSingleOperationResp(false, "auth headers missing");
                     }
@@ -285,7 +298,6 @@ public class Executor {
                 if (VariableResolver.isAuthContext(key)) {
                     authVal = VariableResolver.resolveAuthContext(key.toString(), rawApi.getRequest().getHeaders(), authHeader);
                 } else {
-                    AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(Filters.eq("type", "HARDCODED"));
                     if (authMechanism == null || authMechanism.getAuthParams() == null || authMechanism.getAuthParams().size() == 0) {
                         return new ExecutorSingleOperationResp(false, "auth headers missing");
                     }

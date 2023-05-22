@@ -49,4 +49,4 @@ validate:
     length:
       gt: 0
     percentage_match:
-      gt: 90
+      gte: 90
