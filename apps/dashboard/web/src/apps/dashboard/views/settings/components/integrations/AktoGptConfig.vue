@@ -57,9 +57,7 @@ export default {
 				id: item.id,
 				state: item.state ? 'ENABLED' : 'DISABLED'
 			}));
-			console.log('Updated items: ', updatedItems)
 			api.saveAktoGptConfig(updatedItems).then((resp) => {
-				console.log(resp)
 				this.transformAktoConfigs(resp['currentState'])
 			})
 		},

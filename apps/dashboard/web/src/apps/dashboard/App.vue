@@ -351,6 +351,7 @@ export default {
   },
   methods: {
     ...mapGetters('auth', ['getUsername', 'getAvatar', 'getActiveAccount', 'getAccounts']),
+    ...mapGetters('inventory', ['getUrl', 'getMethod']),
     openDiscordCommunity() {
       return window.open("https://discord.gg/Wpc6xVME4s")
     },
@@ -407,8 +408,8 @@ export default {
       payload['startTimestamp'] = func.timeNow();
       payload['apiInfoKeyList'] = [
           {
-              "url": this.url,
-              "method": this.method,
+              "url": this.getUrl(),
+              "method": this.getMethod(),
               "apiCollectionId": this.apiCollectionId
           }
       ]
