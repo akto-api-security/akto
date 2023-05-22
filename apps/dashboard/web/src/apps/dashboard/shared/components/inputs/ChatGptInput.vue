@@ -213,7 +213,6 @@ export default {
             })
         },
         async runTestsViaAktoGpt(){
-            console.log("runTestsViaAktoGpt")
             let selectedTests = this.responses[0].tests
             this.$emit('runTestsViaAktoGpt', {selectedTests})
         }

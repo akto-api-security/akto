@@ -4,11 +4,10 @@ import com.akto.action.ExportSampleDataAction;
 import com.akto.action.gpt.GptAction;
 import com.akto.action.gpt.result_fetchers.ResultFetcherStrategy;
 import com.akto.action.gpt.utils.HeadersUtils;
-import com.akto.dto.OriginalHttpRequest;
-import com.akto.util.enums.GlobalEnums;
-import com.google.gson.Gson;
+import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dto.test_editor.Category;
+import com.akto.dto.test_editor.Info;
 import com.mongodb.BasicDBObject;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 
@@ -56,10 +55,10 @@ public class SuggestTests implements QueryHandler {
 
     private String getTestDetails() {
         BasicDBObject testDetails = new BasicDBObject();
-        GlobalEnums.TestCategory[] testCategories = GlobalEnums.TestCategory.values();
-        for (GlobalEnums.TestCategory testCategory : testCategories) {
-            if (testCategory == GlobalEnums.TestCategory.UC) continue;
-            testDetails.put(testCategory.getName(), testCategory.getShortName());
+        Map<String, Info> testInfoMap = YamlTemplateDao.instance.fetchTestInfoMap();
+        for (Map.Entry<String, Info> entry : testInfoMap.entrySet()) {
+            Category category = entry.getValue().getCategory();
+            testDetails.put(category.getName(), category.getShortName());
         }
         return testDetails.toJson();
     }

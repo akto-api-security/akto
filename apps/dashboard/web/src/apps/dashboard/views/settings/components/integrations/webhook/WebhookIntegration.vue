@@ -50,7 +50,7 @@
 
 import SimpleTable from "../../../../../shared/components/SimpleTable";
 import WebhookBuilder from "./WebhookBuilder";
-import api from "../../../api";
+import api from "../api";
 import func from "../../../../../../../util/func";
 import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import SampleData from "../../../../../shared/components/SampleData";
@@ -141,7 +141,10 @@ export default {
               x["activeStatus"] = newStatus
             }
           })
+
+
         })
+
 
         return result
       },
@@ -179,13 +182,16 @@ export default {
           let frequencyInSeconds = updatedData["frequencyInSeconds"]
 
           let body = updatedData["body"]
+          let selectedWebhookOptions = updatedData["selectedWebhookOptions"]
+          let newEndpointCollections = updatedData["newEndpointCollections"]
+          let newSensitiveEndpointCollections = updatedData["newSensitiveEndpointCollections"]
 
           let createNew = data["createNew"]
           if (createNew) {
-            return api.addCustomWebhook(webhookName, url, queryParams, method, headerString, body, frequencyInSeconds)
+            return api.addCustomWebhook(webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections)
           } else {
             let id = this.originalStateFromDb["id"]
-            return api.updateCustomWebhook(id, webhookName, url, queryParams, method, headerString, body, frequencyInSeconds)
+            return api.updateCustomWebhook(id, webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections)
           }
       },
       saveWebhook(data) {
