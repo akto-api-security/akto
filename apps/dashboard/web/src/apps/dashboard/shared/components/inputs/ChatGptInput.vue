@@ -47,32 +47,85 @@
         </div>    
         <div class="prompt-body" v-if="responses || loading">
             <div class="gpt-prompt">
-                <span class="gpt-prompt-text">
-                    <v-icon :size=14 :color='("var(--hexColor"+Math.floor(Math.random() * 13 + 1)+")")'>$fas_user-graduate</v-icon>
-                    {{ computedLabel }}
-                </span>
+                <div class="d-flex">
+                    <owner-name :owner-name="ownerName" :owner-id="0" :show-name="false" />
+                    <div class="ml-2 label">{{ computedLabel }}</div>
+                </div>
             </div>
             <div class="prompt-loader" v-if="loading">
                 <spinner :size=28 />
             </div>
             <div class="response-body" v-else-if="responses.length == 0">
-                <v-icon class="gpt-icon" :size="14">$aktoWhite</v-icon>
+                <v-icon class="gpt-icon" :size="20">$aktoWhite</v-icon>
                 <span class="listItem">
                     Sorry couldn't find any response with your prompt.
-                    Try again.
+                    Please try again.
                 </span>
             </div>
 
             <div class="response-body" v-else>
-                <v-icon class="gpt-icon" :size="16">$aktoWhite</v-icon>
-                    <v-list-item v-for="(item, index) in responses" :key="index" class="listItem">
-                        <div v-if="item.functionality">
-                            <div class="fw-500" style="text-transform: uppercase">{{item.functionality}}</div>
-                            <div v-for="(api, ii) in item.apis" :key="'api_'+ii">- {{api}}</div>
+                    <div class="d-flex">
+                        <div>
+                            <v-icon class="gpt-icon" :size="20">$aktoWhite</v-icon>
                         </div>
-                        <span v-else>{{ item }}</span>
-                        
-                    </v-list-item>
+                        <div class="akto-gpt-resp" v-if="queryType === 'generate_curl_for_test'">
+                            <div v-if="responses[0] && responses[0].curl && responses[0].curl.includes('-H')">
+                                <div class="code"> <code-block :lines="[responses[0].curl]" onCopyBtnClickText="Curl copied to clipboard"></code-block> </div>
+                            </div>
+                            <div v-else-if="responses[0] && responses[0].error" class="error-resp">
+                                {{ responses[0].error }}
+                            </div>
+                            <div v-else>
+                                It seems that this API is not vulnerable to {{ responses[0].test_type }}.
+                            </div>
+                        </div>
+                        <div class="akto-gpt-resp" v-else-if="queryType === 'generate_regex'">
+                            <div v-if="responses[0] && responses[0].regex">
+                                <div class="code"> 
+                                    <code-block :lines="[responses[0].regex.trim()]" onCopyBtnClickText="Regex copied to clipboard"></code-block> 
+                                    <div class="mt-6">
+                                        <v-btn primary color="var(--themeColor)" @click="addRegexToAkto" dark depressed>Create sensitive param in Akto</v-btn>
+                                    </div>
+                                </div>
+                            </div>
+                            <div v-else-if="responses[0] && responses[0].error" class="error-resp">
+                                {{ responses[0].error }}
+                            </div>
+                            <div v-else>
+                                It seems that this API is not vulnerable to {{ responses[0].test_type }} vulnerability.
+                            </div>
+                        </div>
+                        <div v-else-if="queryType === 'suggest_tests'">
+                            <div v-if="responses[0] && responses[0].tests">
+                                <div class="test-suggestion-results ml-2">
+                                    <div> This api is vulnerable to the following vulnerabilities:</div>
+                                        <div class="mt-4">
+                                            <ul> 
+                                                <li v-for="(item, index) in responses[0].tests" :key="index">
+                                                    {{ responses[0].test_details[item] }}
+                                                </li>
+                                            </ul>
+                                        </div>
+                                </div>
+                                <div class="mt-6">
+                                    <v-btn primary color="var(--themeColor)" dark depressed @click="runTestsViaAktoGpt">Run these tests in Akto</v-btn>
+                                </div>
+                            </div>
+                            <div v-else class="error-resp">
+                                {{ responses[0].error }}
+                            </div>
+                        </div>
+                        <div v-else :style="{'overflow-x' : 'scroll'}">
+                            <v-list-item v-for="(item, index) in responses" :key="index" class="listItem">
+                                <div v-if="item.functionality">
+                                    <div class="fw-500" style="text-transform: uppercase">{{item.functionality}}</div>
+                                    <div v-for="(api, ii) in item.apis" :key="'api_'+ii">- {{api}}</div>
+                                </div>
+                                <span v-else>{{ item }}</span>
+                                
+                            </v-list-item>
+                        </div>
+                    </div>
             </div>
         </div>
 
@@ -85,16 +138,22 @@ import obj from '@/util/obj';
 import SimpleMenu from '../SimpleMenu'
 import Spinner from '../Spinner'
 import request from '@/util/request'
+import CodeBlock from '@/apps/dashboard/shared/components/CodeBlock'
+import OwnerName from '@/apps/dashboard/shared/components/OwnerName'
+import { mapGetters } from 'vuex';
 
 export default {
     name: "ChatGptInput",
     components: {
         SimpleMenu,
-        Spinner
+        Spinner,
+        CodeBlock,
+        OwnerName
     },
     props: {
         items: obj.arrR,
-        showDialog: obj.boolN
+        showDialog: obj.boolN,
+        ownerName: obj.strR,
     },
     data () {
         let _this = this;
@@ -104,12 +163,14 @@ export default {
             selectedObject: null,
             searchKey: null,
             responses: null,
+            queryType: null,
             menuItems: this.items.map(x => {
                 return {
                     icon: x.icon,
                     label: x.label.replaceAll("${input}", "_________"),
                     click: () => {
                         _this.responses = null
+                        _this.queryType = null
                         _this.selectedObject = x
                     }
                 }
@@ -128,6 +189,7 @@ export default {
             this.loading = true;
             this.askGPT(queryPayload).then(resp => {
                 _this.responses = resp.response.responses || []
+                _this.queryType = resp.type
                 _this.loading = false
             }).catch(() => {
                 _this.responses = []
@@ -135,11 +197,24 @@ export default {
             })   
         },
         askGPT(data) {
+            if ('meta' in data && 'apiCollectionId' in data.meta) {
+                data.meta.apiCollectionId = parseInt(data.meta.apiCollectionId);
+            }
             return request({
                 url: '/api/ask_ai',
                 method: 'post',
                 data
             })
+        },
+        addRegexToAkto(){
+            this.$emit('addRegexToAkto', {
+                "regex": this.responses[0].regex.trim(),
+                "name": this.searchKey
+            })
+        },
+        async runTestsViaAktoGpt(){
+            let selectedTests = this.responses[0].tests
+            this.$emit('runTestsViaAktoGpt', {selectedTests})
         }
     },
     mounted () {
@@ -229,8 +304,6 @@ export default {
     display: flex
     align-items: center
     padding: 0 20px
-    .gpt-prompt-text
-        font-size: 12px
 
 
 .chat-gpt-text-field
@@ -259,9 +332,11 @@ export default {
     
     .response-body
         padding: 20px
+        font-size: 16px !important
         .listItem
             min-height: 16px !important
-            font-size: 12px !important
+            font-size: 14px !important
+            padding-left: 4px !important
 </style>
 
 <style scoped>
@@ -304,4 +379,20 @@ export default {
         border: 0px
     }
 
+    .code{
+        max-width: 600px;
+    }
+
+    .label{
+        font-size: 16px;
+        font-weight: 500;
+    }
+
+    .akto-gpt-resp{
+        margin-left: 8px;
+    }
+
+    .error-resp{
+        font-size: 14px;
+    }
 </style>

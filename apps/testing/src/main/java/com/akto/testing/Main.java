@@ -3,6 +3,7 @@ package com.akto.testing;
 import com.akto.DaoInit;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
@@ -75,18 +76,6 @@ public class Main {
         int delta = Context.now() - 20*60;
 
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
-
-        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(new BasicDBObject());
-        boolean runStatusCodeAnalyser = accountSettings == null ||
-                accountSettings.getSetupType() != AccountSettings.SetupType.PROD;
-
-        if (runStatusCodeAnalyser) {
-            try {
-                StatusCodeAnalyser.run();
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while running status code analyser: " + e, LogDb.TESTING);
-            }
-        }
 
         loggerMaker.infoAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);

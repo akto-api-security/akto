@@ -1,7 +1,11 @@
 package com.akto.rules;
 
+import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.test_editor.filter.ConfigParser;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.test_editor.DataOperandsFilterResponse;
+import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.info.TestInfo;
 import com.akto.dto.type.*;
@@ -10,9 +14,9 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.RelationshipSync;
 import com.akto.store.TestingUtil;
+import com.akto.test_editor.filter.Filter;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.StatusCodeAnalyser;
-import com.akto.testing.TestExecutor;
 import com.akto.types.CappedSet;
 import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
@@ -22,7 +26,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 
+import org.bson.conversions.Bson;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +43,7 @@ import static com.akto.runtime.APICatalogSync.trimAndSplit;
 public abstract class TestPlugin {
     static ObjectMapper mapper = new ObjectMapper();
     static JsonFactory factory = mapper.getFactory();
-    final LoggerMaker loggerMaker = new LoggerMaker(this.getClass());
+    static final LoggerMaker loggerMaker = new LoggerMaker(TestPlugin.class);
 
     private static final Logger logger = LoggerFactory.getLogger(TestPlugin.class);
     private static final Gson gson = new Gson();
@@ -216,12 +222,16 @@ public abstract class TestPlugin {
                                          ApiInfo.ApiInfoKey apiInfoKey, boolean isHeader, int responseCode,
                                          Map<String, SingleTypeInfo> singleTypeInfoMap) {
 
-        String key = SingleTypeInfo.composeKey(
-                apiInfoKey.url, apiInfoKey.method.name(), responseCode, isHeader,
-                param,SingleTypeInfo.GENERIC, apiInfoKey.getApiCollectionId(), isUrlParam
+        Bson filter = Filters.and(
+            Filters.eq("apiCollectionId", apiInfoKey.getApiCollectionId()),
+            Filters.eq("url", apiInfoKey.url),
+            Filters.eq("method", apiInfoKey.method.name()),
+            Filters.eq("responseCode", responseCode),
+            Filters.eq("isHeader", isHeader),
+            Filters.eq("param", param),
+            Filters.eq("isUrlParam", isUrlParam)
         );
-
-        SingleTypeInfo singleTypeInfo = singleTypeInfoMap.get(key);
+        SingleTypeInfo singleTypeInfo = SingleTypeInfoDao.instance.findOne(filter);
 
         if (singleTypeInfo == null) return null;
 
@@ -404,6 +414,31 @@ public abstract class TestPlugin {
         }
 
         return comparisonExcludedKeys;
+    }
+
+    public static boolean validateFilter(FilterNode filterNode, RawApi rawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap, String logId) {
+        if (filterNode == null) return true;
+        if (rawApi == null) return false;
+        return validate(filterNode, rawApi, null, apiInfoKey,"filter", varMap, logId);
+    }
+
+    public static boolean validateValidator(FilterNode validatorNode, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap, String logId) {
+        if (validatorNode == null) return true;
+        if (testRawApi == null) return false;
+
+        OriginalHttpResponse response = rawApi.getResponse();
+        String body = response == null ? null : response.getBody();
+        boolean isDefaultPayload = StatusCodeAnalyser.isDefaultPayload(body);
+        boolean validateResult = validate(validatorNode,rawApi,testRawApi, apiInfoKey,"validator", varMap, logId);
+
+        loggerMaker.infoAndAddToDb(logId + " isDefaultPayload = " + isDefaultPayload + "; validateResult = " + validateResult, LogDb.TESTING);
+        return !isDefaultPayload && validateResult;
+    }
+
+    private static boolean validate(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, String context, Map<String, Object> varMap, String logId) {
+        Filter filter = new Filter();
+        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(node, rawApi, testRawApi, apiInfoKey, null, null , false,context, varMap, logId);
+        return dataOperandsFilterResponse.getResult();
     }
     
     private SampleRequestReplayResponse replaySampleReq(OriginalHttpRequest testRequest, int replayCount, boolean followRedirects, OriginalHttpResponse originalHttpResponse) throws Exception {

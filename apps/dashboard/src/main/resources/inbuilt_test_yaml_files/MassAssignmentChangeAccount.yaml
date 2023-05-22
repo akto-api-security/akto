@@ -1,0 +1,69 @@
+id: MASS_ASSIGNMENT_CHANGE_ACCOUNT
+info:
+  name: "Mass assignment leading to modification of account"
+  description: "The endpoint appears to be vulnerable to Mass Assignment attack. The original request was replayed by changing account value in request body. The application responded with 2XX success code in response."
+  details: >
+    "The endpoint appears to be vulnerable to Mass Assignment attack. The original request was replayed by changing account value in request body. The application responded with 2XX success code in response.
+    <b>Background:</b>
+    Objects in modern applications might contain many properties. Some of these properties should be updated directly by the client (e.g., user.first_name or user.address) and some of them should not (e.g., user.is_vip flag).\n"
+    "An API endpoint is vulnerable if it automatically converts client parameters into internal object properties, without considering the sensitivity and the exposure level of these properties. This could allow an attacker to update object properties that they should not have access to.\n"
+    "Examples for sensitive properties:
+    Permission-related properties: user.is_admin, user.is_vip should only be set by admins.
+    Process-dependent properties: user.cash should only be set internally after payment verification.
+    Internal properties: article.created_time should only be set internally by the application."
+  impact: "Exploitation can lead to privilege escalation."
+  category:
+    name: MA
+    shortName: Mass Assignment
+    displayName: Mass Assignment (MA)
+  subCategory: MASS_ASSIGNMENT_CHANGE_ACCOUNT
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa6-mass-assignment.md"
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+
+  method:
+    contains_either:
+      - "PUT"
+      - "POST"
+      - "PATCH"
+
+  response_payload:
+    for_one:
+      key:
+        contains_either: account
+        extract: account_key
+
+  request_payload:
+    for_one:
+      key:
+        not_contains: ${account_key}
+
+  param_context:
+    param: ${account_key}
+    extract: account_context
+
+execute:
+  type: single
+  requests:
+    - req:
+        - add_body_param:
+            account_context.key: ${account_context.value}
+
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_payload:
+    for_one:
+      key:
+        eq: ${account_key}
+      value:
+        eq: ${account_context.value}
