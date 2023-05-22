@@ -35,9 +35,12 @@ public class GptConfigAction extends UserAction {
         List<BasicDBObject> updatedAktoGptConfigList = new ArrayList<>();
         for (AktoGptConfig aktoGptConfig : aktoGptConfigList) {
             ApiCollection apiCollection = apiCollectionMap.remove(aktoGptConfig.getId());
-            BasicDBObject obj = new BasicDBObject("id", aktoGptConfig.getId())
-                    .append("state", aktoGptConfig.getState().toString())
-                    .append("collectionName", apiCollection.getName());
+            int id = aktoGptConfig.getId() != 0 ? aktoGptConfig.getId() : apiCollection.getId();
+            String state = aktoGptConfig.getState() != null ? aktoGptConfig.getState().toString() : DEFAULT_STATE.toString();
+            String name = apiCollection != null && apiCollection.getName() != null ? apiCollection.getName(): String.valueOf(id);
+            BasicDBObject obj = new BasicDBObject("id", id)
+                    .append("state", state)
+                    .append("collectionName", name);
             updatedAktoGptConfigList.add(obj);
         }
         for (Integer apiCollectionId : apiCollectionMap.keySet()) {
