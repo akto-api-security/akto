@@ -5,6 +5,6 @@ import com.mongodb.BasicDBObject;
 
 public interface QueryHandler {
 
-    public BasicDBObject handleQuery(BasicDBObject meta);
+    public BasicDBObject handleQuery(BasicDBObject meta) throws Exception;
 }
 

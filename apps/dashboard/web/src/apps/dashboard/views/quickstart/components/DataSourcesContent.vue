@@ -26,6 +26,7 @@ import Fargate from './Fargate'
 import GcpTrafficMirroring from './GcpTrafficMirroring'
 import BurpsuiteSource from './BurpsuiteSource'
 import PostmanSource from './PostmanSource'
+import NginxSource from "./NginxSource"
 import SingleDataSource from './SingleDataSource'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
 import api from '../api'
@@ -41,7 +42,9 @@ export default {
         PostmanSource,
         Spinner,
         KubernetesDaemonset,
-        Fargate
+        Fargate,
+        NginxSource,
+        Spinner
     },
     data() {
         return {
@@ -93,7 +96,14 @@ export default {
                     title: "Postman",
                     detailComponent: 'PostmanSource',
                     connected: "More"
-                }
+                },
+                "NGINX": {
+                    icon: "$nginx",
+                    key: "NGINX",
+                    title: "NGINX",
+                    detailComponent: 'NginxSource',
+                    connected: "More"
+                },
             }
         }
     },
@@ -104,9 +114,9 @@ export default {
         getSourcesInOrder(){
             let order = []
             if (window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'){
-                order = ['BURP', 'POSTMAN','AWS','GCP', 'KUBERNETES', 'DATA_PROCESSORS']
+                order = ['BURP', 'POSTMAN','AWS','GCP', 'KUBERNETES', 'DATA_PROCESSORS', 'NGINX']
             } else {
-                order = [ 'AWS','KUBERNETES', 'DATA_PROCESSORS', 'BURP', 'POSTMAN', 'GCP']
+                order = [ 'AWS','KUBERNETES', 'DATA_PROCESSORS', 'NGINX', 'BURP', 'POSTMAN', 'GCP']
             }
             let final_order = []
             order.forEach(item => {

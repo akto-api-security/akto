@@ -7,7 +7,8 @@ Vue.use(Vuex)
 const state = {
     loading: false,
     defaultSubcategories: [],
-    userSubcategories: []
+    userSubcategories: [],
+    searchText: "",
 }
 
 const marketplace = {
@@ -18,6 +19,9 @@ const marketplace = {
             state.loading = false
             state.defaultSubcategories = []
             state.userSubcategories = []
+        },
+        searchTestResults(state, {searchText}){
+            state.searchText = searchText
         }
     },
     actions: {
@@ -44,7 +48,8 @@ const marketplace = {
     getters: {
         getLoading: (state) => state.loading,
         getDefaultSubcategories: (state) => state.defaultSubcategories,
-        getUserSubcategories: (state) => state.userSubcategories
+        getUserSubcategories: (state) => state.userSubcategories,
+        getSearchText: (state)=>state.searchText
     }
 }
 

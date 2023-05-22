@@ -1,5 +1,11 @@
 package com.akto.dto;
 
+import java.util.List;
+import java.util.Map;
+
+import com.akto.dto.type.RequestTemplate;
+import com.mongodb.BasicDBObject;
+
 public class RawApi {
 
     private OriginalHttpRequest request;
@@ -20,6 +26,68 @@ public class RawApi {
         response.buildFromSampleMessage(message);
 
         return new RawApi(request, response, message);
+    }
+
+    public BasicDBObject fetchReqPayload() {
+        OriginalHttpRequest req = this.getRequest();
+        String reqBody = req.getBody();
+        BasicDBObject payload;
+        try {
+             payload = BasicDBObject.parse(reqBody);
+        } catch (Exception e) {
+            payload = new BasicDBObject();
+        }
+        return payload;
+    }
+
+    public void modifyReqPayload(BasicDBObject payload) {
+        OriginalHttpRequest req = this.getRequest();
+        req.setBody(payload.toJson());
+        this.setRequest(req);
+    }
+
+    public void modifyUrl(String url) {
+        OriginalHttpRequest req = this.getRequest();
+        req.setUrl(url);
+        this.setRequest(req);
+    }
+
+    public void modifyMethod(String method) {
+        OriginalHttpRequest req = this.getRequest();
+        req.setMethod(method);
+        this.setRequest(req);
+    }
+
+    public Map<String, List<String>> fetchReqHeaders() {
+        OriginalHttpRequest req = this.getRequest();
+        return req.getHeaders();
+    }
+
+    public void modifyReqHeaders(Map<String, List<String>> headers) {
+        OriginalHttpRequest req = this.getRequest();
+        req.setHeaders(headers);
+        this.setRequest(req);
+    }
+
+    public BasicDBObject fetchQueryParam() {
+        OriginalHttpRequest req = this.getRequest();
+        String queryParams = req.getQueryParams();
+        String url = req.getUrl();
+        BasicDBObject queryParamObj = RequestTemplate.getQueryJSON(url + "?" + queryParams);
+        return queryParamObj;
+    }
+
+    public void modifyQueryParam(BasicDBObject payload) {
+        OriginalHttpRequest req = this.getRequest();
+
+        String queryParams = "";
+        for (String key: payload.keySet()) {
+            queryParams = queryParams + key + "=" + payload.get(key) + "&";
+        }
+        queryParams = queryParams.substring(0, queryParams.length() - 1);
+
+        // recheck
+        req.setQueryParams(queryParams);
     }
 
     public RawApi copy() {

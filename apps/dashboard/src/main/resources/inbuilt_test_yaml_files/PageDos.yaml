@@ -1,0 +1,49 @@
+id: PAGINATION_MISCONFIGURATION
+info:
+  name: Possible Dos by Pagination misconfiguration
+  description: "Quite often, APIs do not impose any restrictions on the size or number of resources that can be requested by the user."
+  details: "Such vulnerabilities arise when there is no max limit imposed on the number of resources returned. Typically, the number of objects to be returned is provided by a parameter in the API call. An attacker can set it as a large number. "
+  impact: "This can impact the API server performance, leading to  Denial of Service (DoS). It also leaves the door open to authentication flaws such as brute force."
+  category:
+    name: RL
+    shortName: Lack of Resources & Rate Limiting
+    displayName: Lack of Resources & Rate Limiting (RL)
+  subCategory: PAGINATION_MISCONFIGURATION
+  severity: HIGH
+  tags:
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa4-lack-of-resources-and-rate-limiting.md#scenario-2"
+
+api_selection_filters:
+  query_param:
+    for_one:
+      key:
+        or:
+          - regex: .*limit.*
+          - regex: .*size.*
+          - regex: .*page.*
+        extract: limitKey
+      value:
+        extract: limitValue
+  response_payload:
+    length:
+      extract: original_length
+
+execute:
+  type: single
+  requests:
+    - req:
+        modify_query_param:
+          limitKey: ${limitValue}0
+
+validate:
+  response_code:
+    and:
+      gte: 200
+      lt: 300
+  response_payload:
+    length:
+      gt: ${original_length}

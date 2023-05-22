@@ -1,5 +1,7 @@
 package com.akto.dto.testing.sources;
 
+import java.util.List;
+
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 
@@ -22,11 +24,12 @@ public class TestSourceConfig {
     private int addedEpoch;
     private int stars;
     private int installs;
+    private List<String> tags;
 
     public TestSourceConfig() {
     }
 
-    public TestSourceConfig(String id, TestCategory category, String subcategory, Severity severity, String description, String creator, int addedEpoch) {
+    public TestSourceConfig(String id, TestCategory category, String subcategory, Severity severity, String description, String creator, int addedEpoch, List<String> tags) {
         this.id = id;
         this.category = category;
         this.subcategory = subcategory;
@@ -34,6 +37,7 @@ public class TestSourceConfig {
         this.description = description;
         this.creator = creator;
         this.addedEpoch = addedEpoch;
+        this.tags = tags;
     }
 
     public String getId() {
@@ -108,6 +112,14 @@ public class TestSourceConfig {
         this.installs = installs;
     }
 
+    public List<String> getTags(){
+        return this.tags;
+    } 
+
+    public void setTags(List<String> tags){
+        this.tags = tags;
+    }
+
     @Override
     public String toString() {
         return "{" +
@@ -120,6 +132,7 @@ public class TestSourceConfig {
             ", addedEpoch='" + getAddedEpoch() + "'" +
             ", stars='" + getStars() + "'" +
             ", installs='" + getInstalls() + "'" +
+            ", tags='" + getTags() + "'" +
             "}";
     }
 }
