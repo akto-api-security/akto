@@ -20,7 +20,7 @@ public class GptConfigAction extends UserAction {
 
     private List<BasicDBObject> currentState;
 
-    public static final AktoGptConfigState DEFAULT_STATE = AktoGptConfigState.ENABLED;
+    public static final AktoGptConfigState DEFAULT_STATE = AktoGptConfigState.DISABLED;
 
     private static final Logger logger = LoggerFactory.getLogger(GptConfigAction.class);
 
