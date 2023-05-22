@@ -343,11 +343,12 @@ export default {
       ],
     }
   },
-  mounted() {
+  async mounted() {
     window.Beamer.init();
     let i = setInterval(() => {
         this.$store.dispatch('dashboard/fetchActiveLoaders')
     }, 1000)
+    await this.showAskAktoGPTButton()
   },
   methods: {
     ...mapGetters('auth', ['getUsername', 'getAvatar', 'getActiveAccount', 'getAccounts']),
