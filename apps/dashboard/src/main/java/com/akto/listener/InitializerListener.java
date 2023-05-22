@@ -549,8 +549,10 @@ public class InitializerListener implements ServletContextListener {
             urlObject.put("host", null);
             urlObject.put("path", path);
             urlObject.put("method", method);
-            urlObject.put(SingleTypeInfo._API_COLLECTION_ID, null);
-            urlObject.put(SingleTypeInfo.COLLECTION_NAME, null);
+            if (allowCollectionIds) {
+                urlObject.put(SingleTypeInfo._API_COLLECTION_ID, null);
+                urlObject.put(SingleTypeInfo.COLLECTION_NAME, null);
+            }
             return new UrlResult(urlString, urlObject);
         }
 
@@ -578,8 +580,10 @@ public class InitializerListener implements ServletContextListener {
         urlObject.put("host", hostName);
         urlObject.put("path", path);
         urlObject.put("method", method);
-        urlObject.put(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId);
-        urlObject.put(SingleTypeInfo.COLLECTION_NAME, apiCollection.getDisplayName());
+        if (allowCollectionIds) {
+            urlObject.put(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId);
+            urlObject.put(SingleTypeInfo.COLLECTION_NAME, apiCollection.getDisplayName());
+        }
 
         return new UrlResult(urlString, urlObject);
     }
@@ -628,14 +632,19 @@ public class InitializerListener implements ServletContextListener {
             for (SingleTypeInfo sti : sensitiveParamsList) {
                 ApiCollection apiCollection = apiCollectionMap.get(sti.getApiCollectionId());
                 String url = sti.getUrl();
-                boolean apiCollectionContainsCondition = true;
+                boolean skipAddingIntoMap = false;
                 if (apiCollection != null && apiCollection.getHostName() != null) {
-                    apiCollectionContainsCondition = newSensitiveEndpointCollections == null || newSensitiveEndpointCollections.contains(apiCollection.getDisplayName());
                     String hostName = apiCollection.getHostName();
                     url = url.startsWith("/") ? hostName + url : hostName + "/" + url;
                 }
 
-                if (!apiCollectionContainsCondition) {
+                if (newSensitiveEndpointCollections != null) {//case of filtering by collection for sensitive endpoints
+                    skipAddingIntoMap = true;
+                    if (apiCollection != null) {
+                        skipAddingIntoMap = !newSensitiveEndpointCollections.contains(apiCollection.getDisplayName());
+                    }
+                }
+                if (skipAddingIntoMap) {
                     continue;
                 }
 
