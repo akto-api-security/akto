@@ -239,6 +239,8 @@ const inventory = {
         getApiInfoList: (state) => state.apiInfoList,
         getFilters: (state) => state.filters,
         getUnusedEndpoints: (state) => state.unusedEndpoints,
+        getUrl: (state) => state.url,
+        getMethod: (state) => state.method,
     }
 }
 
