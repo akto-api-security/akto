@@ -13,7 +13,7 @@ import com.akto.dto.testing.HardcodedAuthParam;
 import com.akto.log.LoggerMaker;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.Main;
-import com.akto.runtime.policies.AktoPolicy;
+import com.akto.runtime.policies.AktoPolicyNew;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Updates;
@@ -25,7 +25,7 @@ import java.util.*;
 public class RuntimeListener extends AfterMongoConnectListener {
 
     public static HttpCallParser httpCallParser = null;
-    public static AktoPolicy aktoPolicy = null;
+    public static AktoPolicyNew aktoPolicy = null;
     public static ResourceAnalyser resourceAnalyser = null;
 
     private final LoggerMaker loggerMaker= new LoggerMaker(RuntimeListener.class);
@@ -35,7 +35,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
         Context.accountId.set(1_000_000);
         Main.initializeRuntime();
         httpCallParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
-        aktoPolicy = new AktoPolicy(RuntimeListener.httpCallParser.apiCatalogSync, false);
+        aktoPolicy = new AktoPolicyNew(false);
         resourceAnalyser = new ResourceAnalyser(300_000, 0.01, 100_000, 0.01);
 
         try {

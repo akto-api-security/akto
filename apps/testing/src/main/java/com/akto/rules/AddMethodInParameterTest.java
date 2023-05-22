@@ -11,7 +11,7 @@ public class AddMethodInParameterTest extends ChangeMethodPlugin {
         if (queryParams == null) {
             queryParams = "method="+method.name();
         } else {
-            queryParams = "&method="+method.name();
+            queryParams += "&method="+method.name();
         }
 
         originalHttpRequest.setQueryParams(queryParams);
