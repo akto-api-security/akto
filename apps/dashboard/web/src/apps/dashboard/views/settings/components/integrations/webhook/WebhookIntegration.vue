@@ -261,7 +261,6 @@ export default {
     },
     computed : {
       json: function() {
-        debugger
         if (!this.customWebhookResult) return null
         let message = this.customWebhookResult["message"]
         if (!message) message = "{}"
