@@ -4,25 +4,26 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import com.akto.dao.AuthMechanismsDao;
+import com.akto.dao.CustomAuthTypeDao;
+import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.Auth;
 import com.akto.dto.test_editor.ExecutionResult;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.AuthParam;
+import com.akto.test_editor.execution.Operations;
 import com.akto.testing.ApiExecutor;
-import com.mongodb.client.model.Filters;
 
 public class AuthValidator {
     
-    public static boolean validate(Auth auth, RawApi rawApi) {
+    public static boolean validate(Auth auth, RawApi rawApi, AuthMechanism authMechanism) {
 
         if (auth == null) {
             return true;
         }
 
-        List<String> headerKeys = getHeaders(auth);
+        List<String> headerKeys = getHeaders(auth, authMechanism);
 
         auth.setHeaders(headerKeys);
 
@@ -43,7 +44,7 @@ public class AuthValidator {
         return true;
     }
 
-    public static List<String> getHeaders(Auth auth) {
+    public static List<String> getHeaders(Auth auth, AuthMechanism authMechanism) {
 
         if (auth != null && auth.getHeaders() != null && auth.getHeaders().size() > 0) {
             return auth.getHeaders();
@@ -51,7 +52,6 @@ public class AuthValidator {
 
         List<String> headerKeys = new ArrayList<>();
 
-        AuthMechanism authMechanism = AuthMechanismsDao.instance.findOne(Filters.eq("type", "HARDCODED"));
         if (authMechanism == null || authMechanism.getAuthParams() == null || authMechanism.getAuthParams().size() == 0) {
             return null;
         }
@@ -71,6 +71,18 @@ public class AuthValidator {
         Map<String, List<String>> headers = rawApi.getRequest().getHeaders();
         for (String header : auth.getHeaders()) {
             headers.remove(header);
+        }
+
+        List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
+        for (CustomAuthType customAuthType : customAuthTypes) {
+            List<String> customAuthTypeHeaderKeys = customAuthType.getHeaderKeys();
+            for (String headerAuthKey: customAuthTypeHeaderKeys) {
+                Operations.deleteHeader(rawApi, headerAuthKey);
+            }
+            List<String> customAuthTypePayloadKeys = customAuthType.getPayloadKeys();
+            for (String payloadAuthKey: customAuthTypePayloadKeys) {
+                Operations.deleteBodyParam(rawApi, payloadAuthKey);
+            }
         }
 
         OriginalHttpResponse testResponse;
