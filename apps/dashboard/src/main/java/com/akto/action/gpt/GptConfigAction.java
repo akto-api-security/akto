@@ -73,7 +73,7 @@ public class GptConfigAction extends UserAction {
             String collectionName = ApiCollectionsDao.instance.findOne(new BasicDBObject("_id", apiCollectionId)).getName();
             currentState = Collections.singletonList(new BasicDBObject("id", aktoGptConfig.getId())
                     .append("state", aktoGptConfig.getState().toString())
-                    .append("collectionName", collectionName));
+                    .append("collectionName", collectionName != null ? collectionName : String.valueOf(apiCollectionId)));
             logger.debug("Fetching AktoGptConfig for collectionId: {}, {}", apiCollectionId, currentState);
         }
         return SUCCESS.toUpperCase();
