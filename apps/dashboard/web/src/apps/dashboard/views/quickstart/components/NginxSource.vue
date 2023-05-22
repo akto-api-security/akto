@@ -1,8 +1,7 @@
 <template>
     <div>
         If your API calls are being routed through NGINX, you can use Akto's NGINX module to send traffic to Akto dashboard.
-        This methods is recommended when you have end to end TLS and SSL termination happens at NGINX. You need to setup
-        akto mirroring setup on any cloud provider and then install akto traffic module in nginx.
+        You need to setup Akto data processors stack and then install Akto traffic collector module in NGINX.
         <div v-if="isLocalDeploy">
             <BannerHorizontal class="mt-3">
                 <div slot="content">
@@ -26,7 +25,7 @@ export default {
     data() {
         return {
             isLocalDeploy: window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy',
-            link:"https://docs.akto.io/add-api-data/integrations/nginx"
+            link:"https://docs.akto.io/traffic-connections/nginx"
         }
     }
 }
