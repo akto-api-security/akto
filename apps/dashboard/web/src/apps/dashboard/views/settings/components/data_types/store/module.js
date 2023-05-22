@@ -38,14 +38,39 @@ const data_types = {
         SET_NEW_DATA_TYPE(state) {
             state.data_type = {
                 "name": "",
-                "operator": "AND",
-                "keyConditions": {"operator": "AND", "predicates": []},
+                "operator": "OR",
+                "keyConditions": {"operator": "AND", "predicates": [{}]},
                 "sensitiveAlways": true,
-                "valueConditions": {"operator": "AND", "predicates": []},
+                "valueConditions": {"operator": "AND", "predicates": [{}]},
                 "active": true,
                 "sensitivePosition": [],
                 "createNew": true
             }
+
+        },
+        SET_NEW_DATA_TYPE_BY_AKTOGPT(state, payload) {
+            console.log('SET_NEW_DATA_TYPE_BY_AKTOGPT', 'payload', payload)
+            state.data_type = {
+                "name": payload.name.toUpperCase(),
+                "operator": "AND",
+                "keyConditions": {
+                  "operator": "AND",
+                  "predicates": []
+                },
+                "sensitiveAlways": true,
+                "valueConditions": {
+                  "operator": "AND",
+                  "predicates": [
+                    {
+                          "type": "REGEX",
+                          "value": payload.regex
+                    }
+                  ]
+                },
+                "active": true,
+                "sensitivePosition": [],
+                "createNew": true
+              }
 
         },
         SET_REVIEW_DATA(state, result){
@@ -82,6 +107,9 @@ const data_types = {
         }
     },
     actions: {
+        setNewDataTypeByAktoGpt({commit}, payload) {
+            commit("SET_NEW_DATA_TYPE_BY_AKTOGPT", payload)
+        },
         setNewDataType({commit, dispatch}) {
             commit("SET_NEW_DATA_TYPE")
         },

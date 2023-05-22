@@ -2,7 +2,6 @@ package com.akto.dto.test_run_findings;
 
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.sources.TestSourceConfig;
-import com.akto.util.enums.GlobalEnums.TestSubCategory;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 
 import java.util.Objects;
@@ -22,19 +21,20 @@ public class TestingIssuesId {
     private ApiInfoKey apiInfoKey;
     private TestErrorSource testErrorSource;
     public static final String TEST_SUB_CATEGORY = "testSubCategory";
-    private TestSubCategory testSubCategory;
+    // ?? enum in db
+    private String testSubCategory;
     public static final String TEST_CATEGORY_FROM_SOURCE_CONFIG = "testCategoryFromSourceConfig";
     private String testCategoryFromSourceConfig;
     @BsonIgnore
     private TestSourceConfig testSourceConfig;
 
-    public TestingIssuesId(ApiInfoKey apiInfoKey, TestErrorSource source, TestSubCategory category) {
+    public TestingIssuesId(ApiInfoKey apiInfoKey, TestErrorSource source, String category) {
         this.apiInfoKey = apiInfoKey;
         this.testErrorSource = source;
         this.testSubCategory = category;
     }
 
-    public TestingIssuesId(ApiInfoKey apiInfoKey, TestErrorSource source, TestSubCategory category, String testCategoryFromSourceConfig) {
+    public TestingIssuesId(ApiInfoKey apiInfoKey, TestErrorSource source, String category, String testCategoryFromSourceConfig) {
         this.apiInfoKey = apiInfoKey;
         this.testErrorSource = source;
         this.testSubCategory = category;
@@ -65,7 +65,7 @@ public class TestingIssuesId {
 
     @Override
     public String toString() {
-        return "{ApiInfoKey : " + this.apiInfoKey.toString() + ", testSubCategory : " + testSubCategory.name()
+        return "{ApiInfoKey : " + this.apiInfoKey.toString() + ", testSubCategory : " + testSubCategory
                 + ", testErrorSource : " + testErrorSource.name();
     }
 
@@ -77,7 +77,7 @@ public class TestingIssuesId {
         this.testErrorSource = testErrorSource;
     }
 
-    public void setTestSubCategory(TestSubCategory testSubCategory) {
+    public void setTestSubCategory(String testSubCategory) {
         this.testSubCategory = testSubCategory;
     }
 
@@ -89,7 +89,7 @@ public class TestingIssuesId {
         return testErrorSource;
     }
 
-    public TestSubCategory getTestSubCategory() {
+    public String getTestSubCategory() {
         return testSubCategory;
     }
 
