@@ -41,12 +41,13 @@ public class Filter {
             Object updatedQuerySet = filterAction.resolveQuerySetValues(filterActionRequest, node.fetchNodeValues(), varMap);
             filterActionRequest.setQuerySet(updatedQuerySet);
             if (node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACT.toString())) {
+                boolean resp = true;
                 if (filterActionRequest.getConcernedProperty() != null) {
                     filterAction.extract(filterActionRequest, varMap);
                 } else {
-                    filterAction.extractContextVar(filterActionRequest, varMap);
+                    resp = filterAction.extractContextVar(filterActionRequest, varMap);
                 }
-                return new DataOperandsFilterResponse(true, null, null);
+                return new DataOperandsFilterResponse(resp, null, null);
             } else if (filterActionRequest.getConcernedProperty() != null && !node.getNodeType().equalsIgnoreCase("context")) {
                 return filterAction.apply(filterActionRequest);
             } else {
