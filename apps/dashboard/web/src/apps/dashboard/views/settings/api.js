@@ -69,20 +69,11 @@ export default {
             return resp
         })
     },
-    addBurpToken() {
+    addApiToken(tokenUtility) {
         return request({
-            url: '/api/addBurpToken',
+            url: '/api/addApiToken',
             method: 'post',
-            data: {}
-        }).then((resp) => {
-            return resp
-        })
-    },
-    addExternalApiToken() {
-        return request({
-            url: '/api/addExternalApiToken',
-            method: 'post',
-            data: {}
+            data: {tokenUtility}
         }).then((resp) => {
             return resp
         })
@@ -203,52 +194,6 @@ export default {
             }
         })
     },
-    addCustomWebhook(webhookName, url, queryParams, method, headerString, body, frequencyInSeconds) {
-        return request({
-            url: '/api/addCustomWebhook',
-            method: 'post',
-            data: {
-                webhookName, url, queryParams, method, headerString, body, frequencyInSeconds
-            }
-        })
-    },
-    updateCustomWebhook(id, webhookName, url, queryParams, method, headerString, body, frequencyInSeconds) {
-        return request({
-            url: '/api/updateCustomWebhook',
-            method: 'post',
-            data: {
-                id, webhookName, url, queryParams, method, headerString, body, frequencyInSeconds
-            }
-        })
-    },
-    fetchCustomWebhooks() {
-        return request({
-            url: '/api/fetchCustomWebhooks',
-            method: 'post',
-            data: {}
-        })
-    },
-    changeStatus(id, activeStatus) {
-        return request({
-            url: '/api/changeStatus',
-            method: 'post',
-            data: {id, activeStatus}
-        })
-    },
-    runOnce(id) {
-        return request({
-            url: '/api/runOnce',
-            method: 'post',
-            data: {id}
-        })
-    },
-    fetchLatestWebhookResult(id) {
-        return request({
-            url: '/api/fetchLatestWebhookResult',
-            method: 'post',
-            data: {id}
-        })
-    },
     fetchUserLastLoginTs() {
         return request({
             url: '/api/fetchUserLastLoginTs',
@@ -258,5 +203,23 @@ export default {
             return resp
         })
     },
+    fetchAktoGptConfig(){
+        return request({
+            url: '/api/fetchAktoGptConfig',
+            method: 'post',
+            data: {
+                "apiCollectionId": -1
+            }
+        })
+    },
+    saveAktoGptConfig(aktoConfigList){
+        return request({
+            url: '/api/saveAktoGptConfig',
+            method: 'post',
+            data: {
+                "currentState": aktoConfigList
+            }
+        })
+    }
 
 }

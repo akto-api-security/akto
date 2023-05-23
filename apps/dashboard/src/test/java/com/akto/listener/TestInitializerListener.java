@@ -54,7 +54,7 @@ public class TestInitializerListener extends MongoBasedTest {
 
         SingleTypeInfoDao.instance.insertMany(Arrays.asList(sti1, sti2, sti3, sti4, sti5, sti1h, sti2h, sti3h));
 
-        InitializerListener.ChangesInfo changesInfo = InitializerListener.getChangesInfo(Context.now(), Context.now());
+        InitializerListener.ChangesInfo changesInfo = InitializerListener.getChangesInfo(Context.now(), Context.now(), null, null, false);
         assertNotNull(changesInfo);
         List<String> newEndpointsLast7Days = changesInfo.newEndpointsLast7Days;
         Map<String, String> newSensitiveParams = changesInfo.newSensitiveParams;
@@ -90,7 +90,7 @@ public class TestInitializerListener extends MongoBasedTest {
         TestingRunIssues testingRunIssues1 = new TestingRunIssues(new TestingIssuesId(apiInfoKey1, GlobalEnums.TestErrorSource.AUTOMATED_TESTING,null, "something"), GlobalEnums.Severity.HIGH, GlobalEnums.TestRunIssueStatus.OPEN, 0, 0, new ObjectId());
 
         ApiInfo.ApiInfoKey apiInfoKey2 = new ApiInfo.ApiInfoKey(0, "url2", URLMethods.Method.GET);
-        TestingRunIssues testingRunIssues2 = new TestingRunIssues(new TestingIssuesId(apiInfoKey2, GlobalEnums.TestErrorSource.AUTOMATED_TESTING,GlobalEnums.TestSubCategory.BFLA, null), GlobalEnums.Severity.HIGH, GlobalEnums.TestRunIssueStatus.OPEN, 0, 0, new ObjectId());
+        TestingRunIssues testingRunIssues2 = new TestingRunIssues(new TestingIssuesId(apiInfoKey2, GlobalEnums.TestErrorSource.AUTOMATED_TESTING,"BFLA", null), GlobalEnums.Severity.HIGH, GlobalEnums.TestRunIssueStatus.OPEN, 0, 0, new ObjectId());
 
         TestingRunIssuesDao.instance.insertMany(Arrays.asList(testingRunIssues1, testingRunIssues2));
 

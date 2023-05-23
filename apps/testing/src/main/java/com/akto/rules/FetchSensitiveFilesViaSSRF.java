@@ -31,7 +31,7 @@ public class FetchSensitiveFilesViaSSRF extends BaseSSRFTest{
 
     @Override
     public String subTestName() {
-        return GlobalEnums.TestSubCategory.FETCH_SENSITIVE_FILES.name();
+        return "FETCH_SENSITIVE_FILES";
     }
 
     @Override

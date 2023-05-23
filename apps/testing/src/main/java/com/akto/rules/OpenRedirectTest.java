@@ -48,10 +48,6 @@ public class OpenRedirectTest extends TestPlugin {
 
             // find original redirect location
             location = resp.findHeaderValue("location");
-            if (location == null) {
-                rawApi = null;
-                continue;
-            }
 
             // find if location is being passed in header
             Map<String, List<String>> reqHeaders = req.getHeaders();
