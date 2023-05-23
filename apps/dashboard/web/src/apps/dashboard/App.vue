@@ -189,9 +189,9 @@ export default {
         icon: '$fas_cog',
         children:[
           {
-            title: 'Text Editor',
+            title: 'Test Editor',
             icon: '$aktoWhite',
-            link: '/dashboard/tools/Text-Editor'
+            link: '/dashboard/tools/test-editor'
           }
         ]
       }

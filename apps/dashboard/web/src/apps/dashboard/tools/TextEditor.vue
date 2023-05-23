@@ -1,5 +1,5 @@
 <template>
-    <simple-layout title="Text Editor">
+    <simple-layout title="Test Editor">
         <template>
             <div class="d-flex">
                 <div class="test-col">
@@ -71,7 +71,7 @@
                     <div class="editor-header-container">
                         <div class="file-title">
                             <span class="file-name">
-                                Lorem Ipsum
+                                Test editor
                             </span>
                             <v-icon :style="{'cursor' : 'pointer'}" size=14 @click="openTestLink()">$githubIcon</v-icon>
                             <span class="last-edited">(last edited 3 minutes ago)</span>
@@ -548,7 +548,7 @@ export default {
     .tests-list{
         margin: -20px 0px 10px 0px ;
         .tests-category-container {
-            padding-left: 22px;
+            padding-left: 12px;
             .test-category-name {
                 display: flex;
                 gap: 7px;
