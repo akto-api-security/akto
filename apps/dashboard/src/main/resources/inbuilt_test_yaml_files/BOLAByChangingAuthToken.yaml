@@ -1,0 +1,52 @@
+id: REPLACE_AUTH_TOKEN
+info:
+  name: BOLA by changing auth token
+  description: "Attacker can access resources of any user by changing the auth token in request."
+  details: >
+            "The endpoint appears to be vulnerable to broken object level authorization attack. The original request
+            was replayed with attacker's auth token. The server responded with 2XX success codes and greater
+            than <b>{{percentageMatch}}%</b> of the response body matched with original response body. Also, the endpoint had atleast one private
+            resources in request payload.<br>"
+            "<b>Background:</b> Object level authorization is an access control mechanism that is usually implemented at the code level to
+             validate that one user can only access objects that they should have access to.
+            Unauthorized access can result in data disclosure to unauthorized parties, data loss, or data manipulation. Unauthorized access to objects can also lead to full account takeover."
+  impact: "Unauthorized access can result in data disclosure to unauthorized parties, data loss, or data manipulation. Unauthorized access to objects can also lead to full account takeover."
+  category:
+    name: BOLA
+    shortName: BOLA
+    displayName: Broken Object Level Authorization (BOLA)
+  subCategory: REPLACE_AUTH_TOKEN
+  severity: HIGH
+  tags: 
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://www.akto.io/blog/bola-exploitation-using-unauthorized-uuid-on-api-endpoint"
+    - "https://www.akto.io/blog/what-is-broken-object-level-authorization-bola"
+    - "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa1-broken-object-level-authorization.md"
+    - "https://cwe.mitre.org/data/definitions/284.html"
+    - "https://cwe.mitre.org/data/definitions/285.html"
+    - "https://cwe.mitre.org/data/definitions/639.html"
+auth:
+  authenticated: true
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  private_variable_context:
+    gt: 0
+execute:
+  type: single
+  requests:
+    - req:
+      - replace_auth_header: true
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_payload:
+    length:
+      gt: 0
+    percentage_match:
+      gte: 90

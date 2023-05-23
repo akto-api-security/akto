@@ -247,8 +247,7 @@ public class UserDetailsFilter implements Filter {
         blockedList.add("/api/inviteUsers");
         blockedList.add("/api/logout");
         blockedList.add("/api/getPostmanCredential");
-        blockedList.add("/api/addBurpToken");
-        blockedList.add("/api/addExternalApiToken");
+        blockedList.add("/api/addApiToken");
         blockedList.add("/api/deleteApiToken");
         blockedList.add("/api/fetchApiTokens");
 

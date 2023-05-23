@@ -3,6 +3,7 @@ package com.akto.testing;
 import com.akto.DaoInit;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
@@ -29,6 +30,29 @@ public class Main {
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
+    private static ObjectId createTRRSummaryIfAbsent(TestingRun testingRun, int start){
+        ObjectId summaryId = new ObjectId();
+        try {
+            ObjectId testingRunId = new ObjectId(testingRun.getHexId());
+            TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.findOne(
+                Filters.and(
+                    Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRunId),
+                    Filters.eq(TestingRunResultSummary.STATE,TestingRun.State.SCHEDULED)
+                )
+            );
+            summaryId = testingRunResultSummary.getId();
+            TestingRunResultSummariesDao.instance.updateOne(
+                    Filters.eq(TestingRunResultSummary.ID, summaryId),
+                    Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING));
+        } catch (Exception e){
+            TestingRunResultSummary summary = new TestingRunResultSummary(start, 0, new HashMap<>(),
+            0, testingRun.getId(), testingRun.getId().toHexString(), 0);
+
+            summaryId = TestingRunResultSummariesDao.instance.insertOne(summary).getInsertedId().asObjectId().getValue();
+        }
+        return summaryId;
+    }
+
     public static void main(String[] args) throws InterruptedException {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         DaoInit.init(new ConnectionString(mongoURI));
@@ -52,18 +76,6 @@ public class Main {
         int delta = Context.now() - 20*60;
 
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
-
-        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(new BasicDBObject());
-        boolean runStatusCodeAnalyser = accountSettings == null ||
-                accountSettings.getSetupType() != AccountSettings.SetupType.PROD;
-
-        if (runStatusCodeAnalyser) {
-            try {
-                StatusCodeAnalyser.run();
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while running status code analyser: " + e, LogDb.TESTING);
-            }
-        }
 
         loggerMaker.infoAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
@@ -115,11 +127,8 @@ public class Main {
                 }
             }
 
-            TestingRunResultSummary summary = new TestingRunResultSummary(start, 0, new HashMap<>(),
-                    0, testingRun.getId(), testingRun.getId().toHexString(), 0);
-
-            ObjectId summaryId = TestingRunResultSummariesDao.instance.insertOne(summary).getInsertedId().asObjectId().getValue();
-            loggerMaker.infoAndAddToDb("Inserted testing run summary: " + summaryId, LogDb.TESTING);
+            ObjectId summaryId = createTRRSummaryIfAbsent(testingRun, start);
+            loggerMaker.infoAndAddToDb("Using testing run summary: " + summaryId, LogDb.TESTING);
 
             try {
                 testExecutor.init(testingRun, summaryId);

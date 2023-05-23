@@ -1,22 +1,12 @@
 import request from '@/util/request'
 
 export default {
-    fetchActiveTestingDetails() {
-        return request({
-            url: '/api/retrieveAllCollectionTests',
-            method: 'post',
-            data: {}
-        }).then((resp) => {
-            return resp
-        })
-    },
-    fetchPastTestingDetails({startTimestamp, endTimestamp}) {
+    fetchTestingDetails({startTimestamp, endTimestamp, fetchCicd}) {
         return request({
             url: '/api/retrieveAllCollectionTests',
             method: 'post',
             data: {
-                startTimestamp, 
-                endTimestamp
+                startTimestamp, endTimestamp, fetchCicd
             }
         }).then((resp) => {
             return resp
@@ -54,11 +44,11 @@ export default {
         })        
     },
 
-    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests) {
+    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, source) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests}
+            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, source}
         }).then((resp) => {
             return resp
         })        
