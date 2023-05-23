@@ -239,7 +239,7 @@ const router =  new Router({
                     ]                    
                 },
                 {
-                    path: 'tools/Text-Editor',
+                    path: 'tools/test-editor',
                     name: 'tools',
                     component: TextEditor
                 }
