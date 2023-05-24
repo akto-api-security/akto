@@ -79,6 +79,9 @@ public class YamlTestTemplate extends SecurityTestTemplate {
             return testResults;
         }
         for (ExecutionResult attempt: attempts) {
+            if (attempt.getResponse() == null) {
+                continue;
+            }
             String msg = RedactSampleData.convertOriginalReqRespToString(attempt.getRequest(), attempt.getResponse());
             RawApi testRawApi = new RawApi(attempt.getRequest(), attempt.getResponse(), msg);
             boolean vulnerable = TestPlugin.validateValidator(this.getValidatorNode(), this.getRawApi(), testRawApi , this.getApiInfoKey(), this.varMap, this.logId);

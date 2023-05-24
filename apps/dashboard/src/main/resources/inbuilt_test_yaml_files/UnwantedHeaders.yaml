@@ -1,0 +1,95 @@
+id: UNWANTED_RESPONSE_HEADERS
+info:
+  name: Unwanted Response Headers
+  description: "Attacker can access resources of any user by changing the auth token in request."
+  details: >
+            "The endpoint appears to be vulnerable to broken object level authorization attack. The original request
+            was replayed with attacker's auth token. The server responded with 2XX success codes and greater
+            than <b>{{percentageMatch}}%</b> of the response body matched with original response body. Also, the endpoint had atleast one private
+            resources in request payload.<br>"
+            "<b>Background:</b> Object level authorization is an access control mechanism that is usually implemented at the code level to
+             validate that one user can only access objects that they should have access to.
+            Unauthorized access can result in data disclosure to unauthorized parties, data loss, or data manipulation. Unauthorized access to objects can also lead to full account takeover."
+  impact: "Unauthorized access can result in data disclosure to unauthorized parties, data loss, or data manipulation. Unauthorized access to objects can also lead to full account takeover."
+  category:
+    name: MHH
+    shortName: MHH
+    displayName: Misconfigured HTTP Headers (MHH)
+  subCategory: UNWANTED_RESPONSE_HEADERS
+  severity: LOW
+  tags: 
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://www.akto.io/blog/bola-exploitation-using-unauthorized-uuid-on-api-endpoint"
+    - "https://www.akto.io/blog/what-is-broken-object-level-authorization-bola"
+    - "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa1-broken-object-level-authorization.md"
+    - "https://cwe.mitre.org/data/definitions/284.html"
+    - "https://cwe.mitre.org/data/definitions/285.html"
+    - "https://cwe.mitre.org/data/definitions/639.html"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}
+
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_headers:
+    for_one:
+      key:
+        contains_either:
+          - "$wsep"
+          - "Host-Header"
+          - "K-Proxy-Request"
+          - "Liferay-Portal"
+          - "Pega-Host"
+          - "Powered-By"
+          - "Product"
+          - "Server"
+          - "SourceMap"
+          - "X-AspNet-Version"
+          - "X-AspNetMvc-Version"
+          - "X-Atmosphere-error"
+          - "X-Atmosphere-first-request"
+          - "X-Atmosphere-tracking-id"
+          - "X-B3-ParentSpanId"
+          - "X-B3-Sampled"
+          - "X-B3-SpanId"
+          - "X-B3-TraceId"
+          - "X-CF-Powered-By"
+          - "X-CMS"
+          - "X-Content-Encoded-By"
+          - "X-Envoy-Attempt-Count"
+          - "X-Envoy-External-Address"
+          - "X-Envoy-Internal"
+          - "X-Envoy-Original-Dst-Host"
+          - "X-Envoy-Upstream-Service-Time"
+          - "X-Framework"
+          - "X-Generated-By"
+          - "X-Generator"
+          - "X-Mod-Pagespeed"
+          - "X-Old-Content-Length"
+          - "X-Page-Speed"
+          - "X-Php-Version"
+          - "X-Powered-By"
+          - "X-Powered-By-Plesk"
+          - "X-Powered-CMS"
+          - "X-Redirect-By"
+          - "X-Server-Powered-By"
+          - "X-SourceFiles"
+          - "X-SourceMap"
+          - "X-Turbo-Charged-By"
+          - "X-Varnish-Backend"
+          - "X-Varnish-Server"

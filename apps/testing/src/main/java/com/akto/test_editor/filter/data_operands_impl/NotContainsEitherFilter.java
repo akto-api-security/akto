@@ -5,11 +5,11 @@ import java.util.List;
 
 import com.akto.dto.test_editor.DataOperandFilterRequest;
 
-public class ContainsEitherFilter extends DataOperandsImpl {
+public class NotContainsEitherFilter extends DataOperandsImpl {
     
     @Override
     public Boolean isValid(DataOperandFilterRequest dataOperandFilterRequest) {
-        
+
         Boolean result = false;
         Boolean res;
         List<String> querySet = new ArrayList<>();
@@ -20,6 +20,7 @@ public class ContainsEitherFilter extends DataOperandsImpl {
         } catch(Exception e) {
             return result;
         }
+
         for (String queryString: querySet) {
             try {
                 res = evaluateOnStringQuerySet(data.trim(), queryString.trim());
@@ -31,18 +32,8 @@ public class ContainsEitherFilter extends DataOperandsImpl {
         return result;    
     }
 
-    public Boolean evaluateOnListQuerySet(String data, List<String> querySet) {
-        Boolean result = false;
-        Boolean res;
-        for (String queryString: querySet) {
-            res = evaluateOnStringQuerySet(data.trim(), queryString.trim());
-            result = result || res;
-        }
-        return result;
-    }
 
     public Boolean evaluateOnStringQuerySet(String data, String query) {
-        return data.toLowerCase().contains(query.toLowerCase());
+        return !data.toLowerCase().contains(query.toLowerCase());
     }
-
 }
