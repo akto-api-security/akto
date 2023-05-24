@@ -144,16 +144,16 @@ public final class FilterAction {
         }
     }
 
-    public void extractContextVar(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
+    public boolean extractContextVar(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
 
         if (filterActionRequest.getContextEntities() == null || filterActionRequest.getContextEntities().size() == 0) {
-            return;
+            return false;
         }
         Object val = filterActionRequest.getContextEntities();
 
         List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
         varMap.put("context_" + querySet.get(0).toString(), val);
-
+        return true;
     }
 
     public DataOperandsFilterResponse applyFilterOnUrl(FilterActionRequest filterActionRequest) {
@@ -214,6 +214,9 @@ public final class FilterAction {
         if (rawApi == null) {
             return new DataOperandsFilterResponse(false, null, null);
         }
+        if (rawApi.getResponse() == null) {
+            return new DataOperandsFilterResponse(false, null, null);
+        }
         int respCode = rawApi.getResponse().getStatusCode();
         DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(respCode, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
         Boolean res = invokeFilter(dataOperandFilterRequest);
@@ -223,6 +226,9 @@ public final class FilterAction {
     public void extractResponseCode(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
         RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
         if (rawApi == null) {
+            return;
+        }
+        if (rawApi.getResponse() == null) {
             return;
         }
         String respCode = Integer.toString(rawApi.getResponse().getStatusCode());
@@ -880,9 +886,11 @@ public final class FilterAction {
     public DataOperandsFilterResponse evaluatePrivateVariables(FilterActionRequest filterActionRequest) {
 
         OriginalHttpRequest request = filterActionRequest.getRawApi().getRequest();
-        List<BasicDBObject> privateValues = getPrivateResourceCount(request, filterActionRequest.getApiInfoKey());
+        BasicDBObject resp = getPrivateResourceCount(request, filterActionRequest.getApiInfoKey());
 
-        return new DataOperandsFilterResponse(privateValues.size() > 0, null, privateValues);
+        int privateCount = (int) resp.get("privateCount");
+        List<BasicDBObject> privateValues = (List<BasicDBObject>) resp.get("values");
+        return new DataOperandsFilterResponse(privateCount > 0, null, privateValues);
 
     }
 
@@ -959,13 +967,15 @@ public final class FilterAction {
         return new DataOperandsFilterResponse(res, null, null);
     }
 
-    public List<BasicDBObject> getPrivateResourceCount(OriginalHttpRequest originalHttpRequest, ApiInfo.ApiInfoKey apiInfoKey) {
+    public BasicDBObject getPrivateResourceCount(OriginalHttpRequest originalHttpRequest, ApiInfo.ApiInfoKey apiInfoKey) {
         String urlWithParams = originalHttpRequest.getFullUrlWithParams();
         String url = apiInfoKey.url;
         URLMethods.Method method = apiInfoKey.getMethod();
 
         // check private resource in
         // 1. url
+        BasicDBObject resp = new BasicDBObject();
+        int privateCnt = 0;
         List<BasicDBObject> privateValues = new ArrayList<>();
         if (APICatalog.isTemplateUrl(url)) {
             URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, method);
@@ -974,6 +984,9 @@ public final class FilterAction {
                 if (tokens[i] == null) {
                     SingleTypeInfo singleTypeInfo = querySti(i+"", true,apiInfoKey, false, -1);
                     BasicDBObject obj = new BasicDBObject();
+                    if (singleTypeInfo != null && singleTypeInfo.getIsPrivate()) {
+                        privateCnt++;
+                    }
                     if (singleTypeInfo == null || !singleTypeInfo.getIsPrivate() || singleTypeInfo.getValues() == null || singleTypeInfo.getValues().getElements().size() == 0) {
                         continue;
                     }
@@ -994,19 +1007,26 @@ public final class FilterAction {
         for (String param: flattened.keySet()) {
             SingleTypeInfo singleTypeInfo = querySti(param,false,apiInfoKey, false, -1);
             BasicDBObject obj = new BasicDBObject();
+            if (singleTypeInfo != null && singleTypeInfo.getIsPrivate()) {
+                privateCnt++;
+            }
             if (singleTypeInfo == null || !singleTypeInfo.getIsPrivate() || singleTypeInfo.getValues() == null || singleTypeInfo.getValues().getElements().size() == 0) {
                 continue;
             }
             Set<String> valSet = singleTypeInfo.getValues().getElements();
             String val = valSet.iterator().next();
-            obj.put("key", param);
+            String key = SingleTypeInfo.findLastKeyFromParam(param);
+            obj.put("key", key);
             obj.put("value", val);
             if (privateValues.size() < 5) {
                 privateValues.add(obj);
             }
         }
 
-        return privateValues;
+        resp.put("privateCount", privateCnt);
+        resp.put("values", privateValues);
+
+        return resp;
 
     }
 
@@ -1040,12 +1060,20 @@ public final class FilterAction {
             // add log
         }
 
-        if (reqObj.containsKey(param)) {
-            Object paramVal = reqObj.get(param);
-            if (val.equalsIgnoreCase(paramVal.toString())) {
+        Object fetchedVal = getValue(reqObj, null, param);
+
+        if (fetchedVal != null) {
+            if (val.equalsIgnoreCase(fetchedVal.toString())) {
                 return true;
             }
         }
+
+        // if (reqObj.containsKey(param)) {
+        //     Object paramVal = reqObj.get(param);
+        //     if (val.equalsIgnoreCase(paramVal.toString())) {
+        //         return true;
+        //     }
+        // }
 
         String responsePayload = rawApi.getResponse().getJsonResponseBody();
         BasicDBObject respObj = new BasicDBObject();
@@ -1055,12 +1083,20 @@ public final class FilterAction {
             // add log
         }
 
-        if (respObj.containsKey(param)) {
-            Object paramVal = respObj.get(param);
-            if (val.equalsIgnoreCase(paramVal.toString())) {
+        fetchedVal = getValue(respObj, null, param);
+
+        if (fetchedVal != null) {
+            if (val.equalsIgnoreCase(fetchedVal.toString())) {
                 return true;
             }
         }
+
+        // if (respObj.containsKey(param)) {
+        //     Object paramVal = respObj.get(param);
+        //     if (val.equalsIgnoreCase(paramVal.toString())) {
+        //         return true;
+        //     }
+        // }
 
         return false;
 

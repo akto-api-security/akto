@@ -54,7 +54,7 @@ public class TestInitializerListener extends MongoBasedTest {
 
         SingleTypeInfoDao.instance.insertMany(Arrays.asList(sti1, sti2, sti3, sti4, sti5, sti1h, sti2h, sti3h));
 
-        InitializerListener.ChangesInfo changesInfo = InitializerListener.getChangesInfo(Context.now(), Context.now());
+        InitializerListener.ChangesInfo changesInfo = InitializerListener.getChangesInfo(Context.now(), Context.now(), null, null, false);
         assertNotNull(changesInfo);
         List<String> newEndpointsLast7Days = changesInfo.newEndpointsLast7Days;
         Map<String, String> newSensitiveParams = changesInfo.newSensitiveParams;

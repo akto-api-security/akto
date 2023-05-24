@@ -7,7 +7,7 @@
                 :items="apiCollectionsForTable"  
                 :actions="actions"
                 name="API Collections" 
-                sortKeyDefault="endpoints" 
+                sortKeyDefault="endpoints"
                 :sortDescDefault="true"   
                 @rowClicked=rowClicked
                 hide-default-footer ="true"

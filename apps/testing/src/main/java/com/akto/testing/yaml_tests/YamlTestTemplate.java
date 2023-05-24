@@ -7,6 +7,7 @@ import com.akto.dto.test_editor.Auth;
 import com.akto.dto.test_editor.ExecutionResult;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.FilterNode;
+import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.auth.AuthValidator;
@@ -25,21 +26,21 @@ public class YamlTestTemplate extends SecurityTestTemplate {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(YamlTestTemplate.class);
 
-    public YamlTestTemplate(ApiInfo.ApiInfoKey apiInfoKey, FilterNode filterNode, FilterNode validatorNode, ExecutorNode executorNode, RawApi rawApi, Map<String, Object> varMap, Auth auth, String logId) {
-        super(apiInfoKey, filterNode, validatorNode, executorNode ,rawApi, varMap, auth, logId);
+    public YamlTestTemplate(ApiInfo.ApiInfoKey apiInfoKey, FilterNode filterNode, FilterNode validatorNode, ExecutorNode executorNode, RawApi rawApi, Map<String, Object> varMap, Auth auth, AuthMechanism authMechanism, String logId) {
+        super(apiInfoKey, filterNode, validatorNode, executorNode ,rawApi, varMap, auth, authMechanism, logId);
     }
 
     @Override
     public boolean filter() {
         loggerMaker.infoAndAddToDb("filter started" + logId, LogDb.TESTING);
-        List<String> authHeaders = AuthValidator.getHeaders(this.auth);
+        List<String> authHeaders = AuthValidator.getHeaders(this.auth, this.authMechanism);
         loggerMaker.infoAndAddToDb("found authHeaders " + authHeaders + " " + logId, LogDb.TESTING);
         if (authHeaders != null && authHeaders.size() > 0) {
             this.varMap.put("auth_headers", authHeaders);
         }
         if (this.auth != null && this.auth.getAuthenticated() != null) {
             loggerMaker.infoAndAddToDb("validating auth, authenticated value is " + this.auth.getAuthenticated() + " " + logId, LogDb.TESTING);
-            boolean validAuthHeaders = AuthValidator.validate(this.auth, this.rawApi);
+            boolean validAuthHeaders = AuthValidator.validate(this.auth, this.rawApi, this.authMechanism);
             if (!validAuthHeaders) {
                 loggerMaker.infoAndAddToDb("invalid auth, skipping filter " + logId, LogDb.TESTING);
                 return false;
@@ -65,7 +66,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
                 }
             }
         }
-        List<ExecutionResult> results = new Executor().execute(this.executorNode, this.rawApi, this.varMap, this.logId);
+        List<ExecutionResult> results = new Executor().execute(this.executorNode, this.rawApi, this.varMap, this.logId, this.authMechanism);
         loggerMaker.infoAndAddToDb("execution result size " + results.size() +  " " + logId, LogDb.TESTING);
         return results;
     }
@@ -74,6 +75,9 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     public List<TestResult> validator(List<ExecutionResult> attempts) {
         List<TestResult> testResults = new ArrayList<>();
         loggerMaker.infoAndAddToDb("validation started " + logId, LogDb.TESTING);
+        if (attempts == null) {
+            return testResults;
+        }
         for (ExecutionResult attempt: attempts) {
             String msg = RedactSampleData.convertOriginalReqRespToString(attempt.getRequest(), attempt.getResponse());
             RawApi testRawApi = new RawApi(attempt.getRequest(), attempt.getResponse(), msg);

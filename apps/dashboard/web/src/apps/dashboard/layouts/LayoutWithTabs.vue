@@ -58,7 +58,8 @@
             description: obj.strN,
             defaultTabName: obj.strN,
             tabsContent: obj.objN,
-            tab: obj.strN
+            tab: obj.strN,
+            disableHash: obj.boolN
         },
         data () {
             return {
@@ -83,7 +84,9 @@
                 if(tabName){
                     tabName = this.tabs[newVal].replace(" ", "-")
                 }
-                window.location.hash = "#" + tabName
+                if (this.disableHash !== true) {
+                    window.location.hash = "#" + tabName
+                }
             }
         },
         mounted() {

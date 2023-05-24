@@ -29,12 +29,6 @@ api_selection_filters:
       gte: 200
       lt: 205
   or:
-    - request_headers:
-        for_one:
-          key:
-            contains_either:
-                - file
-            extract: file_key
     - request_payload:
         for_one:
           key:
@@ -55,8 +49,6 @@ execute:
         - modify_query_param:
             file_key: ///etc/passwd
         - modify_body_param:
-            file_key: ///etc/passwd
-        - modify_header:
             file_key: ///etc/passwd
 
 validate:

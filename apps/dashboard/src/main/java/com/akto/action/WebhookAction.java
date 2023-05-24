@@ -1,30 +1,25 @@
 package com.akto.action;
 
-import java.util.List;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-
-import org.bson.conversions.Bson;
-
-import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dao.notifications.CustomWebhooksDao;
 import com.akto.dao.notifications.CustomWebhooksResultDao;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.notifications.CustomWebhook;
-import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
+import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.listener.InitializerListener;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
+import org.bson.conversions.Bson;
 
-import com.akto.runtime.Main;
+import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 public class WebhookAction extends UserAction {
@@ -39,7 +34,10 @@ public class WebhookAction extends UserAction {
     private int frequencyInSeconds;
     private ActiveStatus activeStatus;
     private CustomWebhookResult customWebhookResult;
+    private List<CustomWebhook.WebhookOptions> selectedWebhookOptions;
     private List<CustomWebhook> customWebhooks;
+    private List<String> newEndpointCollections;
+    private List<String> newSensitiveEndpointCollections;
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -65,6 +63,10 @@ public class WebhookAction extends UserAction {
             addActionError("Please enter valid headers");
             return ERROR.toUpperCase();
         }
+        if (selectedWebhookOptions == null) {
+            addActionError("Please select at least one option");
+            return ERROR.toUpperCase();
+        }
 
         if (!isUrl) {
             addActionError("Please enter a valid url");
@@ -76,7 +78,7 @@ public class WebhookAction extends UserAction {
             int now = Context.now();
             String userEmail = getSUser().getLogin();
             if (userEmail == null) return ERROR.toUpperCase();
-            CustomWebhook customWebhook = new CustomWebhook(now,webhookName,url,headerString,queryParams,body,method,frequencyInSeconds,userEmail,now,now,0,activeStatus);
+            CustomWebhook customWebhook = new CustomWebhook(now,webhookName,url,headerString,queryParams,body,method,frequencyInSeconds,userEmail,now,now,0,activeStatus, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections);
             CustomWebhooksDao.instance.insertOne(customWebhook);
             fetchCustomWebhooks();
         }
@@ -115,10 +117,13 @@ public class WebhookAction extends UserAction {
         } else if (frequencyInSeconds<=0){
             addActionError("Please enter a valid frequency");
             return ERROR.toUpperCase();
+        } else if (selectedWebhookOptions == null) {
+            addActionError("Please select at least one option");
+            return ERROR.toUpperCase();
         } else {
             int now = Context.now();
 
-            Bson updates = 
+            Bson updates =
             Updates.combine(
                 Updates.set("url", url),
                 Updates.set("headerString", headerString),
@@ -127,7 +132,10 @@ public class WebhookAction extends UserAction {
                 Updates.set("method", method),
                 Updates.set("frequencyInSeconds", frequencyInSeconds),
                 Updates.set("lastUpdateTime",now),
-                Updates.set("webhookName", webhookName)
+                Updates.set("webhookName", webhookName),
+                Updates.set(CustomWebhook.SELECTED_WEBHOOK_OPTIONS, selectedWebhookOptions),
+                Updates.set(CustomWebhook.NEW_ENDPOINT_COLLECTIONS, newEndpointCollections),
+                Updates.set(CustomWebhook.NEW_SENSITIVE_ENDPOINT_COLLECTIONS, newSensitiveEndpointCollections)
             );
 
             CustomWebhooksDao.instance.updateOne(Filters.eq("_id",id), updates);
@@ -293,5 +301,29 @@ public class WebhookAction extends UserAction {
 
     public List<CustomWebhook> getCustomWebhooks() {
         return this.customWebhooks;
+    }
+
+    public List<CustomWebhook.WebhookOptions> getSelectedWebhookOptions() {
+        return selectedWebhookOptions;
+    }
+
+    public void setSelectedWebhookOptions(List<CustomWebhook.WebhookOptions> selectedWebhookOptions) {
+        this.selectedWebhookOptions = selectedWebhookOptions;
+    }
+
+    public List<String> getNewEndpointCollections() {
+        return newEndpointCollections;
+    }
+
+    public void setNewEndpointCollections(List<String> newEndpointCollections) {
+        this.newEndpointCollections = newEndpointCollections;
+    }
+
+    public List<String> getNewSensitiveEndpointCollections() {
+        return newSensitiveEndpointCollections;
+    }
+
+    public void setNewSensitiveEndpointCollections(List<String> newSensitiveEndpointCollections) {
+        this.newSensitiveEndpointCollections = newSensitiveEndpointCollections;
     }
 }
