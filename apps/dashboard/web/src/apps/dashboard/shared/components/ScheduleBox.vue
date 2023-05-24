@@ -41,19 +41,6 @@
                         </simple-menu>
                     </div>
                 </div>
-                <div class="d-flex" style="gap: 20px">
-                    <div>
-                        <simple-menu :items="maxConcurrentRequestsOptions">
-                            <template v-slot:activator2>
-                                <div>
-                                    <span class="column-title">Allowed requests / min: </span>
-                                    <span class="column-title clickable-line">{{ maxConcurrentRequestsLabel }}</span>
-                                    <v-icon size="14" color="var(--themeColorDark)">$fas_angle-down</v-icon>
-                                </div>
-                            </template>
-                        </simple-menu>
-                    </div>
-                </div>
             </div>
             <v-btn primary dark color="var(--themeColor)" @click="schedule">
                 {{ scheduleString }}

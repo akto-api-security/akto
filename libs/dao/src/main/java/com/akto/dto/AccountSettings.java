@@ -35,6 +35,9 @@ public class AccountSettings {
 
     public static final String URL_REGEX_MATCHING_ENABLED = "urlRegexMatchingEnabled";
 
+    public static final String GLOBAL_RATE_LIMIT = "globalRateLimit";
+    private int globalRateLimit;
+
     public AccountSettings() {
     }
 
@@ -43,6 +46,14 @@ public class AccountSettings {
         this.privateCidrList = privateCidrList;
         this.redactPayload = redactPayload;
         this.setupType = setupType;
+    }
+
+    public int getGlobalRateLimit() {
+        return globalRateLimit;
+    }
+
+    public void setGlobalRateLimit(int globalRateLimit) {
+        this.globalRateLimit = globalRateLimit;
     }
 
     public enum SetupType {
