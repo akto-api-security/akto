@@ -14,7 +14,9 @@ import okhttp3.ResponseBody;
 
 public class GithubSync {
 
-    public String syncDir(String repoUrl, String dirPath) {
+    public Map<String, String> syncDir(String repoUrl, String dirPath) throws Exception {
+        //todo: use repoUrl
+
         Map<String, String> dirContents = new HashMap<String, String>();
         OkHttpClient client = new OkHttpClient();
 
@@ -22,40 +24,34 @@ public class GithubSync {
                 .url("https://api.github.com/repos/akto-api-security/akto/git/trees/master?recursive=1")
                 .build();
 
-        try {
-            Response response = client.newCall(getRequest).execute();
-            ResponseBody responseBody = response.body();
+       
+        Response response = client.newCall(getRequest).execute();
+        ResponseBody responseBody = response.body();
 
-
-            if (responseBody != null) {
-                String json = responseBody.string();
-                JSONObject jsonObject = new JSONObject(json);
-                JSONArray tree = jsonObject.getJSONArray("tree");
-                for (Object treeNodeObject : tree) {
-                    JSONObject treeNode = (JSONObject) treeNodeObject;
-                    String path = treeNode.getString("path");
+        if (responseBody != null) {
+            String json = responseBody.string();
+            JSONObject jsonObject = new JSONObject(json);
+            JSONArray tree = jsonObject.getJSONArray("tree");
+            for (Object treeNodeObject : tree) {
+                JSONObject treeNode = (JSONObject) treeNodeObject;
+                String path = treeNode.getString("path");
+                
+                if(path.contains(dirPath)) {
+                    Request fileRequest = new Request.Builder()
+                        .url("https://raw.githubusercontent.com/akto-api-security/akto/master/" + path)
+                        .build();
+                    Response fileResponse = client.newCall(fileRequest).execute();
+                    ResponseBody fileResponseBody = fileResponse.body();
+                    String fileContents = fileResponseBody.string();
+                
+                    String[] pathSplit = path.split("/");
+                    String filename = pathSplit[pathSplit.length - 1];
                     
-                    if(path.contains(dirPath)) {
-                        Request fileRequest = new Request.Builder()
-                            .url("https://raw.githubusercontent.com/akto-api-security/akto/master/" + path)
-                            .build();
-                        Response fileResponse = client.newCall(fileRequest).execute();
-                        ResponseBody fileResponseBody = fileResponse.body();
-                        String fileContents = fileResponseBody.string();
-                    
-                        //String fileName = path.split("/")[-1];
-                        System.out.println(fileContents);
-                    }
-
+                    dirContents.put(filename, fileContents);
                 }
-                //System.out.println(tree);
-                return "";
             }
-
-        } catch (IOException e) {
-            e.printStackTrace();
         }
 
-        return "";
+        return dirContents;
     }
 }

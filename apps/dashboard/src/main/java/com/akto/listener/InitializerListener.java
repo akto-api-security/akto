@@ -1010,52 +1010,69 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void saveTestEditorYaml() {
-        GithubSync githubSync = new GithubSync();
-        githubSync.syncDir("test", "apps/dashboard/src/main/resources/inbuilt_test_yaml_files/");
-        return;
-        // List<String> templatePaths = new ArrayList<>();
-        // try {
-        //     templatePaths = convertStreamToListString(InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files"));
-        // } catch (Exception e) {
-        //     loggerMaker.errorAndAddToDb(String.format("failed to read test yaml folder %s", e.toString()), LogDb.DASHBOARD);
-        // }
+        Map<String, String> templates = new HashMap<String, String>();
 
-        // String template = null;
-        // for (String path: templatePaths) {
-        //     try {
-        //         template = convertStreamToString(InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files/" + path));
-        //         //System.out.println(template);
-        //         TestConfig testConfig = null;
-        //         try {
-        //             testConfig = TestConfigYamlParser.parseTemplate(template);
-        //         } catch (Exception e) {
-        //             logger.error("invalid parsing yaml template for file " + path, e);
-        //         }
+        try {
+            GithubSync githubSync = new GithubSync();
+            templates = githubSync.syncDir("test", "apps/dashboard/src/main/resources/inbuilt_test_yaml_files/");
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(String.format("Error while downloading test editor templates from Github, falling back to loading from folder %s", e.toString()), LogDb.DASHBOARD);
 
-        //         if (testConfig == null) {
-        //             logger.error("parsed template for file is null " + path);
-        //         }
+            // Get list of template file paths
+            List<String> templatePaths = new ArrayList<>();
+            try {
+                templatePaths = convertStreamToListString(InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files"));
+            } catch (Exception ex) {
+                loggerMaker.errorAndAddToDb(String.format("failed to read test yaml folder %s", ex.toString()), LogDb.DASHBOARD);
+            }
 
-        //         String id = testConfig.getId();
+            // Get templates from files
+            String template = null;
+            for (String path: templatePaths) {
+                try {
+                    template = convertStreamToString(InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files/" + path));
+                    templates.put(path, template);
+                } catch (Exception ex) {
+                    loggerMaker.errorAndAddToDb(String.format("failed to read test yaml path %s %s", template, ex.toString()), LogDb.DASHBOARD);
+                }
+            }
+        }
 
-        //         int createdAt = Context.now();
-        //         int updatedAt = Context.now();
-        //         String author = "AKTO";
+        for (Map.Entry<String,String> template : templates.entrySet()) {
+            String path = template.getKey();
+            String template_content = template.getValue();
+            TestConfig testConfig = null;
 
-        //         YamlTemplateDao.instance.updateOne(
-        //             Filters.eq("_id", id),
-        //             Updates.combine(
-        //                     Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
-        //                     Updates.setOnInsert(YamlTemplate.AUTHOR, author),
-        //                     Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
-        //                     Updates.set(YamlTemplate.CONTENT, template),
-        //                     Updates.set(YamlTemplate.INFO, testConfig.getInfo())
-        //             )
-        //         );
-        //     } catch (Exception e) {
-        //         loggerMaker.errorAndAddToDb(String.format("failed to read test yaml path %s %s", template, e.toString()), LogDb.DASHBOARD);
-        //     }
-        
+            try {
+                testConfig = TestConfigYamlParser.parseTemplate(template_content);
+            } catch (Exception e) {
+                logger.error("invalid parsing yaml template for file " + path, e);
+            }
+
+
+            if (testConfig == null) {
+                logger.error("parsed template for file is null " + path);
+            }
+
+            String id = testConfig.getId();
+
+            int createdAt = Context.now();
+            int updatedAt = Context.now();
+            String author = "AKTO";
+
+            
+            YamlTemplateDao.instance.updateOne(
+                Filters.eq("_id", id),
+                Updates.combine(
+                        Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
+                        Updates.setOnInsert(YamlTemplate.AUTHOR, author),
+                        Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
+                        Updates.set(YamlTemplate.CONTENT, template_content),
+                        Updates.set(YamlTemplate.INFO, testConfig.getInfo())
+                )
+            );
+
+        }     
     }
 
     private static List<String> convertStreamToListString(InputStream in) throws Exception {
