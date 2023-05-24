@@ -20,7 +20,8 @@ const team = {
         urlRegexMatchingEnabled: null,
         setupType: null,
         lastLoginTs: null,
-        privateCidrList: null
+        privateCidrList: null,
+        enableDebugLogs: null
     },
     getters: {
         getId: (state) => state.id,
@@ -33,7 +34,8 @@ const team = {
         getUrlRegexMatchingEnabled: (state) => state.urlRegexMatchingEnabled,
         getSetupType: (state) => state.setupType,
         getLastLoginTs: (state) => state.lastLoginTs,
-        getPrivateCidrList: (state) => state.privateCidrList
+        getPrivateCidrList: (state) => state.privateCidrList,
+        getEnableDebugLogs: (state) => state.enableDebugLogs
     },
     mutations: {
         SET_TEAM_DETAILS(state, details) {
@@ -58,6 +60,7 @@ const team = {
                 state.dashboardVersion = "-"
                 state.setupType = "PROD"
                 state.mergeAsyncOutside = false
+                state.enableDebugLogs = false
             } else {
                 state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
                 state.apiRuntimeVersion = resp.accountSettings.apiRuntimeVersion ? resp.accountSettings.apiRuntimeVersion : "-"
@@ -67,6 +70,7 @@ const team = {
                 state.setupType = resp.accountSettings.setupType
                 state.mergeAsyncOutside = resp.accountSettings.mergeAsyncOutside || false
                 state.privateCidrList = resp.accountSettings.privateCidrList
+                state.enableDebugLogs = resp.accountSettings.enableDebugLogs
             }
         },
         SET_USER_INFO(state, resp) {
@@ -92,6 +96,11 @@ const team = {
         toggleRedactFeature({commit, dispatch, state}, v) {
             api.toggleRedactFeature(v).then((resp => {
                 state.redactPayload = v
+            }))
+        },
+        toggleDebugLogsFeature({commit, dispatch, state}, v) {
+            api.toggleDebugLogsFeature(v).then((resp => {
+                state.enableDebugLogs = v
             }))
         },
         updateMergeAsyncOutside({commit, dispatch, state}) {

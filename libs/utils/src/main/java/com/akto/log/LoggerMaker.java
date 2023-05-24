@@ -1,15 +1,16 @@
 package com.akto.log;
 
-import com.akto.dao.AnalyserLogsDao;
-import com.akto.dao.DashboardLogsDao;
-import com.akto.dao.LogsDao;
-import com.akto.dao.RuntimeLogsDao;
+import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.Log;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
@@ -28,6 +29,32 @@ public class LoggerMaker  {
         TESTING,RUNTIME,DASHBOARD, ANALYSER
     }
 
+    private static AccountSettings accountSettings = null;
+
+    private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
+    static {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                fillMap();
+            }
+        }, 0, 2, TimeUnit.MINUTES);
+    }
+
+
+    private static void fillMap() {
+        try {
+            System.out.println("Running fillMap....................................");
+            Context.accountId.set(1_000_000);
+            accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+    }
+
+
     public LoggerMaker(Class<?> c) {
         aClass = c;
         logger = LoggerFactory.getLogger(c);
@@ -40,6 +67,11 @@ public class LoggerMaker  {
         } catch (Exception e){
             e.printStackTrace();
         }
+    }
+
+    public void debugInfoAddToDb(String info, LogDb db) {
+        if (accountSettings == null || !accountSettings.isEnableDebugLogs()) return;
+        infoAndAddToDb(info, db);
     }
 
     public void infoAndAddToDb(String info, LogDb db) {

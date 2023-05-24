@@ -107,6 +107,16 @@ public class AdminSettingsAction extends UserAction {
         );
     }
 
+    private boolean enableDebugLogs;
+    public String toggleDebugLogsFeature() {
+        AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.ENABLE_DEBUG_LOGS, enableDebugLogs)
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
     public AccountSettings getAccountSettings() {
         return this.accountSettings;
     }
@@ -127,4 +137,7 @@ public class AdminSettingsAction extends UserAction {
         this.newMergingEnabled = newMergingEnabled;
     }
 
+    public void setEnableDebugLogs(boolean enableDebugLogs) {
+        this.enableDebugLogs = enableDebugLogs;
+    }
 }

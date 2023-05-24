@@ -37,6 +37,9 @@ public class AccountSettings {
 
     private String initStackType;
 
+    private boolean enableDebugLogs;
+    public static final String ENABLE_DEBUG_LOGS = "enableDebugLogs";
+
     public static final String INIT_STACK_TYPE = "initStackType";
 
     public AccountSettings() {
@@ -166,5 +169,13 @@ public class AccountSettings {
 
     public void setInitStackType(String initStackType) {
         this.initStackType = initStackType;
+    }
+
+    public boolean isEnableDebugLogs() {
+        return enableDebugLogs;
+    }
+
+    public void setEnableDebugLogs(boolean enableDebugLogs) {
+        this.enableDebugLogs = enableDebugLogs;
     }
 }

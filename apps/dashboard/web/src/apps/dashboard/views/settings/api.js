@@ -220,6 +220,16 @@ export default {
                 "currentState": aktoConfigList
             }
         })
+    },
+
+    toggleDebugLogsFeature(enableDebugLogs){
+        return request({
+            url: '/api/toggleDebugLogsFeature',
+            method: 'post',
+            data: {
+                enableDebugLogs
+            }
+        })
     }
 
 }
