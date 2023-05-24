@@ -2,7 +2,7 @@
     <div v-if="messagesBasic && messagesBasic.length > 0">
         <div>
             <div>
-                <layout-with-tabs :tabsContent="getTabsContent()" title=""
+                <layout-with-tabs :tabsContent="getTabsContent()" title="" :disableHash="true"
                     :tabs="['Description', 'Original', 'Attempt']" ref="layoutWithTabs" class="details-container">
                     <template slot="Description">
                         <div class="description-title mt-4" :style="{ 'height': '500px' }"

@@ -179,8 +179,11 @@ public class VariableResolver {
         String[] splitValue = headerVal.toString().split(" ");
         String modifiedHeaderVal = null;
 
+        List<String> finalValue = new ArrayList<>();
+
         for (String val: splitValue) {
             if (!KeyTypes.isJWT(val)) {
+                finalValue.add(val);
                 continue;
             }
             if (secondParam.equalsIgnoreCase("none_algo_token")) {
@@ -201,9 +204,10 @@ public class VariableResolver {
                     return null;
                 }
             }
+            finalValue.add(modifiedHeaderVal);
         }
         
-        return modifiedHeaderVal;
+        return String.join( " ", finalValue);
     }
 
     public static Boolean isWordListVariable(Object key, Map<String, Object> varMap) {

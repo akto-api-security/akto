@@ -191,7 +191,7 @@ public class DaoInit {
                 cappedSetClassModel, CustomWebhookClassModel, CustomWebhookResultClassModel,
                 nodeResultClassModel, awsResourcesModel, AktoDataTypeClassModel, testingRunIssuesClassModel,
                 testingIssuesIdClassModel, testSourceConfigClassModel, endpointLogicalGroupClassModel, testRolesClassModel,
-                logicalGroupTestingEndpointClassModel, testInfoClassModel , bflaTestInfoClassModel, nucleiTestInfoClassModel, customAuthTypeModel,
+                logicalGroupTestingEndpointClassModel, testInfoClassModel, bflaTestInfoClassModel, nucleiTestInfoClassModel, customAuthTypeModel,
                 containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData,
                 loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
                 vulnerableRequestForTemplateClassModel).automatic(true).build());
@@ -223,6 +223,7 @@ public class DaoInit {
                 new EnumCodec<>(GlobalEnums.Severity.class),
                 new EnumCodec<>(TrafficMetrics.Name.class),
                 new EnumCodec<>(Loader.Type.class),
+                new EnumCodec<>(CustomWebhook.WebhookOptions.class)),
                 new EnumCodec<>(GlobalEnums.YamlTemplateSource.class),
                 new EnumCodec<>(AktoGptConfigState.class));
 

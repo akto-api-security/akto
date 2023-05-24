@@ -1,9 +1,9 @@
-id: SSRF_ON_LOCALHOST
+id: SSRF_ON_LOCALHOST_DNS_PINNING
 info:
-  name: "Sensitive localhost details exposed via replacing URI param with localhost/admin"
-  description: "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing the URI parameter with localhost/admin. The application responded with 2XX success code and also gave out admin-related details." 
+  name: "Sensitive localhost details exposed via replacing URI param redirecting to localhost/admin"
+  description: "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing the URI parameter with localhost/admin. The make-127-0-0-1-rr.1u.ms/admin which redirects to localhost/admin." 
   details: >
-            "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing the URI parameter with localhost/admin. The application responded with 2XX success code and also gave out admin-related details.
+            "The endpoint appears to be vulnerable to Server Side Request Forgery attack. The original request was replayed by replacing the URI parameter with localhost/admin. The make-127-0-0-1-rr.1u.ms/admin which redirects to localhost/admin.
             Modern concepts in application development make SSRF more common and more dangerous.
             More common - the following concepts encourage developers to access an external resource based on user input: Webhooks, file fetching from URLs, custom SSO, and URL previews.
             More dangerous - Modern technologies like cloud providers, Kubernetes, and Docker expose management and control channels over HTTP on predictable, well-known paths. Those channels are an easy target for an SSRF attack.
@@ -14,7 +14,7 @@ info:
     name: SSRF
     shortName: Server Side Request Forgery
     displayName: Server Side Request Forgery (SSRF)
-  subCategory: SSRF_ON_LOCALHOST
+  subCategory: SSRF_ON_LOCALHOST_DNS_PINNING
   severity: HIGH
   tags:
     - Business logic
@@ -26,13 +26,6 @@ api_selection_filters:
       gte: 200
       lt: 205
   or:
-    - request_headers:
-        for_one:
-          value:
-            contains_either:
-                - http
-          key:
-            extract: url_key
     - request_payload:
         for_one:
           value:
@@ -53,11 +46,9 @@ execute:
   requests:
     - req:
         - modify_query_param:
-            url_key: http://localhost/admin
+            url_key: http://make-127-0-0-1-rr.1u.ms/admin
         - modify_body_param:
-            url_key: http://localhost/admin
-        - modify_header:
-            url_key: http://localhost/admin
+            url_key: http://make-127-0-0-1-rr.1u.ms/admin
 
 validate:
   response_code:

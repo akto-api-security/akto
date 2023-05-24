@@ -76,11 +76,11 @@ public abstract class Predicate {
                 Object notBelongTo = valueMap.get(VALUE);
                 Set<ApiInfo.ApiInfoKey> setNotBelong = createApiInfoSetFromMap(notBelongTo);
                 return new NotBelongsToPredicate(setNotBelong);
-
             default:
                 return null;
         }
     }
+
     private static Set<ApiInfo.ApiInfoKey> createApiInfoSetFromMap(Object value) {
         if (!(value instanceof List)) {
             return null;

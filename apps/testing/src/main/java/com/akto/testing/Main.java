@@ -77,18 +77,6 @@ public class Main {
 
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
 
-        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(new BasicDBObject());
-        boolean runStatusCodeAnalyser = accountSettings == null ||
-                accountSettings.getSetupType() != AccountSettings.SetupType.PROD;
-
-        if (runStatusCodeAnalyser) {
-            try {
-                StatusCodeAnalyser.run();
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while running status code analyser: " + e, LogDb.TESTING);
-            }
-        }
-
         loggerMaker.infoAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"), LogDb.TESTING);
