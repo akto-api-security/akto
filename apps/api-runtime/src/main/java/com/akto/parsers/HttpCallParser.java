@@ -346,10 +346,20 @@ public class HttpCallParser {
     public boolean aggregate(List<HttpResponseParams> responses) {
         int count = 0;
         boolean ret = false;
+        Set<String> urlSet= new HashSet<>();
         for (HttpResponseParams responseParams: responses) {
             if (responseParams.getSource() == HttpResponseParams.Source.HAR || responseParams.getSource() == HttpResponseParams.Source.PCAP) {
                 ret = true;
             }
+
+            HttpRequestParams requestParams = responseParams.requestParams;
+            if (requestParams != null) {
+                String path = requestParams.getMethod() + " " + requestParams.url;
+                if (urlSet.size() < 50) {
+                    urlSet.add(path);
+                }
+            }
+
             try {
                 int collId = responseParams.getRequestParams().getApiCollectionId();
                 URLAggregator aggregator = aggregatorMap.get(collId);
@@ -364,7 +374,8 @@ public class HttpCallParser {
                 
             }
         }
-        
+
+        loggerMaker.debugInfoAddToDb("URLs: " + urlSet.toString(), LogDb.RUNTIME);
         loggerMaker.infoAndAddToDb("added " + count + " urls", LogDb.RUNTIME);
         return ret;
     }

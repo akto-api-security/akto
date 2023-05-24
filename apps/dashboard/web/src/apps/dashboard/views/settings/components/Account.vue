@@ -63,6 +63,16 @@
             </div>
         </div>
 
+        <div class="toggle-redact-feature" v-if="localEnableDebugLogs !== null">
+            <div class="entry-text">Enable debug logs</div>
+            <div class="entry-value">
+                <v-switch
+                    color="var(--themeColor)"
+                    v-model="localEnableDebugLogs"
+                />
+            </div>
+        </div>
+
         <div class="toggle-redact-feature" v-if="!localMergeAsyncOutside">
             <div class="entry-text">Activate new merging</div>
             <div class="entry-value">
@@ -111,13 +121,21 @@ import {mapState} from 'vuex'
             this.$store.dispatch('team/fetchUserLastLoginTs')
         },
         computed: {
-            ...mapState('team', ['redactPayload', 'setupType', 'dashboardVersion', 'apiRuntimeVersion', 'mergeAsyncOutside', 'lastLoginTs', 'privateCidrList', 'urlRegexMatchingEnabled']),
+            ...mapState('team', ['redactPayload', 'setupType', 'dashboardVersion', 'apiRuntimeVersion', 'mergeAsyncOutside', 'lastLoginTs', 'privateCidrList', 'urlRegexMatchingEnabled', 'enableDebugLogs']),
             localRedactPayload: {
                 get() {
                     return this.redactPayload
                 },
                 set(v) {
                     this.$store.dispatch('team/toggleRedactFeature', v)
+                }
+            },
+            localEnableDebugLogs: {
+                get() {
+                    return this.enableDebugLogs
+                },
+                set(v) {
+                    this.$store.dispatch('team/toggleDebugLogsFeature', v)
                 }
             },
             localSetupType: {
