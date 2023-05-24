@@ -1,0 +1,53 @@
+id: SERVER_VERSION_EXPOSED_IN_AN_INVALID_REQUEST
+info:
+  name: Server Version Exposed Via Response Header In an Invalid Request
+  description: "Attacker can obtain information about the software version and other identifying details of the server software running on a remote system."
+  details: >
+            "The endpoint appears to be vulnerable to server version disclosure attack. The original request
+            was replayed by modifying it with an invalid url. The server response contained a header named Server 
+            which contained information about the server software and its version number.
+            "<b>Background:</b> Server version disclosure vulnerabilities are often considered low-risk compared 
+            to other types of security flaws. However, they can still provide attackers with valuable information 
+            that aids in the planning and execution of subsequent attacks. For example, knowing the specific version 
+            of a web server software can help an attacker identify publicly known vulnerabilities associated with 
+            that version and exploit them to gain unauthorized access to the server or compromise its integrity.
+  impact: "Knowing the specific version of a web server software can help an attacker identify publicly known 
+          vulnerabilities associated with that version and exploit them to gain unauthorized access to the 
+          server or compromise its integrity"
+  category:
+    name: SVD
+    shortName: SVD
+    displayName: Server Version Disclosure (SVD)
+  subCategory: SERVER_VERSION_EXPOSED_IN_AN_INVALID_REQUEST
+  severity: LOW
+  tags: 
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/01-Information_Gathering/02-Fingerprint_Web_Server"
+    - "https://github.com/ASRG/asrg.io/issues/200"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}invalidTestUrl
+
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_headers:
+    for_one:
+      key:
+        eq: Server
+      value:
+        regex: (.+?)\s*(\d+\.\d+\.\d+)
