@@ -37,15 +37,15 @@ public class LoggerMaker  {
         scheduler.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
-                fillMap();
+                updateAccountSettings();
             }
         }, 0, 2, TimeUnit.MINUTES);
     }
 
 
-    private static void fillMap() {
+    private static void updateAccountSettings() {
         try {
-            System.out.println("Running fillMap....................................");
+            System.out.println("Running updateAccountSettings....................................");
             Context.accountId.set(1_000_000);
             accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
         } catch (Exception e) {
