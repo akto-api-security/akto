@@ -47,4 +47,16 @@ validate:
     for_one:
       key:
         not_contains_either:
+          - Cache-Control
+          - Clear-Site-Data
+          - Content-Security-Policy
+          - Cross-Origin-Embedder-Policy
+          - Cross-Origin-Opener-Policy
+          - Cross-Origin-Resource-Policy
+          - Permissions-Policy
+          - Pragma
+          - Referrer-Policy
+          - Strict-Transport-Security
+          - X-Content-Type-Options
           - X-Frame-Options
+          - X-Permitted-Cross-Domain-Policies
