@@ -1,4 +1,4 @@
-id: CATS_METHOD_TEST
+id: RANDOM_METHOD_TEST
 info:
   name: Access Control Bypass by changing request method to an arbitrary value
   description: "Many authentication mechanisms only limit access to the most common HTTP methods, thus allowing unauthorized access to restricted resources by other HTTP methods."
@@ -20,7 +20,7 @@ info:
     name: UHM
     shortName: UHM
     displayName: Unnecessary HTTP Methods (UHM)
-  subCategory: CATS_METHOD_TEST
+  subCategory: RANDOM_METHOD_TEST
   severity: LOW
   tags: 
     - Business logic
