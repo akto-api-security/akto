@@ -42,6 +42,7 @@ import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.utils.DashboardMode;
+import com.akto.utils.GithubSync;
 import com.akto.utils.HttpUtils;
 import com.akto.utils.RedactSampleData;
 import com.mongodb.BasicDBList;
@@ -51,6 +52,11 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;
+
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -72,6 +78,7 @@ import java.io.InputStreamReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -80,6 +87,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 import static com.mongodb.client.model.Filters.eq;
 
 public class InitializerListener implements ServletContextListener {
@@ -1000,49 +1010,52 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void saveTestEditorYaml() {
-        List<String> templatePaths = new ArrayList<>();
-        try {
-            templatePaths = convertStreamToListString(InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files"));
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(String.format("failed to read test yaml folder %s", e.toString()), LogDb.DASHBOARD);
-        }
+        GithubSync githubSync = new GithubSync();
+        githubSync.syncDir("test", "apps/dashboard/src/main/resources/inbuilt_test_yaml_files/");
+        return;
+        // List<String> templatePaths = new ArrayList<>();
+        // try {
+        //     templatePaths = convertStreamToListString(InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files"));
+        // } catch (Exception e) {
+        //     loggerMaker.errorAndAddToDb(String.format("failed to read test yaml folder %s", e.toString()), LogDb.DASHBOARD);
+        // }
 
-        String template = null;
-        for (String path: templatePaths) {
-            try {
-                template = convertStreamToString(InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files/" + path));
-                //System.out.println(template);
-                TestConfig testConfig = null;
-                try {
-                    testConfig = TestConfigYamlParser.parseTemplate(template);
-                } catch (Exception e) {
-                    logger.error("invalid parsing yaml template for file " + path, e);
-                }
+        // String template = null;
+        // for (String path: templatePaths) {
+        //     try {
+        //         template = convertStreamToString(InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files/" + path));
+        //         //System.out.println(template);
+        //         TestConfig testConfig = null;
+        //         try {
+        //             testConfig = TestConfigYamlParser.parseTemplate(template);
+        //         } catch (Exception e) {
+        //             logger.error("invalid parsing yaml template for file " + path, e);
+        //         }
 
-                if (testConfig == null) {
-                    logger.error("parsed template for file is null " + path);
-                }
+        //         if (testConfig == null) {
+        //             logger.error("parsed template for file is null " + path);
+        //         }
 
-                String id = testConfig.getId();
+        //         String id = testConfig.getId();
 
-                int createdAt = Context.now();
-                int updatedAt = Context.now();
-                String author = "AKTO";
+        //         int createdAt = Context.now();
+        //         int updatedAt = Context.now();
+        //         String author = "AKTO";
 
-                YamlTemplateDao.instance.updateOne(
-                    Filters.eq("_id", id),
-                    Updates.combine(
-                            Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
-                            Updates.setOnInsert(YamlTemplate.AUTHOR, author),
-                            Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
-                            Updates.set(YamlTemplate.CONTENT, template),
-                            Updates.set(YamlTemplate.INFO, testConfig.getInfo())
-                    )
-                );
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(String.format("failed to read test yaml path %s %s", template, e.toString()), LogDb.DASHBOARD);
-            }
-        }
+        //         YamlTemplateDao.instance.updateOne(
+        //             Filters.eq("_id", id),
+        //             Updates.combine(
+        //                     Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
+        //                     Updates.setOnInsert(YamlTemplate.AUTHOR, author),
+        //                     Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
+        //                     Updates.set(YamlTemplate.CONTENT, template),
+        //                     Updates.set(YamlTemplate.INFO, testConfig.getInfo())
+        //             )
+        //         );
+        //     } catch (Exception e) {
+        //         loggerMaker.errorAndAddToDb(String.format("failed to read test yaml path %s %s", template, e.toString()), LogDb.DASHBOARD);
+        //     }
+        
     }
 
     private static List<String> convertStreamToListString(InputStream in) throws Exception {
