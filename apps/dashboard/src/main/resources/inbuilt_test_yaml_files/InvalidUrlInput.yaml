@@ -39,12 +39,12 @@ api_selection_filters:
     - request_payload:
         for_one:
           key:
-            contains_either: mess
+            contains_either: file
             extract: keyVar
     - query_param:
         for_one:
           key:
-            contains_either: mess
+            contains_either: file
             extract: keyVar
 
 execute:
