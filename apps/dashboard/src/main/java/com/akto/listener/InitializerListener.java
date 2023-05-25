@@ -835,6 +835,41 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public void loadTemplateFilesFromDirectory(BackwardCompatibility backwardCompatibility) {
+        if (backwardCompatibility.getLoadTemplateFilesFromDirectory() == 0) {
+            System.out.println("syncing from file");     
+
+            //Load Templates from folder when instance is initialized
+            Map<String, String> templates = new HashMap<>();
+
+            // Get list of template file paths
+            List<String> templatePaths = new ArrayList<>();
+            try {
+                templatePaths = convertStreamToListString(InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files"));
+            } catch (Exception ex) {
+                loggerMaker.errorAndAddToDb(String.format("failed to read test yaml folder %s", ex.toString()), LogDb.DASHBOARD);
+            }
+
+            // Get templates from files
+            String template = null;
+            for (String path: templatePaths) {
+                try {
+                    template = convertStreamToString(InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files/" + path));
+                    templates.put(path, template);
+                } catch (Exception ex) {
+                    loggerMaker.errorAndAddToDb(String.format("failed to read test yaml path %s %s", template, ex.toString()), LogDb.DASHBOARD);
+                }
+            }
+
+            storeTestEditorTemplates(templates);
+
+            BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.LOAD_TEMPLATES_FILES_FROM_DIRECTORY, Context.now())
+            );
+        }
+    }
+
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
         sce.getServletContext().getSessionCookieConfig().setSecure(HttpUtils.isHttpsEnabled());
@@ -879,8 +914,6 @@ public class InitializerListener implements ServletContextListener {
         TrafficMetricsDao.instance.createIndicesIfAbsent();
         TestRolesDao.instance.createIndicesIfAbsent();
 
-        saveTestEditorYaml();
-
         ApiInfoDao.instance.createIndicesIfAbsent();
         RuntimeLogsDao.instance.createIndicesIfAbsent();
         LogsDao.instance.createIndicesIfAbsent();
@@ -904,6 +937,7 @@ public class InitializerListener implements ServletContextListener {
             deleteAccessListFromApiToken(backwardCompatibility);
             deleteNullSubCategoryIssues(backwardCompatibility);
             enableNewMerging(backwardCompatibility);
+            loadTemplateFilesFromDirectory(backwardCompatibility);
 
             SingleTypeInfo.init();
 
@@ -934,7 +968,7 @@ public class InitializerListener implements ServletContextListener {
             setUpDailyScheduler();
             setUpWebhookScheduler();
             setUpPiiAndTestSourcesScheduler();
-            setUpTestEditorFilesScheduler();
+            setUpTestEditorTemplatesScheduler();
 
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             dropSampleDataIfEarlierNotDroped(accountSettings);
@@ -1010,52 +1044,22 @@ public class InitializerListener implements ServletContextListener {
         return url != null ? url : "https://stairway.akto.io/deployment/status";
     }
 
-    public void setUpTestEditorFilesScheduler(){
+    public void setUpTestEditorTemplatesScheduler(){
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 String mongoURI = System.getenv("AKTO_MONGO_CONN");
                 DaoInit.init(new ConnectionString(mongoURI));
                 Context.accountId.set(1_000_000);
                 try {
-                    saveTestEditorYaml();
+                    updateTestEditorTemplates();
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(String.format("Error while updating Test Editor Files %s", e.toString()), LogDb.DASHBOARD);
                 }
             }
-        }, 2, 10, TimeUnit.MINUTES);
+        }, 0, 4, TimeUnit.HOURS);
     }
 
-    public static void saveTestEditorYaml() {
-        Map<String, String> templates = new HashMap<>();
-
-        GithubSync githubSync = new GithubSync();
-        templates = githubSync.syncDir("akto-api-security/akto", "apps/dashboard/src/main/resources/inbuilt_test_yaml_files/");
-
-        if (templates == null) {
-            templates = new HashMap<>();
-
-            loggerMaker.errorAndAddToDb(String.format("Error while downloading test editor templates from Github, falling back to loading from folder"), LogDb.DASHBOARD);
-            
-            // Get list of template file paths
-            List<String> templatePaths = new ArrayList<>();
-            try {
-                templatePaths = convertStreamToListString(InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files"));
-            } catch (Exception ex) {
-                loggerMaker.errorAndAddToDb(String.format("failed to read test yaml folder %s", ex.toString()), LogDb.DASHBOARD);
-            }
-
-            // Get templates from files
-            String template = null;
-            for (String path: templatePaths) {
-                try {
-                    template = convertStreamToString(InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files/" + path));
-                    templates.put(path, template);
-                } catch (Exception ex) {
-                    loggerMaker.errorAndAddToDb(String.format("failed to read test yaml path %s %s", template, ex.toString()), LogDb.DASHBOARD);
-                }
-            }
-        }
-
+    public static void storeTestEditorTemplates(Map<String, String> templates) {
         for (Map.Entry<String,String> template : templates.entrySet()) {
             String path = template.getKey();
             String template_content = template.getValue();
@@ -1090,6 +1094,16 @@ public class InitializerListener implements ServletContextListener {
                 )
             );
         }     
+    }
+
+    public static void updateTestEditorTemplates() {   
+        System.out.println("syncing from github");     
+        GithubSync githubSync = new GithubSync();
+        Map<String, String> templates = githubSync.syncDir("akto-api-security/akto", "apps/dashboard/src/main/resources/inbuilt_test_yaml_files/");
+
+        if (templates != null) {
+           storeTestEditorTemplates(templates);
+        }
     }
 
     private static List<String> convertStreamToListString(InputStream in) throws Exception {
