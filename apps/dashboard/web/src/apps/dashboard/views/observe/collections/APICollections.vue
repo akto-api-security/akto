@@ -257,7 +257,7 @@ export default {
         showTrafficHelper() {
             let flag = true;
             this.apiCollections.forEach((c) => {
-                if (((c.urls || []).length) > 0) flag = false
+                if ((c.urlsCount) > 0) flag = false
             })
             return flag
         }

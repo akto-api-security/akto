@@ -3,10 +3,10 @@ package com.akto.action;
 import com.akto.dao.PendingInviteCodesDao;
 import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.RBAC;
 import com.akto.dto.User;
-import com.akto.notifications.email.SendgridEmail;
 import com.akto.utils.JWT;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -59,7 +59,7 @@ public class InviteUserAction extends UserAction{
     public String execute() {
         int user_id = getSUser().getId();
 
-        User admin = UsersDao.instance.getFirstUser();
+        User admin = UsersDao.instance.getFirstUser(Context.accountId.get());
         String code = validateEmail(this.inviteeEmail, admin.getLogin());
 
         if (code != null) {
@@ -90,7 +90,7 @@ public class InviteUserAction extends UserAction{
         try {
             Jws<Claims> jws = JWT.parseJwt(inviteCode,"");
             PendingInviteCodesDao.instance.insertOne(
-                    new PendingInviteCode(inviteCode, user_id, inviteeEmail,jws.getBody().getExpiration().getTime())
+                    new PendingInviteCode(inviteCode, user_id, inviteeEmail,jws.getBody().getExpiration().getTime(),Context.accountId.get())
             );
         } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
             e.printStackTrace();
@@ -98,15 +98,6 @@ public class InviteUserAction extends UserAction{
         }
 
         finalInviteCode = websiteHostName + "/signup?signupInvitationCode=" + inviteCode + "&signupEmailId=" + inviteeEmail;
-        String inviteFrom = getSUser().getName();
-        Mail email = SendgridEmail.buildInvitationEmail(inviteeName, inviteeEmail, inviteFrom, finalInviteCode);
-        try {
-            SendgridEmail.send(email);
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-            return ERROR.toUpperCase();
-        }
 
         return Action.SUCCESS.toUpperCase();
     }

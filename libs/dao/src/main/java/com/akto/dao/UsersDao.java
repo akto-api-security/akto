@@ -16,6 +16,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.bson.conversions.Bson;
+
 import static com.mongodb.client.model.Filters.eq;
 import static com.mongodb.client.model.Filters.in;
 import static com.mongodb.client.model.Projections.include;
@@ -85,8 +87,9 @@ public class UsersDao extends CommonContextDao<User> {
 
     final public static UsersDao instance = new UsersDao();
 
-    public User getFirstUser() {
-        MongoCursor<User> cursor = instance.getMCollection().find().sort(Sorts.ascending("_id")).limit(1).cursor();
+    public User getFirstUser(int accountId) {
+        Bson findQ = Filters.exists("accounts."+accountId);
+        MongoCursor<User> cursor = instance.getMCollection().find(findQ).sort(Sorts.ascending("_id")).limit(1).cursor();
         if (cursor.hasNext()) {
             return cursor.next();
         }

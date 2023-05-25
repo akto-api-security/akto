@@ -121,7 +121,7 @@ public class InitializerListener implements ServletContextListener {
             }
         }, 0, 4, TimeUnit.HOURS);
     }
-    static void editTestSourceConfig() throws IOException{
+    public static void editTestSourceConfig() throws IOException{
         List<TestSourceConfig> detailsTest = TestSourceConfigsDao.instance.findAll(new BasicDBObject()) ;
         for(TestSourceConfig tsc : detailsTest){
             String filePath = tsc.getId() ;
@@ -184,7 +184,7 @@ public class InitializerListener implements ServletContextListener {
         return parentPath.substring(parentPath.lastIndexOf("/") + 1);
     }
 
-    static void executeTestSourcesFetch() {
+    public static void executeTestSourcesFetch() {
         try {
             TestCategory[] testCategories = TestCategory.values();
             Map<String, TestCategory> shortNameToTestCategory = new HashMap<>();
@@ -245,7 +245,7 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
-    static void executePIISourceFetch() {
+    public static void executePIISourceFetch() {
         List<PIISource> piiSources = PIISourceDao.instance.findAll("active", true);
         for (PIISource piiSource : piiSources) {
             String fileUrl = piiSource.getFileUrl();
@@ -748,7 +748,7 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    public void addAktoDataTypes(BackwardCompatibility backwardCompatibility) {
+    public static void addAktoDataTypes(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getAddAktoDataTypes() == 0) {
             List<AktoDataType> aktoDataTypes = new ArrayList<>();
             int now = Context.now();
@@ -820,6 +820,30 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
+    public static void insertPiiSources(){
+        if (PIISourceDao.instance.findOne("_id", "A") == null) {
+            String fileUrl = "https://raw.githubusercontent.com/akto-api-security/pii-types/master/general.json";
+            PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
+            piiSource.setId("A");
+
+            PIISourceDao.instance.insertOne(piiSource);
+        }
+
+        if (PIISourceDao.instance.findOne("_id", "Fin") == null) {
+            String fileUrl = "https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/fintech.json";
+            PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
+            piiSource.setId("Fin");
+            PIISourceDao.instance.insertOne(piiSource);
+        }
+
+        if (PIISourceDao.instance.findOne("_id", "File") == null) {
+            String fileUrl = "https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/filetypes.json";
+            PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
+            piiSource.setId("File");
+            PIISourceDao.instance.insertOne(piiSource);
+        }
+    }
+
     public void runInitializerFunctions() {
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
         TrafficMetricsDao.instance.createIndicesIfAbsent();
@@ -851,27 +875,7 @@ public class InitializerListener implements ServletContextListener {
 
             SingleTypeInfo.init();
 
-            if (PIISourceDao.instance.findOne("_id", "A") == null) {
-                String fileUrl = "https://raw.githubusercontent.com/akto-api-security/pii-types/master/general.json";
-                PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
-                piiSource.setId("A");
-
-                PIISourceDao.instance.insertOne(piiSource);
-            }
-
-            if (PIISourceDao.instance.findOne("_id", "Fin") == null) {
-                String fileUrl = "https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/fintech.json";
-                PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
-                piiSource.setId("Fin");
-                PIISourceDao.instance.insertOne(piiSource);
-            }
-
-            if (PIISourceDao.instance.findOne("_id", "File") == null) {
-                String fileUrl = "https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/filetypes.json";
-                PIISource piiSource = new PIISource(fileUrl, 0, 1638571050, 0, new HashMap<>(), true);
-                piiSource.setId("File");
-                PIISourceDao.instance.insertOne(piiSource);
-            }
+            insertPiiSources();
 
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             dropSampleDataIfEarlierNotDroped(accountSettings);

@@ -33,7 +33,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
 
     public static Map<Integer, AccountHTTPCallParserAktoPolicyInfo> accountHTTPParserMap = new ConcurrentHashMap<>();
 
-    private final LoggerMaker loggerMaker= new LoggerMaker(RuntimeListener.class);
+    private static final LoggerMaker loggerMaker= new LoggerMaker(RuntimeListener.class);
     @Override
     public void runMainFunction() {
         //todo create map and fill
@@ -57,7 +57,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
         }, "runtime-listner-task");
     }
 
-    public void initialiseDemoCollections() {
+    public static void initialiseDemoCollections() {
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(new BasicDBObject());
         if (accountSettings != null && accountSettings.getDemoCollectionCreateTime() > 0) {
             return;
