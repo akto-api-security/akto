@@ -2,10 +2,8 @@ package com.akto.action.growth_tools;
 
 import com.akto.action.UserAction;
 import com.akto.dao.AccountsDao;
-import com.akto.dao.CommonContextDao;
 import com.akto.dto.Account;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class PublicApiAction extends UserAction {

@@ -171,6 +171,7 @@ public class CreateAdminUserViaMassAssignment extends TestPlugin{
 
     @Override
     public String subTestName() {
+        // replace with string?
         return "MASS_ASSIGNMENT_CREATE_ADMIN_ROLE";
     }
 }

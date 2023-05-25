@@ -82,6 +82,15 @@ export default {
             return resp
         })
     },
+    runTestForTemplate(content, apiInfoKey) {
+        return request({
+            url: '/api/runTestForGivenTemplate',
+            method: 'post',
+            data:{content, apiInfoKey}
+        }).then((resp) => {
+            return resp
+        })
+    },
     fetchTestingRunResults(testingRunResultSummaryHexId) {
         return request({
             url: '/api/fetchTestingRunResults',
@@ -110,6 +119,16 @@ export default {
             method: 'post',
             data: {
                 testingRunResultHexId
+            }
+        })
+    },
+
+    fetchTestingRunResultFromTestingRun(testingRunHexId) {
+        return request({
+            url: '/api/fetchTestingRunResultFromTestingRun',
+            method: 'post',
+            data: {
+                testingRunHexId
             }
         })
     },

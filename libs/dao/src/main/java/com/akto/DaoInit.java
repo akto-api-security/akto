@@ -223,7 +223,7 @@ public class DaoInit {
                 new EnumCodec<>(GlobalEnums.Severity.class),
                 new EnumCodec<>(TrafficMetrics.Name.class),
                 new EnumCodec<>(Loader.Type.class),
-                new EnumCodec<>(CustomWebhook.WebhookOptions.class)),
+                new EnumCodec<>(CustomWebhook.WebhookOptions.class),
                 new EnumCodec<>(GlobalEnums.YamlTemplateSource.class),
                 new EnumCodec<>(AktoGptConfigState.class));
 
