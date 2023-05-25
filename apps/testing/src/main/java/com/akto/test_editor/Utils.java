@@ -1,11 +1,15 @@
 package com.akto.test_editor;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.akto.dao.test_editor.TestEditorEnums;
+import com.akto.dto.RawApi;
+import com.akto.dto.type.RequestTemplate;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
@@ -163,6 +167,59 @@ public class Utils {
                 return false;
         }
         return result;
+    }
+
+    public static boolean isMultiOperation(String operation) {
+        return operation.equalsIgnoreCase(TestEditorEnums.TerminalExecutorDataOperands.MODIFY_ALL_BODY_PARAMS.toString()) || 
+        operation.equalsIgnoreCase(TestEditorEnums.TerminalExecutorDataOperands.MODIFY_ALL_QUERY_PARAMS.toString());
+    }
+
+    public static Set<String> getKeysForMultiOperation(String operation, RawApi rawApi) {
+        Set<String> keys = new HashSet<>();
+        if (operation.equalsIgnoreCase(TestEditorEnums.TerminalExecutorDataOperands.MODIFY_ALL_BODY_PARAMS.toString())) {
+            String reqBody = rawApi.getRequest().getBody();
+            BasicDBObject reqObj = new BasicDBObject();
+            try {
+                reqObj =  BasicDBObject.parse(reqBody);
+            } catch(Exception e) {
+                // add log
+            }
+            Utils.getAllBodyKeys(reqObj, null, keys);
+        } else {
+            Utils.getAllQueryParamKeys(rawApi, keys);
+        }
+        return keys;
+    }
+
+    public static void getAllBodyKeys(Object obj, String parentKey, Set<String> keys) {
+        if (obj instanceof BasicDBObject) {
+            BasicDBObject basicDBObject = (BasicDBObject) obj;
+            Set<String> keySet = basicDBObject.keySet();
+            for(String key: keySet) {
+                if (key == null) {
+                    continue;
+                }
+                Object value = basicDBObject.get(key);
+                getAllBodyKeys(value, key, keys);
+            }
+        } else if (obj instanceof BasicDBList) {
+            for(Object elem: (BasicDBList) obj) {
+                getAllBodyKeys(elem, parentKey, keys);
+            }
+        } else {
+            keys.add(parentKey);
+        }
+    }
+
+    public static void getAllQueryParamKeys(RawApi rawApi, Set<String> keys) {
+        String queryParams = rawApi.getRequest().getQueryParams();
+        String url = rawApi.getRequest().getUrl();
+        BasicDBObject queryParamObj = RequestTemplate.getQueryJSON(url + "?" + queryParams);
+
+        Set<String> keySet = queryParamObj.keySet();
+        for(String key: keySet) {
+            keys.add(key);
+        }
     }
 
 }

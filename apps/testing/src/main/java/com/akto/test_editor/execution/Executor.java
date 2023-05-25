@@ -3,6 +3,7 @@ package com.akto.test_editor.execution;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.test_editor.TestEditorEnums;
@@ -45,7 +46,7 @@ public class Executor {
             List<RawApi> sampleRawApis = new ArrayList<>();
             sampleRawApis.add(sampleRawApi);
 
-            singleReq = buildTestRequest(reqNode, null, sampleRawApis, varMap, authMechanism);
+            singleReq = buildTestRequest(reqNode, null, sampleRawApis, varMap, authMechanism, sampleRawApi);
             List<RawApi> testRawApis = new ArrayList<>();
             testRawApis = singleReq.getRawApis();
             if (testRawApis == null) {
@@ -66,7 +67,7 @@ public class Executor {
         return result;
     }
 
-    public ExecutorSingleRequest buildTestRequest(ExecutorNode node, String operation, List<RawApi> rawApis, Map<String, Object> varMap, AuthMechanism authMechanism) {
+    public ExecutorSingleRequest buildTestRequest(ExecutorNode node, String operation, List<RawApi> rawApis, Map<String, Object> varMap, AuthMechanism authMechanism, RawApi baseRawApi) {
 
         List<ExecutorNode> childNodes = node.getChildNodes();
         if (node.getNodeType().equalsIgnoreCase(ExecutorOperandTypes.NonTerminal.toString()) || node.getNodeType().equalsIgnoreCase(ExecutorOperandTypes.Terminal.toString())) {
@@ -96,62 +97,60 @@ public class Executor {
                 value = null;
             }
             // if rawapi size is 1, var type is wordlist, iterate on values
-            RawApi rApi = rawApis.get(0).copy();
-            if (rawApis.size() == 1 && VariableResolver.isWordListVariable(key, varMap)) {
-                List<String> wordListVal = VariableResolver.resolveWordListVar(key.toString(), varMap);
-
-                for (int i = 0; i < wordListVal.size(); i++) {
-                    RawApi copyRApi = rApi.copy();
-                    ExecutorSingleOperationResp resp = invokeOperation(operation, wordListVal.get(i), value, copyRApi, varMap, authMechanism);
-                    if (!resp.getSuccess()) {
-                        return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
+            
+            if (Utils.isMultiOperation(operation)) {
+                Set<String> payLoadKeys = Utils.getKeysForMultiOperation(operation, baseRawApi);
+                if (VariableResolver.isWordListVariable(key, varMap)) {
+                    List<String> wordListVal = VariableResolver.resolveWordListVar(key.toString(), varMap);
+                    for (String bodyKey: payLoadKeys) {
+                        for (String val: wordListVal) {
+                            RawApi copyRApi = baseRawApi.copy();
+                            ExecutorSingleOperationResp resp = invokeOperation(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_BODY_PARAM.toString(), bodyKey, val, copyRApi, varMap, authMechanism);
+                            if (!resp.getSuccess()) {
+                                continue;
+                            }
+                            newRawApis.add(copyRApi);
+                        }
                     }
-                    if (resp.getErrMsg() == null || resp.getErrMsg().length() == 0) {
+                } else {
+                    for (String bodyKey: payLoadKeys) {
+                        RawApi copyRApi = baseRawApi.copy();
+                        ExecutorSingleOperationResp resp = invokeOperation(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_BODY_PARAM.toString(), bodyKey, key, copyRApi, varMap, authMechanism);
+                        if (!resp.getSuccess()) {
+                            continue;
+                        }
                         newRawApis.add(copyRApi);
                     }
                 }
-
-            } else if (rawApis.size() == 1 && VariableResolver.isWordListVariable(value, varMap)) {
-                List<String> wordListVal = VariableResolver.resolveWordListVar(value.toString(), varMap);
-
-                for (int i = 0; i < wordListVal.size(); i++) {
-                    RawApi copyRApi = rApi.copy();
-                    ExecutorSingleOperationResp resp = invokeOperation(operation, key, wordListVal.get(i), copyRApi, varMap, authMechanism);
-                    if (!resp.getSuccess()) {
-                        return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
-                    }
-                    if (resp.getErrMsg() == null || resp.getErrMsg().length() == 0) {
-                        newRawApis.add(copyRApi);
-                    }
-                }
-
             } else {
                 if (VariableResolver.isWordListVariable(key, varMap)) {
                     List<String> wordListVal = VariableResolver.resolveWordListVar(key.toString(), varMap);
-                    int index = 0;
-                    for (RawApi rawApi : rawApis) {
-                        if (index >= wordListVal.size()) {
-                            break;
-                        }
-                        ExecutorSingleOperationResp resp = invokeOperation(operation, wordListVal.get(index), value, rawApi, varMap, authMechanism);
+
+                    for (int i = 0; i < wordListVal.size(); i++) {
+                        RawApi copyRApi = baseRawApi.copy();
+                        ExecutorSingleOperationResp resp = invokeOperation(operation, wordListVal.get(i), value, copyRApi, varMap, authMechanism);
                         if (!resp.getSuccess()) {
-                            return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
+                            continue;
                         }
-                        index++;
+                        if (resp.getErrMsg() == null || resp.getErrMsg().length() == 0) {
+                            newRawApis.add(copyRApi);
+                        }
                     }
+
                 } else if (VariableResolver.isWordListVariable(value, varMap)) {
                     List<String> wordListVal = VariableResolver.resolveWordListVar(value.toString(), varMap);
-                    int index = 0;
-                    for (RawApi rawApi : rawApis) {
-                        if (index >= wordListVal.size()) {
-                            break;
-                        }
-                        ExecutorSingleOperationResp resp = invokeOperation(operation, key, wordListVal.get(index), rawApi, varMap, authMechanism);
+
+                    for (int i = 0; i < wordListVal.size(); i++) {
+                        RawApi copyRApi = baseRawApi.copy();
+                        ExecutorSingleOperationResp resp = invokeOperation(operation, key, wordListVal.get(i), copyRApi, varMap, authMechanism);
                         if (!resp.getSuccess()) {
-                            return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
+                            continue;
                         }
-                        index++;
+                        if (resp.getErrMsg() == null || resp.getErrMsg().length() == 0) {
+                            newRawApis.add(copyRApi);
+                        }
                     }
+
                 } else {
                     for (RawApi rawApi : rawApis) {
                         ExecutorSingleOperationResp resp = invokeOperation(operation, key, value, rawApi, varMap, authMechanism);
@@ -159,15 +158,18 @@ public class Executor {
                             return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
                         }
                     }
+
+                    invokeOperation(operation, key, value, baseRawApi, varMap, authMechanism);
+                    
                 }
-                
             }
+
         }
 
         ExecutorNode childNode;
         for (int i = 0; i < childNodes.size(); i++) {
             childNode = childNodes.get(i);
-            ExecutorSingleRequest executionResult = buildTestRequest(childNode, operation, rawApis, varMap, authMechanism);
+            ExecutorSingleRequest executionResult = buildTestRequest(childNode, operation, rawApis, varMap, authMechanism, baseRawApi);
             rawApis = executionResult.getRawApis();
             if (!executionResult.getSuccess()) {
                 return executionResult;
@@ -176,11 +178,16 @@ public class Executor {
         }
 
         if (newRawApis.size() > 0) {
-            return new ExecutorSingleRequest(true, "", newRawApis, followRedirect);
-        } else {
-            return new ExecutorSingleRequest(true, "", rawApis, followRedirect);
+            if (rawApis.size() <= 1) {
+                rawApis = newRawApis;
+            } else {
+                rawApis.addAll(newRawApis);
+            }
         }
+
+        return new ExecutorSingleRequest(true, "", rawApis, followRedirect);
     }
+
 
     public ExecutorSingleOperationResp invokeOperation(String operationType, Object key, Object value, RawApi rawApi, Map<String, Object> varMap, AuthMechanism authMechanism) {
         try {
