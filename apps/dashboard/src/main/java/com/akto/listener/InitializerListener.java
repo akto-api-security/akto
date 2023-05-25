@@ -1022,7 +1022,7 @@ public class InitializerListener implements ServletContextListener {
                     loggerMaker.errorAndAddToDb(String.format("Error while updating Test Editor Files %s", e.toString()), LogDb.DASHBOARD);
                 }
             }
-        }, 4, 4, TimeUnit.HOURS);
+        }, 2, 10, TimeUnit.MINUTES);
     }
 
     public static void saveTestEditorYaml() {
