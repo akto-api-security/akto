@@ -326,6 +326,18 @@
         </result>
     </action>
 
+    <action name="api/inviteUsers" class="com.akto.action.InviteUserAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="middleware/config" class="com.akto.action.MiddlewareConfigAction" method="getMiddlewareConfig">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

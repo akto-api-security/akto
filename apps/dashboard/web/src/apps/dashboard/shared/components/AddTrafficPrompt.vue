@@ -1,7 +1,7 @@
 <template>
     <span>
         Looks like you don't have any traffic data. Learn how to add APIs from 
-        <a href="https://docs.akto.io/integrations/burp-suite" target="_blank" class="helper-clicker">Burp</a>.
+        <a href="https://docs.akto.io/traffic-connections/burp-suite" target="_blank" class="helper-clicker">Burp</a>.
     </span>
 </template>
 

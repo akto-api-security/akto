@@ -1,8 +1,11 @@
 package com.akto.action;
 
+import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
+import com.akto.listener.InitializerListener;
+import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.cloud.Utils;
@@ -11,9 +14,11 @@ import com.akto.utils.cloud.stack.aws.AwsStack;
 import com.akto.utils.cloud.stack.dto.StackState;
 import com.akto.utils.platform.DashboardStackDetails;
 import com.akto.utils.platform.MirroringStackDetails;
+import com.akto.runtime.Main;
 import com.amazonaws.services.lambda.model.*;
 import com.amazonaws.util.EC2MetadataUtils;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
@@ -29,6 +34,9 @@ import org.slf4j.LoggerFactory;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static com.akto.dao.MCollection.ID;
 import static com.mongodb.client.model.Filters.eq;
@@ -41,6 +49,8 @@ public class AccountAction extends UserAction {
 
     public static final int MAX_NUM_OF_LAMBDAS_TO_FETCH = 50;
     private static AmazonAutoScaling asc = AmazonAutoScalingClientBuilder.standard().build();
+    private final static ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+    
     @Override
     public String execute() {
 
@@ -219,11 +229,11 @@ public class AccountAction extends UserAction {
         RBAC.Role role = isNew ? RBAC.Role.ADMIN : RBAC.Role.MEMBER;
         RBACDao.instance.insertOne(new RBAC(user.getId(), role, newAccountId));
         Context.accountId.set(newAccountId);
-        if (isNew) intializeCollectionsForTheAccount();
+        if (isNew) intializeCollectionsForTheAccount(newAccountId);
         return user;
     }
 
-    private static void intializeCollectionsForTheAccount() {
+    private static void intializeCollectionsForTheAccount(int newAccountId) {
         ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), new HashSet<>(), null, 0));
 
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
@@ -250,9 +260,29 @@ public class AccountAction extends UserAction {
                 Updates.set(BackwardCompatibility.RESET_SINGLE_TYPE_INFO_COUNT, Context.now())
         );
 
-        SingleTypeInfoDao.instance.createIndicesIfAbsent();
-        SensitiveSampleDataDao.instance.createIndicesIfAbsent();
-        RuntimeFilterDao.instance.initialiseFilters();
+        InitializerListener.addAktoDataTypes(backwardCompatibility);
+
+        executorService.schedule(new Runnable() {
+            public void run() {
+                String mongoURI = System.getenv("AKTO_MONGO_CONN");
+                DaoInit.init(new ConnectionString(mongoURI));
+                Context.accountId.set(newAccountId);
+                Main.createIndices();
+                Main.insertRuntimeFilters();
+                RuntimeListener.initialiseDemoCollections();
+                AccountSettingsDao.instance.updateOnboardingFlag(true);
+                InitializerListener.insertPiiSources();
+                try {
+                    InitializerListener.executeTestSourcesFetch();
+                    InitializerListener.editTestSourceConfig();
+                } catch (Exception e) {
+                }
+                try {
+                    InitializerListener.executePIISourceFetch();
+                } catch (Exception e) {
+                }
+            }
+        }, 0, TimeUnit.SECONDS);
     }
 
     public String goToAccount() {

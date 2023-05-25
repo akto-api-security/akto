@@ -281,6 +281,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         }
 
         try {
+            shouldLogin = "true";
             createUserAndRedirect(email, email, signupInfo, invitedToAccountId);
         } catch (IOException e) {
             ;
@@ -368,7 +369,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         if (user == null && "false".equalsIgnoreCase(shouldLogin)) {
             SignupUserInfo signupUserInfo = SignupDao.instance.insertSignUp(userEmail, username, signupInfo, invitationToAccount);
             LoginAction.loginUser(signupUserInfo.getUser(), servletResponse, false, servletRequest);
-            servletResponse.sendRedirect("/dashboard/setup");
+            servletResponse.sendRedirect("/dashboard/onboarding");
         } else {
 
             int accountId = 0;
@@ -401,7 +402,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             servletRequest.getSession().setAttribute("user", user);
             servletRequest.getSession().setAttribute("accountId", accountId);
             new LoginAction().loginUser(user, servletResponse, true, servletRequest);
-            servletResponse.sendRedirect("/dashboard/observe/inventory");
+            servletResponse.sendRedirect("/dashboard/onboarding");
         }
     }
 
