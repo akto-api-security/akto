@@ -44,4 +44,4 @@ execute:
 
 validate:
   response_payload:
-    contains_either: "Unexpected path"
+    contains_either: "Django tried these url patterns"

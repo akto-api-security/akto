@@ -53,6 +53,8 @@ execute:
       - modify_query_param:
           keyVar: "testInvalidFile"
 validate:
+  response_code:
+    gte: 400
   or:
     - response_payload:
         and:
@@ -61,7 +63,6 @@ validate:
           - contains_either:
               - SQL
               - MYSQL
-              - file not found
               - access denied
     - response_payload:
         - length:
