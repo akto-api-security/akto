@@ -934,6 +934,7 @@ public class InitializerListener implements ServletContextListener {
             setUpDailyScheduler();
             setUpWebhookScheduler();
             setUpPiiAndTestSourcesScheduler();
+            setUpTestEditorFilesScheduler();
 
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             dropSampleDataIfEarlierNotDroped(accountSettings);
@@ -1007,6 +1008,21 @@ public class InitializerListener implements ServletContextListener {
     private String getUpdateDeploymentStatusUrl() {
         String url = System.getenv("UPDATE_DEPLOYMENT_STATUS_URL");
         return url != null ? url : "https://stairway.akto.io/deployment/status";
+    }
+
+    public void setUpTestEditorFilesScheduler(){
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                String mongoURI = System.getenv("AKTO_MONGO_CONN");
+                DaoInit.init(new ConnectionString(mongoURI));
+                Context.accountId.set(1_000_000);
+                try {
+                    saveTestEditorYaml();
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(String.format("Error while updating Test Editor Files %s", e.toString()), LogDb.DASHBOARD);
+                }
+            }
+        }, 4, 4, TimeUnit.HOURS);
     }
 
     public static void saveTestEditorYaml() {
