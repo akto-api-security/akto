@@ -131,7 +131,7 @@ public class TestExecutor {
 
         List<AuthParam> authParams = authMechanism.getAuthParams();
 
-        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap();
+        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false);
 
         authMechanism.setAuthParams(authParams);
 
