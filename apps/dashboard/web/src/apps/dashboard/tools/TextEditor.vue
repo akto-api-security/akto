@@ -90,7 +90,7 @@
                     <div class="req-resp-col">
                         <div class="req-box-container" v-if="messageJson.message">
                             <sample-data :json="json" requestTitle="Request" responseTitle="Response" :tabularDisplay="true"
-                                @run_tests="runTestForGivenTemplate()" :isLoading="runTestObj.isLoading" />
+                                @run_tests="runTestForGivenTemplate()"/>
                         </div>
                         <div class="empty-container" v-else>
                             No Values Yet !!
@@ -249,6 +249,7 @@ export default {
         },
         setSelectedMethod(testId) {
             this.selectedUrl = {}
+            this.messageJson = {}
             if (this.mapRequestsToId[testId] && this.mapRequestsToId[testId].length > 0) {
                 let obj = {
                     apiCollectionId: this.mapRequestsToId[testId][0].apiCollectionId,
@@ -260,7 +261,6 @@ export default {
             }
         },
         async makeJson() {
-            this.messageJson = {}
             await inventoryApi.fetchSampleData(this.selectedUrl.url, this.selectedUrl.apiCollectionId, this.selectedUrl.method).then((resp) => {
                 if (resp.sampleDataList[0].samples && resp.sampleDataList[0].samples.length > 0) {
                     this.messageJson = { "message": resp.sampleDataList[0].samples[0], "highlightPaths": [] }
