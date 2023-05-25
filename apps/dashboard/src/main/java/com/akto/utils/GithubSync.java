@@ -22,8 +22,26 @@ public class GithubSync {
     private static final LoggerMaker loggerMaker = new LoggerMaker(GithubSync.class);
     private static final OkHttpClient client = new OkHttpClient();
 
+    public String syncFile(String repo, String filePath) {
+        String fileContents = null; 
+
+        Request fileRequest = new Request.Builder()
+                            .url(String.format("https://raw.githubusercontent.com/%s/master/%s", repo, filePath))
+                            .build();
+                            
+        try {
+            Response fileResponse = client.newCall(fileRequest).execute();
+            ResponseBody fileResponseBody = fileResponse.body();
+            fileContents = fileResponseBody.string();
+        } catch (IOException ex) {
+            loggerMaker.errorAndAddToDb(String.format("Error while syncing file %s in Github repo %s %s ", repo, filePath, ex.toString()), LogDb.DASHBOARD);
+        }
+        
+        return fileContents;
+    }
+
     public Map<String, String> syncDir(String repo, String dirPath) {
-        Map<String, String> dirContents = new HashMap<String, String>();
+        Map<String, String> dirContents = new HashMap<>();
 
         // Get Github repo tree - Eg: https://api.github.com/repos/akto-api-security/akto/git/trees/master?recursive=1
         Request treeRequest = new Request.Builder()
