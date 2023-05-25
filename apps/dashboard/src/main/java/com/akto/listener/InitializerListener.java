@@ -1010,13 +1010,13 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void saveTestEditorYaml() {
-        Map<String, String> templates = null;
+        Map<String, String> templates = new HashMap<>();
 
         GithubSync githubSync = new GithubSync();
         templates = githubSync.syncDir("akto-api-security/akto", "apps/dashboard/src/main/resources/inbuilt_test_yaml_files/");
 
         if (templates == null) {
-            templates = new HashMap<String, String>();
+            templates = new HashMap<>();
 
             loggerMaker.errorAndAddToDb(String.format("Error while downloading test editor templates from Github, falling back to loading from folder"), LogDb.DASHBOARD);
             
