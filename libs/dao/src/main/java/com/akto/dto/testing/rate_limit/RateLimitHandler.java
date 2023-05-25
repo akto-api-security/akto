@@ -18,8 +18,14 @@ public class RateLimitHandler {
     }
 
     public boolean shouldWait (Request request) {
+        if (this.rateLimits.isEmpty()) {
+            return false;
+        }
         Set<ApiRateLimit> rateLimits = this.rateLimits.keySet();
         for (ApiRateLimit rateLimit : rateLimits) {
+            if (rateLimit.getMaxRequests(request) == 0) {
+                return false;
+            }
             int availableRequests = this.rateLimits.get(rateLimit);
             if (availableRequests > 0) {
                 this.rateLimits.put(rateLimit, availableRequests - 1);
