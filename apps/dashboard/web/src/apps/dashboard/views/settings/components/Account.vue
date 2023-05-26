@@ -93,19 +93,60 @@
             </div>
         </div>
 
+        <div class="toggle-redact-feature">
+            <div class="entry-text">Traffic filters</div>
+            <div class="d-flex traffic-filter-div">
+                <div class="input-value-key">
+                    <v-text-field v-model="newKey" style="width: 200px">
+                        <template slot="label">
+                            <div class="d-flex">
+                                Header key
+                                <help-tooltip :size="12"
+                                    text="Please enter the name of header key" />
+                            </div>
+                        </template>
+                    </v-text-field>
+
+                </div>
+                <div class="input-value-value">
+                    <v-text-field v-model="newVal" style="width: 500px">
+                        <template slot="label">
+                            <div class="d-flex">
+                                Header value
+                                <help-tooltip :size="12" text="Please enter the name of header value" />
+                            </div>
+                        </template>
+
+                    </v-text-field>
+                </div>
+
+                <div class="filter-save-btn">
+                    <v-btn primary dark color="var(--hexColor9)" @click="addFilterHeaderValueMap" v-if="filterHeaderValueMapChanged">
+                        Save
+                    </v-btn>
+                </div>
+
+            </div>
+        </div>
+
     </div>
 </template>
 
 <script>
 import func from "@/util/func";
+import HelpTooltip from '@/apps/dashboard/shared/components/help/HelpTooltip'
+
 import {mapState} from 'vuex'
     export default {
         name: "Account",
         components: { 
+            HelpTooltip
         },
         data () {
             return {
-                setup_types: ["STAGING", "PROD", "QA", "DEV"]
+                setup_types: ["STAGING", "PROD", "QA", "DEV"],
+                newKey: null,
+                newVal: null,
             }
         },
         methods: {
@@ -114,6 +155,9 @@ import {mapState} from 'vuex'
             },
             epochToDateTime(timestamp) {
                 return func.epochToDateTime(timestamp)
+            },
+            addFilterHeaderValueMap() {
+                this.$store.dispatch('team/addFilterHeaderValueMap', {"filterHeaderValueMapKey" : this.newKey, "filterHeaderValueMapValue": this.newVal})
             }
         },
         mounted() {
@@ -121,7 +165,7 @@ import {mapState} from 'vuex'
             this.$store.dispatch('team/fetchUserLastLoginTs')
         },
         computed: {
-            ...mapState('team', ['redactPayload', 'setupType', 'dashboardVersion', 'apiRuntimeVersion', 'mergeAsyncOutside', 'lastLoginTs', 'privateCidrList', 'urlRegexMatchingEnabled', 'enableDebugLogs']),
+            ...mapState('team', ['redactPayload', 'setupType', 'dashboardVersion', 'apiRuntimeVersion', 'mergeAsyncOutside', 'lastLoginTs', 'privateCidrList', 'urlRegexMatchingEnabled', 'enableDebugLogs', 'filterHeaderValueMap']),
             localRedactPayload: {
                 get() {
                     return this.redactPayload
@@ -166,6 +210,24 @@ import {mapState} from 'vuex'
                 set(v) {
                     this.$store.dispatch('team/updateEnableNewMerge', v)
                 }
+            },
+            nonNullAuth() {
+                return this.filterHeaderValueMap
+            },
+            filterHeaderValueMapChanged() {
+                let nonNullData = this.newKey != null && this.newVal != null && this.newKey != "" && this.newVal != ""
+                if (this.nonNullAuth) {
+                    return nonNullData && this.filterHeaderValueMap && (Object.keys(this.filterHeaderValueMap)[0] !== this.newKey || Object.values(this.filterHeaderValueMap)[0] !== this.newVal)
+                } else {
+                    return nonNullData
+                }
+            }
+        },
+        watch: {
+            filterHeaderValueMap(a) {
+                if (!a) return
+                this.newKey = Object.keys(a)[0] 
+                this.newVal = Object.values(a)[0]
             }
         }
     }
@@ -189,12 +251,36 @@ import {mapState} from 'vuex'
     display: flex
     height: 60px
     line-height: 60px
+
+.input-value-key
+    padding-right: 8px
+    color: var(--themeColorDark)
+
+.input-value-value
+    padding-right: 8px
+    color: var(--themeColorDark)
+    max-width: 200px
+
+.filter-save-btn
+    display: flex
+    align-items: center
 </style>
 
-<style>
+<style scoped>
      .toggle-redact-feature .v-input--selection-controls {
         margin-top:20px;
         padding-top: 0px;
+    }
+
+    .traffic-filter-div>>>.v-label {
+        font-size: 12px;
+        color: var(--themeColor);
+        font-weight: 400;
+    }
+
+    .traffic-filter-div>>>input {
+        font-size: 12px;
+        font-weight: 400;
     }
 </style>
 

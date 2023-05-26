@@ -230,6 +230,16 @@ export default {
                 enableDebugLogs
             }
         })
+    },
+
+    addFilterHeaderValueMap(filterHeaderValueMap){
+        return request({
+            url: '/api/addFilterHeaderValueMap',
+            method: 'post',
+            data: {
+                filterHeaderValueMap
+            }
+        })
     }
 
 }
