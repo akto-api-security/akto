@@ -112,7 +112,7 @@
                     <div class="req-resp-col">
                         <div class="req-box-container" v-if="messageJson.message">
                             <sample-data :json="json" requestTitle="Request" responseTitle="Response" :tabularDisplay="true"
-                                @run_tests="runTestForGivenTemplate()"/>
+                                @run_tests="runTestForGivenTemplate()" :isLoading="runTestObj.isLoading"/>
                         </div>
                         <div class="empty-container" v-else>
                             No Values Yet !!
