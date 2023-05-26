@@ -73,7 +73,11 @@ public class SaveTestEditorAction extends UserAction {
                 Object category = infoMap.get("category");
                 testName = infoMap.get("name").toString();
                 infoMap.replace("subCategory", testId);
-                YamlTemplate template = YamlTemplateDao.instance.findOne(Filters.eq("info.name", testName));
+                Bson filters = Filters.and(
+                    Filters.eq("info.name", testName),
+                    Filters.ne("source", "CUSTOM")
+                );
+                YamlTemplate template = YamlTemplateDao.instance.findOne(filters);
                 if (template != null) {
                     addActionError("Cannot save template, specify a differnet test name under info tab");
                     return ERROR.toUpperCase();
