@@ -46,7 +46,7 @@ validate:
   response_headers:
     for_one:
       key:
-        contains_all:
+        not_contains_either:
           - Cache-Control
           - Clear-Site-Data
           - Content-Security-Policy
