@@ -216,7 +216,7 @@ export default {
         children:[
           {
             title: 'Test Editor',
-            icon: '$aktoWhite',
+            icon: '$testEditor',
             link: '/dashboard/tools/test-editor'
           }
         ]
