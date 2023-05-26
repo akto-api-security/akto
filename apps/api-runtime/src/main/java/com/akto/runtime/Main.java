@@ -363,7 +363,7 @@ public class Main {
 
         if (accountSettings != null) {
             Map<String, String> filterHeaders = accountSettings.getFilterHeaderValueMap();
-            if (filterHeaders != null) {
+            if (filterHeaders != null && !filterHeaders.isEmpty()) {
                 List<HttpResponseParams> accWiseResponseFiltered = new ArrayList<HttpResponseParams>();
                 for(HttpResponseParams accWiseResponseEntry : accWiseResponse) {
                     Map<String, List<String>> reqHeaders = accWiseResponseEntry.getRequestParams().getHeaders();
