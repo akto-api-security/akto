@@ -2,17 +2,14 @@
     <div>
         <simple-layout title="Test Editor">
             <template>
-                <div class="d-flex">
+                <div class="d-flex test-editor-panel">
                     <div class="test-col">
                         <layout-with-left-pane>
-                            <search class="search-box" placeholder="Search Tests" @changed="setSearchText" />
                             <div class="tests-container">
                                 <div class="main-list-title" @click="toggleListDisplay('custom')">
                                     <v-icon size=18
                                         :style="{ transform: customToggle ? 'rotate(90deg)' : '', transition: 'all 0.2s linear', color: 'var(--lighten2)' }">$fas_angle-right</v-icon>
                                     <span class="title-name">
-                                        <v-icon size=18
-                                            :style="customToggle ? { 'color': 'var(--themeColor)' } : { 'color': 'var(--black)' }">$far_folder</v-icon>
                                         Custom
                                     </span>
 
@@ -34,7 +31,6 @@
                                             <v-list-item-content>
                                                 <v-list-item-title>
                                                     <div class="test-category-name show-overflow">
-                                                        <v-icon class="test-icons">$far_folder</v-icon>
                                                         {{ item.displayName }}
                                                     </div>
                                                 </v-list-item-title>
@@ -55,8 +51,6 @@
                                     <v-icon size=18
                                         :style="{ transform: aktoToggle ? 'rotate(90deg)' : '', transition: 'all 0.2s linear', color: 'var(--lighten2)' }">$fas_angle-right</v-icon>
                                     <span class="title-name">
-                                        <v-icon size=18
-                                            :style="aktoToggle ? { 'color': 'var(--themeColor)' } : { 'color': 'var(--black)' }">$far_folder</v-icon>
                                         Akto Default
                                     </span>
 
@@ -77,7 +71,6 @@
                                             <v-list-item-content>
                                                 <v-list-item-title>
                                                     <div class="test-category-name show-overflow">
-                                                        <v-icon class="test-icons">$far_folder</v-icon>
                                                         {{ item.displayName }}
                                                     </div>
                                                 </v-list-item-title>
@@ -102,9 +95,8 @@
                                 <span class="file-name">
                                     Test editor
                                 </span>
-                                <v-icon :style="{ 'cursor': 'pointer' }" size=14
-                                    @click="openTestLink()">$githubIcon</v-icon>
-                                <span class="last-edited">(last edited 3 minutes ago)</span>
+                                <v-icon :style="{ 'cursor': 'pointer' }" size=14>$githubIcon</v-icon>
+                                <!-- <span class="last-edited">(last edited 3 minutes ago)</span> -->
                             </div>
                             <div class="file-title" :style="{ cursor: IsEdited ? 'pointer' : '' }"
                                 @click="openDialogBox('save')">
@@ -276,7 +268,6 @@ export default {
                 this.makeJson()
             } else if (param === 'save') {
                 this.$store.dispatch('testing/addTestTemplate', { content: this.textEditor.getValue(), testId: formValues.name, testCategory: formValues.category })
-                location.reload()
             }
         },
         setSelectedMethod(testId) {
@@ -318,7 +309,6 @@ export default {
                                 if (run) {
                                     _this.testingRunResult = run
                                     stopInterval = true
-                                    debugger
                                     __topThis.runTestObj.runTime =  Math.round((new Date().getTime() - testStartTime.getTime())/1000) + " seconds"
                                     await testingApi.fetchIssueFromTestRunResultDetails(_this.testingRunResult.hexId).then(async respIssue => {
                                         __topThis.dialogBoxIssue = respIssue['runIssues']
@@ -500,6 +490,11 @@ export default {
     border: none !important;
 }
 
+.test-editor-panel >>> .akto-left-pane {
+    padding-left: 4px;
+    padding-right: 4px;
+}
+
 .search-box>>>.v-text-field input {
     font-size: 16px !important;
 }
@@ -659,15 +654,15 @@ export default {
 
 .main-list-title {
     // width: 260px;
-    padding: 0px 6px;
+    padding: 0px 2px;
     display: flex;
-    gap: 10px;
+    gap: 2px;
     align-items: center;
     cursor: pointer;
 }
 
 .title-name {
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 500;
     color: var(--themeColorDark);
     display: flex;
@@ -679,17 +674,16 @@ export default {
     margin: -20px 0px 10px 0px;
 
     .tests-category-container {
-        padding-left: 12px;
+        padding-left: 2px;
 
         .test-category-name {
             display: flex;
             gap: 7px;
             align-items: center;
             margin-left: 6px;
-            font-size: 14px;
+            font-size: 12px;
             color: var(--themeColorDark);
             font-weight: 500;
-            max-width: 150px !important;
 
             .test-icons {
                 color: var(--black);
@@ -705,7 +699,7 @@ export default {
                 color: var(--themeColorDark);
                 font-size: 12px;
                 font-weight: 500;
-                padding-left: 62px;
+                padding-left: 16px;
             }
         }
     }
@@ -719,8 +713,8 @@ export default {
 
 .total-tests {
     position: absolute;
-    right: 34px;
-    font-size: 16px;
+    right: 14px;
+    font-size: 12px;
     color: var(--themeColorDark);
 }
 

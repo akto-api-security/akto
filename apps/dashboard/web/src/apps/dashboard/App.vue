@@ -216,7 +216,7 @@ export default {
         children:[
           {
             title: 'Test Editor',
-            icon: '$testEditor',
+            icon: '$testEditorIcon',
             link: '/dashboard/tools/test-editor'
           }
         ]
