@@ -21,7 +21,8 @@ const team = {
         setupType: null,
         lastLoginTs: null,
         privateCidrList: null,
-        enableDebugLogs: null
+        enableDebugLogs: null,
+        filterHeaderValueMap: null
     },
     getters: {
         getId: (state) => state.id,
@@ -35,7 +36,8 @@ const team = {
         getSetupType: (state) => state.setupType,
         getLastLoginTs: (state) => state.lastLoginTs,
         getPrivateCidrList: (state) => state.privateCidrList,
-        getEnableDebugLogs: (state) => state.enableDebugLogs
+        getEnableDebugLogs: (state) => state.enableDebugLogs,
+        getfilterHeaderValueMap: (state) => state.filterHeaderValueMap
     },
     mutations: {
         SET_TEAM_DETAILS(state, details) {
@@ -61,6 +63,7 @@ const team = {
                 state.setupType = "PROD"
                 state.mergeAsyncOutside = false
                 state.enableDebugLogs = false
+                state.filterHeaderValueMap = null
             } else {
                 state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
                 state.apiRuntimeVersion = resp.accountSettings.apiRuntimeVersion ? resp.accountSettings.apiRuntimeVersion : "-"
@@ -71,6 +74,7 @@ const team = {
                 state.mergeAsyncOutside = resp.accountSettings.mergeAsyncOutside || false
                 state.privateCidrList = resp.accountSettings.privateCidrList
                 state.enableDebugLogs = resp.accountSettings.enableDebugLogs
+                state.filterHeaderValueMap = resp.accountSettings.filterHeaderValueMap
             }
         },
         SET_USER_INFO(state, resp) {
@@ -128,6 +132,14 @@ const team = {
                 api.getTeamData().then((resp) => {
                     commit('SET_TEAM_DETAILS', resp)
                 })
+                return resp
+            })
+        },
+        addFilterHeaderValueMap({commit, dispatch}, {filterHeaderValueMapKey, filterHeaderValueMapValue}) {
+            let filterHeaderValueMap = {};
+            filterHeaderValueMap[filterHeaderValueMapKey] = filterHeaderValueMapValue
+            return api.addFilterHeaderValueMap(filterHeaderValueMap).then(resp => {
+                console.log(resp);
                 return resp
             })
         },

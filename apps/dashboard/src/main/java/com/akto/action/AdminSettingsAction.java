@@ -6,7 +6,9 @@ import com.akto.dto.*;
 import com.akto.runtime.Main;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
+import org.bson.conversions.Bson;
 
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -117,6 +119,24 @@ public class AdminSettingsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+
+    private Map<String, String> filterHeaderValueMap;
+
+    public String addFilterHeaderValueMap() {
+        Bson update;
+        if (this.filterHeaderValueMap == null) {
+            update = Updates.unset(AccountSettings.FILTER_HEADER_VALUE_MAP);
+        } else {
+            update = Updates.set(AccountSettings.FILTER_HEADER_VALUE_MAP, this.filterHeaderValueMap);
+        }
+
+        AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(), update
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
     public AccountSettings getAccountSettings() {
         return this.accountSettings;
     }
@@ -140,4 +160,9 @@ public class AdminSettingsAction extends UserAction {
     public void setEnableDebugLogs(boolean enableDebugLogs) {
         this.enableDebugLogs = enableDebugLogs;
     }
+
+    public void setFilterHeaderValueMap(Map<String, String> filterHeaderValueMap) {
+        this.filterHeaderValueMap = filterHeaderValueMap;
+    }
+    
 }
