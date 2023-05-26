@@ -22,6 +22,7 @@ public class TestConfig {
     private ConfigParserResult validation;
     private String content;
     private GlobalEnums.YamlTemplateSource templateSource;
+    private int updateTs;
 
     public TestConfig(String id, Info info, Auth auth, ConfigParserResult apiSelectionFilters, Map<String, List<String>> wordlists, ExecutorConfigParserResult execute, 
         ConfigParserResult validation) {
@@ -107,5 +108,13 @@ public class TestConfig {
 
     public void setTemplateSource(GlobalEnums.YamlTemplateSource templateSource) {
         this.templateSource = templateSource;
+    }
+
+    public int getUpdateTs() {
+        return updateTs;
+    }
+
+    public void setUpdateTs(int updateTs) {
+        this.updateTs = updateTs;
     }
 }
