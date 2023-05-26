@@ -126,7 +126,7 @@
     "GetAktoSetupDetails": {
       "Type": "AWS::Lambda::Function",
       "Properties": {
-        "Runtime": "nodejs12.x",
+        "Runtime": "nodejs18.x",
         "Timeout": 60,
         "Role": {
           "Fn::GetAtt": [
@@ -195,7 +195,7 @@
       "Properties": {
         "Description": "Look up info from a VPC",
         "Handler": "index.handler",
-        "Runtime": "nodejs12.x",
+        "Runtime": "nodejs18.x",
         "Timeout": 30,
         "Role": {
           "Fn::GetAtt": [
@@ -373,7 +373,7 @@
       "Type": "AWS::Lambda::Function",
       "Properties": {
         "Handler": "index.handler",
-        "Runtime": "nodejs12.x",
+        "Runtime": "nodejs18.x",
         "Timeout": 30,
         "Role": {
           "Fn::GetAtt": [
@@ -701,7 +701,7 @@
       "Type": "AWS::Lambda::Function",
       "Properties": {
         "Handler": "index.handler",
-        "Runtime": "nodejs12.x",
+        "Runtime": "nodejs18.x",
         "Timeout": 30,
         "Role": {
           "Fn::GetAtt": [
@@ -718,7 +718,7 @@
       "Type": "AWS::Lambda::Function",
       "Properties": {
         "Handler": "index.handler",
-        "Runtime": "nodejs12.x",
+        "Runtime": "nodejs18.x",
         "Timeout": 30,
         "Role": {
           "Fn::GetAtt": [
