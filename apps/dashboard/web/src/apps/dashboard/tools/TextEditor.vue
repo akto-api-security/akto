@@ -21,6 +21,36 @@
                                     </span>
                                 </div>
 
+                                <v-list dense nav v-if="customToggle" class="tests-list">
+                                    <v-list-group v-for="item in customTestCategories" :key="item.displayName"
+                                        class="tests-category-container" active-class="tests-category-container-active">
+                                        <template v-slot:prependIcon>
+                                            <v-icon color="var(--lighten1)" size=16>$fas_angle-right</v-icon>
+                                        </template>
+                                        <template v-slot:appendIcon>
+                                            <span class="total-tests">{{ customTestObj[item.name].all.length }}</span>
+                                        </template>
+                                        <template v-slot:activator>
+                                            <v-list-item-content>
+                                                <v-list-item-title>
+                                                    <div class="test-category-name">
+                                                        <v-icon class="test-icons">$far_folder</v-icon>
+                                                        {{ item.name }}
+                                                    </div>
+                                                </v-list-item-title>
+                                            </v-list-item-content>
+                                        </template>
+
+                                        <v-list-item v-for="(test, index) in customTestObj[item.name].all" :key="index"
+                                            class="test-container">
+                                            <v-list-item-content>
+                                                <v-list-item-title v-text="test.label" class="test-name"
+                                                    @click="changeValue(test.label), setSelectedMethod(test.value)" />
+                                            </v-list-item-content>
+                                        </v-list-item>
+                                    </v-list-group>
+                                </v-list>
+
                                 <div class="main-list-title" @click="toggleListDisplay('akto')">
                                     <v-icon size=18
                                         :style="{ transform: aktoToggle ? 'rotate(90deg)' : '', transition: 'all 0.2s linear', color: 'var(--lighten2)' }">$fas_angle-right</v-icon>
@@ -198,12 +228,12 @@ export default {
                 automaticLayout: true,
                 colorDecorations: true,
                 scrollBeyondLastLine: false
-
             },
             textEditor: null,
             searchText: "",
             testCategories: [],
             testsObj: {},
+            customTestObj: {},
             businessLogicSubcategories: [],
             vulnerableRequests: [],
             mapTestToYaml: {},
@@ -233,7 +263,6 @@ export default {
             dialogBox: false,
             testingRunResult: {},
             testingRunHexId: null
-
         }
     },
     methods: {
@@ -247,6 +276,7 @@ export default {
                 this.makeJson()
             } else if (param === 'save') {
                 this.$store.dispatch('testing/addTestTemplate', { content: this.textEditor.getValue(), testId: formValues.name, testCategory: formValues.category })
+                location.reload()
             }
         },
         setSelectedMethod(testId) {
@@ -362,7 +392,9 @@ export default {
         },
         populateMapCategoryToSubcategory() {
             let ret = {}
+            this.customTestObj={}
             this.mapTestToYaml = {}
+            this.totalCustomTests = 0
             this.businessLogicSubcategories.forEach(x => {
                 if (!ret[x.superCategory.name]) {
                     ret[x.superCategory.name] = { all: [] }
@@ -373,9 +405,17 @@ export default {
                     icon: "$aktoWhite"
                 }
                 this.mapTestToYaml[x.testName] = x.content
-                ret[x.superCategory.name].all.push(obj)
+                if(x.templateSource._name === "CUSTOM"){
+                    this.totalCustomTests++
+                    if (!this.customTestObj[x.superCategory.name]) {
+                        this.customTestObj[x.superCategory.name] = { all: [] }
+                    }
+                    this.customTestObj[x.superCategory.name].all.push(obj)
+                }else{
+                    ret[x.superCategory.name].all.push(obj)
+                }
             })
-            this.totalAktoTests = this.businessLogicSubcategories.length
+            this.totalAktoTests = this.businessLogicSubcategories.length - this.totalCustomTests
             return ret
         },
         mapRequests() {
@@ -424,6 +464,15 @@ export default {
             let arr = []
             this.testCategories.forEach((test) => {
                 if (this.testsObj[test.name]) {
+                    arr.push(test)
+                }
+            })
+            return arr
+        },
+        customTestCategories() {
+            let arr = []
+            this.testCategories.forEach((test) => {
+                if (this.customTestObj[test.name]) {
                     arr.push(test)
                 }
             })
