@@ -192,19 +192,11 @@ export default {
         tab: obj.strN
     },
     data() {
-        let maxRequestsValues = [
-            { "label": 10, click: () => this.setMaxRequestsPerMin(10, 10) },
-            { "label": 20, click: () => this.setMaxRequestsPerMin(20, 20) },
-            { "label": 30, click: () => this.setMaxRequestsPerMin(30, 30) },
-            { "label": 60, click: () => this.setMaxRequestsPerMin(60, 60) },
-            { "label": 80, click: () => this.setMaxRequestsPerMin(80, 80) },
-            { "label": 100, click: () => this.setMaxRequestsPerMin(100, 100) },
-            { "label": 200, click: () => this.setMaxRequestsPerMin(200, 200) },
-            { "label": 300, click: () => this.setMaxRequestsPerMin(300, 300) },
-            { "label": 400, click: () => this.setMaxRequestsPerMin(400, 400) },
-            { "label": 600, click: () => this.setMaxRequestsPerMin(600, 600) },
-            { "label": 1000, click: () => this.setMaxRequestsPerMin(1000, 1000) }
-        ]
+        let requestPerMinValues = [10, 20, 30, 60, 80, 100, 200, 300, 400, 600, 1000]
+        let maxRequestsValues = requestPerMinValues.reduce((acc, val) => {
+            acc.push({ "label": val, click: () => this.setMaxRequestsPerMin(val, val) })
+            return acc
+        }, [])
         return {
             originalDbState: null,
             stepBuilder: false,
