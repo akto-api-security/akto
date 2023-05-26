@@ -1,6 +1,7 @@
 package com.akto.dto;
 
 import java.util.List;
+import java.util.Map;
 
 public class AccountSettings {
     private int id;
@@ -41,6 +42,9 @@ public class AccountSettings {
     public static final String ENABLE_DEBUG_LOGS = "enableDebugLogs";
 
     public static final String INIT_STACK_TYPE = "initStackType";
+
+    private Map<String, String> filterHeaderValueMap;
+    public static final String FILTER_HEADER_VALUE_MAP = "filterHeaderValueMap";
 
     public AccountSettings() {
     }
@@ -177,5 +181,13 @@ public class AccountSettings {
 
     public void setEnableDebugLogs(boolean enableDebugLogs) {
         this.enableDebugLogs = enableDebugLogs;
+    }
+
+    public Map<String, String> getFilterHeaderValueMap() {
+        return filterHeaderValueMap;
+    }
+
+    public void setFilterHeaderValueMap(Map<String, String> filterHeaderValueMap) {
+        this.filterHeaderValueMap = filterHeaderValueMap;
     }
 }
