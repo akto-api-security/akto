@@ -1,5 +1,7 @@
 package com.akto.dto.test_editor;
 
+import com.akto.util.enums.GlobalEnums;
+
 import java.util.List;
 import java.util.Map;
 
@@ -19,6 +21,8 @@ public class TestConfig {
 
     private ConfigParserResult validation;
     private String content;
+    private GlobalEnums.YamlTemplateSource templateSource;
+    private int updateTs;
 
     public TestConfig(String id, Info info, Auth auth, ConfigParserResult apiSelectionFilters, Map<String, List<String>> wordlists, ExecutorConfigParserResult execute, 
         ConfigParserResult validation) {
@@ -96,5 +100,21 @@ public class TestConfig {
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public GlobalEnums.YamlTemplateSource getTemplateSource() {
+        return templateSource;
+    }
+
+    public void setTemplateSource(GlobalEnums.YamlTemplateSource templateSource) {
+        this.templateSource = templateSource;
+    }
+
+    public int getUpdateTs() {
+        return updateTs;
+    }
+
+    public void setUpdateTs(int updateTs) {
+        this.updateTs = updateTs;
     }
 }
