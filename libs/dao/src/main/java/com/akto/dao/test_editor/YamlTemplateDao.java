@@ -23,6 +23,7 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
                 TestConfig testConfig = TestConfigYamlParser.parseTemplate(yamlTemplate.getContent());
                 if (includeYamlContent) {
                     testConfig.setContent(yamlTemplate.getContent());
+                    testConfig.setTemplateSource(yamlTemplate.getSource());
                 }
                 testConfigMap.put(testConfig.getId(), testConfig);
             } catch (Exception e) {
