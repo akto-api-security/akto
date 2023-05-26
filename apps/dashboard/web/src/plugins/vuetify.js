@@ -24,6 +24,8 @@ import DeleteIcon from "../apps/dashboard/shared/icons/DeleteIcon"
 import PlusIcon from "../apps/dashboard/shared/icons/PlusIcon"
 import CICDIcon from "../apps/dashboard/shared/icons/CICDIcon"
 import ChatGPT from "../apps/dashboard/shared/icons/ChatGPT"
+import SaveIcon from "../apps/dashboard/shared/icons/SaveIcon"
+import TestEditorIcon from "../apps/dashboard/shared/icons/TestEditorIcon"
 
 Vue.component('font-awesome-icon', FontAwesomeIcon)
 
@@ -276,6 +278,14 @@ faIconsOpts.nginx = {
 
 faIconsOpts.chatGPT = {
   component: ChatGPT
+}
+
+faIconsOpts.saveIcon = {
+  component: SaveIcon
+}
+
+faIconsOpts.testEditorIcon = {
+  component: TestEditorIcon
 }
 
 faIcons.forEach(x => faIconsOpts[x.prefix+"_"+x.iconName] = {

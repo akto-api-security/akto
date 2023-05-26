@@ -168,6 +168,9 @@ export default {
     .dropdown-menu >>> .v-list-item {
         min-height: 30px !important;
     }
+    .dropdown-menu >>> .v-menu__content{
+        max-height: 130px !important;
+    }
     .light-btn{
         border: 1px solid var(--borderColor) !important;
         color: var(--themeColorDark) !important;

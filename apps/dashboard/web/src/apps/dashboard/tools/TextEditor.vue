@@ -33,9 +33,9 @@
                                         <template v-slot:activator>
                                             <v-list-item-content>
                                                 <v-list-item-title>
-                                                    <div class="test-category-name">
+                                                    <div class="test-category-name show-overflow">
                                                         <v-icon class="test-icons">$far_folder</v-icon>
-                                                        {{ item.name }}
+                                                        {{ item.displayName }}
                                                     </div>
                                                 </v-list-item-title>
                                             </v-list-item-content>
@@ -44,7 +44,7 @@
                                         <v-list-item v-for="(test, index) in customTestObj[item.name].all" :key="index"
                                             class="test-container">
                                             <v-list-item-content>
-                                                <v-list-item-title v-text="test.label" class="test-name"
+                                                <v-list-item-title v-text="test.label" class="test-name show-overflow"
                                                     @click="changeValue(test.label), setSelectedMethod(test.value)" />
                                             </v-list-item-content>
                                         </v-list-item>
@@ -76,9 +76,9 @@
                                         <template v-slot:activator>
                                             <v-list-item-content>
                                                 <v-list-item-title>
-                                                    <div class="test-category-name">
+                                                    <div class="test-category-name show-overflow">
                                                         <v-icon class="test-icons">$far_folder</v-icon>
-                                                        {{ item.name }}
+                                                        {{ item.displayName }}
                                                     </div>
                                                 </v-list-item-title>
                                             </v-list-item-content>
@@ -87,7 +87,7 @@
                                         <v-list-item v-for="(test, index) in testsObj[item.name].all" :key="index"
                                             class="test-container">
                                             <v-list-item-content>
-                                                <v-list-item-title v-text="test.label" class="test-name"
+                                                <v-list-item-title v-text="test.label" class="test-name show-overflow"
                                                     @click="changeValue(test.label), setSelectedMethod(test.value)" />
                                             </v-list-item-content>
                                         </v-list-item>
@@ -108,7 +108,7 @@
                             </div>
                             <div class="file-title" :style="{ cursor: IsEdited ? 'pointer' : '' }"
                                 @click="openDialogBox('save')">
-                                <v-icon :style="{ opacity: IsEdited ? '1' : '0.4' }" size=14>$aktoWhite</v-icon>
+                                <v-icon :style="{ opacity: IsEdited ? '1' : '0.4' }" size=16>$saveIcon</v-icon>
                                 <span class="file-name" :style="{ opacity: IsEdited ? '1' : '0.2' }">Save</span>
                             </div>
                         </div>
@@ -127,7 +127,7 @@
                         </div>
                         <div class="select-url" @click="openDialogBox('choose')">
                             <v-icon size=12>$fas_check</v-icon>
-                            <span class="file-name url-name">{{ selectedUrl.url }}</span>
+                            <span class="file-name url-name show-overflow">{{ selectedUrl.url }}</span>
                         </div>
                         <div class="footer-div">
                             <div class="show-run-test" v-if="!runTest">
@@ -689,6 +689,7 @@ export default {
             font-size: 14px;
             color: var(--themeColorDark);
             font-weight: 500;
+            max-width: 150px !important;
 
             .test-icons {
                 color: var(--black);
@@ -705,13 +706,6 @@ export default {
                 font-size: 12px;
                 font-weight: 500;
                 padding-left: 62px;
-                overflow: hidden;
-                white-space: nowrap;
-
-                &:hover {
-                    overflow: visible;
-                    white-space: normal;
-                }
             }
         }
     }
@@ -748,16 +742,18 @@ export default {
 
     .url-name {
         font-size: 12px !important;
-        overflow: hidden;
-        white-space: nowrap;
-        text-overflow: ellipsis;
         word-break: break-all;
-        line-height: 120%;
+    }
+}
+.show-overflow{
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    line-height: 120%;
 
-        &:hover {
-            overflow: visible;
-            white-space: normal;
-        }
+    &:hover {
+        overflow: visible;
+        white-space: normal;
     }
 }
 </style>
