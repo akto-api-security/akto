@@ -73,11 +73,11 @@ export default {
             return resp
         })        
     },
-    addTestTemplate(content) {
+    addTestTemplate(content,testId, testCategory) {
         return request({
             url: '/api/saveTestEditorFile',
             method: 'post',
-            data:{content}
+            data:{content, testId, testCategory}
         }).then((resp) => {
             return resp
         })

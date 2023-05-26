@@ -114,7 +114,7 @@ export default {
         currentParam(newVal){
             if(newVal === 'save'){
                 this.field1 = {
-                    span_text: 'Test Name',
+                    span_text: 'Test Id',
                 }
                 this.field2 = {
                     span_text: 'Category',

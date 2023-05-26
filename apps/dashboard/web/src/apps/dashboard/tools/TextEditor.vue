@@ -245,6 +245,8 @@ export default {
                     method: formValues.url.method
                 }
                 this.makeJson()
+            } else if (param === 'save') {
+                this.$store.dispatch('testing/addTestTemplate', { content: this.textEditor.getValue(), testId: formValues.name, testCategory: formValues.category })
             }
         },
         setSelectedMethod(testId) {
