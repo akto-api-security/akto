@@ -16,6 +16,8 @@ import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.type.URLMethods;
 import com.akto.util.enums.GlobalEnums;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
@@ -59,10 +61,27 @@ public class SaveTestEditorAction extends UserAction {
     public String saveTestEditorFile() {
         TestConfig testConfig;
         try {
+            ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+
+            Map<String, Object> config = mapper.readValue(content, Map.class);
+            config.replace("id", testId);
+
+            Object info = config.get("info");
+            if (info != null) {
+                Map<String, Object> infoMap = (Map<String, Object>) info;
+                Object category = infoMap.get("category");
+                if (category != null) {
+                    Map<String, Object> categoryMap = (Map<String, Object>) category;
+                    categoryMap.replace("name", testCategory.getName());
+                    categoryMap.replace("displayName", testCategory.getDisplayName());
+                    categoryMap.replace("shortName", testCategory.getShortName());
+                }
+            }
+            this.content = mapper.writeValueAsString(config);
             testConfig = TestConfigYamlParser.parseTemplate(content);
-            testConfig.setId(testId);
-            Category category = new Category(testCategory.getName(), testCategory.getDisplayName(), testCategory.getShortName());
-            testConfig.getInfo().setCategory(category);
+//            testConfig.setId(testId);
+//            Category category = new Category(testCategory.getName(), testCategory.getDisplayName(), testCategory.getShortName());
+//            testConfig.getInfo().setCategory(category);
         } catch (Exception e) {
             e.printStackTrace();
             addActionError(e.getMessage());
