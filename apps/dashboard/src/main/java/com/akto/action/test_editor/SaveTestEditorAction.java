@@ -9,15 +9,18 @@ import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
+import com.akto.dto.test_editor.Category;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.type.URLMethods;
+import com.akto.util.enums.GlobalEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
+import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.io.File;
@@ -37,9 +40,10 @@ public class SaveTestEditorAction extends UserAction {
 
     private String content;
     private String testingRunHexId;
-    private String templateSource;
     private BasicDBObject apiInfoKey;
     private TestingRunResult testingRunResult;
+    private GlobalEnums.TestCategory testCategory;
+    private String testId;
     public String fetchTestingRunResultFromTestingRun() {
         if (testingRunHexId == null) {
             addActionError("testingRunHexId is null");
@@ -56,21 +60,15 @@ public class SaveTestEditorAction extends UserAction {
         TestConfig testConfig;
         try {
             testConfig = TestConfigYamlParser.parseTemplate(content);
+            testConfig.setId(testId);
+            Category category = new Category(testCategory.getName(), testCategory.getDisplayName(), testCategory.getShortName());
+            testConfig.getInfo().setCategory(category);
         } catch (Exception e) {
             e.printStackTrace();
             addActionError(e.getMessage());
             return ERROR.toUpperCase();
         }
 
-        if (testConfig == null) {
-            addActionError("testConfig is null");
-            return ERROR.toUpperCase();
-        }
-
-        if (apiInfoKey == null) {
-            addActionError("apiInfoKey is null");
-            return ERROR.toUpperCase();
-        }
         String id = testConfig.getId();
 
         int createdAt = Context.now();
@@ -78,10 +76,8 @@ public class SaveTestEditorAction extends UserAction {
         String author = getSUser().getLogin();
 
 
-        //todo: @shivam modify this part when yaml template is bootstrapped via script in RuntimeInitializer
-        YamlTemplateSource source = templateSource == null? YamlTemplateSource.AKTO_TEMPLATES : YamlTemplateSource.valueOf(templateSource);
         YamlTemplate template = YamlTemplateDao.instance.findOne(Filters.eq("_id", id));
-        if (template == null || template.getSource() == YamlTemplateSource.CUSTOM || source == YamlTemplateSource.AKTO_TEMPLATES) {
+        if (template == null || template.getSource() == YamlTemplateSource.CUSTOM) {
             YamlTemplateDao.instance.updateOne(
                     Filters.eq("_id", id),
                     Updates.combine(
@@ -90,9 +86,12 @@ public class SaveTestEditorAction extends UserAction {
                             Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
                             Updates.set(YamlTemplate.CONTENT, content),
                             Updates.set(YamlTemplate.INFO, testConfig.getInfo()),
-                            Updates.set(YamlTemplate.SOURCE, source)
+                            Updates.setOnInsert(YamlTemplate.SOURCE, YamlTemplateSource.CUSTOM)
                     )
             );
+        } else {
+            addActionError("Cannot update akto templates");
+            return ERROR.toUpperCase();
         }
         return SUCCESS.toUpperCase();
     }
@@ -202,14 +201,6 @@ public class SaveTestEditorAction extends UserAction {
         this.testingRunHexId = testingRunHexId;
     }
 
-    public String getTemplateSource() {
-        return templateSource;
-    }
-
-    public void setTemplateSource(String templateSource) {
-        this.templateSource = templateSource;
-    }
-
     public BasicDBObject getApiInfoKey() {
         return apiInfoKey;
     }
@@ -224,5 +215,21 @@ public class SaveTestEditorAction extends UserAction {
 
     public void setTestingRunResult(TestingRunResult testingRunResult) {
         this.testingRunResult = testingRunResult;
+    }
+
+    public GlobalEnums.TestCategory getTestCategory() {
+        return testCategory;
+    }
+
+    public void setTestCategory(GlobalEnums.TestCategory testCategory) {
+        this.testCategory = testCategory;
+    }
+
+    public String getTestId() {
+        return testId;
+    }
+
+    public void setTestId(String testId) {
+        this.testId = testId;
     }
 }
