@@ -35,7 +35,8 @@ public class GlobalEnums {
         UHM("UHM", Severity.LOW, "Unnecessary HTTP Methods (UHM)", "Unnecessary HTTP Methods"),
         VEM("VEM", Severity.LOW, "Verbose Error Messages (VEM)", "Verbose Error Messages"),
         MHH("MHH", Severity.LOW, "Misconfigured HTTP Headers (MHH)", "Misconfigured HTTP Headers"),
-        SVD("SVD", Severity.LOW, "Server Version Disclosure (SVD)", "Server Version Disclosure");
+        SVD("SVD", Severity.LOW, "Server Version Disclosure (SVD)", "Server Version Disclosure"),
+        SI("SI", Severity.HIGH, "SQL Injection (SI)", "SQL Injection");
 
         private final String name;
         private final Severity severity;
