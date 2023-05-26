@@ -3,6 +3,7 @@ package com.akto.utils;
 import com.akto.analyser.ResourceAnalyser;
 import com.akto.dao.ThirdPartyAccessDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
@@ -259,6 +260,7 @@ public class Utils {
 
         if(skipKafka) {
             SingleTypeInfo.fetchCustomDataTypes(); //todo:
+            responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()));
             APICatalogSync apiCatalogSync = RuntimeListener.httpCallParser.syncFunction(responses, true, false);
             RuntimeListener.aktoPolicy.main(responses,true, false);
             for (HttpResponseParams responseParams: responses)  {
