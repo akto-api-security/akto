@@ -67,9 +67,16 @@ public class SaveTestEditorAction extends UserAction {
             config.replace("id", testId);
 
             Object info = config.get("info");
+            String testName; 
             if (info != null) {
                 Map<String, Object> infoMap = (Map<String, Object>) info;
                 Object category = infoMap.get("category");
+                testName = infoMap.get("name").toString();
+                YamlTemplate template = YamlTemplateDao.instance.findOne(Filters.eq("info.name", testName));
+                if (template != null) {
+                    addActionError("Cannot save template, specify a differnet test name under info tab");
+                    return ERROR.toUpperCase();
+                }
                 if (category != null) {
                     Map<String, Object> categoryMap = (Map<String, Object>) category;
                     categoryMap.replace("name", testCategory.getName());
@@ -109,7 +116,7 @@ public class SaveTestEditorAction extends UserAction {
                     )
             );
         } else {
-            addActionError("Cannot update akto templates");
+            addActionError("Cannot save template, specify a different test id");
             return ERROR.toUpperCase();
         }
         return SUCCESS.toUpperCase();
