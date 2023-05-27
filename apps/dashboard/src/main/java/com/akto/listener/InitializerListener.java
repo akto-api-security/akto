@@ -1067,7 +1067,37 @@ public class InitializerListener implements ServletContextListener {
             for (Map.Entry<String,String> template : templates.entrySet()) {
                 String path = template.getKey();
                 String template_content = template.getValue();
-                storeTestEditorTemplate(path, template_content);
+                
+                TestConfig testConfig = null;
+
+                try {
+                    testConfig = TestConfigYamlParser.parseTemplate(template_content);
+                } catch (Exception e) {
+                    logger.error("invalid parsing yaml template for file " + template_content, e);
+                }
+
+
+                if (testConfig == null) {
+                    logger.error("parsed template for file is null " + path);
+                }
+
+                String id = testConfig.getId();
+
+                int createdAt = Context.now();
+                int updatedAt = Context.now();
+                String author = "AKTO";
+                
+                
+                YamlTemplateDao.instance.updateOne(
+                    Filters.eq("_id", id),
+                    Updates.combine(
+                            Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
+                            Updates.setOnInsert(YamlTemplate.AUTHOR, author),
+                            Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
+                            Updates.set(YamlTemplate.CONTENT, template_content),
+                            Updates.set(YamlTemplate.INFO, testConfig.getInfo())
+                    )
+                );
             }
         }
     }
@@ -1097,9 +1127,31 @@ public class InitializerListener implements ServletContextListener {
             }
             
             for (Map.Entry<String,String> template : templates.entrySet()) {
-                String path = template.getKey();
+                String template_path = template.getKey();
                 String template_content = template.getValue();
-                storeTestEditorTemplate(path, template_content);
+
+                TestConfig testConfig = null;
+
+                try {
+                    testConfig = TestConfigYamlParser.parseTemplate(template_content);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file at path %s %s", template_path, e.toString()), LogDb.DASHBOARD);
+                }
+
+
+                if (testConfig == null) {
+                    loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file at path %s", template_path), LogDb.DASHBOARD);
+                } else {
+                    //todo: Store template only if is_active is true
+                    String id = testConfig.getId();
+
+                    int createdAt = Context.now();
+                    int updatedAt = Context.now();
+                    String author = "AKTO";
+
+                    YamlTemplate yamlTemplate = new YamlTemplate(id, createdAt, author, updatedAt, template_content, testConfig.getInfo());
+                    YamlTemplateDao.instance.insertOne(yamlTemplate);
+                }
             }
 
             BackwardCompatibilityDao.instance.updateOne(
