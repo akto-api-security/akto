@@ -13,15 +13,18 @@ public class YamlTemplate {
     public static final String CONTENT = "content";
     private Info info;
     public static final String INFO = "info";
+    private String sha;
+    public static final String SHA = "sha";
 
 
-    public YamlTemplate(String id, int createdAt, String author, int updatedAt, String content, Info info) {
+    public YamlTemplate(String id, int createdAt, String author, int updatedAt, String content, Info info, String sha) {
         this.id = id;
         this.createdAt = createdAt;
         this.author = author;
         this.updatedAt = updatedAt;
         this.content = content;
         this.info = info;
+        this.sha = sha;
     }
 
     public YamlTemplate() {
@@ -73,5 +76,13 @@ public class YamlTemplate {
 
     public void setInfo(Info info) {
         this.info = info;
+    }
+
+    public String getSha() {
+        return sha;
+    }
+
+    public void setSha(String sha) {
+        this.sha = sha;
     }
 }
