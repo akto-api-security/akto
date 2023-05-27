@@ -1024,39 +1024,6 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 4, TimeUnit.HOURS);
     }
 
-    public static void storeTestEditorTemplate(String path, String template_content) {
-        TestConfig testConfig = null;
-
-        try {
-            testConfig = TestConfigYamlParser.parseTemplate(template_content);
-        } catch (Exception e) {
-            logger.error("invalid parsing yaml template for file " + path, e);
-        }
-
-
-        if (testConfig == null) {
-            logger.error("parsed template for file is null " + path);
-        }
-
-        String id = testConfig.getId();
-
-        int createdAt = Context.now();
-        int updatedAt = Context.now();
-        String author = "AKTO";
-
-        
-        YamlTemplateDao.instance.updateOne(
-            Filters.eq("_id", id),
-            Updates.combine(
-                    Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
-                    Updates.setOnInsert(YamlTemplate.AUTHOR, author),
-                    Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
-                    Updates.set(YamlTemplate.CONTENT, template_content),
-                    Updates.set(YamlTemplate.INFO, testConfig.getInfo())
-            )
-        );
-    }
-
     public static void updateTestEditorTemplatesFromGithub() {   
         loggerMaker.infoAndAddToDb("Updating test template files from Github", LogDb.DASHBOARD);
 
