@@ -837,8 +837,6 @@ public class InitializerListener implements ServletContextListener {
 
     public void loadTemplateFilesFromDirectory(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getLoadTemplateFilesFromDirectory() == 0) {
-            System.out.println("syncing from file");     
-
             //Load Templates from folder when instance is initialized
             Map<String, String> templates = new HashMap<>();
 
@@ -851,17 +849,20 @@ public class InitializerListener implements ServletContextListener {
             }
 
             // Get templates from files
-            String template = null;
             for (String path: templatePaths) {
                 try {
-                    template = convertStreamToString(InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files/" + path));
-                    templates.put(path, template);
+                    String template_content = convertStreamToString(InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files/" + path));
+                    templates.put(path, template_content);
                 } catch (Exception ex) {
-                    loggerMaker.errorAndAddToDb(String.format("failed to read test yaml path %s %s", template, ex.toString()), LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb(String.format("failed to read test yaml path %s %s", path, ex.toString()), LogDb.DASHBOARD);
                 }
             }
-
-            storeTestEditorTemplates(templates);
+            
+            for (Map.Entry<String,String> template : templates.entrySet()) {
+                String path = template.getKey();
+                String template_content = template.getValue();
+                storeTestEditorTemplate(path, template_content);
+            }
 
             BackwardCompatibilityDao.instance.updateOne(
                     Filters.eq("_id", backwardCompatibility.getId()),
@@ -1051,7 +1052,7 @@ public class InitializerListener implements ServletContextListener {
                 DaoInit.init(new ConnectionString(mongoURI));
                 Context.accountId.set(1_000_000);
                 try {
-                    updateTestEditorTemplates();
+                    updateTestEditorTemplatesFromGithub();
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(String.format("Error while updating Test Editor Files %s", e.toString()), LogDb.DASHBOARD);
                 }
@@ -1059,50 +1060,49 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 4, TimeUnit.HOURS);
     }
 
-    public static void storeTestEditorTemplates(Map<String, String> templates) {
-        for (Map.Entry<String,String> template : templates.entrySet()) {
-            String path = template.getKey();
-            String template_content = template.getValue();
-            TestConfig testConfig = null;
+    public static void storeTestEditorTemplate(String path, String template_content) {
+        TestConfig testConfig = null;
 
-            try {
-                testConfig = TestConfigYamlParser.parseTemplate(template_content);
-            } catch (Exception e) {
-                logger.error("invalid parsing yaml template for file " + path, e);
-            }
+        try {
+            testConfig = TestConfigYamlParser.parseTemplate(template_content);
+        } catch (Exception e) {
+            logger.error("invalid parsing yaml template for file " + path, e);
+        }
 
 
-            if (testConfig == null) {
-                logger.error("parsed template for file is null " + path);
-            }
+        if (testConfig == null) {
+            logger.error("parsed template for file is null " + path);
+        }
 
-            String id = testConfig.getId();
+        String id = testConfig.getId();
 
-            int createdAt = Context.now();
-            int updatedAt = Context.now();
-            String author = "AKTO";
+        int createdAt = Context.now();
+        int updatedAt = Context.now();
+        String author = "AKTO";
 
-            
-            YamlTemplateDao.instance.updateOne(
-                Filters.eq("_id", id),
-                Updates.combine(
-                        Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
-                        Updates.setOnInsert(YamlTemplate.AUTHOR, author),
-                        Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
-                        Updates.set(YamlTemplate.CONTENT, template_content),
-                        Updates.set(YamlTemplate.INFO, testConfig.getInfo())
-                )
-            );
-        }     
+        
+        YamlTemplateDao.instance.updateOne(
+            Filters.eq("_id", id),
+            Updates.combine(
+                    Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
+                    Updates.setOnInsert(YamlTemplate.AUTHOR, author),
+                    Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
+                    Updates.set(YamlTemplate.CONTENT, template_content),
+                    Updates.set(YamlTemplate.INFO, testConfig.getInfo())
+            )
+        );
     }
 
-    public static void updateTestEditorTemplates() {   
-        System.out.println("syncing from github");     
+    public static void updateTestEditorTemplatesFromGithub() {   
         GithubSync githubSync = new GithubSync();
         Map<String, String> templates = githubSync.syncDir("akto-api-security/akto", "apps/dashboard/src/main/resources/inbuilt_test_yaml_files/");
 
         if (templates != null) {
-           storeTestEditorTemplates(templates);
+            for (Map.Entry<String,String> template : templates.entrySet()) {
+                String path = template.getKey();
+                String template_content = template.getValue();
+                storeTestEditorTemplate(path, template_content);
+            }
         }
     }
 
