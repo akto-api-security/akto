@@ -14,6 +14,8 @@ import okhttp3.ResponseBody;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.akto.github.GithubFile;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 
@@ -22,11 +24,11 @@ public class GithubSync {
     private static final LoggerMaker loggerMaker = new LoggerMaker(GithubSync.class);
     private static final OkHttpClient client = new OkHttpClient();
 
-    public String syncFile(String repo, String filePath) {
+    public String syncFile(String download_url) {
         String fileContents = null; 
 
         Request fileRequest = new Request.Builder()
-                            .url(String.format("https://raw.githubusercontent.com/%s/master/%s", repo, filePath))
+                            .url(download_url)
                             .build();
                             
         try {
@@ -34,46 +36,53 @@ public class GithubSync {
             ResponseBody fileResponseBody = fileResponse.body();
             fileContents = fileResponseBody.string();
         } catch (IOException ex) {
-            loggerMaker.errorAndAddToDb(String.format("Error while syncing file %s in Github repo %s %s ", repo, filePath, ex.toString()), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(String.format("Error while syncing file %s ", download_url), LogDb.DASHBOARD);
         }
         
         return fileContents;
     }
 
-    public Map<String, String> syncDir(String repo, String dirPath) {
-        Map<String, String> dirContents = new HashMap<>();
-
-        // Get Github repo tree - Eg: https://api.github.com/repos/akto-api-security/akto/git/trees/master?recursive=1
-        Request treeRequest = new Request.Builder()
-                .url(String.format("https://api.github.com/repos/%s/git/trees/master?recursive=1", repo))
+    public Map<String, GithubFile> syncDir(String repo, String dirPath, Map<String, String> fileShaCheck) {
+        Map<String, GithubFile> dirContents = new HashMap<>();
+        
+        Request dirRequest = new Request.Builder()
+                .url(String.format("https://api.github.com/repos/%s/contents/%s", repo, dirPath))
                 .build();
 
         try {
-            Response treeResponse = client.newCall(treeRequest).execute();
-            ResponseBody treeResponseBody = treeResponse.body();
+            Response dirResponse = client.newCall(dirRequest).execute();
 
-            if (treeResponseBody != null) {
-                String json = treeResponseBody.string();
-                JSONObject jsonObject = new JSONObject(json);
-                JSONArray tree = jsonObject.getJSONArray("tree");
-                for (Object treeNodeObject : tree) {
-                    JSONObject treeNode = (JSONObject) treeNodeObject;
-                    String path = treeNode.getString("path");
+            if (dirResponse.code() == 404) {
+                loggerMaker.errorAndAddToDb(String.format("Could not retrieve directory contents %s of repo %s", dirPath, repo), LogDb.DASHBOARD);
+                return null;
+            }
+
+            ResponseBody dirResponseBody = dirResponse.body();
+            if (dirResponseBody != null) {
+                String jsonString = dirResponseBody.string();
+                JSONArray dirContentsArray = new JSONArray(jsonString);
+                for (Object file : dirContentsArray) {
+                    JSONObject fileObject = (JSONObject) file;
+                    String filename = fileObject.getString("name");
+                    String filepath = fileObject.getString("path");
+                    String download_url = fileObject.getString("download_url");
+                    String sha = fileObject.getString("sha");
+
+                    //check if file has not been updated
+                    if (fileShaCheck != null) {
+                        if (fileShaCheck.containsKey(filename)) {
+                            if (fileShaCheck.get(filename) == sha){
+                                //skip file
+                                System.out.println(String.format("Skipping File %s", filename));
+                                continue;
+                            }
+                        }
+                    }
                     
                     // Retreive Github file contents 
-                    if(path.contains(dirPath)) {
-                        Request fileRequest = new Request.Builder()
-                            .url(String.format("https://raw.githubusercontent.com/%s/master/%s", repo, path))
-                            .build();
-                        Response fileResponse = client.newCall(fileRequest).execute();
-                        ResponseBody fileResponseBody = fileResponse.body();
-                        String fileContents = fileResponseBody.string();
-                    
-                        String[] pathSplit = path.split("/");
-                        String filename = pathSplit[pathSplit.length - 1];
-                        
-                        dirContents.put(filename, fileContents);
-                    }
+                    String fileContents = syncFile(download_url);
+                    GithubFile githubFile = new GithubFile(filename, filepath, fileContents, sha);
+                    dirContents.put(filename, githubFile);
                 }
             }
         } catch (Exception ex) {

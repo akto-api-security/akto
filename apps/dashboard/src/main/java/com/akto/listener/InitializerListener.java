@@ -32,6 +32,7 @@ import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.github.GithubFile;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.notifications.slack.DailyUpdate;
@@ -930,6 +931,7 @@ public class InitializerListener implements ServletContextListener {
                 PIISourceDao.instance.insertOne(piiSource);
             }
 
+            updateTestEditorTemplatesFromGithub();
             setUpDailyScheduler();
             setUpWebhookScheduler();
             setUpPiiAndTestSourcesScheduler();
@@ -1027,20 +1029,30 @@ public class InitializerListener implements ServletContextListener {
     public static void updateTestEditorTemplatesFromGithub() {   
         loggerMaker.infoAndAddToDb("Updating test template files from Github", LogDb.DASHBOARD);
 
+        //Get existing template sha values 
+        Map<String, String> fileShaCheck = new HashMap<>();
+        List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(new BasicDBObject());
+
+        for(YamlTemplate yamlTemplate: yamlTemplates) {
+            fileShaCheck.put(yamlTemplate.getId(), yamlTemplate.getSha());
+        }
+
         GithubSync githubSync = new GithubSync();
-        Map<String, String> templates = githubSync.syncDir("akto-api-security/akto", "apps/dashboard/src/main/resources/inbuilt_test_yaml_files/");
+        Map<String, GithubFile> templates = githubSync.syncDir("akto-api-security/akto", "apps/dashboard/src/main/resources/inbuilt_test_yaml_files/", fileShaCheck);
 
         if (templates != null) {
-            for (Map.Entry<String,String> template : templates.entrySet()) {
-                String path = template.getKey();
-                String template_content = template.getValue();
+            for (Map.Entry<String, GithubFile> templateEntry : templates.entrySet()) {
+                String path = templateEntry.getKey();
+                GithubFile template = templateEntry.getValue();
+                String templateContent = template.getContent();
+                String sha = template.getSha();
                 
                 TestConfig testConfig = null;
 
                 try {
-                    testConfig = TestConfigYamlParser.parseTemplate(template_content);
+                    testConfig = TestConfigYamlParser.parseTemplate(templateContent);
                 } catch (Exception e) {
-                    logger.error("invalid parsing yaml template for file " + template_content, e);
+                    logger.error("invalid parsing yaml template for file " + templateContent, e);
                 }
 
 
@@ -1049,11 +1061,9 @@ public class InitializerListener implements ServletContextListener {
                 }
 
                 String id = testConfig.getId();
-
                 int createdAt = Context.now();
                 int updatedAt = Context.now();
                 String author = "AKTO";
-                
                 
                 YamlTemplateDao.instance.updateOne(
                     Filters.eq("_id", id),
@@ -1061,8 +1071,9 @@ public class InitializerListener implements ServletContextListener {
                             Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
                             Updates.setOnInsert(YamlTemplate.AUTHOR, author),
                             Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
-                            Updates.set(YamlTemplate.CONTENT, template_content),
-                            Updates.set(YamlTemplate.INFO, testConfig.getInfo())
+                            Updates.set(YamlTemplate.CONTENT, templateContent),
+                            Updates.set(YamlTemplate.INFO, testConfig.getInfo()),
+                            Updates.set(YamlTemplate.SHA, sha)
                     )
                 );
             }
@@ -1086,37 +1097,37 @@ public class InitializerListener implements ServletContextListener {
             // Get templates from files
             for (String path: templatePaths) {
                 try {
-                    String template_content = convertStreamToString(InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files/" + path));
-                    templates.put(path, template_content);
+                    String templateContent = convertStreamToString(InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files/" + path));
+                    templates.put(path, templateContent);
                 } catch (Exception ex) {
                     loggerMaker.errorAndAddToDb(String.format("failed to read test yaml path %s %s", path, ex.toString()), LogDb.DASHBOARD);
                 }
             }
             
             for (Map.Entry<String,String> template : templates.entrySet()) {
-                String template_path = template.getKey();
-                String template_content = template.getValue();
+                String templatePath = template.getKey();
+                String templateContent = template.getValue();
 
                 TestConfig testConfig = null;
 
                 try {
-                    testConfig = TestConfigYamlParser.parseTemplate(template_content);
+                    testConfig = TestConfigYamlParser.parseTemplate(templateContent);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file at path %s %s", template_path, e.toString()), LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file at path %s %s", templatePath, e.toString()), LogDb.DASHBOARD);
                 }
 
 
                 if (testConfig == null) {
-                    loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file at path %s", template_path), LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file at path %s", templatePath), LogDb.DASHBOARD);
                 } else {
                     //todo: Store template only if is_active is true
                     String id = testConfig.getId();
-
                     int createdAt = Context.now();
                     int updatedAt = Context.now();
                     String author = "AKTO";
+                    String sha = "0";
 
-                    YamlTemplate yamlTemplate = new YamlTemplate(id, createdAt, author, updatedAt, template_content, testConfig.getInfo());
+                    YamlTemplate yamlTemplate = new YamlTemplate(id, createdAt, author, updatedAt, templateContent, testConfig.getInfo(), sha);
                     YamlTemplateDao.instance.insertOne(yamlTemplate);
                 }
             }
