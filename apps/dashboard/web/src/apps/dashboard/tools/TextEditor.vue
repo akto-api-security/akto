@@ -5,6 +5,7 @@
                 <div class="d-flex test-editor-panel">
                     <div class="test-col">
                         <layout-with-left-pane>
+                            <search class="search-box" placeholder="Search Tests" @changed="setSearchText" />
                             <div class="tests-container">
                                 <div class="main-list-title" @click="toggleListDisplay('custom')">
                                     <v-icon size=18
@@ -18,8 +19,8 @@
                                     </span>
                                 </div>
 
-                                <v-list dense nav v-if="customToggle" class="tests-list">
-                                    <v-list-group v-for="item in customTestCategories" :key="item.displayName"
+                                <v-list dense nav class="tests-list" :style="{display: !customToggle ? 'none' : ''}">
+                                    <v-list-group v-for="item in selectedTestCategories(customTestObj)" :key="item.displayName"
                                         class="tests-category-container" active-class="tests-category-container-active">
                                         <template v-slot:prependIcon>
                                             <v-icon color="var(--lighten1)" size=16>$fas_angle-right</v-icon>
@@ -58,8 +59,8 @@
                                         {{ totalAktoTests }}
                                     </span>
                                 </div>
-                                <v-list dense nav v-if="aktoToggle" class="tests-list">
-                                    <v-list-group v-for="item in selectedTestCategories" :key="item.displayName"
+                                <v-list dense nav class="tests-list" :style="{display: !aktoToggle ? 'none' : ''}">
+                                    <v-list-group v-for="item in selectedTestCategories(testsObj)" :key="item.displayName"
                                         class="tests-category-container" active-class="tests-category-container-active">
                                         <template v-slot:prependIcon>
                                             <v-icon color="var(--lighten1)" size=16>$fas_angle-right</v-icon>
@@ -96,7 +97,7 @@
                                     Test editor
                                 </span>
                                 <v-icon :style="{ 'cursor': 'pointer' }" size=14>$githubIcon</v-icon>
-                                <!-- <span class="last-edited">(last edited 3 minutes ago)</span> -->
+                                <span class="last-edited" v-if="lastEdited !== -1"> last edited {{ lastEdited }}</span>
                             </div>
                             <div class="file-title" :style="{ cursor: IsEdited ? 'pointer' : '' }"
                                 @click="openDialogBox('save')">
@@ -179,11 +180,11 @@ import SimpleLayout from '../layouts/SimpleLayout.vue';
 import SelectorModal from './SelectorModal.vue';
 import IssuesDialog from '../../dashboard/views/issues/components/IssuesDialog'
 
-
-
 import issuesApi from "../views/issues/api"
 import inventoryApi from "../views/observe/inventory/api"
 import testingApi from "../views/testing/api"
+
+import func from "@/util/func"
 
 import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController';
 import 'monaco-editor/esm/vs/editor/contrib/folding/browser/folding';
@@ -222,13 +223,13 @@ export default {
                 scrollBeyondLastLine: false
             },
             textEditor: null,
-            searchText: "",
             testCategories: [],
             testsObj: {},
             customTestObj: {},
             businessLogicSubcategories: [],
             vulnerableRequests: [],
             mapTestToYaml: {},
+            mapTestToStamp:{},
             totalAktoTests: 0,
             aktoToggle: false,
             customToggle: false,
@@ -254,7 +255,10 @@ export default {
             dialogBoxIssue: {},
             dialogBox: false,
             testingRunResult: {},
-            testingRunHexId: null
+            testingRunHexId: null,
+            lastEdited: -1,
+            copyTestObj: {},
+            copyCustomObj: {},
         }
     },
     methods: {
@@ -369,16 +373,39 @@ export default {
             return this.textEditor.getValue()
         },
         changeValue(testName) {
+            this.lastEdited = -1
             if (!this.mapTestToYaml[testName]) {
                 this.textEditor.setValue('')
             } else {
                 this.textEditor.setValue(this.mapTestToYaml[testName])
                 this.defaultValue = this.textEditor.getValue()
                 this.IsEdited = false
+                this.lastEdited = this.mapTestToStamp[testName]
             }
         },
         setSearchText(val) {
-            this.searchText = val
+            this.testsObj = JSON.parse(JSON.stringify(this.copyTestObj))
+            this.customTestObj = JSON.parse(JSON.stringify(this.copyCustomObj))
+            this.totalCustomTests = this.searchObjects(this.customTestObj, val.toLowerCase())
+            this.totalAktoTests = this.searchObjects(this.testsObj, val.toLowerCase())
+        },
+        searchObjects(objects,searchString) {
+            let totalTests = 0
+            for (let key in objects) {
+                if (objects.hasOwnProperty(key)) {
+                    let obj = objects[key]
+                    let arr = obj.all.filter((test)=>{
+                        let name = test.label.toString().toLowerCase().replace(/ /g, "")
+                        let category = test.category.toString().toLowerCase().replace(/ /g, "")
+                        if(name.includes(searchString) || category.includes(searchString)){
+                            totalTests++
+                            return true
+                        }
+                    })
+                    objects[key].all = arr
+                }
+            }
+            return totalTests
         },
         populateMapCategoryToSubcategory() {
             let ret = {}
@@ -392,9 +419,11 @@ export default {
                 let obj = {
                     label: x.testName,
                     value: x.name,
-                    icon: "$aktoWhite"
+                    icon: "$aktoWhite",
+                    category: x.superCategory.displayName
                 }
                 this.mapTestToYaml[x.testName] = x.content
+                this.mapTestToStamp[x.testName] = func.prettifyEpoch(x.updatedTs)
                 if(x.templateSource._name === "CUSTOM"){
                     this.totalCustomTests++
                     if (!this.customTestObj[x.superCategory.name]) {
@@ -404,6 +433,7 @@ export default {
                 }else{
                     ret[x.superCategory.name].all.push(obj)
                 }
+                this.copyCustomObj = JSON.parse(JSON.stringify(this.customTestObj))
             })
             this.totalAktoTests = this.businessLogicSubcategories.length - this.totalCustomTests
             return ret
@@ -421,6 +451,15 @@ export default {
                 })
             })
         },
+        selectedTestCategories(object) {
+            let arr = []
+            this.testCategories.forEach((test) => {
+                if (object[test.name] && object[test.name].all.length > 0) {
+                    arr.push(test)
+                }
+            })
+            return arr
+        },
     },
     async mounted() {
         this.createEditor()
@@ -431,6 +470,7 @@ export default {
             _this.businessLogicSubcategories = resp.subCategories
             _this.vulnerableRequests = resp.vulnerableRequests
             _this.testsObj = _this.populateMapCategoryToSubcategory()
+            _this.copyTestObj = JSON.parse(JSON.stringify(_this.testsObj))
             _this.mapRequests()
         })
         _this.textEditor.onDidChangeModelContent(() => {
@@ -449,24 +489,6 @@ export default {
                 title: this.messageJson["title"],
                 "highlightPaths": this.messageJson["highlightPaths"],
             }
-        },
-        selectedTestCategories() {
-            let arr = []
-            this.testCategories.forEach((test) => {
-                if (this.testsObj[test.name]) {
-                    arr.push(test)
-                }
-            })
-            return arr
-        },
-        customTestCategories() {
-            let arr = []
-            this.testCategories.forEach((test) => {
-                if (this.customTestObj[test.name]) {
-                    arr.push(test)
-                }
-            })
-            return arr
         },
         getTextColor() {
             switch (this.runTestObj.vulnerability) {
