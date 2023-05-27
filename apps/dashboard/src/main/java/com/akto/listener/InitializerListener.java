@@ -1027,7 +1027,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void updateTestEditorTemplatesFromGithub() {   
-        loggerMaker.infoAndAddToDb("Updating test template files from Github", LogDb.DASHBOARD);
+        logger.info("Updating test template files from Github");
 
         //Get existing template sha values 
         Map<String, String> fileShaCheck = new HashMap<>();
@@ -1041,9 +1041,7 @@ public class InitializerListener implements ServletContextListener {
         Map<String, GithubFile> templates = githubSync.syncDir("akto-api-security/akto", "apps/dashboard/src/main/resources/inbuilt_test_yaml_files/", fileShaCheck);
 
         if (templates != null) {
-            for (Map.Entry<String, GithubFile> templateEntry : templates.entrySet()) {
-                String path = templateEntry.getKey();
-                GithubFile template = templateEntry.getValue();
+            for (GithubFile template : templates.values()) {
                 String templateContent = template.getContent();
                 String sha = template.getSha();
                 
@@ -1052,12 +1050,12 @@ public class InitializerListener implements ServletContextListener {
                 try {
                     testConfig = TestConfigYamlParser.parseTemplate(templateContent);
                 } catch (Exception e) {
-                    logger.error("invalid parsing yaml template for file " + templateContent, e);
+                    loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file %s %s", template.getName(), e.toString()), LogDb.DASHBOARD);
                 }
 
 
                 if (testConfig == null) {
-                    logger.error("parsed template for file is null " + path);
+                    loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file %s %s", template.getName()), LogDb.DASHBOARD);
                 }
 
                 String id = testConfig.getId();
