@@ -931,7 +931,6 @@ public class InitializerListener implements ServletContextListener {
                 PIISourceDao.instance.insertOne(piiSource);
             }
 
-            updateTestEditorTemplatesFromGithub();
             setUpDailyScheduler();
             setUpWebhookScheduler();
             setUpPiiAndTestSourcesScheduler();
@@ -1034,7 +1033,7 @@ public class InitializerListener implements ServletContextListener {
         List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(new BasicDBObject());
 
         for(YamlTemplate yamlTemplate: yamlTemplates) {
-            fileShaCheck.put(yamlTemplate.getId(), yamlTemplate.getSha());
+            fileShaCheck.put(yamlTemplate.getFileName(), yamlTemplate.getSha());
         }
 
         GithubSync githubSync = new GithubSync();
@@ -1043,6 +1042,7 @@ public class InitializerListener implements ServletContextListener {
         if (templates != null) {
             for (GithubFile template : templates.values()) {
                 String templateContent = template.getContent();
+                String fileName = template.getName();
                 String sha = template.getSha();
                 
                 TestConfig testConfig = null;
@@ -1056,24 +1056,25 @@ public class InitializerListener implements ServletContextListener {
 
                 if (testConfig == null) {
                     loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file %s %s", template.getName()), LogDb.DASHBOARD);
+                } else {
+                    String id = testConfig.getId();
+                    int createdAt = Context.now();
+                    int updatedAt = Context.now();
+                    String author = "AKTO";
+                    
+                    YamlTemplateDao.instance.updateOne(
+                        Filters.eq("_id", id),
+                        Updates.combine(
+                                Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
+                                Updates.setOnInsert(YamlTemplate.AUTHOR, author),
+                                Updates.setOnInsert(YamlTemplate.FILE_NAME, fileName),
+                                Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
+                                Updates.set(YamlTemplate.CONTENT, templateContent),
+                                Updates.set(YamlTemplate.INFO, testConfig.getInfo()),
+                                Updates.set(YamlTemplate.SHA, sha)
+                        )
+                    );
                 }
-
-                String id = testConfig.getId();
-                int createdAt = Context.now();
-                int updatedAt = Context.now();
-                String author = "AKTO";
-                
-                YamlTemplateDao.instance.updateOne(
-                    Filters.eq("_id", id),
-                    Updates.combine(
-                            Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
-                            Updates.setOnInsert(YamlTemplate.AUTHOR, author),
-                            Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
-                            Updates.set(YamlTemplate.CONTENT, templateContent),
-                            Updates.set(YamlTemplate.INFO, testConfig.getInfo()),
-                            Updates.set(YamlTemplate.SHA, sha)
-                    )
-                );
             }
         }
     }
@@ -1103,7 +1104,7 @@ public class InitializerListener implements ServletContextListener {
             }
             
             for (Map.Entry<String,String> template : templates.entrySet()) {
-                String templatePath = template.getKey();
+                String fileName = template.getKey();
                 String templateContent = template.getValue();
 
                 TestConfig testConfig = null;
@@ -1111,12 +1112,12 @@ public class InitializerListener implements ServletContextListener {
                 try {
                     testConfig = TestConfigYamlParser.parseTemplate(templateContent);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file at path %s %s", templatePath, e.toString()), LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file  %s %s", fileName, e.toString()), LogDb.DASHBOARD);
                 }
 
 
                 if (testConfig == null) {
-                    loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file at path %s", templatePath), LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file  %s", fileName), LogDb.DASHBOARD);
                 } else {
                     //todo: Store template only if is_active is true
                     String id = testConfig.getId();
@@ -1125,7 +1126,7 @@ public class InitializerListener implements ServletContextListener {
                     String author = "AKTO";
                     String sha = "0";
 
-                    YamlTemplate yamlTemplate = new YamlTemplate(id, createdAt, author, updatedAt, templateContent, testConfig.getInfo(), sha);
+                    YamlTemplate yamlTemplate = new YamlTemplate(id, createdAt, author, updatedAt, templateContent, testConfig.getInfo(), sha, fileName);
                     YamlTemplateDao.instance.insertOne(yamlTemplate);
                 }
             }

@@ -71,9 +71,8 @@ public class GithubSync {
                     //check if file has not been updated
                     if (fileShaCheck != null) {
                         if (fileShaCheck.containsKey(filename)) {
-                            if (fileShaCheck.get(filename) == sha){
+                            if (fileShaCheck.get(filename).equals(sha)){
                                 //skip file
-                                System.out.println(String.format("Skipping File %s", filename));
                                 continue;
                             }
                         }
