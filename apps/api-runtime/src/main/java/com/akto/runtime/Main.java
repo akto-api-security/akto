@@ -127,16 +127,27 @@ public class Main {
     public static class AccountInfo {
         long estimatedCount;
         int lastEstimatedCountTime;
+        AccountSettings accountSettings;
 
         public AccountInfo() {
             this.estimatedCount = 0;
             this.lastEstimatedCountTime = 0;
+            this.accountSettings = null;
         }
 
-        public AccountInfo(long estimatedCount, int lastEstimatedCountTime) {
+        public AccountInfo(long estimatedCount, int lastEstimatedCountTime, AccountSettings accountSettings) {
             this.estimatedCount = estimatedCount;
             this.lastEstimatedCountTime = lastEstimatedCountTime;
+            this.accountSettings = accountSettings;
         }
+
+        public AccountSettings getAccountSettings() {
+            return accountSettings;
+        }
+
+        public void setAccountSettings(AccountSettings accountSettings) {
+            this.accountSettings = accountSettings;
+        }        
     }
 
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
@@ -238,7 +249,6 @@ public class Main {
                         }
 
                         httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
-                         
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb("Error while parsing kafka message " + e, LogDb.RUNTIME);
                         continue;
@@ -271,6 +281,7 @@ public class Main {
                         loggerMaker.infoAndAddToDb("current time: " + Context.now() + " lastEstimatedCountTime: " + accountInfo.lastEstimatedCountTime, LogDb.RUNTIME);
                         accountInfo.lastEstimatedCountTime = Context.now();
                         accountInfo.estimatedCount = SingleTypeInfoDao.instance.getMCollection().estimatedDocumentCount();
+                        accountInfo.setAccountSettings(AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()));
                         loggerMaker.infoAndAddToDb("STI Estimated count: " + accountInfo.estimatedCount, LogDb.RUNTIME);
                     }
 
@@ -309,6 +320,9 @@ public class Main {
 
                     try {
                         List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
+
+                        accWiseResponse = filterBasedOnHeaders(accWiseResponse, accountInfo.accountSettings);
+    
                         APICatalogSync apiCatalogSync = parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI);
 
                         // send to central kafka
@@ -342,6 +356,50 @@ public class Main {
         } finally {
             main.consumer.close();
         }
+    }
+
+    public static List<HttpResponseParams> filterBasedOnHeaders(List<HttpResponseParams> accWiseResponse,
+            AccountSettings accountSettings) {
+
+        if (accountSettings != null) {
+            Map<String, String> filterHeaders = accountSettings.getFilterHeaderValueMap();
+            if (filterHeaders != null && !filterHeaders.isEmpty()) {
+                List<HttpResponseParams> accWiseResponseFiltered = new ArrayList<HttpResponseParams>();
+                for(HttpResponseParams accWiseResponseEntry : accWiseResponse) {
+                    Map<String, List<String>> reqHeaders = accWiseResponseEntry.getRequestParams().getHeaders();
+                    Map<String, List<String>> resHeaders = accWiseResponseEntry.getHeaders();
+
+                    boolean shouldKeep = false;
+                    for(Map.Entry<String, String> filterHeaderKV : filterHeaders.entrySet()) {
+                        try {
+                            List<String> reqHeaderValues = reqHeaders == null ? null : reqHeaders.get(filterHeaderKV.getKey().toLowerCase());
+                            List<String> resHeaderValues = resHeaders == null ? null : resHeaders.get(filterHeaderKV.getKey().toLowerCase());
+
+
+                            boolean isPresentInReq = reqHeaderValues != null && reqHeaderValues.indexOf(filterHeaderKV.getValue()) != -1;
+                            boolean isPresentInRes = resHeaderValues != null && resHeaderValues.indexOf(filterHeaderKV.getValue()) != -1;
+    
+                            shouldKeep = isPresentInReq || isPresentInRes;
+                            
+                            if (!shouldKeep) {
+                                break;
+                            }
+                            
+                        } catch (Exception e) {
+                            // eat it
+                        }
+                    }
+
+                    if (shouldKeep) {
+                        accWiseResponseFiltered.add(accWiseResponseEntry);
+                    }
+                }
+
+                accWiseResponse = accWiseResponseFiltered;
+            }
+        }
+
+        return accWiseResponse;
     }
 
     public static void initializeRuntime(){
