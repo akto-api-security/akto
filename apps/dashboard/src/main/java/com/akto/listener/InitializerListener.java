@@ -1025,6 +1025,14 @@ public class InitializerListener implements ServletContextListener {
         List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(new BasicDBObject());
 
         for(YamlTemplate yamlTemplate: yamlTemplates) {
+            String fileName = yamlTemplate.getFileName();
+            String sha = yamlTemplate.getSha();
+
+            //ignore custom temlates
+            if (fileName == null || fileName == "" || sha == null || sha == "") {
+                continue;
+            }
+
             yamlTemplatesGithubFileSha.put(yamlTemplate.getFileName(), yamlTemplate.getSha());
         }
 
