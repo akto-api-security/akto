@@ -923,6 +923,8 @@ public class InitializerListener implements ServletContextListener {
                 PIISourceDao.instance.insertOne(piiSource);
             }
 
+            //remove later
+            updateTestEditorTemplatesFromGithub();
             setUpDailyScheduler();
             setUpWebhookScheduler();
             setUpPiiAndTestSourcesScheduler();
@@ -1049,6 +1051,20 @@ public class InitializerListener implements ServletContextListener {
                 if (testConfig == null) {
                     loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file %s", template.getName()), LogDb.DASHBOARD);
                 } else {
+                    String dashboardVersion = System.getProperty("akto-image-tag", "latest");
+                    System.out.println(dashboardVersion);
+
+                    String templateVersion = null;
+
+                    if (DashboardMode.isLocalDeployment()) {
+                        //Set to min_akto_version
+                        templateVersion = "1.29.1";
+                    } else {
+                        //Set to min_onprem_Version
+                        templateVersion = "1.30.6";
+                    }
+
+                    
                     String id = testConfig.getId();
                     int createdAt = Context.now();
                     int updatedAt = Context.now();
