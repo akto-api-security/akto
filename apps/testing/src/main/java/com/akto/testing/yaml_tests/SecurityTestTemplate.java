@@ -9,6 +9,9 @@ import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestResult;
 
+import java.util.Collections;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -44,7 +47,11 @@ public abstract class SecurityTestTemplate {
 
     public List<TestResult> run() {
         boolean valid = filter();
-        if (!valid) return null;
+        if (!valid) {
+            List<TestResult> testResults = new ArrayList<>();
+            testResults.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList("Request API failed to satisfy api_selection_filters block, skipping execution"), 0, false, TestResult.Confidence.HIGH, null));
+            return testResults;
+        }
         List<ExecutionResult> attempts = executor();
         return validator(attempts);
     }
