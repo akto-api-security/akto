@@ -69,12 +69,6 @@ import java.util.*;
                      }
                  }
 
-                 if (paginatedKeyPresent == null) {
-                     loggerMaker.infoAndAddToDb("No paginated keyword found for endpoint: " + req.getUrl() + " skipping this endpoint", LoggerMaker.LogDb.TESTING);
-                     continue;
-                 }
-
-
                  //modify query param
                  String modifiedQueryParamString = OriginalHttpRequest.getRawQueryFromJson(queryParams.toJson());
                  if (modifiedQueryParamString != null) {

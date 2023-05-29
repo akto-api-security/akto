@@ -10,7 +10,7 @@
                 :items="apiCollectionsForTable"  
                 :actions="actions"
                 name="API Collections" 
-                sortKeyDefault="endpoints" 
+                sortKeyDefault="endpoints"
                 :sortDescDefault="true"   
                 @rowClicked=rowClicked
                 hide-default-footer ="true"
@@ -154,8 +154,8 @@ export default {
                 this.$store.dispatch('collections/loadAllApiCollections')
             }
         },
-        rowClicked(item) {
-            this.$emit("selectedItem", {type: 1, collectionName: item.name, apiCollectionId: item.id})
+        rowClicked(item, $event) {
+            this.$emit("selectedItem", {type: 1, collectionName: item.name, apiCollectionId: item.id}, $event)
         },
         createCollection(name) {
           this.$store.dispatch('collections/createCollection', {name})

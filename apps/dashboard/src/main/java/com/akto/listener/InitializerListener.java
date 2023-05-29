@@ -10,6 +10,8 @@ import com.akto.dao.notifications.CustomWebhooksDao;
 import com.akto.dao.notifications.CustomWebhooksResultDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dao.pii.PIISourceDao;
+import com.akto.dao.test_editor.TestConfigYamlParser;
+import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.*;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
@@ -21,10 +23,13 @@ import com.akto.dto.data_types.Predicate;
 import com.akto.dto.data_types.RegexPredicate;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
+import com.akto.dto.notifications.CustomWebhook.WebhookOptions;
 import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
+import com.akto.dto.test_editor.TestConfig;
+import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
@@ -46,20 +51,27 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
-import com.sendgrid.helpers.mail.Mail;
 import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.checkerframework.checker.units.qual.C;
+import org.checkerframework.checker.units.qual.A;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 import javax.servlet.ServletContextListener;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -361,21 +373,21 @@ public class InitializerListener implements ServletContextListener {
 
                                 loggerMaker.infoAndAddToDb(slackWebhook.toString(), LogDb.DASHBOARD);
 
-                                ChangesInfo ci = getChangesInfo(now - slackWebhook.getLastSentTimestamp(), now - slackWebhook.getLastSentTimestamp());
+                                ChangesInfo ci = getChangesInfo(now - slackWebhook.getLastSentTimestamp(), now - slackWebhook.getLastSentTimestamp(), null, null, false);
                                 if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0) {
                                     return;
                                 }
 
                                 DailyUpdate dailyUpdate = new DailyUpdate(
-                                        0, 0,
-                                        ci.newSensitiveParams.size(), ci.newEndpointsLast7Days.size(),
-                                        ci.recentSentiiveParams, ci.newParamsInExistingEndpoints,
-                                        slackWebhook.getLastSentTimestamp(), now ,
-                                        ci.newSensitiveParams, slackWebhook.getDashboardUrl());
+                                0, 0,
+                                ci.newSensitiveParams.size(), ci.newEndpointsLast7Days.size(),
+                                ci.recentSentiiveParams, ci.newParamsInExistingEndpoints,
+                                slackWebhook.getLastSentTimestamp(), now,
+                                ci.newSensitiveParams, slackWebhook.getDashboardUrl());
 
                                 slackWebhook.setLastSentTimestamp(now);
-                                SlackWebhooksDao.instance.updateOne(eq("webhook",slackWebhook.getWebhook()), Updates.set("lastSentTimestamp", now));
-
+                                SlackWebhooksDao.instance.updateOne(eq("webhook", slackWebhook.getWebhook()), Updates.set("lastSentTimestamp", now));
+                
                                 loggerMaker.infoAndAddToDb("******************DAILY INVENTORY SLACK******************", LogDb.DASHBOARD);
                                 String webhookUrl = slackWebhook.getWebhook();
                                 String payload = dailyUpdate.toJSON();
@@ -417,7 +429,7 @@ public class InitializerListener implements ServletContextListener {
             return;
         }
 
-        ChangesInfo ci = getChangesInfo(now - webhook.getLastSentTimestamp(), now - webhook.getLastSentTimestamp());
+        ChangesInfo ci = getChangesInfo(now - webhook.getLastSentTimestamp(), now - webhook.getLastSentTimestamp(), webhook.getNewEndpointCollections(), webhook.getNewSensitiveEndpointCollections(), true);
         if (ci == null || (ci.newEndpointsLast7Days.size() + ci.newSensitiveParams.size() + ci.recentSentiiveParams + ci.newParamsInExistingEndpoints) == 0) {
             return;
         }
@@ -425,6 +437,8 @@ public class InitializerListener implements ServletContextListener {
         List<String> errors = new ArrayList<>();
 
         Map<String, Object> valueMap = new HashMap<>();
+
+        createBodyForWebhook(webhook);
 
         valueMap.put("AKTO.changes_info.newSensitiveEndpoints", ci.newSensitiveParamsObject);
         valueMap.put("AKTO.changes_info.newSensitiveEndpointsCount", ci.newSensitiveParams.size());
@@ -452,9 +466,9 @@ public class InitializerListener implements ServletContextListener {
         OriginalHttpResponse response = null; // null response means api request failed. Do not use new OriginalHttpResponse() in such cases else the string parsing fails.
 
         try {
-            response = ApiExecutor.sendRequest(request,true);
+            response = ApiExecutor.sendRequest(request, true);
             loggerMaker.infoAndAddToDb("webhook request sent", LogDb.DASHBOARD);
-        } catch(Exception e){
+        } catch (Exception e) {
             errors.add("API execution failed");
         }
 
@@ -467,6 +481,24 @@ public class InitializerListener implements ServletContextListener {
 
         CustomWebhookResult webhookResult = new CustomWebhookResult(webhook.getId(), webhook.getUserEmail(), now, message, errors);
         CustomWebhooksResultDao.instance.insertOne(webhookResult);
+    }
+
+    private static void createBodyForWebhook(CustomWebhook webhook) {
+
+        if (webhook.getSelectedWebhookOptions() == null || webhook.getSelectedWebhookOptions().isEmpty()) {// no filtering
+            return;
+        }
+
+        StringBuilder body = new StringBuilder();
+        body.append("{");
+
+        List<WebhookOptions> allowedWebhookOptions = webhook.getSelectedWebhookOptions();
+        for (WebhookOptions webhookOption : allowedWebhookOptions) {
+            body.append("\"").append(webhookOption.getOptionName()).append("\":").append(webhookOption.getOptionReplaceString()).append(",");
+        }
+        body.deleteCharAt(body.length() - 1);//Removing last comma
+        body.append("}");
+        webhook.setBody(body.toString());
     }
 
     public void webhookSender() {
@@ -522,7 +554,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
 
-    public static UrlResult extractUrlFromBasicDbObject(BasicDBObject singleTypeInfo, Map<Integer, ApiCollection> apiCollectionMap) {
+    public static UrlResult extractUrlFromBasicDbObject(BasicDBObject singleTypeInfo, Map<Integer, ApiCollection> apiCollectionMap, List<String> collectionList, boolean allowCollectionIds) {
         String method = singleTypeInfo.getString("method");
         String path = singleTypeInfo.getString("url");
 
@@ -536,13 +568,24 @@ public class InitializerListener implements ServletContextListener {
             urlObject.put("host", null);
             urlObject.put("path", path);
             urlObject.put("method", method);
+            if (allowCollectionIds) {
+                urlObject.put(SingleTypeInfo._API_COLLECTION_ID, null);
+                urlObject.put(SingleTypeInfo.COLLECTION_NAME, null);
+            }
             return new UrlResult(urlString, urlObject);
         }
 
         int apiCollectionId = (int) apiCollectionIdObj;
         ApiCollection apiCollection = apiCollectionMap.get(apiCollectionId);
+        if (apiCollection == null) {
+            apiCollection = new ApiCollection();
+        }
+        boolean apiCollectionContainsCondition = collectionList == null || collectionList.contains(apiCollection.getDisplayName());
+        if (!apiCollectionContainsCondition) {
+            return null;
+        }
 
-        String hostName = apiCollection != null ? apiCollection.getHostName() : "";
+        String hostName = apiCollection.getHostName() == null ?  "" : apiCollection.getHostName();
         String url;
         if (hostName != null) {
             url = path.startsWith("/") ? hostName + path : hostName + "/" + path;
@@ -556,11 +599,17 @@ public class InitializerListener implements ServletContextListener {
         urlObject.put("host", hostName);
         urlObject.put("path", path);
         urlObject.put("method", method);
+        if (allowCollectionIds) {
+            urlObject.put(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId);
+            urlObject.put(SingleTypeInfo.COLLECTION_NAME, apiCollection.getDisplayName());
+        }
 
         return new UrlResult(urlString, urlObject);
     }
 
-    protected static ChangesInfo getChangesInfo(int newEndpointsFrequency, int newSensitiveParamsFrequency) {
+    protected static ChangesInfo getChangesInfo(int newEndpointsFrequency, int newSensitiveParamsFrequency,
+                                                List<String> newEndpointCollections, List<String> newSensitiveEndpointCollections,
+                                                boolean includeCollectionIds) {
         try {
 
             ChangesInfo ret = new ChangesInfo();
@@ -575,14 +624,20 @@ public class InitializerListener implements ServletContextListener {
             for (BasicDBObject singleTypeInfo : newEndpointsSmallerDuration) {
                 newParamInNewEndpoint += (int) singleTypeInfo.getOrDefault("countTs", 0);
                 singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
-                UrlResult urlResult = extractUrlFromBasicDbObject(singleTypeInfo, apiCollectionMap);
+                UrlResult urlResult = extractUrlFromBasicDbObject(singleTypeInfo, apiCollectionMap, newEndpointCollections, includeCollectionIds);
+                if (urlResult == null) {
+                    continue;
+                }
                 ret.newEndpointsLast7Days.add(urlResult.urlString);
                 ret.newEndpointsLast7DaysObject.add(urlResult.urlObject);
             }
 
             for (BasicDBObject singleTypeInfo : newEndpointsBiggerDuration) {
                 singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
-                UrlResult urlResult = extractUrlFromBasicDbObject(singleTypeInfo, apiCollectionMap);
+                UrlResult urlResult = extractUrlFromBasicDbObject(singleTypeInfo, apiCollectionMap, null, includeCollectionIds);
+                if (urlResult == null) {
+                    continue;
+                }
                 ret.newEndpointsLast31Days.add(urlResult.urlString);
                 ret.newEndpointsLast31DaysObject.add(urlResult.urlObject);
             }
@@ -592,12 +647,24 @@ public class InitializerListener implements ServletContextListener {
             ret.recentSentiiveParams = 0;
             int delta = newSensitiveParamsFrequency;
             Map<Pair<String, String>, Set<String>> endpointToSubTypes = new HashMap<>();
+            Map<Pair<String, String>, ApiCollection> endpointToApiCollection = new HashMap<>();
             for (SingleTypeInfo sti : sensitiveParamsList) {
                 ApiCollection apiCollection = apiCollectionMap.get(sti.getApiCollectionId());
                 String url = sti.getUrl();
+                boolean skipAddingIntoMap = false;
                 if (apiCollection != null && apiCollection.getHostName() != null) {
                     String hostName = apiCollection.getHostName();
                     url = url.startsWith("/") ? hostName + url : hostName + "/" + url;
+                }
+
+                if (newSensitiveEndpointCollections != null) {//case of filtering by collection for sensitive endpoints
+                    skipAddingIntoMap = true;
+                    if (apiCollection != null) {
+                        skipAddingIntoMap = !newSensitiveEndpointCollections.contains(apiCollection.getDisplayName());
+                    }
+                }
+                if (skipAddingIntoMap) {
+                    continue;
                 }
 
                 String encoded = Base64.getEncoder().encodeToString((sti.getUrl() + " " + sti.getMethod()).getBytes());
@@ -611,6 +678,7 @@ public class InitializerListener implements ServletContextListener {
                         subTypes = new HashSet<>();
                         endpointToSubTypes.put(key, subTypes);
                     }
+                    endpointToApiCollection.put(key, apiCollection);
                     subTypes.add(value);
                 }
             }
@@ -626,6 +694,10 @@ public class InitializerListener implements ServletContextListener {
                 basicDBObject.put("url", methodPlusUrlList[1]);
                 basicDBObject.put("method", methodPlusUrlList[0]);
                 basicDBObject.put("subTypes", subTypes);
+                basicDBObject.put("link", key.getSecond());
+                ApiCollection collection = endpointToApiCollection.get(key);
+                basicDBObject.put(SingleTypeInfo._API_COLLECTION_ID, collection != null ? collection.getId() : null);
+                basicDBObject.put(SingleTypeInfo.COLLECTION_NAME, collection != null ? collection.getDisplayName() : null);
                 ret.newSensitiveParamsObject.add(basicDBObject);
             }
 
@@ -706,6 +778,7 @@ public class InitializerListener implements ServletContextListener {
             TestingRunIssuesDao.instance.deleteAll(
                     Filters.or(
                             Filters.exists("_id.testSubCategory", false),
+                            // ?? enum saved in db
                             Filters.eq("_id.testSubCategory", null)
                     )
             );
@@ -784,7 +857,7 @@ public class InitializerListener implements ServletContextListener {
         logger.info("MONGO URI " + mongoURI);
 
 
-        executorService.schedule( new Runnable() {
+        executorService.schedule(new Runnable() {
             public void run() {
                 boolean calledOnce = false;
                 do {
@@ -816,7 +889,7 @@ public class InitializerListener implements ServletContextListener {
                     }
                 } while (!connectedToMongo);
             }
-        }, 0 , TimeUnit.SECONDS);
+        }, 0, TimeUnit.SECONDS);
 
     }
 
@@ -849,6 +922,8 @@ public class InitializerListener implements ServletContextListener {
         TrafficMetricsDao.instance.createIndicesIfAbsent();
         TestRolesDao.instance.createIndicesIfAbsent();
 
+        saveTestEditorYaml();
+
         ApiInfoDao.instance.createIndicesIfAbsent();
         RuntimeLogsDao.instance.createIndicesIfAbsent();
         LogsDao.instance.createIndicesIfAbsent();
@@ -876,6 +951,10 @@ public class InitializerListener implements ServletContextListener {
             SingleTypeInfo.init();
 
             insertPiiSources();
+
+            setUpDailyScheduler();
+            setUpWebhookScheduler();
+            setUpPiiAndTestSourcesScheduler();
 
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             dropSampleDataIfEarlierNotDroped(accountSettings);
@@ -949,5 +1028,75 @@ public class InitializerListener implements ServletContextListener {
     private String getUpdateDeploymentStatusUrl() {
         String url = System.getenv("UPDATE_DEPLOYMENT_STATUS_URL");
         return url != null ? url : "https://stairway.akto.io/deployment/status";
+    }
+
+    public static void saveTestEditorYaml() {
+        List<String> templatePaths = new ArrayList<>();
+        try {
+            templatePaths = convertStreamToListString(InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files"));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(String.format("failed to read test yaml folder %s", e.toString()), LogDb.DASHBOARD);
+        }
+
+        String template = null;
+        for (String path: templatePaths) {
+            try {
+                template = convertStreamToString(InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files/" + path));
+                //System.out.println(template);
+                TestConfig testConfig = null;
+                try {
+                    testConfig = TestConfigYamlParser.parseTemplate(template);
+                } catch (Exception e) {
+                    logger.error("invalid parsing yaml template for file " + path, e);
+                }
+
+                if (testConfig == null) {
+                    logger.error("parsed template for file is null " + path);
+                }
+
+                String id = testConfig.getId();
+
+                int createdAt = Context.now();
+                int updatedAt = Context.now();
+                String author = "AKTO";
+
+                YamlTemplateDao.instance.updateOne(
+                    Filters.eq("_id", id),
+                    Updates.combine(
+                            Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
+                            Updates.setOnInsert(YamlTemplate.AUTHOR, author),
+                            Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
+                            Updates.set(YamlTemplate.CONTENT, template),
+                            Updates.set(YamlTemplate.INFO, testConfig.getInfo())
+                    )
+                );
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(String.format("failed to read test yaml path %s %s", template, e.toString()), LogDb.DASHBOARD);
+            }
+        }
+    }
+
+    private static List<String> convertStreamToListString(InputStream in) throws Exception {
+
+        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+        String line = null;
+        List<String> files = new ArrayList<>();
+        while ((line = reader.readLine()) != null) {
+            files.add(line);
+        }
+        in.close();
+        return files;
+    }
+
+    private static String convertStreamToString(InputStream in) throws Exception {
+
+        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+        StringBuilder stringbuilder = new StringBuilder();
+        String line = null;
+        while ((line = reader.readLine()) != null) {
+            stringbuilder.append(line + "\n");
+        }
+        in.close();
+        return stringbuilder.toString();
     }
 }
