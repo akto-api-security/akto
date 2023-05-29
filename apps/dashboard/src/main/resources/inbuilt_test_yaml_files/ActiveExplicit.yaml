@@ -49,6 +49,6 @@ validate:
     length:
       gt: 0
 metadata:
-  minimum_akto_version: 1.29.1
-  minimum_onprem_version: 1.30.6
+  min_akto_version: 1.29.1
+  min_onprem_version: 1.30.6
   is_active: true
