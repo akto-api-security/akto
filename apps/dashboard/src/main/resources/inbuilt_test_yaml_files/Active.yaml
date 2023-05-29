@@ -1,4 +1,4 @@
-id: ADD_USER_ID
+id: ACTIVE
 info:
   name: "IDOR by adding user id in query params"
   description: "Attacker can access resources of any user by adding user_id in URL."
