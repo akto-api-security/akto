@@ -56,6 +56,12 @@
                     window.ACCESS_TOKEN = '${accessToken}';
                     window.SIGNUP_INVITATION_CODE = '${signupInvitationCode}'
                     window.SIGNUP_EMAIL_ID = '${signupEmailId}'
+
+                    if(window.DASHBOARD_MODE=='' && window.IS_SAAS=='' && window.location.host=='app.akto.io'){
+                        window.DASHBOARD_MODE='LOCAL_DEPLOY'
+                        window.IS_SAAS='true'
+                    }
+
                     // Enabling the debug mode flag is useful during implementation,
                     // but it's recommended you remove it for production
 

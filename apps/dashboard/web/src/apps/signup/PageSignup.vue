@@ -12,7 +12,7 @@
           <span style="vertical-align: text-bottom; color: var(--themeColor)"> akto </span>
         </div>
         
-
+        <div v-if="(isLocalDeploy && isSaas)">
          <google-auth @signInCallback="signInCallback" scope="" purpose="signup">
           <v-btn class="sign-up-third-party" plain width="100%">
             <div>
@@ -21,6 +21,7 @@
             </div>
           </v-btn>
         </google-auth>
+      </div>
 
         <!--<slack-auth @signInCallback="signInCallback" :login-only="true">
           <v-btn class="sign-up-third-party" plain width="100%">
@@ -39,7 +40,7 @@
 <!--        </v-btn>-->
         <!-- <div class="or">or</div> -->
 
-        <div v-if="username">
+        <div v-if="username || (!isSaas)">
           <login-fields @fieldsChanged="fieldsChanged" @enterPressed="signupUser" :isSignUp ="true" class="mt-4"/>
           <v-btn class="signup-btn" :disabled="disableButtons" :loading="signupLoading" @click="signupUser" style="background-color:  var(--themeColor) !important; color: var(--white) !important">
             Sign up
@@ -81,6 +82,8 @@ export default {
           }
       ],
       username: window.SIGNUP_EMAIL_ID || null,
+      isLocalDeploy: window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy',
+      isSaas: window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true',
       fullName: null,
       companyName: null,
       role: null,

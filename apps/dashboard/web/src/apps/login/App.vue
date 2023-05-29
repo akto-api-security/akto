@@ -11,6 +11,7 @@
                 </h1>
               </v-card-title>
 
+              <div v-if="(isLocalDeploy && isSaas)">
               <google-auth scope="" purpose="signin" class="ma-4">
                 <v-btn class="sign-up-third-party" plain width="100%" style="height: 56px">
                   <div>
@@ -46,7 +47,7 @@
               </div>
  -->
               <div class="my-8 mx-4 divider-rule"><span class="primary--text">or</span></div>
-
+            </div>
               <div class="ma-4">
                 <login-fields @fieldsChanged="fieldsChanged" @enterPressed="login" :isSignUp="false" />
               </div>
@@ -84,7 +85,9 @@ export default {
       loadingLogin: false,
       loadingSignup: false,
       disableButtons: true,
-      formModel: null
+      formModel: null,
+      isLocalDeploy: window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy',
+      isSaas: window.IS_SAAS && window.IS_SAAS.toLowerCase() == 'true',
     }
   },
   methods: {
