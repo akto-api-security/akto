@@ -21,7 +21,9 @@ var state = {
     parameters: [],
     url: '',
     method: '',
-    unusedEndpoints: []
+    unusedEndpoints: [],
+    filteredItems:[],
+    allSamples:[]
 }
 
 let functionCompareEndpoint = (x, p) => {
@@ -47,6 +49,8 @@ const inventory = {
             state.parameters = []
             state.url = ''
             state.method = ''
+            state.allSamples = []
+            state.filteredItems = []
         },
         EMPTY_PARAMS (state) {
             state.parametersLoading = false
@@ -54,13 +58,18 @@ const inventory = {
             state.url = ''
             state.method = ''
         },
+        FILTERED_ITEMS(state,info){
+            state.filteredItems = info
+        },
+        ALL_SAMPLED_DATA(state,info){
+            state.allSamples = info
+        },
         SAVE_API_COLLECTION (state, info) {
             state.apiCollectionId = info.apiCollectionId
             state.apiCollectionName = info.data.name
             state.apiCollection = info.data.endpoints.map(x => {return {...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false}})
             state.apiInfoList = info.data.apiInfoList
             state.unusedEndpoints = info.unusedEndpoints
-
         },
         TOGGLE_SENSITIVE (state, p) {
             let sensitiveParamIndex = state.sensitiveParams.findIndex(x => {
@@ -230,6 +239,8 @@ const inventory = {
         getApiInfoList: (state) => state.apiInfoList,
         getFilters: (state) => state.filters,
         getUnusedEndpoints: (state) => state.unusedEndpoints,
+        getUrl: (state) => state.url,
+        getMethod: (state) => state.method,
     }
 }
 

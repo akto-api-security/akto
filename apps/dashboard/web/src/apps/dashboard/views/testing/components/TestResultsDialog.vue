@@ -2,7 +2,7 @@
     <div v-if="messagesBasic && messagesBasic.length > 0">
         <div>
             <div>
-                <layout-with-tabs :tabsContent="getTabsContent()" title=""
+                <layout-with-tabs :tabsContent="getTabsContent()" title="" :disableHash="true"
                     :tabs="['Description', 'Original', 'Attempt']" ref="layoutWithTabs" class="details-container">
                     <template slot="Description">
                         <div class="description-title mt-4" :style="{ 'height': '500px' }"
@@ -41,7 +41,7 @@
                                                 <v-chip :style="{ 'height': '24px !important' }" color="var(--themeColorDark6)"
                                                     class="issue-summary mr-2" text-color="var(--white)" :key="index"
                                                     v-for="(chipItem, index) in subCatogoryMap[issuesDetails.id.testSubCategory].issueTags">
-                                                    {{ chipItem.name }}
+                                                    {{ chipItem }}
                                                 </v-chip>
                                             </v-col>
                                         </v-row>

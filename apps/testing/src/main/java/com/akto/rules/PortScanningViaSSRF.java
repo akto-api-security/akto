@@ -21,7 +21,7 @@ public class PortScanningViaSSRF extends BaseSSRFTest{
 
     @Override
     public String subTestName() {
-        return GlobalEnums.TestSubCategory.PORT_SCANNING.name();
+        return "PORT_SCANNING";
     }
 
     @Override

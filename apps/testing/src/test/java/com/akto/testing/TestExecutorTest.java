@@ -64,7 +64,7 @@ public class TestExecutorTest extends MongoBasedTest {
         AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
         TestingUtil testingUtil = new TestingUtil(authMechanismStore.getAuthMechanism(), messageStore, new ArrayList<>(), "");
 
-        String host = TestExecutor.findHost(apiInfoKey, testingUtil);
+        String host = TestExecutor.findHost(apiInfoKey, testingUtil.getSampleMessages(), messageStore);
         assertEquals(answer,host);
     }
 

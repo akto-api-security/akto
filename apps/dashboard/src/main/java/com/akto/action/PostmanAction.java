@@ -349,6 +349,7 @@ public class PostmanAction extends UserAction {
     }
 
     String postmanCollectionFile;
+    int postmanAktoCollectionId;
     public String importDataFromPostmanFile() {
         ObjectMapper mapper = new ObjectMapper();
         JsonNode collectionDetailsObj;
@@ -374,7 +375,7 @@ public class PostmanAction extends UserAction {
 
 
         int accountId = Context.accountId.get();
-        int finalAktoCollectionId = aktoCollectionId;
+        postmanAktoCollectionId = aktoCollectionId;
 
         ObjectId loaderId = createPostmanLoader();
 
@@ -382,7 +383,7 @@ public class PostmanAction extends UserAction {
             public void run() {
                 loggerMaker.infoAndAddToDb("Starting thread to process postman file", LogDb.DASHBOARD);
                 Context.accountId.set(accountId);
-                importDataFromPostmanFileMain(collectionDetailsObj, finalAktoCollectionId, collectionName,allowReplay, skipKafka, loaderId);
+                importDataFromPostmanFileMain(collectionDetailsObj, postmanAktoCollectionId, collectionName,allowReplay, skipKafka, loaderId);
             }
         }, 1, TimeUnit.SECONDS);
 
@@ -478,6 +479,7 @@ public class PostmanAction extends UserAction {
         this.postmanCollectionFile = postmanCollectionFile;
     }
 
-
-
+    public int getPostmanAktoCollectionId() {
+        return postmanAktoCollectionId;
+    }
 }

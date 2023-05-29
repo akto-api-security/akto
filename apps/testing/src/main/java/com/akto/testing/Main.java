@@ -4,6 +4,7 @@ import com.akto.DaoInit;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
@@ -112,9 +113,10 @@ public class Main {
 
                     SampleMessageStore sampleMessageStore = SampleMessageStore.create();
                     AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
+                    sampleMessageStore.fetchSampleMessages();
 
                     if (runStatusCodeAnalyser) {
-                        StatusCodeAnalyser.run(sampleMessageStore, authMechanismStore);
+                        StatusCodeAnalyser.run(sampleMessageStore.getSampleDataMap(),sampleMessageStore, authMechanismStore);
                     }
 
                     TestExecutor testExecutor = new TestExecutor();
