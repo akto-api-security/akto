@@ -54,11 +54,6 @@ import com.mongodb.client.model.Updates;
 import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;
 
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
-import okhttp3.ResponseBody;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -79,7 +74,6 @@ import java.io.InputStreamReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -89,8 +83,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
 import static com.mongodb.client.model.Filters.eq;
 
 public class InitializerListener implements ServletContextListener {
@@ -1029,15 +1021,15 @@ public class InitializerListener implements ServletContextListener {
         logger.info("Updating test template files from Github");
 
         //Get existing template sha values 
-        Map<String, String> fileShaCheck = new HashMap<>();
+        Map<String, String> yamlTemplatesGithubFileSha = new HashMap<>();
         List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(new BasicDBObject());
 
         for(YamlTemplate yamlTemplate: yamlTemplates) {
-            fileShaCheck.put(yamlTemplate.getFileName(), yamlTemplate.getSha());
+            yamlTemplatesGithubFileSha.put(yamlTemplate.getFileName(), yamlTemplate.getSha());
         }
 
         GithubSync githubSync = new GithubSync();
-        Map<String, GithubFile> templates = githubSync.syncDir("akto-api-security/akto", "apps/dashboard/src/main/resources/inbuilt_test_yaml_files/", fileShaCheck);
+        Map<String, GithubFile> templates = githubSync.syncDir("akto-api-security/akto", "apps/dashboard/src/main/resources/inbuilt_test_yaml_files/", yamlTemplatesGithubFileSha);
 
         if (templates != null) {
             for (GithubFile template : templates.values()) {
@@ -1055,7 +1047,7 @@ public class InitializerListener implements ServletContextListener {
 
 
                 if (testConfig == null) {
-                    loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file %s %s", template.getName()), LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file %s", template.getName()), LogDb.DASHBOARD);
                 } else {
                     String id = testConfig.getId();
                     int createdAt = Context.now();
@@ -1139,7 +1131,6 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private static List<String> convertStreamToListString(InputStream in) throws Exception {
-
         BufferedReader reader = new BufferedReader(new InputStreamReader(in));
         String line = null;
         List<String> files = new ArrayList<>();
@@ -1151,7 +1142,6 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private static String convertStreamToString(InputStream in) throws Exception {
-
         BufferedReader reader = new BufferedReader(new InputStreamReader(in));
         StringBuilder stringbuilder = new StringBuilder();
         String line = null;

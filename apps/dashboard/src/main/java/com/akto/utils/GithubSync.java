@@ -24,25 +24,45 @@ public class GithubSync {
     private static final LoggerMaker loggerMaker = new LoggerMaker(GithubSync.class);
     private static final OkHttpClient client = new OkHttpClient();
 
-    public String syncFile(String download_url) {
-        String fileContents = null; 
+    public GithubFile syncFile(String repo, String filePath, String latestSha, Map<String, String> githubFileShaMap) {
+        String[] filePathSplit = filePath.split("/");
+        String fileName = filePathSplit[filePathSplit.length - 1];
+        
+        //check if file has not been updated
+        if (latestSha != null && githubFileShaMap != null) {
+            if (githubFileShaMap.containsKey(fileName)) {
+                if (githubFileShaMap.get(fileName).equals(latestSha)){
+                    //skip file
+                    return null;
+                }
+            }
+        }
+
+        GithubFile githubFile = null;
 
         Request fileRequest = new Request.Builder()
-                            .url(download_url)
+                            .url(String.format("https://raw.githubusercontent.com/%s/master/%s", repo, filePath))
                             .build();
                             
         try {
             Response fileResponse = client.newCall(fileRequest).execute();
-            ResponseBody fileResponseBody = fileResponse.body();
-            fileContents = fileResponseBody.string();
+
+            if (fileResponse.code() == 404) {
+                loggerMaker.errorAndAddToDb(String.format("File %s not found in repo %s", fileName, repo), LogDb.DASHBOARD);
+            } else {
+                ResponseBody fileResponseBody = fileResponse.body();
+                String fileContents = fileResponseBody.string();
+                
+                githubFile = new GithubFile(fileName, filePath, fileContents, latestSha);
+            }
         } catch (IOException ex) {
-            loggerMaker.errorAndAddToDb(String.format("Error while syncing file %s ", download_url), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(String.format("Error while syncing file %s from repo %s", filePath, repo), LogDb.DASHBOARD);
         }
-        
-        return fileContents;
+
+        return githubFile;
     }
 
-    public Map<String, GithubFile> syncDir(String repo, String dirPath, Map<String, String> fileShaCheck) {
+    public Map<String, GithubFile> syncDir(String repo, String dirPath, Map<String, String> githubFileShaMap) {
         Map<String, GithubFile> dirContents = new HashMap<>();
         
         Request dirRequest = new Request.Builder()
@@ -63,25 +83,16 @@ public class GithubSync {
                 JSONArray dirContentsArray = new JSONArray(jsonString);
                 for (Object file : dirContentsArray) {
                     JSONObject fileObject = (JSONObject) file;
-                    String filename = fileObject.getString("name");
-                    String filepath = fileObject.getString("path");
-                    String download_url = fileObject.getString("download_url");
-                    String sha = fileObject.getString("sha");
-
-                    //check if file has not been updated
-                    if (fileShaCheck != null) {
-                        if (fileShaCheck.containsKey(filename)) {
-                            if (fileShaCheck.get(filename).equals(sha)){
-                                //skip file
-                                continue;
-                            }
-                        }
-                    }
+                    String fileName = fileObject.getString("name");
+                    String filePath = fileObject.getString("path");
+                    String latestSha = fileObject.getString("sha");
                     
-                    // Retreive Github file contents 
-                    String fileContents = syncFile(download_url);
-                    GithubFile githubFile = new GithubFile(filename, filepath, fileContents, sha);
-                    dirContents.put(filename, githubFile);
+                    // Retreive Github file 
+                    GithubFile githubFile = syncFile(repo, filePath, latestSha, githubFileShaMap);
+
+                    if (githubFile != null) {
+                        dirContents.put(fileName, githubFile);
+                    }
                 }
             }
         } catch (Exception ex) {
