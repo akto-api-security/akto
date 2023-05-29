@@ -379,10 +379,12 @@ public class Main {
                             boolean isPresentInReq = reqHeaderValues != null && reqHeaderValues.indexOf(filterHeaderKV.getValue()) != -1;
                             boolean isPresentInRes = resHeaderValues != null && resHeaderValues.indexOf(filterHeaderKV.getValue()) != -1;
     
-                            if (isPresentInReq || isPresentInRes) {
-                                shouldKeep = true;
+                            shouldKeep = isPresentInReq || isPresentInRes;
+                            
+                            if (!shouldKeep) {
                                 break;
                             }
+                            
                         } catch (Exception e) {
                             // eat it
                         }
