@@ -240,6 +240,16 @@ export default {
                 filterHeaderValueMap
             }
         })
+    },
+
+    addApiCollectionNameMapper(apiCollectionNameMapper) {
+        return request ({
+            url: '/api/addApiCollectionNameMapper',
+            method: 'post',
+            data: {
+                apiCollectionNameMapper
+            }
+        })
     }
 
 }

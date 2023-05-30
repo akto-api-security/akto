@@ -1,7 +1,9 @@
 package com.akto.dto;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 public class AccountSettings {
     private int id;
@@ -46,6 +48,9 @@ public class AccountSettings {
     private Map<String, String> filterHeaderValueMap;
     public static final String FILTER_HEADER_VALUE_MAP = "filterHeaderValueMap";
 
+    private Map<String, String> apiCollectionNameMapper;
+    public static final String API_COLLECTION_NAME_MAPPER = "apiCollectionNameMapper";
+
     public AccountSettings() {
     }
 
@@ -60,6 +65,22 @@ public class AccountSettings {
         PROD, QA, STAGING, DEV
     }
 
+    public Map<Pattern, String> convertApiCollectionNameMapperToRegex() {
+        
+        Map<Pattern, String> ret = new HashMap<>();
+
+        if (apiCollectionNameMapper == null) return ret;
+        
+        for(String apiCollectionNameMapperKey: apiCollectionNameMapper.keySet()) {
+            try {
+                ret.put(Pattern.compile(apiCollectionNameMapperKey), apiCollectionNameMapper.get(apiCollectionNameMapperKey));
+            } catch (Exception e) {
+                // eat it
+            }
+        }
+        return ret;
+        
+    }
 
     public int getId() {
         return id;
@@ -189,5 +210,13 @@ public class AccountSettings {
 
     public void setFilterHeaderValueMap(Map<String, String> filterHeaderValueMap) {
         this.filterHeaderValueMap = filterHeaderValueMap;
+    }
+
+    public Map<String, String> getApiCollectionNameMapper() {
+        return apiCollectionNameMapper;
+    }
+
+    public void setApiCollectionNameMapper(Map<String, String> apiCollectionNameMapper) {
+        this.apiCollectionNameMapper = apiCollectionNameMapper;
     }
 }

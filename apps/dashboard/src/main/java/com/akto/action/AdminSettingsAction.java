@@ -121,13 +121,29 @@ public class AdminSettingsAction extends UserAction {
 
 
     private Map<String, String> filterHeaderValueMap;
-
+    
     public String addFilterHeaderValueMap() {
         Bson update;
         if (this.filterHeaderValueMap == null) {
             update = Updates.unset(AccountSettings.FILTER_HEADER_VALUE_MAP);
         } else {
             update = Updates.set(AccountSettings.FILTER_HEADER_VALUE_MAP, this.filterHeaderValueMap);
+        }
+
+        AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(), update
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
+    private Map<String, String> apiCollectionNameMapper;
+    public String addApiCollectionNameMapper() {
+        Bson update;
+        if (this.apiCollectionNameMapper == null) {
+            update = Updates.unset(AccountSettings.API_COLLECTION_NAME_MAPPER);
+        } else {
+            update = Updates.set(AccountSettings.API_COLLECTION_NAME_MAPPER, this.apiCollectionNameMapper);
         }
 
         AccountSettingsDao.instance.updateOne(
