@@ -129,6 +129,42 @@
             </div>
         </div>
 
+        <div class="toggle-redact-feature">
+            <div class="entry-text">Replace collection</div>
+            <div class="d-flex traffic-filter-div">
+                <div class="input-value-key">
+                    <v-text-field v-model="newApiCollectionNameMapperKey" style="width: 200px">
+                        <template slot="label">
+                            <div class="d-flex">
+                                Host
+                                <help-tooltip :size="12"
+                                    text="Please enter the regex to match host" />
+                            </div>
+                        </template>
+                    </v-text-field>
+
+                </div>
+                <div class="input-value-value">
+                    <v-text-field v-model="newApiCollectionNameMapperValue" style="width: 500px">
+                        <template slot="label">
+                            <div class="d-flex">
+                                Replaced collection name
+                                <help-tooltip :size="12" text="Please enter the name of new collection" />
+                            </div>
+                        </template>
+
+                    </v-text-field>
+                </div>
+
+                <div class="filter-save-btn">
+                    <v-btn primary dark color="var(--hexColor9)" @click="addApiCollectionNameMapper" v-if="apiCollectionNameMapperChanged">
+                        Save
+                    </v-btn>
+                </div>
+
+            </div>
+        </div>
+
     </div>
 </template>
 
@@ -147,6 +183,8 @@ import {mapState} from 'vuex'
                 setup_types: ["STAGING", "PROD", "QA", "DEV"],
                 newKey: null,
                 newVal: null,
+                newApiCollectionNameMapperKey: null,
+                newApiCollectionNameMapperValue: null
             }
         },
         methods: {
@@ -158,6 +196,9 @@ import {mapState} from 'vuex'
             },
             addFilterHeaderValueMap() {
                 this.$store.dispatch('team/addFilterHeaderValueMap', {"filterHeaderValueMapKey" : this.newKey, "filterHeaderValueMapValue": this.newVal})
+            },
+            addApiCollectionNameMapper() {
+                this.$store.dispatch('team/addApiCollectionNameMapper', {"apiCollectionNameMapperKey" : this.newApiCollectionNameMapperKey, "apiCollectionNameMapperValue": this.newApiCollectionNameMapperValue})
             }
         },
         mounted() {
@@ -165,7 +206,7 @@ import {mapState} from 'vuex'
             this.$store.dispatch('team/fetchUserLastLoginTs')
         },
         computed: {
-            ...mapState('team', ['redactPayload', 'setupType', 'dashboardVersion', 'apiRuntimeVersion', 'mergeAsyncOutside', 'lastLoginTs', 'privateCidrList', 'urlRegexMatchingEnabled', 'enableDebugLogs', 'filterHeaderValueMap']),
+            ...mapState('team', ['redactPayload', 'setupType', 'dashboardVersion', 'apiRuntimeVersion', 'mergeAsyncOutside', 'lastLoginTs', 'privateCidrList', 'urlRegexMatchingEnabled', 'enableDebugLogs', 'filterHeaderValueMap', 'apiCollectionNameMapper']),
             localRedactPayload: {
                 get() {
                     return this.redactPayload
@@ -221,6 +262,17 @@ import {mapState} from 'vuex'
                 } else {
                     return nonNullData
                 }
+            },
+            nonNullCollectionMapper() {
+                return this.apiCollectionNameMapper
+            },
+            apiCollectionNameMapperChanged() {
+                let nonNullData = this.newApiCollectionNameMapperKey != null && this.newApiCollectionNameMapperValue != null && this.newApiCollectionNameMapperKey != "" && this.newApiCollectionNameMapperValue != ""
+                if (this.nonNullCollectionMapper) {
+                    return nonNullData && this.apiCollectionNameMapper && (Object.keys(this.apiCollectionNameMapper)[0] !== this.newApiCollectionNameMapperKey || Object.values(this.apiCollectionNameMapper)[0] !== this.newApiCollectionNameMapperValue)
+                } else {
+                    return nonNullData
+                }
             }
         },
         watch: {
@@ -228,6 +280,11 @@ import {mapState} from 'vuex'
                 if (!a) return
                 this.newKey = Object.keys(a)[0] 
                 this.newVal = Object.values(a)[0]
+            },
+            apiCollectionNameMapper(a) {
+                if (!a) return
+                this.newApiCollectionNameMapperKey = Object.keys(a)[0] 
+                this.newApiCollectionNameMapperValue = Object.values(a)[0]
             }
         }
     }
