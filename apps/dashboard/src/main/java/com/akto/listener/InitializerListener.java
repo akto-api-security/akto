@@ -44,6 +44,7 @@ import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.utils.DashboardMode;
+import com.akto.utils.DashboardVersion;
 import com.akto.utils.GithubSync;
 import com.akto.utils.HttpUtils;
 import com.akto.utils.RedactSampleData;
@@ -1046,10 +1047,19 @@ public class InitializerListener implements ServletContextListener {
         }
 
         Metadata metadata = testConfig.getMetadata();
-        System.out.println(metadata.getMinAktoVersion());
-        System.out.println(metadata.getMinOnpremVersion());
-        System.out.println(metadata.getIsActive());
-        System.out.println(testConfig.getId());
+
+        // Get deployment type and the appropriate template version
+        String templateMinimumAktoVersion = null;
+
+        if (DashboardMode.isLocalDeployment()) {
+            templateMinimumAktoVersion = metadata.getMinAktoVersion();
+        } else {
+            templateMinimumAktoVersion = metadata.getMinOnpremVersion(); 
+        }
+
+        // Get dashboard version
+        String dashboardVersion = DashboardVersion.getDashboardVersion();
+        System.out.println(dashboardVersion);
 
         return;
 
