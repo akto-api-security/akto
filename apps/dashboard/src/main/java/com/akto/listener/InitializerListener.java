@@ -1025,80 +1025,6 @@ public class InitializerListener implements ServletContextListener {
     public static void updateTestEditorTemplatesFromGithub() {   
         logger.info("Updating test template files from Github");
 
-        // InputStream in = InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files/Version.yaml");
-        // BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-        // StringBuilder stringbuilder = new StringBuilder();
-        // String line = null;
-        // try {
-        //     while ((line = reader.readLine()) != null) {
-        //         stringbuilder.append(line + "\n");
-        //     }
-        //     in.close();
-        // } catch (Exception e) {
-        //     System.out.println(e);
-        // }
-        // String template = stringbuilder.toString();
-
-        // String templateContent = template;
-        // String fileName = "Version.yaml";
-        // String sha = "3d21ec53a331a6f037a91c368710b99387d012c3";
-
-        // TestConfig testConfig = null;
-
-        // try {
-        //     testConfig = TestConfigYamlParser.parseTemplate(template);
-        // } catch (Exception e) {
-        //     loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file %s %s", "Version", e.toString()), LogDb.DASHBOARD);
-        // }
-
-        // Metadata metadata = testConfig.getMetadata();
-
-        // // Get deployment type and the appropriate template version
-        // String templateMinimumAktoVersion = null;
-
-        // if (DashboardMode.isLocalDeployment()) {
-        //     templateMinimumAktoVersion = metadata.getMinAktoVersion();
-        // } else {
-        //     templateMinimumAktoVersion = metadata.getMinOnpremVersion(); 
-        // }
-
-        // // Get dashboard version
-        // String dashboardVersion = DashboardVersion.getDashboardVersion();
-
-        // // Check if updated template is not supported by dashboard
-        // if (DashboardVersion.isSemanticVersionString(dashboardVersion)) {
-        //     if (DashboardVersion.compareVersions(templateMinimumAktoVersion, dashboardVersion) > 0) {
-        //         // replace with continue
-        //         System.out.println("Template does't support version");
-        //         return;
-        //     } 
-        // } 
-
-        // String id = testConfig.getId();
-        // int createdAt = Context.now();
-        // int updatedAt = Context.now();
-        // String author = "AKTO";
-        // Boolean isActive = metadata.getIsActive();
-        
-        // YamlTemplateDao.instance.updateOne(
-        //     Filters.eq("_id", id),
-        //     Updates.combine(
-        //             Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
-        //             Updates.setOnInsert(YamlTemplate.AUTHOR, author),
-        //             Updates.setOnInsert(YamlTemplate.FILE_NAME, fileName),
-        //             Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
-        //             Updates.set(YamlTemplate.CONTENT, templateContent),
-        //             Updates.set(YamlTemplate.INFO, testConfig.getInfo()),
-        //             Updates.set(YamlTemplate.SHA, sha),
-        //             Updates.set(YamlTemplate.IS_ACTIVE, isActive)
-        //     )
-        // );
-
-
-        
-
-        // return;
-
         //Get existing template sha values 
         Map<String, String> yamlTemplatesGithubFileSha = new HashMap<>();
         List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(new BasicDBObject());
@@ -1132,7 +1058,6 @@ public class InitializerListener implements ServletContextListener {
                     loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file %s %s", template.getName(), e.toString()), LogDb.DASHBOARD);
                 }
 
-
                 if (testConfig == null) {
                     loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file %s", template.getName()), LogDb.DASHBOARD);
                 } else {
@@ -1158,7 +1083,6 @@ public class InitializerListener implements ServletContextListener {
                         } 
                     } 
 
-    
                     String id = testConfig.getId();
                     int createdAt = Context.now();
                     int updatedAt = Context.now();
