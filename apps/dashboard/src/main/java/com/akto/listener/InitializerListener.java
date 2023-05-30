@@ -48,6 +48,7 @@ import com.akto.utils.DashboardVersion;
 import com.akto.utils.GithubSync;
 import com.akto.utils.HttpUtils;
 import com.akto.utils.RedactSampleData;
+import com.itextpdf.text.Meta;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
@@ -1022,44 +1023,46 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void updateTestEditorTemplatesFromGithub() {   
-        logger.info("Updating test template files from Github");
+        // logger.info("Updating test template files from Github");
 
-        InputStream in = InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files/Version.yaml");
-        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-        StringBuilder stringbuilder = new StringBuilder();
-        String line = null;
-        try {
-            while ((line = reader.readLine()) != null) {
-                stringbuilder.append(line + "\n");
-            }
-            in.close();
-        } catch (Exception e) {
-            System.out.println(e);
-        }
-        String template = stringbuilder.toString();
+        // InputStream in = InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files/Version.yaml");
+        // BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+        // StringBuilder stringbuilder = new StringBuilder();
+        // String line = null;
+        // try {
+        //     while ((line = reader.readLine()) != null) {
+        //         stringbuilder.append(line + "\n");
+        //     }
+        //     in.close();
+        // } catch (Exception e) {
+        //     System.out.println(e);
+        // }
+        // String template = stringbuilder.toString();
 
-        TestConfig testConfig = null;
+        // TestConfig testConfig = null;
 
-        try {
-            testConfig = TestConfigYamlParser.parseTemplate(template);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file %s %s", "Version", e.toString()), LogDb.DASHBOARD);
-        }
+        // try {
+        //     testConfig = TestConfigYamlParser.parseTemplate(template);
+        // } catch (Exception e) {
+        //     loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file %s %s", "Version", e.toString()), LogDb.DASHBOARD);
+        // }
 
-        Metadata metadata = testConfig.getMetadata();
+        // Metadata metadata = testConfig.getMetadata();
 
-        // Get deployment type and the appropriate template version
-        String templateMinimumAktoVersion = null;
+        // // Get deployment type and the appropriate template version
+        // String templateMinimumAktoVersion = null;
 
-        if (DashboardMode.isLocalDeployment()) {
-            templateMinimumAktoVersion = metadata.getMinAktoVersion();
-        } else {
-            templateMinimumAktoVersion = metadata.getMinOnpremVersion(); 
-        }
+        // if (DashboardMode.isLocalDeployment()) {
+        //     templateMinimumAktoVersion = metadata.getMinAktoVersion();
+        // } else {
+        //     templateMinimumAktoVersion = metadata.getMinOnpremVersion(); 
+        // }
 
-        // Get dashboard version
-        String dashboardVersion = DashboardVersion.getDashboardVersion();
-        System.out.println(dashboardVersion);
+        // // Get dashboard version
+        // String dashboardVersion = DashboardVersion.getDashboardVersion();
+        // System.out.println(dashboardVersion);
+
+
 
         return;
 
@@ -1176,14 +1179,22 @@ public class InitializerListener implements ServletContextListener {
                 if (testConfig == null) {
                     loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file  %s", fileName), LogDb.DASHBOARD);
                 } else {
-                    //todo: Store template only if is_active is true
+
                     String id = testConfig.getId();
+                    
+                    Metadata metadata = testConfig.getMetadata();
+                    Boolean isActive = true;
+
+                    if (metadata != null) {
+                        isActive = metadata.getIsActive();
+                    } 
+
                     int createdAt = Context.now();
                     int updatedAt = Context.now();
                     String author = "AKTO";
                     String sha = "0";
 
-                    YamlTemplate yamlTemplate = new YamlTemplate(id, createdAt, author, updatedAt, templateContent, testConfig.getInfo(), sha, fileName);
+                    YamlTemplate yamlTemplate = new YamlTemplate(id, createdAt, author, updatedAt, templateContent, testConfig.getInfo(), sha, fileName, isActive);
                     YamlTemplateDao.instance.insertOne(yamlTemplate);
                 }
             }

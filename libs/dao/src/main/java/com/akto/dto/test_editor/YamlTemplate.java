@@ -17,8 +17,10 @@ public class YamlTemplate {
     public static final String SHA = "sha";
     private String fileName;
     public static final String FILE_NAME = "fileName";
+    private Boolean isActive;
+    public static final String IS_ACTIVE = "isActive";
 
-    public YamlTemplate(String id, int createdAt, String author, int updatedAt, String content, Info info, String sha, String fileName) {
+    public YamlTemplate(String id, int createdAt, String author, int updatedAt, String content, Info info, String sha, String fileName, Boolean isActive) {
         this.id = id;
         this.createdAt = createdAt;
         this.author = author;
@@ -27,6 +29,7 @@ public class YamlTemplate {
         this.info = info;
         this.sha = sha;
         this.fileName = fileName;
+        this.isActive = isActive;
     }
 
     public YamlTemplate() {
@@ -94,5 +97,13 @@ public class YamlTemplate {
 
     public void setFileName(String fileName) {
         this.fileName = fileName;
+    }
+
+    public Boolean getIsActive() {
+        return isActive;
+    }
+
+    public void setIsActive(Boolean isActive) {
+        this.isActive = isActive;
     }
 }
