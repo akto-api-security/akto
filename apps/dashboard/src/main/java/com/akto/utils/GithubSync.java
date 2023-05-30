@@ -66,7 +66,7 @@ public class GithubSync {
         Map<String, GithubFile> dirContents = new HashMap<>();
         
         Request dirRequest = new Request.Builder()
-                .url(String.format("https://api.github.com/repos/%s/contents/%s", repo, dirPath))
+                .url(String.format("https://api.github.com/repos/%s/contents/%s?ref=test/test-editor-files-versioning-isactive", repo, dirPath))
                 .build();
 
         try {

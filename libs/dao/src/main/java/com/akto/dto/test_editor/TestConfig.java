@@ -19,8 +19,10 @@ public class TestConfig {
 
     private ConfigParserResult validation;
 
+    private Metadata metadata;
+
     public TestConfig(String id, Info info, Auth auth, ConfigParserResult apiSelectionFilters, Map<String, List<String>> wordlists, ExecutorConfigParserResult execute, 
-        ConfigParserResult validation) {
+        ConfigParserResult validation, Metadata metadata) {
         
         this.id = id;
         this.info = info;
@@ -29,6 +31,7 @@ public class TestConfig {
         this.wordlists = wordlists;
         this.execute = execute;
         this.validation = validation;
+        this.metadata = metadata;
     }
 
     public TestConfig() { }
@@ -89,4 +92,11 @@ public class TestConfig {
         this.validation = validation;
     }
 
+    public Metadata getMetadata() {
+        return metadata;
+    }
+
+    public void setMetadata(Metadata metadata) {
+        this.metadata = metadata;
+    }
 }
