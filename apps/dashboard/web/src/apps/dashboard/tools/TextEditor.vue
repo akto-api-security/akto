@@ -3,7 +3,13 @@
         <simple-layout title="Test Editor" version="Beta">
             <template>
                 <div class="d-flex test-editor-panel">
-                    <div class="test-col">
+                    <div class="test-col"
+                        ref="resizeableDiv"
+                        :style="{ width: resizeableDivWidth + 'px' }"
+                        @mousedown="startResize"
+                        @mouseup="stopResize"
+                        @mousemove="resizeDiv"
+                    >
                         <layout-with-left-pane>
                             <search class="search-box" placeholder="Search Tests" @changed="setSearchText" />
                             <div class="tests-container">
@@ -259,10 +265,29 @@ export default {
             lastEdited: -1,
             copyTestObj: {},
             copyCustomObj: {},
-            defaultTest: "REMOVE_TOKENS"
+            defaultTest: "REMOVE_TOKENS",
+            resizeableDivWidth: 220,
+            resizing: false,
+            startX: 0,
+            startWidth: 0,
         }
     },
     methods: {
+        startResize(event){
+            this.resizing = true
+            this.startX = event.clientX;
+            this.startWidth = this.resizeableDivWidth;
+        },
+        stopResize(){
+            this.resizing = false
+        },
+        resizeDiv(event){
+            if (this.resizing) {
+                const offset = event.clientX - this.startX;
+                const newWidth = this.startWidth + offset;
+                this.resizeableDivWidth = newWidth;
+            }
+        },
         getFormValues(param, formValues) {
             if (param === 'choose') {
                 this.selectedUrl = {
@@ -565,9 +590,16 @@ export default {
 
 <style lang="scss" scoped>
 .test-col {
-    flex: 1.5;
+    // flex: 1.5
     max-height: calc(100vh - 72px);
+    min-width: 180px;
+    max-width: 360px;
     overflow-y: scroll;
+    flex-grow: 0;
+    flex-shrink: 0;
+    overflow: auto;
+    resize: horizontal;
+    transition: width 0.3s ease; 
 }
 
 .editor-col {
