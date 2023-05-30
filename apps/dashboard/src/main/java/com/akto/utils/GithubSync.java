@@ -1,7 +1,9 @@
 package com.akto.utils;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.json.JSONArray;
@@ -23,6 +25,39 @@ public class GithubSync {
     private static final Logger logger = LoggerFactory.getLogger(GithubSync.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(GithubSync.class);
     private static final OkHttpClient client = new OkHttpClient();
+
+    public List<String> getDirFileNames(String repo, String dirPath) {
+        List<String> dirFileNames = new ArrayList<>();
+        
+        Request dirRequest = new Request.Builder()
+                .url(String.format("https://api.github.com/repos/%s/contents/%s?ref=test/test-editor-files-versioning-isactive", repo, dirPath))
+                .build();
+
+        try {
+            Response dirResponse = client.newCall(dirRequest).execute();
+
+            if (dirResponse.code() == 404) {
+                loggerMaker.errorAndAddToDb(String.format("Could not retrieve directory file names %s of repo %s", dirPath, repo), LogDb.DASHBOARD);
+                return null;
+            }
+
+            ResponseBody dirResponseBody = dirResponse.body();
+            if (dirResponseBody != null) {
+                String jsonString = dirResponseBody.string();
+                JSONArray dirContentsArray = new JSONArray(jsonString);
+                for (Object file : dirContentsArray) {
+                    JSONObject fileObject = (JSONObject) file;
+                    String fileName = fileObject.getString("name");
+                    dirFileNames.add(fileName);
+                }
+            }
+        } catch (Exception ex) {
+            loggerMaker.errorAndAddToDb(String.format("Error while syncing files from directory %s in Github repo %s %s ", repo, dirPath, ex.toString()), LogDb.DASHBOARD);
+            return null;
+        }
+        
+        return dirFileNames;
+    }
 
     public GithubFile syncFile(String repo, String filePath, String latestSha, Map<String, String> githubFileShaMap) {
         String[] filePathSplit = filePath.split("/");
@@ -102,4 +137,6 @@ public class GithubSync {
         
         return dirContents;
     }
+
+
 }
