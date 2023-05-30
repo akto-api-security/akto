@@ -181,4 +181,7 @@ public class AdminSettingsAction extends UserAction {
         this.filterHeaderValueMap = filterHeaderValueMap;
     }
     
+    public void setApiCollectionNameMapper(Map<String, String> apiCollectionNameMapper) {
+        this.apiCollectionNameMapper = apiCollectionNameMapper;
+    }
 }
