@@ -118,7 +118,7 @@
                         <div class="empty-container" v-else>
                             No Values Yet !!
                         </div>
-                        <div class="select-url" @click="openDialogBox('choose')">
+                        <div class="select-url" @click="openDialogBox('choose')" v-if="showSelector">
                             <v-icon size=12>$fas_check</v-icon>
                             <span class="file-name url-name show-overflow">{{ selectedUrl.url }}</span>
                         </div>
@@ -144,7 +144,7 @@
                                 <div class="vulnerable-container">
                                     <span>
                                         <v-icon size=14
-                                            :style="{ transform: showAllDetails ? 'rotate(180deg)' : '', transition: 'all 0.2s linear', cursor: 'pointer' }"
+                                            :style="{ transform: showAllDetails ? 'rotate(180deg)' : '', cursor: 'pointer' }"
                                             @click="showAllDetails = !showAllDetails">
                                             $fas_angle-double-down
                                         </v-icon>
@@ -273,6 +273,11 @@ export default {
                 this.makeJson()
             } else if (param === 'save') {
                 this.$store.dispatch('testing/addTestTemplate', { content: this.textEditor.getValue(), testId: formValues.name, testCategory: formValues.category })
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: "Test template has been added, refresh page to see result.",
+                    color: 'green'
+                });
             }
         },
         setSelectedMethod(testId) {
@@ -493,6 +498,9 @@ export default {
                 title: this.messageJson["title"],
                 "highlightPaths": this.messageJson["highlightPaths"],
             }
+        },
+        showSelector(){
+            return this.defaultValue.length > 0
         },
         getTextColor() {
             switch (this.runTestObj.vulnerability) {
