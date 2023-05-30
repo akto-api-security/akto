@@ -104,11 +104,21 @@ export default {
         },
         emitFunc(param){
             if(param !== 'save'){
-                this.$emit('get_form_values',param,this.newCollection)
+                if(this.newCollection.url && this.newCollection.url.url.length > 0){
+                    this.$emit('get_form_values',param,this.newCollection)
+                    this.$emit('closeDialog')
+                }else{
+                    window._AKTO.$emit('SHOW_SNACKBAR', {
+                        show: true,
+                        text: "Please Select an Api",
+                        color: 'red'
+                    });
+                }
             }else{
                 this.$emit('get_form_values',param,this.newTest)
+                this.$emit('closeDialog')
             }
-            this.$emit('closeDialog')
+            
         },
     },
     watch:{

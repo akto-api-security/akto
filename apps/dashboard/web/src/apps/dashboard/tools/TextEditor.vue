@@ -278,6 +278,7 @@ export default {
         setSelectedMethod(testId) {
             this.selectedUrl = {}
             this.messageJson = {}
+            this.runTest = false
             if (!(this.mapRequestsToId[testId] && this.mapRequestsToId[testId].length > 0)) {
                 testId = this.defaultTest
             }
