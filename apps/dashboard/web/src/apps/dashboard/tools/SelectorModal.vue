@@ -96,6 +96,7 @@ export default {
         },
         mapCollectionIdToName() {
             let collections = this.$store.state.collections.apiCollections
+            this.newCollection.name = collections[0].id
             return [...new Set(collections.map(collection => {return { text: collection.displayName, value: collection.id}}))]
         },
         getApiEndpoints(arr){

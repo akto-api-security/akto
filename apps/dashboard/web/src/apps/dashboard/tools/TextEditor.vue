@@ -1,6 +1,6 @@
 <template>
     <div>
-        <simple-layout title="Test Editor">
+        <simple-layout title="Test Editor" version="Beta">
             <template>
                 <div class="d-flex test-editor-panel">
                     <div class="test-col">
@@ -14,7 +14,7 @@
                                         Custom
                                     </span>
 
-                                    <span class="total-tests">
+                                    <span class="total-tests shift-right">
                                         {{ totalCustomTests }}
                                     </span>
                                 </div>
@@ -55,7 +55,7 @@
                                         Akto Default
                                     </span>
 
-                                    <span class="total-tests">
+                                    <span class="total-tests shift-right">
                                         {{ totalAktoTests }}
                                     </span>
                                 </div>
@@ -259,6 +259,7 @@ export default {
             lastEdited: -1,
             copyTestObj: {},
             copyCustomObj: {},
+            defaultTest: "REMOVE_TOKENS"
         }
     },
     methods: {
@@ -277,19 +278,20 @@ export default {
         setSelectedMethod(testId) {
             this.selectedUrl = {}
             this.messageJson = {}
-            if (this.mapRequestsToId[testId] && this.mapRequestsToId[testId].length > 0) {
-                let obj = {
-                    apiCollectionId: this.mapRequestsToId[testId][0].apiCollectionId,
-                    url: this.mapRequestsToId[testId][0].url,
-                    method: this.mapRequestsToId[testId][0].method._name
-                }
-                this.selectedUrl = obj
-                this.makeJson()
+            if (!(this.mapRequestsToId[testId] && this.mapRequestsToId[testId].length > 0)) {
+                testId = this.defaultTest
             }
+            let obj = {
+                apiCollectionId: this.mapRequestsToId[testId][0].apiCollectionId,
+                url: this.mapRequestsToId[testId][0].url,
+                method: this.mapRequestsToId[testId][0].method._name
+            }
+            this.selectedUrl = obj
+            this.makeJson()
         },
         async makeJson() {
             await inventoryApi.fetchSampleData(this.selectedUrl.url, this.selectedUrl.apiCollectionId, this.selectedUrl.method).then((resp) => {
-                if (resp.sampleDataList[0].samples && resp.sampleDataList[0].samples.length > 0) {
+                if (resp.sampleDataList.length > 0 && resp.sampleDataList[0].samples && resp.sampleDataList[0].samples.length > 0) {
                     this.messageJson = { "message": resp.sampleDataList[0].samples[0], "highlightPaths": [] }
                 }
             })
@@ -397,7 +399,8 @@ export default {
                     let arr = obj.all.filter((test)=>{
                         let name = test.label.toString().toLowerCase().replace(/ /g, "")
                         let category = test.category.toString().toLowerCase().replace(/ /g, "")
-                        if(name.includes(searchString) || category.includes(searchString)){
+                        let content = this.mapTestToYaml[test.label].toString().toLowerCase();
+                        if(name.includes(searchString) || category.includes(searchString) || content.includes(searchString)){
                             totalTests++
                             return true
                         }
@@ -526,11 +529,6 @@ export default {
     align-items: center !important;
 }
 
-.tests-category-container>>>.v-list-group__header__append-icon {
-    position: absolute;
-    right: -35px;
-}
-
 .monaco-editor>>>.margin-view-overlays {
     background: var(--hexColor44);
 }
@@ -548,7 +546,7 @@ export default {
 }
 
 .req-box-container>>>.sample-data-container {
-    max-height: 650px;
+    max-height: 60vh;
     overflow-y: scroll;
 }
 </style>
@@ -591,8 +589,8 @@ export default {
 .req-resp-col {
     flex: 3;
     height: calc(100vh - 120px);
-    overflow-y: scroll;
     display: flex;
+    overflow: hidden;
     flex-direction: column;
 
     .empty-container {
@@ -681,6 +679,10 @@ export default {
     gap: 2px;
     align-items: center;
     cursor: pointer;
+    .shift-right{
+        position: absolute;
+        right: 20px; 
+    }
 }
 
 .title-name {
@@ -721,7 +723,7 @@ export default {
                 color: var(--themeColorDark);
                 font-size: 12px;
                 font-weight: 500;
-                padding-left: 16px;
+                padding-left: 36px;
             }
         }
     }
@@ -734,14 +736,12 @@ export default {
 }
 
 .total-tests {
-    position: absolute;
-    right: 14px;
     font-size: 12px;
     color: var(--themeColorDark);
 }
 
 .select-url {
-    max-width: 250px;
+    max-width: 310px;
     position: absolute;
     top: 87px;
     right: 20px;
