@@ -106,7 +106,7 @@
                             </div>
                             <div style="margin-left: 24px">
                                 <div class="d-flex jc-sb mr-3">
-                                    <span v-if="messagesBasic.length > 1" class="description-title mt-4">
+                                    <span v-if="jsonBasic && jsonBasic['message']" class="description-title mt-4">
                                         Test response matches {{ percentageMatch }}% with original API response
 
                                         <v-chip v-if="isVulnerableAttempt" :style="{ 'height': '18px !important' }" class="ml-2 mr-2" color="var(--rgbaColor15)" text-color="var(--white)">
