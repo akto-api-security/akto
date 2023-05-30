@@ -182,6 +182,22 @@ export default {
     .dropdown-menu >>> .v-menu__content{
         max-height: 130px !important;
     }
+    .dropdown-menu >>> .v-input__slot:before{
+        border: none !important;
+        box-shadow: none !important;
+    }
+    .dropdown-menu >>> .v-input__slot:after{
+        border: none !important;
+        box-shadow: none !important;
+    }
+    .form-field-text >>> .v-input__slot:before{
+        border: none !important;
+        box-shadow: none !important;
+    }
+    .form-field-text >>> .v-input__slot:after{
+        border: none !important;
+        box-shadow: none !important;
+    }
     .light-btn{
         border: 1px solid var(--borderColor) !important;
         color: var(--themeColorDark) !important;

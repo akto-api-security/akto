@@ -144,9 +144,9 @@
                                 <div class="vulnerable-container">
                                     <span>
                                         <v-icon size=14
-                                            :style="{ transform: showAllDetails ? 'rotate(180deg)' : '', cursor: 'pointer' }"
+                                            :style="{cursor: 'pointer' }"
                                             @click="showAllDetails = !showAllDetails">
-                                            $fas_angle-double-down
+                                            {{ showdetailsIcon }}
                                         </v-icon>
                                         <span :style="{ 'color': getTextColor }">{{ runTestObj.vulnerability }}</span>
                                         <span>Vulnerability Found</span>
@@ -502,6 +502,9 @@ export default {
         showSelector(){
             return this.defaultValue.length > 0
         },
+        showdetailsIcon(){
+            return this.showAllDetails ? "$fas_angle-double-down" : "$fas_angle-double-up"
+        },
         getTextColor() {
             switch (this.runTestObj.vulnerability) {
                 case 'HIGH':
@@ -607,6 +610,7 @@ export default {
         font-size: 18px;
         font-weight: 600;
         color: var(--themeColorDark);
+        flex: 16;
     }
 
     .req-box-container {
