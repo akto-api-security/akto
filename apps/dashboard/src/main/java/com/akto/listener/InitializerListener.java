@@ -898,7 +898,7 @@ public class InitializerListener implements ServletContextListener {
             deleteAccessListFromApiToken(backwardCompatibility);
             deleteNullSubCategoryIssues(backwardCompatibility);
             enableNewMerging(backwardCompatibility);
-            loadTemplateFilesFromDirectory(backwardCompatibility);
+            //loadTemplateFilesFromDirectory(backwardCompatibility);
 
             SingleTypeInfo.init();
 
@@ -1023,120 +1023,164 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void updateTestEditorTemplatesFromGithub() {   
-        // logger.info("Updating test template files from Github");
+        logger.info("Updating test template files from Github");
 
-        // InputStream in = InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files/Version.yaml");
-        // BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-        // StringBuilder stringbuilder = new StringBuilder();
-        // String line = null;
-        // try {
-        //     while ((line = reader.readLine()) != null) {
-        //         stringbuilder.append(line + "\n");
-        //     }
-        //     in.close();
-        // } catch (Exception e) {
-        //     System.out.println(e);
-        // }
-        // String template = stringbuilder.toString();
+        InputStream in = InitializerListener.class.getResourceAsStream("/inbuilt_test_yaml_files/Version.yaml");
+        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+        StringBuilder stringbuilder = new StringBuilder();
+        String line = null;
+        try {
+            while ((line = reader.readLine()) != null) {
+                stringbuilder.append(line + "\n");
+            }
+            in.close();
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+        String template = stringbuilder.toString();
 
-        // TestConfig testConfig = null;
+        String templateContent = template;
+        String fileName = "Version.yaml";
+        String sha = "3d21ec53a331a6f037a91c368710b99387d012c3";
 
-        // try {
-        //     testConfig = TestConfigYamlParser.parseTemplate(template);
-        // } catch (Exception e) {
-        //     loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file %s %s", "Version", e.toString()), LogDb.DASHBOARD);
-        // }
+        TestConfig testConfig = null;
 
-        // Metadata metadata = testConfig.getMetadata();
+        try {
+            testConfig = TestConfigYamlParser.parseTemplate(template);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file %s %s", "Version", e.toString()), LogDb.DASHBOARD);
+        }
 
-        // // Get deployment type and the appropriate template version
-        // String templateMinimumAktoVersion = null;
+        Metadata metadata = testConfig.getMetadata();
 
-        // if (DashboardMode.isLocalDeployment()) {
-        //     templateMinimumAktoVersion = metadata.getMinAktoVersion();
-        // } else {
-        //     templateMinimumAktoVersion = metadata.getMinOnpremVersion(); 
-        // }
+        // Get deployment type and the appropriate template version
+        String templateMinimumAktoVersion = null;
 
-        // // Get dashboard version
-        // String dashboardVersion = DashboardVersion.getDashboardVersion();
-        // System.out.println(dashboardVersion);
+        if (DashboardMode.isLocalDeployment()) {
+            templateMinimumAktoVersion = metadata.getMinAktoVersion();
+        } else {
+            templateMinimumAktoVersion = metadata.getMinOnpremVersion(); 
+        }
+
+        // Get dashboard version
+        String dashboardVersion = DashboardVersion.getDashboardVersion();
+
+        // Check if updated template is not supported by dashboard
+        if (DashboardVersion.isSemanticVersionString(dashboardVersion)) {
+            if (DashboardVersion.compareVersions(templateMinimumAktoVersion, dashboardVersion) > 0) {
+                // replace with continue
+                System.out.println("Template does't support version");
+                return;
+            } 
+        } 
+
+        String id = testConfig.getId();
+        int createdAt = Context.now();
+        int updatedAt = Context.now();
+        String author = "AKTO";
+        Boolean isActive = metadata.getIsActive();
+        
+        YamlTemplateDao.instance.updateOne(
+            Filters.eq("_id", id),
+            Updates.combine(
+                    Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
+                    Updates.setOnInsert(YamlTemplate.AUTHOR, author),
+                    Updates.setOnInsert(YamlTemplate.FILE_NAME, fileName),
+                    Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
+                    Updates.set(YamlTemplate.CONTENT, templateContent),
+                    Updates.set(YamlTemplate.INFO, testConfig.getInfo()),
+                    Updates.set(YamlTemplate.SHA, sha),
+                    Updates.set(YamlTemplate.IS_ACTIVE, isActive)
+            )
+        );
 
 
+        
 
         return;
 
         //Get existing template sha values 
-        // Map<String, String> yamlTemplatesGithubFileSha = new HashMap<>();
-        // List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(new BasicDBObject());
+        Map<String, String> yamlTemplatesGithubFileSha = new HashMap<>();
+        List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(new BasicDBObject());
 
-        // for(YamlTemplate yamlTemplate: yamlTemplates) {
-        //     String fileName = yamlTemplate.getFileName();
-        //     String sha = yamlTemplate.getSha();
+        for(YamlTemplate yamlTemplate: yamlTemplates) {
+            String fileName = yamlTemplate.getFileName();
+            String sha = yamlTemplate.getSha();
 
-        //     //ignore custom temlates
-        //     if (fileName == null || fileName == "" || sha == null || sha == "") {
-        //         continue;
-        //     }
+            //ignore custom temlates
+            if (fileName == null || fileName == "" || sha == null || sha == "") {
+                continue;
+            }
 
-        //     yamlTemplatesGithubFileSha.put(yamlTemplate.getFileName(), yamlTemplate.getSha());
-        // }
+            yamlTemplatesGithubFileSha.put(yamlTemplate.getFileName(), yamlTemplate.getSha());
+        }
 
-        // GithubSync githubSync = new GithubSync();
-        // Map<String, GithubFile> templates = githubSync.syncDir("akto-api-security/akto", "apps/dashboard/src/main/resources/inbuilt_test_yaml_files/", yamlTemplatesGithubFileSha);
+        GithubSync githubSync = new GithubSync();
+        Map<String, GithubFile> templates = githubSync.syncDir("akto-api-security/akto", "apps/dashboard/src/main/resources/inbuilt_test_yaml_files/", yamlTemplatesGithubFileSha);
 
-        // if (templates != null) {
-        //     for (GithubFile template : templates.values()) {
-        //         String templateContent = template.getContent();
-        //         String fileName = template.getName();
-        //         String sha = template.getSha();
+        if (templates != null) {
+            for (GithubFile template : templates.values()) {
+                String templateContent = template.getContent();
+                String fileName = template.getName();
+                String sha = template.getSha();
                 
-        //         TestConfig testConfig = null;
+                TestConfig testConfig = null;
 
-        //         try {
-        //             testConfig = TestConfigYamlParser.parseTemplate(templateContent);
-        //         } catch (Exception e) {
-        //             loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file %s %s", template.getName(), e.toString()), LogDb.DASHBOARD);
-        //         }
+                try {
+                    testConfig = TestConfigYamlParser.parseTemplate(templateContent);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file %s %s", template.getName(), e.toString()), LogDb.DASHBOARD);
+                }
 
 
-        //         if (testConfig == null) {
-        //             loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file %s", template.getName()), LogDb.DASHBOARD);
-        //         } else {
-        //             String dashboardVersion = System.getProperty("akto-image-tag", "latest");
-        //             System.out.println(dashboardVersion);
+                if (testConfig == null) {
+                    loggerMaker.errorAndAddToDb(String.format("Error parsing yaml template file %s", template.getName()), LogDb.DASHBOARD);
+                } else {
+                    Metadata metadata = testConfig.getMetadata();
 
-        //             String templateVersion = null;
+                    // Get deployment type and the appropriate template version
+                    String templateMinimumAktoVersion = null;
 
-        //             if (DashboardMode.isLocalDeployment()) {
-        //                 //Set to min_akto_version
-        //                 templateVersion = "1.29.1";
-        //             } else {
-        //                 //Set to min_onprem_Version
-        //                 templateVersion = "1.30.6";
-        //             }
+                    if (DashboardMode.isLocalDeployment()) {
+                        templateMinimumAktoVersion = metadata.getMinAktoVersion();
+                    } else {
+                        templateMinimumAktoVersion = metadata.getMinOnpremVersion(); 
+                    }
 
+                    // Get dashboard version
+                    String dashboardVersion = DashboardVersion.getDashboardVersion();
+
+                    // Check if updated template is not supported by dashboard
+                    if (DashboardVersion.isSemanticVersionString(dashboardVersion)) {
+                        if (DashboardVersion.compareVersions(templateMinimumAktoVersion, dashboardVersion) > 0) {
+                            System.out.println(String.format("%s does not support dashoard version", fileName));
+                            continue;
+                        } 
+                    } 
+
+    
+                    String id = testConfig.getId();
+                    int createdAt = Context.now();
+                    int updatedAt = Context.now();
+                    String author = "AKTO";
+                    Boolean isActive = metadata.getIsActive();
                     
-        //             String id = testConfig.getId();
-        //             int createdAt = Context.now();
-        //             int updatedAt = Context.now();
-        //             String author = "AKTO";
-                    
-        //             YamlTemplateDao.instance.updateOne(
-        //                 Filters.eq("_id", id),
-        //                 Updates.combine(
-        //                         Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
-        //                         Updates.setOnInsert(YamlTemplate.AUTHOR, author),
-        //                         Updates.setOnInsert(YamlTemplate.FILE_NAME, fileName),
-        //                         Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
-        //                         Updates.set(YamlTemplate.CONTENT, templateContent),
-        //                         Updates.set(YamlTemplate.INFO, testConfig.getInfo()),
-        //                         Updates.set(YamlTemplate.SHA, sha)
-        //                 )
-        //             );
-        //         }
-        //     }
-        // }
+                    YamlTemplateDao.instance.updateOne(
+                        Filters.eq("_id", id),
+                        Updates.combine(
+                                Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
+                                Updates.setOnInsert(YamlTemplate.AUTHOR, author),
+                                Updates.setOnInsert(YamlTemplate.FILE_NAME, fileName),
+                                Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
+                                Updates.set(YamlTemplate.CONTENT, templateContent),
+                                Updates.set(YamlTemplate.INFO, testConfig.getInfo()),
+                                Updates.set(YamlTemplate.SHA, sha),
+                                Updates.set(YamlTemplate.IS_ACTIVE, isActive)
+                        )
+                    );
+                }
+            }
+        }
     }
 
     public void loadTemplateFilesFromDirectory(BackwardCompatibility backwardCompatibility) {
