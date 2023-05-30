@@ -15,6 +15,7 @@ import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.policies.AktoPolicyNew;
 import com.mongodb.ConnectionString;
 import org.bson.conversions.Bson;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
