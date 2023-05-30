@@ -1,6 +1,6 @@
-id: VERSION_SAME
+id: Test
 info:
-  name: "IDOR by adding user id in query params"
+  name: "Test"
   description: "Attacker can access resources of any user by adding user_id in URL."
   details: >
     "The endpoint appears to be vulnerable to broken object level authorization attack. The original request was replayed by adding other user's user id in query params.
@@ -49,5 +49,5 @@ validate:
     length:
       gt: 0
 metadata:
-  min_akto_version: 1.29.1
-  min_onprem_version: 1.30.6
+  minAktoVersion: 1.29.1
+  minOnpremVersion: 1.30.6
