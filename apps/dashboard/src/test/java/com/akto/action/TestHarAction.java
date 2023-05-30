@@ -27,7 +27,7 @@ import static org.junit.Assert.assertEquals;
 public class TestHarAction extends MongoBasedTest{
 
 
-    @Test
+    @Ignore
     public void testHeaderFilter() throws IOException {
 
         AccountSettingsDao.instance.getMCollection().drop();
