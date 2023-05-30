@@ -1,7 +1,7 @@
 <template>
     <div>
         <div class="layout-border pl-8" style="padding-bottom: 12px">
-            <div v-if="title" :class="['pt-6', version.length > 0 ? 'version-class': '']">
+            <div v-if="title" :class="['pt-6', version && version.length > 0 ? 'version-class': '']">
                 <div>
                     <span class="board-name">{{ title || 'Loading...' }}</span>
                 </div>
@@ -10,7 +10,7 @@
                     <span class="board-description">{{description}}</span>
                 </div>
 
-                <div v-if="version.length > 0" class="version-name">
+                <div v-if="version && version.length > 0" class="version-name">
                     {{ version }}
                 </div>
             </div>
