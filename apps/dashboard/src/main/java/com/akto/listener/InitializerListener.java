@@ -1076,6 +1076,12 @@ public class InitializerListener implements ServletContextListener {
                         templateMinimumAktoVersion = metadata.getMinOnpremVersion(); 
                     }
 
+                    // Ignore template if templateMinimumAktoVersion is not a semantic version string
+                    if(!DashboardVersion.isSemanticVersionString(templateMinimumAktoVersion)) {
+                        logger.info(String.format("Template %s has malformatted akto versionspecified.", fileName));
+                        continue;
+                    }
+
                     // Get dashboard version
                     String dashboardVersion = DashboardVersion.getDashboardVersion();
 
