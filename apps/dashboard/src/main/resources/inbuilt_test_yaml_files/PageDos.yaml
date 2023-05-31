@@ -47,3 +47,6 @@ validate:
   response_payload:
     length:
       gt: ${original_length}
+metadata:
+  minAktoVersion: 1.29.1
+  minOnpremVersion: 1.30.8

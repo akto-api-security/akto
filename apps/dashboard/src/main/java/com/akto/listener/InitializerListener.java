@@ -1043,7 +1043,7 @@ public class InitializerListener implements ServletContextListener {
 
         GithubSync githubSync = new GithubSync();
         Map<String, GithubFile> templates = githubSync.syncDir("akto-api-security/akto", "apps/dashboard/src/main/resources/inbuilt_test_yaml_files/", yamlTemplatesGithubFileSha);
-
+        
         if (templates != null) {
             for (GithubFile template : templates.values()) {
                 if (template == null) {
@@ -1067,6 +1067,11 @@ public class InitializerListener implements ServletContextListener {
                 } else {
                     Metadata metadata = testConfig.getMetadata();
 
+                    // Skip template if metadata field is empty
+                    if (metadata == null) {
+                        continue;
+                    }
+
                     // Get deployment type and the appropriate template version
                     String templateMinimumAktoVersion = null;
 
@@ -1078,7 +1083,7 @@ public class InitializerListener implements ServletContextListener {
 
                     // Ignore template if templateMinimumAktoVersion is not a semantic version string
                     if(!DashboardVersion.isSemanticVersionString(templateMinimumAktoVersion)) {
-                        logger.info(String.format("Template %s has malformatted akto versionspecified.", fileName));
+                        logger.info(String.format("Template %s has malformatted akto version specified.", fileName));
                         continue;
                     }
 

@@ -67,3 +67,6 @@ validate:
         eq: ${role_key}
       value:
         eq: ${role_context.value}
+metadata:
+  minAktoVersion: 1.29.1
+  minOnpremVersion: 1.30.8
