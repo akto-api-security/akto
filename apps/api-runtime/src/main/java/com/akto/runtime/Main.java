@@ -9,6 +9,7 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 import com.akto.DaoInit;
 import com.akto.dao.*;
@@ -147,6 +148,9 @@ public class Main {
 
         public void setAccountSettings(AccountSettings accountSettings) {
             this.accountSettings = accountSettings;
+            if (accountSettings != null) {
+                logger.info("Received " + accountSettings.convertApiCollectionNameMapperToRegex().size() + " apiCollectionNameMappers");
+            }
         }        
     }
 
@@ -396,6 +400,31 @@ public class Main {
                 }
 
                 accWiseResponse = accWiseResponseFiltered;
+            }
+
+            Map<Pattern, String> apiCollectioNameMapper = accountSettings.convertApiCollectionNameMapperToRegex();
+            if (apiCollectioNameMapper != null && !apiCollectioNameMapper.isEmpty()) {
+                for(HttpResponseParams accWiseResponseEntry : accWiseResponse) {
+                    Map<String, List<String>> reqHeaders = accWiseResponseEntry.getRequestParams().getHeaders();
+                    for(Map.Entry<Pattern, String> apiCollectioNameOrigXNew : apiCollectioNameMapper.entrySet()) {
+                        List<String> reqHeaderValues = reqHeaders == null ? null : reqHeaders.get("host");
+                        if (reqHeaderValues != null && !reqHeaderValues.isEmpty()) {
+                            for (int i = 0; i < reqHeaderValues.size(); i++) {
+                                String reqHeaderValue = reqHeaderValues.get(i);
+                                Pattern regex = apiCollectioNameOrigXNew.getKey();
+                                String newValue = apiCollectioNameOrigXNew.getValue();
+
+                                try {
+                                    if (regex.matcher(reqHeaderValue).matches()) {
+                                        reqHeaderValues.set(i, newValue);
+                                    }
+                                } catch (Exception e) {
+                                    // eat it
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 

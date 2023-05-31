@@ -3,6 +3,7 @@ package com.akto.action;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
+import com.akto.dto.type.CollectionReplaceDetails;
 import com.akto.runtime.Main;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
@@ -121,7 +122,7 @@ public class AdminSettingsAction extends UserAction {
 
 
     private Map<String, String> filterHeaderValueMap;
-
+    
     public String addFilterHeaderValueMap() {
         Bson update;
         if (this.filterHeaderValueMap == null) {
@@ -129,6 +130,32 @@ public class AdminSettingsAction extends UserAction {
         } else {
             update = Updates.set(AccountSettings.FILTER_HEADER_VALUE_MAP, this.filterHeaderValueMap);
         }
+
+        AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(), update
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
+    private String regex;
+    private String newName;
+    public String addApiCollectionNameMapper() {
+        String hashStr = regex.hashCode()+"";
+        Bson update = Updates.set(AccountSettings.API_COLLECTION_NAME_MAPPER+"."+hashStr, new CollectionReplaceDetails(regex, newName));
+
+        AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(), update
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String deleteApiCollectionNameMapper() {
+        
+        String hashStr = regex.hashCode()+"";
+
+        Bson update = Updates.unset(AccountSettings.API_COLLECTION_NAME_MAPPER+"."+hashStr);
 
         AccountSettingsDao.instance.updateOne(
                 AccountSettingsDao.generateFilter(), update
@@ -165,4 +192,11 @@ public class AdminSettingsAction extends UserAction {
         this.filterHeaderValueMap = filterHeaderValueMap;
     }
     
+    public void setRegex(String regex) {
+        this.regex = regex;
+    }
+
+    public void setNewName(String newName) {
+        this.newName = newName;
+    }
 }
