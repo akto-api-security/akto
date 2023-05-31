@@ -272,12 +272,13 @@ export default {
                 }
                 this.makeJson()
             } else if (param === 'save') {
-                this.$store.dispatch('testing/addTestTemplate', { content: this.textEditor.getValue(), testId: formValues.name, testCategory: formValues.category })
-                window._AKTO.$emit('SHOW_SNACKBAR', {
-                    show: true,
-                    text: "Test template has been added, refresh page to see result.",
-                    color: 'green'
-                });
+                this.$store.dispatch('testing/addTestTemplate', { content: this.textEditor.getValue(), testId: formValues.name, testCategory: formValues.category }).then((resp)=>{
+                    window._AKTO.$emit('SHOW_SNACKBAR', {
+                        show: true,
+                        text: "Test template has been added, refresh page to see result.",
+                        color: 'green'
+                    });
+                })
             }
         },
         setSelectedMethod(testId) {
