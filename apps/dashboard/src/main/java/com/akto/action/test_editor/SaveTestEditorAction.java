@@ -64,6 +64,14 @@ public class SaveTestEditorAction extends UserAction {
             ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
 
             Map<String, Object> config = mapper.readValue(content, Map.class);
+            String originalIDFromContent = (String) config.get("id");
+            if (!testId.equals(originalIDFromContent)) {
+                YamlTemplate yamlTemplate = YamlTemplateDao.instance.findOne(Filters.eq("id", testId));
+                if (yamlTemplate != null && yamlTemplate.getSource() == YamlTemplateSource.CUSTOM) {//custom template with same name exists
+                    addActionError("Cannot save template as template with same id exists, specify a different test id");
+                    return ERROR.toUpperCase();
+                }
+            }
             config.replace("id", testId);
 
             Object info = config.get("info");
