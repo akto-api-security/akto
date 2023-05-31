@@ -1,5 +1,5 @@
 <template>
-    <v-dialog width="500px" v-model="showDialog">
+    <v-dialog width="500px" v-model="dialogVisible">
         <a-card 
             :title="title" 
             class="ma-0 dialog-card" 
@@ -79,7 +79,7 @@ export default {
             newCollection:{
                 name: 0,
                 url: {},
-            }
+            },
         }
     },
     methods:{
@@ -119,6 +119,16 @@ export default {
                 this.$emit('closeDialog')
             }
             
+        },
+    },
+    computed: {
+        dialogVisible: {
+            get() {
+                return this.showDialog;
+            },
+            set() {
+                this.$emit('closeDialog');
+            },
         },
     },
     watch:{
@@ -164,6 +174,15 @@ export default {
     .dropdown-menu >>> .v-list-item__title {
         font-size: 14px !important;
         color: var(--themeColorDark) !important;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        line-height: 120%;
+        word-break: break-all;
+    }
+    .dropdown-menu >>> .v-list-item__title:hover{
+        overflow: visible;
+        white-space: normal;
     }
     .dropdown-menu >>> .v-select__selection {
         font-size: 14px !important;
