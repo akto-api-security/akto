@@ -49,5 +49,5 @@ validate:
     length:
       gt: 0
 metadata:
-  minAktoVersion: 1.28.0
+  minAktoVersion: 1.27.0
   minOnpremVersion: 1.30.6
