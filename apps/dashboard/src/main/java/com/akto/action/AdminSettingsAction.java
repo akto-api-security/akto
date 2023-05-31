@@ -3,6 +3,7 @@ package com.akto.action;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
+import com.akto.dto.type.CollectionReplaceDetails;
 import com.akto.runtime.Main;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
@@ -140,7 +141,8 @@ public class AdminSettingsAction extends UserAction {
     private String regex;
     private String newName;
     public String addApiCollectionNameMapper() {
-        Bson update = Updates.set(AccountSettings.API_COLLECTION_NAME_MAPPER+"."+regex, newName);
+        String hashStr = regex.hashCode()+"";
+        Bson update = Updates.set(AccountSettings.API_COLLECTION_NAME_MAPPER+"."+hashStr, new CollectionReplaceDetails(regex, newName));
 
         AccountSettingsDao.instance.updateOne(
                 AccountSettingsDao.generateFilter(), update
@@ -151,7 +153,9 @@ public class AdminSettingsAction extends UserAction {
 
     public String deleteApiCollectionNameMapper() {
         
-        Bson update = Updates.unset(AccountSettings.API_COLLECTION_NAME_MAPPER+"."+regex);
+        String hashStr = regex.hashCode()+"";
+
+        Bson update = Updates.unset(AccountSettings.API_COLLECTION_NAME_MAPPER+"."+hashStr);
 
         AccountSettingsDao.instance.updateOne(
                 AccountSettingsDao.generateFilter(), update

@@ -139,7 +139,7 @@
             <div class="entry-text">Replace collection</div>
             <div>
 
-                <div v-for="(newName, regex) in apiCollectionNameMapper">
+                <div v-for="({newName, regex}) in apiCollectionNameMapper">
                     <div>
                         <span class="fs-14 fw-500">{{regex}}</span>
                         <span class="fs-14">{{newName}}</span>

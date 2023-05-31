@@ -12,6 +12,7 @@ import com.akto.dto.*;
 import com.akto.dto.messaging.Message.Mode;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.type.CollectionReplaceDetails;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLTemplate;
@@ -499,8 +500,10 @@ public class TestDBSync extends MongoBasedTest {
         responseParamsList.add(httpResponseParams5);
 
         AccountSettings accountSettings = new AccountSettings();
-        Map<String, String> apiCollectionNameMapper= new HashMap<>();
-        apiCollectionNameMapper.put("^dev-\\d+\\.akto\\.io$", "dev.akto.io");
+        Map<String, CollectionReplaceDetails> apiCollectionNameMapper= new HashMap<>();
+        String regex = "^dev-\\d+\\.akto\\.io$";
+        String newName = "dev.akto.io";
+        apiCollectionNameMapper.put(regex.hashCode()+"", new CollectionReplaceDetails(regex, newName));
         accountSettings.setApiCollectionNameMapper(apiCollectionNameMapper);
 
         Main.filterBasedOnHeaders(responseParamsList, accountSettings);
