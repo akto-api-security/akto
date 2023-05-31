@@ -17,6 +17,7 @@ import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.test_editor.ExecutorSingleRequest;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.testing.ApiExecutor;
+import com.mongodb.BasicDBObject;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.Utils;
@@ -83,6 +84,7 @@ public class Executor {
         }
         Boolean followRedirect = true;
         List<RawApi> newRawApis = new ArrayList<>();
+
         if (childNodes.size() == 0) {
             Object key = node.getOperationType();
             Object value = node.getValues();
@@ -96,71 +98,53 @@ public class Executor {
                 }
                 value = null;
             }
-            // if rawapi size is 1, var type is wordlist, iterate on values
-            
-            if (Utils.isMultiOperation(operation)) {
-                Set<String> payLoadKeys = Utils.getKeysForMultiOperation(operation, baseRawApi);
-                if (VariableResolver.isWordListVariable(key, varMap)) {
-                    List<String> wordListVal = VariableResolver.resolveWordListVar(key.toString(), varMap);
-                    for (String bodyKey: payLoadKeys) {
-                        for (String val: wordListVal) {
+
+            Object expandedKey = expandKey(varMap, key, value);
+            Object expandedVal = expandValue(varMap, value);
+            if (expandedKey != null && (expandedKey instanceof ArrayList)) {
+                ArrayList<String> keyArr = (ArrayList<String>) expandedKey;
+                if (expandedVal != null && (expandedVal instanceof ArrayList)) {
+                    ArrayList<Object> valArr = (ArrayList<Object>) expandedVal;
+                    for (String k: keyArr) {
+                        for (Object v: valArr) {
                             RawApi copyRApi = baseRawApi.copy();
-                            ExecutorSingleOperationResp resp = invokeOperation(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_BODY_PARAM.toString(), bodyKey, val, copyRApi, varMap, authMechanism);
-                            if (!resp.getSuccess()) {
+                            ExecutorSingleOperationResp resp = invokeOperation(operation, k, v, copyRApi, varMap, authMechanism);
+                            if (!resp.getSuccess() || resp.getErrMsg().length() > 0) {
                                 continue;
                             }
                             newRawApis.add(copyRApi);
                         }
                     }
                 } else {
-                    for (String bodyKey: payLoadKeys) {
+                    for (String k: keyArr) {
                         RawApi copyRApi = baseRawApi.copy();
-                        ExecutorSingleOperationResp resp = invokeOperation(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_BODY_PARAM.toString(), bodyKey, key, copyRApi, varMap, authMechanism);
-                        if (!resp.getSuccess()) {
+                        ExecutorSingleOperationResp resp = invokeOperation(operation, k, value, copyRApi, varMap, authMechanism);
+                        if (!resp.getSuccess() || resp.getErrMsg().length() > 0) {
                             continue;
                         }
                         newRawApis.add(copyRApi);
                     }
                 }
+
             } else {
-                if (VariableResolver.isWordListVariable(key, varMap)) {
-                    List<String> wordListVal = VariableResolver.resolveWordListVar(key.toString(), varMap);
-
-                    for (int i = 0; i < wordListVal.size(); i++) {
+                if (expandedVal != null && (expandedVal instanceof ArrayList)) {
+                    ArrayList<Object> valArr = (ArrayList<Object>) expandedVal;
+                    for (Object v: valArr) {
                         RawApi copyRApi = baseRawApi.copy();
-                        ExecutorSingleOperationResp resp = invokeOperation(operation, wordListVal.get(i), value, copyRApi, varMap, authMechanism);
-                        if (!resp.getSuccess()) {
+                        ExecutorSingleOperationResp resp = invokeOperation(operation, key, v, copyRApi, varMap, authMechanism);
+                        if (!resp.getSuccess() || resp.getErrMsg().length() > 0) {
                             continue;
                         }
-                        if (resp.getErrMsg() == null || resp.getErrMsg().length() == 0) {
-                            newRawApis.add(copyRApi);
-                        }
+                        newRawApis.add(copyRApi);
                     }
-
-                } else if (VariableResolver.isWordListVariable(value, varMap)) {
-                    List<String> wordListVal = VariableResolver.resolveWordListVar(value.toString(), varMap);
-
-                    for (int i = 0; i < wordListVal.size(); i++) {
-                        RawApi copyRApi = baseRawApi.copy();
-                        ExecutorSingleOperationResp resp = invokeOperation(operation, key, wordListVal.get(i), copyRApi, varMap, authMechanism);
-                        if (!resp.getSuccess()) {
-                            continue;
-                        }
-                        if (resp.getErrMsg() == null || resp.getErrMsg().length() == 0) {
-                            newRawApis.add(copyRApi);
-                        }
-                    }
-
                 } else {
                     for (RawApi rawApi : rawApis) {
                         ExecutorSingleOperationResp resp = invokeOperation(operation, key, value, rawApi, varMap, authMechanism);
-                        if (!resp.getSuccess()) {
-                            return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
+                        if (!resp.getSuccess() || resp.getErrMsg().length() > 0) {
+                            continue;
                         }
                     }
-
                     invokeOperation(operation, key, value, baseRawApi, varMap, authMechanism);
-                    
                 }
             }
 
@@ -188,6 +172,45 @@ public class Executor {
         return new ExecutorSingleRequest(true, "", rawApis, followRedirect);
     }
 
+    public Object expandKey(Map<String, Object> varMap, Object key, Object value) {
+
+        if (key == null || !(key instanceof String)) {
+            return null;
+        }
+
+        Object keyContext = null, valContext = null;
+        if (key instanceof String) {
+            keyContext = VariableResolver.resolveContextKey(varMap, key.toString());
+        }
+        if (value instanceof String) {
+            valContext = VariableResolver.resolveContextVariable(varMap, value.toString());
+        }
+
+        if (keyContext instanceof ArrayList && valContext instanceof ArrayList) {
+            return null;
+        }
+
+        if (VariableResolver.isWordListVariable(key, varMap)) {
+            return VariableResolver.resolveWordListVar(key.toString(), varMap);
+        }
+
+        return VariableResolver.resolveExpression(varMap, key.toString());
+
+    }
+
+    public Object expandValue(Map<String, Object> varMap, Object value) {
+
+        if (value == null || !(value instanceof String)) {
+            return null;
+        }
+
+        if (VariableResolver.isWordListVariable(value, varMap)) {
+            return VariableResolver.resolveWordListVar(value.toString(), varMap);
+        }
+
+        return VariableResolver.resolveExpression(varMap, value.toString());
+
+    }
 
     public ExecutorSingleOperationResp invokeOperation(String operationType, Object key, Object value, RawApi rawApi, Map<String, Object> varMap, AuthMechanism authMechanism) {
         try {
@@ -210,7 +233,7 @@ public class Executor {
                 for (int i = 0; i < keyContextList.size(); i++) {
                     String v1 = valueContextList.get(i);
                     ExecutorSingleOperationResp resp = runOperation(operationType, rawApi, keyContextList.get(i), v1, varMap, authMechanism);
-                    if (!resp.getSuccess()) {
+                    if (!resp.getSuccess() || resp.getErrMsg().length() > 0) {
                         return resp;
                     }
                 }

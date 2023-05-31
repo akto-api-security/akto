@@ -51,7 +51,8 @@ public class TestEditorEnums {
     }
 
     public enum ExtractOperator {
-        EXTRACT
+        EXTRACT,
+        EXTRACTMULTIPLE
     }
 
     public enum OperandTypes {

@@ -40,10 +40,11 @@ public class Filter {
             FilterActionRequest filterActionRequest = new FilterActionRequest(node.getValues(), rawApi, testRawApi, apiInfoKey, node.getConcernedProperty(), node.getSubConcernedProperty(), matchingKeySet, contextEntities, operand, context, keyValOperandSeen, node.getBodyOperand(), node.getContextProperty());
             Object updatedQuerySet = filterAction.resolveQuerySetValues(filterActionRequest, node.fetchNodeValues(), varMap);
             filterActionRequest.setQuerySet(updatedQuerySet);
-            if (node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACT.toString())) {
+            if (node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACT.toString()) || node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACTMULTIPLE.toString())) {
                 boolean resp = true;
+                boolean extractMultiple = node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACTMULTIPLE.toString());
                 if (filterActionRequest.getConcernedProperty() != null) {
-                    filterAction.extract(filterActionRequest, varMap);
+                    filterAction.extract(filterActionRequest, varMap, extractMultiple);
                 } else {
                     resp = filterAction.extractContextVar(filterActionRequest, varMap);
                 }

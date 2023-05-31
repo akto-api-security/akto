@@ -22,7 +22,7 @@ public class VariableResolver {
         return obj;
     }
 
-    public static String resolveExpression(Map<String, Object> varMap, String expression) {
+    public static Object resolveExpression(Map<String, Object> varMap, String expression) {
 
         Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
         Matcher matcher = pattern.matcher(expression);
@@ -32,8 +32,20 @@ public class VariableResolver {
                 match = match.substring(2, match.length());
                 match = match.substring(0, match.length() - 1);
                 Object val = getValue(varMap, match);
-                String valString = val.toString();
-                expression = expression.replaceAll("(\\$\\{[^}]*\\})", valString);
+                if (val == null) {
+                    
+                }
+                if (val instanceof String) {
+                    String valString = val.toString();
+                    return expression.replaceAll("(\\$\\{[^}]*\\})", valString);
+                } else {
+                    ArrayList<String> expressionList = new ArrayList<>();
+                    ArrayList<String> valList = (ArrayList<String>) val;
+                    for (String v: valList) {
+                        expressionList.add(expression.replaceAll("(\\$\\{[^}]*\\})", v));
+                    }
+                    return expressionList;
+                }
             } catch (Exception e) {
                 return expression;
             }
@@ -42,10 +54,9 @@ public class VariableResolver {
             if (val == null) {
                 return expression;
             } else {
-                return val.toString();
+                return val;
             }
         }
-        return expression;
 
     }
 

@@ -74,9 +74,9 @@ public class TestConfigYamlParser {
         try {
             if (config.containsKey("wordLists")) {
                 wordListMap = (Map) config.get("wordLists");
-                if (wordListMap.size() > 1) {
-                    return new TestConfig(id, info, null, null, null, null, null);
-                }
+                // if (wordListMap.size() > 1) {
+                //     return new TestConfig(id, info, null, null, null, null, null);
+                // }
             }
         } catch (Exception e) {
             return new TestConfig(id, info, null, null, null, null, null);
