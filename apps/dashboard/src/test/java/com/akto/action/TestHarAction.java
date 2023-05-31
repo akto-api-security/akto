@@ -8,6 +8,7 @@ import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.User;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.listener.RuntimeListener;
@@ -21,6 +22,7 @@ import org.junit.Test;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
@@ -28,8 +30,11 @@ import static org.junit.Assert.assertEquals;
 public class TestHarAction extends MongoBasedTest{
 
 
-    @Ignore
+    @Test
     public void testHeaderFilter() throws IOException {
+        Context.accountId.set(1_000_000);
+        ApiCollectionsDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", 0, new HashSet<>(), null, 0));
 
         AccountSettingsDao.instance.getMCollection().drop();
         AccountSettings accountSettings = new AccountSettings(1_000_000, new ArrayList<>(), false, AccountSettings.SetupType.STAGING);
