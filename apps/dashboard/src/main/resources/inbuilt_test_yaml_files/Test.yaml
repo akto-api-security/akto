@@ -51,3 +51,4 @@ validate:
 metadata:
   minAktoVersion: 1.27.0
   minOnpremVersion: 1.30.6
+  isActive: true
