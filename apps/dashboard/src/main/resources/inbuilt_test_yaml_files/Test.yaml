@@ -48,7 +48,3 @@ validate:
       lt: 50
     length:
       gt: 0
-metadata:
-  minAktoVersion: 1.24.1
-  minOnpremVersion: 1.30.6
-  isActive: true
