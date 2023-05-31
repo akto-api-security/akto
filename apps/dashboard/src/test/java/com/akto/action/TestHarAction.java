@@ -32,6 +32,7 @@ public class TestHarAction extends MongoBasedTest{
 
     @Test
     public void testHeaderFilter() throws IOException {
+        Context.accountId.set(1_000_000);
         ApiCollectionsDao.instance.getMCollection().drop();
         ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", 0, new HashSet<>(), null, 0));
 
