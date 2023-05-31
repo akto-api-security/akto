@@ -15,6 +15,7 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.type.URLMethods;
+import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -66,7 +67,7 @@ public class SaveTestEditorAction extends UserAction {
             Map<String, Object> config = mapper.readValue(content, Map.class);
             String originalIDFromContent = (String) config.get("id");
             if (!testId.equals(originalIDFromContent)) {
-                YamlTemplate yamlTemplate = YamlTemplateDao.instance.findOne(Filters.eq("id", testId));
+                YamlTemplate yamlTemplate = YamlTemplateDao.instance.findOne(Filters.eq(Constants.ID, testId));
                 if (yamlTemplate != null && yamlTemplate.getSource() == YamlTemplateSource.CUSTOM) {//custom template with same name exists
                     addActionError("Cannot save template as template with same id exists, specify a different test id");
                     return ERROR.toUpperCase();
