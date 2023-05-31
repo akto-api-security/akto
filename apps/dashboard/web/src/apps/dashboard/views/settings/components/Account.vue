@@ -1,5 +1,6 @@
 <template>
-    <div class="pa-8">
+    <div class="pa-8 d-flex" style="gap: 100px">
+      <div>
         <div class="account-id">
             <div class="entry-text">Account ID</div>
             <div class="entry-value">{{getActiveAccount()}}</div>
@@ -93,6 +94,11 @@
             </div>
         </div>
 
+
+      </div>
+      <div>
+
+
         <div class="toggle-redact-feature">
             <div class="entry-text">Traffic filters</div>
             <div class="d-flex traffic-filter-div">
@@ -129,42 +135,55 @@
             </div>
         </div>
 
-        <div class="toggle-redact-feature">
+        <div class="toggle-redact-feature mt-8">
             <div class="entry-text">Replace collection</div>
-            <div class="d-flex traffic-filter-div">
-                <div class="input-value-key">
-                    <v-text-field v-model="newApiCollectionNameMapperKey" style="width: 200px">
-                        <template slot="label">
-                            <div class="d-flex">
-                                Host
-                                <help-tooltip :size="12"
-                                    text="Please enter the regex to match host" />
-                            </div>
-                        </template>
-                    </v-text-field>
+            <div>
 
-                </div>
-                <div class="input-value-value">
-                    <v-text-field v-model="newApiCollectionNameMapperValue" style="width: 500px">
-                        <template slot="label">
-                            <div class="d-flex">
-                                Replaced collection name
-                                <help-tooltip :size="12" text="Please enter the name of new collection" />
-                            </div>
-                        </template>
-
-                    </v-text-field>
+                <div v-for="(newName, regex) in apiCollectionNameMapper">
+                    <div>
+                        <span class="fs-14 fw-500">{{regex}}</span>
+                        <span class="fs-14">{{newName}}</span>
+                        <v-btn icon @click="() => deleteApiCollectionNameMapper(regex)">
+                            <v-icon size="12">$fas_trash</v-icon>
+                        </v-btn>
+                    </div>
                 </div>
 
-                <div class="filter-save-btn">
-                    <v-btn primary dark color="var(--hexColor9)" @click="addApiCollectionNameMapper" v-if="apiCollectionNameMapperChanged">
-                        Save
-                    </v-btn>
-                </div>
+                <div class="d-flex traffic-filter-div">
+                    <div class="input-value-key">
+                        <v-text-field v-model="newApiCollectionNameMapperKey" style="width: 200px">
+                            <template slot="label">
+                                <div class="d-flex">
+                                    Host
+                                    <help-tooltip :size="12"
+                                        text="Please enter the regex to match host" />
+                                </div>
+                            </template>
+                        </v-text-field>
 
+                    </div>
+                    <div class="input-value-value">
+                        <v-text-field v-model="newApiCollectionNameMapperValue" style="width: 500px">
+                            <template slot="label">
+                                <div class="d-flex">
+                                    Replaced collection name
+                                    <help-tooltip :size="12" text="Please enter the name of new collection" />
+                                </div>
+                            </template>
+
+                        </v-text-field>
+                    </div>
+
+                    <div class="filter-save-btn">
+                        <v-btn primary dark color="var(--hexColor9)" @click="addApiCollectionNameMapper" v-if="apiCollectionNameMapperChanged">
+                            Save
+                        </v-btn>
+                    </div>
+                </div>
             </div>
         </div>
-
+    
+      </div>
     </div>
 </template>
 
@@ -197,8 +216,13 @@ import {mapState} from 'vuex'
             addFilterHeaderValueMap() {
                 this.$store.dispatch('team/addFilterHeaderValueMap', {"filterHeaderValueMapKey" : this.newKey, "filterHeaderValueMapValue": this.newVal})
             },
-            addApiCollectionNameMapper() {
-                this.$store.dispatch('team/addApiCollectionNameMapper', {"apiCollectionNameMapperKey" : this.newApiCollectionNameMapperKey, "apiCollectionNameMapperValue": this.newApiCollectionNameMapperValue})
+            async addApiCollectionNameMapper() {
+                await this.$store.dispatch('team/addApiCollectionNameMapper', {"regex" : this.newApiCollectionNameMapperKey, "newName": this.newApiCollectionNameMapperValue})
+                this.newApiCollectionNameMapperKey = null
+                this.newApiCollectionNameMapperValue = null
+            },
+            deleteApiCollectionNameMapper(regex) {
+                this.$store.dispatch('team/deleteApiCollectionNameMapper', {regex})
             }
         },
         mounted() {
@@ -263,16 +287,8 @@ import {mapState} from 'vuex'
                     return nonNullData
                 }
             },
-            nonNullCollectionMapper() {
-                return this.apiCollectionNameMapper
-            },
             apiCollectionNameMapperChanged() {
-                let nonNullData = this.newApiCollectionNameMapperKey != null && this.newApiCollectionNameMapperValue != null && this.newApiCollectionNameMapperKey != "" && this.newApiCollectionNameMapperValue != ""
-                if (this.nonNullCollectionMapper) {
-                    return nonNullData && this.apiCollectionNameMapper && (Object.keys(this.apiCollectionNameMapper)[0] !== this.newApiCollectionNameMapperKey || Object.values(this.apiCollectionNameMapper)[0] !== this.newApiCollectionNameMapperValue)
-                } else {
-                    return nonNullData
-                }
+                return this.newApiCollectionNameMapperKey && this.newApiCollectionNameMapperValue
             }
         },
         watch: {
@@ -280,11 +296,6 @@ import {mapState} from 'vuex'
                 if (!a) return
                 this.newKey = Object.keys(a)[0] 
                 this.newVal = Object.values(a)[0]
-            },
-            apiCollectionNameMapper(a) {
-                if (!a) return
-                this.newApiCollectionNameMapperKey = Object.keys(a)[0] 
-                this.newApiCollectionNameMapperValue = Object.values(a)[0]
             }
         }
     }
@@ -299,15 +310,15 @@ import {mapState} from 'vuex'
 
 .account-id
     display: flex
-    height: 50px
+    height: 30px
     vertical-align: middle
-    line-height: 50px
+    line-height: 30px
 
 
 .toggle-redact-feature
     display: flex
-    height: 60px
-    line-height: 60px
+    height: 50px
+    line-height: 50px
 
 .input-value-key
     padding-right: 8px

@@ -96,6 +96,20 @@ const team = {
                 commit('SET_ADMIN_SETTINGS', resp)
             }))
         },
+        deleteApiCollectionNameMapper({commit, dispatch}, {regex}) {
+            api.deleteApiCollectionNameMapper(regex).then((resp => {
+
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: "Collection replacement deleted successfully",
+                    color: 'green'
+                })
+
+                api.fetchAdminSettings().then((resp => {
+                    commit('SET_ADMIN_SETTINGS', resp)
+                }))
+            }))
+        },        
         fetchUserLastLoginTs({commit, dispatch}) {
             api.fetchUserLastLoginTs().then((resp => {
                 commit('SET_USER_INFO', resp)
@@ -143,15 +157,20 @@ const team = {
             let filterHeaderValueMap = {};
             filterHeaderValueMap[filterHeaderValueMapKey] = filterHeaderValueMapValue
             return api.addFilterHeaderValueMap(filterHeaderValueMap).then(resp => {
-                console.log(resp);
                 return resp
             })
         },
-        addApiCollectionNameMapper({commit, dispatch}, {apiCollectionNameMapperKey, apiCollectionNameMapperValue}) {
-            let apiCollectionNameMapper = {};
-            apiCollectionNameMapper[apiCollectionNameMapperKey] = apiCollectionNameMapperValue
-            return api.addApiCollectionNameMapper(apiCollectionNameMapper).then(resp => {
-                return resp
+        addApiCollectionNameMapper({commit, dispatch}, {regex, newName}) {
+            return api.addApiCollectionNameMapper(regex, newName).then(resp => {
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: "Collection replacement added successfully",
+                    color: 'green'
+                })
+
+                api.fetchAdminSettings().then((resp => {
+                    commit('SET_ADMIN_SETTINGS', resp)
+                }))
             })
         },
         emptyState({commit, dispatch}) {

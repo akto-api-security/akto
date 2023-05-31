@@ -137,14 +137,21 @@ public class AdminSettingsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    private Map<String, String> apiCollectionNameMapper;
+    private String regex;
+    private String newName;
     public String addApiCollectionNameMapper() {
-        Bson update;
-        if (this.apiCollectionNameMapper == null) {
-            update = Updates.unset(AccountSettings.API_COLLECTION_NAME_MAPPER);
-        } else {
-            update = Updates.set(AccountSettings.API_COLLECTION_NAME_MAPPER, this.apiCollectionNameMapper);
-        }
+        Bson update = Updates.set(AccountSettings.API_COLLECTION_NAME_MAPPER+"."+regex, newName);
+
+        AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(), update
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String deleteApiCollectionNameMapper() {
+        
+        Bson update = Updates.unset(AccountSettings.API_COLLECTION_NAME_MAPPER+"."+regex);
 
         AccountSettingsDao.instance.updateOne(
                 AccountSettingsDao.generateFilter(), update
@@ -181,7 +188,11 @@ public class AdminSettingsAction extends UserAction {
         this.filterHeaderValueMap = filterHeaderValueMap;
     }
     
-    public void setApiCollectionNameMapper(Map<String, String> apiCollectionNameMapper) {
-        this.apiCollectionNameMapper = apiCollectionNameMapper;
+    public void setRegex(String regex) {
+        this.regex = regex;
+    }
+
+    public void setNewName(String newName) {
+        this.newName = newName;
     }
 }
