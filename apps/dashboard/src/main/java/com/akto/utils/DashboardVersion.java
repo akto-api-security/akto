@@ -61,7 +61,15 @@ public class DashboardVersion {
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(new BasicDBObject());
         String dashboardVersionDb = accountSettings.getDashboardVersion();
 
+        if (dashboardVersionDb == null) {
+            return "latest";
+        }
+
         String aktoImageTag = dashboardVersionDb.split(" - ", 2)[0];
+
+        if (aktoImageTag == null) {
+            return "latest";
+        }
 
         String dashboardVersion = null;
 
