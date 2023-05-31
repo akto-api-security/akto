@@ -135,9 +135,9 @@ public class GithubSync {
                     // Retreive Github file 
                     GithubFile githubFile = syncFile(repo, filePath, latestSha, githubFileShaMap);
 
-                    if (githubFile != null) {
-                        dirContents.put(fileName, githubFile);
-                    }
+                    // Files which are not updated have null values
+                    dirContents.put(fileName, githubFile);
+                    
                 }
             }
         } catch (Exception ex) {

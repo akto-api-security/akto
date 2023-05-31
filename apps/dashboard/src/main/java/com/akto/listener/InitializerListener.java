@@ -1046,6 +1046,10 @@ public class InitializerListener implements ServletContextListener {
 
         if (templates != null) {
             for (GithubFile template : templates.values()) {
+                if (template == null) {
+                    continue;
+                }
+
                 String templateContent = template.getContent();
                 String fileName = template.getName();
                 String sha = template.getSha();
@@ -1078,7 +1082,7 @@ public class InitializerListener implements ServletContextListener {
                     // Check if updated template is not supported by dashboard
                     if (DashboardVersion.isSemanticVersionString(dashboardVersion)) {
                         if (DashboardVersion.compareVersions(templateMinimumAktoVersion, dashboardVersion) > 0) {
-                            System.out.println(String.format("%s does not support dashoard version", fileName));
+                            logger.info(String.format("Updated Template %s requires minimum akto version %s, skipping update.", fileName, templateMinimumAktoVersion));
                             continue;
                         } 
                     } 
@@ -1104,25 +1108,28 @@ public class InitializerListener implements ServletContextListener {
                     );
                 }
             }
-        }
 
-        // Set templates to inactive if not present in Github
-        List<String> currentTemplateFilesGithub = githubSync.getDirFileNames("akto-api-security/akto", "apps/dashboard/src/main/resources/inbuilt_test_yaml_files/");
-        for(YamlTemplate yamlTemplate: yamlTemplates) {
-            String id = yamlTemplate.getId();
-            String fileName = yamlTemplate.getFileName();
+            // Set templates to inactive if not present in Github
+            Set<String> githubFileNames = templates.keySet();
 
-            if (!currentTemplateFilesGithub.contains(fileName)) {
-                int updatedAt = Context.now();
-                Boolean isActive = false;
+            for(YamlTemplate yamlTemplate: yamlTemplates) {
+                String id = yamlTemplate.getId();
+                String fileName = yamlTemplate.getFileName();
 
-                YamlTemplateDao.instance.updateOne(
-                        Filters.eq("_id", id),
-                        Updates.combine(
-                                Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
-                                Updates.set(YamlTemplate.IS_ACTIVE, isActive)
-                        )
-                    );
+                if (!githubFileNames.contains(fileName)) {
+                    logger.info(String.format("%s not present in Github, marking as inactive", fileName));
+
+                    int updatedAt = Context.now();
+                    Boolean isActive = false;
+
+                    YamlTemplateDao.instance.updateOne(
+                            Filters.eq("_id", id),
+                            Updates.combine(
+                                    Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
+                                    Updates.set(YamlTemplate.IS_ACTIVE, isActive)
+                            )
+                        );
+                }
             }
         }
     }
