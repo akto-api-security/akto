@@ -64,7 +64,12 @@
                 <v-icon>{{ item.icon }}</v-icon>
               </v-list-item-icon>
               <v-list-item-content class="content-nav-drawer">
-                <v-list-item-title v-text="item.title" class="title-nav-drawer" />
+                <v-list-item-title class="title-nav-drawer">
+                    {{ item.title }}
+                    <div v-if="item.title === 'Test Editor'" class="beta-version">
+                      Beta
+                    </div>
+                </v-list-item-title>
               </v-list-item-content>
             </template>
           </v-list-item>
@@ -231,6 +236,11 @@ export default {
         title: 'Tests library',
         icon: '$bookBookmark',
         link: '/dashboard/library'
+      },
+      {
+        title: 'Test Editor',
+        icon: '$testEditorIcon',
+        link: '/dashboard/test-editor'
       }
     ]
 
@@ -613,6 +623,15 @@ export default {
   color:  var(--white)
   margin-left: 8px !important
   font-weight: 400 !important
+  display: flex
+  gap: 8px
+  align-items: center
+
+.beta-version 
+  border-radius: 4px
+  border: 1px solid
+  padding: 0px 4px
+  font-size: 10px
 
 .nav-item-group
   width: 100%

@@ -66,7 +66,7 @@ public class MarketplaceAction extends UserAction {
         this.categories = GlobalEnums.TestCategory.values();
         Bson filters = Filters.empty();
 
-        Map<String, TestConfig> testConfigMap  = YamlTemplateDao.instance.fetchTestConfigMap();
+        Map<String, TestConfig> testConfigMap  = YamlTemplateDao.instance.fetchTestConfigMap(false);
         this.searchText = this.searchText.toLowerCase();
         
         for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {

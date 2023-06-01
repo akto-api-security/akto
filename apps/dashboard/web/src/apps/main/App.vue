@@ -354,6 +354,8 @@
         --hexColor40: #5865F2;
         --hexColor41: #F7F7F7;
         --hexColor42: #fe7b5b;
+        --hexColor43: #424A51;
+        --hexColor44: #EDEDF0;
 
         --primary: #126BFF;
         --quickStartTheme:#6200B0;

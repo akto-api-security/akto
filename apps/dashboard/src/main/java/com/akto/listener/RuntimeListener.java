@@ -3,14 +3,19 @@ package com.akto.listener;
 
 import com.akto.action.HarAction;
 import com.akto.dao.AccountSettingsDao;
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
+import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.demo.VulnerableRequestForTemplate;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.AuthParam;
 import com.akto.dto.testing.HardcodedAuthParam;
+import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.Main;
@@ -31,6 +36,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
 
     public static HttpCallParser httpCallParser = null;
     public static AktoPolicy aktoPolicy = null;
+    public static final String JUICE_SHOP_DEMO_COLLECTION_NAME = "juice_shop_demo";
 
     public static Map<Integer, AccountHTTPCallParserAktoPolicyInfo> accountHTTPParserMap = new ConcurrentHashMap<>();
 
@@ -61,6 +67,13 @@ public class RuntimeListener extends AfterMongoConnectListener {
     public static void initialiseDemoCollections() {
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(new BasicDBObject());
         if (accountSettings != null && accountSettings.getDemoCollectionCreateTime() > 0) {
+            long count = VulnerableRequestForTemplateDao.instance.count(new BasicDBObject());
+            if (count < 1) {
+                //initialise vulnerable requests for templates in case its not present in db
+                insertVulnerableRequestsForDemo();
+                loggerMaker.infoAndAddToDb("map created in db for vulnerable requests and corresponding templates", LoggerMaker.LogDb.DASHBOARD);
+            }
+            loggerMaker.infoAndAddToDb("Demo collections already initialised", LoggerMaker.LogDb.DASHBOARD);
             return;
         }
 
@@ -90,7 +103,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
         // process har file
         HarAction harAction = new HarAction();
         harAction.setHarString(harString);
-        harAction.setApiCollectionName("juice_shop_demo");
+        harAction.setApiCollectionName(JUICE_SHOP_DEMO_COLLECTION_NAME);
         Map<String, Object> session = new HashMap<>();
         harAction.setSession(session);
         // todo: skipKafka = true for onPrem also
@@ -110,11 +123,36 @@ public class RuntimeListener extends AfterMongoConnectListener {
         );
         AuthMechanismsDao.instance.insertOne(authMechanism);
 
+        //inserting first time during initialisation of demo collections
+        insertVulnerableRequestsForDemo();
+
         AccountSettingsDao.instance.updateOne(
                 AccountSettingsDao.generateFilter(),
                 Updates.set(AccountSettings.DEMO_COLLECTION_CREATE_TIME, Context.now())
         );
     }
+
+    private void insertVulnerableRequestsForDemo() {
+        ApiCollection collection = ApiCollectionsDao.instance.findByName(JUICE_SHOP_DEMO_COLLECTION_NAME);
+        if (collection == null) {
+            loggerMaker.errorAndAddToDb("Error: collection not found", LoggerMaker.LogDb.DASHBOARD);
+            return;
+        }
+        Map<String, List<String>> apiVsTemplateMap = VulnerableRequestForTemplateDao.getApiVsTemplateMap();
+        List<VulnerableRequestForTemplate> vulnerableRequestForTemplates = new ArrayList<>();
+        for (Map.Entry<String, List<String>> entry : apiVsTemplateMap.entrySet()) {
+            String apiName = entry.getKey();
+            List<String> templates = entry.getValue();
+            String[] apiNameParts = apiName.split(" ");
+            String method = apiNameParts[0];
+            String path = apiNameParts[1];
+            ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(collection.getId(), path, URLMethods.Method.fromString(method));
+            vulnerableRequestForTemplates.add(new VulnerableRequestForTemplate(apiInfoKey, templates));
+        }
+        VulnerableRequestForTemplateDao.instance.insertMany(vulnerableRequestForTemplates);
+    }
+
+    //
 
     @Override
     public int retryAfter() {

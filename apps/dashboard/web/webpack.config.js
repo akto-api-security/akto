@@ -88,7 +88,7 @@ module.exports = {
       },
       {
         test: /\.(js|jsx)$/,
-        exclude: /node_modules\/(?!(tiptap|tiptap-utils|are-you-es5|tiptap-extensions)\/)/,
+        exclude: /node_modules\/(?!(tiptap|tiptap-utils|are-you-es5|tiptap-extensions|monaco-yaml|monaco-worker-manager|monaco-marker-data-provider|monaco-editor)\/).*/,
         use: {
           loader: 'babel-loader',
           options: {

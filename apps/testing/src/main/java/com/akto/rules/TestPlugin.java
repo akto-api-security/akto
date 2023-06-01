@@ -148,7 +148,7 @@ public abstract class TestPlugin {
 
     public Result addWithoutRequestError(String originalMessage, TestResult.TestError testError) {
         List<TestResult> testResults = new ArrayList<>();
-        testResults.add(new TestResult(null, originalMessage, Collections.singletonList(testError), 0, false, TestResult.Confidence.HIGH, null));
+        testResults.add(new TestResult(null, originalMessage, Collections.singletonList(testError.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
         return new Result(testResults, false,new ArrayList<>(), 0);
     }
 
@@ -160,7 +160,7 @@ public abstract class TestPlugin {
             loggerMaker.errorAndAddToDb("Error while converting testRequest object to string : " + e, LogDb.TESTING);
         }
 
-        return new TestResult(message, originalMessage, Collections.singletonList(testError), 0, false, TestResult.Confidence.HIGH, testInfo);
+        return new TestResult(message, originalMessage, Collections.singletonList(testError.getMessage()), 0, false, TestResult.Confidence.HIGH, testInfo);
     }
 
     public Result addWithRequestError(String originalMessage, TestResult.TestError testError, OriginalHttpRequest request, TestInfo testInfo) {
@@ -173,14 +173,14 @@ public abstract class TestPlugin {
     public TestResult buildTestResult(OriginalHttpRequest request, OriginalHttpResponse response, String originalMessage,
                                       double percentageMatch, boolean isVulnerable, TestInfo testInfo) {
 
-        List<TestResult.TestError> errors = new ArrayList<>();
+        List<String> errors = new ArrayList<>();
         String message = null;
         try {
             message = RedactSampleData.convertOriginalReqRespToString(request, response);
         } catch (Exception e) {
             logger.error("Error while converting OriginalHttpRequest to string", e);
             message = RedactSampleData.convertOriginalReqRespToString(new OriginalHttpRequest(), new OriginalHttpResponse());
-            errors.add(TestResult.TestError.FAILED_TO_CONVERT_TEST_REQUEST_TO_STRING);
+            errors.add(TestResult.TestError.FAILED_TO_CONVERT_TEST_REQUEST_TO_STRING.getMessage());
         }
 
         return new TestResult(message, originalMessage, errors, percentageMatch, isVulnerable, TestResult.Confidence.HIGH, testInfo);

@@ -919,7 +919,29 @@
             </result>
         </action>
 
+        <action name="tools/publicApi" class="com.akto.action.growth_tools.PublicApiAction">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchTestingRunResults" class="com.akto.action.testing.StartTestAction" method="fetchTestingRunResults">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchTestingRunResultFromTestingRun" class="com.akto.action.test_editor.SaveTestEditorAction" method="fetchTestingRunResultFromTestingRun">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
@@ -1683,7 +1705,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
-                
+
         <action name="api/fetchTrafficMetricsDesciptions" class="com.akto.action.traffic_metrics.TrafficMetricsAction" method="fetchTrafficMetricsDesciptions">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -1743,6 +1765,16 @@
             </result>
         </action>
 
+        <action name="api/runTestForGivenTemplate" class="com.akto.action.test_editor.SaveTestEditorAction" method="runTestForGivenTemplate">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
     </package>
 
 </struts>

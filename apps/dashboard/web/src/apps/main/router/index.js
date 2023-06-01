@@ -24,6 +24,7 @@ const ApiChanges = () => import("@/apps/dashboard/views/observe/changes/Changes"
 const ParamState = () => import("@/apps/dashboard/views/observe/misc/ParamState")
 const MPTestCategory = () => import("@/apps/dashboard/views/marketplace/components/MPTestCategory")
 const Onboarding = () => import("@/apps/dashboard/views/onboarding/Onboarding.vue")
+const TextEditor = () => import("@/apps/dashboard/tools/TextEditor.vue")
 
 Vue.use(Router)
 
@@ -236,6 +237,11 @@ const router =  new Router({
                             })
                         }
                     ]                    
+                },
+                {
+                    path: 'test-editor',
+                    name: 'testEditor',
+                    component: TextEditor
                 }
             ]
         },
