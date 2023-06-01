@@ -136,7 +136,7 @@ public class TestExecutor {
 
         List<AuthParam> authParams = authMechanism.getAuthParams();
 
-        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap();
+        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false);
 
         authMechanism.setAuthParams(authParams);
 
@@ -198,7 +198,7 @@ public class TestExecutor {
                          () -> startWithLatch(apiInfoKey,
                                  testingRun.getTestIdConfig(),
                                  testingRun.getId(),testingRun.getTestingRunConfig(), testingUtil, summaryId,
-                                 accountId, latch, now, testingRun.getTestRunTime(), testConfigMap));
+                                 accountId, latch, now, testingRun.getTestRunTime(), testConfigMap, testingRun));
                  futureTestingRunResults.add(future);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error in API " + apiInfoKey + " : " + e.getMessage(), LogDb.TESTING);
@@ -325,7 +325,7 @@ public class TestExecutor {
                             trim(fuzzResult);
                             TestingRunResultDao.instance.insertOne(fuzzResult);
                             TestingIssuesHandler handler = new TestingIssuesHandler();
-                            handler.handleIssuesCreationFromTestingRunResults(Collections.singletonList(fuzzResult));
+                            handler.handleIssuesCreationFromTestingRunResults(Collections.singletonList(fuzzResult), false);
                             testingRunResults.add(fuzzResult);
                         }
                     } catch (Exception e) {
@@ -494,7 +494,7 @@ public class TestExecutor {
     public List<TestingRunResult> startWithLatch(
             ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId, TestingRunConfig testingRunConfig,
             TestingUtil testingUtil, ObjectId testRunResultSummaryId, int accountId, CountDownLatch latch, int startTime,
-            int timeToKill, Map<String, TestConfig> testConfigMap) {
+            int timeToKill, Map<String, TestConfig> testConfigMap, TestingRun testingRun) {
 
         loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);
 
@@ -514,7 +514,11 @@ public class TestExecutor {
                     loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);
                     //Creating issues from testingRunResults
                    TestingIssuesHandler handler = new TestingIssuesHandler();
-                   handler.handleIssuesCreationFromTestingRunResults(testingRunResults);
+                   boolean triggeredByTestEditor = false;
+                   if (testingRun.getTriggeredBy() != null) {
+                        triggeredByTestEditor = testingRun.getTriggeredBy().equals("test_editor");
+                   }
+                   handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor); // pass new field here
                 }
             } catch (Exception e) {
                 e.printStackTrace();

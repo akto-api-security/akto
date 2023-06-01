@@ -105,6 +105,10 @@ public abstract class MCollection<T> {
         return this.findOne(eq(key, values));
     }
 
+    public long count(Bson q) {
+        return (int)this.getMCollection().countDocuments(q);
+    }
+
     public T findLatestOne(Bson q) {
         MongoCursor<T> cursor = this.getMCollection().find(q).limit(1).sort(Sorts.descending("_id")).cursor();
 
