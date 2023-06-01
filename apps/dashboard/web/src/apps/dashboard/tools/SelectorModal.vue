@@ -21,7 +21,7 @@
                     />
                     <div v-else>
                         <v-text-field
-                            v-model="newTest.name"
+                            v-model="modelTestName"
                             dense
                             class="form-field-text"                     
                         />
@@ -33,7 +33,7 @@
                         class="dropdown-menu" 
                         :items="field2.items"
                         attach
-                        v-model="newTest.category"
+                        v-model="modelTestCategory"
                         append-icon="$fas_angle-down"
                         @change="saveInfo"
                     />
@@ -67,6 +67,7 @@ export default {
         title:obj.strR,
         currentParam: obj.strR,
         testCategories: obj.arrR,
+        customTest: obj.objN,
     },
     data(){
         return{
@@ -130,6 +131,36 @@ export default {
                 this.$emit('closeDialog');
             },
         },
+        modelTestName:{
+            get(){
+                if(this.customTest.name && this.customTest.name.length > 0){
+                    return this.customTest.name
+                }
+                return this.newTest.name
+            },
+            set(value){
+                let obj = {
+                    name: value,
+                    category: this.newTest.category
+                }
+                this.newTest = JSON.parse(JSON.stringify(obj))
+            }
+        },
+        modelTestCategory:{
+            get(){
+                if(this.customTest.category && this.customTest.category.length > 0){
+                    return this.customTest.category
+                }
+                return this.newTest.category
+            },
+            set(value){
+                let obj = {
+                    name: this.newTest.name,
+                    category: value
+                }
+                this.newTest = JSON.parse(JSON.stringify(obj))
+            }
+        }
     },
     watch:{
         currentParam(newVal){

@@ -108,7 +108,7 @@
                         <div ref="editor" style="height: calc(100vh - 120px);" class="monaco-editor"></div>
                         <selector-modal :show-dialog="showDialogBox" :title="titleBox" @closeDialog="closeDialog"
                             :currentParam="currentParam" :test-categories="testCategories"
-                            @get_form_values="getFormValues" />
+                            @get_form_values="getFormValues" :custom-test="setTextId" />
                     </div>
                     <div class="req-resp-col">
                         <div class="req-box-container" v-if="messageJson.message">
@@ -259,7 +259,10 @@ export default {
             lastEdited: -1,
             copyTestObj: {},
             copyCustomObj: {},
-            defaultTest: "REMOVE_TOKENS"
+            defaultTest: "REMOVE_TOKENS",
+            defaultTestName: "BFLA",
+            allCustomTests: {},
+            setTextId: {},
         }
     },
     methods: {
@@ -382,7 +385,12 @@ export default {
             return this.textEditor.getValue()
         },
         changeValue(testName) {
+            this.setTextId = {}
             this.lastEdited = -1
+            this.defaultTestName = testName
+            if(this.allCustomTests[testName]){
+                this.setTextId = this.allCustomTests[testName]
+            }
             if (!this.mapTestToYaml[testName]) {
                 this.textEditor.setValue('')
             } else {
@@ -422,6 +430,7 @@ export default {
             this.customTestObj={}
             this.mapTestToYaml = {}
             this.totalCustomTests = 0
+            this.allCustomTests = {}
             this.businessLogicSubcategories.forEach(x => {
                 if (!ret[x.superCategory.name]) {
                     ret[x.superCategory.name] = { all: [] }
@@ -435,6 +444,11 @@ export default {
                 this.mapTestToYaml[x.testName] = x.content
                 this.mapTestToStamp[x.testName] = func.prettifyEpoch(x.updatedTs)
                 if(x.templateSource._name === "CUSTOM"){
+                    let customVal = {
+                        name: x._name,
+                        category: x.superCategory.name
+                    }
+                    this.allCustomTests[x.testName] = customVal
                     this.totalCustomTests++
                     if (!this.customTestObj[x.superCategory.name]) {
                         this.customTestObj[x.superCategory.name] = { all: [] }
@@ -483,6 +497,8 @@ export default {
             _this.copyTestObj = JSON.parse(JSON.stringify(_this.testsObj))
             _this.mapRequests()
         })
+        this.changeValue(this.defaultTestName)
+        this.setSelectedMethod(this.defaultTest)
         _this.textEditor.onDidChangeModelContent(() => {
             _this.IsEdited = _this.textEditor.getValue() !== _this.defaultValue
         })
