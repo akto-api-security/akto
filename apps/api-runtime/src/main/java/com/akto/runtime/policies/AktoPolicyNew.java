@@ -34,7 +34,7 @@ public class AktoPolicyNew {
 
     public void fetchFilters() {
         this.filters = RuntimeFilterDao.instance.findAll(new BasicDBObject());
-        loggerMaker.infoAndAddToDb("Filters found: " + this.filters.size(), LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("Fetched " + filters.size() + " filters from db", LogDb.RUNTIME);
     }
 
     public AktoPolicyNew(boolean fetchAllSTI) {
@@ -42,6 +42,7 @@ public class AktoPolicyNew {
     }
 
     public void buildFromDb(boolean fetchAllSTI) {
+        loggerMaker.infoAndAddToDb("AktoPolicyNew.buildFromDB(), fetchAllSti: " + fetchAllSTI, LogDb.RUNTIME);
         fetchFilters();
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(new BasicDBObject());
@@ -83,7 +84,7 @@ public class AktoPolicyNew {
                 loggerMaker.errorAndAddToDb(e.getMessage() + " " + e.getCause(), LogDb.RUNTIME);
             }
         }
-
+        loggerMaker.infoAndAddToDb("Built AktoPolicyNew", LogDb.RUNTIME);
     }
 
     public void syncWithDb(boolean initialising, boolean fetchAllSTI) {
@@ -128,6 +129,7 @@ public class AktoPolicyNew {
 
     public void main(List<HttpResponseParams> httpResponseParamsList, boolean syncNow, boolean fetchAllSTI) throws Exception {
         if (httpResponseParamsList == null) httpResponseParamsList = new ArrayList<>();
+        loggerMaker.infoAndAddToDb("AktoPolicy main: httpResponseParamsList size: " + httpResponseParamsList.size(), LogDb.RUNTIME);
         for (HttpResponseParams httpResponseParams: httpResponseParamsList) {
             try {
                 process(httpResponseParams);
@@ -139,6 +141,9 @@ public class AktoPolicyNew {
 
         if (syncNow) {
             syncWithDb(false, fetchAllSTI);
+            loggerMaker.infoAndAddToDb("AktoPolicy main: sync with db done", LogDb.RUNTIME);
+        } else {
+            loggerMaker.infoAndAddToDb("AktoPolicy main: syncNow=false", LogDb.RUNTIME);
         }
     }
 

@@ -261,6 +261,7 @@ public class HttpCallParser {
 
     public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
+        int originalSize = httpResponseParamsList.size();
         for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
 
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
@@ -329,7 +330,8 @@ public class HttpCallParser {
             }
 
         }
-
+        int filteredSize = filteredResponseParams.size();
+        loggerMaker.infoAndAddToDb("Filtered " + (originalSize - filteredSize) + " responses", LogDb.RUNTIME);
         return filteredResponseParams;
     }
 
