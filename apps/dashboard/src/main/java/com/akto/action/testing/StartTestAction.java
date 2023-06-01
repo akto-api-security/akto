@@ -56,6 +56,7 @@ public class StartTestAction extends UserAction {
     private String testName;
     private Map<String,String> metadata;
     private boolean fetchCicd;
+    private String triggeredBy;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
 
@@ -131,6 +132,9 @@ public class StartTestAction extends UserAction {
         if(localTestingRun==null){
             try {
                 localTestingRun = createTestingRun(scheduleTimestamp, this.recurringDaily ? 86400 : 0);
+                if (triggeredBy.length() > 0) {
+                    localTestingRun.setTriggeredBy(triggeredBy);
+                }
             } catch (Exception e){
                 loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
             }
@@ -218,7 +222,8 @@ public class StartTestAction extends UserAction {
             Bson filterQ = Filters.and(
                 Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, this.endTimestamp),
                 Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, this.startTimestamp),
-                Filters.nin(Constants.ID,getCicdTests())
+                Filters.nin(Constants.ID,getCicdTests()),
+                Filters.ne("triggeredBy", "test_editor")
             );
             testingRuns = TestingRunDao.instance.findAll(filterQ);
         }
@@ -491,6 +496,14 @@ public class StartTestAction extends UserAction {
 
     public void setSource(CallSource source) {
         this.source = source;
+    }
+
+    public String getTriggeredBy() {
+        return triggeredBy;
+    }
+
+    public void setTriggeredBy(String triggeredBy) {
+        this.triggeredBy = triggeredBy;
     }
 
     public enum CallSource{
