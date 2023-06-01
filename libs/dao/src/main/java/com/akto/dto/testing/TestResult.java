@@ -7,7 +7,7 @@ import java.util.List;
 public class TestResult extends GenericTestResult {
 
     private String message;
-    private List<TestError> errors;
+    private List<String> errors;
 
     private String originalMessage;
     private double percentageMatch;
@@ -43,7 +43,7 @@ public class TestResult extends GenericTestResult {
         }
     }
 
-    public TestResult(String message, String originalMessage, List<TestError> errors, double percentageMatch, boolean isVulnerable,
+    public TestResult(String message, String originalMessage, List<String> errors, double percentageMatch, boolean isVulnerable,
                       Confidence confidence, TestInfo testInfo) {
         super(isVulnerable, confidence);
         this.message = message;
@@ -64,11 +64,11 @@ public class TestResult extends GenericTestResult {
         this.message = message;
     }
 
-    public List<TestError> getErrors() {
+    public List<String> getErrors() {
         return errors;
     }
 
-    public void setErrors(List<TestError> errors) {
+    public void setErrors(List<String> errors) {
         this.errors = errors;
     }
 
