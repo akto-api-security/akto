@@ -161,7 +161,7 @@ export default {
             return ['Health', 'Data types','Auth types', 'Tags', 'Account', 'Users', 'Integrations'];
           }
           else if(window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy'){
-            return ['Data types','Auth types', 'Tags', 'Users', 'Health' ,'Integrations'];
+            return ['Data types','Auth types', 'Tags', 'Users','Integrations'];
           }
           return ['Data types','Auth types', 'Tags', 'Account', 'Users', 'Health', 'Integrations', 'Metrics'];
         }
