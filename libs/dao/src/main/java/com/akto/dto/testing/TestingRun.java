@@ -21,6 +21,7 @@ public class TestingRun {
     private int periodInSeconds;
     private int testRunTime;
     private int maxConcurrentRequests;
+    private String triggeredBy;
 
     @BsonIgnore
     private String hexId;
@@ -31,7 +32,7 @@ public class TestingRun {
 
     public TestingRun() { }
 
-    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name) {
+    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, String triggeredBy) {
         this.scheduleTimestamp = scheduleTimestamp;
         this.testRunTime = -1;
         this.maxConcurrentRequests = -1;
@@ -43,6 +44,7 @@ public class TestingRun {
         this.state = state;
         this.periodInSeconds = periodInSeconds;
         this.name = name;
+        this.triggeredBy = triggeredBy;
     }
     public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, int testRunTime, int maxConcurrentRequests) {
         this.scheduleTimestamp = scheduleTimestamp;
@@ -169,6 +171,14 @@ public class TestingRun {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getTriggeredBy() {
+        return triggeredBy;
+    }
+
+    public void setTriggeredBy(String triggeredBy) {
+        this.triggeredBy = triggeredBy;
     }
 
     @Override

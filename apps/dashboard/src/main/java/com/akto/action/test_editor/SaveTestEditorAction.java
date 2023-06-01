@@ -188,6 +188,7 @@ public class SaveTestEditorAction extends UserAction {
                 apiInfoKey.getString(ApiInfo.ApiInfoKey.URL),
                 URLMethods.Method.valueOf(apiInfoKey.getString(ApiInfo.ApiInfoKey.METHOD)));
         StartTestAction testAction = new StartTestAction();
+        testAction.setTriggeredBy("TEST_EDITOR");
         testAction.setSession(getSession());
         testAction.setRecurringDaily(false);
         testAction.setApiInfoKeyList(Collections.singletonList(infoKey));//default id
