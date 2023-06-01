@@ -216,11 +216,13 @@
 
                     } else {
 
+                    if(!this.isLocalDeploy){
                         window._AKTO.$emit('SHOW_SNACKBAR', {
                             show: true,
                             text: `${countEmails} invitation${plural} sent successfully!`,
                             color: 'green'
                         })
+                    }
                         this.$store.dispatch('team/getTeamData')
                         this.showInviteCodeDialog = true
                     }
