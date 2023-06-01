@@ -260,7 +260,7 @@ export default {
             copyTestObj: {},
             copyCustomObj: {},
             defaultTest: "REMOVE_TOKENS",
-            defaultTestName: "BFLA",
+            defaultTestName: "Broken Authentication by removing auth token",
             allCustomTests: {},
             setTextId: {},
         }
