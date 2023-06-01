@@ -41,6 +41,8 @@ public abstract class SecurityTestTemplate {
 
     public abstract boolean filter();
 
+    public abstract boolean checkAuthBeforeExecution();
+
     public abstract List<ExecutionResult>  executor();
 
     public abstract List<TestResult> validator(List<ExecutionResult> attempts);
@@ -50,6 +52,12 @@ public abstract class SecurityTestTemplate {
         if (!valid) {
             List<TestResult> testResults = new ArrayList<>();
             testResults.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList("Request API failed to satisfy api_selection_filters block, skipping execution"), 0, false, TestResult.Confidence.HIGH, null));
+            return testResults;
+        }
+        valid = checkAuthBeforeExecution();
+        if (!valid) {
+            List<TestResult> testResults = new ArrayList<>();
+            testResults.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList("Request API failed authentication check, skipping execution"), 0, false, TestResult.Confidence.HIGH, null));
             return testResults;
         }
         List<ExecutionResult> attempts = executor();
