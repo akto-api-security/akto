@@ -1,0 +1,50 @@
+id: CONTENT_TYPE_HEADER_MISSING
+info:
+  name: Content Type Header Missing
+  description: "This vulnerability can enable attackers to inject malicious code into the application or cause it to malfunction."
+  details: >
+            "The endpoint appears to be have Misconfigured HTTP Headers. The original request
+            was replayed without any modifications. The server responded with 2XX success codes and the
+            response headers didn't contain Content-Type header"
+            "<b>Background:</b> The Content-Type header specifies the type of data contained in the request or
+            response body, allowing the receiving party to interpret and handle the data correctly."
+  impact: "When the Content-Type header is missing, it can lead to various security risks, data integrity issues and possible DOS attacks"
+  category:
+    name: MHH
+    shortName: MHH
+    displayName: Misconfigured HTTP Headers (MHH)
+  subCategory: CONTENT_TYPE_HEADER_MISSING
+  severity: LOW
+  tags: 
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://www.akto.io/blog/bola-exploitation-using-unauthorized-uuid-on-api-endpoint"
+    - "https://www.akto.io/blog/what-is-broken-object-level-authorization-bola"
+    - "https://github.com/OWASP/API-Security/blob/master/2019/en/src/0xa1-broken-object-level-authorization.md"
+    - "https://cwe.mitre.org/data/definitions/284.html"
+    - "https://cwe.mitre.org/data/definitions/285.html"
+    - "https://cwe.mitre.org/data/definitions/639.html"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_url: ${urlVar}
+
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_headers:
+    for_one:
+      key:
+        not_contains: Content-Type

@@ -1,0 +1,65 @@
+id: INVALID_FILE_INPUT
+info:
+  name: Invalid File Input
+  description: "The error response contains information which may help in more sophisticated attacks"
+  details: >
+          "The error response contains information about the database or an inconsistent error message.<br>"
+          "<b>Background:</b> Inconsistencies in error messages can reveal important clues on how a site works, 
+          and what information is present under the covers. For example, when a user tries to access a file that 
+          does not exist, the error message typically indicates, “file not found”. When accessing a file that 
+          the user is not authorized for, it indicates, “access denied”. The user is not supposed to know the 
+          file even exists, but such inconsistencies will readily reveal the presence or absence of inaccessible 
+          files or the site directory structure. It may also contain informaiton pertaining to which database is being used."	
+  impact: "This information can be used to facilitate more sophisticated attacks on your application"
+  category:
+    name: VEM
+    shortName: VEM
+    displayName: Verbose Error Messages (VEM)
+  subCategory: INVALID_FILE_INPUT
+  severity: LOW
+  tags: 
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/www-community/Improper_Error_Handling"
+    - "https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/08-Testing_for_Error_Handling/01-Testing_For_Improper_Error_Handling"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  or:
+    - request_payload:
+        for_one:
+          key:
+            contains_either: file
+            extract: keyVar
+    - query_param:
+        for_one:
+          key:
+            contains_either: file
+            extract: keyVar
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_body_param:
+          keyVar: "testInvalidFile"
+      - modify_query_param:
+          keyVar: "testInvalidFile"
+validate:
+  response_code:
+    gte: 400
+  or:
+    - response_payload:
+        and:
+          - length:
+              gt: 0
+          - contains_either:
+              - SQL
+              - MYSQL
+              - access denied
+    - response_payload:
+        - length:
+            gt: 1000

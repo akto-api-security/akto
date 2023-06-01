@@ -1,0 +1,46 @@
+id: TRACK_METHOD_TEST
+info:
+  name: TRACK Method Vulnerability Test
+  description: "The endpoint appears to accept requests with TRACK HTTP Method. The original request was replayed by replacing the method value with TRACK. The application responded with 2XX success code."
+  details: >
+            "The endpoint appears to be vulnerable to unsafe HTTP methods attack. The original request was 
+            replayed by replacing the method value with TRACK. The server responded with 2XX success code.
+            "<b>Background:</b> The TRACK method is used to invoke a remote, application-layer loop- back of 
+            the request message. TRACK allows the client to see what is being received at the other end of the 
+            request chain and use that data for testing or diagnostic information.
+  impact: "TRACK method can be used for debugging purposes. It repeats the content of a request, and an attacker could steal credentials by using a client-side attack."
+  category:
+    name: UHM
+    shortName: UHM
+    displayName: Unnecessary HTTP Methods (UHM)
+  subCategory: TRACK_METHOD_TEST
+  severity: LOW
+  tags: 
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://www.onwebsecurity.com/security/unsafe-http-methods.html"
+    - "https://hackerone.com/reports/83837"
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_method: TRACK
+      - add_header:
+          new_test_header: test_val
+
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_headers:
+    for_one:
+      key:
+        eq: new_test_header
