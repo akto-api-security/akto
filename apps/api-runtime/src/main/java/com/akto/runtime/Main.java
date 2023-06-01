@@ -9,6 +9,7 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 import com.akto.DaoInit;
 import com.akto.dao.*;
@@ -127,15 +128,29 @@ public class Main {
     public static class AccountInfo {
         long estimatedCount;
         int lastEstimatedCountTime;
+        AccountSettings accountSettings;
 
         public AccountInfo() {
             this.estimatedCount = 0;
             this.lastEstimatedCountTime = 0;
+            this.accountSettings = null;
         }
 
-        public AccountInfo(long estimatedCount, int lastEstimatedCountTime) {
+        public AccountInfo(long estimatedCount, int lastEstimatedCountTime, AccountSettings accountSettings) {
             this.estimatedCount = estimatedCount;
             this.lastEstimatedCountTime = lastEstimatedCountTime;
+            this.accountSettings = accountSettings;
+        }
+
+        public AccountSettings getAccountSettings() {
+            return accountSettings;
+        }
+
+        public void setAccountSettings(AccountSettings accountSettings) {
+            this.accountSettings = accountSettings;
+            if (accountSettings != null) {
+                logger.info("Received " + accountSettings.convertApiCollectionNameMapperToRegex().size() + " apiCollectionNameMappers");
+            }
         }
     }
 
@@ -240,7 +255,6 @@ public class Main {
                         }
 
                         httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
-                         
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb("Error while parsing kafka message " + e, LogDb.RUNTIME);
                         continue;
@@ -273,6 +287,7 @@ public class Main {
                         loggerMaker.infoAndAddToDb("current time: " + Context.now() + " lastEstimatedCountTime: " + accountInfo.lastEstimatedCountTime, LogDb.RUNTIME);
                         accountInfo.lastEstimatedCountTime = Context.now();
                         accountInfo.estimatedCount = SingleTypeInfoDao.instance.getMCollection().estimatedDocumentCount();
+                        accountInfo.setAccountSettings(AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()));
                         loggerMaker.infoAndAddToDb("STI Estimated count: " + accountInfo.estimatedCount, LogDb.RUNTIME);
                     }
 
@@ -312,6 +327,8 @@ public class Main {
 
                     try {
                         List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
+
+                        accWiseResponse = filterBasedOnHeaders(accWiseResponse, accountInfo.accountSettings);
                         loggerMaker.infoAndAddToDb("Initiating sync function for account: " + accountId, LogDb.RUNTIME);
                         APICatalogSync apiCatalogSync = parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI);
                         loggerMaker.debugInfoAddToDb("Sync function completed for account: " + accountId, LogDb.RUNTIME);
@@ -353,6 +370,75 @@ public class Main {
         } finally {
             main.consumer.close();
         }
+    }
+
+    public static List<HttpResponseParams> filterBasedOnHeaders(List<HttpResponseParams> accWiseResponse,
+            AccountSettings accountSettings) {
+
+        if (accountSettings != null) {
+            Map<String, String> filterHeaders = accountSettings.getFilterHeaderValueMap();
+            if (filterHeaders != null && !filterHeaders.isEmpty()) {
+                List<HttpResponseParams> accWiseResponseFiltered = new ArrayList<HttpResponseParams>();
+                for(HttpResponseParams accWiseResponseEntry : accWiseResponse) {
+                    Map<String, List<String>> reqHeaders = accWiseResponseEntry.getRequestParams().getHeaders();
+                    Map<String, List<String>> resHeaders = accWiseResponseEntry.getHeaders();
+
+                    boolean shouldKeep = false;
+                    for(Map.Entry<String, String> filterHeaderKV : filterHeaders.entrySet()) {
+                        try {
+                            List<String> reqHeaderValues = reqHeaders == null ? null : reqHeaders.get(filterHeaderKV.getKey().toLowerCase());
+                            List<String> resHeaderValues = resHeaders == null ? null : resHeaders.get(filterHeaderKV.getKey().toLowerCase());
+
+
+                            boolean isPresentInReq = reqHeaderValues != null && reqHeaderValues.indexOf(filterHeaderKV.getValue()) != -1;
+                            boolean isPresentInRes = resHeaderValues != null && resHeaderValues.indexOf(filterHeaderKV.getValue()) != -1;
+
+                            shouldKeep = isPresentInReq || isPresentInRes;
+
+                            if (!shouldKeep) {
+                                break;
+                            }
+
+                        } catch (Exception e) {
+                            // eat it
+                        }
+                    }
+
+                    if (shouldKeep) {
+                        accWiseResponseFiltered.add(accWiseResponseEntry);
+                    }
+                }
+
+                accWiseResponse = accWiseResponseFiltered;
+            }
+
+            Map<Pattern, String> apiCollectioNameMapper = accountSettings.convertApiCollectionNameMapperToRegex();
+            if (apiCollectioNameMapper != null && !apiCollectioNameMapper.isEmpty()) {
+                for(HttpResponseParams accWiseResponseEntry : accWiseResponse) {
+                    Map<String, List<String>> reqHeaders = accWiseResponseEntry.getRequestParams().getHeaders();
+                    for(Map.Entry<Pattern, String> apiCollectioNameOrigXNew : apiCollectioNameMapper.entrySet()) {
+                        List<String> reqHeaderValues = reqHeaders == null ? null : reqHeaders.get("host");
+                        if (reqHeaderValues != null && !reqHeaderValues.isEmpty()) {
+                            for (int i = 0; i < reqHeaderValues.size(); i++) {
+                                String reqHeaderValue = reqHeaderValues.get(i);
+                                Pattern regex = apiCollectioNameOrigXNew.getKey();
+                                String newValue = apiCollectioNameOrigXNew.getValue();
+
+                                try {
+                                    if (regex.matcher(reqHeaderValue).matches()) {
+                                        reqHeaderValues.set(i, newValue);
+                                    }
+                                } catch (Exception e) {
+                                    // eat it
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return accWiseResponse;
     }
 
     public static void initializeRuntime(){

@@ -1,6 +1,11 @@
 package com.akto.dto;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+
+import com.akto.dto.type.CollectionReplaceDetails;
 
 public class AccountSettings {
     private int id;
@@ -42,6 +47,12 @@ public class AccountSettings {
 
     public static final String INIT_STACK_TYPE = "initStackType";
 
+    private Map<String, String> filterHeaderValueMap;
+    public static final String FILTER_HEADER_VALUE_MAP = "filterHeaderValueMap";
+
+    private Map<String, CollectionReplaceDetails> apiCollectionNameMapper;
+    public static final String API_COLLECTION_NAME_MAPPER = "apiCollectionNameMapper";
+
     public AccountSettings() {
     }
 
@@ -56,6 +67,23 @@ public class AccountSettings {
         PROD, QA, STAGING, DEV
     }
 
+    public Map<Pattern, String> convertApiCollectionNameMapperToRegex() {
+        
+        Map<Pattern, String> ret = new HashMap<>();
+
+        if (apiCollectionNameMapper == null) return ret;
+        
+        for(CollectionReplaceDetails collectionReplaceDetails: apiCollectionNameMapper.values()) {
+            try {
+
+                ret.put(Pattern.compile(collectionReplaceDetails.getRegex()), collectionReplaceDetails.getNewName());
+            } catch (Exception e) {
+                // eat it
+            }
+        }
+        return ret;
+        
+    }
 
     public int getId() {
         return id;
@@ -177,5 +205,21 @@ public class AccountSettings {
 
     public void setEnableDebugLogs(boolean enableDebugLogs) {
         this.enableDebugLogs = enableDebugLogs;
+    }
+
+    public Map<String, String> getFilterHeaderValueMap() {
+        return filterHeaderValueMap;
+    }
+
+    public void setFilterHeaderValueMap(Map<String, String> filterHeaderValueMap) {
+        this.filterHeaderValueMap = filterHeaderValueMap;
+    }
+
+    public Map<String,CollectionReplaceDetails> getApiCollectionNameMapper() {
+        return this.apiCollectionNameMapper;
+    }
+
+    public void setApiCollectionNameMapper(Map<String,CollectionReplaceDetails> apiCollectionNameMapper) {
+        this.apiCollectionNameMapper = apiCollectionNameMapper;
     }
 }

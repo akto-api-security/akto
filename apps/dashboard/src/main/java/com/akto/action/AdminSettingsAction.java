@@ -3,10 +3,13 @@ package com.akto.action;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
+import com.akto.dto.type.CollectionReplaceDetails;
 import com.akto.runtime.Main;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
+import org.bson.conversions.Bson;
 
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -117,6 +120,50 @@ public class AdminSettingsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+
+    private Map<String, String> filterHeaderValueMap;
+    
+    public String addFilterHeaderValueMap() {
+        Bson update;
+        if (this.filterHeaderValueMap == null) {
+            update = Updates.unset(AccountSettings.FILTER_HEADER_VALUE_MAP);
+        } else {
+            update = Updates.set(AccountSettings.FILTER_HEADER_VALUE_MAP, this.filterHeaderValueMap);
+        }
+
+        AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(), update
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
+    private String regex;
+    private String newName;
+    public String addApiCollectionNameMapper() {
+        String hashStr = regex.hashCode()+"";
+        Bson update = Updates.set(AccountSettings.API_COLLECTION_NAME_MAPPER+"."+hashStr, new CollectionReplaceDetails(regex, newName));
+
+        AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(), update
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String deleteApiCollectionNameMapper() {
+        
+        String hashStr = regex.hashCode()+"";
+
+        Bson update = Updates.unset(AccountSettings.API_COLLECTION_NAME_MAPPER+"."+hashStr);
+
+        AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(), update
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
     public AccountSettings getAccountSettings() {
         return this.accountSettings;
     }
@@ -139,5 +186,17 @@ public class AdminSettingsAction extends UserAction {
 
     public void setEnableDebugLogs(boolean enableDebugLogs) {
         this.enableDebugLogs = enableDebugLogs;
+    }
+
+    public void setFilterHeaderValueMap(Map<String, String> filterHeaderValueMap) {
+        this.filterHeaderValueMap = filterHeaderValueMap;
+    }
+    
+    public void setRegex(String regex) {
+        this.regex = regex;
+    }
+
+    public void setNewName(String newName) {
+        this.newName = newName;
     }
 }

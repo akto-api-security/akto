@@ -230,6 +230,37 @@ export default {
                 enableDebugLogs
             }
         })
+    },
+
+    addFilterHeaderValueMap(filterHeaderValueMap){
+        return request({
+            url: '/api/addFilterHeaderValueMap',
+            method: 'post',
+            data: {
+                filterHeaderValueMap
+            }
+        })
+    },
+
+    addApiCollectionNameMapper(regex, newName) {
+        return request ({
+            url: '/api/addApiCollectionNameMapper',
+            method: 'post',
+            data: {
+                regex, 
+                newName
+            }
+        })
+    },
+
+    deleteApiCollectionNameMapper(regex) {
+        return request ({
+            url: '/api/deleteApiCollectionNameMapper',
+            method: 'post',
+            data: {
+                regex
+            }
+        })
     }
 
 }

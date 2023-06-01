@@ -21,7 +21,9 @@ const team = {
         setupType: null,
         lastLoginTs: null,
         privateCidrList: null,
-        enableDebugLogs: null
+        enableDebugLogs: null,
+        filterHeaderValueMap: null,
+        apiCollectionNameMapper: null
     },
     getters: {
         getId: (state) => state.id,
@@ -35,7 +37,9 @@ const team = {
         getSetupType: (state) => state.setupType,
         getLastLoginTs: (state) => state.lastLoginTs,
         getPrivateCidrList: (state) => state.privateCidrList,
-        getEnableDebugLogs: (state) => state.enableDebugLogs
+        getEnableDebugLogs: (state) => state.enableDebugLogs,
+        getFilterHeaderValueMap: (state) => state.filterHeaderValueMap,
+        getApiCollectionNameMapper: (state) => state.apiCollectionNameMapper
     },
     mutations: {
         SET_TEAM_DETAILS(state, details) {
@@ -61,6 +65,8 @@ const team = {
                 state.setupType = "PROD"
                 state.mergeAsyncOutside = false
                 state.enableDebugLogs = false
+                state.filterHeaderValueMap = null
+                state.apiCollectionNameMapper = null
             } else {
                 state.redactPayload = resp.accountSettings.redactPayload ? resp.accountSettings.redactPayload : false
                 state.apiRuntimeVersion = resp.accountSettings.apiRuntimeVersion ? resp.accountSettings.apiRuntimeVersion : "-"
@@ -71,6 +77,8 @@ const team = {
                 state.mergeAsyncOutside = resp.accountSettings.mergeAsyncOutside || false
                 state.privateCidrList = resp.accountSettings.privateCidrList
                 state.enableDebugLogs = resp.accountSettings.enableDebugLogs
+                state.filterHeaderValueMap = resp.accountSettings.filterHeaderValueMap
+                state.apiCollectionNameMapper = resp.accountSettings.apiCollectionNameMapper
             }
         },
         SET_USER_INFO(state, resp) {
@@ -88,6 +96,20 @@ const team = {
                 commit('SET_ADMIN_SETTINGS', resp)
             }))
         },
+        deleteApiCollectionNameMapper({commit, dispatch}, {regex}) {
+            api.deleteApiCollectionNameMapper(regex).then((resp => {
+
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: "Collection replacement deleted successfully",
+                    color: 'green'
+                })
+
+                api.fetchAdminSettings().then((resp => {
+                    commit('SET_ADMIN_SETTINGS', resp)
+                }))
+            }))
+        },        
         fetchUserLastLoginTs({commit, dispatch}) {
             api.fetchUserLastLoginTs().then((resp => {
                 commit('SET_USER_INFO', resp)
@@ -129,6 +151,26 @@ const team = {
                     commit('SET_TEAM_DETAILS', resp)
                 })
                 return resp
+            })
+        },
+        addFilterHeaderValueMap({commit, dispatch}, {filterHeaderValueMapKey, filterHeaderValueMapValue}) {
+            let filterHeaderValueMap = {};
+            filterHeaderValueMap[filterHeaderValueMapKey] = filterHeaderValueMapValue
+            return api.addFilterHeaderValueMap(filterHeaderValueMap).then(resp => {
+                return resp
+            })
+        },
+        addApiCollectionNameMapper({commit, dispatch}, {regex, newName}) {
+            return api.addApiCollectionNameMapper(regex, newName).then(resp => {
+                window._AKTO.$emit('SHOW_SNACKBAR', {
+                    show: true,
+                    text: "Collection replacement added successfully",
+                    color: 'green'
+                })
+
+                api.fetchAdminSettings().then((resp => {
+                    commit('SET_ADMIN_SETTINGS', resp)
+                }))
             })
         },
         emptyState({commit, dispatch}) {
