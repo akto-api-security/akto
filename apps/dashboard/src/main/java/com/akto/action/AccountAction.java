@@ -272,6 +272,7 @@ public class AccountAction extends UserAction {
                 RuntimeListener.initialiseDemoCollections();
                 AccountSettingsDao.instance.updateOnboardingFlag(true);
                 InitializerListener.insertPiiSources();
+                InitializerListener.saveTestEditorYaml();
                 try {
                     InitializerListener.executeTestSourcesFetch();
                     InitializerListener.editTestSourceConfig();

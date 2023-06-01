@@ -52,6 +52,7 @@
 import {mapState} from 'vuex'
 import Spinner from '@/apps/dashboard/shared/components/Spinner'
 import HintIcon from "./HintIcon";
+import api from "../api"
 
 export default {
     name: "SetConfig",
@@ -64,6 +65,21 @@ export default {
         }
     },
     mounted() {
+
+        this.timer = setInterval(async () => {
+            if (this.authKey==null ){
+                console.log("calling");
+                await api.fetchAuthMechanismData().then((resp)=>{
+                        this.$store.commit('onboarding/UPDATE_AUTH_MECHANISM', resp.authMechanism)
+                        this.$store.commit('onboarding/UPDATE_AUTH_MECHANISM_LOADING', false)
+                    }).catch((e) => {
+                        this.$store.commit('onboarding/UPDATE_AUTH_MECHANISM_LOADING', false)
+                    })
+            } else {
+                console.log("stopping")
+                clearInterval(this.timer)
+            }
+        }, 1000)
     },
     computed: {
         ...mapState('onboarding', ['authMechanismLoading']),
