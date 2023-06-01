@@ -314,7 +314,7 @@ public class Main {
                         List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
                         loggerMaker.infoAndAddToDb("Initiating sync function for account: " + accountId, LogDb.RUNTIME);
                         APICatalogSync apiCatalogSync = parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI);
-                        loggerMaker.infoAndAddToDb("Sync function completed for account: " + accountId, LogDb.RUNTIME);
+                        loggerMaker.debugInfoAddToDb("Sync function completed for account: " + accountId, LogDb.RUNTIME);
 
                         // send to central kafka
                         if (kafkaProducer != null) {

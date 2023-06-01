@@ -331,7 +331,7 @@ public class HttpCallParser {
 
         }
         int filteredSize = filteredResponseParams.size();
-        loggerMaker.infoAndAddToDb("Filtered " + (originalSize - filteredSize) + " responses", LogDb.RUNTIME);
+        loggerMaker.debugInfoAddToDb("Filtered " + (originalSize - filteredSize) + " responses", LogDb.RUNTIME);
         return filteredResponseParams;
     }
 
