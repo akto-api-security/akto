@@ -132,7 +132,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
         );
     }
 
-    private void insertVulnerableRequestsForDemo() {
+    private static void insertVulnerableRequestsForDemo() {
         ApiCollection collection = ApiCollectionsDao.instance.findByName(JUICE_SHOP_DEMO_COLLECTION_NAME);
         if (collection == null) {
             loggerMaker.errorAndAddToDb("Error: collection not found", LoggerMaker.LogDb.DASHBOARD);
