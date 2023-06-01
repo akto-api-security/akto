@@ -106,7 +106,7 @@ jobs:
           restore-keys: ${{ runner.os }}-m2
       - name: Run CI/CD tests
         if: ${{ github.event.inputs.Environment == 'prod' && github.event.inputs.Deploy == 'true' }}
-        uses: akto-api-security/run-scan@v1.0.0
+        uses: akto-api-security/run-scan@v1.0.2
         with:
           AKTO_DASHBOARD_URL: ${{vars.AKTO_DASHBOARD_URL}}
           AKTO_API_KEY: ${{vars.AKTO_API_KEY}}
