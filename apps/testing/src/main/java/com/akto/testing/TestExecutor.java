@@ -508,7 +508,10 @@ public class TestExecutor {
                     loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);
                     //Creating issues from testingRunResults
                    TestingIssuesHandler handler = new TestingIssuesHandler();
-                   boolean triggeredByTestEditor = testingRun.getTriggeredBy().equals("test_editor");
+                   boolean triggeredByTestEditor = false;
+                   if (testingRun.getTriggeredBy() != null) {
+                        triggeredByTestEditor = testingRun.getTriggeredBy().equals("test_editor");
+                   }
                    handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor); // pass new field here
                 }
             } catch (Exception e) {
