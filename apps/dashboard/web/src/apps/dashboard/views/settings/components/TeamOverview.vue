@@ -11,7 +11,12 @@
                 </v-card-title>
 
                 <v-card-text style="font-size: 14px;">
+                    <div v-if="isSaas">
+                    You can copy the links provided and share them with your invitees.
+                    </div>
+                    <div v-else>
                     Your invitation emails have been successfully sent. Alternatively, you can copy the links provided and share them directly with your invitees.
+                    </div>
                 </v-card-text>
 
                 <div style="padding: 8px 24px 0px 24px">
