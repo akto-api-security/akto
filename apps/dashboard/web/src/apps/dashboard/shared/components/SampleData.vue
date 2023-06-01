@@ -17,9 +17,10 @@
                         <v-btn 
                             class="run-btn" primary dense dark color="var(--themeColor)" 
                             @click="$emit('run_tests')" 
-                            :style="!isLoading ? {'cursor': 'pointer !important'} : {}"
+                            :disabled="isLoading"
+                            :style="isLoading ? {'background' : 'var(--themeColor) !important', color: 'var(--white) !important'} : {}"
                         >
-                            <spinner v-if="isLoading" color="var(--white)" style="margin-right: 8px"/>
+                            <spinner v-if="isLoading" :style="{'color' : 'white !important'}"/>
                             <v-icon v-else size=16>$fas_play</v-icon>
                             Run Test
                         </v-btn>
@@ -39,9 +40,10 @@
                         <v-btn 
                             class="run-btn" primary dense dark color="var(--themeColor)" 
                             @click="$emit('run_tests')" 
-                            :style="!isLoading ? {'cursor': 'pointer !important'} : {}"
+                            :disabled="isLoading"
+                            :style="isLoading ? {'background' : 'var(--themeColor) !important', color: 'var(--white) !important'} : {}"
                         >
-                            <spinner v-if="isLoading" />
+                            <spinner v-if="isLoading" :style="{'color' : 'white !important'}"/>
                             <v-icon v-else size=16>$fas_play</v-icon>
                             Run Test
                         </v-btn>
@@ -251,7 +253,6 @@ export default {
     width: 120px;
     align-items: center;
     gap: 8px;
-    cursor: auto !important;
 }
 
 </style>
