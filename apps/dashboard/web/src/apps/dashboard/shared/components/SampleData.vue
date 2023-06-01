@@ -20,7 +20,7 @@
                             :disabled="isLoading"
                             :style="isLoading ? {'background' : 'var(--themeColor) !important', color: 'var(--white) !important'} : {}"
                         >
-                            <spinner v-if="isLoading" :style="{'color' : 'white !important'}"/>
+                            <spinner v-if="isLoading" :style="{'color' : 'white !important' , 'margin-right' : '8px'}"/>
                             <v-icon v-else size=16>$fas_play</v-icon>
                             Run Test
                         </v-btn>
@@ -43,7 +43,7 @@
                             :disabled="isLoading"
                             :style="isLoading ? {'background' : 'var(--themeColor) !important', color: 'var(--white) !important'} : {}"
                         >
-                            <spinner v-if="isLoading" :style="{'color' : 'white !important'}"/>
+                            <spinner v-if="isLoading" :style="{'color' : 'white !important' , 'margin-right' : '8px'}"/>
                             <v-icon v-else size=16>$fas_play</v-icon>
                             Run Test
                         </v-btn>
