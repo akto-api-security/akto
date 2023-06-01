@@ -170,7 +170,7 @@ export default {
         TestRolesConfigDetails,
         TokenAutomation,
         HelpTooltip,
-        LogFetch
+        LogFetch,
     },
     props: {
         tab: obj.strN

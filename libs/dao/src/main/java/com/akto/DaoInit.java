@@ -2,6 +2,7 @@ package com.akto;
 
 import com.akto.dto.*;
 import com.akto.dto.data_types.*;
+import com.akto.dto.demo.VulnerableRequestForTemplate;
 import com.akto.dto.gpt.AktoGptConfig;
 import com.akto.dto.gpt.AktoGptConfigState;
 import com.akto.dto.loaders.Loader;
@@ -173,6 +174,7 @@ public class DaoInit {
 
         ClassModel<LoginFlowStepsData> loginFlowStepsData = ClassModel.builder(LoginFlowStepsData.class)
         .enableDiscriminator(true).build();
+        ClassModel<VulnerableRequestForTemplate> vulnerableRequestForTemplateClassModel = ClassModel.builder(VulnerableRequestForTemplate.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(queueEntryClassModel,
                 configClassModel,
@@ -194,7 +196,8 @@ public class DaoInit {
                 testingIssuesIdClassModel, testSourceConfigClassModel, endpointLogicalGroupClassModel, testRolesClassModel,
                 logicalGroupTestingEndpointClassModel, testInfoClassModel, bflaTestInfoClassModel, nucleiTestInfoClassModel, customAuthTypeModel,
                 containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData,
-                loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel).automatic(true).build());
+                loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
+                vulnerableRequestForTemplateClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -223,8 +226,9 @@ public class DaoInit {
                 new EnumCodec<>(GlobalEnums.Severity.class),
                 new EnumCodec<>(TrafficMetrics.Name.class),
                 new EnumCodec<>(Loader.Type.class),
-                new EnumCodec<>(AktoGptConfigState.class),
-                new EnumCodec<>(CustomWebhook.WebhookOptions.class));
+                new EnumCodec<>(CustomWebhook.WebhookOptions.class),
+                new EnumCodec<>(GlobalEnums.YamlTemplateSource.class),
+                new EnumCodec<>(AktoGptConfigState.class));
 
         CodecRegistry codecRegistry = fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
                 customEnumCodecs);
