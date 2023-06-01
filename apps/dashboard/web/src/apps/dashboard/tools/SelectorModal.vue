@@ -73,6 +73,10 @@ export default {
         return{
             field1:{},
             field2:{},
+            copyObj:{
+                name:'your_test_name',
+                category: "BOLA" 
+            },
             newTest:{
                 name:'your_test_name',
                 category: "BOLA"
@@ -181,6 +185,13 @@ export default {
                     span_text: 'API',
                     items: this.showApiEndpoints(),
                 }
+            }
+        },
+        customTest(newVal){
+            if(newVal.name && newVal.name.length > 0){
+                this.newTest = JSON.parse(JSON.stringify(newVal))
+            }else{
+                this.newTest = JSON.parse(JSON.stringify(this.copyObj))
             }
         }
     }
