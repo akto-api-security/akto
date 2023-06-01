@@ -15,6 +15,7 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.type.URLMethods;
+import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -64,6 +65,14 @@ public class SaveTestEditorAction extends UserAction {
             ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
 
             Map<String, Object> config = mapper.readValue(content, Map.class);
+            String originalIDFromContent = (String) config.get("id");
+            if (!testId.equals(originalIDFromContent)) {
+                YamlTemplate yamlTemplate = YamlTemplateDao.instance.findOne(Filters.eq(Constants.ID, testId));
+                if (yamlTemplate != null && yamlTemplate.getSource() == YamlTemplateSource.CUSTOM) {//custom template with same name exists
+                    addActionError("Cannot save template as template with same id exists, specify a different test id");
+                    return ERROR.toUpperCase();
+                }
+            }
             config.replace("id", testId);
 
             Object info = config.get("info");
@@ -179,6 +188,7 @@ public class SaveTestEditorAction extends UserAction {
                 apiInfoKey.getString(ApiInfo.ApiInfoKey.URL),
                 URLMethods.Method.valueOf(apiInfoKey.getString(ApiInfo.ApiInfoKey.METHOD)));
         StartTestAction testAction = new StartTestAction();
+        testAction.setTriggeredBy("test_editor");
         testAction.setSession(getSession());
         testAction.setRecurringDaily(false);
         testAction.setApiInfoKeyList(Collections.singletonList(infoKey));//default id
