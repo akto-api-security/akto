@@ -127,10 +127,10 @@ public class TestingIssuesHandler {
         });
     }
 
-    public void handleIssuesCreationFromTestingRunResults(List<TestingRunResult> testingRunResultList) {
+    public void handleIssuesCreationFromTestingRunResults(List<TestingRunResult> testingRunResultList, boolean triggeredByTestEditor) {
 
         Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap = TestingUtils.
-                listOfIssuesIdsFromTestingRunResults(testingRunResultList, true);
+                listOfIssuesIdsFromTestingRunResults(testingRunResultList, true, triggeredByTestEditor);
 
         loggerMaker.infoAndAddToDb(String.format("Total issue id created from TestingRunResult map : %s", testingIssuesIdsMap.size()), LogDb.TESTING);
         Bson inQuery = Filters.in(ID, testingIssuesIdsMap.keySet().toArray());

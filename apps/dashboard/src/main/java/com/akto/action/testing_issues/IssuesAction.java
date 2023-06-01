@@ -64,7 +64,10 @@ public class IssuesAction extends UserAction {
         if (startEpoch != 0) {
             filters = Filters.and(filters, Filters.gte(TestingRunIssues.CREATION_TIME, startEpoch));
         }
-        return filters;
+
+        Bson combinedFilters = Filters.and(filters, Filters.ne("_id.testErrorSource", "TEST_EDITOR"));
+        
+        return combinedFilters;
     }
 
     public String fetchAffectedEndpoints() {
