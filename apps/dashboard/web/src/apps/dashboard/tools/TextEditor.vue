@@ -326,7 +326,7 @@ export default {
                                     _this.testingRunResult = run
                                     stopInterval = true
                                     __topThis.runTestObj.runTime =  Math.round((new Date().getTime() - testStartTime.getTime())/1000) + " seconds"
-                                    await testingApi.fetchIssueFromTestRunResultDetails(_this.testingRunResult.hexId).then(async respIssue => {
+                                    await testingApi.fetchIssueFromTestRunResultDetailsForTestEditor(_this.testingRunResult.hexId, "true").then(async respIssue => {
                                         __topThis.dialogBoxIssue = respIssue['runIssues']
                                         if (__topThis.dialogBoxIssue) {
                                             await issuesApi.fetchAffectedEndpoints(__topThis.dialogBoxIssue.id).then(affectedResp => {
