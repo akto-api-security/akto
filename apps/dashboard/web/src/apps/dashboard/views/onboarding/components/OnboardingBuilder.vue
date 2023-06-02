@@ -121,8 +121,8 @@ export default {
                         clearInterval(this.timer)
                     } else {
                         marketplaceApi.searchTestResults("").then((resp) => {
-                            if (resp.searchResults && resp.searchResults.length > 0) {
-                                console.log(resp.searchResults)
+                            // we wait for atleast 100 tests to be downloaded before we run tests.
+                            if (resp.searchResults && resp.searchResults.length > 100) {
                                 foundTests = true;
                             }
                         })
