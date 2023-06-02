@@ -106,7 +106,7 @@ public class SampleMessageStore {
         List<RawApi> messages = new ArrayList<>();
 
         List<String> samples = sampleDataMap.get(apiInfoKey);
-        if (samples == null || samples.isEmpty()) return null;
+        if (samples == null || samples.isEmpty()) return messages;
 
         for (String message: samples) {
             try {
