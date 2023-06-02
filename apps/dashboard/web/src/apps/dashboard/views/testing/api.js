@@ -73,7 +73,24 @@ export default {
             return resp
         })        
     },
-
+    addTestTemplate(content,testId, testCategory) {
+        return request({
+            url: '/api/saveTestEditorFile',
+            method: 'post',
+            data:{content, testId, testCategory}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    runTestForTemplate(content, apiInfoKey) {
+        return request({
+            url: '/api/runTestForGivenTemplate',
+            method: 'post',
+            data:{content, apiInfoKey}
+        }).then((resp) => {
+            return resp
+        })
+    },
     fetchTestingRunResults(testingRunResultSummaryHexId) {
         return request({
             url: '/api/fetchTestingRunResults',
@@ -106,12 +123,32 @@ export default {
         })
     },
 
+    fetchTestingRunResultFromTestingRun(testingRunHexId) {
+        return request({
+            url: '/api/fetchTestingRunResultFromTestingRun',
+            method: 'post',
+            data: {
+                testingRunHexId
+            }
+        })
+    },
+
     fetchIssueFromTestRunResultDetails(testingRunResultHexId) {
         return request({
             url: '/api/fetchIssueFromTestRunResultDetails',
             method: 'post',
             data: {
                 testingRunResultHexId
+            }
+        })
+    },
+
+    fetchIssueFromTestRunResultDetailsForTestEditor(testingRunResultHexId, isTestRunByTestEditor) {
+        return request({
+            url: '/api/fetchIssueFromTestRunResultDetails',
+            method: 'post',
+            data: {
+                testingRunResultHexId, isTestRunByTestEditor
             }
         })
     },

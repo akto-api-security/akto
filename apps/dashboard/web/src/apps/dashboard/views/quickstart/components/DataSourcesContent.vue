@@ -43,8 +43,7 @@ export default {
         Spinner,
         KubernetesDaemonset,
         Fargate,
-        NginxSource,
-        Spinner
+        NginxSource
     },
     data() {
         return {
