@@ -143,6 +143,16 @@ export default {
         })
     },
 
+    fetchIssueFromTestRunResultDetailsForTestEditor(testingRunResultHexId, isTestRunByTestEditor) {
+        return request({
+            url: '/api/fetchIssueFromTestRunResultDetails',
+            method: 'post',
+            data: {
+                testingRunResultHexId, isTestRunByTestEditor
+            }
+        })
+    },
+
     triggerLoginSteps(type, requestData, authParamData) {
         return request({
             url: 'api/triggerLoginSteps',
