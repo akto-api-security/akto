@@ -151,7 +151,7 @@ public class Main {
             if (accountSettings != null) {
                 logger.info("Received " + accountSettings.convertApiCollectionNameMapperToRegex().size() + " apiCollectionNameMappers");
             }
-        }        
+        }
     }
 
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
@@ -213,6 +213,8 @@ public class Main {
                     mainThread.join();
                 } catch (InterruptedException e) {
                     e.printStackTrace();
+                } catch (Error e){
+                    loggerMaker.errorAndAddToDb("Error in main thread: "+ e.getMessage(), LogDb.RUNTIME);
                 }
             }
         });
@@ -290,6 +292,7 @@ public class Main {
                     }
 
                     if (!isDashboardInstance && accountInfo.estimatedCount> 20_000_000) {
+                        loggerMaker.infoAndAddToDb("STI count is greater than 20M, skipping", LogDb.RUNTIME);
                         continue;
                     }
 
@@ -298,8 +301,8 @@ public class Main {
                                 apiConfig.getUserIdentifier(), apiConfig.getThreshold(), apiConfig.getSync_threshold_count(),
                                 apiConfig.getSync_threshold_time(), fetchAllSTI
                         );
-
                         httpCallParserMap.put(accountId, parser);
+                        loggerMaker.infoAndAddToDb("New parser created for account: " + accountId, LogDb.RUNTIME);
                     }
 
                     if (!flowMap.containsKey(accountId)) {
@@ -326,25 +329,32 @@ public class Main {
                         List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
 
                         accWiseResponse = filterBasedOnHeaders(accWiseResponse, accountInfo.accountSettings);
-    
+                        loggerMaker.infoAndAddToDb("Initiating sync function for account: " + accountId, LogDb.RUNTIME);
                         APICatalogSync apiCatalogSync = parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI);
+                        loggerMaker.debugInfoAddToDb("Sync function completed for account: " + accountId, LogDb.RUNTIME);
 
                         // send to central kafka
                         if (kafkaProducer != null) {
                             loggerMaker.infoAndAddToDb("Sending " + accWiseResponse.size() +" records to context analyzer", LogDb.RUNTIME);
                             for (HttpResponseParams httpResponseParams: accWiseResponse) {
                                 try {
+                                    loggerMaker.debugInfoAddToDb("Sending to kafka data for account: " + httpResponseParams.getAccountId(), LogDb.RUNTIME);
                                     kafkaProducer.send(httpResponseParams.getOrig(), centralKafkaTopicName);
                                 } catch (Exception e) {
                                     // force close it
-                                    kafkaProducer.close();
                                     loggerMaker.errorAndAddToDb("Closing kafka: " + e.getMessage(), LogDb.RUNTIME);
+                                    kafkaProducer.close();
+                                    loggerMaker.infoAndAddToDb("Successfully closed kafka", LogDb.RUNTIME);
                                 }
                             }
+                        } else {
+                            loggerMaker.errorAndAddToDb("Kafka producer is null", LogDb.RUNTIME);
                         }
 
                         // flow.init(accWiseResponse);
+                        loggerMaker.infoAndAddToDb("Initiating akto policy for account: " + accountId, LogDb.RUNTIME);
                         aktoPolicy.main(accWiseResponse, apiCatalogSync, fetchAllSTI);
+                        loggerMaker.infoAndAddToDb("Akto policy completed for account: " + accountId, LogDb.RUNTIME);
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
                     }
@@ -382,13 +392,13 @@ public class Main {
 
                             boolean isPresentInReq = reqHeaderValues != null && reqHeaderValues.indexOf(filterHeaderKV.getValue()) != -1;
                             boolean isPresentInRes = resHeaderValues != null && resHeaderValues.indexOf(filterHeaderKV.getValue()) != -1;
-    
+
                             shouldKeep = isPresentInReq || isPresentInRes;
-                            
+
                             if (!shouldKeep) {
                                 break;
                             }
-                            
+
                         } catch (Exception e) {
                             // eat it
                         }

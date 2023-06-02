@@ -40,11 +40,11 @@ public class AktoPolicy {
     private final int batchSizeThreshold = 10_000_000;
     private int currentBatchSize = 0;
 
-    private static final Logger logger = LoggerFactory.getLogger(AktoPolicy.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(AktoPolicy.class);
 
     public void fetchFilters() {
         this.filters = RuntimeFilterDao.instance.findAll(new BasicDBObject());
+        loggerMaker.infoAndAddToDb("Fetched " + filters.size() + " filters from db", LogDb.RUNTIME);
     }
 
     public AktoPolicy(APICatalogSync apiCatalogSync, boolean fetchAllSTI) {
@@ -52,21 +52,25 @@ public class AktoPolicy {
     }
 
     public void buildFromDb(Map<Integer, APICatalog> delta, boolean fetchAllSTI) {
+        loggerMaker.infoAndAddToDb("AktoPolicy.buildFromDb(), fetchAllSti:" +fetchAllSTI, LogDb.RUNTIME);
         fetchFilters();
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(new BasicDBObject());
         if (accountSettings != null) {
+            loggerMaker.debugInfoAddToDb("Found account settings", LogDb.RUNTIME);
             List<String> cidrList = accountSettings.getPrivateCidrList();
             if ( cidrList != null && !cidrList.isEmpty()) {
-                logger.info("Found cidr from db");
+                loggerMaker.debugInfoAddToDb("Found private cidr list", LogDb.RUNTIME);
                 apiAccessTypePolicy.setPrivateCidrList(cidrList);
             }
 
             redact = accountSettings.isRedactPayload();
+            loggerMaker.debugInfoAddToDb("Redact payload: " + redact, LogDb.RUNTIME);
         }
 
         apiInfoCatalogMap = new HashMap<>();
         if (delta == null) return;
+        loggerMaker.infoAndAddToDb("Building AktoPolicy, delta size:" + delta.size(), LogDb.RUNTIME);
         for (Integer collectionId: delta.keySet()) {
             ApiInfoCatalog apiInfoCatalog = new ApiInfoCatalog(new HashMap<>(), new HashMap<>(), new ArrayList<>());
             apiInfoCatalogMap.put(collectionId, apiInfoCatalog);
@@ -97,6 +101,7 @@ public class AktoPolicy {
                 }
             }
         }
+        loggerMaker.infoAndAddToDb("Fetching apiInfo from db", LogDb.RUNTIME);
         List<ApiInfo> apiInfoList;
         if (fetchAllSTI) {
             apiInfoList = ApiInfoDao.instance.findAll(new BasicDBObject());
@@ -104,16 +109,20 @@ public class AktoPolicy {
             List<Integer> apiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
             apiInfoList =  ApiInfoDao.instance.findAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
         }
+        loggerMaker.infoAndAddToDb("Fetched " + apiInfoList.size() + " apiInfo from db", LogDb.RUNTIME);
         for (ApiInfo apiInfo: apiInfoList) {
             try {
+                loggerMaker.debugInfoAddToDb("Filling apiInfo in catalog for api: " + apiInfo.getId(), LogDb.RUNTIME);
                 fillApiInfoInCatalog(apiInfo, true);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e.getMessage() + " " + e.getCause(), LogDb.RUNTIME);
             }
         }
 
+        loggerMaker.infoAndAddToDb("Processing reserve apiInfo", LogDb.RUNTIME);
         for (ApiInfo apiInfo: reserveApiInfoMap.values()) {
             try {
+                loggerMaker.debugInfoAddToDb("Filling apiInfo in catalog for api: " + apiInfo.getId(), LogDb.RUNTIME);
                 fillApiInfoInCatalog(apiInfo, false);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e.getMessage() + " " + e.getCause(), LogDb.RUNTIME);
@@ -121,16 +130,20 @@ public class AktoPolicy {
         }
 
         List<FilterSampleData> filterSampleDataList = FilterSampleDataDao.instance.findAll(new BasicDBObject());
+        loggerMaker.infoAndAddToDb("Fetched " + filterSampleDataList.size() + " filterSampleData from db", LogDb.RUNTIME);
         for (FilterSampleData filterSampleData: filterSampleDataList) {
             try{
+                loggerMaker.debugInfoAddToDb("Filling filterSampleData in catalog for filter: " + filterSampleData.getId(), LogDb.RUNTIME);
                 fillFilterSampleDataInCatalog(filterSampleData);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e.getMessage() + " " + e.getCause(), LogDb.RUNTIME);
             }
         }
 
+        loggerMaker.infoAndAddToDb("Processing reserve filterSampleData", LogDb.RUNTIME);
         for (FilterSampleData filterSampleData: reserveFilterSampleDataMap.values()) {
             try {
+                loggerMaker.debugInfoAddToDb("Filling filterSampleData in catalog for filter: " + filterSampleData.getId(), LogDb.RUNTIME);
                 fillFilterSampleDataInCatalog(filterSampleData);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e.getMessage() + " " + e.getCause(), LogDb.RUNTIME);
@@ -139,6 +152,7 @@ public class AktoPolicy {
 
         reserveApiInfoMap = new HashMap<>();
         reserveFilterSampleDataMap = new HashMap<>();
+        loggerMaker.infoAndAddToDb("Built AktoPolicy", LogDb.RUNTIME);
     }
 
     public void syncWithDb(boolean initialising, Map<Integer, APICatalog> delta, boolean fetchAllSTI) {
@@ -291,6 +305,7 @@ public class AktoPolicy {
 
     public void main(List<HttpResponseParams> httpResponseParamsList, APICatalogSync apiCatalogSync, boolean fetchAllSTI) throws Exception {
         if (httpResponseParamsList == null) httpResponseParamsList = new ArrayList<>();
+        loggerMaker.infoAndAddToDb("AktoPolicy main: httpResponseParamsList size: " + httpResponseParamsList.size(), LogDb.RUNTIME);
         for (HttpResponseParams httpResponseParams: httpResponseParamsList) {
             try {
                 process(httpResponseParams);
@@ -305,6 +320,9 @@ public class AktoPolicy {
             this.currentBatchSize = 0;
             this.timeSinceLastSync = Context.now();
             syncWithDb(false, apiCatalogSync.dbState, fetchAllSTI);
+            loggerMaker.infoAndAddToDb("AktoPolicy main: sync with db done", LogDb.RUNTIME);
+        } else {
+            loggerMaker.infoAndAddToDb("Api catalog is null, sync Not syncing with db", LogDb.RUNTIME);
         }
     }
 
