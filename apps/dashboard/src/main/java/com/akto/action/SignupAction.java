@@ -200,6 +200,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             String userEmail = payload.getEmail();
 
             SignupInfo.GoogleSignupInfo signupInfo = new SignupInfo.GoogleSignupInfo(aktoGoogleConfig.getId(), accessToken, refreshToken, tokenResponse.getExpiresInSeconds());
+            shouldLogin = "true";
             createUserAndRedirect(userEmail, username, signupInfo, 0);
             code = "";
         } catch (IOException e) {
