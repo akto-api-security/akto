@@ -62,19 +62,20 @@ export default {
     },
     data () {
         return {
+            timer:null
         }
     },
     mounted() {
-
+        this.$store.commit('onboarding/UPDATE_AUTH_MECHANISM_LOADING', true)
         this.timer = setInterval(async () => {
             if (this.authKey==null ){
                 await api.fetchAuthMechanismData().then((resp)=>{
                         this.$store.commit('onboarding/UPDATE_AUTH_MECHANISM', resp.authMechanism)
-                        this.$store.commit('onboarding/UPDATE_AUTH_MECHANISM_LOADING', false)
                     }).catch((e) => {
                         this.$store.commit('onboarding/UPDATE_AUTH_MECHANISM_LOADING', false)
                     })
             } else {
+                this.$store.commit('onboarding/UPDATE_AUTH_MECHANISM_LOADING', false)
                 clearInterval(this.timer)
             }
         }, 1000)

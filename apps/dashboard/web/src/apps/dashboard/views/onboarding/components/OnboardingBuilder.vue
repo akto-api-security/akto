@@ -107,7 +107,8 @@ export default {
                     "showStepBuilder": false
                 },
             ],
-            loading: false
+            loading: false,
+            timer: null
         }
     },
     methods: {

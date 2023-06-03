@@ -189,7 +189,11 @@ public class AccountAction extends UserAction {
         if (accountName == null || accountName.isEmpty()) {
             throw new IllegalArgumentException("Account name can't be empty");
         }
-
+        long existingAccountsCount = AccountsDao.instance.count(new BasicDBObject());
+        if(existingAccountsCount==0){
+            AccountsDao.instance.insertOne(new Account(1_000_000, accountName));
+            return 1_000_000;
+        }
         int triesAllowed = 10;
         int now = Context.now();
         while(triesAllowed >=0) {

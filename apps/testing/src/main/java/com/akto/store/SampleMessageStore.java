@@ -48,7 +48,7 @@ public class SampleMessageStore {
                 CustomTestingEndpoints customTestingEndpoints = (CustomTestingEndpoints) testingEndpoints;
                 List<ApiInfoKey> apiInfoKeys = customTestingEndpoints.getApisList();
 
-                if (apiInfoKeys.size() == 0) {
+                if (apiInfoKeys.isEmpty()) {
                     return;
                 } else {
                     int apiCollectionId = apiInfoKeys.get(0).getApiCollectionId();
