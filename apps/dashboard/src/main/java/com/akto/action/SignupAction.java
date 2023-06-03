@@ -257,6 +257,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 long countUsers = UsersDao.instance.getMCollection().countDocuments();
                 if (countUsers > 0) {
                     code = "Ask admin to invite you";
+                    return ERROR.toUpperCase();
                 }
             }
         }
