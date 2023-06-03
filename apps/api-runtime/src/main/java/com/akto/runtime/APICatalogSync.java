@@ -57,6 +57,15 @@ public class APICatalogSync {
         this.dbState = new HashMap<>();
         this.delta = new HashMap<>();
         this.sensitiveParamInfoBooleanMap = new HashMap<>();
+        try {
+            String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
+            if (instanceType != null && "RUNTIME".equalsIgnoreCase(instanceType)) {
+                mergeAsyncOutside = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()).getMergeAsyncOutside();
+            }
+        } catch (Exception e) {
+
+        }
+            
     }
 
     public static final int STRING_MERGING_THRESHOLD = 10;
