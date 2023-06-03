@@ -208,8 +208,18 @@ public class InitializerListener implements ServletContextListener {
 
             String testingSourcesRepoTree = "https://api.github.com/repos/akto-api-security/tests-library/git/trees/master?recursive=1";
             String tempFilename = "temp_testingSourcesRepoTree.json";
-            FileUtils.copyURLToFile(new URL(testingSourcesRepoTree), new File(tempFilename));
-            String fileContent = FileUtils.readFileToString(new File(tempFilename), StandardCharsets.UTF_8);
+            String fileContent = "";
+            try {
+                FileUtils.copyURLToFile(new URL(testingSourcesRepoTree), new File(tempFilename));
+                fileContent = FileUtils.readFileToString(new File(tempFilename), StandardCharsets.UTF_8);
+            } catch (Exception e) {
+                logger.error("api github error " + tempFilename, e);
+            }
+
+            if(fileContent.isEmpty()) {
+                fileContent = convertStreamToString(InitializerListener.class.getResourceAsStream("/testingSourcesRepoTree.json"));
+            }
+
             BasicDBObject fileList = BasicDBObject.parse(fileContent);
             BasicDBList files = (BasicDBList) (fileList.get("tree"));
 
@@ -251,7 +261,8 @@ public class InitializerListener implements ServletContextListener {
             }
 
 
-        } catch (IOException e1) {
+        } catch (Exception e1) {
+            logger.error("executeTestSourcesFetch error " , e1);
         }
 
 
