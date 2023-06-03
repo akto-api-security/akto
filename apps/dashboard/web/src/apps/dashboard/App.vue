@@ -262,7 +262,8 @@ export default {
       regexRequired:false,
       renderAktoButton:false,
       apiCollectionId:-1,
-      myAccountItems: [
+      isLocalDeploy: window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'local_deploy',
+      myAccountLocalItems:[
       ...listAccounts,
         {
           label: '',
@@ -275,7 +276,9 @@ export default {
         {
           label: '',
           click: () => { }
-        },
+        }
+      ],
+      myAccountItems: [
         {
           label: "Settings",
           click: () => this.$router.push('/dashboard/settings')
@@ -391,6 +394,7 @@ export default {
     }
   },
   async mounted() {
+    this.myAccountItems.unshift(... ( this.isLocalDeploy ? this.myAccountLocalItems : [] ))
     window.Beamer.init();
     let i = setInterval(() => {
         this.$store.dispatch('dashboard/fetchActiveLoaders')
