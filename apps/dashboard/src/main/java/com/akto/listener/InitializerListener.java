@@ -844,7 +844,10 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-
+    private static void checkMongoConnection() throws Exception {
+        AccountsDao.instance.getStats();
+        connectedToMongo = true;
+    }
 
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
@@ -867,11 +870,11 @@ public class InitializerListener implements ServletContextListener {
                             DaoInit.init(new ConnectionString(mongoURI));
                             calledOnce = true;
                         }
+                        checkMongoConnection();
                         AccountTask.instance.executeTask(new Consumer<Account>() {
                             @Override
                             public void accept(Account account) {
                                 AccountSettingsDao.instance.getStats();
-                                connectedToMongo = true;
                                 runInitializerFunctions();
                             }
                         }, "context-initializer");
