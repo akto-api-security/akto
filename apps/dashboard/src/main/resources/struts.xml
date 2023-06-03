@@ -1650,6 +1650,28 @@
             </result>
         </action>
 
+        <action name="api/fetchSensitiveParameters" class="com.akto.action.observe.InventoryAction" method="fetchSensitiveParameters">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
+        <action name="api/fetchEndpointData" class="com.akto.action.observe.InventoryAction" method="fetchEndpointData">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
+            </result>
+        </action>
+        
         <action name="api/ask_ai" class="com.akto.action.gpt.GptAction" method="askAi">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -1657,7 +1679,18 @@
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchCollectionEndpointCountInfo" class="com.akto.action.observe.InventoryAction" method="fetchCollectionEndpointCountInfo">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
             </result>
         </action>
 
@@ -1668,7 +1701,18 @@
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchAllEndpointData" class="com.akto.action.observe.InventoryAction" method="fetchAllEndpointData">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
             </result>
         </action>
 
@@ -1679,6 +1723,7 @@
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>

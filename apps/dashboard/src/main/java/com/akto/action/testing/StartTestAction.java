@@ -1,6 +1,5 @@
 package com.akto.action.testing;
 
-import com.akto.DaoInit;
 import com.akto.action.UserAction;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.context.Context;
@@ -54,6 +53,7 @@ public class StartTestAction extends UserAction {
     private AuthMechanism authMechanism;
     private int endTimestamp;
     private String testName;
+    private EndpointDataQuery endpointDataQuery;
     private Map<String,String> metadata;
     private boolean fetchCicd;
     private String triggeredBy;
@@ -101,6 +101,9 @@ public class StartTestAction extends UserAction {
                 }
                 testingEndpoints = new WorkflowTestingEndpoints(workflowTest);
                 testIdConfig = 1;
+                break;
+            case FILTER_BASED:
+                testingEndpoints = new FilterBasedTestingEndpoints(endpointDataQuery);
                 break;
             default:
                 addActionError("Invalid APIs type");
@@ -476,6 +479,14 @@ public class StartTestAction extends UserAction {
 
     public void setMaxConcurrentRequests(int maxConcurrentRequests) {
         this.maxConcurrentRequests = maxConcurrentRequests;
+    }
+
+    public EndpointDataQuery getEndpointDataQuery() {
+        return this.endpointDataQuery;
+    }
+
+    public void setEndpointDataQuery(EndpointDataQuery endpointDataQuery) {
+        this.endpointDataQuery = endpointDataQuery;
     }
 
     public Map<String, String> getMetadata() {

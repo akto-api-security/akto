@@ -133,7 +133,7 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         List<SingleTypeInfo> singleTypeInfoList = SingleTypeInfoDao.instance.findAll(new BasicDBObject());
         assertEquals(singleTypeInfoList.size(),9);
 
-        Bson filter = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(null,null,null, null);
+        Bson filter = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(null,null,null, null, null);
 
         List<SingleTypeInfo> sensitiveSingleTypeInfos = SingleTypeInfoDao.instance.findAll(filter);
         assertEquals(sensitiveSingleTypeInfos.size(), 6);

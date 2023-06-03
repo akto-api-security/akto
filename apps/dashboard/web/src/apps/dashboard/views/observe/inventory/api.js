@@ -137,6 +137,17 @@ export default {
             return resp
         })
     },
+    fetchSensitiveParameters (apiInfoList) {
+        return request({
+            url: '/api/fetchSensitiveParameters',
+            method: 'post',
+            data: {
+                apiInfoList
+            }
+        }).then((resp) => {
+            return resp
+        })
+    },
     loadParamsOfEndpoint (apiCollectionId, url, method) {
         return request({
             url: '/api/loadParamsOfEndpoint',
@@ -369,6 +380,44 @@ export default {
             return resp
         })
     },
+
+    fetchEndpointData (endpointDataQuery, pageNo) {
+        return request({
+            url: '/api/fetchEndpointData',
+            method: 'post',
+            data: {
+                endpointDataQuery: endpointDataQuery,
+                collectionPage: pageNo
+            }
+        }).then((resp) => {
+            return resp.response.data
+        })
+    },
+
+    fetchCollectionEndpointCountInfo (apiCollectionId) {
+        return request({
+            url: '/api/fetchCollectionEndpointCountInfo',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId
+            }
+        }).then((resp) => {
+            return resp.response.data
+        })
+    },
+
+    fetchAllEndpointData (apiCollectionId) {
+        return request({
+            url: '/api/fetchAllEndpointData',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId
+            }
+        }).then((resp) => {
+            return resp.response.data
+        })
+    },
+    
     fetchAktoGptConfig(apiCollectionId){
         return request({
             url: '/api/fetchAktoGptConfig',

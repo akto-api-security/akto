@@ -410,6 +410,9 @@ export default {
         deep: true,
       },
     },
+    activated(){
+        this.fetchRecentParams()
+    },
     mounted () {
         this.fetchRecentParams()
         this.fillInitial()

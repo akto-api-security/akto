@@ -53,6 +53,9 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
             ApiInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames));    
             counter++;
         }
+
+        String[] fieldNames = {"lastSeen"};
+        ApiInfoDao.instance.getMCollection().createIndex(Indexes.ascending(fieldNames)); 
     }
 
     @Override

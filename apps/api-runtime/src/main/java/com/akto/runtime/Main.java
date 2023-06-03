@@ -1,9 +1,5 @@
 package com.akto.runtime;
 
-import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -13,8 +9,6 @@ import java.util.concurrent.TimeUnit;
 import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
-import com.akto.dao.test_editor.TestConfigYamlParser;
-import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.APIConfig;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
@@ -24,8 +18,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.test_editor.TestConfig;
-import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.runtime.policies.AktoPolicies;
 import com.google.gson.Gson;
 import com.mongodb.ConnectionString;
@@ -95,6 +87,8 @@ public class Main {
 
 
     public static void createIndices() {
+        logger.info("create ts index called " + Context.now());
+        SingleTypeInfoDao.instance.createSingleTypeInfoTimeStampIndex();
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
         SensitiveSampleDataDao.instance.createIndicesIfAbsent();
         SampleDataDao.instance.createIndicesIfAbsent();
@@ -335,12 +329,103 @@ public class Main {
         }
     }
 
+    public static void createStiCollectionView() {
+
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        boolean runCreateStiView = accountSettings == null ? true : AccountSettingsDao.instance.updateStiViewFlag(true, AccountSettings.RUN_CREATE_STI_VIEW);
+
+        if (runCreateStiView) {
+            try {
+                AccountSettingsDao.instance.updateRunCreateStiViewFlag(true);
+                logger.info("create view called " + Context.now());
+                SingleTypeInfoDao.instance.createStiCollectionView();
+                logger.info("create sti view id index called " + Context.now());
+                SingleTypeInfoDao.instance.createStiViewIdIndex();
+                logger.info("create merge called " + Context.now());
+                SingleTypeInfoDao.instance.mergeStiViewAndApiInfo();
+                logger.info("create index called " + Context.now());
+                SingleTypeInfoDao.instance.createStiViewIndexes();
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error in create sti view " + e.getMessage(), LogDb.RUNTIME);
+            }
+            
+        }
+    }
+
+    public static void updateStiCollectionView() {
+
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        boolean runUpdateStiView = accountSettings == null ? true : AccountSettingsDao.instance.updateStiViewFlag(true, AccountSettings.RUN_UPDATE_STI_VIEW);
+
+        if (runUpdateStiView) {
+            try {
+                logger.info("update view called " + Context.now());
+                SingleTypeInfoDao.instance.createStiCollectionView();
+                logger.info("update merge called " + Context.now());
+                SingleTypeInfoDao.instance.mergeStiViewAndApiInfo();
+                logger.info("update merge finished " + Context.now());
+                AccountSettingsDao.instance.updateStiViewFlag(false, AccountSettings.RUN_UPDATE_STI_VIEW);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error in update sti view " + e.getMessage(), LogDb.RUNTIME);
+                AccountSettingsDao.instance.updateStiViewFlag(false, AccountSettings.RUN_UPDATE_STI_VIEW);
+            }
+        }
+
+    }
+
+    public static void rebuildStiCollectionView() {
+
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        boolean runRebuildStiView = accountSettings == null ? true : AccountSettingsDao.instance.updateStiViewFlag(true, AccountSettings.RUN_REBUILD_STI_VIEW);
+
+        if (runRebuildStiView) {
+            try {
+                logger.info("rebuild view called " + Context.now());
+                SingleTypeInfoDao.instance.createStiCollectionViewReplica();
+                SingleTypeInfoDao.instance.createStiViewReplicaIdIndex();
+                SingleTypeInfoDao.instance.mergeStiViewReplicaAndApiInfo();
+
+                SingleTypeInfoViewDao.instance.dropCollection();
+                SingleTypeInfoViewReplicaDao.instance.renameCollection("single_type_info_view");
+
+                SingleTypeInfoDao.instance.createStiViewIndexes();
+
+                AccountSettingsDao.instance.updateStiViewFlag(false, AccountSettings.RUN_REBUILD_STI_VIEW);
+                logger.info("rebuild view finished " + Context.now());
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error in rebuild sti view " + e.getMessage(), LogDb.RUNTIME);
+                AccountSettingsDao.instance.updateStiViewFlag(false, AccountSettings.RUN_REBUILD_STI_VIEW);
+            }
+        }
+
+    }
+
     public static void initializeRuntime(){
         SingleTypeInfoDao.instance.getMCollection().updateMany(Filters.exists("apiCollectionId", false), Updates.set("apiCollectionId", 0));
         SingleTypeInfo.init();
 
         createIndices();
         insertRuntimeFilters();
+        createStiCollectionView();
+
+        // setting sti view update flags false when server starts
+        AccountSettingsDao.instance.updateStiViewFlag(false, AccountSettings.RUN_UPDATE_STI_VIEW);   
+        AccountSettingsDao.instance.updateStiViewFlag(false, AccountSettings.RUN_REBUILD_STI_VIEW); 
+
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                Context.accountId.set(1_000_000);
+                updateStiCollectionView();
+            }
+        }, 10, 30, TimeUnit.SECONDS);
+
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                Context.accountId.set(1_000_000);
+                rebuildStiCollectionView();
+            }
+        }, 10, 10, TimeUnit.MINUTES);
+
         try {
             AccountSettingsDao.instance.updateVersion(AccountSettings.API_RUNTIME_VERSION);
         } catch (Exception e) {

@@ -1,5 +1,6 @@
 package com.akto.dao;
 
+import com.mongodb.MongoNamespace;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.*;
 import com.mongodb.client.model.*;
@@ -57,6 +58,10 @@ public abstract class MCollection<T> {
     }
     public List<T> findAll(Bson q) {
         return findAll(q, null);
+    }
+
+    public long findCount(Bson q) {
+        return this.getMCollection().countDocuments(q);
     }
 
     public List<T> findAll(Bson q, Bson projection) {
@@ -156,6 +161,14 @@ public abstract class MCollection<T> {
         return this.getMCollection().replaceOne(q, obj, new ReplaceOptions().upsert(true));
     }
 
+    public void renameCollection(String newColName) {
+        this.getMCollection().renameCollection(new MongoNamespace(getDBName(), newColName), new RenameCollectionOptions());
+    }
+
+    public void dropCollection() {
+        this.getMCollection().drop();
+    }
+
     public InsertOneResult insertOne(T elem) {
         return getMCollection().insertOne(elem);
     }
@@ -165,7 +178,16 @@ public abstract class MCollection<T> {
         return getMCollection().insertMany(elems);
     }
 
+    public T findLatestOne(Bson q, Bson sort) {
+        MongoCursor<T> cursor = this.getMCollection().find(q).limit(1).sort(sort).cursor();
 
+        while(cursor.hasNext()) {
+            T elem = cursor.next();
+            return elem;
+        }
+
+        return null;
+    }
     
     public DeleteResult deleteAll(Bson q) {
         return this.getMCollection().deleteMany(q);
@@ -185,4 +207,22 @@ public abstract class MCollection<T> {
     public Logger getLogger() {
         return logger;
     }
+
+    public void createView(String viewName, List<Bson> pipeline) {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+        mongoDatabase.createView(viewName, getCollName(), pipeline);
+    }
+
+    public void createOnDemandView(List<Bson> pipeline) {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+        AggregateIterable<Document> res = mongoDatabase.getCollection(getCollName()).aggregate(pipeline);
+        Document doc = res.first();
+    }
+
+    public void mergeCollections(List<Bson> pipeline) {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+        AggregateIterable<Document> res = mongoDatabase.getCollection(getCollName()).aggregate(pipeline);
+        Document doc = res.first();
+    }
+
 }

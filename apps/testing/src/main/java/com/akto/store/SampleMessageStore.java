@@ -43,6 +43,24 @@ public class SampleMessageStore {
                                 Filters.eq(SingleTypeInfo._IS_HEADER, false)
                         )
                 );
+            } else if (type.equals(TestingEndpoints.Type.FILTER_BASED)) {
+                int apiCollectionId = 0;
+                FilterBasedTestingEndpoints filterBasedTestingEndpoints = (FilterBasedTestingEndpoints) testingEndpoints;
+                EndpointDataQuery endpointDataQuery = filterBasedTestingEndpoints.getEndpointDataQuery();
+                for (EndpointDataFilterCondition endpointDataFilterCondition: endpointDataQuery.getFilterConditions()) {
+                    if (endpointDataFilterCondition.getKey().equals("apiCollectionId")) {
+                        apiCollectionId = Integer.parseInt((endpointDataFilterCondition.getValues().get(0)));
+                    }
+                }
+
+                singleTypeInfoList = SingleTypeInfoDao.instance.findAll(
+                        Filters.and(
+                                Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
+                                Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1),
+                                Filters.eq(SingleTypeInfo._IS_HEADER, false)
+                        )
+                );
+
             } else {
                 CustomTestingEndpoints customTestingEndpoints = (CustomTestingEndpoints) testingEndpoints;
                 List<ApiInfoKey> apiInfoKeys = customTestingEndpoints.getApisList();

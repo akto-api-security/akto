@@ -41,6 +41,10 @@ export default {
         type: Boolean,
         required: false
     },
+    intN: {
+        type: Number,
+        required: false
+    },
 
     overviewChartOpts: {
         legend: {

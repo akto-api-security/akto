@@ -9,6 +9,7 @@ import com.akto.dao.APISpecDao;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.SingleTypeInfoViewDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.mongodb.client.model.Filters;
@@ -22,18 +23,10 @@ public class ApiCollectionsAction extends UserAction {
 
     public String fetchAllCollections() {
         this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
-
-        Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap();
-
+        // todo: add logic for logical groups
         for (ApiCollection apiCollection: apiCollections) {
-            int apiCollectionId = apiCollection.getId();
-            Integer count = countMap.get(apiCollectionId);
-            if (count != null && apiCollection.getHostName() != null) {
-                apiCollection.setUrlsCount(count);
-            } else {
-                apiCollection.setUrlsCount(apiCollection.getUrls().size());
-            }
-            apiCollection.setUrls(new HashSet<>());
+            int urlCount = SingleTypeInfoViewDao.instance.getUrlCount(apiCollection.getId());
+            apiCollection.setUrlsCount(urlCount);
         }
 
         return Action.SUCCESS.toUpperCase();

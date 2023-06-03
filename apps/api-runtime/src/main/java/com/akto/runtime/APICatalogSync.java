@@ -8,6 +8,7 @@ import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.HttpResponseParams.Source;
+import com.akto.dto.testing.SingleTypeInfoView;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic.Key;
@@ -658,6 +659,7 @@ public class APICatalogSync {
         ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSti = new ArrayList<>();
         ArrayList<WriteModel<SampleData>> bulkUpdatesForSampleData = new ArrayList<>();
         ArrayList<WriteModel<ApiInfo>> bulkUpdatesForApiInfo = new ArrayList<>();
+        ArrayList<WriteModel<SingleTypeInfoView>> bulkUpdatesForStiView = new ArrayList<>();
 
         for (URLTemplate urlTemplate: result.templateToStaticURLs.keySet()) {
             Set<String> matchStaticURLs = result.templateToStaticURLs.get(urlTemplate);
@@ -673,6 +675,12 @@ public class APICatalogSync {
                 );
 
                 Bson filterQSampleData = Filters.and(
+                    Filters.eq("_id.apiCollectionId", apiCollectionId),
+                    Filters.eq("_id.method", delMethod.name()),
+                    Filters.eq("_id.url", delEndpoint)
+                );
+
+                Bson filterQStiView = Filters.and(
                     Filters.eq("_id.apiCollectionId", apiCollectionId),
                     Filters.eq("_id.method", delMethod.name()),
                     Filters.eq("_id.url", delEndpoint)
@@ -720,12 +728,14 @@ public class APICatalogSync {
                     isFirst = false;
                 } else {
                     bulkUpdatesForSti.add(new DeleteManyModel<>(filterQ));
+                    bulkUpdatesForStiView.add(new DeleteManyModel<>(filterQStiView));
                     // SingleTypeInfoDao.instance.deleteAll(filterQ);
 
                 }
 
                 bulkUpdatesForSampleData.add(new DeleteManyModel<>(filterQSampleData));
                 bulkUpdatesForApiInfo.add(new DeleteManyModel<>(filterQSampleData));
+                bulkUpdatesForStiView.add(new DeleteManyModel<>(filterQStiView));
                 // SampleDataDao.instance.deleteAll(filterQSampleData);
                 // ApiInfoDao.instance.deleteAll(filterQSampleData);
             }
@@ -746,7 +756,14 @@ public class APICatalogSync {
                 Filters.eq("_id.url", delEndpoint)
             );
 
+            Bson filterQStiView = Filters.and(
+                Filters.eq("_id.apiCollectionId", apiCollectionId),
+                Filters.eq("_id.method", delMethod.name()),
+                Filters.eq("_id.url", delEndpoint)
+            );
+
             bulkUpdatesForSti.add(new DeleteManyModel<>(filterQ));
+            bulkUpdatesForStiView.add(new DeleteManyModel<>(filterQStiView));
             bulkUpdatesForSampleData.add(new DeleteManyModel<>(filterQSampleData));
             // SingleTypeInfoDao.instance.deleteAll(filterQ);
             // SampleDataDao.instance.deleteAll(filterQSampleData);
@@ -754,6 +771,10 @@ public class APICatalogSync {
 
         if (bulkUpdatesForSti.size() > 0) {
             SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForSti, new BulkWriteOptions().ordered(false));
+        }
+
+        if (bulkUpdatesForStiView.size() > 0) {
+            SingleTypeInfoViewDao.instance.getMCollection().bulkWrite(bulkUpdatesForStiView, new BulkWriteOptions().ordered(false));
         }
 
         if (bulkUpdatesForSampleData.size() > 0) {
@@ -1111,8 +1132,23 @@ public class APICatalogSync {
             );
         }
 
+        triggerUpdateStiView();
+
         return new DbUpdateReturn(bulkUpdates, bulkUpdatesForSampleData, bulkUpdatesForSensitiveParamInfo);
     }
+
+    public static void triggerUpdateStiView() {
+        try {
+            loggerMaker.infoAndAddToDb("trigger update sti view called " + Context.now(), LogDb.RUNTIME);
+            SingleTypeInfoDao.instance.createStiCollectionView();
+            logger.info("trigger update sti view merge called " + Context.now());
+            SingleTypeInfoDao.instance.mergeStiViewAndApiInfo();
+            logger.info("trigger update sti view merge finished " + Context.now());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in trigger update sti view " + e.getMessage(), LogDb.RUNTIME);
+        }
+    }
+
 
     public static class DbUpdateReturn {
         public ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSingleTypeInfo;
