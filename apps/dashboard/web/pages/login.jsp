@@ -57,7 +57,7 @@
                     window.SIGNUP_INVITATION_CODE = '${signupInvitationCode}'
                     window.SIGNUP_EMAIL_ID = '${signupEmailId}'
 
-                    if(window.DASHBOARD_MODE=='' && window.IS_SAAS=='' && window.location.host=='app.akto.io'){
+                    if(window.DASHBOARD_MODE=='' && window.IS_SAAS=='' && window.location.host.endsWith('akto.io') ){
                         window.DASHBOARD_MODE='LOCAL_DEPLOY'
                         window.IS_SAAS='true'
                     }
