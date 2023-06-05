@@ -95,8 +95,9 @@ const testing = {
 
             })
         },
-        addTestTemplate({commit},{content, testId, testCategory}) {
-            return api.addTestTemplate(content, testId, testCategory).then(resp => {
+        addTestTemplate({commit},{content, originalTestId}) {
+            return api.addTestTemplate(content, originalTestId).then(resp => {
+                return resp
             })
         },
         loadTestingRunResults({commit}) {
