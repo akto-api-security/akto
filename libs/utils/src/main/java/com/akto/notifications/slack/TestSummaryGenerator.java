@@ -204,7 +204,8 @@ public class TestSummaryGenerator {
 
         List<TestingRunIssues> testingRunIssues = TestingRunIssuesDao.instance.findAll(Filters.and(
                 Filters.gte(TestingRunIssues.LAST_SEEN, startTs),
-                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN)));
+                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
+                Filters.ne("_id.testErrorSource", "TEST_EDITOR")));
 
         return new GenerateResult(workflowTestResults, automatedTestingResultSummary, testingRunMap,
                 testingRunResultSummaryMap, testingRunIssues, workflowTestsMap);

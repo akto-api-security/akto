@@ -56,6 +56,8 @@ public class StartTestAction extends UserAction {
     private String testName;
     private Map<String,String> metadata;
     private boolean fetchCicd;
+    private String triggeredBy;
+    private boolean isTestRunByTestEditor;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
 
@@ -131,6 +133,9 @@ public class StartTestAction extends UserAction {
         if(localTestingRun==null){
             try {
                 localTestingRun = createTestingRun(scheduleTimestamp, this.recurringDaily ? 86400 : 0);
+                if (triggeredBy.length() > 0) {
+                    localTestingRun.setTriggeredBy(triggeredBy);
+                }
             } catch (Exception e){
                 loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
             }
@@ -218,7 +223,8 @@ public class StartTestAction extends UserAction {
             Bson filterQ = Filters.and(
                 Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, this.endTimestamp),
                 Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, this.startTimestamp),
-                Filters.nin(Constants.ID,getCicdTests())
+                Filters.nin(Constants.ID,getCicdTests()),
+                Filters.ne("triggeredBy", "test_editor")
             );
             testingRuns = TestingRunDao.instance.findAll(filterQ);
         }
@@ -294,6 +300,9 @@ public class StartTestAction extends UserAction {
                 }
                 TestingIssuesId issuesId = new TestingIssuesId(result.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING,
                         category, config != null ? config.getId() : null);
+                if (isTestRunByTestEditor) {
+                    issuesId.setTestErrorSource(TestErrorSource.TEST_EDITOR);
+                }
                 runIssues = TestingRunIssuesDao.instance.findOne(Filters.eq(Constants.ID, issuesId));
             }
         }catch (Exception ignore) {}
@@ -491,6 +500,22 @@ public class StartTestAction extends UserAction {
 
     public void setSource(CallSource source) {
         this.source = source;
+    }
+
+    public String getTriggeredBy() {
+        return triggeredBy;
+    }
+
+    public void setTriggeredBy(String triggeredBy) {
+        this.triggeredBy = triggeredBy;
+    }
+
+    public boolean isTestRunByTestEditor() {
+        return isTestRunByTestEditor;
+    }
+
+    public void setIsTestRunByTestEditor(boolean testRunByTestEditor) {
+        isTestRunByTestEditor = testRunByTestEditor;
     }
 
     public enum CallSource{
