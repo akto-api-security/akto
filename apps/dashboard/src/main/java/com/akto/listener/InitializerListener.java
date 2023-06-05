@@ -30,6 +30,9 @@ import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.testing.rate_limit.ApiRateLimit;
+import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
+import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
@@ -336,6 +339,22 @@ public class InitializerListener implements ServletContextListener {
         );
 
         return ret;
+    }
+
+    private void setupRateLimitWatcher () {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                if (settings == null) {
+                    return;
+                }
+                int globalRateLimit = settings.getGlobalRateLimit();
+                Map<ApiRateLimit, Integer> rateLimitMap =  RateLimitHandler.getInstance().getRateLimitsMap();
+                rateLimitMap.clear();
+                rateLimitMap.put(new GlobalApiRateLimit(globalRateLimit), globalRateLimit);
+            }
+        }, 0, 1, TimeUnit.MINUTES);
     }
 
     private void setUpDailyScheduler() {
@@ -925,6 +944,7 @@ public class InitializerListener implements ServletContextListener {
             setUpDailyScheduler();
             setUpWebhookScheduler();
             setUpPiiAndTestSourcesScheduler();
+            setupRateLimitWatcher();
 
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             dropSampleDataIfEarlierNotDroped(accountSettings);
