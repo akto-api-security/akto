@@ -182,6 +182,11 @@ public class InitializerListener implements ServletContextListener {
             } catch (Exception e) {
                 // TODO: handle exception
             }
+            finally{
+                if(inputStream!=null){
+                    inputStream.close();
+                }
+            }
 
         }
     }
@@ -860,8 +865,18 @@ public class InitializerListener implements ServletContextListener {
         connectedToMongo = true;
     }
 
+    public static void setSubdomain(){
+        if (System.getenv("AKTO_SUBDOMAIN") != null) {
+            subdomain = System.getenv("AKTO_SUBDOMAIN");
+        }
+
+        subdomain += "/signup-google";
+    }
+
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
+        setSubdomain();
+
         sce.getServletContext().getSessionCookieConfig().setSecure(HttpUtils.isHttpsEnabled());
 
         logger.info("context initialized");
@@ -1099,6 +1114,7 @@ public class InitializerListener implements ServletContextListener {
             files.add(line);
         }
         in.close();
+        reader.close();
         return files;
     }
 
@@ -1111,6 +1127,7 @@ public class InitializerListener implements ServletContextListener {
             stringbuilder.append(line + "\n");
         }
         in.close();
+        reader.close();
         return stringbuilder.toString();
     }
 }

@@ -211,6 +211,7 @@
             </result>
         </action>
 
+        
         <action name="signup-google" class="com.akto.action.SignupAction" method="registerViaGoogle">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
