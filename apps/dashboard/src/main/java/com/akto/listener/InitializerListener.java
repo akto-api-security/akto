@@ -93,6 +93,7 @@ public class InitializerListener implements ServletContextListener {
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     public static final boolean isSaas = "true".equals(System.getenv("IS_SAAS"));
     private static final int THREE_HOURS = 3*60*60;
+    private static final int CONNECTION_TIMEOUT = 10 * 1000;
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     public static boolean connectedToMongo = false;
@@ -154,7 +155,7 @@ public class InitializerListener implements ServletContextListener {
             filePath = filePath.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/");
             if(downloadFileCheck(filePath)){
             try {
-                FileUtils.copyURLToFile(new URL(filePath), new File(filePath));
+                FileUtils.copyURLToFile(new URL(filePath), new File(filePath), CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);
             } catch (IOException e1) {
                 e1.printStackTrace();
                 continue;
@@ -232,7 +233,7 @@ public class InitializerListener implements ServletContextListener {
             String fileContent = "";
             if(downloadFileCheck(tempFilename)) {
             try {
-                FileUtils.copyURLToFile(new URL(testingSourcesRepoTree), new File(tempFilename));
+                FileUtils.copyURLToFile(new URL(testingSourcesRepoTree), new File(tempFilename), CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);
             } catch (Exception e) {
                 logger.error("api github error " + tempFilename, e);
             }
@@ -306,7 +307,7 @@ public class InitializerListener implements ServletContextListener {
                 if (fileUrl.startsWith("http")) {
                     String tempFileUrl = "temp_" + id;
                     if(downloadFileCheck(tempFileUrl)){
-                        FileUtils.copyURLToFile(new URL(fileUrl), new File(tempFileUrl));
+                        FileUtils.copyURLToFile(new URL(fileUrl), new File(tempFileUrl), CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);
                     }
                     fileUrl = tempFileUrl;
                 }
