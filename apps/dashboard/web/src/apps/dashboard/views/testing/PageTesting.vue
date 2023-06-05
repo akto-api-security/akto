@@ -1,5 +1,6 @@
 <template>
-    <layout-with-tabs title="API Testing" class="page-testing" :tabs='["Test results", "User config", "Roles"]' :tab="tab" :disableHash="true">
+    <layout-with-tabs title="API Testing" class="page-testing"
+        :tabs='["Test results", "User config", "Roles", "Rate Limit"]' :tab="tab" :disableHash="true">
         <template slot="Test results">
             <div class="py-8">
                 <div>
@@ -129,6 +130,17 @@
                 <log-fetch />
             </div>
         </template>
+        <template slot="Rate Limit">
+            <div class="ma-4">
+                <simple-menu :items="maxRequestsPerMinOptions">
+                    <template v-slot:activator2>
+                        <span>Allowed requests / min: </span>
+                        <span class="column-title clickable-line">{{ maxRequestsPerMinLabel }}</span>
+                        <v-icon size="14" color="var(--themeColorDark)">$fas_angle-down</v-icon>
+                    </template>
+                </simple-menu>
+            </div>
+        </template>
     </layout-with-tabs>
 </template>
 
@@ -148,11 +160,14 @@ import func from '@/util/func'
 import testing from '@/util/testing'
 import { mapState } from 'vuex'
 import api from './api'
+import settingsApi from '../settings/api'
 import LayoutWithLeftPane from '@/apps/dashboard/layouts/LayoutWithLeftPane'
 import ApiCollectionGroup from '@/apps/dashboard/shared/components/menus/ApiCollectionGroup'
 import LoginStepBuilder from './components/token/LoginStepBuilder'
 import TokenAutomation from './components/token/TokenAutomation'
 import HelpTooltip from '@/apps/dashboard/shared/components/help/HelpTooltip'
+import SimpleMenu from "@/apps/dashboard/shared/components/SimpleMenu"
+
 import obj from "@/util/obj";
 
 export default {
@@ -170,15 +185,22 @@ export default {
         TestRolesConfigDetails,
         TokenAutomation,
         HelpTooltip,
-        LogFetch,
+        SimpleMenu,
+        LogFetch
     },
     props: {
         tab: obj.strN
     },
     data() {
+        let requestPerMinValues = [10, 20, 30, 60, 80, 100, 200, 300, 400, 600, 1000]
+        let maxRequestsValues = requestPerMinValues.reduce((acc, val) => {
+            acc.push({ "label": val, click: () => this.setMaxRequestsPerMin(val, val) })
+            return acc
+        }, [])
         return {
             originalDbState: null,
             stepBuilder: false,
+            maxRequestsValues,
             newKey: this.nonNullAuth ? this.nonNullAuth.key : null,
             newVal: this.nonNullAuth ? this.nonNullAuth.value : null,
             stopAllTestsLoading: false,
@@ -187,13 +209,22 @@ export default {
             authMechanismData: {},
             testRoleName: "",
             testLogicalGroupRegex: "",
-            showTokenAutomation: false
+            showTokenAutomation: false,
+            maxRequestPerMin: 0,
+            maxRequestsPerMinLabel: "No Limit",
+            maxRequestsPerMinOptions: [{ label: "No Limit", click: () => this.setMaxRequestsPerMin("No Limit", 0) }, ...maxRequestsValues]
+
         }
     },
     methods: {
         setAuthHeaderKey(newKey) {
             this.newKey = newKey
             this.saveAuth()
+        },
+        setMaxRequestsPerMin(label, requests) {
+            this.maxRequestsPerMinLabel = label
+            this.maxRequestPerMin = requests
+            settingsApi.updateGlobalRateLimit(requests)
         },
         setAuthHeaderValue(newVal) {
             this.newVal = newVal
@@ -395,6 +426,13 @@ export default {
     },
     async mounted() {
         this.fetchAuthMechanismData()
+        settingsApi.fetchAdminSettings().then(resp => {
+            let accountSetting = resp.accountSettings
+            if (accountSetting['globalRateLimit'] !== undefined && accountSetting['globalRateLimit'] !== 0) {
+                this.maxRequestsPerMinLabel = accountSetting['globalRateLimit']
+                this.maxRequestPerMin = accountSetting['globalRateLimit']
+            }
+        })
         let now = func.timeNow()
         this.$store.dispatch('test_roles/loadTestRoles')
         await this.$store.dispatch('testing/loadTestingDetails', { startTimestamp: now - func.recencyPeriod, endTimestamp: now })
