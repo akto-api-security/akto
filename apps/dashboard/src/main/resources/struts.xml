@@ -211,6 +211,14 @@
             </result>
         </action>
         
+        <action name="signup-google" class="com.akto.action.SignupAction" method="registerViaGoogle">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="root">code</param>
+            </result>
+        </action>        
 
         <action name="api/getAPICatalog" class="com.akto.action.APICatalogAction" method="getAPICatalog">
             <interceptor-ref name="json"/>
