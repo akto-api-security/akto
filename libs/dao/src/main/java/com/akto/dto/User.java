@@ -10,6 +10,7 @@ import java.util.Map;
 
 public class User {
     private String name;
+    public static final String LOGIN = "login";
     private String login;
     private int id;
     private List<String> refreshTokens;

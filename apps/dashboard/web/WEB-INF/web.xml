@@ -64,6 +64,7 @@
         <filter-name>RateLimitFilter</filter-name>
         <url-pattern>/auth/login</url-pattern>
         <url-pattern>/api/inviteUsers</url-pattern>
+        <url-pattern>/tools/publicApi</url-pattern>
     </filter-mapping>
 
 

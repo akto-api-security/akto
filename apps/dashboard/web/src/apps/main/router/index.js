@@ -25,6 +25,7 @@ const ParamState = () => import("@/apps/dashboard/views/observe/misc/ParamState"
 const MPTestCategory = () => import("@/apps/dashboard/views/marketplace/components/MPTestCategory")
 const Onboarding = () => import("@/apps/dashboard/views/onboarding/Onboarding.vue")
 const TextEditor = () => import("@/apps/dashboard/tools/TextEditor.vue")
+const WebsiteTextEditor = () => import("@/apps/dashboard/tools/App.vue")
 
 Vue.use(Router)
 
@@ -51,6 +52,11 @@ const router =  new Router({
             path: '/signup',
             name: 'signup',
             component: PageSignup
+        },
+        {
+            path: '/tools/test-editor',
+            name: 'Test editor',
+            component: WebsiteTextEditor,
         },
         {
             path: '/dashboard/onboarding',
