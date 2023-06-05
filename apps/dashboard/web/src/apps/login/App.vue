@@ -147,7 +147,6 @@ export default {
   font-size: 16px
   font-weight: 600
   margin-left: 5px
-  color: var(--white)
 
 .page-login_title
     font-weight: 600
