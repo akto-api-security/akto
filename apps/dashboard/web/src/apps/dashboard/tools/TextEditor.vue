@@ -39,9 +39,9 @@
                                         </template>
 
                                         <v-list-item v-for="(test, index) in customTestObj[item.name].all" :key="index"
-                                            class="test-container">
+                                            class="test-container"  @click="setSelectedMethod(test.value)">
                                             <v-list-item-content :class="test.label === defaultTestName ? 'test-container-active': ''">
-                                                <div class="test-name show-tooltip" @click="setSelectedMethod(test.value)">
+                                                <div class="test-name show-tooltip">
                                                     <v-tooltip bottom>
                                                         <template v-slot:activator="{ on, attrs }">
                                                             <span v-bind="attrs" v-on="on" >
