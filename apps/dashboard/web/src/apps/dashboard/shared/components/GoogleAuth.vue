@@ -30,8 +30,8 @@ export default {
         'scope=https%3A//www.googleapis.com/auth/userinfo.email%20https%3A//www.googleapis.com/auth/userinfo.profile&' +
         'response_type=code&' +
         'state=' + this.purpose + '&' +
-        'redirect_uri=https%3A//' + window.location.host + '/signup-google&' +
-        'client_id=779574722609-j4scecjhuiiu8u8g9hegjs27ihhpa3c2.apps.googleusercontent.com'
+        'redirect_uri=http%3A//' + window.location.host + '/signup-google&' +
+        'client_id=779574722609-u7r6qf8ra7b46pdb80a4vp9neipf16mr.apps.googleusercontent.com'
     }
   }
 }

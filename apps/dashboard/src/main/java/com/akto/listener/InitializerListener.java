@@ -96,7 +96,7 @@ public class InitializerListener implements ServletContextListener {
     public static boolean connectedToMongo = false;
 
     private static String domain = null;
-    public static String subdomain = "http://akto-aktol-1ruxhizfbl6cc-1122202785.ap-south-1.elb.amazonaws.com";
+    public static String subdomain = "http://akto-aktol-1ruxhizfbl6cc-1122202785.ap-south-1.elb.amazonaws.com/signup-google";
 
     public static String getDomain() {
         if (domain == null) {
