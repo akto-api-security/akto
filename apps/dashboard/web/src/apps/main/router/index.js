@@ -240,8 +240,15 @@ const router =  new Router({
                 },
                 {
                     path: 'test-editor',
-                    name: 'testEditor',
-                    component: TextEditor
+                    redirect: '/dashboard/test-editor/REMOVE_TOKENS'
+                },
+                {
+                    path: 'test-editor/:testId',
+                    name: 'test-editor-id',
+                    component: TextEditor,
+                    props: route => ({
+                        defaultTestId: decodeURIComponent(route.params.testId)
+                    })    
                 }
             ]
         },
