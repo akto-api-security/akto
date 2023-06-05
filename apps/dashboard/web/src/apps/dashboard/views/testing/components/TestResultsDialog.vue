@@ -284,6 +284,10 @@ export default {
 <style lang="sass" scoped>
 .test-errors-class
   padding: 24px 0px 0px 24px
+  font-size: 14px !important
+  font-weight: 500
+  color: var(--themeColorDark)
+
 
 .table-column
   padding: 4px 8px !important
