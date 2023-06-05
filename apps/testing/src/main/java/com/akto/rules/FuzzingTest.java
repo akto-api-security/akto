@@ -43,6 +43,7 @@ public class FuzzingTest extends TestPlugin {
     private final Map<String, Object> valuesMap;
     private static final int ONE_DAY = 24*60*60;
     public static final int payloadLineLimit = 100;
+    private static final int CONNECTION_TIMEOUT = 10 * 1000;
 
     public FuzzingTest(String testRunId, String testRunResultSummaryId, String origTemplatePath, String subcategory,
                        String testSourceConfigCategory, Map<String, Object> valuesMap) {
@@ -124,7 +125,7 @@ public class FuzzingTest extends TestPlugin {
 
         try {
             if(downloadFileCheck(this.tempTemplatePath)){
-            FileUtils.copyURLToFile(new URL(this.origTemplatePath), new File(this.tempTemplatePath));
+            FileUtils.copyURLToFile(new URL(this.origTemplatePath), new File(this.tempTemplatePath), CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);
             }
         } catch (IOException e1) {
             e1.printStackTrace();
