@@ -242,6 +242,7 @@ public class FuzzingTest extends TestPlugin {
 
         File file = new File(templatePath);
         FileUtils.writeStringToFile(file, finalTemplateString, Charsets.UTF_8);
+        inputStream.close();
     }
 
     public static void downloadLinks(String templatePath, String outputDir) throws IOException {
@@ -282,6 +283,7 @@ public class FuzzingTest extends TestPlugin {
 
             FileUtils.writeLines(new File(outputDir + "/" + fileNameList[fileNameList.length-1]), StandardCharsets.UTF_8.name(), lines);
         }
+        inputStream.close();
     }
 
     public String getSubcategory() {

@@ -182,6 +182,11 @@ public class InitializerListener implements ServletContextListener {
             } catch (Exception e) {
                 // TODO: handle exception
             }
+            finally{
+                if(inputStream!=null){
+                    inputStream.close();
+                }
+            }
 
         }
     }
@@ -1109,6 +1114,7 @@ public class InitializerListener implements ServletContextListener {
             files.add(line);
         }
         in.close();
+        reader.close();
         return files;
     }
 
@@ -1121,6 +1127,7 @@ public class InitializerListener implements ServletContextListener {
             stringbuilder.append(line + "\n");
         }
         in.close();
+        reader.close();
         return stringbuilder.toString();
     }
 }
