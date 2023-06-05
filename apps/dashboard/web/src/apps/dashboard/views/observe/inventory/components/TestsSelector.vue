@@ -9,6 +9,11 @@
             <div class="d-flex" >
                 <div class="name-div">Name: </div>
                 <name-input :defaultName="collectionName" :defaultSuffixes="nameSuffixes" @changed="setTestName" />
+                <v-btn plain :ripple="false" class="pa-0" @click="deselectAll">
+                    <v-chip small color="var(--lighten2)" text-color="var(--themeColorDark)" class="tag-chip clickable">
+                        Remove all <v-icon  color="var(--themeColorDark)" style="max-width: 12px;" class="pl-1" size="12">$fas_times</v-icon>
+                    </v-chip>
+                </v-btn>
             </div>
             <div class="d-flex brda">
                 <div class="category-list-container">
@@ -127,6 +132,10 @@ export default {
         
     },
     methods: {
+        deselectAll() {
+            this.globalCheckbox = false
+            Object.keys(this.mapCategoryToSubcategory).map(kk => this.mapCategoryToSubcategory[kk].selected=[])
+        },
         getCategoryName(category) {
             return this.categories.find(x => x.name === category).displayName
         },
@@ -266,4 +275,9 @@ export default {
 .disable-div
     pointer-events: none
     opacity: 0.4
+
+.tag-chip
+    font-weight: 400
+    font-size: 12px
+
 </style>

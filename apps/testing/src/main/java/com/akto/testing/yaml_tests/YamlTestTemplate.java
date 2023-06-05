@@ -52,8 +52,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     }
 
     @Override
-    public List<ExecutionResult>  executor() {
-        loggerMaker.infoAndAddToDb("executor started" + logId, LogDb.TESTING);
+    public boolean checkAuthBeforeExecution() {
         if (this.auth != null && this.auth.getAuthenticated() != null && this.auth.getAuthenticated() == true) {
             loggerMaker.infoAndAddToDb("running noAuth check " + logId, LogDb.TESTING);
             ExecutionResult res = AuthValidator.checkAuth(this.auth, this.rawApi.copy());
@@ -62,10 +61,16 @@ public class YamlTestTemplate extends SecurityTestTemplate {
                 int statusCode = StatusCodeAnalyser.getStatusCode(resp.getBody(), resp.getStatusCode());
                 if (statusCode >= 200 && statusCode < 300) {
                     loggerMaker.infoAndAddToDb("noAuth check failed, skipping execution " + logId, LogDb.TESTING);
-                    return null;
+                    return false;
                 }
             }
         }
+        return true;
+    }
+
+    @Override
+    public List<ExecutionResult>  executor() {
+        loggerMaker.infoAndAddToDb("executor started" + logId, LogDb.TESTING);
         List<ExecutionResult> results = new Executor().execute(this.executorNode, this.rawApi, this.varMap, this.logId, this.authMechanism);
         loggerMaker.infoAndAddToDb("execution result size " + results.size() +  " " + logId, LogDb.TESTING);
         return results;
@@ -79,6 +84,9 @@ public class YamlTestTemplate extends SecurityTestTemplate {
             return testResults;
         }
         for (ExecutionResult attempt: attempts) {
+            if (attempt.getResponse() == null) {
+                continue;
+            }
             String msg = RedactSampleData.convertOriginalReqRespToString(attempt.getRequest(), attempt.getResponse());
             RawApi testRawApi = new RawApi(attempt.getRequest(), attempt.getResponse(), msg);
             boolean vulnerable = TestPlugin.validateValidator(this.getValidatorNode(), this.getRawApi(), testRawApi , this.getApiInfoKey(), this.varMap, this.logId);

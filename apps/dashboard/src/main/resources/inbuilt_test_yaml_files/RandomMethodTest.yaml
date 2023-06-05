@@ -1,0 +1,51 @@
+id: RANDOM_METHOD_TEST
+info:
+  name: Access Control Bypass by changing request method to an arbitrary value
+  description: "Many authentication mechanisms only limit access to the most common HTTP methods, thus allowing unauthorized access to restricted resources by other HTTP methods."
+  details: >
+            "It may be possible to bypass authentication or authorization on this endpoint by changing the HTTP
+            method to an arbitrary value. The original request was replayed by removing victim's <b>auth</b> token. The server 
+            responded with 2XX success codes.<br>"
+            "<b>Background:</b> An access control vulnerability can arise if the server does not properly enforce 
+            authorization checks for certain resources when the an arbitrary method value is used. This vulnerability can allow 
+            an attacker to bypass access controls and gain unauthorized access to restricted resources. The access 
+            bypass control by changing the HTTP method to an arbitrary value occurs when an attacker modifies the HTTP request 
+            method from a restricted method (e.g., POST) to the an arbitrary value. By doing so, the attacker aims to 
+            exploit the server's vulnerability in handling authorization checks for the given method, which may 
+            differ from other methods."
+  impact: "Broken User authentication is a serious vulnerability. Attackers can gain control to other user's 
+          accounts in the system, read their personal data, and perform sensitive actions on their behalf, like 
+          money transactions and sending personal messages."
+  category:
+    name: UHM
+    shortName: UHM
+    displayName: Unnecessary HTTP Methods (UHM)
+  subCategory: RANDOM_METHOD_TEST
+  severity: LOW
+  tags: 
+    - Business logic
+    - OWASP top 10
+    - HackerOne top 10
+  references:
+    - "https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management_Testing/06-Test_HTTP_Methods"
+    - "https://web.archive.org/web/20081116154150/http://www.aspectsecurity.com/documents/Bypassing_VBAAC_with_HTTP_Verb_Tampering.pdf"
+    - "https://capec.mitre.org/data/definitions/274.html"
+
+auth:
+  authenticated: true
+
+api_selection_filters:
+  response_code:
+    eq: 302
+
+execute:
+  type: single
+  requests:
+    - req:
+      - modify_method: TestMethod
+      - remove_auth_header: true
+
+validate:
+  response_code:
+    gte: 200
+    lt: 300

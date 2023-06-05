@@ -6,6 +6,7 @@ public class TestEditorEnums {
         CONTAINS_EITHER,
         CONTAINS_ALL,
         NOT_CONTAINS,
+        NOT_CONTAINS_EITHER,
         REGEX,
         EQ,
         GTE,
