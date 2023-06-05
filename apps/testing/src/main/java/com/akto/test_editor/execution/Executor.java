@@ -255,6 +255,8 @@ public class Executor {
                     String regex = regexInfo.get("regex");
                     String replaceWith = regexInfo.get("replace_with");
                     newUrl = Utils.applyRegexModifier(url, regex, replaceWith);
+                } else {
+                    newUrl = key.toString();
                 }
                 return Operations.modifyUrl(rawApi, newUrl);
             case "modify_method":

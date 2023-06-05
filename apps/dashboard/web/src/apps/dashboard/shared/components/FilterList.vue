@@ -1,5 +1,5 @@
 <template>
-    <div>
+    <div style="background: #FFFFFF">
         <div v-if="!hideListTitle" class="list-header">
             <div>{{title}}</div>
             <div>{{Object.values(checkedMap).filter(x => x).length}}/{{Object.values(checkedMap).length}}</div>
@@ -29,7 +29,9 @@
                 <v-text-field
                     v-model="searchText"
                     dense
+                    ref="searchTextInput"
                     color="var(--themeColor)"
+                    class="search-text-input"
                     prepend-inner-icon="$fas_search"
                 >
                     <template v-slot:prepend-inner>
@@ -105,6 +107,13 @@ export default {
             operators: ['OR', 'AND', 'NOT'],
             selectedOperator: 'OR'
         }
+    },
+    mounted() {
+        let inputEl = this.$refs.searchTextInput.$el.querySelector('.search-text-input input')
+        setTimeout(()=>{
+            inputEl.focus()
+        },200)
+
     },
     methods: {
         operatorClicked(operator) {

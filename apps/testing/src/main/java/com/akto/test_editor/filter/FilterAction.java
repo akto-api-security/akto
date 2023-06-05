@@ -37,6 +37,7 @@ import com.akto.test_editor.filter.data_operands_impl.GreaterThanFilter;
 import com.akto.test_editor.filter.data_operands_impl.LesserThanEqFilter;
 import com.akto.test_editor.filter.data_operands_impl.LesserThanFilter;
 import com.akto.test_editor.filter.data_operands_impl.NeqFilter;
+import com.akto.test_editor.filter.data_operands_impl.NotContainsEitherFilter;
 import com.akto.test_editor.filter.data_operands_impl.NotContainsFilter;
 import com.akto.test_editor.filter.data_operands_impl.RegexFilter;
 import com.akto.util.JSONUtils;
@@ -58,7 +59,7 @@ public final class FilterAction {
         put("gte", new GreaterThanEqFilter());
         put("lt", new LesserThanFilter());
         put("lte", new LesserThanEqFilter());
-        put("not_contains", new NotContainsFilter());
+        put("not_contains_either", new NotContainsEitherFilter());
         put("contains_jwt", new ContainsJwt());
     }};
 
@@ -290,7 +291,7 @@ public final class FilterAction {
                 matchingKeys.add(s);
             }
             Boolean filterResp = matchingKeys.size() > 0;
-            if (filterActionRequest.getOperand().equalsIgnoreCase("not_contains")) {
+            if (filterActionRequest.getOperand().equalsIgnoreCase("not_contains") || filterActionRequest.getOperand().equalsIgnoreCase("not_contains_either")) {
                 int keyCount = getKeyCount(payloadObj, null);
                 filterResp = matchingKeySet.size() == keyCount;
             }
@@ -300,7 +301,7 @@ public final class FilterAction {
             matchingKeys = filterActionRequest.getMatchingKeySet();
             valueExists(payloadObj, null, filterActionRequest.getQuerySet(), filterActionRequest.getOperand(), matchingKeys, filterActionRequest.getKeyValOperandSeen(), matchingValueKeySet);
             Boolean filterResp = matchingValueKeySet.size() > 0;
-            if (filterActionRequest.getOperand().equalsIgnoreCase("not_contains")) {
+            if (filterActionRequest.getOperand().equalsIgnoreCase("not_contains") || filterActionRequest.getOperand().equalsIgnoreCase("not_contains_either")) {
                 int keyCount = getKeyCount(payloadObj, null);
                 filterResp = matchingKeySet.size() == keyCount;
             }
@@ -493,7 +494,7 @@ public final class FilterAction {
                 }
                 result = result || res;
             }
-            if (filterActionRequest.getOperand().equalsIgnoreCase("not_contains")) {
+            if (filterActionRequest.getOperand().equalsIgnoreCase("not_contains") || filterActionRequest.getOperand().equalsIgnoreCase("not_contains_either")) {
                 result = newMatchingKeys.size() == headers.size();
             }
             return new DataOperandsFilterResponse(result, newMatchingKeys, null);
@@ -513,7 +514,7 @@ public final class FilterAction {
                 }
                 result = result || res;
             }
-            if (filterActionRequest.getOperand().equalsIgnoreCase("not_contains")) {
+            if (filterActionRequest.getOperand().equalsIgnoreCase("not_contains") || filterActionRequest.getOperand().equalsIgnoreCase("not_contains_either")) {
                 result = matchingValueKeySet.size() == headers.size();
             }
             return new DataOperandsFilterResponse(result, matchingValueKeySet, null);
