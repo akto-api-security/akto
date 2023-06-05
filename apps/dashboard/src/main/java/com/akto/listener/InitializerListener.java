@@ -57,6 +57,7 @@ import com.slack.api.webhook.WebhookResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.FileTime;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -91,6 +92,7 @@ public class InitializerListener implements ServletContextListener {
     private static final LoggerMaker loggerMaker = new LoggerMaker(InitializerListener.class);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     public static final boolean isSaas = "true".equals(System.getenv("IS_SAAS"));
+    private static final int THREE_HOURS = 3*60*60;
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     public static boolean connectedToMongo = false;
@@ -108,6 +110,18 @@ public class InitializerListener implements ServletContextListener {
         }
 
         return domain;
+    }
+
+    private static boolean downloadFileCheck(String filePath){
+        try {
+            FileTime fileTime = Files.getLastModifiedTime(new File(filePath).toPath());
+            if(fileTime.toMillis()/1000l >= (Context.now()-THREE_HOURS)){
+                return false;
+            }
+        } catch (Exception e){
+            return true;
+        }
+        return true;
     }
 
     public void setUpPiiAndTestSourcesScheduler(){
@@ -138,11 +152,13 @@ public class InitializerListener implements ServletContextListener {
         for(TestSourceConfig tsc : detailsTest){
             String filePath = tsc.getId() ;
             filePath = filePath.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/");
+            if(downloadFileCheck(filePath)){
             try {
                 FileUtils.copyURLToFile(new URL(filePath), new File(filePath));
             } catch (IOException e1) {
                 e1.printStackTrace();
                 continue;
+            }
             }
 
             Yaml yaml = new Yaml();
@@ -214,14 +230,17 @@ public class InitializerListener implements ServletContextListener {
             String testingSourcesRepoTree = "https://api.github.com/repos/akto-api-security/tests-library/git/trees/master?recursive=1";
             String tempFilename = "temp_testingSourcesRepoTree.json";
             String fileContent = "";
+            if(downloadFileCheck(tempFilename)) {
             try {
                 FileUtils.copyURLToFile(new URL(testingSourcesRepoTree), new File(tempFilename));
-                fileContent = FileUtils.readFileToString(new File(tempFilename), StandardCharsets.UTF_8);
             } catch (Exception e) {
                 logger.error("api github error " + tempFilename, e);
             }
-
-            if(fileContent.isEmpty()) {
+            }
+            try {
+                fileContent = FileUtils.readFileToString(new File(tempFilename), StandardCharsets.UTF_8);
+            } catch (Exception e) {
+                logger.error("temp file does not exist, using local file " + tempFilename, e);
                 fileContent = convertStreamToString(InitializerListener.class.getResourceAsStream("/testingSourcesRepoTree.json"));
             }
 
@@ -286,7 +305,9 @@ public class InitializerListener implements ServletContextListener {
             try {
                 if (fileUrl.startsWith("http")) {
                     String tempFileUrl = "temp_" + id;
-                    FileUtils.copyURLToFile(new URL(fileUrl), new File(tempFileUrl));
+                    if(downloadFileCheck(tempFileUrl)){
+                        FileUtils.copyURLToFile(new URL(fileUrl), new File(tempFileUrl));
+                    }
                     fileUrl = tempFileUrl;
                 }
                 String fileContent = FileUtils.readFileToString(new File(fileUrl), StandardCharsets.UTF_8);
@@ -729,7 +750,7 @@ public class InitializerListener implements ServletContextListener {
         return null;
     }
 
-    public void dropFilterSampleDataCollection(BackwardCompatibility backwardCompatibility) {
+    public static void dropFilterSampleDataCollection(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getDropFilterSampleData() == 0) {
             FilterSampleDataDao.instance.getMCollection().drop();
         }
@@ -739,7 +760,7 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
-    public void dropAuthMechanismData(BackwardCompatibility authMechanismData) {
+    public static void dropAuthMechanismData(BackwardCompatibility authMechanismData) {
         if (authMechanismData.getAuthMechanismData() == 0) {
             AuthMechanismsDao.instance.getMCollection().drop();
         }
@@ -749,7 +770,7 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
-    public void dropWorkflowTestResultCollection(BackwardCompatibility backwardCompatibility) {
+    public static void dropWorkflowTestResultCollection(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getDropWorkflowTestResult() == 0) {
             WorkflowTestResultsDao.instance.getMCollection().drop();
         }
@@ -759,7 +780,7 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
-    public void resetSingleTypeInfoCount(BackwardCompatibility backwardCompatibility) {
+    public static void resetSingleTypeInfoCount(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getResetSingleTypeInfoCount() == 0) {
             SingleTypeInfoDao.instance.resetCount();
         }
@@ -770,7 +791,7 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
-    public void dropSampleDataIfEarlierNotDroped(AccountSettings accountSettings) {
+    public static void dropSampleDataIfEarlierNotDroped(AccountSettings accountSettings) {
         if (accountSettings == null) return;
         if (accountSettings.isRedactPayload() && !accountSettings.isSampleDataCollectionDropped()) {
             AdminSettingsAction.dropCollections(Context.accountId.get());
@@ -778,7 +799,7 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
-    public void deleteAccessListFromApiToken(BackwardCompatibility backwardCompatibility) {
+    public static void deleteAccessListFromApiToken(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getDeleteAccessListFromApiToken() == 0) {
             ApiTokensDao.instance.updateMany(new BasicDBObject(), Updates.unset("accessList"));
         }
@@ -789,7 +810,7 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
-    public void deleteNullSubCategoryIssues(BackwardCompatibility backwardCompatibility) {
+    public static void deleteNullSubCategoryIssues(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getDeleteNullSubCategoryIssues() == 0) {
             TestingRunIssuesDao.instance.deleteAll(
                     Filters.or(
@@ -806,7 +827,7 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
-    public void enableNewMerging(BackwardCompatibility backwardCompatibility) {
+    public static void enableNewMerging(BackwardCompatibility backwardCompatibility) {
         if (!DashboardMode.isLocalDeployment()) {
             return;
         }
@@ -823,7 +844,7 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
-    public void readyForNewTestingFramework(BackwardCompatibility backwardCompatibility) {
+    public static void readyForNewTestingFramework(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getReadyForNewTestingFramework() == 0) {
             TestingRunDao.instance.getMCollection().drop();
             TestingRunResultDao.instance.getMCollection().drop();
@@ -946,6 +967,19 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
+        dropFilterSampleDataCollection(backwardCompatibility);
+        resetSingleTypeInfoCount(backwardCompatibility);
+        dropWorkflowTestResultCollection(backwardCompatibility);
+        readyForNewTestingFramework(backwardCompatibility);
+        addAktoDataTypes(backwardCompatibility);
+        updateDeploymentStatus(backwardCompatibility);
+        dropAuthMechanismData(backwardCompatibility);
+        deleteAccessListFromApiToken(backwardCompatibility);
+        deleteNullSubCategoryIssues(backwardCompatibility);
+        enableNewMerging(backwardCompatibility);
+    }
+
     public void runInitializerFunctions() {
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
         TrafficMetricsDao.instance.createIndicesIfAbsent();
@@ -966,16 +1000,7 @@ public class InitializerListener implements ServletContextListener {
 
         // backward compatibility
         try {
-            dropFilterSampleDataCollection(backwardCompatibility);
-            resetSingleTypeInfoCount(backwardCompatibility);
-            dropWorkflowTestResultCollection(backwardCompatibility);
-            readyForNewTestingFramework(backwardCompatibility);
-            addAktoDataTypes(backwardCompatibility);
-            updateDeploymentStatus(backwardCompatibility);
-            dropAuthMechanismData(backwardCompatibility);
-            deleteAccessListFromApiToken(backwardCompatibility);
-            deleteNullSubCategoryIssues(backwardCompatibility);
-            enableNewMerging(backwardCompatibility);
+            setBackwardCompatibilities(backwardCompatibility);
 
             SingleTypeInfo.init();
 
@@ -1028,7 +1053,10 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
-    public void updateDeploymentStatus(BackwardCompatibility backwardCompatibility) {
+    public static void updateDeploymentStatus(BackwardCompatibility backwardCompatibility) {
+        if(DashboardMode.isLocalDeployment()){
+            return;
+        }
         String ownerEmail = System.getenv("OWNER_EMAIL");
         if (ownerEmail == null) {
             logger.info("Owner email missing, might be an existing customer, skipping sending an slack and mixpanel alert");
@@ -1054,7 +1082,7 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
-    private String getUpdateDeploymentStatusUrl() {
+    private static String getUpdateDeploymentStatusUrl() {
         String url = System.getenv("UPDATE_DEPLOYMENT_STATUS_URL");
         return url != null ? url : "https://stairway.akto.io/deployment/status";
     }

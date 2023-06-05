@@ -1,5 +1,6 @@
 package com.akto.rules;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
@@ -26,6 +27,7 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.attribute.FileTime;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -39,7 +41,7 @@ public class FuzzingTest extends TestPlugin {
     private final String subcategory;
     private String testSourceConfigCategory;
     private final Map<String, Object> valuesMap;
-
+    private static final int ONE_DAY = 24*60*60;
     public static final int payloadLineLimit = 100;
 
     public FuzzingTest(String testRunId, String testRunResultSummaryId, String origTemplatePath, String subcategory,
@@ -61,6 +63,18 @@ public class FuzzingTest extends TestPlugin {
         } catch (IOException e) {
             return null;
         }
+    }
+
+    private static boolean downloadFileCheck(String filePath){
+        try {
+            FileTime fileTime = java.nio.file.Files.getLastModifiedTime(new File(filePath).toPath());
+            if(fileTime.toMillis()/1000l >= (Context.now()-ONE_DAY)){
+                return false;
+            }
+        } catch (Exception e){
+            return true;
+        }
+        return true;
     }
 
     @Override
@@ -109,7 +123,9 @@ public class FuzzingTest extends TestPlugin {
         NucleiTestInfo nucleiTestInfo = new NucleiTestInfo(this.subcategory, this.origTemplatePath);
 
         try {
+            if(downloadFileCheck(this.tempTemplatePath)){
             FileUtils.copyURLToFile(new URL(this.origTemplatePath), new File(this.tempTemplatePath));
+            }
         } catch (IOException e1) {
             e1.printStackTrace();
             return addWithRequestError( originalMessage, TestResult.TestError.FAILED_DOWNLOADING_NUCLEI_TEMPLATE, testRequest, nucleiTestInfo);

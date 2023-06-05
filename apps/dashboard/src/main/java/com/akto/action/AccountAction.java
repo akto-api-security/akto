@@ -238,39 +238,18 @@ public class AccountAction extends UserAction {
     }
 
     private static void intializeCollectionsForTheAccount(int newAccountId) {
-        ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), new HashSet<>(), null, 0));
-
-        BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
-        if (backwardCompatibility == null) {
-            backwardCompatibility = new BackwardCompatibility();
-            BackwardCompatibilityDao.instance.insertOne(backwardCompatibility);
-        }
-
-        // backward compatibility
-        if (backwardCompatibility.getDropFilterSampleData() == 0) {
-            FilterSampleDataDao.instance.getMCollection().drop();
-        }
-        BackwardCompatibilityDao.instance.updateOne(
-                Filters.eq(ID, backwardCompatibility.getId()),
-                Updates.set(BackwardCompatibility.DROP_FILTER_SAMPLE_DATA, Context.now())
-        );
-
-        if (backwardCompatibility.getResetSingleTypeInfoCount() == 0) {
-            SingleTypeInfoDao.instance.resetCount();
-        }
-
-        BackwardCompatibilityDao.instance.updateOne(
-                Filters.eq("_id", backwardCompatibility.getId()),
-                Updates.set(BackwardCompatibility.RESET_SINGLE_TYPE_INFO_COUNT, Context.now())
-        );
-
-        InitializerListener.addAktoDataTypes(backwardCompatibility);
-
         executorService.schedule(new Runnable() {
             public void run() {
                 String mongoURI = System.getenv("AKTO_MONGO_CONN");
                 DaoInit.init(new ConnectionString(mongoURI));
                 Context.accountId.set(newAccountId);
+                ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), new HashSet<>(), null, 0));
+                BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
+                if (backwardCompatibility == null) {
+                    backwardCompatibility = new BackwardCompatibility();
+                    BackwardCompatibilityDao.instance.insertOne(backwardCompatibility);
+                }
+                InitializerListener.setBackwardCompatibilities(backwardCompatibility);
                 Main.createIndices();
                 Main.insertRuntimeFilters();
                 RuntimeListener.initialiseDemoCollections();
@@ -281,10 +260,12 @@ public class AccountAction extends UserAction {
                     InitializerListener.executeTestSourcesFetch();
                     InitializerListener.editTestSourceConfig();
                 } catch (Exception e) {
+                    e.printStackTrace();
                 }
                 try {
                     InitializerListener.executePIISourceFetch();
                 } catch (Exception e) {
+                    e.printStackTrace();
                 }
             }
         }, 0, TimeUnit.SECONDS);
