@@ -860,8 +860,18 @@ public class InitializerListener implements ServletContextListener {
         connectedToMongo = true;
     }
 
+    public static void setSubdomain(){
+        if (System.getenv("AKTO_SUBDOMAIN") != null) {
+            subdomain = System.getenv("AKTO_SUBDOMAIN");
+        }
+
+        subdomain += "/signup-google";
+    }
+
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
+        setSubdomain();
+
         sce.getServletContext().getSessionCookieConfig().setSecure(HttpUtils.isHttpsEnabled());
 
         logger.info("context initialized");
