@@ -204,7 +204,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             createUserAndRedirect(userEmail, username, signupInfo, 0);
             code = "";
         } catch (IOException e) {
-            code = e.getMessage();
+            code = "Please login again";
             return ERROR.toUpperCase();
 
         }
