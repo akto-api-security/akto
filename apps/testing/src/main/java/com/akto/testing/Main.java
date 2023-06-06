@@ -11,6 +11,9 @@ import com.akto.dto.AccountSettings;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResultSummary;
+import com.akto.dto.testing.rate_limit.ApiRateLimit;
+import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
+import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
@@ -22,8 +25,10 @@ import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class Main {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
@@ -53,6 +58,23 @@ public class Main {
         return summaryId;
     }
 
+    private static void setupRateLimitWatcher () {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                Context.accountId.set(1_000_000);
+                AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                if (settings == null) {
+                    return;
+                }
+                int globalRateLimit = settings.getGlobalRateLimit();
+                Map<ApiRateLimit, Integer> rateLimitMap =  RateLimitHandler.getInstance().getRateLimitsMap();
+                rateLimitMap.clear();
+                rateLimitMap.put(new GlobalApiRateLimit(globalRateLimit), globalRateLimit);
+            }
+        }, 0, 1, TimeUnit.MINUTES);
+    }
+
     public static void main(String[] args) throws InterruptedException {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         DaoInit.init(new ConnectionString(mongoURI));
@@ -74,6 +96,7 @@ public class Main {
         } while (!connectedToMongo);
 
         int delta = Context.now() - 20*60;
+        setupRateLimitWatcher();
 
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
 
