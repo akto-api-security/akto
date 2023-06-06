@@ -781,6 +781,15 @@
             </result>
         </action>
 
+        <action name="api/updateGlobalRateLimit" class="com.akto.action.AdminSettingsAction" method="updateGlobalRateLimit">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+        </action>
+
         <action name="api/fetchAdminSettings" class="com.akto.action.AdminSettingsAction">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

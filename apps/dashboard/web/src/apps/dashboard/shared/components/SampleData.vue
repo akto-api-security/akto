@@ -1,7 +1,7 @@
 <template>
     <div>
         <div v-if="tabularDisplay">
-            <layout-with-tabs :tabs="['Request', 'Response']" class="req-resp-tab">
+            <layout-with-tabs :tabs="['Request', 'Response']" class="req-resp-tab" :disableHash="!!disableHash">
                 <template slot="Request">
                     <sample-single-side
                         :title="requestTitle" 
@@ -100,6 +100,7 @@ export default {
         responseTitle: obj.ObjR,
         tabularDisplay: obj.boolN,
         isLoading: obj.boolN,
+        disableHash: obj.boolN
     },
     computed: {
         requestFirstLine: function() {
