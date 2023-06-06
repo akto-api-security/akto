@@ -62,7 +62,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
 
         User user = UsersDao.instance.findOne(Filters.eq(User.LOGIN, username));
 
-        if (user != null) {
+        if (user != null && user.getSignupInfoMap()!=null && user.getSignupInfoMap().containsKey(Config.ConfigType.PASSWORD + Config.CONFIG_SALT)){
             SignupInfo.PasswordHashInfo signupInfo = (SignupInfo.PasswordHashInfo) user.getSignupInfoMap().get(Config.ConfigType.PASSWORD + "-ankush");
             String salt = signupInfo.getSalt();
             String passHash = Integer.toString((salt + password).hashCode());

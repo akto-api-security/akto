@@ -4,6 +4,9 @@ import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
 @BsonDiscriminator
 public abstract class Config {
+
+    public static final String CONFIG_SALT = "-ankush";
+
     public ConfigType getConfigType() {
         return configType;
     }
