@@ -20,6 +20,7 @@ import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 
@@ -71,9 +72,27 @@ public class RuntimeListener extends AfterMongoConnectListener {
         aktoPolicy = new AktoPolicy(RuntimeListener.httpCallParser.apiCatalogSync, false);
 
         try {
+            initialiseAnonymousUser();
             initialiseDemoCollections();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while initialising demo collections: " + e, LoggerMaker.LogDb.DASHBOARD);
+        }
+    }
+
+    private void initialiseAnonymousUser() {
+
+        User user = UsersDao.instance.findOne(Filters.eq(User.LOGIN, ANONYMOUS_EMAIL));
+        if (user != null) {
+            loggerMaker.infoAndAddToDb("Anonymous user already initialised", LoggerMaker.LogDb.DASHBOARD);
+            return;
+        }
+
+        String salt = "127oy";
+        String passHash = Integer.toString((salt + "admin123").hashCode());
+        SignupInfo signupInfo = new SignupInfo.PasswordHashInfo(salt, passHash);
+        user = UsersDao.instance.insertSignUp(ANONYMOUS_EMAIL, "Anonymous User", signupInfo, 1_000_000);
+        if (user != null) {
+            loggerMaker.infoAndAddToDb("Anonymous user initialised", LoggerMaker.LogDb.DASHBOARD);
         }
     }
 

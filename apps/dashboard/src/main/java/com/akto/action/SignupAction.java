@@ -4,6 +4,7 @@ import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.listener.InitializerListener;
+import com.akto.listener.RuntimeListener;
 import com.akto.utils.JWT;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeTokenRequest;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
@@ -320,7 +321,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
             int accountId = account.getId();
             User user = UsersDao.instance.insertSignUp(userEmail, username, signupInfo, accountId);
-            long count = UsersDao.instance.getMCollection().countDocuments();
+            long count = UsersDao.instance.count(Filters.ne(User.LOGIN, RuntimeListener.ANONYMOUS_EMAIL));
             // if first user then automatic admin
             // else check if rbac is 0 or not. If 0 then make the user that was created first as admin.
             // done for customers who were there before rbac feature
