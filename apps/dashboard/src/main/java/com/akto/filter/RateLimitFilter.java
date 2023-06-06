@@ -19,6 +19,8 @@ public class RateLimitFilter implements Filter {
         ConcurrentHashMap<String, RateLimitCache.IpInfo> val ;
         if (path.equals("/auth/login")) {
             val = cache.cacheMap.get(RateLimitCache.CACHE_TYPE.SIGN_IN);
+        } else if (path.equals("/tools/publicApi")) {
+            val = cache.cacheMap.get(RateLimitCache.CACHE_TYPE.ANONYMOUS_LOGIN);
         } else {
             val = cache.cacheMap.get(RateLimitCache.CACHE_TYPE.SEND_EMAIL);
         }
