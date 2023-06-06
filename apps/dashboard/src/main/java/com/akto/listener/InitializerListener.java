@@ -341,22 +341,6 @@ public class InitializerListener implements ServletContextListener {
         return ret;
     }
 
-    private void setupRateLimitWatcher () {
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-                if (settings == null) {
-                    return;
-                }
-                int globalRateLimit = settings.getGlobalRateLimit();
-                Map<ApiRateLimit, Integer> rateLimitMap =  RateLimitHandler.getInstance().getRateLimitsMap();
-                rateLimitMap.clear();
-                rateLimitMap.put(new GlobalApiRateLimit(globalRateLimit), globalRateLimit);
-            }
-        }, 0, 1, TimeUnit.MINUTES);
-    }
-
     private void setUpDailyScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
@@ -944,7 +928,6 @@ public class InitializerListener implements ServletContextListener {
             setUpDailyScheduler();
             setUpWebhookScheduler();
             setUpPiiAndTestSourcesScheduler();
-            setupRateLimitWatcher();
 
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             dropSampleDataIfEarlierNotDroped(accountSettings);
