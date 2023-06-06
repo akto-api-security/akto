@@ -1,5 +1,5 @@
 <template>
-    <layout-with-tabs title="API Testing" class="page-testing" :tabs='["Test results", "User config", "Roles"]' :tab="tab" :disableHash="true">
+    <layout-with-tabs title="API Testing" class="page-testing" :tabs='["Table","Test results", "User config", "Roles"]' :tab="tab" :disableHash="true">
         <template slot="Test results">
             <div class="py-8">
                 <div>
@@ -129,6 +129,9 @@
                 <log-fetch />
             </div>
         </template>
+        <template slot="Table">
+            <github-table :headers="tableHeaders" :items="tableItems" :actions="actions"></github-table>
+        </template>
     </layout-with-tabs>
 </template>
 
@@ -142,6 +145,7 @@ import LayoutWithTabs from '@/apps/dashboard/layouts/LayoutWithTabs'
 import TestRoles from './components/test_roles/TestRoles'
 import TestRolesConfigDetails from './components/test_roles/components/TestRolesConfigDetails'
 import LogFetch from './LogFetch'
+import GithubTable from '../../shared/components/GithubTable.vue'
 
 
 import func from '@/util/func'
@@ -171,6 +175,7 @@ export default {
         TokenAutomation,
         HelpTooltip,
         LogFetch,
+        GithubTable
     },
     props: {
         tab: obj.strN
@@ -187,10 +192,201 @@ export default {
             authMechanismData: {},
             testRoleName: "",
             testLogicalGroupRegex: "",
-            showTokenAutomation: false
+            showTokenAutomation: false,
+
+            // calculate total_severity by= 100*high + 10*medium + 1*low
+            // calculate icon by mapping status {
+            //        completed->"$far_check-circle/#56bca6"
+            //        incomplete->"$far_times-circle/#EA392C"
+            //        running-> "$fas_spinner/var(--themeColorDark)"
+            //        scheduled-> "$far_calendar/var(--themeColor)"
+            // }
+
+            tableItems:[
+                {
+                    icon: '$fas_spinner/var(--themeColorDark)',
+                    name: 'Bola on Login',
+                    number_of_tests_str: '120 Tests',
+                    run_type: 'One Time',
+                    run_time: "Next run in 2 days",
+                    run_time_epoch: 140,
+                    severity_high_str: '40 High',
+                    severity_medium_str: '50 Medium',
+                    total_severity: 4500,
+                },
+                {
+                    icon: '$far_check-circle/#56bca6',
+                    name: 'All OWASP in staging',
+                    number_of_tests_str: '100 Tests',
+                    run_type: 'CI/CD',
+                    run_time: "Last run 10 mins ago",
+                    run_time_epoch: 20,
+                    severity_high_str: '5 High',
+                    severity_medium_str: '20 Medium',
+                    severity_low_str: '20 Low',
+                    total_severity: 720,
+                },
+                {
+                    icon: '$far_times-circle/#EA392C',
+                    name: 'GET only SSRF',
+                    number_of_tests_str: '350 Tests',
+                    run_type: 'CI/CD',
+                    run_time: "Next run in 3 days",
+                    run_time_epoch: 180,
+                    severity_high_str: '20 High',
+                    severity_low_str: '10 Low',
+                    total_severity: 2010,
+                },
+                {
+                    icon: '$fas_spinner/var(--themeColorDark)',
+                    name: 'Mass Assignment Staging',
+                    number_of_tests_str: '20 Tests',
+                    run_type: 'Recurring',
+                    run_time: "Next run in 1 day",
+                    run_time_epoch: 80,
+                    severity_medium_str: '10 Medium',
+                    severity_low_str: '4 Low',
+                    total_severity: 104,
+                },
+                {
+                    icon: '$far_calendar/var(--themeColor)',
+                    name: 'Bola Recurring',
+                    number_of_tests_str: '10 Tests',
+                    run_type: 'Recurring',
+                    run_time: "Next run in 2 days",
+                    run_time_epoch: 148,
+                },
+                {
+                    icon: '$far_check-circle/#56bca6',
+                    name: 'All Auth Stage',
+                    number_of_tests_str: '1120 Tests',
+                    run_type: 'One Time',
+                    run_time: "Last 35 mins ago",
+                    run_time_epoch: 5,
+                },
+                {
+                    icon: '$far_calendar/var(--themeColor)',
+                    name: 'Bola on Login',
+                    number_of_tests_str: '70 Tests',
+                    run_type: 'One Time',
+                    run_time: "Next run in 3 days",
+                    run_time_epoch: 190,
+                    severity_high_str: '40 High',
+                    total_severity: 4000,
+                },
+                {
+                    icon: '$far_times-circle/#EA392C',
+                    name: 'Bola on Login',
+                    number_of_tests_str: '80 Tests',
+                    run_type: 'One Time',
+                    run_time: "Last run 2 mins ago",
+                    run_time_epoch: 30,
+                    severity_medium_str: '50 Medium',
+                    total_severity: 500,
+                },
+                
+            ],
+            tableHeaders: [
+                {
+                    text: "",
+                    value: "icon",
+                    showFilterMenu: false,
+                    showSort: false,
+                    row_order: 1,
+                },
+                {
+                    text: "Test Name",
+                    value: "name",
+                    showFilterMenu: false,
+                    showSort: false,
+                    row_order: 1,
+                },
+                {
+                    text: "Number of Tests",
+                    value: "number_of_tests_str",
+                    showFilterMenu: false,
+                    showSort: false,
+                    row_order: 2,
+                    icon: '$fileShieldIcon'
+                },
+                {
+                    text:'Run Type',
+                    value:'run_type',
+                    showFilterMenu: true,
+                    showSort: false,
+                    row_order:2,
+                    icon: '$far_play-circle'
+                },
+                {
+                    text: 'Run Time',
+                    value: 'run_time',
+                    showFilterMenu: false,
+                    showSort:true,
+                    row_order: 2,
+                    sortKey: 'run_time_epoch',
+                    icon: '$far_clock'
+                },
+                {
+                    text: 'High Severity',
+                    value: 'severity_high_str',
+                    showFilterMenu: true,
+                    showSort: true,
+                    row_order: 1,
+                    sortKey: 'total_severity',
+                    color: '#B42318/#FEF3F2'
+                },
+                {
+                    text: 'Medium Severity',
+                    value: 'severity_medium_str',
+                    showFilterMenu: true,
+                    showSort: false,
+                    row_order: 1,
+                    sortKey: 'total_severity',
+                    color: '#B54708/#FFFAEB'
+                },
+                {
+                    text: 'Low Severity',
+                    value: 'severity_low_str',
+                    showFilterMenu: true,
+                    showSort: true,
+                    row_order: 1,
+                    sortKey: 'total_severity',
+                    color: '#344054/#F2F4F7'
+                }
+            ],
+            actions:[
+                {
+                    label: 'Re-run',
+                    icon: '$fas_redo',
+                    click: () => this.reRunTest(),
+                    isValid: true,
+                },
+                {
+                    label: 'Schedule Test',
+                    icon: '$far_calendar',
+                    click: () => this.scheduleTest(),
+                    isValid: true,
+                },
+                {
+                    label: 'Stop',
+                    icon: '$far_stop-circle',
+                    labelColor: '#EA392C',
+                    click: () => this.stopTest(),
+                    isValid: false,
+                }
+            ],
         }
     },
     methods: {
+        reRunTest(){
+            console.log("reRunTest")
+        },
+        scheduleTest(){
+            console.log("scheduleTest")
+        },
+        stopTest(){
+            console.log("stopTest")
+        },
         setAuthHeaderKey(newKey) {
             this.newKey = newKey
             this.saveAuth()

@@ -19,6 +19,9 @@
             @rowClicked="rowClicked"
             @filterApplied="filterApplied"
         >
+            <template v-slot:add-custom-headers="{appliedFilter,filteredItems}">
+                <slot name="add-user-headers" :appliedFilter="appliedFilter" :sortFunc="sortFunc" :filterFunc="filterFunc" :filteredItems="filteredItems" />
+            </template>
             <template v-slot:add-at-top="{filters, filterOperators, sortKey, sortDesc}">
                 <div class="d-flex jc-end">
                     <div class="d-flex jc-end">

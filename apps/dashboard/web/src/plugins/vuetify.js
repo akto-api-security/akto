@@ -26,6 +26,7 @@ import CICDIcon from "../apps/dashboard/shared/icons/CICDIcon"
 import ChatGPT from "../apps/dashboard/shared/icons/ChatGPT"
 import SaveIcon from "../apps/dashboard/shared/icons/SaveIcon"
 import TestEditorIcon from "../apps/dashboard/shared/icons/TestEditorIcon"
+import FileShieldIcon from "../apps/dashboard/shared/icons/FileShieldIcon"
 
 Vue.component('font-awesome-icon', FontAwesomeIcon)
 
@@ -124,6 +125,8 @@ import {
   faPaperPlane,
   faUserGraduate,
   faArrowUp,
+  faSpinner,
+  faArrowCircleLeft,
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -140,7 +143,11 @@ import {
   faQuestionCircle as farQuestionCircle,
   faPaperPlane as farPaperPlane,
   faCircle as farCircle,
-  faDotCircle as farDotCircle
+  faDotCircle as farDotCircle,
+  faTimesCircle as farTimesCircle,
+  faCheckCircle as farCheckCircle,
+  faPlayCircle as farPlayCircle,
+  faStopCircle as farStopCircle,
 } from '@fortawesome/free-regular-svg-icons'
 
 import {
@@ -159,10 +166,10 @@ const faIcons = [
   faCreditCard,faAddressCard,faChalkboard,faFilter,faKey,faAngleDoubleDown,faAngleDoubleUp,faUpload,faRedo,faGlobe,faAngleDown,
   faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faCaretSquareUp,faEllipsisH,
   faUserSecret,faCopy,faPlay,faStop,faPen,faCalendarPlus,faCalendarTimes,faThumbsUp,faCaretUp,faShareAlt,faUserPlus,faCaretDown,
-  faLaptopHouse,faAnchor,fabGithub,faArrowRight,faGift,faGripLines,faAlignJustify,faBook,faMagic,faLayerGroup,faPaperPlane,faUserGraduate,faArrowUp,
+  faLaptopHouse,faAnchor,fabGithub,faArrowRight,faGift,faGripLines,faAlignJustify,faBook,faMagic,faLayerGroup,faPaperPlane,faUserGraduate,faArrowUp,faSpinner,faArrowCircleLeft,
   
   farComments,farCalendar, farHandPointRight, farBuilding, farStar,farSquare, farCheckSquare,farFolder,farFolderOpen,farClock,
-  farQuestionCircle, faBook, farCircle, farDotCircle, farPaperPlane,
+  farQuestionCircle, faBook, farCircle, farDotCircle, farPaperPlane,farTimesCircle,farCheckCircle,farPlayCircle,farStopCircle,
 
   fabSalesforce,fabHubspot,fabDiscord
 ]
@@ -286,6 +293,10 @@ faIconsOpts.saveIcon = {
 
 faIconsOpts.testEditorIcon = {
   component: TestEditorIcon
+}
+
+faIconsOpts.fileShieldIcon = {
+  component: FileShieldIcon
 }
 
 faIcons.forEach(x => faIconsOpts[x.prefix+"_"+x.iconName] = {
