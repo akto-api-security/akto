@@ -513,6 +513,7 @@ export default {
       this.newName = '';
       this.showCreateAccountDialog = false;
       api.saveToAccount(newAccountName).then(resp => {
+        window.location.href="/dashboard/onboarding"
         window.location.reload()
       })
     },    saveNewTeam(name) {

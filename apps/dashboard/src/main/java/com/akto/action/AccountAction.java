@@ -49,7 +49,7 @@ public class AccountAction extends UserAction {
 
     public static final int MAX_NUM_OF_LAMBDAS_TO_FETCH = 50;
     private static AmazonAutoScaling asc = AmazonAutoScalingClientBuilder.standard().build();
-    private final static ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     
     @Override
     public String execute() {

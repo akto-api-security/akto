@@ -135,7 +135,7 @@ public class InitializerListener implements ServletContextListener {
                     public void accept(Account t) {
                         try {
                             executeTestSourcesFetch();
-                    editTestSourceConfig();
+                            editTestSourceConfig();
                         } catch (Exception e) {
                         }
 
@@ -154,12 +154,12 @@ public class InitializerListener implements ServletContextListener {
             String filePath = tsc.getId() ;
             filePath = filePath.replace("https://github.com/", "https://raw.githubusercontent.com/").replace("/blob/", "/");
             if(downloadFileCheck(filePath)){
-            try {
-                FileUtils.copyURLToFile(new URL(filePath), new File(filePath), CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);
-            } catch (IOException e1) {
-                e1.printStackTrace();
-                continue;
-            }
+                try {
+                    FileUtils.copyURLToFile(new URL(filePath), new File(filePath), CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);
+                } catch (IOException e1) {
+                    e1.printStackTrace();
+                    continue;
+                }
             }
 
             Yaml yaml = new Yaml();
@@ -204,7 +204,6 @@ public class InitializerListener implements ServletContextListener {
                     inputStream.close();
                 }
             }
-
         }
     }
 
@@ -232,12 +231,13 @@ public class InitializerListener implements ServletContextListener {
             String tempFilename = "temp_testingSourcesRepoTree.json";
             String fileContent = "";
             if(downloadFileCheck(tempFilename)) {
-            try {
-                FileUtils.copyURLToFile(new URL(testingSourcesRepoTree), new File(tempFilename), CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);
-            } catch (Exception e) {
-                logger.error("api github error " + tempFilename, e);
+                try {
+                    FileUtils.copyURLToFile(new URL(testingSourcesRepoTree), new File(tempFilename), CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);
+                } catch (Exception e) {
+                    logger.error("api github error " + tempFilename, e);
+                }
             }
-            }
+            
             try {
                 fileContent = FileUtils.readFileToString(new File(tempFilename), StandardCharsets.UTF_8);
             } catch (Exception e) {
