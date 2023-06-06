@@ -426,7 +426,7 @@ public abstract class TestPlugin {
         if (validatorNode == null) return true;
         if (testRawApi == null) return false;
 
-        OriginalHttpResponse response = rawApi.getResponse();
+        OriginalHttpResponse response = testRawApi.getResponse();
         String body = response == null ? null : response.getBody();
         boolean isDefaultPayload = StatusCodeAnalyser.isDefaultPayload(body);
         boolean validateResult = validate(validatorNode,rawApi,testRawApi, apiInfoKey,"validator", varMap, logId);
