@@ -240,8 +240,6 @@ public class AccountAction extends UserAction {
     private static void intializeCollectionsForTheAccount(int newAccountId) {
         executorService.schedule(new Runnable() {
             public void run() {
-                String mongoURI = System.getenv("AKTO_MONGO_CONN");
-                DaoInit.init(new ConnectionString(mongoURI));
                 Context.accountId.set(newAccountId);
                 ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), new HashSet<>(), null, 0));
                 BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());

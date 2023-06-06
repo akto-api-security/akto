@@ -127,7 +127,7 @@ export default {
             color: 'red'
           })
         } else {
-          window.location.href = '/dashboard/quick-start'
+          window.location.href = '/dashboard/onboarding'
         }
       })
     }

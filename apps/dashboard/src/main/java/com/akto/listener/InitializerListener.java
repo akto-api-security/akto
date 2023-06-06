@@ -128,8 +128,6 @@ public class InitializerListener implements ServletContextListener {
     public void setUpPiiAndTestSourcesScheduler(){
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                String mongoURI = System.getenv("AKTO_MONGO_CONN");
-                DaoInit.init(new ConnectionString(mongoURI));
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
@@ -557,8 +555,6 @@ public class InitializerListener implements ServletContextListener {
     public void setUpWebhookScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                String mongoURI = System.getenv("AKTO_MONGO_CONN");
-                DaoInit.init(new ConnectionString(mongoURI));
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
