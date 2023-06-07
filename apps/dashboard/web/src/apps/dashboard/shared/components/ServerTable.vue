@@ -31,7 +31,7 @@
                         <div v-if="showName" class="table-name">
                         {{name}}
                         </div>
-                        <slot name="add-custom-headers" :appliedFilter="appliedFilter">
+                        <slot name="add-custom-headers" :appliedFilter="appliedFilter" :setSortOrInvertOrder="copySetSortOrInvertOrder">
                             <div class="d-flex headerButtons">
                                 <template v-for = "(header,index) in selectedHeaders">
                                     <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.sortKey || header.value]"> 
@@ -314,6 +314,12 @@ export default {
             } else {
                 this.sortKey = headerSortKey
             }
+            this.fetchRecentParams()
+        },
+        copySetSortOrInvertOrder(headerObj){
+            let headerSortKey = headerObj.header.sortKey || headerObj.header.value
+            this.sortKey = headerSortKey
+            this.sortDesc = headerObj.sortOrder
             this.fetchRecentParams()
         },
         filterFunc(item, header) {

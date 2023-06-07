@@ -325,21 +325,23 @@ export default {
                     showSort:true,
                     row_order: 2,
                     sortKey: 'run_time_epoch',
-                    icon: '$far_clock'
+                    icon: '$far_clock',
+                    sortText: 'Newest Run/1/Oldest Run/0'
                 },
                 {
                     text: 'High Severity',
                     value: 'severity_high_str',
-                    showFilterMenu: true,
+                    showFilterMenu: false,
                     showSort: true,
                     row_order: 1,
                     sortKey: 'total_severity',
-                    color: '#B42318/#FEF3F2'
+                    color: '#B42318/#FEF3F2',
+                    sortText: 'Highest Severity/1/Lowest Severity/0'
                 },
                 {
                     text: 'Medium Severity',
                     value: 'severity_medium_str',
-                    showFilterMenu: true,
+                    showFilterMenu: false,
                     showSort: false,
                     row_order: 1,
                     sortKey: 'total_severity',
@@ -348,10 +350,9 @@ export default {
                 {
                     text: 'Low Severity',
                     value: 'severity_low_str',
-                    showFilterMenu: true,
-                    showSort: true,
+                    showFilterMenu: false,
+                    showSort: false,
                     row_order: 1,
-                    sortKey: 'total_severity',
                     color: '#344054/#F2F4F7'
                 }
             ],

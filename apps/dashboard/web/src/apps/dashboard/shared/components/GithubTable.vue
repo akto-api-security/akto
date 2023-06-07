@@ -9,16 +9,16 @@
         class="github-table"
     >
         <!-- TODO: handle sorting and severity -->
-        <template v-slot:add-user-headers="{totalItems,getColumnValueList,appliedFilter}">
+        <template v-slot:add-user-headers="{totalItems,getColumnValueList,appliedFilter,setSortOrInvertOrder}">
             <div class="d-flex jc-sb github-header-container" :style="{'width': '100%'}">
                 <span class="text">
                     {{ totalItems }} Test Runs
                 </span>
                 <div class="d-flex" :style="{gap:'8px'}">
                     <template v-for="(header) in headers">
-                        <actions-menu :items="computeActionItems(getColumnValueList(header.value))" 
-                            :key="header.text" v-if="header.showFilterMenu"
-                            :title="header.text" @menuClicked="appliedFilter(header.value,itemClicked($event))"
+                        <simple-menu :items="computeActionItems(getColumnValueList(header.value))" 
+                            :key="header.text" v-if="header.showFilterMenu" :newView="true" :title="header.text"
+                            @menuClicked="appliedFilter(header.value,itemClicked($event))"
                         >
                             <template v-slot:activator2>
                                 <div class="d-flex align-center">
@@ -26,16 +26,18 @@
                                     <v-icon :size="12" color="var(--themeColorDark)">$fas_angle-down</v-icon>  
                                 </div>  
                             </template>
-                        </actions-menu>
+                        </simple-menu>
                     </template>
-                    <actions-menu :items="sortHeaders" title="Sort By">
+                    <simple-menu :newView="true" :items="sortHeaders" title="Sort By" 
+                            @menuClicked="setSortOrInvertOrder(itemClicked($event))"
+                    >
                         <template v-slot:activator2>
                             <div class="d-flex align-center">
                                 <span class="text">Sort</span>
                                 <v-icon :size="12" color="var(--themeColorDark)">$fas_angle-down</v-icon>  
                             </div>  
                         </template>
-                    </actions-menu>
+                    </simple-menu>
                 </div>
             </div>
         </template>
@@ -46,38 +48,42 @@
                 >
                     <div class="first-row">
                         <template v-for="(header,index) in headers">
-                            <div class="row-items" :key="index" 
-                                v-if="header.row_order == 1 && content.rowData[header.value] && content.rowData[header.value].length > 0"
-                            >
-                                <v-icon :size=16 v-if="header.value === 'icon'" 
-                                        :color="computeIcon(content.rowData[header.value],1)"
-                                > 
-                                    {{ computeIcon(content.rowData[header.value] , 0) }}
-                                </v-icon>
-                                <div class="title" v-else-if="isValid(header)">{{ content.rowData[header.value] }}</div>
-                                <div class="box_container" :style="getStyles(header.color)" v-else>
-                                    {{ content.rowData[header.value] }}
+                            <slot :name="[`item.${header.value}`]" :item="content.rowData[header.value]">    
+                                <div class="row-items" :key="index" 
+                                    v-if="header.row_order == 1 && content.rowData[header.value] && content.rowData[header.value].length > 0"
+                                >
+                                    <v-icon :size=16 v-if="header.value === 'icon'" 
+                                            :color="computeIcon(content.rowData[header.value],1)"
+                                    > 
+                                        {{ computeIcon(content.rowData[header.value] , 0) }}
+                                    </v-icon>
+                                    <div class="title" v-else-if="isValid(header)">{{ content.rowData[header.value] }}</div>
+                                    <div class="box_container" :style="getStyles(header.color)" v-else>
+                                        {{ content.rowData[header.value] }}
+                                    </div>
                                 </div>
-                            </div>
+                            </slot>
                         </template>
                     </div>
                     <div class="second-row">
                         <template v-for="(header,index) in headers">
-                            <div class="row-items" v-if="header.row_order == 2" :key=index>
-                                <v-icon :size="14" color="var(--themeColorDark3)">{{ header.icon }}</v-icon>
-                                <span class="row-text">{{ content.rowData[header.value] }}</span>
-                                <v-divider class="divider" />
-                            </div>
+                            <slot :name="[`item.${header.value}`]" :item="content.rowData[header.value]">
+                                <div class="row-items" v-if="header.row_order == 2" :key=index>
+                                    <v-icon :size="14" color="var(--themeColorDark3)">{{ header.icon }}</v-icon>
+                                    <span class="row-text">{{ content.rowData[header.value] }}</span>
+                                    <v-divider class="divider" />
+                                </div>
+                            </slot>
                         </template>
                     </div>
                     <div v-if="actions && actions.length > 0" class="table-row-actions">
-                        <actions-menu :items="actions">
+                        <simple-menu :items="actions" :newView="true">
                             <template v-slot:activator2>
                                 <v-btn icon :ripple="false" @click="() => content.current = content.index">
                                     <v-icon size="14" color="var(--themeColorDark)">$fas_ellipsis-h</v-icon>
                                 </v-btn>                    
                             </template>
-                        </actions-menu>
+                        </simple-menu>
                     </div>
                 </tr>
             </slot>
@@ -89,7 +95,7 @@
 
 import obj from "@/util/obj"
 import SimpleTable from './SimpleTable.vue'
-import ActionsMenu from './ActionsMenu.vue'
+import SimpleMenu from './SimpleMenu.vue'
 
 export default {
     name: "GridTable",
@@ -100,7 +106,7 @@ export default {
     },
     components:{
         SimpleTable,
-        ActionsMenu
+        SimpleMenu
     },
     methods: {
         rowClicked(item){
@@ -138,7 +144,36 @@ export default {
     },
     computed:{
         sortHeaders(){
-            return []
+            let arr = []
+            this.headers.forEach((header) =>{
+                if(header.showSort){
+                    if(header.sortText){
+                        let sortArr = header.sortText.split("/")
+                        for(let index = 0 ; index < sortArr.length ; index += 2){
+                            let order = true
+                            if(sortArr[index + 1] != '1'){
+                                order = false
+                            }
+                            let obj={
+                                label: sortArr[index],
+                                header: header,
+                                sortOrder: order,
+                                isValid:true,
+                            }
+                            arr.push(obj)
+                        }
+                    }else{
+                        let obj = {
+                            label: header.title,
+                            header: header,
+                            sortOrder: true,
+                            isValid:true,
+                        }
+                        arr.push(obj)
+                    }
+                }
+            })
+            return arr
         }
     }
 }
