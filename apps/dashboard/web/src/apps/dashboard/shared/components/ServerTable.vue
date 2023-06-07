@@ -31,7 +31,7 @@
                         <div v-if="showName" class="table-name">
                         {{name}}
                         </div>
-                        <slot name="add-custom-headers" :appliedFilter="appliedFilter" :filteredItems="filteredItems">
+                        <slot name="add-custom-headers" :appliedFilter="appliedFilter">
                             <div class="d-flex headerButtons">
                                 <template v-for = "(header,index) in selectedHeaders">
                                     <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.sortKey || header.value]"> 
@@ -236,6 +236,13 @@ export default {
                     this.filters[hValue].delete(item.value)
                 }
             }
+            this.filters = {...this.filters}
+            this.showHideFilterIcon(hValue)
+            this.options = {...this.options, page: 1}
+        },
+        appliedFilter(hValue,item){
+            this.filters = this.headers.reduce((map, e) => {map[e.sortKey || e.value] = new Set(); return map}, {})
+            this.filters[hValue].add(item.value)
             this.filters = {...this.filters}
             this.showHideFilterIcon(hValue)
             this.options = {...this.options, page: 1}

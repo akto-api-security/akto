@@ -8,16 +8,17 @@
         :hideDownloadCSVIcon="true"
         class="github-table"
     >
-        <template v-slot:add-user-headers="{filteredItems}">
+        <!-- TODO: handle sorting and severity -->
+        <template v-slot:add-user-headers="{totalItems,getColumnValueList,appliedFilter}">
             <div class="d-flex jc-sb github-header-container" :style="{'width': '100%'}">
                 <span class="text">
-                    {{ filteredItems.length }} Test Runs
+                    {{ totalItems }} Test Runs
                 </span>
                 <div class="d-flex" :style="{gap:'8px'}">
                     <template v-for="(header) in headers">
-                        <actions-menu :items="filterHeaders(header)" 
+                        <actions-menu :items="computeActionItems(getColumnValueList(header.value))" 
                             :key="header.text" v-if="header.showFilterMenu"
-                            :title="header.text"
+                            :title="header.text" @menuClicked="appliedFilter(header.value,itemClicked($event))"
                         >
                             <template v-slot:activator2>
                                 <div class="d-flex align-center">
@@ -119,10 +120,21 @@ export default {
                 color: colorArr[0]
             }
         },
-        filterHeaders(header){
-            // console.log(header)
-            return []
+        computeActionItems(headerObj){
+            let arr = []
+            headerObj.values.forEach((x) =>{
+                let obj = {
+                    label: x.title,
+                    value: x.value,
+                    isValid:true,
+                }
+                arr.push(obj)
+            })
+            return arr
         },
+        itemClicked(item){
+            return item
+        }
     },
     computed:{
         sortHeaders(){

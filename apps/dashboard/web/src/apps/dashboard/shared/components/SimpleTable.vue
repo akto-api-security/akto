@@ -19,8 +19,13 @@
             @rowClicked="rowClicked"
             @filterApplied="filterApplied"
         >
-            <template v-slot:add-custom-headers="{appliedFilter,filteredItems}">
-                <slot name="add-user-headers" :appliedFilter="appliedFilter" :sortFunc="sortFunc" :filterFunc="filterFunc" :filteredItems="filteredItems" />
+            <template v-slot:add-custom-headers="{appliedFilter}">
+                <slot name="add-user-headers" 
+                    :appliedFilter="appliedFilter" 
+                    :sortFunc="sortFunc" 
+                    :totalItems="totalItems" 
+                    :getColumnValueList="getColumnValueList"
+                    />
             </template>
             <template v-slot:add-at-top="{filters, filterOperators, sortKey, sortDesc}">
                 <div class="d-flex jc-end">
@@ -94,7 +99,8 @@ export default {
     },
     data () {
         return {
-            reRenderKey: 0
+            reRenderKey: 0,
+            totalItems: 0,
         }
     },
     methods: {
@@ -122,6 +128,7 @@ export default {
             if (limit != -1) {
                 ret = ret.slice(skip, skip+limit)
             }
+            this.totalItems = ret.length
             return ret
         },
         async fetchParams(sortKey, sortOrder, skip, limit, filters, filterOperators) {

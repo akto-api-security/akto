@@ -16,9 +16,9 @@
             <div class="item-container" v-for="(item) in items" 
                 :key="item.label" 
                 :style="item.isValid ? {} : {'opacity' : '0.3', 'border-top': '1px solid var(--themeColorDark10)'}"  
-                @click="item.click"
+                @click="item.isValid ? clickFunc(item) : null"
             >
-                <v-icon :size="12" :style="{color: item.labelColor ? item.labelColor:'var(--themeColorDark)'}">{{ item.icon }}</v-icon>
+                <v-icon v-if="item.icon" :size="12" :style="{color: item.labelColor ? item.labelColor:'var(--themeColorDark)'}">{{ item.icon }}</v-icon>
                 <span class="title" :style="{color: item.labelColor ? item.labelColor : ''}">{{ item.label }}</span>
             </div>
           </div>
@@ -36,6 +36,14 @@ export default {
     props: {
         items: obj.arrR,
         title: obj.strN,
+    },
+    methods: {
+        clickFunc(item){
+            if(item.click)
+                item.click()
+            else
+                this.$emit('menuClicked',item)
+        }
     },
 }
 </script>

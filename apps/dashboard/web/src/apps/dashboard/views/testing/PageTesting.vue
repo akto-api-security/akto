@@ -202,6 +202,7 @@ export default {
             //        scheduled-> "$far_calendar/var(--themeColor)"
             // }
 
+            //TODO: handle severity
             tableItems:[
                 {
                     icon: '$fas_spinner/var(--themeColorDark)',
