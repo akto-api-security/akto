@@ -432,7 +432,7 @@ public abstract class TestPlugin {
         boolean isDefaultPayload = StatusCodeAnalyser.isDefaultPayload(body);
         boolean validateResult = validate(validatorNode,rawApi,testRawApi, apiInfoKey,"validator", varMap, logId);
 
-        loggerMaker.infoAndAddToDb(logId + " isDefaultPayload = " + isDefaultPayload + "; validateResult = " + validateResult, LogDb.TESTING);
+        // loggerMaker.infoAndAddToDb(logId + " isDefaultPayload = " + isDefaultPayload + "; validateResult = " + validateResult, LogDb.TESTING);
         return !isDefaultPayload && validateResult;
     }
 
