@@ -830,6 +830,19 @@
             </result>
         </action>
 
+        <action name="api/fetchTestRunTableInfo" class="com.akto.action.testing.StartTestAction" method="fetchTestRunTableInfo">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="enumAsBean">true</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/startTest" class="com.akto.action.testing.StartTestAction" method="startTest">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

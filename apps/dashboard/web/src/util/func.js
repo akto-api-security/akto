@@ -167,7 +167,7 @@ export default {
         return new Intl.NumberFormat( 'en-US', { maximumFractionDigits: 1,notation: "compact" , compactDisplay: "short" }).format(num)
     },
     prettifyEpoch(epoch) {
-        var diffSeconds = (+Date.now())/1000 - epoch
+        var diffSeconds = Math.abs( (+Date.now())/1000 - epoch )
         if (diffSeconds < 120) {
             return '1 minute ago'
         } else if (diffSeconds < 3600) {

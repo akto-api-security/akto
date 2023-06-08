@@ -130,7 +130,7 @@
             </div>
         </template>
         <template slot="Table">
-            <github-table :headers="tableHeaders" :items="tableItems" :actions="actions" sortKeyDefault="total_severity">
+            <github-table :headers="tableHeaders" :items="getlatestTestingRuns()" :actions="actions" sortKeyDefault="total_severity">
                 <template #severity_1="{item}">
                     <template v-for="(val,index) in item">
                         <div class="box_container" v-for="(value, key) in val" :key="index + key" :style="getColor(key)">
@@ -397,6 +397,9 @@ export default {
         }
     },
     methods: {
+        getlatestTestingRuns(){
+            return this.latestTestingRuns;
+        },
         reRunTest(){
             console.log("reRunTest")
         },
@@ -505,7 +508,7 @@ export default {
     },
     computed: {
         ...mapState('test_roles', ['testRoles', 'loading', 'selectedRole']),
-        ...mapState('testing', ['testingRuns', 'authMechanism', 'testingRunResults', 'pastTestingRuns','cicdTestingRuns']),
+        ...mapState('testing', ['testingRuns', 'authMechanism', 'testingRunResults', 'pastTestingRuns','cicdTestingRuns', 'latestTestingRuns']),
         mapCollectionIdToName() {
             return this.$store.state.collections.apiCollections.reduce((m, e) => {
                 m[e.id] = e.displayName
@@ -721,5 +724,6 @@ export default {
     font-size: 12px;
     padding: 2px 8px;
     border-radius: 16px;
+    font-weight: 500;
 }
 </style>

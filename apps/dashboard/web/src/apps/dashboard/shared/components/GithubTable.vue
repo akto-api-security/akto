@@ -62,7 +62,7 @@
                                     > 
                                         {{ computeIcon(content.rowData[header.value] , 0) }}
                                     </v-icon>
-                                    <div class="title" v-else>{{ content.rowData[header.value] }}</div>
+                                    <div class="main-title" v-else>{{ content.rowData[header.value] }}</div>
                                 </div>
                             </slot>
                         </template>
@@ -228,7 +228,7 @@ export default {
         align-items: center;
         gap: 12px;
         margin-bottom: 8px;
-        .title{
+        .main-title{
             color: var(--themeColorDark);
             font-weight: 600;
             font-size: 16px;

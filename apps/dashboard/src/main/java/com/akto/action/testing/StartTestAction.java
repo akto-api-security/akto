@@ -57,6 +57,16 @@ public class StartTestAction extends UserAction {
     private Map<String,String> metadata;
     private boolean fetchCicd;
     private String triggeredBy;
+    private Map<ObjectId,TestingRunResultSummary> lastestTestingRunResultSummaries;
+
+    public Map<ObjectId, TestingRunResultSummary> getLastestTestingRunResultSummaries() {
+        return lastestTestingRunResultSummaries;
+    }
+
+    public void setLastestTestingRunResultSummaries(
+            Map<ObjectId, TestingRunResultSummary> lastestTestingRunResultSummaries) {
+        this.lastestTestingRunResultSummaries = lastestTestingRunResultSummaries;
+    }
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
 
@@ -340,6 +350,12 @@ public class StartTestAction extends UserAction {
         TestingRunDao.instance.getMCollection().updateMany(filter,Updates.set(TestingRun.STATE, State.STOPPED));
         testingRuns = TestingRunDao.instance.findAll(filter);
 
+        return SUCCESS.toUpperCase();
+    }
+
+    public String fetchTestRunTableInfo(){
+        testingRuns = TestingRunDao.instance.findAll(Filters.ne("triggeredBy", "test_editor"));
+        lastestTestingRunResultSummaries = TestingRunResultSummariesDao.instance.fetchLastestTestingRunResultSummaries();
         return SUCCESS.toUpperCase();
     }
 

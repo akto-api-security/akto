@@ -1,13 +1,43 @@
 package com.akto.dao.testing;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
+
 import com.akto.dao.AccountsContextDao;
 import com.akto.dto.testing.TestingRunResultSummary;
+import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.Sorts;
 
 public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunResultSummary> {
 
     public static final TestingRunResultSummariesDao instance = new TestingRunResultSummariesDao();
 
     private TestingRunResultSummariesDao() {}
+
+    public Map<ObjectId, TestingRunResultSummary> fetchLastestTestingRunResultSummaries(){
+        List<Bson> pipeline = new ArrayList<>();
+        BasicDBObject groupedId = new BasicDBObject(TestingRunResultSummary.TESTING_RUN_ID, "$testingRunId");
+        pipeline.add(Aggregates.sort(Sorts.descending(TestingRunResultSummary.START_TIMESTAMP)));
+        pipeline.add(Aggregates.group(groupedId,
+                Accumulators.first("data", "$$ROOT")));
+        pipeline.add(Aggregates.replaceRoot( "$data"));
+        MongoCursor<TestingRunResultSummary> endpointsCursor = TestingRunResultSummariesDao.instance.getMCollection().aggregate(pipeline, TestingRunResultSummary.class).cursor();
+
+        Map<ObjectId, TestingRunResultSummary> trss = new HashMap<>();
+        while(endpointsCursor.hasNext()) {
+            TestingRunResultSummary temp = endpointsCursor.next();
+            trss.put(temp.getTestingRunId(), temp);
+        }
+        return trss;
+    }
 
     @Override
     public String getCollName() {

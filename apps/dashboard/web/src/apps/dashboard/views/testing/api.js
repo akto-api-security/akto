@@ -13,6 +13,16 @@ export default {
         })
     },
 
+    fetchTestRunTableInfo() {
+        return request({
+            url: '/api/fetchTestRunTableInfo',
+            method: 'post',
+            data: {}
+        }).then((resp) => {
+            return resp
+        })
+    },
+
     fetchTestingRunResultSummaries(startTimestamp, endTimestamp, testingRunHexId) {
         return request({
             url: '/api/fetchTestingRunResultSummaries',
