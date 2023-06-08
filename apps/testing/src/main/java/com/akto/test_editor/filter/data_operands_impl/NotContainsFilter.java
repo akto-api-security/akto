@@ -34,6 +34,6 @@ public class NotContainsFilter extends DataOperandsImpl {
 
 
     public Boolean evaluateOnStringQuerySet(String data, String query) {
-        return !data.contains(query);
+        return !data.toLowerCase().contains(query.toLowerCase());
     }
 }
