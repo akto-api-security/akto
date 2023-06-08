@@ -115,7 +115,6 @@ service.interceptors.request.use((config) => {
 // For every response that is sent to the vue app, look for access token in header and set it if not null
 service.interceptors.response.use((response) => {
   if (response.headers["access-token"] != null) {
-    debugger
     store.commit('auth/SET_ACCESS_TOKEN',response.headers["access-token"])
   }
 
