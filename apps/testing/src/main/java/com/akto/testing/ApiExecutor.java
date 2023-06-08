@@ -3,6 +3,7 @@ package com.akto.testing;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -22,43 +23,13 @@ import javax.net.ssl.*;
 public class ApiExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
 
-    private static final TrustManager[] trustAllCerts = new TrustManager[] {
-        new X509TrustManager() {
-            @Override
-            public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) throws CertificateException {
-            }
-    
-            @Override
-            public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) throws CertificateException {
-            }
-    
-            @Override
-            public java.security.cert.X509Certificate[] getAcceptedIssuers() {
-              return new java.security.cert.X509Certificate[]{};
-            }
-        }
-    };
-
-    private static final SSLContext trustAllSslContext;
-    static {
-        try {
-            trustAllSslContext = SSLContext.getInstance("SSL");
-            trustAllSslContext.init(null, trustAllCerts, new java.security.SecureRandom());
-        } catch (NoSuchAlgorithmException | KeyManagementException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private static final SSLSocketFactory trustAllSslSocketFactory = trustAllSslContext.getSocketFactory();
-
     public static OriginalHttpResponse common(Request request, boolean followRedirects) throws Exception {
 
-        OkHttpClient client = HTTPClientHandler.instance.getHTTPClient(followRedirects);
+        while (RateLimitHandler.getInstance().shouldWait(request)) {
+            Thread.sleep(1000);
+        }
 
-        Builder builder = client.newBuilder();
-        builder.sslSocketFactory(trustAllSslSocketFactory, (X509TrustManager)trustAllCerts[0]);
-        builder.hostnameVerifier((hostname, session) -> true);
-        client = builder.build();
+        OkHttpClient client = HTTPClientHandler.instance.getHTTPClient(followRedirects);
 
         Call call = client.newCall(request);
         Response response = null;

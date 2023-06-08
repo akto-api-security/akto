@@ -83,11 +83,11 @@ export default {
             return resp
         })        
     },
-    addTestTemplate(content,testId, testCategory) {
+    addTestTemplate(content,originalTestId) {
         return request({
             url: '/api/saveTestEditorFile',
             method: 'post',
-            data:{content, testId, testCategory}
+            data:{content, originalTestId}
         }).then((resp) => {
             return resp
         })
@@ -149,6 +149,16 @@ export default {
             method: 'post',
             data: {
                 testingRunResultHexId
+            }
+        })
+    },
+
+    fetchIssueFromTestRunResultDetailsForTestEditor(testingRunResultHexId, isTestRunByTestEditor) {
+        return request({
+            url: '/api/fetchIssueFromTestRunResultDetails',
+            method: 'post',
+            data: {
+                testingRunResultHexId, isTestRunByTestEditor
             }
         })
     },

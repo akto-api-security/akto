@@ -67,6 +67,7 @@ public class StartTestAction extends UserAction {
             Map<ObjectId, TestingRunResultSummary> lastestTestingRunResultSummaries) {
         this.lastestTestingRunResultSummaries = lastestTestingRunResultSummaries;
     }
+    private boolean isTestRunByTestEditor;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
 
@@ -309,6 +310,9 @@ public class StartTestAction extends UserAction {
                 }
                 TestingIssuesId issuesId = new TestingIssuesId(result.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING,
                         category, config != null ? config.getId() : null);
+                if (isTestRunByTestEditor) {
+                    issuesId.setTestErrorSource(TestErrorSource.TEST_EDITOR);
+                }
                 runIssues = TestingRunIssuesDao.instance.findOne(Filters.eq(Constants.ID, issuesId));
             }
         }catch (Exception ignore) {}
@@ -520,6 +524,14 @@ public class StartTestAction extends UserAction {
 
     public void setTriggeredBy(String triggeredBy) {
         this.triggeredBy = triggeredBy;
+    }
+
+    public boolean isTestRunByTestEditor() {
+        return isTestRunByTestEditor;
+    }
+
+    public void setIsTestRunByTestEditor(boolean testRunByTestEditor) {
+        isTestRunByTestEditor = testRunByTestEditor;
     }
 
     public enum CallSource{
