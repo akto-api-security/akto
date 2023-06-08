@@ -25,7 +25,6 @@ const ParamState = () => import("@/apps/dashboard/views/observe/misc/ParamState"
 const MPTestCategory = () => import("@/apps/dashboard/views/marketplace/components/MPTestCategory")
 const Onboarding = () => import("@/apps/dashboard/views/onboarding/Onboarding.vue")
 const TextEditor = () => import("@/apps/dashboard/tools/TextEditor.vue")
-const WebsiteTextEditor = () => import("@/apps/dashboard/tools/App.vue")
 
 Vue.use(Router)
 
@@ -55,8 +54,16 @@ const router =  new Router({
         },
         {
             path: '/tools/test-editor',
-            name: 'Test editor',
-            component: WebsiteTextEditor,
+            redirect: '/tools/test-editor/REMOVE_TOKENS',
+        },
+        {
+            path: '/tools/test-editor/:toolsTestId',
+            name: 'tools-test-editor-id',
+            component: TextEditor,
+            props: route => ({
+                defaultTestId: decodeURIComponent(route.params.toolsTestId),
+                isAnonymousPage: true
+            })    
         },
         {
             path: '/dashboard/onboarding',

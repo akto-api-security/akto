@@ -189,7 +189,7 @@
                 </div>
             </template>
         </simple-layout>
-        <issues-dialog :similarlyAffectedIssues="similarlyAffectedIssues" :openDetailsDialog="dialogBox"
+        <issues-dialog :openDetailsDialog="dialogBox"
             :testingRunResult="testingRunResult" :subCatogoryMap="subCatogoryMap" :issue="dialogBoxIssue"
             @closeDialogBox="(dialogBox = false)">
         </issues-dialog>
@@ -212,6 +212,7 @@ import testingApi from "../views/testing/api"
 
 import func from "@/util/func"
 import obj from "@/util/obj"
+import request from '@/util/request'
 
 import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController';
 import 'monaco-editor/esm/vs/editor/contrib/folding/browser/folding';
@@ -240,7 +241,8 @@ export default {
         IssuesDialog
     },
     props: {
-        defaultTestId: obj.strN
+        defaultTestId: obj.strN,
+        isAnonymousPage: obj.boolN
     },
     data() {
         return {
@@ -281,7 +283,6 @@ export default {
                 runTime: "",
                 vulnerability: "",
             },
-            similarlyAffectedIssues: [],
             dialogBoxIssue: {},
             dialogBox: false,
             testingRunResult: {},
@@ -294,6 +295,8 @@ export default {
             currentCategory: '',
             allCustomTests: {},
             setTextId: {},
+            subCatogoryMap: {},
+            sampleDataListForTestRun: null
         }
     },
     methods: {
@@ -348,7 +351,11 @@ export default {
             this.selectedUrl = {}
             this.messageJson = {}
             this.runTest = false
-            window.history.pushState({urlPath:'/dashboard/test-editor/'+testId},"",'/dashboard/test-editor/'+testId)
+            if (this.isAnonymousPage) {
+                window.history.pushState({urlPath:'/tools/test-editor/'+testId},"",'/tools/test-editor/'+testId)
+            } else {
+                window.history.pushState({urlPath:'/dashboard/test-editor/'+testId},"",'/dashboard/test-editor/'+testId)
+            }
             if (!(this.mapRequestsToId[testId] && this.mapRequestsToId[testId].length > 0)) {
                 testId = Object.keys(this.mapRequestsToId)[0]
             }
@@ -368,6 +375,7 @@ export default {
             await inventoryApi.fetchSampleData(this.selectedUrl.url, this.selectedUrl.apiCollectionId, this.selectedUrl.method).then((resp) => {
                 if (resp.sampleDataList.length > 0 && resp.sampleDataList[0].samples && resp.sampleDataList[0].samples.length > 0) {
                     this.messageJson = { "message": resp.sampleDataList[0].samples[0], "highlightPaths": [] }
+                    this.sampleDataListForTestRun = resp.sampleDataList
                 }
             })
         },
@@ -375,40 +383,20 @@ export default {
             this.runTest = true
             let testStartTime = new Date()
             this.runTestObj.isLoading = true
-            await testingApi.runTestForTemplate(this.textEditor.getValue(), this.selectedUrl).then(resp => {
+            await testingApi.runTestForTemplate(this.textEditor.getValue(), this.selectedUrl, this.sampleDataListForTestRun).then(resp => {
+                this.testingRunResult = resp["testingRunResult"]
                 this.testingRunHexId = resp["testingRunHexId"]
-                let __topThis = this
-                if (this.testingRunHexId) {//Test run started
-                    let stopInterval = false
-                    let interval = setInterval(async () => {
-                        if (stopInterval) {
-                            clearInterval(interval)
-                        } else {
-                            let _this = this
-                            await testingApi.fetchTestingRunResultFromTestingRun(__topThis.testingRunHexId).then(async respResult => {
-                                let run = respResult["testingRunResult"]
-                                if (run) {
-                                    _this.testingRunResult = run
-                                    stopInterval = true
-                                    __topThis.runTestObj.runTime =  Math.round((new Date().getTime() - testStartTime.getTime())/1000) + " seconds"
-                                    await testingApi.fetchIssueFromTestRunResultDetailsForTestEditor(_this.testingRunResult.hexId, "true").then(async respIssue => {
-                                        __topThis.dialogBoxIssue = respIssue['runIssues']
-                                        if (__topThis.dialogBoxIssue) {
-                                            await issuesApi.fetchAffectedEndpoints(__topThis.dialogBoxIssue.id).then(affectedResp => {
-                                                __topThis.similarlyAffectedIssues = affectedResp['similarlyAffectedIssues']
-                                                __topThis.runTestObj.vulnerability = "HIGH"
-                                                __topThis.runTestObj.isLoading = false
-                                            })
-                                        } else {//No issues found
-                                            __topThis.runTestObj.vulnerability = "No "
-                                            __topThis.runTestObj.isLoading = false
-                                        }
-                                    })
-                                }
-                            })
-                        }
-                    }, 2000)
+                this.dialogBoxIssue = resp["testingRunIssues"]
+                this.subCatogoryMap = resp["subCategoryMap"]
+
+                if (this.dialogBoxIssue) {
+                    this.runTestObj.vulnerability = this.dialogBoxIssue.severity
+                    this.runTestObj.isLoading = false
+                } else {//No issues found
+                    this.runTestObj.vulnerability = "No "
+                    this.runTestObj.isLoading = false
                 }
+                this.runTime = Math.round((new Date().getTime() - testStartTime.getTime())/1000) + " seconds"
             })
         },
         showAllAttempts() {
@@ -564,7 +552,6 @@ export default {
             return arr
         },
         async refreshTestTemplates() {
-            await this.$store.dispatch('issues/fetchAllSubCategories')
             let _this = this
             await issuesApi.fetchAllSubCategories().then(resp => {
                 _this.testCategories = resp.categories
@@ -577,6 +564,12 @@ export default {
         }        
     },
     async mounted() {
+            if (this.isAnonymousPage) {
+                await request({
+                    url: '/tools/publicApi',
+                    method: 'GET'
+            })
+        }
         this.createEditor()
         let _this = this
         await this.refreshTestTemplates()
@@ -586,11 +579,6 @@ export default {
         })
     },
     computed: {
-        subCatogoryMap: {
-            get() {
-                return this.$store.state.issues.subCatogoryMap
-            }
-        },
         json() {
             return {
                 "message": JSON.parse(this.messageJson["message"]),
@@ -606,6 +594,7 @@ export default {
         },
         getTextColor() {
             switch (this.runTestObj.vulnerability) {
+                case 'CRITICAL':
                 case 'HIGH':
                     return 'var(--hexColor3)';
                 case 'MEDIUM':
