@@ -224,6 +224,7 @@ export default {
                         {Medium: 50},
                     ],
                     total_severity: 4500,
+                    severityTags: new Set(["High", "Medium"]),
                 },
                 {
                     icon: '$far_check-circle/#56bca6',
@@ -238,6 +239,7 @@ export default {
                         {Low: 20},
                     ],
                     total_severity: 720,
+                    severityTags: new Set(["High", "Medium", "Low"]),
                 },
                 {
                     icon: '$far_times-circle/#EA392C',
@@ -251,6 +253,7 @@ export default {
                         {Low: 10},
                     ],
                     total_severity: 2010,
+                    severityTags: new Set(["High","Low"]),
                 },
                 {
                     icon: '$fas_spinner/var(--themeColorDark)',
@@ -264,6 +267,7 @@ export default {
                         {Low: 4},
                     ],
                     total_severity: 104,
+                    severityTags: new Set(["Medium", "Low"]),
                 },
                 {
                     icon: '$far_calendar/var(--themeColor)',
@@ -293,6 +297,7 @@ export default {
                     severity: [
                         {High: 40},
                     ],
+                    severityTags: new Set(["High"]),
                     total_severity: 4000,
                 },
                 {
@@ -306,6 +311,7 @@ export default {
                         {Low: 60},
                     ],
                     total_severity: 60,
+                    severityTags: new Set(["Low"]),
                 },
                 
             ],
@@ -353,12 +359,19 @@ export default {
                 {
                     text: 'Severity',
                     value: 'severity',
-                    showFilterMenu: true,
+                    showFilterMenu: false,
                     showSort: true,
                     row_order: 1,
                     sortKey: 'total_severity',
                     sortText: 'Highest Severity/1/Lowest Severity/0'
                 },
+                {
+                    text: 'Severity',
+                    value: 'severityTags',
+                    showFilterMenu: true,
+                    showSort: false,
+                    row_order: 0,
+                }
             ],
             actions:[
                 {

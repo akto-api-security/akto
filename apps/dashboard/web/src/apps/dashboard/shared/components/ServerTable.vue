@@ -26,12 +26,18 @@
             :ref="tableId"
         >
             <template v-slot:top="{ pagination, options, updateOptions }">
-                <div class="d-flex jc-sb mt-4">
+                <slot name="add-custom-headers" 
+                    :appliedFilter="copyAppliedFilter" 
+                    :setSortOrInvertOrder="copySetSortOrInvertOrder" 
+                    :clearFilters="clearFilters"
+                    :filters="filters"
+                >
+                    <div class="d-flex jc-sb mt-4">
                     
                         <div v-if="showName" class="table-name">
                         {{name}}
                         </div>
-                        <slot name="add-custom-headers" :appliedFilter="appliedFilter" :setSortOrInvertOrder="copySetSortOrInvertOrder">
+                       
                             <div class="d-flex headerButtons">
                                 <template v-for = "(header,index) in selectedHeaders">
                                     <v-menu :key="index" offset-y :close-on-content-click="false" v-model="showFilterMenu[header.sortKey || header.value]"> 
@@ -73,7 +79,6 @@
                                 </v-menu>
 
                             </div>
-                        </slot>
                         <div>
                             <slot name="massActions"/>
                         </div>
@@ -88,7 +93,8 @@
                                 />
                             </div>
                         </div>
-                </div>
+                    </div>
+                </slot>
             </template>
             <template v-slot:footer.prepend="{}">
                 <v-spacer/>
@@ -203,7 +209,7 @@ export default {
             sortDesc: this.sortDescDefault || false,
             filters: this.headers.reduce((map, e) => {map[e.sortKey || e.value] = new Set(); return map}, {}),
             showFilterMenu: this.headers.reduce((map, e) => {map[e.sortKey || e.value] = false; return map}, {}),
-            filterOperators: this.headers.reduce((map, e) => {map[e.sortKey || e.value] = 'OR'; return map}, {})
+            filterOperators: this.headers.reduce((map, e) => {map[e.sortKey || e.value] = 'OR'; return map}, {}),
         }
     },
     methods: {
@@ -240,11 +246,14 @@ export default {
             this.showHideFilterIcon(hValue)
             this.options = {...this.options, page: 1}
         },
-        appliedFilter(hValue,item){
+        copyAppliedFilter(hValue,item){
             this.filters = this.headers.reduce((map, e) => {map[e.sortKey || e.value] = new Set(); return map}, {})
             this.filters[hValue].add(item.value)
-            this.filters = {...this.filters}
             this.showHideFilterIcon(hValue)
+            this.options = {...this.options, page: 1}
+        },
+        clearFilters(){
+            this.filters = this.headers.reduce((map, e) => {map[e.sortKey || e.value] = new Set(); return map}, {})
             this.options = {...this.options, page: 1}
         },
         operatorChanged(hValue, {operator}) {

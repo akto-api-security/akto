@@ -19,12 +19,14 @@
             @rowClicked="rowClicked"
             @filterApplied="filterApplied"
         >
-            <template v-slot:add-custom-headers="{appliedFilter,setSortOrInvertOrder}">
+            <template v-slot:add-custom-headers="{appliedFilter,setSortOrInvertOrder,clearFilters,filters}">
                 <slot name="add-user-headers" 
                     :appliedFilter="appliedFilter" 
                     :setSortOrInvertOrder="setSortOrInvertOrder" 
                     :totalItems="totalItems" 
                     :getColumnValueList="getColumnValueList"
+                    :clearFilters="clearFilters"
+                    :filters="filters"
                     />
             </template>
             <template v-slot:add-at-top="{filters, filterOperators, sortKey, sortDesc}">

@@ -10,7 +10,11 @@
         class="github-table"
     >
         <!-- TODO: handle sorting and severity -->
-        <template v-slot:add-user-headers="{totalItems,getColumnValueList,appliedFilter,setSortOrInvertOrder}">
+        <template v-slot:add-user-headers="{totalItems,getColumnValueList,appliedFilter,setSortOrInvertOrder,clearFilters,filters}">
+                <v-btn  :ripple="false" plain color="var(--themeColorDark3)" v-if="isFilter(filters)" @click="clearFilters">
+                    <v-icon :size="14">$fas_times</v-icon>
+                    Clear filter
+                </v-btn>
             <div class="d-flex jc-sb github-header-container" :style="{'width': '100%'}">
                 <span class="text">
                     {{ totalItems }} Test Runs
@@ -132,6 +136,15 @@ export default {
         },
         itemClicked(item){
             return item
+        },
+        isFilter(filters){
+            let val = false
+            this.headers.forEach((header)=>{
+                if(filters[header.sortKey || header.value] && filters[header.sortKey || header.value].size > 0){
+                    val= true
+                }
+            })
+            return val
         }
     },
     computed:{
@@ -188,6 +201,9 @@ export default {
     font-size: 14px;
     font-weight: 500;
 }
+.github-table{
+    margin-top: 16px;
+}
 </style>
 <style scoped lang="scss">
     .github-header-container{
@@ -196,7 +212,7 @@ export default {
         background: var(--themeColorDark17);
         border-radius: 6px 6px 0px 0px;
         border: 1px solid var(--themeColorDark16);
-        margin-right: -8px;
+        margin-top: 10px;
     }
     .table-row-actions{
         position: absolute;
