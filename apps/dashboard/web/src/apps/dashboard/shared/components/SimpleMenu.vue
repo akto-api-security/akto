@@ -11,10 +11,10 @@
           <div class="list-container" v-if="newView">
             <div class="list-title d-flex align-center jc-sb" v-if="title && title.length > 0">
                 {{ title }}
-                <v-icon :size="14">$fas_times</v-icon>
+                <v-icon :size="14" :style="{cursor : 'pointer'}">$fas_times</v-icon>
             </div>
-            <div class="item-container" v-for="(item) in items" 
-                :key="item.label" 
+            <div class="item-container" v-for="(item,index) in items" 
+                :key="index" 
                 :style="item.isValid ? {} : {'opacity' : '0.3', 'border-top': '1px solid var(--themeColorDark10)'}"  
                 @click="item.isValid ? clickFunc(item) : null"
             >

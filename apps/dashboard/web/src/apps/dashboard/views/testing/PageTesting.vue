@@ -130,7 +130,15 @@
             </div>
         </template>
         <template slot="Table">
-            <github-table :headers="tableHeaders" :items="tableItems" :actions="actions"></github-table>
+            <github-table :headers="tableHeaders" :items="tableItems" :actions="actions" sortKeyDefault="total_severity">
+                <template #severity_1="{item}">
+                    <template v-for="(val,index) in item">
+                        <div class="box_container" v-for="(value, key) in val" :key="index + key" :style="getColor(key)">
+                            {{ value }} {{ key }}
+                        </div>
+                    </template>
+                </template>
+            </github-table>
         </template>
     </layout-with-tabs>
 </template>
@@ -211,8 +219,10 @@ export default {
                     run_type: 'One Time',
                     run_time: "Next run in 2 days",
                     run_time_epoch: 140,
-                    severity_high_str: '40 High',
-                    severity_medium_str: '50 Medium',
+                    severity: [
+                        {High: 40},
+                        {Medium: 50},
+                    ],
                     total_severity: 4500,
                 },
                 {
@@ -222,9 +232,11 @@ export default {
                     run_type: 'CI/CD',
                     run_time: "Last run 10 mins ago",
                     run_time_epoch: 20,
-                    severity_high_str: '5 High',
-                    severity_medium_str: '20 Medium',
-                    severity_low_str: '20 Low',
+                    severity: [
+                        {High: 6},
+                        {Medium: 10},
+                        {Low: 20},
+                    ],
                     total_severity: 720,
                 },
                 {
@@ -234,8 +246,10 @@ export default {
                     run_type: 'CI/CD',
                     run_time: "Next run in 3 days",
                     run_time_epoch: 180,
-                    severity_high_str: '20 High',
-                    severity_low_str: '10 Low',
+                    severity: [
+                        {High: 20},
+                        {Low: 10},
+                    ],
                     total_severity: 2010,
                 },
                 {
@@ -245,8 +259,10 @@ export default {
                     run_type: 'Recurring',
                     run_time: "Next run in 1 day",
                     run_time_epoch: 80,
-                    severity_medium_str: '10 Medium',
-                    severity_low_str: '4 Low',
+                    severity: [
+                        {Medium: 10},
+                        {Low: 4},
+                    ],
                     total_severity: 104,
                 },
                 {
@@ -256,6 +272,7 @@ export default {
                     run_type: 'Recurring',
                     run_time: "Next run in 2 days",
                     run_time_epoch: 148,
+                    total_severity: 0,
                 },
                 {
                     icon: '$far_check-circle/#56bca6',
@@ -264,6 +281,7 @@ export default {
                     run_type: 'One Time',
                     run_time: "Last 35 mins ago",
                     run_time_epoch: 5,
+                    total_severity: 0,
                 },
                 {
                     icon: '$far_calendar/var(--themeColor)',
@@ -272,7 +290,9 @@ export default {
                     run_type: 'One Time',
                     run_time: "Next run in 3 days",
                     run_time_epoch: 190,
-                    severity_high_str: '40 High',
+                    severity: [
+                        {High: 40},
+                    ],
                     total_severity: 4000,
                 },
                 {
@@ -282,8 +302,10 @@ export default {
                     run_type: 'One Time',
                     run_time: "Last run 2 mins ago",
                     run_time_epoch: 30,
-                    severity_medium_str: '50 Medium',
-                    total_severity: 500,
+                    severity: [
+                        {Low: 60},
+                    ],
+                    total_severity: 60,
                 },
                 
             ],
@@ -329,32 +351,14 @@ export default {
                     sortText: 'Newest Run/1/Oldest Run/0'
                 },
                 {
-                    text: 'High Severity',
-                    value: 'severity_high_str',
-                    showFilterMenu: false,
+                    text: 'Severity',
+                    value: 'severity',
+                    showFilterMenu: true,
                     showSort: true,
                     row_order: 1,
                     sortKey: 'total_severity',
-                    color: '#B42318/#FEF3F2',
                     sortText: 'Highest Severity/1/Lowest Severity/0'
                 },
-                {
-                    text: 'Medium Severity',
-                    value: 'severity_medium_str',
-                    showFilterMenu: false,
-                    showSort: false,
-                    row_order: 1,
-                    sortKey: 'total_severity',
-                    color: '#B54708/#FFFAEB'
-                },
-                {
-                    text: 'Low Severity',
-                    value: 'severity_low_str',
-                    showFilterMenu: false,
-                    showSort: false,
-                    row_order: 1,
-                    color: '#344054/#F2F4F7'
-                }
             ],
             actions:[
                 {
@@ -388,6 +392,27 @@ export default {
         },
         stopTest(){
             console.log("stopTest")
+        },
+        getColor(key){
+            switch(key){
+                case 'High':
+                    return{
+                        color: '#B42318',
+                        background: '#FEF3F2'
+                    }
+
+                case 'Medium':
+                    return{
+                        color: '#B54708',
+                        background: '#FFFAEB'
+                    }
+
+                case 'Low':
+                    return{
+                        color: '#344054',
+                        background: '#F2F4F7'
+                    }
+            }
         },
         setAuthHeaderKey(newKey) {
             this.newKey = newKey
@@ -678,5 +703,10 @@ export default {
 
 .auth-token-text {
     font-size: 14px;
+}
+.box_container {
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 16px;
 }
 </style>

@@ -5,6 +5,7 @@
         name="" 
         :pageSize="20"
         :sortDescDefault="true"
+        :sortKeyDefault="sortKeyDefault"
         :hideDownloadCSVIcon="true"
         class="github-table"
     >
@@ -48,7 +49,7 @@
                 >
                     <div class="first-row">
                         <template v-for="(header,index) in headers">
-                            <slot :name="[`item.${header.value}`]" :item="content.rowData[header.value]">    
+                            <slot :name="[`${header.value}_1`]" :item="content.rowData[header.value]">    
                                 <div class="row-items" :key="index" 
                                     v-if="header.row_order == 1 && content.rowData[header.value] && content.rowData[header.value].length > 0"
                                 >
@@ -57,17 +58,14 @@
                                     > 
                                         {{ computeIcon(content.rowData[header.value] , 0) }}
                                     </v-icon>
-                                    <div class="title" v-else-if="isValid(header)">{{ content.rowData[header.value] }}</div>
-                                    <div class="box_container" :style="getStyles(header.color)" v-else>
-                                        {{ content.rowData[header.value] }}
-                                    </div>
+                                    <div class="title" v-else>{{ content.rowData[header.value] }}</div>
                                 </div>
                             </slot>
                         </template>
                     </div>
                     <div class="second-row">
                         <template v-for="(header,index) in headers">
-                            <slot :name="[`item.${header.value}`]" :item="content.rowData[header.value]">
+                            <slot :name="[`${header.value}_2`]" :item="content.rowData[header.value]">
                                 <div class="row-items" v-if="header.row_order == 2" :key=index>
                                     <v-icon :size="14" color="var(--themeColorDark3)">{{ header.icon }}</v-icon>
                                     <span class="row-text">{{ content.rowData[header.value] }}</span>
@@ -102,7 +100,8 @@ export default {
     props:{
         headers: obj.arrR,
         items: obj.arrR,  
-        actions: obj.arrN,    
+        actions: obj.arrN,  
+        sortKeyDefault: obj.strN,  
     },
     components:{
         SimpleTable,
@@ -118,13 +117,6 @@ export default {
         },
         isValid(header){
             return !(header.value.toString().includes('severity'))
-        },
-        getStyles(colorStr){
-            let colorArr = colorStr.split("/")
-            return{
-                background: colorArr[1],
-                color: colorArr[0]
-            }
         },
         computeActionItems(headerObj){
             let arr = []
@@ -224,11 +216,6 @@ export default {
             color: var(--themeColorDark);
             font-weight: 600;
             font-size: 16px;
-        }
-        .box_container {
-            font-size: 12px;
-            padding: 2px 8px;
-            border-radius: 16px;
         }
     }
     .second-row{
