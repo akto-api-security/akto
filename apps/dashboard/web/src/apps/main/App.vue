@@ -309,6 +309,9 @@
         --themeColorDark17: #47466A0D ;
         --themeColorDark18: #47466A08;
         --themeColorDark19: #474667;
+        --themeColorDark20: #47466A05;
+        --themeColorDark21: #47466A14;
+        --themeColorDark22: #47466A0f;
          
         --hexColor1: #1790FF;
         --hexColor2: #FF8717;

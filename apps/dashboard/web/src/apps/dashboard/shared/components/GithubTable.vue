@@ -8,21 +8,22 @@
         :sortKeyDefault="sortKeyDefault"
         :hideDownloadCSVIcon="true"
         class="github-table"
+        @rowClicked = "rowclick"
     >
         <!-- TODO: handle sorting and severity -->
         <template v-slot:add-user-headers="{totalItems,getColumnValueList,appliedFilter,setSortOrInvertOrder,clearFilters,filters}">
-                <v-btn  :ripple="false" plain color="var(--themeColorDark3)" v-if="isFilter(filters)" @click="clearFilters">
+                <v-btn  :ripple="false" plain color="var(--themeColorDark3)" v-if="isFilter(filters)" @click="clearFilters" class="pa-0 btn-clear">
                     <v-icon :size="14">$fas_times</v-icon>
                     Clear filter
                 </v-btn>
             <div class="d-flex jc-sb github-header-container" :style="{'width': '100%'}">
                 <span class="text">
-                    {{ totalItems }} Test Runs
+                    {{ totalItems }} Test {{ computeRunsText(totalItems) }}
                 </span>
                 <div class="d-flex" :style="{gap:'8px'}">
                     <template v-for="(header) in headers">
                         <simple-menu :items="computeActionItems(getColumnValueList(header.value))" 
-                            :key="header.text" v-if="header.showFilterMenu" :newView="true" :title="header.text"
+                            :key="header.text" v-if="header.showFilterMenu && computeActionItems(getColumnValueList(header.value)).length>0" :newView="true" :title="header.text"
                             @menuClicked="appliedFilter(header.value,itemClicked($event))"
                         >
                             <template v-slot:activator2>
@@ -33,7 +34,7 @@
                             </template>
                         </simple-menu>
                     </template>
-                    <simple-menu :newView="true" :items="sortHeaders" title="Sort By" 
+                    <simple-menu v-if="items.length>0" :newView="true" :items="sortHeaders" title="Sort By" 
                             @menuClicked="setSortOrInvertOrder(itemClicked($event))"
                     >
                         <template v-slot:activator2>
@@ -145,6 +146,15 @@ export default {
                 }
             })
             return val
+        },
+        computeRunsText(totalItems){
+            if(totalItems==1){
+                return "run";
+            }
+            return "runs";
+        },
+        rowclick(item){
+            console.log("row click action", item);
         }
     },
     computed:{
@@ -187,8 +197,12 @@ export default {
 .github-table >>> th{
     display: none;
 }
+.github-table >>> tr:hover{
+    background-color:  var(--themeColorDark20) !important;
+}
 .github-table >>> .v-data-table__wrapper{
     border: 1px solid var(--themeColorDark16) !important;
+    border-radius: 0px 0px 6px 6px;
 }
 .github-table >>> .github-table-row{
     display: flex !important;
@@ -202,17 +216,20 @@ export default {
     font-weight: 500;
 }
 .github-table{
-    margin-top: 16px;
+    margin-top: 32px;
 }
 </style>
 <style scoped lang="scss">
     .github-header-container{
         padding: 16px 24px;
         width: 100%;
-        background: var(--themeColorDark17);
+        background: var(--themeColorDark22);
         border-radius: 6px 6px 0px 0px;
         border: 1px solid var(--themeColorDark16);
         margin-top: 10px;
+        .btn-clear{
+            height: 18px !important;
+        }
     }
     .table-row-actions{
         position: absolute;

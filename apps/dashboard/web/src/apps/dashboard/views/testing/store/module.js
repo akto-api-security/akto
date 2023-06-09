@@ -40,7 +40,8 @@ function getTotalSeverity(countIssues){
     if(countIssues==null){
         return 0;
     }
-    ts = countIssues['HIGH']*1000 + countIssues['MEDIUM']*10 + countIssues['LOW']
+    ts = countIssues['High']*1000 + countIssues['Medium']*10 + countIssues['Low']
+    console.log(ts);
     return ts;
 }
 
@@ -96,7 +97,7 @@ const testing = {
                     delete testingRunResultSummary.countIssues['LOW']
                 }
                 obj['icon'] = setTestingRunIcon(data, testingRunResultSummary);
-                obj['name'] = data.name;
+                obj['name'] = data.name.length < 70 ? data.name : data.name.slice(0,67)+"...";
                 obj['number_of_tests_str'] = (testingRunResultSummary.testResultsCount == null) ? getAlternateTestsInfo(data.state) : lastestTestingRunResultSummaries[data['hexId']].testResultsCount + " Tests";
                 obj['run_type'] = getTestingRunType(data, testingRunResultSummary);
                 obj['run_time_epoch'] = data.endTimestamp == -1 ? data.scheduleTimestamp : data.endTimestamp

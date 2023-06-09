@@ -225,7 +225,7 @@ export default {
             testLogicalGroupRegex: "",
             showTokenAutomation: false,
 
-            // calculate total_severity by= 100*high + 10*medium + 1*low
+            // calculate total_severity by= 10000*high + 100*medium + 1*low  // logic to be given.
             // calculate icon by mapping status {
             //        completed->"$far_check-circle/#56bca6"
             //        incomplete->"$far_times-circle/#EA392C"
@@ -347,14 +347,14 @@ export default {
                     row_order: 1,
                 },
                 {
-                    text: "Test Name",
+                    text: "Test name",
                     value: "name",
                     showFilterMenu: false,
                     showSort: false,
                     row_order: 1,
                 },
                 {
-                    text: "Number of Tests",
+                    text: "Number of tests",
                     value: "number_of_tests_str",
                     showFilterMenu: false,
                     showSort: false,
@@ -362,7 +362,7 @@ export default {
                     icon: '$fileShieldIcon'
                 },
                 {
-                    text:'Run Type',
+                    text:'Run type',
                     value:'run_type',
                     showFilterMenu: true,
                     showSort: false,
@@ -370,14 +370,14 @@ export default {
                     icon: '$far_play-circle'
                 },
                 {
-                    text: 'Run Time',
+                    text: 'Run time',
                     value: 'run_time',
                     showFilterMenu: false,
                     showSort:true,
                     row_order: 2,
                     sortKey: 'run_time_epoch',
                     icon: '$far_clock',
-                    sortText: 'Newest Run/1/Oldest Run/0'
+                    sortText: 'Newest run/1/Oldest run/0'
                 },
                 {
                     text: 'Severity',
@@ -386,7 +386,7 @@ export default {
                     showSort: true,
                     row_order: 1,
                     sortKey: 'total_severity',
-                    sortText: 'Highest Severity/1/Lowest Severity/0'
+                    sortText: 'Highest severity/1/Lowest severity/0'
                 },
                 {
                     text: 'Severity',
@@ -404,7 +404,7 @@ export default {
                     isValid: true,
                 },
                 {
-                    label: 'Schedule Test',
+                    label: 'Schedule test',
                     icon: '$far_calendar',
                     click: () => this.scheduleTest(),
                     isValid: true,

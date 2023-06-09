@@ -128,10 +128,11 @@ export default {
         border-radius: 8px;
         background: var(--white);
         min-width: 200px;
-        min-height: 130px;
         .list-title{
+          font-family: Poppins, sans-serif !important;
             padding: 12px 16px;
-            background: #47466A14;
+            border-radius: 7px 7px 0px 0px;
+            background: var(--themeColorDark22);
             font-size: 14px;
             color: var(--themeColorDark);
         }
@@ -139,11 +140,13 @@ export default {
             display: flex;
             align-items: center;
             gap: 4px;
-            margin: 10px 0px;
             padding: 0 14px;
+            height: 42px;
             cursor: pointer;
+            &:hover {background-color: var(--themeColorDark20)} 
             .title{
-                font-size: 16px !important;
+              font-family: Poppins, sans-serif !important;
+                font-size: 14px !important;
                 color: var(--themeColorDark);
             }
         }
