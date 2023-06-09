@@ -222,7 +222,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             code = "Password can't be empty";
             return ERROR.toUpperCase();
         }
-        long count = UsersDao.instance.getMCollection().countDocuments();
+        long count = UsersDao.instance.count(Filters.ne(User.LOGIN, RuntimeListener.ANONYMOUS_EMAIL));
         // only 1st user is allowed to signup without invitationCode
         if (count != 0) {
             Jws<Claims> jws;
