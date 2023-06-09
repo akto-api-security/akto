@@ -22,19 +22,23 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
 
     private TestingRunResultSummariesDao() {}
 
-    public Map<ObjectId, TestingRunResultSummary> fetchLastestTestingRunResultSummaries(){
-        List<Bson> pipeline = new ArrayList<>();
-        BasicDBObject groupedId = new BasicDBObject(TestingRunResultSummary.TESTING_RUN_ID, "$testingRunId");
-        pipeline.add(Aggregates.sort(Sorts.descending(TestingRunResultSummary.START_TIMESTAMP)));
-        pipeline.add(Aggregates.group(groupedId,
-                Accumulators.first("data", "$$ROOT")));
-        pipeline.add(Aggregates.replaceRoot( "$data"));
-        MongoCursor<TestingRunResultSummary> endpointsCursor = TestingRunResultSummariesDao.instance.getMCollection().aggregate(pipeline, TestingRunResultSummary.class).cursor();
-
+    public Map<ObjectId, TestingRunResultSummary> fetchLatestTestingRunResultSummaries(){
         Map<ObjectId, TestingRunResultSummary> trss = new HashMap<>();
-        while(endpointsCursor.hasNext()) {
-            TestingRunResultSummary temp = endpointsCursor.next();
-            trss.put(temp.getTestingRunId(), temp);
+        try {
+            List<Bson> pipeline = new ArrayList<>();
+            BasicDBObject groupedId = new BasicDBObject(TestingRunResultSummary.TESTING_RUN_ID, "$testingRunId");
+            pipeline.add(Aggregates.sort(Sorts.descending(TestingRunResultSummary.START_TIMESTAMP)));
+            pipeline.add(Aggregates.group(groupedId,
+                    Accumulators.first("data", "$$ROOT")));
+            pipeline.add(Aggregates.replaceRoot("$data"));
+            MongoCursor<TestingRunResultSummary> endpointsCursor = TestingRunResultSummariesDao.instance
+                    .getMCollection().aggregate(pipeline, TestingRunResultSummary.class).cursor();
+            while (endpointsCursor.hasNext()) {
+                TestingRunResultSummary temp = endpointsCursor.next();
+                trss.put(temp.getTestingRunId(), temp);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         return trss;
     }

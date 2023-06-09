@@ -15,14 +15,23 @@ const state = {
     latestTestingRuns: []
 }
 
-function setTestingRunIcon(testingRun, testingRunResultSummary){
-    if(testingRunResultSummary.metadata!=null){
-        return '$far_check-circle/#56bca6';
+
+function getOrderPriority(state){
+    switch(state._name){
+        case "RUNNING": return 1;
+        case "SCHEDULED": return 2;
+        case "STOPPED": return 4;
+        default: return 3;
     }
-    if(testingRun.endTimestamp == -1 || testingRun.pickedupTimestamp == -1){
-        return '$fas_spinner/var(--themeColorDark)';
+}
+
+function getTestingRunIcon(state){
+    switch(state._name){
+        case "RUNNING": return '$fas_spinner/var(--themeColorDark)';
+        case "SCHEDULED": return '$far_calendar/var(--themeColor)';
+        case "STOPPED": return '$far_times-circle/#EA392C';
+        default: return '$far_check-circle/#56bca6';
     }
-    return '$far_check-circle/#56bca6';
 }
 
 function getTestingRunType(testingRun, testingRunResultSummary){
@@ -40,14 +49,15 @@ function getTotalSeverity(countIssues){
     if(countIssues==null){
         return 0;
     }
-    ts = countIssues['High']*1000 + countIssues['Medium']*10 + countIssues['Low']
-    console.log(ts);
+    ts = countIssues['High']*1000*1000 + countIssues['Medium']*1000 + countIssues['Low']
     return ts;
 }
 
-function getRuntime(scheduleTimestamp ,endTimestamp){
+function getRuntime(scheduleTimestamp ,endTimestamp, state){
+    if(state._name=='RUNNING'){
+        return "Currently running";
+    }
     const currTime = Date.now();
-
     if(endTimestamp == -1){
         if(currTime > scheduleTimestamp){
             return "Was scheduled for " + func.prettifyEpoch(scheduleTimestamp)
@@ -59,13 +69,16 @@ function getRuntime(scheduleTimestamp ,endTimestamp){
 }
 
 function getAlternateTestsInfo(state){
-    console.log(state._name);
     switch(state._name){
         case "RUNNING": return "Tests are still running";
         case "SCHEDULED": return "Tests have been scheduled";
         case "STOPPED": return "Tests have been stopper";
-        default: return "Information unavilable";
+        default: return "Information unavailable";
     }
+}
+
+function getTestsInfo(testResultsCount, state){
+    return (testResultsCount == null) ? getAlternateTestsInfo(state) : testResultsCount + " Tests"
 }
 
 const testing = {
@@ -81,10 +94,10 @@ const testing = {
             state.cicdTestingRuns = []
             state.latestTestingRuns = []
         },
-        SAVE_TESTING_DETAILS(state, {testingRuns, lastestTestingRunResultSummaries}) {
+        SAVE_TESTING_DETAILS(state, {testingRuns, latestTestingRunResultSummaries}) {
             testingRuns.forEach((data)=>{
                 let obj={};
-                let testingRunResultSummary = lastestTestingRunResultSummaries[data['hexId']];
+                let testingRunResultSummary = latestTestingRunResultSummaries[data['hexId']];
                 if(testingRunResultSummary==null){
                     testingRunResultSummary = {};
                 }
@@ -96,12 +109,13 @@ const testing = {
                     delete testingRunResultSummary.countIssues['MEDIUM']
                     delete testingRunResultSummary.countIssues['LOW']
                 }
-                obj['icon'] = setTestingRunIcon(data, testingRunResultSummary);
-                obj['name'] = data.name.length < 70 ? data.name : data.name.slice(0,67)+"...";
-                obj['number_of_tests_str'] = (testingRunResultSummary.testResultsCount == null) ? getAlternateTestsInfo(data.state) : lastestTestingRunResultSummaries[data['hexId']].testResultsCount + " Tests";
+                obj['orderPriority'] = getOrderPriority(data.state)
+                obj['icon'] = getTestingRunIcon(data.state);
+                obj['name'] = data.name
+                obj['number_of_tests_str'] = getTestsInfo(testingRunResultSummary.testResultsCount, data.state)
                 obj['run_type'] = getTestingRunType(data, testingRunResultSummary);
-                obj['run_time_epoch'] = data.endTimestamp == -1 ? data.scheduleTimestamp : data.endTimestamp
-                obj['run_time'] = getRuntime(data.scheduleTimestamp ,data.endTimestamp)
+                obj['run_time_epoch'] = data.scheduleTimestamp > data.endTimestamp ? data.scheduleTimestamp : data.endTimestamp
+                obj['run_time'] = getRuntime(data.scheduleTimestamp ,data.endTimestamp, data.state)
                 obj['severity'] = testingRunResultSummary.countIssues == null ? [] : Object.entries(testingRunResultSummary.countIssues).map(([key, value]) => ({ [key]: value })).filter(obj => Object.values(obj)[0] > 0);
                 obj['total_severity'] = getTotalSeverity(testingRunResultSummary.countIssues);
                 obj['severityTags'] = testingRunResultSummary.countIssues == null ? new Set() : Object.entries(testingRunResultSummary.countIssues)
@@ -113,6 +127,10 @@ const testing = {
                     }, new Set());
                 state.latestTestingRuns.push(obj);
             })
+            state.latestTestingRuns.sort(function(a,b){
+                return a.run_time_epoch > b.run_time_epoch ? -1 : 1;
+            })
+            
         },
         SAVE_DETAILS (state, {authMechanism, testingRuns}) {
             state.authMechanism = authMechanism

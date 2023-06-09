@@ -131,7 +131,7 @@
             </div>
         </template>
         <template slot="Table">
-            <github-table :headers="tableHeaders" :items="tableItems" :actions="actions" @actionsClicked="computeTestActions">
+            <github-table :headers="tableHeaders" :items="getlatestTestingRuns()" :actions="actions" @actionsClicked="computeTestActions">
                 <template #severity_1="{item}">
                     <template v-for="(val,index) in item">
                         <div class="box_container" v-for="(value, key) in val" :key="index + key" :style="getColor(key)">
@@ -224,33 +224,13 @@ export default {
             testRoleName: "",
             testLogicalGroupRegex: "",
             showTokenAutomation: false,
-            action1:{
-                label: 'Schedule test',
-                icon: '$far_calendar',
-                click: () => this.scheduleTest(),
-                isValid: true,
-            },
-            action2:{
-                label: 'Add to CI/CD pipeline',
-                icon: '$fas_infinity',
-                click: () => this.addToCiCd(),
-                isValid: true,
-            },
-            action3:{
-                label: 'Re-run',
-                icon: '$fas_redo',
-                click: () => this.reRunTest(),
-                isValid: true,
-            },
-            action4:{
-                label: 'Stop',
-                icon: '$far_stop-circle',
-                labelColor: '#EA392C',
-                click: () => this.stopTest(),
-                isValid: true,
-            },
 
-            // calculate total_severity by= 10000*high + 100*medium + 1*low  // logic to be given.
+            // calculate total_severity by= 1000*1000*high + 1000*medium + 1*low  
+            // logic: this is equivalent to saying that 
+            // I have a 9 digit number where the first three digits represent high, 
+            // next three medium and last three digits represent low. 
+            // assumption is that there will not be more than 1000 of each vulnerability. 
+            // [we can make this number 10^5 just for safety].
             // calculate icon by mapping status {
             //        completed->"$far_check-circle/#56bca6"
             //        incomplete->"$far_times-circle/#EA392C"
@@ -421,7 +401,14 @@ export default {
                     row_order: 0,
                 }
             ],
-            actions:[
+            actionsList:[
+                {
+                    label: 'Schedule test',
+                    icon: '$far_calendar',
+                    click: () => this.scheduleTest(),
+                    isValid: true,
+                    hasLastBorder: false,
+                },
                 {
                     label: 'Re-run',
                     icon: '$fas_redo',
@@ -429,10 +416,11 @@ export default {
                     isValid: true,
                 },
                 {
-                    label: 'Schedule test',
-                    icon: '$far_calendar',
-                    click: () => this.scheduleTest(),
+                    label: 'Add to CI/CD pipeline',
+                    icon: '$fas_infinity',
+                    click: () => this.addToCiCd(),
                     isValid: true,
+                    hasLastBorder: true,
                 },
                 {
                     label: 'Stop',
@@ -442,6 +430,7 @@ export default {
                     isValid: false,
                 }
             ],
+            actions:[{}],
             maxRequestPerMin: 0,
             maxRequestsPerMinLabel: "No Limit",
             maxRequestsPerMinOptions: [{ label: "No Limit", click: () => this.setMaxRequestsPerMin("No Limit", 0) }, ...maxRequestsValues]
@@ -454,21 +443,27 @@ export default {
         },
         computeTestActions(item){
             let arr = []
-            if(item['run_type'] === 'One Time'){
-                arr.push(this.action1)
+            this.actionsList[0].hasLastBorder = false
+            if(item['run_type'] === 'One-time'){
+                arr.push(this.actionsList[0])
             }else{
-                arr.push(this.action3)
+                arr.push(this.actionsList[1])
             }
 
             if(item['run_type'] === 'CI/CD'){
-                arr.push(this.action1)
-                this.action4.isValid = false
+                this.actionsList[0].hasLastBorder = true
+                arr.push(this.actionsList[0])
             }else{
-                this.action4.isValid = true
-                arr.push(this.action2)
+                arr.push(this.actionsList[2])
             }
 
-            arr.push(this.action4)
+            if(item['orderPriority'] === 1 || item['orderPriority'] === 3){
+                this.actionsList[3].isValid = false
+            }else{
+                this.actionsList[3].isValid = true
+            }
+
+            arr.push(this.actionsList[3])
             this.actions = arr
         },
         addToCiCd(){

@@ -57,15 +57,15 @@ public class StartTestAction extends UserAction {
     private Map<String,String> metadata;
     private boolean fetchCicd;
     private String triggeredBy;
-    private Map<ObjectId,TestingRunResultSummary> lastestTestingRunResultSummaries;
+    private Map<ObjectId,TestingRunResultSummary> latestTestingRunResultSummaries;
 
-    public Map<ObjectId, TestingRunResultSummary> getLastestTestingRunResultSummaries() {
-        return lastestTestingRunResultSummaries;
+    public Map<ObjectId, TestingRunResultSummary> getLatestTestingRunResultSummaries() {
+        return latestTestingRunResultSummaries;
     }
 
-    public void setLastestTestingRunResultSummaries(
-            Map<ObjectId, TestingRunResultSummary> lastestTestingRunResultSummaries) {
-        this.lastestTestingRunResultSummaries = lastestTestingRunResultSummaries;
+    public void setLatestTestingRunResultSummaries(
+            Map<ObjectId, TestingRunResultSummary> latestTestingRunResultSummaries) {
+        this.latestTestingRunResultSummaries = latestTestingRunResultSummaries;
     }
     private boolean isTestRunByTestEditor;
 
@@ -359,7 +359,7 @@ public class StartTestAction extends UserAction {
 
     public String fetchTestRunTableInfo(){
         testingRuns = TestingRunDao.instance.findAll(Filters.ne("triggeredBy", "test_editor"));
-        lastestTestingRunResultSummaries = TestingRunResultSummariesDao.instance.fetchLastestTestingRunResultSummaries();
+        latestTestingRunResultSummaries = TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries();
         return SUCCESS.toUpperCase();
     }
 

@@ -15,7 +15,7 @@
             </div>
             <div class="item-container" v-for="(item,index) in items" 
                 :key="index" 
-                :style="item.isValid ? {} : {'opacity' : '0.3', 'border-top': '1px solid var(--themeColorDark10)'}"  
+                :style="[ item.hasLastBorder===true ? {'border-bottom': '1px solid var(--themeColorDark23)'} : {} , item.isValid ? {} : {'opacity' : '0.3' } ]"  
                 @click="item.isValid ? clickFunc(item) : null"
             >
                 <v-icon v-if="item.icon" :size="12" :style="{color: item.labelColor ? item.labelColor:'var(--themeColorDark)'}">{{ item.icon }}</v-icon>
@@ -124,7 +124,7 @@ export default {
 </style>
 <style lang="scss" scoped>
     .list-container{
-        border: 1px solid var(--themeColorDark16);
+        border: 1px solid var(--themeColorDark16) !important;
         border-radius: 8px;
         background: var(--white);
         min-width: 200px;
@@ -134,6 +134,7 @@ export default {
             border-radius: 7px 7px 0px 0px;
             background: var(--themeColorDark22);
             font-size: 14px;
+            font-weight: 500;
             color: var(--themeColorDark);
         }
         .item-container {

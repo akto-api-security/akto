@@ -14,7 +14,7 @@
         <template v-slot:add-user-headers="{totalItems,getColumnValueList,appliedFilter,setSortOrInvertOrder,clearFilters,filters}">
                 <v-btn  :ripple="false" plain color="var(--themeColorDark3)" v-if="isFilter(filters)" @click="clearFilters" class="pa-0 btn-clear">
                     <v-icon :size="14">$fas_times</v-icon>
-                    Clear filter
+                    Clear filters
                 </v-btn>
             <div class="d-flex jc-sb github-header-container" :style="{'width': '100%'}">
                 <span class="text">
@@ -210,10 +210,16 @@ export default {
     padding: 12px 24px !important;
     border-bottom: 1px solid var(--themeColorDark16) !important;
 }
+
+.github-table>>>.github-table-row:last-child{
+        border-bottom:none !important;
+}
+
 .github-table >>> .v-data-footer,.text{
     color:var(--themeColorDark);
     font-size: 14px;
     font-weight: 500;
+    border-top: none;
 }
 .github-table{
     margin-top: 32px;
@@ -227,6 +233,7 @@ export default {
         border-radius: 6px 6px 0px 0px;
         border: 1px solid var(--themeColorDark16);
         margin-top: 10px;
+        border-bottom: none;
         .btn-clear{
             height: 18px !important;
         }
@@ -249,6 +256,10 @@ export default {
             color: var(--themeColorDark);
             font-weight: 600;
             font-size: 16px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 50vw;
         }
     }
     .second-row{
@@ -262,6 +273,10 @@ export default {
             .row-text{
                 font-size: 12px;
                 color: var(--themeColorDark3);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                max-width: 20vw;
             }
             .divider{
                 border-width: 2px !important;
